@@ -50,11 +50,12 @@ import {
   CheckCircle2,
   Clock,
   Star,
-  Bookmark,
   CircleDot,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { MarketCardV2 } from "@/app/(platform)/marketplace-v2/components/MarketCardV2"
+import type { MarketplaceListing } from "@/actions/marketplace"
 
 import {
   scanIdeaAction,
@@ -281,16 +282,20 @@ function DiagnosticPanel({
   }
 
   return (
-    <Card>
-      <CardContent className="pt-6 space-y-6">
+    <Card className="rounded-xl shadow-sm border-status-warning/30">
+      <div className="h-1 w-full bg-status-warning rounded-t-xl" />
+      <CardContent className="pt-5 space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <h3 className="text-base font-semibold">Guided diagnostic -- {module.name}</h3>
-            <p className="text-xs text-muted-foreground">
-              Answer {diagnostic.questions.length} decisive questions. AI derives the likely process class.
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-7 bg-status-warning rounded-full" />
+              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">Guided diagnostic</h3>
+            </div>
+            <p className="text-sm text-muted-foreground ml-[1.375rem]">
+              Answer {diagnostic.questions.length} decisive questions for <span className="font-medium text-foreground">{module.name}</span>. AI derives the likely process class.
             </p>
           </div>
-          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button variant="outline" size="sm" className="rounded-full" onClick={onClose}>Close</Button>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
@@ -387,13 +392,21 @@ function InterviewPanel({
   }
 
   return (
-    <Card>
-      <CardContent className="pt-6 space-y-6">
+    <Card className="rounded-xl shadow-sm">
+      <div className="h-1 w-full bg-chart-2 rounded-t-xl" />
+      <CardContent className="pt-5 space-y-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">Interview -- {module.name}</h3>
-          <Button variant="outline" onClick={onClose}>Close</Button>
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-7 bg-chart-2 rounded-full" />
+              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">Expert interview</h3>
+            </div>
+            <p className="text-sm text-muted-foreground ml-[1.375rem]">
+              Capture answers for <span className="font-medium text-foreground">{module.name}</span>. Save writes back into module unknowns.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" className="rounded-full" onClick={onClose}>Close</Button>
         </div>
-        <p className="text-xs text-muted-foreground">Capture answers live. Save writes back into module unknowns.</p>
         {module.detail.expertQuestions.map((q, i) => (
           <div key={i} className="space-y-2">
             <div className="flex items-center gap-2">
@@ -418,7 +431,10 @@ function InterviewPanel({
           <h4 className="text-sm font-semibold">General notes</h4>
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Freeform notes" />
         </div>
-        <Button onClick={save}>Save interview → update module</Button>
+        <Button onClick={save} className="bg-international-orange hover:bg-international-orange-hover text-white">
+          <CheckCircle2 className="h-4 w-4 mr-2" />
+          Save interview
+        </Button>
       </CardContent>
     </Card>
   )
@@ -1015,7 +1031,7 @@ function XRayView({
               <h3 className="text-xl font-display font-bold tracking-tight text-foreground">Your idea</h3>
             </div>
             <p className="text-sm text-muted-foreground ml-[1.375rem]">
-              Describe your product concept and we&apos;ll decompose it into buildable modules, experts, and suppliers.
+              Describe your product concept and we&apos;ll reverse engineer it into buildable modules, experts, and suppliers.
             </p>
           </div>
           <Textarea
@@ -1034,7 +1050,7 @@ function XRayView({
             {isScanning ? (
               <><Loader2 className="h-4 w-4 animate-spin mr-2" />Scanning your idea...</>
             ) : (
-              <><Zap className="h-4 w-4 mr-2" />Scan &amp; decompose</>
+              <><Zap className="h-4 w-4 mr-2" />Scan &amp; reverse engineer</>
             )}
           </Button>
           {spec.function && (
@@ -1046,12 +1062,15 @@ function XRayView({
       </Card>
 
       {isScanning && (
-        <div className="space-y-4">
-          <Skeleton className="h-[280px] rounded-xl" />
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Skeleton className="h-24 rounded-xl" />
-            <Skeleton className="h-24 rounded-xl" />
+        <div className="space-y-6">
+          <Skeleton className="h-[320px] rounded-xl" />
+          <div className="grid lg:grid-cols-2 gap-4">
+            <Skeleton className="h-28 rounded-xl" />
+            <Skeleton className="h-28 rounded-xl" />
+            <Skeleton className="h-28 rounded-xl" />
+            <Skeleton className="h-28 rounded-xl" />
           </div>
+          <Skeleton className="h-64 rounded-xl" />
         </div>
       )}
 
@@ -1059,19 +1078,30 @@ function XRayView({
         <>
           <Schematic spec={spec} onOpenDiagnostic={onOpenDiagnostic} />
 
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="grid lg:grid-cols-2 gap-4">
             <Pill label="Assumptions" items={spec.assumptions} />
             <Pill label="Materials" items={spec.materials} />
             <Pill label="Manufacturing processes" items={spec.processes} />
             <Pill label="Validation" items={spec.validation} />
           </div>
 
-          <div className="space-y-4">
+          {/* Modules section */}
+          <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">Modules (sub-assemblies)</h2>
-              <Badge variant="secondary">Gating module has guided diagnostic; others use interviews</Badge>
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-7 bg-international-orange rounded-full" />
+                <div>
+                  <h2 className="text-lg font-display font-semibold tracking-tight text-foreground">
+                    Modules
+                  </h2>
+                  <p className="text-xs text-muted-foreground">Sub-assemblies that make up your product</p>
+                </div>
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                {spec.modules.length} modules
+              </Badge>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-5">
               {spec.modules.map((m) => (
                 <div key={m.id} id={`module-${m.id}`}>
                   <ModuleCard m={m} onOpenInterview={onOpenInterview} onOpenDiagnostic={onOpenDiagnostic} />
@@ -1083,13 +1113,16 @@ function XRayView({
       )}
 
       {!isScanning && spec.modules.length === 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-foreground">
-              No modules yet. Tap <span className="font-semibold">Scan</span> to generate the X-Ray.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          title="No modules yet"
+          description="Describe your product idea above and hit Scan to reverse engineer it into buildable modules."
+          action={
+            <Button className="bg-international-orange hover:bg-international-orange-hover text-white" onClick={() => onScan(localIdea)}>
+              <Zap className="h-4 w-4 mr-2" />
+              Scan now
+            </Button>
+          }
+        />
       )}
     </div>
   )
@@ -1129,6 +1162,38 @@ function PeopleView({ spec, scanId }: { spec: XRaySpec; scanId: string | null })
     return map
   }, [people])
 
+  /** Convert a PersonMatch to a MarketplaceListing for MarketCardV2 */
+  const toMarketplaceListing = useCallback((p: PersonMatch): MarketplaceListing => {
+    if (p.listing) {
+      return p.listing as MarketplaceListing
+    }
+    // Fallback for provider profiles without a full listing
+    return {
+      id: p.id,
+      category: "People",
+      subcategory: p.role,
+      title: p.name,
+      description: p.tags.join(", "),
+      attributes: {
+        rate: p.rate,
+        expertise: p.tags,
+        skills: p.tags,
+      },
+      image_url: null,
+      is_verified: p.isVerified,
+    }
+  }, [])
+
+  const handleViewDetail = useCallback((listing: MarketplaceListing) => {
+    toast.info(`Opening ${listing.title} profile`)
+  }, [])
+
+  const handleSaveToggle = useCallback((id: string) => {
+    toast.success("Saved to favorites")
+    // Save state not persisted in X-Ray context — placeholder
+    void id
+  }, [])
+
   return (
     <div className="space-y-8">
       {/* Header card */}
@@ -1155,8 +1220,8 @@ function PeopleView({ spec, scanId }: { spec: XRaySpec; scanId: string | null })
       </Card>
 
       {isLoading && (
-        <div className="grid md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-52 rounded-xl" />)}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-64 rounded-xl" />)}
         </div>
       )}
 
@@ -1184,62 +1249,18 @@ function PeopleView({ spec, scanId }: { spec: XRaySpec; scanId: string | null })
                 <p className="text-xs text-muted-foreground">Because modules include {discipline} questions</p>
               </div>
             </div>
-            <Badge variant="secondary" className="text-xs">Top {Math.min(matches.length, 3)}</Badge>
+            <Badge variant="secondary" className="text-xs">{matches.length} match{matches.length !== 1 ? "es" : ""}</Badge>
           </div>
-          <div className="grid md:grid-cols-3 gap-4">
-            {matches.slice(0, 3).map((p) => {
-              const initials = p.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
-              const matchPct = Math.round(p.matchScore * 100)
-
-              return (
-                <Card key={p.id} className="rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
-                  <CardContent className="pt-5 pb-5 space-y-3">
-                    <div className="flex items-start gap-3">
-                      {/* Initials avatar */}
-                      <div className="h-10 w-10 rounded-full bg-chart-2/15 text-chart-2 flex items-center justify-center text-sm font-semibold shrink-0">
-                        {initials}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-sm text-foreground truncate">{p.name}</p>
-                          {p.isVerified && (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0" />
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">{p.role}</p>
-                      </div>
-                    </div>
-                    {/* Match score bar */}
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-muted/50 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-chart-2"
-                          style={{ width: `${matchPct}%` }}
-                        />
-                      </div>
-                      <span className="text-[11px] text-muted-foreground tabular-nums font-medium">{matchPct}%</span>
-                    </div>
-                    {/* Tags */}
-                    {p.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {p.tags.slice(0, 3).map((t, i) => (
-                          <span key={i} className="inline-block rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">{t}</span>
-                        ))}
-                        {p.tags.length > 3 && (
-                          <span className="inline-block rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">+{p.tags.length - 3}</span>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-xs font-medium text-foreground">{p.rate}</span>
-                      <Button variant="ghost" size="sm" className="h-8 px-2 rounded-full">
-                        <Bookmark className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {matches.slice(0, 6).map((p) => (
+              <MarketCardV2
+                key={`${p.id}-${p.matchedDiscipline}`}
+                listing={toMarketplaceListing(p)}
+                isSaved={false}
+                onSaveToggle={handleSaveToggle}
+                onViewDetail={handleViewDetail}
+              />
+            ))}
           </div>
         </div>
       ))}
@@ -1276,74 +1297,142 @@ function SupplierView({ spec, setSpec, scanId }: { spec: XRaySpec; setSpec: (s: 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {!diagComplete ? (
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <span className="font-semibold">Supplier matching blocked</span> -- complete the diagnostic first. This preserves transparency: no bespoke negotiation, just clarity-first quoting.
-          </AlertDescription>
-        </Alert>
+        <EmptyState
+          title="Supplier matching locked"
+          description="Complete the gating diagnostic first. This preserves transparency: no bespoke negotiation, just clarity-first quoting."
+          action={
+            <Button className="bg-international-orange hover:bg-international-orange-hover text-white">
+              <Lock className="h-4 w-4 mr-2" />
+              Go to X-Ray tab to run diagnostic
+            </Button>
+          }
+        />
       ) : (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold">Supplier matching</h3>
-                <p className="text-sm text-foreground">Conditioned on process class: {processClass}.</p>
-                <p className="text-xs text-muted-foreground mt-1">This preserves transparency: no bespoke negotiation, just clarity-first quoting.</p>
-              </div>
-              {hasLoaded && (
-                <Button variant="ghost" size="sm" onClick={() => loadSuppliers(true)} disabled={isLoading}>
-                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {isLoading && <Skeleton className="h-48 rounded-xl" />}
-
-      {spec.modules.map((m) => {
-        const suppliers = suppliersByModule[m.id] || []
-        return (
-          <Card key={m.id}>
-            <CardContent className="pt-6 space-y-4">
+        <>
+          {/* Header card */}
+          <Card className="rounded-xl shadow-sm">
+            <CardContent className="pt-6 pb-5">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <h3 className="text-base font-semibold">{m.name}</h3>
-                  <p className="text-xs text-muted-foreground">Based on {m.keyParts.slice(0, 3).join(", ")}</p>
-                </div>
-                {m.supplier ? <Badge>Selected: {m.supplier}</Badge> : <Badge variant="secondary">Pick 1</Badge>}
-              </div>
-              <div className={"grid md:grid-cols-3 gap-4 " + (!diagComplete ? "opacity-50 pointer-events-none" : "")}>
-                {suppliers.length > 0 ? suppliers.slice(0, 3).map((s) => (
-                  <Card
-                    key={s.id}
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => assign(m.id, s.name)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") assign(m.id, s.name) }}
-                  >
-                    <CardContent className="pt-6">
-                      <p className="font-medium">{s.name}</p>
-                      <p className="text-xs text-muted-foreground">{s.capabilities.join(" • ")}</p>
-                      <p className="text-xs text-muted-foreground">Lead {s.typicalLeadWeeks}w • Warranty {s.warrantyMonths}m</p>
-                      {s.matchReason && <p className="text-xs text-muted-foreground mt-1">{s.matchReason}</p>}
-                    </CardContent>
-                  </Card>
-                )) : (
-                  <p className="text-xs text-muted-foreground col-span-3">
-                    {diagComplete ? "No matching suppliers found" : "Complete diagnostic to unlock"}
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-7 bg-chart-4 rounded-full" />
+                    <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">Supplier matching</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground ml-[1.375rem]">
+                    Conditioned on process class: <span className="font-medium text-foreground">{processClass}</span>. Transparency-first quoting.
                   </p>
+                </div>
+                {hasLoaded && (
+                  <Button variant="outline" size="sm" className="rounded-full" onClick={() => loadSuppliers(true)} disabled={isLoading}>
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
+                  </Button>
                 )}
               </div>
             </CardContent>
           </Card>
-        )
-      })}
+
+          {isLoading && (
+            <div className="grid md:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-48 rounded-xl" />)}
+            </div>
+          )}
+
+          {spec.modules.map((m) => {
+            const suppliers = suppliersByModule[m.id] || []
+            const accentColor = chipColor(m.id)
+            const isSelected = (name: string): boolean => m.supplier === name
+
+            return (
+              <div key={m.id} className="space-y-4">
+                {/* Module section header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: accentColor + "18" }}>
+                      <Box className="h-4 w-4" style={{ color: accentColor }} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-display font-semibold text-foreground">{m.name}</h3>
+                      <p className="text-xs text-muted-foreground">{m.keyParts.slice(0, 3).join(", ")}</p>
+                    </div>
+                  </div>
+                  {m.supplier ? (
+                    <Badge className="bg-status-success-light text-status-success-dark">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />{m.supplier}
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">Select a supplier</Badge>
+                  )}
+                </div>
+                <div className="grid md:grid-cols-3 gap-4">
+                  {suppliers.length > 0 ? suppliers.slice(0, 3).map((s) => {
+                    const initials = s.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+                    const selected = isSelected(s.name)
+
+                    return (
+                      <Card
+                        key={s.id}
+                        className={cn(
+                          "cursor-pointer rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200",
+                          selected && "ring-2 ring-international-orange border-international-orange"
+                        )}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => assign(m.id, s.name)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") assign(m.id, s.name) }}
+                      >
+                        <CardContent className="pt-5 pb-5 space-y-3">
+                          <div className="flex items-start gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-chart-4/15 text-chart-4 flex items-center justify-center text-sm font-semibold shrink-0">
+                              {initials}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-sm text-foreground truncate">{s.name}</p>
+                                {s.isVerified && <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0" />}
+                                {selected && <CheckCircle2 className="h-3.5 w-3.5 text-international-orange shrink-0" />}
+                              </div>
+                              <p className="text-xs text-muted-foreground">{s.supplierType}</p>
+                            </div>
+                          </div>
+                          {/* Capability tags */}
+                          <div className="flex flex-wrap gap-1">
+                            {s.capabilities.slice(0, 3).map((c, i) => (
+                              <span key={i} className="inline-block rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">{c}</span>
+                            ))}
+                            {s.capabilities.length > 3 && (
+                              <span className="inline-block rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">+{s.capabilities.length - 3}</span>
+                            )}
+                          </div>
+                          {/* Lead time and warranty */}
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>{s.typicalLeadWeeks}w lead</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <ShieldCheck className="h-3 w-3" />
+                              <span>{s.warrantyMonths}m warranty</span>
+                            </div>
+                          </div>
+                          {s.matchReason && (
+                            <p className="text-xs text-muted-foreground italic">{s.matchReason}</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )
+                  }) : (
+                    <p className="text-sm text-muted-foreground col-span-3 py-4 text-center">
+                      No matching suppliers found for this module.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </>
+      )}
     </div>
   )
 }
@@ -1353,12 +1442,35 @@ function RFQView({ spec }: { spec: XRaySpec }) {
   const processClass = getDerivedProcessClass(spec)
 
   return (
-    <Card>
-      <CardContent className="pt-6 space-y-2">
-        <h3 className="text-base font-semibold">RFQ</h3>
-        <p className="text-xs text-muted-foreground">(Coming soon) Generate a spec pack from diagnostic + interviews + selected suppliers.</p>
-        <p className="text-sm">Process class: <span className="font-semibold">{processClass || "(unset)"}</span></p>
-        {total > 0 && <p className="text-sm">Total estimated: £{Math.round(total).toLocaleString()}</p>}
+    <Card className="rounded-xl shadow-sm">
+      <CardContent className="pt-6 pb-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-1 h-7 bg-chart-5 rounded-full" />
+          <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">Request for Quotation</h3>
+        </div>
+        <div className="rounded-xl bg-muted/30 border p-6 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-2xl bg-muted/50 flex items-center justify-center">
+              <FileText className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">Coming soon</p>
+              <p className="text-xs text-muted-foreground">Generate a spec pack from diagnostic + interviews + selected suppliers.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-6 pt-2">
+            <div>
+              <p className="text-xs text-muted-foreground">Process class</p>
+              <p className="text-sm font-semibold text-foreground">{processClass || "(unset)"}</p>
+            </div>
+            {total > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground">Estimated total</p>
+                <p className="text-sm font-semibold text-foreground">£{Math.round(total).toLocaleString()}</p>
+              </div>
+            )}
+          </div>
+        </div>
       </CardContent>
     </Card>
   )

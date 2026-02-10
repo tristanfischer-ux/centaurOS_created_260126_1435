@@ -26,6 +26,17 @@ export interface PersonMatch {
   isInternal: boolean
   matchScore: number
   isVerified: boolean
+  /** Full marketplace listing data for rendering standard marketplace cards */
+  listing: {
+    id: string
+    category: "People" | "Products" | "Services" | "AI"
+    subcategory: string
+    title: string
+    description: string
+    attributes: Record<string, unknown>
+    image_url: string | null
+    is_verified: boolean
+  } | null
 }
 
 // ─── Discipline to search keyword mapping ────────────────────────────
@@ -62,7 +73,7 @@ export async function matchPeopleForModules(modules: ModuleSpec[]): Promise<Pers
   // Query marketplace listings for People category
   const { data: listings, error: listingsError } = await supabase
     .from("marketplace_listings")
-    .select("id, title, description, attributes, is_verified, subcategory")
+    .select("id, title, description, attributes, is_verified, subcategory, category, image_url")
     .eq("category", "People")
     .limit(50)
 
@@ -127,6 +138,16 @@ export async function matchPeopleForModules(modules: ModuleSpec[]): Promise<Pers
             isInternal: false,
             matchScore: score + (listing.is_verified ? 2 : 0),
             isVerified: listing.is_verified ?? false,
+            listing: {
+              id: listing.id,
+              category: (listing.category as "People" | "Products" | "Services" | "AI") ?? "People",
+              subcategory: listing.subcategory || "Specialist",
+              title: listing.title,
+              description: listing.description || "",
+              attributes: (attrs || {}) as Record<string, unknown>,
+              image_url: listing.image_url ?? null,
+              is_verified: listing.is_verified ?? false,
+            },
           })
         }
       }
@@ -170,6 +191,7 @@ export async function matchPeopleForModules(modules: ModuleSpec[]): Promise<Pers
             isInternal: false,
             matchScore: score + (provider.years_experience ? Math.min(provider.years_experience, 5) : 0),
             isVerified: true,
+            listing: null,
           })
         }
       }
