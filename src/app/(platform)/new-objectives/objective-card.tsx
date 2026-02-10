@@ -133,7 +133,7 @@ export function ObjectiveCard({ objective, strategicObjectives = [], isSelected,
             <PopoverTrigger asChild>
               <button
                 className={cn(
-                  'flex items-center gap-1.5 text-[11px] rounded-md px-2 py-0.5 transition-colors',
+                  'flex items-center gap-1.5 text-[11px] rounded-md px-2 py-0.5 transition-colors max-w-full overflow-hidden',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   linkedStrategic
                     ? 'bg-international-orange/5 text-international-orange hover:bg-international-orange/10'
@@ -142,13 +142,13 @@ export function ObjectiveCard({ objective, strategicObjectives = [], isSelected,
                 onClick={(e) => e.stopPropagation()}
               >
                 {isLinking ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Loader2 className="h-3 w-3 flex-shrink-0 animate-spin" />
                 ) : linkedStrategic ? (
-                  <Flag className="h-3 w-3" />
+                  <Flag className="h-3 w-3 flex-shrink-0" />
                 ) : (
-                  <Link2 className="h-3 w-3" />
+                  <Link2 className="h-3 w-3 flex-shrink-0" />
                 )}
-                <span className="truncate max-w-[160px]">
+                <span className="truncate min-w-0">
                   {linkedStrategic ? linkedStrategic.title : 'Link to strategy'}
                 </span>
               </button>
