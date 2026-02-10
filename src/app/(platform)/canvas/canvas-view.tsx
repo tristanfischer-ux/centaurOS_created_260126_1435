@@ -131,7 +131,8 @@ function buildCanvasElements(
         data: {
           label: task.title,
           status: task.status,
-          assigneeName: task.assignee?.full_name ?? null,
+          // Prefer task_assignees over legacy assignee_id
+          assigneeName: ((task.assignees ?? []).length > 0 ? (task.assignees ?? [])[0].full_name : task.assignee?.full_name) ?? null,
           endDate: task.end_date,
           riskLevel: task.risk_level,
           progress: task.progress,
@@ -169,7 +170,8 @@ function buildCanvasElements(
         data: {
           label: task.title,
           status: task.status,
-          assigneeName: task.assignee?.full_name ?? null,
+          // Prefer task_assignees over legacy assignee_id
+          assigneeName: ((task.assignees ?? []).length > 0 ? (task.assignees ?? [])[0].full_name : task.assignee?.full_name) ?? null,
           endDate: task.end_date,
           riskLevel: task.risk_level,
           progress: task.progress,

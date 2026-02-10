@@ -117,7 +117,7 @@ export function ListView({ tasks, selectedId, onSelect, groupBy }: ListViewProps
           key = task.status.replace(/_/g, ' ')
           break
         case 'assignee':
-          key = task.assignee?.full_name || 'Unassigned'
+          key = (task.assignees?.length > 0 ? task.assignees[0].full_name : task.assignee?.full_name) || 'Unassigned'
           break
         default:
           key = 'all'
@@ -216,18 +216,21 @@ export function ListView({ tasks, selectedId, onSelect, groupBy }: ListViewProps
                     )}
                   </div>
 
-                  {/* Assignee */}
+                  {/* Assignee - prefer task_assignees over legacy assignee_id */}
                   <div className="w-20 hidden sm:flex items-center gap-1.5">
-                    {task.assignee?.full_name && (
-                      <>
-                        <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[8px] font-semibold text-muted-foreground flex-shrink-0">
-                          {task.assignee.full_name[0].toUpperCase()}
-                        </div>
-                        <span className="text-xs text-muted-foreground truncate">
-                          {task.assignee.full_name.split(' ')[0]}
-                        </span>
-                      </>
-                    )}
+                    {(() => {
+                      const primary = task.assignees?.length > 0 ? task.assignees[0] : task.assignee
+                      return primary?.full_name ? (
+                        <>
+                          <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[8px] font-semibold text-muted-foreground flex-shrink-0">
+                            {primary.full_name[0].toUpperCase()}
+                          </div>
+                          <span className="text-xs text-muted-foreground truncate">
+                            {primary.full_name.split(' ')[0]}
+                          </span>
+                        </>
+                      ) : null
+                    })()}
                   </div>
 
                   {/* Due date */}

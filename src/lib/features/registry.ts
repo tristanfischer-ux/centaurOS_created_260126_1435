@@ -54,7 +54,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/canvas',
         releasedAt: new Date('2026-02-09'),
         category: 'strategic',
-        status: 'beta',
+        status: 'stable',
         isVisibleInNav: true,
         changelog: 'Added Strategy — a visual workspace for mapping out your goals with flow visualization, timeline, and working backwards from deadlines. Plot objectives and tasks on an interactive timeline with drag-and-drop positioning.'
     },
@@ -65,7 +65,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/tools/financial',
         releasedAt: new Date('2026-02-08'),
         category: 'analytics',
-        status: 'beta',
+        status: 'stable',
         isVisibleInNav: true,
         changelog: 'Added Financial Tools combining Money Map (visualize money flows in your business) and Cost of Delay (quantify the cost of postponing decisions). Available under the Financial Tools tab in the sidebar.'
     },
@@ -76,7 +76,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/inspiration',
         releasedAt: new Date('2026-02-07'),
         category: 'core',
-        status: 'beta',
+        status: 'stable',
         isVisibleInNav: true,
         changelog: 'Added Manufacturing Techniques Explorer — an interactive encyclopedia of modern manufacturing processes. Browse by category, filter by cost/batch size/material, and click through to detailed technique info with CTAs to find suppliers or start an RFQ. Available under the Techniques tab in Inspiration.'
     },
@@ -87,7 +87,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/strategic-planner',
         releasedAt: new Date('2026-02-05'),
         category: 'strategic',
-        status: 'beta',
+        status: 'stable',
         isVisibleInNav: true,
         changelog: 'Added Strategic Planner — set ambitious goals with target dates and AI generates a structured plan with milestones, phases, and actionable tasks. Track progress with visual indicators and days-remaining counters.'
     },
@@ -109,7 +109,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/agents',
         releasedAt: new Date('2026-02-01'),
         category: 'core',
-        status: 'beta',
+        status: 'stable',
         isVisibleInNav: true,
         changelog: 'Added Prompt Workflows (Agents) — create custom prompt chains for recurring tasks. Save workflows, manage API keys, and automate repetitive work with AI-powered automation.'
     },
@@ -121,7 +121,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/settings',
         releasedAt: new Date('2026-01-31'),
         category: 'integration',
-        status: 'beta',
+        status: 'stable',
         isVisibleInNav: true,
         changelog: 'Added Telegram bot integration. Link your Telegram account in Settings to create objectives via voice or text messages. Smart parsing automatically structures your input into objectives with tasks, dates, and assignees.'
     },
@@ -153,7 +153,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/retainers',
         releasedAt: new Date('2026-01-25'),
         category: 'marketplace',
-        status: 'beta',
+        status: 'stable',
         isVisibleInNav: true,
         changelog: 'Added retainer management for ongoing service relationships. Track hours, manage timesheets, and handle recurring payments with your service providers.'
     },

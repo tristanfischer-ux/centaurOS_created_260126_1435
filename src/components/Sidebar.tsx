@@ -31,11 +31,8 @@ import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
 import { useZoomContext } from "@/components/ZoomProvider"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { NewBadge } from "@/components/ui/new-badge"
-import { BetaBadge } from "@/components/ui/beta-badge"
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
-import { isRouteBeta, getFeatureNameByRoute } from "@/lib/features/registry"
 import { signOut } from "@/actions/auth"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 
@@ -138,20 +135,10 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
     }
 
     /**
-     * Renders a single navigation item with optional tooltip and badges.
+     * Renders a single navigation item with optional tooltip.
      */
     const renderNavItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }>; tooltip?: string }) => {
         const isActive = isRouteActive(pathname, item.href)
-        const isBeta = isRouteBeta(item.href)
-
-        let badgeContent = null
-
-        if (isBeta) {
-            const featureName = getFeatureNameByRoute(item.href)
-            badgeContent = <BetaBadge onClick={() => openFeedback(featureName)} />
-        } else if (item.href !== '/objectives' && item.href !== '/settings') {
-            badgeContent = <NewBadge route={item.href} />
-        }
 
         const navLink = (
             <Link
@@ -173,7 +160,6 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                     />
                     {item.name}
                 </span>
-                {badgeContent}
             </Link>
         )
 
@@ -285,7 +271,6 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                 >
                     <Sparkles className="h-3.5 w-3.5" />
                     What&apos;s New
-                    <NewBadge route="/whats-new" />
                 </Link>
 
                 {/* Sign Out */}

@@ -114,7 +114,11 @@ function MiniTimelineBar({ task, windowStart, windowEnd, stableNow }: {
         ((stableNow - windowStart.getTime()) / windowDuration) * 100
     )) * 100) / 100
 
-    const isAI = task.profiles?.role === 'AI_Agent'
+    // Prefer task_assignees/assignees over legacy profiles (assignee_id) join
+    const primaryAssignee = task.assignees && task.assignees.length > 0
+        ? task.assignees[0]
+        : (task.assignee ?? task.profiles)
+    const isAI = primaryAssignee?.role === 'AI_Agent'
 
     return (
         <div className="relative w-full h-7 bg-muted rounded-md overflow-hidden">
@@ -148,8 +152,8 @@ function MiniTimelineBar({ task, windowStart, windowEnd, stableNow }: {
                 style={{ left: `calc(${startPercent}% + 2px)` }}
             >
                 <UserAvatar
-                    name={task.profiles?.full_name}
-                    role={task.profiles?.role}
+                    name={primaryAssignee?.full_name}
+                    role={primaryAssignee?.role}
                     size="xs"
                 />
             </div>

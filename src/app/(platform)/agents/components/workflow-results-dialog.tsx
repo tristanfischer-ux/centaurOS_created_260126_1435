@@ -21,11 +21,13 @@
  */
 
 import React, { useState, useCallback, useMemo } from "react"
+import Link from "next/link"
 import {
     Copy,
     Check,
     Download,
     FileText,
+    FileOutput,
     CheckCircle2,
     AlertCircle,
     Clock,
@@ -390,6 +392,16 @@ export function WorkflowResultsDialog({
                                 <Download className="w-3.5 h-3.5" />
                                 Download .md
                             </Button>
+                            <Link href="/agents/artifacts">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1.5 text-xs h-8"
+                                >
+                                    <FileOutput className="w-3.5 h-3.5" />
+                                    View Artifacts
+                                </Button>
+                            </Link>
                         </div>
                     </div>
                 </DialogHeader>

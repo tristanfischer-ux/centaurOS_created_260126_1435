@@ -82,15 +82,18 @@ function BoardCard({ task, isSelected, onSelect }: { task: TaskWithData; isSelec
       {/* Bottom row: assignee, date, indicators */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          {/* Assignee */}
-          {task.assignee?.full_name && (
-            <div
-              className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[8px] font-semibold text-muted-foreground"
-              title={task.assignee.full_name}
-            >
-              {task.assignee.full_name[0].toUpperCase()}
-            </div>
-          )}
+          {/* Assignee - prefer task_assignees over legacy assignee_id */}
+          {(() => {
+            const primary = task.assignees?.length > 0 ? task.assignees[0] : task.assignee
+            return primary?.full_name ? (
+              <div
+                className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[8px] font-semibold text-muted-foreground"
+                title={primary.full_name}
+              >
+                {primary.full_name[0].toUpperCase()}
+              </div>
+            ) : null
+          })()}
 
           {/* Risk badge */}
           {task.risk_level && task.risk_level !== 'Low' && (

@@ -73,6 +73,7 @@ export default async function ObjectivesPage({ searchParams }: ObjectivesPagePro
     }
 
     // Fetch tasks with assignee info for all objectives
+    // Include task_assignees (multi-assignee) alongside legacy assignee_id for consistent display
     const { data: tasks } = await supabase
         .from('tasks')
         .select(`
@@ -87,6 +88,7 @@ export default async function ObjectivesPage({ searchParams }: ObjectivesPagePro
             foundry_id,
             is_private,
             assignee:profiles!tasks_assignee_id_fkey(full_name, role),
+            task_assignees(profile:profiles(full_name, role)),
             task_comments(id, is_system_log),
             task_files(id, file_name, file_size, created_at)
         `)
@@ -101,6 +103,10 @@ export default async function ObjectivesPage({ searchParams }: ObjectivesPagePro
         tasks: tasks?.filter(t => t.objective_id === obj.id).map(t => ({
             ...t,
             assignee: t.assignee as TaskAssignee | null,
+            // Map task_assignees junction table to flat assignees array
+            assignees: ((t.task_assignees as { profile: TaskAssignee | null }[] | null) || [])
+                .map(ta => ta.profile)
+                .filter((p): p is TaskAssignee => p !== null),
             notesCount: (t.task_comments as TaskComment[] | null)?.filter(c => !c.is_system_log).length || 0,
             attachmentCount: (t.task_files as TaskFile[] | null)?.length || 0
         })) || []

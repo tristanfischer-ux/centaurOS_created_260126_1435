@@ -49,6 +49,10 @@ interface Task {
         full_name: string | null
         role: string | null
     } | null
+    assignees?: {
+        full_name: string | null
+        role: string | null
+    }[]
 }
 
 interface Objective {
@@ -592,7 +596,8 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                                         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                                                             {/* Prefer task_assignees over legacy assignee_id */}
                                                             {(() => {
-                                                                const primary = task.assignees?.length > 0 ? task.assignees[0] : task.assignee
+                                                                const assigneesList = task.assignees ?? []
+                                                                const primary = assigneesList.length > 0 ? assigneesList[0] : task.assignee
                                                                 return primary?.full_name ? (
                                                                     <div className="flex items-center gap-1 hidden sm:flex">
                                                                         <UserAvatar 

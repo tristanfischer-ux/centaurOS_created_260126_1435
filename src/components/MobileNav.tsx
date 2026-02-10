@@ -31,7 +31,6 @@ import {
     DropdownMenuTrigger,
     DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
-import { NewBadge } from "@/components/ui/new-badge"
 import { signOut } from "@/actions/auth"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 
@@ -163,7 +162,6 @@ export function MobileNav() {
                                             <item.icon className="h-4 w-4" />
                                             {item.name}
                                         </span>
-                                        <NewBadge route={item.href} />
                                     </Link>
                                 </DropdownMenuItem>
                             )
@@ -190,7 +188,6 @@ export function MobileNav() {
                                             <item.icon className="h-4 w-4" />
                                             {item.name}
                                         </span>
-                                        <NewBadge route={item.href} />
                                     </Link>
                                 </DropdownMenuItem>
                             )

@@ -97,7 +97,7 @@ export function MarketplaceToolbar({
     const [showSuggestions, setShowSuggestions] = useState(false)
     const searchRef = useRef<HTMLInputElement>(null)
 
-    const categories: MarketplaceCategory[] = ['All', 'People', 'Products', 'Services']
+    const categories: MarketplaceCategory[] = ['People', 'Products', 'Services', 'All']
 
     // Show suggestion chips when search is focused and empty
     const handleFocus = useCallback(() => {

@@ -449,9 +449,9 @@ export function GanttView({ tasks, objectives, profiles, members = [], currentUs
                         progressSelectedColor: color,
                         backgroundColor: color,
                     },
-                    // Assignee info for avatar (primary)
-                    assigneeName: task.profiles?.full_name,
-                    assigneeRole: task.profiles?.role,
+                    // Assignee info for avatar: prefer task_assignees over legacy assignee_id/profiles join
+                    assigneeName: allAssignees.length > 0 ? allAssignees[0].full_name : task.profiles?.full_name,
+                    assigneeRole: allAssignees.length > 0 ? allAssignees[0].role : task.profiles?.role,
                     taskNumber: task.task_number,
                     // All assignees for multi-display
                     assignees: allAssignees.length > 0 ? allAssignees : (task.profiles ? [{

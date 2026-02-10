@@ -38,6 +38,12 @@ import {
     migrateLocalCustomPrompts,
 } from "@/actions/agent-workflows"
 import type { AgentWorkflowRow, AgentCustomPromptRow } from "@/actions/agent-workflows"
+import {
+    createWorkflowRun,
+    completeWorkflowRun,
+    createArtifact,
+} from "@/actions/agent-artifacts"
+import { generateWorkflowMarkdown } from "./lib/export-markdown"
 import type { PromptCategory, Workflow, WorkflowTemplate, CustomPrompt, AttachedFile, ExecutionStatus } from "./lib/agent-types"
 
 // ─── localStorage keys (used only for one-time migration) ─────────
@@ -922,6 +928,79 @@ function AgentsFlowInner({
         [updateNodeData]
     )
 
+    // ── Auto-create artifact on chain completion ──────────────────
+    const createArtifactFromChain = useCallback(
+        async (currentNodes: Node[], currentEdges: Edge[]) => {
+            try {
+                // Build the markdown content from all node outputs
+                const markdown = generateWorkflowMarkdown(workflowName, currentNodes, currentEdges)
+
+                // Count completed nodes
+                const completedCount = currentNodes.filter(
+                    (n) => (n.data as { executionStatus?: string }).executionStatus === "approved"
+                ).length
+
+                // Detect content type from workflow name / node categories
+                const lowerName = workflowName.toLowerCase()
+                let contentType: 'document' | 'email' | 'report' | 'presentation' | 'checklist' = 'document'
+                if (lowerName.includes('email') || lowerName.includes('campaign')) contentType = 'email'
+                else if (lowerName.includes('report') || lowerName.includes('analysis')) contentType = 'report'
+                else if (lowerName.includes('presentation') || lowerName.includes('deck') || lowerName.includes('slides')) contentType = 'presentation'
+                else if (lowerName.includes('checklist') || lowerName.includes('audit')) contentType = 'checklist'
+
+                // Create workflow run record
+                const { data: run } = await createWorkflowRun({
+                    workflowId: dbWorkflowId,
+                    workflowName,
+                    nodeCount: currentNodes.length,
+                })
+
+                // Complete the run
+                if (run) {
+                    const nodeOutputs = currentNodes.map((n) => ({
+                        id: n.id,
+                        label: (n.data as { label?: string }).label,
+                        output: (n.data as { output?: string }).output,
+                        status: (n.data as { executionStatus?: string }).executionStatus,
+                    }))
+                    await completeWorkflowRun(run.id, 'completed', nodeOutputs, completedCount)
+                }
+
+                // Create the artifact
+                const { data: artifact, error } = await createArtifact({
+                    runId: run?.id || null,
+                    workflowId: dbWorkflowId,
+                    title: `${workflowName} — ${new Date().toLocaleDateString()}`,
+                    content: markdown,
+                    contentType,
+                    metadata: {
+                        workflowName,
+                        nodeCount: currentNodes.length,
+                        completedCount,
+                    },
+                })
+
+                if (error) {
+                    console.error('[AgentsWorkflow] Failed to create artifact:', error)
+                    return
+                }
+
+                if (artifact) {
+                    toast.success("Artifact saved", {
+                        description: "View it in Artifacts",
+                        action: {
+                            label: "Open",
+                            onClick: () => window.location.href = "/agents/artifacts",
+                        },
+                    })
+                }
+            } catch (err) {
+                console.error('[AgentsWorkflow] Error creating artifact:', err)
+            }
+        },
+        [workflowName, dbWorkflowId]
+    )
+
     // ── Approve and continue chain ────────────────────────────────
     const handleApproveAndContinue = useCallback(
         async (nodeId: string) => {
@@ -934,6 +1013,15 @@ function AgentsFlowInner({
                 toast.success("Chain complete — all steps approved")
                 setIsChainRunning(false)
                 setChainProgress(undefined)
+
+                // Auto-create artifact from the completed chain
+                // Use latest node state after the approval update
+                const updatedNodes = nodes.map((n) =>
+                    n.id === nodeId
+                        ? { ...n, data: { ...n.data, executionStatus: "approved" } }
+                        : n
+                )
+                createArtifactFromChain(updatedNodes, edges)
                 return
             }
 
@@ -954,7 +1042,7 @@ function AgentsFlowInner({
             abortControllerRef.current = new AbortController()
             await executeNode(nextNodeId, abortControllerRef.current.signal)
         },
-        [nodes, edges, updateNodeData, executeNode]
+        [nodes, edges, updateNodeData, executeNode, createArtifactFromChain]
     )
 
     // ── Run chain (HITL step-through) ─────────────────────────────

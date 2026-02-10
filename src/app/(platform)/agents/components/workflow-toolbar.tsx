@@ -19,8 +19,10 @@ import {
     FolderOpen,
     FileText,
     FileDown,
+    FileOutput,
     Download,
 } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -405,6 +407,24 @@ export function WorkflowToolbar({
                     </TooltipTrigger>
                     <TooltipContent>
                         View all results and export as Markdown
+                    </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Link href="/agents/artifacts">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5 text-xs"
+                            >
+                                <FileOutput className="w-3.5 h-3.5" />
+                                Artifacts
+                            </Button>
+                        </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        Browse all saved workflow outputs
                     </TooltipContent>
                 </Tooltip>
 

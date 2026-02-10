@@ -254,8 +254,9 @@ export function TasksGanttView({ tasks, selectedId, onSelect }: TasksGanttViewPr
           progress: actualProgress,
           isDisabled: false,
           styles: { progressColor: color, progressSelectedColor: color, backgroundColor: color },
-          assigneeName: task.assignee?.full_name ?? null,
-          assigneeRole: task.assignee?.role ?? null,
+          // Prefer task_assignees (multi-assignee system) over assignee_id (legacy)
+          assigneeName: (task.assignees?.length > 0 ? task.assignees[0].full_name : task.assignee?.full_name) ?? null,
+          assigneeRole: (task.assignees?.length > 0 ? task.assignees[0].role : task.assignee?.role) ?? null,
           taskNumber: task.task_number ?? undefined,
           taskProgress: actualProgress,
           taskStatus: task.status,

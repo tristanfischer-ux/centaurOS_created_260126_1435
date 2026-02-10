@@ -28,6 +28,7 @@ export interface CanvasTask {
   status: string
   assignee_id: string | null
   assignee: TaskAssignee | null
+  assignees?: TaskAssignee[]
   objective_id: string | null
   end_date: string | null
   risk_level: string | null
