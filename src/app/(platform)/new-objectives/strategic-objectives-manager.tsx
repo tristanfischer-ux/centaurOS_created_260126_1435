@@ -23,13 +23,13 @@ import {
   deleteStrategicObjective,
 } from '@/actions/objectives'
 import { toast } from 'sonner'
-import type { StrategicObjective, ObjectiveWithTasks } from './types'
+import type { StrategicObjective } from './types'
 
 interface StrategicObjectivesManagerProps {
   /** The strategic objectives to display */
   strategicObjectives: StrategicObjective[]
-  /** All regular objectives (for counting linked items) */
-  objectives: ObjectiveWithTasks[]
+  /** All regular objectives — only parent_objective_id is read for counting linked items */
+  objectives: { parent_objective_id: string | null }[]
   /** Currently active filter (strategic objective ID) */
   activeFilter: string | null
   /** Callback when a strategic objective is clicked for filtering */

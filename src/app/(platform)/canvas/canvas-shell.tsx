@@ -16,7 +16,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Waypoints, Pencil, Banknote, Calculator } from 'lucide-react'
+import { Waypoints, Pencil, Banknote, Calculator, Link2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import StrategyRiver from '@/components/canvas/StrategyRiver'
@@ -24,19 +24,35 @@ import { goalBundlesToRiverData } from '@/lib/canvas/strategy-river-adapter'
 import { NodeDetailsDialog } from '@/components/canvas/node-details-dialog'
 import { MoneyMapClient } from '../money-map/money-map-client'
 import { CostOfDelayView } from '@/components/tools/cost-of-delay/cost-of-delay-view'
+import { StrategicObjectivesManager } from '../new-objectives/strategic-objectives-manager'
+import { StrategyLinkView } from './strategy-link-view'
 import { EmptyState } from '@/components/ui/empty-state'
 import type { GoalBundle } from '@/types/canvas'
 import type { MilestoneOption } from '@/types/canvas'
+import type { StrategicObjective } from '../new-objectives/types'
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type CanvasTab = 'river' | 'whiteboards' | 'money-map' | 'cost-of-delay'
+type CanvasTab = 'river' | 'link-objectives' | 'whiteboards' | 'money-map' | 'cost-of-delay'
+
+/** Minimal objective data for the link view */
+export interface RegularObjective {
+  id: string
+  title: string
+  parent_objective_id: string | null
+  status: string | null
+  progress: number
+}
 
 interface CanvasShellProps {
   /** Pre-fetched goal bundles for the Strategy River */
   initialBundles: GoalBundle[]
+  /** Strategic objectives for the CRUD manager and link view */
+  strategicObjectives: StrategicObjective[]
+  /** Regular objectives for the link view */
+  regularObjectives: RegularObjective[]
   /** Server-rendered whiteboard list */
   whiteboardList: React.ReactNode
 }
@@ -47,6 +63,7 @@ interface CanvasShellProps {
 
 const TABS: { id: CanvasTab; label: string; icon: React.ElementType }[] = [
   { id: 'river', label: 'Strategy River', icon: Waypoints },
+  { id: 'link-objectives', label: 'Link Objectives', icon: Link2 },
   { id: 'whiteboards', label: 'Whiteboards', icon: Pencil },
   { id: 'money-map', label: 'Money Map', icon: Banknote },
   { id: 'cost-of-delay', label: 'Cost of Delay', icon: Calculator },
@@ -62,6 +79,8 @@ const TABS: { id: CanvasTab; label: string; icon: React.ElementType }[] = [
  */
 export function CanvasShell({
   initialBundles,
+  strategicObjectives,
+  regularObjectives,
   whiteboardList,
 }: CanvasShellProps) {
   const router = useRouter()
@@ -124,8 +143,21 @@ export function CanvasShell({
     }
   }, [activeTab, router])
 
+  // No-op filter for manager on Strategy page (filtering is on the Objectives page)
+  const [_stratFilter, setStratFilter] = useState<string | null>(null)
+
   return (
     <div>
+      {/* Strategic Objectives CRUD manager */}
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-2">
+        <StrategicObjectivesManager
+          strategicObjectives={strategicObjectives}
+          objectives={regularObjectives}
+          activeFilter={_stratFilter}
+          onFilterChange={setStratFilter}
+        />
+      </div>
+
       {/* Tab bar */}
       <div className="flex items-center gap-1 px-4 sm:px-6 lg:px-8 py-2 border-b border-slate-100 bg-background">
         {TABS.map((tab) => {
@@ -165,6 +197,12 @@ export function CanvasShell({
             onGoalClick={handleGoalClick}
           />
         )}
+      </div>
+      <div className={activeTab === 'link-objectives' ? 'block' : 'hidden'}>
+        <StrategyLinkView
+          strategicObjectives={strategicObjectives}
+          regularObjectives={regularObjectives}
+        />
       </div>
       <div className={activeTab === 'whiteboards' ? 'block' : 'hidden'}>
         {whiteboardList}

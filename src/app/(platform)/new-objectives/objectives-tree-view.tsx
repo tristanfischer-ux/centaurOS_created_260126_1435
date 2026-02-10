@@ -1,15 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { ProgressRing, getHealthVariant } from '@/components/ui/progress-ring'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { ChevronRight, ChevronDown, ListChecks, AlertTriangle, Pencil, Trash } from 'lucide-react'
-import type { ObjectiveWithTasks } from './types'
+import { ChevronRight, ChevronDown, ListChecks, AlertTriangle, Pencil, Trash, Flag } from 'lucide-react'
+import type { ObjectiveWithTasks, StrategicObjective } from './types'
 
 interface ObjectivesTreeViewProps {
   objectives: ObjectiveWithTasks[]
+  strategicObjectives?: StrategicObjective[]
   selectedId: string | null
   onSelect: (id: string) => void
   onEdit?: (objective: ObjectiveWithTasks) => void
@@ -193,10 +194,79 @@ function TreeItem({
   )
 }
 
-export function ObjectivesTreeView({ objectives, selectedId, onSelect, onEdit, onDelete }: ObjectivesTreeViewProps) {
-  const tree = buildTree(objectives)
+/**
+ * Strategy section header row in the tree view.
+ */
+function StrategyRow({
+  strategy,
+  objectiveCount,
+  expanded,
+  onToggle,
+}: {
+  strategy: StrategicObjective
+  objectiveCount: number
+  expanded: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center gap-3 py-2.5 px-3 rounded-lg transition-colors hover:bg-muted/50 font-semibold"
+    >
+      {expanded ? (
+        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+      ) : (
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      )}
+      <Flag className="h-3.5 w-3.5 text-international-orange" />
+      <span className="text-sm text-foreground">{strategy.title}</span>
+      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
+        {objectiveCount}
+      </span>
+    </button>
+  )
+}
 
-  if (tree.length === 0) {
+export function ObjectivesTreeView({ objectives, strategicObjectives = [], selectedId, onSelect, onEdit, onDelete }: ObjectivesTreeViewProps) {
+  const [collapsedStrategies, setCollapsedStrategies] = useState<Set<string>>(new Set())
+
+  const toggleStrategy = (strategyId: string) => {
+    setCollapsedStrategies(prev => {
+      const next = new Set(prev)
+      if (next.has(strategyId)) next.delete(strategyId)
+      else next.add(strategyId)
+      return next
+    })
+  }
+
+  // Group objectives by strategy
+  const { grouped, unlinked } = useMemo(() => {
+    if (strategicObjectives.length === 0) {
+      return { grouped: [], unlinked: objectives }
+    }
+
+    const stratMap = new Map<string, ObjectiveWithTasks[]>()
+    const unlinked: ObjectiveWithTasks[] = []
+
+    for (const obj of objectives) {
+      if (obj.parent_objective_id && strategicObjectives.some(s => s.id === obj.parent_objective_id)) {
+        const existing = stratMap.get(obj.parent_objective_id) || []
+        existing.push(obj)
+        stratMap.set(obj.parent_objective_id, existing)
+      } else {
+        unlinked.push(obj)
+      }
+    }
+
+    const grouped = strategicObjectives.map(s => ({
+      strategy: s,
+      objectives: stratMap.get(s.id) || [],
+    }))
+
+    return { grouped, unlinked }
+  }, [objectives, strategicObjectives])
+
+  if (objectives.length === 0) {
     return (
       <div className="text-center py-16">
         <p className="text-sm text-muted-foreground">No objectives yet</p>
@@ -204,31 +274,98 @@ export function ObjectivesTreeView({ objectives, selectedId, onSelect, onEdit, o
     )
   }
 
-  return (
-    <div className="space-y-0.5 bg-white rounded-xl border border-slate-100 p-2">
-      {/* Header row */}
-      <div className="flex items-center gap-3 py-2 px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-        <div className="w-[18px]" />
-        <div className="w-2.5" />
-        <div className="flex-1">Objective</div>
-        <div className="w-16 text-center">Tasks</div>
-        <div className="w-8" />
-        <div className="w-8 text-right">Progress</div>
+  // No strategies — render flat tree
+  if (strategicObjectives.length === 0) {
+    const tree = buildTree(objectives)
+    return (
+      <div className="space-y-0.5 bg-background rounded-xl border border-slate-100 p-2">
+        <TreeHeader />
+        <Separator />
+        {tree.map(node => (
+          <TreeItem
+            key={node.objective.id}
+            node={node}
+            depth={0}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ))}
       </div>
+    )
+  }
 
+  return (
+    <div className="space-y-0.5 bg-background rounded-xl border border-slate-100 p-2">
+      <TreeHeader />
       <Separator />
 
-      {tree.map(node => (
-        <TreeItem
-          key={node.objective.id}
-          node={node}
-          depth={0}
-          selectedId={selectedId}
-          onSelect={onSelect}
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
-      ))}
+      {/* Strategy sections */}
+      {grouped.map(({ strategy, objectives: stratObjectives }) => {
+        const isCollapsed = collapsedStrategies.has(strategy.id)
+        const tree = buildTree(stratObjectives)
+
+        return (
+          <div key={strategy.id}>
+            <StrategyRow
+              strategy={strategy}
+              objectiveCount={stratObjectives.length}
+              expanded={!isCollapsed}
+              onToggle={() => toggleStrategy(strategy.id)}
+            />
+            {!isCollapsed && tree.map(node => (
+              <TreeItem
+                key={node.objective.id}
+                node={node}
+                depth={1}
+                selectedId={selectedId}
+                onSelect={onSelect}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            ))}
+          </div>
+        )
+      })}
+
+      {/* Unlinked */}
+      {unlinked.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 py-2.5 px-3 text-sm font-semibold text-muted-foreground">
+            <div className="w-4" />
+            <span>Unlinked Objectives</span>
+            <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded tabular-nums">
+              {unlinked.length}
+            </span>
+          </div>
+          {buildTree(unlinked).map(node => (
+            <TreeItem
+              key={node.objective.id}
+              node={node}
+              depth={1}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Header row for the tree table */
+function TreeHeader() {
+  return (
+    <div className="flex items-center gap-3 py-2 px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+      <div className="w-[18px]" />
+      <div className="w-2.5" />
+      <div className="flex-1">Objective</div>
+      <div className="w-16 text-center">Tasks</div>
+      <div className="w-8" />
+      <div className="w-8 text-right">Progress</div>
     </div>
   )
 }

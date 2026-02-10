@@ -44,8 +44,8 @@ export default async function CanvasPage() {
 
   const foundryId = profile.foundry_id
 
-  // Fetch strategic goals and whiteboards in parallel
-  const [goalsResult, whiteboardsResult, objectivesResult] = await Promise.all([
+  // Fetch strategic goals, whiteboards, and objectives in parallel
+  const [goalsResult, whiteboardsResult, objectivesResult, strategicObjResult] = await Promise.all([
     getStrategicGoals(),
     supabase
       .from('whiteboards')
@@ -54,8 +54,16 @@ export default async function CanvasPage() {
       .order('updated_at', { ascending: false }),
     supabase
       .from('objectives')
-      .select('id, title')
+      .select('id, title, parent_objective_id, is_strategic_goal, status, progress')
       .eq('foundry_id', foundryId)
+      .eq('is_ghost', false)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('objectives')
+      .select('id, title, created_at')
+      .eq('foundry_id', foundryId)
+      .eq('is_strategic_goal', true)
       .eq('is_ghost', false)
       .is('deleted_at', null)
       .order('created_at', { ascending: false }),
@@ -80,9 +88,38 @@ export default async function CanvasPage() {
     .filter((b): b is GoalBundle => b !== null)
 
   const whiteboards = (whiteboardsResult.data || []) as WhiteboardRow[]
-  const objectivesForDialog = (objectivesResult.data || []).map((o) => ({
+
+  // All objectives (for dialog and link view)
+  const allObjectives = (objectivesResult.data || []) as Array<{
+    id: string
+    title: string
+    parent_objective_id: string | null
+    is_strategic_goal: boolean | null
+    status: string | null
+    progress: number | null
+  }>
+
+  const objectivesForDialog = allObjectives.map((o) => ({
     id: o.id,
     title: o.title,
+  }))
+
+  // Regular objectives (non-strategic) for the link view and counting
+  const regularObjectives = allObjectives
+    .filter((o) => !o.is_strategic_goal)
+    .map((o) => ({
+      id: o.id,
+      title: o.title,
+      parent_objective_id: o.parent_objective_id,
+      status: o.status,
+      progress: o.progress ?? 0,
+    }))
+
+  // Strategic objectives for the CRUD manager
+  const strategicObjectives = (strategicObjResult.data || []).map((o) => ({
+    id: o.id,
+    title: o.title,
+    created_at: o.created_at ?? new Date().toISOString(),
   }))
 
   return (
@@ -90,6 +127,8 @@ export default async function CanvasPage() {
       {/* Strategy River has its own built-in title bar + stats header */}
       <CanvasShell
         initialBundles={bundles}
+        strategicObjectives={strategicObjectives}
+        regularObjectives={regularObjectives}
         whiteboardList={
           <WhiteboardList
             whiteboards={whiteboards}

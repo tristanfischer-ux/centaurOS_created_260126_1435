@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import {
   LayoutGrid, GitBranch, GanttChartSquare, Search, Target, X, Loader2,
+  ChevronRight, ChevronDown, Flag,
 } from 'lucide-react'
 import {
   AlertDialog,
@@ -20,7 +21,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { StrategyHealthBar } from './strategy-health-bar'
-import { StrategicObjectivesManager } from './strategic-objectives-manager'
 import { ObjectiveCard } from './objective-card'
 import { ObjectiveDetailPanel } from './objective-detail-panel'
 import { ObjectivesTreeView } from './objectives-tree-view'
@@ -298,10 +298,10 @@ export function ObjectivesBoard({
         <div className="min-w-0 flex-1">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Strategic Objectives</h1>
+            <h1 className={typography.h1}>Objectives</h1>
           </div>
           <p className={typography.pageSubtitle}>
-            Your strategic objectives and their progress
+            Your objectives, grouped by strategy
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -319,14 +319,6 @@ export function ObjectivesBoard({
         />
       )}
 
-      {/* Strategic Objectives - high-level pillars for grouping */}
-      <StrategicObjectivesManager
-        strategicObjectives={strategicObjectives}
-        objectives={objectives}
-        activeFilter={strategicFilter}
-        onFilterChange={setStrategicFilter}
-      />
-
       {/* Strategy Health Bar */}
       <StrategyHealthBar
         total={stats.total}
@@ -338,24 +330,41 @@ export function ObjectivesBoard({
         onFilterChange={setHealthFilter}
       />
 
-      {/* Toolbar: View tabs + Search */}
+      {/* Toolbar: View tabs + Strategy Filter + Search */}
       <div className="flex items-center justify-between gap-4">
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-          <TabsList className="h-9">
-            <TabsTrigger value="board" className="text-xs gap-1.5 px-3">
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Board
-            </TabsTrigger>
-            <TabsTrigger value="tree" className="text-xs gap-1.5 px-3">
-              <GitBranch className="h-3.5 w-3.5" />
-              Tree
-            </TabsTrigger>
-            <TabsTrigger value="timeline" className="text-xs gap-1.5 px-3">
-              <GanttChartSquare className="h-3.5 w-3.5" />
-              Timeline
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-3">
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+            <TabsList className="h-9">
+              <TabsTrigger value="board" className="text-xs gap-1.5 px-3">
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Board
+              </TabsTrigger>
+              <TabsTrigger value="tree" className="text-xs gap-1.5 px-3">
+                <GitBranch className="h-3.5 w-3.5" />
+                Tree
+              </TabsTrigger>
+              <TabsTrigger value="timeline" className="text-xs gap-1.5 px-3">
+                <GanttChartSquare className="h-3.5 w-3.5" />
+                Timeline
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* Strategy filter dropdown */}
+          {strategicObjectives.length > 0 && (
+            <select
+              value={strategicFilter || ''}
+              onChange={(e) => setStrategicFilter(e.target.value || null)}
+              className="h-8 text-xs border rounded-md bg-background px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label="Filter by strategy"
+            >
+              <option value="">All Strategies</option>
+              {strategicObjectives.map((s) => (
+                <option key={s.id} value={s.id}>{s.title}</option>
+              ))}
+            </select>
+          )}
+        </div>
 
         <div className="flex items-center gap-2">
           {showSearch ? (
@@ -409,6 +418,7 @@ export function ObjectivesBoard({
           {viewMode === 'tree' && (
             <ObjectivesTreeView
               objectives={filteredObjectives}
+              strategicObjectives={strategicObjectives}
               selectedId={selectedId}
               onSelect={handleSelect}
               onEdit={setObjectiveToEdit}
@@ -418,6 +428,7 @@ export function ObjectivesBoard({
           {viewMode === 'timeline' && (
             <ObjectivesGanttView
               objectives={filteredObjectives}
+              strategicObjectives={strategicObjectives}
               selectedId={selectedId}
               onSelect={handleSelect}
               onTaskSelect={handleTaskSelect}
@@ -464,7 +475,7 @@ export function ObjectivesBoard({
   )
 }
 
-// Board view: grid of cards
+// Board view: 3-tier hierarchy — Strategy > Objectives > Tasks (via cards)
 function BoardView({
   objectives,
   strategicObjectives,
@@ -480,6 +491,44 @@ function BoardView({
   onEdit?: (objective: ObjectiveWithTasks) => void
   onDelete?: (objectiveId: string) => void
 }) {
+  const [collapsedStrategies, setCollapsedStrategies] = useState<Set<string>>(new Set())
+
+  const toggleCollapse = useCallback((strategyId: string) => {
+    setCollapsedStrategies(prev => {
+      const next = new Set(prev)
+      if (next.has(strategyId)) next.delete(strategyId)
+      else next.add(strategyId)
+      return next
+    })
+  }, [])
+
+  // Group objectives by strategy
+  const { grouped, unlinked } = useMemo(() => {
+    const grouped: { strategy: StrategicObjective; objectives: ObjectiveWithTasks[] }[] = []
+    const unlinked: ObjectiveWithTasks[] = []
+
+    // Build a map of strategy ID → objectives
+    const stratMap = new Map<string, ObjectiveWithTasks[]>()
+    for (const obj of objectives) {
+      if (obj.parent_objective_id && strategicObjectives.some(s => s.id === obj.parent_objective_id)) {
+        const existing = stratMap.get(obj.parent_objective_id) || []
+        existing.push(obj)
+        stratMap.set(obj.parent_objective_id, existing)
+      } else {
+        unlinked.push(obj)
+      }
+    }
+
+    for (const strat of strategicObjectives) {
+      grouped.push({
+        strategy: strat,
+        objectives: stratMap.get(strat.id) || [],
+      })
+    }
+
+    return { grouped, unlinked }
+  }, [objectives, strategicObjectives])
+
   if (objectives.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -494,19 +543,105 @@ function BoardView({
     )
   }
 
+  // If no strategies exist, render flat grid
+  if (strategicObjectives.length === 0) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {objectives.map(obj => (
+          <ObjectiveCard
+            key={obj.id}
+            objective={obj}
+            strategicObjectives={strategicObjectives}
+            isSelected={selectedId === obj.id}
+            onSelect={onSelect}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
+    )
+  }
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {objectives.map(obj => (
-        <ObjectiveCard
-          key={obj.id}
-          objective={obj}
-          strategicObjectives={strategicObjectives}
-          isSelected={selectedId === obj.id}
-          onSelect={onSelect}
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
-      ))}
+    <div className="space-y-6">
+      {/* Strategy sections */}
+      {grouped.map(({ strategy, objectives: stratObjectives }) => {
+        const isCollapsed = collapsedStrategies.has(strategy.id)
+
+        return (
+          <div key={strategy.id} className="space-y-3">
+            {/* Strategy header */}
+            <button
+              onClick={() => toggleCollapse(strategy.id)}
+              className="flex items-center gap-2 w-full text-left group"
+            >
+              {isCollapsed ? (
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+              )}
+              <Flag className="h-3.5 w-3.5 text-international-orange" />
+              <span className="text-sm font-semibold text-foreground">
+                {strategy.title}
+              </span>
+              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
+                {stratObjectives.length}
+              </span>
+            </button>
+
+            {/* Objectives grid */}
+            {!isCollapsed && (
+              stratObjectives.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pl-6">
+                  {stratObjectives.map(obj => (
+                    <ObjectiveCard
+                      key={obj.id}
+                      objective={obj}
+                      strategicObjectives={strategicObjectives}
+                      isSelected={selectedId === obj.id}
+                      onSelect={onSelect}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground pl-6 py-2">
+                  No objectives linked to this strategy yet.
+                </p>
+              )
+            )}
+          </div>
+        )
+      })}
+
+      {/* Unlinked objectives */}
+      {unlinked.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-4" /> {/* Spacer for alignment */}
+            <span className="text-sm font-semibold text-muted-foreground">
+              Unlinked Objectives
+            </span>
+            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
+              {unlinked.length}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pl-6">
+            {unlinked.map(obj => (
+              <ObjectiveCard
+                key={obj.id}
+                objective={obj}
+                strategicObjectives={strategicObjectives}
+                isSelected={selectedId === obj.id}
+                onSelect={onSelect}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

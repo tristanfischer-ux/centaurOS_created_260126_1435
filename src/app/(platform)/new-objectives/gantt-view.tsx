@@ -10,7 +10,8 @@ import {
   ChevronDown, ChevronRight as ChevronRightIcon,
 } from 'lucide-react'
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns'
-import type { ObjectiveWithTasks } from './types'
+import { Flag } from 'lucide-react'
+import type { ObjectiveWithTasks, StrategicObjective } from './types'
 
 // ─── Unified semantic color system ──────────────────────────────────
 // Green  = Positive/Good    (On Track objectives, Completed tasks)
@@ -71,6 +72,7 @@ interface ExtendedGanttTask extends GanttTask {
   taskCount?: number
   completedCount?: number
   isObjective?: boolean
+  isStrategy?: boolean
   progressPct?: number
   barColor?: string
 }
@@ -112,8 +114,46 @@ function ObjListTable({
     <div>
       {sortedTasks.map(task => {
         const isObj = task.isObjective
+        const isStrat = (task as ExtendedGanttTask).isStrategy
         const progressPct = task.progressPct ?? task.progress
-        const isCollapsed = isObj ? collapsedObjectives.has(task.id) : false
+        const isCollapsed = isObj ? collapsedObjectives.has(task.id) : isStrat ? collapsedObjectives.has(task.id) : false
+
+        // Strategy group header row
+        if (isStrat) {
+          return (
+            <div
+              key={task.id}
+              className="flex items-center text-sm cursor-pointer transition-colors border-b border-slate-100 bg-international-orange/5 hover:bg-international-orange/10 font-semibold"
+              style={{ height: rowHeight }}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleCollapse(task.id)
+              }}
+            >
+              <div className="flex-1 px-4 min-w-[200px] flex items-center gap-1.5 overflow-hidden">
+                <button
+                  className="flex-shrink-0 p-0.5 rounded hover:bg-muted/60 transition-colors"
+                  aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                >
+                  {isCollapsed
+                    ? <ChevronRightIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                    : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  }
+                </button>
+                <Flag className="h-3.5 w-3.5 text-international-orange flex-shrink-0" />
+                <span className="truncate text-foreground text-[13px]">{task.name}</span>
+                {task.taskCount !== undefined && (
+                  <span className="ml-auto shrink-0 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
+                    {task.taskCount}
+                  </span>
+                )}
+              </div>
+              <div className="w-16 px-2" />
+              <div className="w-[68px] px-2" />
+              <div className="w-[68px] px-2" />
+            </div>
+          )
+        }
 
         return (
           <div
@@ -261,12 +301,13 @@ const LEGEND_ITEMS = [
 
 interface ObjectivesGanttViewProps {
   objectives: ObjectiveWithTasks[]
+  strategicObjectives?: StrategicObjective[]
   selectedId: string | null
   onSelect: (id: string) => void
   onTaskSelect?: (taskId: string) => void
 }
 
-export function ObjectivesGanttView({ objectives, selectedId, onSelect, onTaskSelect }: ObjectivesGanttViewProps) {
+export function ObjectivesGanttView({ objectives, strategicObjectives = [], selectedId, onSelect, onTaskSelect }: ObjectivesGanttViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week)
   const [dateOffset, setDateOffset] = useState<Date>(new Date())
   const [collapsedObjectives, setCollapsedObjectives] = useState<Set<string>>(new Set())
@@ -288,81 +329,166 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect, onTaskSe
     })
   }, [])
 
-  // Build gantt data -- objectives and tasks both as type 'task' (no chamfered project bars)
-  // Collapse is handled by filtering, not by the library's hideChildren
+  /**
+   * Build a list of gantt tasks for a set of objectives (with optional nesting).
+   * Shared between strategy-grouped and flat views.
+   */
+  const buildObjectiveGanttTasks = useCallback(
+    (objs: ObjectiveWithTasks[], now: Date): ExtendedGanttTask[] => {
+      const result: ExtendedGanttTask[] = []
+
+      for (const obj of objs) {
+        const tasksWithDates = obj.tasks.filter(t => t.start_date || t.end_date)
+        const allStarts = tasksWithDates.filter(t => t.start_date).map(t => new Date(t.start_date!).getTime())
+        const allEnds = tasksWithDates.filter(t => t.end_date).map(t => new Date(t.end_date!).getTime())
+
+        let objStart = allStarts.length > 0 ? new Date(Math.min(...allStarts)) : new Date(obj.created_at)
+        let objEnd = allEnds.length > 0 ? new Date(Math.max(...allEnds)) : new Date(objStart.getTime() + 14 * 86400000)
+        if (isNaN(objStart.getTime())) objStart = now
+        if (isNaN(objEnd.getTime()) || objEnd <= objStart) objEnd = new Date(objStart.getTime() + 14 * 86400000)
+
+        const objColor = getObjectiveColor(obj.health)
+        const isCollapsed = collapsedObjectives.has(obj.id)
+
+        result.push({
+          start: objStart,
+          end: objEnd,
+          name: obj.title,
+          id: obj.id,
+          type: 'task',
+          progress: obj.progress,
+          isDisabled: true,
+          styles: {
+            progressColor: objColor,
+            progressSelectedColor: objColor,
+            backgroundColor: objColor,
+          },
+          isObjective: true,
+          objectiveHealth: obj.health,
+          taskCount: obj.totalTasks,
+          completedCount: obj.completedTasks,
+          progressPct: obj.progress,
+          barColor: objColor,
+        })
+
+        if (!isCollapsed) {
+          for (const task of obj.tasks) {
+            let taskStart = task.start_date ? new Date(task.start_date) : new Date(task.created_at)
+            let taskEnd = task.end_date ? new Date(task.end_date) : new Date(taskStart.getTime() + 86400000)
+            if (isNaN(taskStart.getTime())) taskStart = now
+            if (isNaN(taskEnd.getTime()) || taskEnd <= taskStart) taskEnd = new Date(taskStart.getTime() + 86400000)
+
+            const taskColor = getTaskColor(task.status, task.end_date)
+            const taskProgress = typeof task.progress === 'number' ? task.progress : (task.status === 'Completed' ? 100 : 0)
+
+            result.push({
+              start: taskStart,
+              end: taskEnd,
+              name: task.title,
+              id: task.id,
+              type: 'task',
+              progress: taskProgress,
+              isDisabled: true,
+              styles: {
+                progressColor: taskColor,
+                progressSelectedColor: taskColor,
+                backgroundColor: taskColor,
+              },
+              isObjective: false,
+              progressPct: taskProgress,
+              barColor: taskColor,
+            })
+          }
+        }
+      }
+
+      return result
+    },
+    [collapsedObjectives]
+  )
+
+  // Build gantt data with strategy group headers when strategies are present
   const ganttTasks: ExtendedGanttTask[] = useMemo(() => {
-    const result: ExtendedGanttTask[] = []
     const now = new Date()
 
+    // No strategies — flat view
+    if (strategicObjectives.length === 0) {
+      return buildObjectiveGanttTasks(objectives, now)
+    }
+
+    // Group by strategy
+    const result: ExtendedGanttTask[] = []
+    const stratMap = new Map<string, ObjectiveWithTasks[]>()
+    const unlinked: ObjectiveWithTasks[] = []
+
     for (const obj of objectives) {
-      const tasksWithDates = obj.tasks.filter(t => t.start_date || t.end_date)
-      const allStarts = tasksWithDates.filter(t => t.start_date).map(t => new Date(t.start_date!).getTime())
-      const allEnds = tasksWithDates.filter(t => t.end_date).map(t => new Date(t.end_date!).getTime())
+      if (obj.parent_objective_id && strategicObjectives.some(s => s.id === obj.parent_objective_id)) {
+        const existing = stratMap.get(obj.parent_objective_id) || []
+        existing.push(obj)
+        stratMap.set(obj.parent_objective_id, existing)
+      } else {
+        unlinked.push(obj)
+      }
+    }
 
-      let objStart = allStarts.length > 0 ? new Date(Math.min(...allStarts)) : new Date(obj.created_at)
-      let objEnd = allEnds.length > 0 ? new Date(Math.max(...allEnds)) : new Date(objStart.getTime() + 14 * 86400000)
-      if (isNaN(objStart.getTime())) objStart = now
-      if (isNaN(objEnd.getTime()) || objEnd <= objStart) objEnd = new Date(objStart.getTime() + 14 * 86400000)
+    for (const strat of strategicObjectives) {
+      const stratObjs = stratMap.get(strat.id) || []
+      const isStratCollapsed = collapsedObjectives.has(`strat-${strat.id}`)
 
-      const objColor = getObjectiveColor(obj.health)
-      const isCollapsed = collapsedObjectives.has(obj.id)
-
-      // Objective bar (type: 'task' to avoid chamfered/arrow rendering)
+      // Strategy header row (non-renderable bar — just a list row)
       result.push({
-        start: objStart,
-        end: objEnd,
-        name: obj.title,
-        id: obj.id,
+        start: now,
+        end: new Date(now.getTime() + 86400000),
+        name: strat.title,
+        id: `strat-${strat.id}`,
         type: 'task',
-        progress: obj.progress,
+        progress: 0,
         isDisabled: true,
         styles: {
-          progressColor: objColor,
-          progressSelectedColor: objColor,
-          backgroundColor: objColor,
+          progressColor: 'transparent',
+          progressSelectedColor: 'transparent',
+          backgroundColor: 'transparent',
         },
-        isObjective: true,
-        objectiveHealth: obj.health,
-        taskCount: obj.totalTasks,
-        completedCount: obj.completedTasks,
-        progressPct: obj.progress,
-        barColor: objColor,
+        isStrategy: true,
+        isObjective: false,
+        taskCount: stratObjs.length,
+        barColor: '#ff4500',
       })
 
-      // Child tasks (only if expanded)
-      if (!isCollapsed) {
-        for (const task of obj.tasks) {
-          let taskStart = task.start_date ? new Date(task.start_date) : new Date(task.created_at)
-          let taskEnd = task.end_date ? new Date(task.end_date) : new Date(taskStart.getTime() + 86400000)
-          if (isNaN(taskStart.getTime())) taskStart = now
-          if (isNaN(taskEnd.getTime()) || taskEnd <= taskStart) taskEnd = new Date(taskStart.getTime() + 86400000)
+      if (!isStratCollapsed) {
+        result.push(...buildObjectiveGanttTasks(stratObjs, now))
+      }
+    }
 
-          const taskColor = getTaskColor(task.status, task.end_date)
-          const taskProgress = typeof task.progress === 'number' ? task.progress : (task.status === 'Completed' ? 100 : 0)
+    // Unlinked
+    if (unlinked.length > 0) {
+      result.push({
+        start: now,
+        end: new Date(now.getTime() + 86400000),
+        name: 'Unlinked Objectives',
+        id: 'strat-unlinked',
+        type: 'task',
+        progress: 0,
+        isDisabled: true,
+        styles: {
+          progressColor: 'transparent',
+          progressSelectedColor: 'transparent',
+          backgroundColor: 'transparent',
+        },
+        isStrategy: true,
+        isObjective: false,
+        taskCount: unlinked.length,
+        barColor: '#9ca3af',
+      })
 
-          result.push({
-            start: taskStart,
-            end: taskEnd,
-            name: task.title,
-            id: task.id,
-            type: 'task',
-            progress: taskProgress,
-            isDisabled: true,
-            styles: {
-              progressColor: taskColor,
-              progressSelectedColor: taskColor,
-              backgroundColor: taskColor,
-            },
-            isObjective: false,
-            progressPct: taskProgress,
-            barColor: taskColor,
-          })
-        }
+      const isUnlinkedCollapsed = collapsedObjectives.has('strat-unlinked')
+      if (!isUnlinkedCollapsed) {
+        result.push(...buildObjectiveGanttTasks(unlinked, now))
       }
     }
 
     return result
-  }, [objectives, collapsedObjectives])
+  }, [objectives, strategicObjectives, collapsedObjectives, buildObjectiveGanttTasks])
 
   // Click handler (bar click)
   const handleClick = useCallback((task: GanttTask) => {
@@ -422,14 +548,19 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect, onTaskSe
           size="sm"
           className="h-7 text-[11px] text-muted-foreground"
           onClick={() => {
-            if (collapsedObjectives.size < objectives.length) {
-              setCollapsedObjectives(new Set(objectives.map(o => o.id)))
+            const allIds = [
+              ...objectives.map(o => o.id),
+              ...strategicObjectives.map(s => `strat-${s.id}`),
+              ...(objectives.some(o => !o.parent_objective_id) ? ['strat-unlinked'] : []),
+            ]
+            if (collapsedObjectives.size < allIds.length) {
+              setCollapsedObjectives(new Set(allIds))
             } else {
               setCollapsedObjectives(new Set())
             }
           }}
         >
-          {collapsedObjectives.size < objectives.length ? (
+          {collapsedObjectives.size === 0 ? (
             <>
               <ChevronRightIcon className="h-3 w-3 mr-1" />
               Collapse All
