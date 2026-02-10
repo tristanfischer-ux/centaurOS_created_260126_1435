@@ -42,11 +42,11 @@ export const gotoCommand: SlashCommand = {
     
     // Map common aliases and shortcuts
     const routes: Record<string, string> = {
-      'dashboard': '/dashboard',
-      'dash': '/dashboard',
-      'd': '/dashboard',
-      'home': '/dashboard',
-      'h': '/dashboard',
+      'dashboard': '/updates',
+      'dash': '/updates',
+      'd': '/updates',
+      'home': '/updates',
+      'h': '/updates',
       'inbox': '/updates',
       'tasks': '/tasks',
       't': '/tasks',
@@ -127,13 +127,13 @@ export const searchCommand: SlashCommand = {
  */
 export const dashboardCommand: SlashCommand = {
   name: 'dashboard',
-  description: 'Go to Dashboard',
+  description: 'Go to Updates',
   usage: '/dashboard',
   icon: LayoutDashboard,
   category: 'navigation',
   aliases: ['dash'],
   execute: async (): Promise<CommandResult> => {
-    return navigateResult('/dashboard')
+    return navigateResult('/updates')
   }
 }
 
@@ -202,7 +202,7 @@ export const homeCommand: SlashCommand = {
   icon: Home,
   category: 'navigation',
   execute: async (): Promise<CommandResult> => {
-    return navigateResult('/dashboard')
+    return navigateResult('/updates')
   }
 }
 

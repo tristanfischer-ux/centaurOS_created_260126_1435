@@ -22,7 +22,6 @@ import {
     Coins,
     GraduationCap,
     BookOpen,
-    LayoutDashboard,
     UserCircle,
     ArrowLeftRight,
     Settings,
@@ -68,7 +67,7 @@ const personNavigation = [
 // Zone B: "Company" — Workspace navigation (work, strategy, team)
 // ─────────────────────────────────────────────────────────────────────────────
 const companyNavigation = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, tooltip: "Company command center with insights and quick actions" },
+    // Dashboard hidden for v1 — redirects to /updates
     { name: "Updates", href: "/updates", icon: Bell, tooltip: "Notes, comments, and changes across tasks and objectives" },
     { name: "Strategy", href: "/canvas", icon: Waypoints, tooltip: "Strategy flow, timeline, and visual map of your strategic goals" },
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
@@ -202,7 +201,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
             {/* App Header — ForgeOS Branding */}
             <div className="px-5 pt-8 pb-4">
                 <div className="flex items-center justify-between">
-                    <Link href="/dashboard" className="group flex items-center gap-2">
+                    <Link href="/updates" className="group flex items-center gap-2">
                         <span className="font-display text-xl font-bold tracking-[0.05em] text-foreground group-hover:text-international-orange transition-colors">
                             ForgeOS
                         </span>

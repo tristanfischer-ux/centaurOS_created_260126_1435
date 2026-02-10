@@ -1,137 +1,151 @@
 "use client"
 
-import {
-  ScanSearch,
-  Lightbulb,
-  Store,
-  Users,
-  Bot,
-  Waypoints,
-  Target,
-  CheckSquare,
-} from "lucide-react"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import React, { useState, useEffect, useCallback } from "react"
+
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
+import ForgeOS_CompanyScan_Demo from "./demo/ForgeOS_CompanyScan_Demo"
+
+import type { XRaySpec } from "./demo/ForgeOS_CompanyScan_Demo"
+
+// ---------------- localStorage persistence ----------------
+
+const STORAGE_KEY = "xray-workbench-state"
+
+interface PersistedState {
+  spec: XRaySpec
+  activeTab: string
+  savedAt: string
+}
 
 /**
- * Connection points that Product X-Ray wires into.
- * Each represents a platform area this page will integrate with.
- */
-const CONNECTION_POINTS = [
-  {
-    name: "Strategy",
-    description: "Strategic flow and visual mapping of goals",
-    icon: Waypoints,
-    href: "/canvas",
-  },
-  {
-    name: "Objectives",
-    description: "High-level strategic goals and OKRs",
-    icon: Target,
-    href: "/new-objectives",
-  },
-  {
-    name: "Tasks",
-    description: "Actionable items and execution tracking",
-    icon: CheckSquare,
-    href: "/new-tasks",
-  },
-  {
-    name: "Team",
-    description: "Team members, roles, and capacity",
-    icon: Users,
-    href: "/team",
-  },
-  {
-    name: "Agents",
-    description: "Prompt workflows and AI-assisted analysis",
-    icon: Bot,
-    href: "/agents",
-  },
-  {
-    name: "Inspiration",
-    description: "Ideas, packs, and opportunity discovery",
-    icon: Lightbulb,
-    href: "/inspiration",
-  },
-  {
-    name: "Marketplace",
-    description: "Experts, suppliers, products, and services",
-    icon: Store,
-    href: "/marketplace",
-  },
-] as const
-
-/**
- * ProductXRayView — Main client component for the Product X-Ray page.
+ * Reads persisted X-Ray workbench state from localStorage.
  *
- * @description Provides deep product analysis by connecting insights across
- * strategy, objectives, tasks, team, agents, inspiration, and marketplace.
- * This is a placeholder shell — content and integrations will be added incrementally.
+ * @returns The stored state, or null if nothing is stored or parse fails.
+ */
+function readPersistedState(): PersistedState | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as PersistedState
+    // Basic shape validation
+    if (parsed && typeof parsed.spec === "object" && typeof parsed.activeTab === "string") {
+      return parsed
+    }
+    return null
+  } catch {
+    console.warn("[ProductXRay] Failed to parse persisted state, starting fresh.")
+    return null
+  }
+}
+
+/**
+ * Writes X-Ray workbench state to localStorage.
+ */
+function writePersistedState(state: PersistedState): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch (error) {
+    console.warn("[ProductXRay] Failed to persist state:", error instanceof Error ? error.message : "Unknown error")
+  }
+}
+
+// ---------------- Main wrapper ----------------
+
+/**
+ * ProductXRayView — Persistence wrapper around the X-Ray Workbench demo.
+ *
+ * @description Renders the standard page header (orange accent bar) then mounts
+ * the demo component with localStorage-based state restoration. On every spec
+ * or tab change the demo emits, the wrapper writes to localStorage so the user
+ * can refresh without losing progress.
+ *
+ * Future: the service stubs in ./services/ will be wired in here to replace
+ * mock data with real Supabase queries and AI-powered scanning.
  */
 export function ProductXRayView() {
+  const [restored, setRestored] = useState<PersistedState | null>(null)
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  // Track latest values for combined persistence writes
+  const specRef = React.useRef<XRaySpec | null>(null)
+  const tabRef = React.useRef<string>("A")
+
+  // Read localStorage on mount (client-side only)
+  useEffect(() => {
+    const persisted = readPersistedState()
+    if (persisted) {
+      setRestored(persisted)
+      specRef.current = persisted.spec
+      tabRef.current = persisted.activeTab
+    }
+    setIsHydrated(true)
+  }, [])
+
+  const handleSpecChange = useCallback((spec: XRaySpec) => {
+    specRef.current = spec
+    writePersistedState({
+      spec,
+      activeTab: tabRef.current,
+      savedAt: new Date().toISOString(),
+    })
+  }, [])
+
+  const handleTabChange = useCallback((tab: string) => {
+    tabRef.current = tab
+    if (specRef.current) {
+      writePersistedState({
+        spec: specRef.current,
+        activeTab: tab,
+        savedAt: new Date().toISOString(),
+      })
+    }
+  }, [])
+
+  // Don't render demo until we've checked localStorage (prevents flash)
+  if (!isHydrated) {
+    return (
+      <div className="space-y-8">
+        <PageHeader />
+        <div className="h-96 flex items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading workbench...</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
-      {/* Page Header */}
-      <div className="pb-4 border-b border-muted">
-        <div className={typography.pageHeader}>
-          <div className={typography.pageHeaderAccent} />
-          <h1 className={typography.h1}>Product X-Ray</h1>
-        </div>
-        <p className={cn(typography.pageSubtitle, "mt-1")}>
-          Deep product analysis connecting strategy, team, marketplace, and
-          execution — all in one view.
-        </p>
-      </div>
+      <PageHeader />
+      <ForgeOS_CompanyScan_Demo
+        initialSpec={restored?.spec}
+        initialTab={restored?.activeTab}
+        onSpecChange={handleSpecChange}
+        onTabChange={handleTabChange}
+        hideHeader
+      />
+    </div>
+  )
+}
 
-      {/* Connection Points Grid */}
-      <div>
-        <h2 className={cn(typography.h3, "mb-4")}>Connected Areas</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {CONNECTION_POINTS.map((point) => {
-            const Icon = point.icon
-            return (
-              <Card
-                key={point.name}
-                className="group border rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-muted group-hover:bg-orange-50 transition-colors">
-                      <Icon className="h-5 w-5 text-muted-foreground group-hover:text-international-orange transition-colors" />
-                    </div>
-                    <CardTitle className="text-base font-semibold">
-                      {point.name}
-                    </CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    {point.description}
-                  </p>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      </div>
+// ---------------- Page Header ----------------
 
-      {/* Placeholder for future content */}
-      <Card className="border rounded-xl shadow-sm">
-        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="flex items-center justify-center h-16 w-16 rounded-2xl bg-muted/30 mb-6">
-            <ScanSearch className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h3 className={cn(typography.h3, "mb-2")}>
-            Analysis workspace coming soon
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-md">
-            This is where your product analysis will live — pulling insights
-            from across your entire workspace into a unified view.
-          </p>
-        </CardContent>
-      </Card>
+/**
+ * Standard platform page header with orange accent bar.
+ */
+function PageHeader() {
+  return (
+    <div className="pb-4 border-b border-muted">
+      <div className={typography.pageHeader}>
+        <div className={typography.pageHeaderAccent} />
+        <h1 className={typography.h1}>Product X-Ray</h1>
+      </div>
+      <p className={cn(typography.pageSubtitle, "mt-1")}>
+        Scan an idea into a structured machine spec. Derive the experts, suppliers, and
+        procurement scaffolding needed to build it.
+      </p>
     </div>
   )
 }

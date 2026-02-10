@@ -18,6 +18,8 @@ export type OptimisticMessage = Message & {
   status?: 'sending' | 'sent' | 'failed'
   retryCount?: number
   localId?: string
+  updated_at?: string
+  is_edited?: boolean
 }
 
 const MAX_RETRIES = 3

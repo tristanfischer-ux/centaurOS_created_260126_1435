@@ -23,7 +23,7 @@ export default function AdminAnalyticsPage() {
       if (result.error) {
         // If not authorized, redirect
         if (result.error === 'Not authorized') {
-          router.push('/dashboard')
+          router.push('/updates')
           return
         }
         setError(result.error)

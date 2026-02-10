@@ -283,24 +283,11 @@ export default function MarketingPage() {
               <p className="text-muted-foreground text-sm leading-relaxed flex-1">
                 &ldquo;Hardware usually kills returns with 12-month cycles. We shorten that to 12 weeks. Validate cheaper, kill failures faster, and place more winning bets.&rdquo;
               </p>
-              {/* Action Buttons */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
-                <motion.a
-                  href={`${APP_DOMAIN}/login`}
-                  whileHover={buttonHover}
-                  whileTap={buttonTap}
-                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  Login
-                </motion.a>
-                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
-                  <Link
-                    href="/join/vc"
-                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    Apply
-                  </Link>
-                </motion.div>
+              {/* Coming Soon */}
+              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex justify-center">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-bold tracking-widest uppercase bg-muted text-muted-foreground">
+                  Coming Soon
+                </span>
               </div>
             </AnimatedCard>
 
@@ -321,24 +308,11 @@ export default function MarketingPage() {
               <p className="text-muted-foreground text-sm leading-relaxed flex-1">
                 &ldquo;List products, services, or manufacturing capacity on our marketplace. Receive qualified orders, respond to RFQs, and grow your business. Zero sales overhead.&rdquo;
               </p>
-              {/* Action Buttons */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
-                <motion.a
-                  href={`${APP_DOMAIN}/login`}
-                  whileHover={buttonHover}
-                  whileTap={buttonTap}
-                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  Login
-                </motion.a>
-                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
-                  <Link
-                    href="/join/supplier"
-                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    Start Selling
-                  </Link>
-                </motion.div>
+              {/* Coming Soon */}
+              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex justify-center">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-bold tracking-widest uppercase bg-muted text-muted-foreground">
+                  Coming Soon
+                </span>
               </div>
             </AnimatedCard>
 
@@ -359,24 +333,11 @@ export default function MarketingPage() {
               <p className="text-muted-foreground text-sm leading-relaxed flex-1">
                 &ldquo;Universities are IP-rich but execution-constrained. We provide the commercialization engine to transform research into venture-backed startups and students into Apprentices.&rdquo;
               </p>
-              {/* Action Buttons */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
-                <motion.a
-                  href={`${APP_DOMAIN}/login`}
-                  whileHover={buttonHover}
-                  whileTap={buttonTap}
-                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  Login
-                </motion.a>
-                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
-                  <Link
-                    href="/join/university"
-                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    Partner
-                  </Link>
-                </motion.div>
+              {/* Coming Soon */}
+              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex justify-center">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-bold tracking-widest uppercase bg-muted text-muted-foreground">
+                  Coming Soon
+                </span>
               </div>
             </AnimatedCard>
           </StaggerContainer>
@@ -673,23 +634,8 @@ function ManufacturingCapabilitiesSection() {
           })}
         </StaggerContainer>
 
-        {/* CTA */}
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeInUp}
-          className="mt-8 md:mt-12 text-center"
-        >
-          <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
-            <Link
-              href="/inspiration?tab=techniques"
-              className="inline-block bg-foreground hover:bg-international-orange text-background py-3 px-8 text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              Explore All Techniques
-            </Link>
-          </motion.div>
-        </motion.div>
+        {/* CTA - Removed as requested */}
+
       </div>
     </section>
   )

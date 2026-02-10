@@ -18,7 +18,7 @@ export default async function StrategicPlannerPage() {
 
   const foundryId = await getFoundryIdCached()
   if (!foundryId) {
-    redirect('/dashboard')
+    redirect('/updates')
   }
 
   // Fetch strategic goals

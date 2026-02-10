@@ -202,7 +202,8 @@ export function formatDailyPulseForEmail(report: FormattedReport): {
 export function formatDailyPulseForSlack(report: FormattedReport): object {
     const data = report.data as DailyPulseData
     
-    const blocks = [
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const blocks: any[] = [
         {
             type: 'header',
             text: {

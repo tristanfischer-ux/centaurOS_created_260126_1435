@@ -48,7 +48,7 @@ export function getMarketingUrl(path: string = '/'): string {
 /**
  * Get the full URL for an app page
  */
-export function getAppUrl(path: string = '/dashboard'): string {
+export function getAppUrl(path: string = '/updates'): string {
   return `${APP_DOMAIN}${path}`
 }
 

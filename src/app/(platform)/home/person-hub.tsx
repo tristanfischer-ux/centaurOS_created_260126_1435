@@ -98,7 +98,7 @@ export function PersonHub({
       if (!foundry.isActive) {
         await switchFoundry(foundryId)
       }
-      router.push('/dashboard')
+      router.push('/updates')
     })
   }
 

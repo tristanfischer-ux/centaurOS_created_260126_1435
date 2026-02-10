@@ -72,7 +72,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
     if (result.success) {
       setSuccess(true);
       setTimeout(() => {
-        router.push(result.redirectTo || "/dashboard");
+        router.push(result.redirectTo || "/updates");
       }, 2000);
     } else {
       setError(result.error || "Failed to accept invitation");

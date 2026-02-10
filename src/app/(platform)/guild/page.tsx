@@ -29,7 +29,7 @@ export default async function GuildPage() {
     const isExecutive = profile.role === 'Founder' || profile.role === 'Executive'
 
     if (!canManageAssignments && !isApprentice) {
-        redirect('/dashboard')
+        redirect('/updates')
     }
 
     // Fetch guild-relevant members for the network tab

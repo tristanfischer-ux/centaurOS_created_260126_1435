@@ -130,7 +130,7 @@ export default function LoginPage() {
                     src="/images/forge-hero-working.png"
                     alt="Team converting ideas to products, 3D printing a rocket engine"
                     fill
-                    className="object-cover object-right"
+                    className="object-cover object-left"
                     priority
                     quality={100}
                 />

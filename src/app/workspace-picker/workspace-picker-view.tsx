@@ -23,7 +23,7 @@ export function WorkspacePickerView({ foundries }: { foundries: Foundry[] }) {
     startTransition(async () => {
       const result = await switchFoundry(foundryId)
       if (result.success) {
-        router.push('/dashboard')
+        router.push('/updates')
       }
     })
   }

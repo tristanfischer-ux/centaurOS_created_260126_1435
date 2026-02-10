@@ -168,8 +168,8 @@ export default function DemoPage() {
             <Link href="/login">
               <Button variant="outline" size="sm">Login Page</Button>
             </Link>
-            <Link href="/dashboard">
-              <Button variant="outline" size="sm">Dashboard</Button>
+            <Link href="/updates">
+              <Button variant="outline" size="sm">Updates</Button>
             </Link>
           </CardContent>
         </Card>

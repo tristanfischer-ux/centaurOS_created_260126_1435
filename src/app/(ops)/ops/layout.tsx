@@ -32,7 +32,7 @@ export default async function OpsLayout({
     
     if (!hasAccess) {
         // SECURITY: Don't reveal this area exists -- just redirect to main app
-        redirect("/dashboard")
+        redirect("/updates")
     }
     
     return (

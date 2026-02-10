@@ -285,7 +285,7 @@ export async function acceptInvitation(token: string): Promise<{
   
   return { 
     success: true,
-    redirectTo: '/dashboard'
+    redirectTo: '/updates'
   }
 }
 

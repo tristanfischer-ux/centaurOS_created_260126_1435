@@ -20,7 +20,6 @@ import {
     Plus,
     GraduationCap,
     BookOpen,
-    LayoutDashboard,
     ShoppingBag,
     ScanSearch,
     Coins,
@@ -52,7 +51,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 // Primary nav items shown in the bottom bar
 const mainNavigation = [
     { name: "My Profile", shortName: "Profile", href: "/my-profile", icon: UserCircle },
-    { name: "Dashboard", shortName: "Work", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Updates", shortName: "Updates", href: "/updates", icon: Bell },
     { name: "Tasks", shortName: "Tasks", href: "/new-tasks", icon: CheckSquare },
 ]
 

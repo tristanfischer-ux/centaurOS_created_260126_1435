@@ -124,7 +124,7 @@ export async function updateSession(request: NextRequest) {
             
             // Otherwise go to dashboard (or last visited page from cookie)
             const lastVisited = request.cookies.get('forge-last-path')?.value
-            redirectUrl.pathname = lastVisited && lastVisited !== '/' ? lastVisited : '/dashboard'
+            redirectUrl.pathname = lastVisited && lastVisited !== '/' && lastVisited !== '/dashboard' ? lastVisited : '/updates'
             return NextResponse.redirect(redirectUrl)
         }
         // User not logged in, let middleware below handle redirect to marketing

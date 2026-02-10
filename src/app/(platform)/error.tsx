@@ -55,9 +55,9 @@ export default function PlatformError({
                                 Go back
                             </Button>
                             <Button variant="secondary" asChild className="flex-1">
-                                <Link href="/dashboard">
+                                <Link href="/updates">
                                     <Home className="h-4 w-4 mr-2" />
-                                    Dashboard
+                                    Home
                                 </Link>
                             </Button>
                         </div>

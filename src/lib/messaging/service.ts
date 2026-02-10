@@ -1141,7 +1141,7 @@ export async function getTaskThread(
   const messageItems = (messages || []).map((msg) => ({
     id: msg.id,
     content: msg.content || '',
-    author: msg.sender as import('@/types/tasks').Profile,
+    author: msg.sender as unknown as import('@/types/tasks').Profile,
     created_at: msg.created_at,
     source: 'message' as const,
     message_id: msg.id,
@@ -1159,7 +1159,7 @@ export async function getTaskThread(
   const commentItems = filteredComments.map((comment) => ({
     id: comment.id,
     content: comment.content,
-    author: comment.user as import('@/types/tasks').Profile,
+    author: comment.user as unknown as import('@/types/tasks').Profile,
     created_at: comment.created_at || new Date().toISOString(),
     source: 'comment' as const,
     task_id: taskId

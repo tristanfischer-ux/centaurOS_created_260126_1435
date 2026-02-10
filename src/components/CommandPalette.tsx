@@ -13,7 +13,7 @@ import {
   Clock, 
   Store, 
   Settings, 
-  LayoutDashboard,
+  Bell,
   Focus,
   ClipboardCheck,
   FileText,
@@ -309,9 +309,9 @@ export function CommandPalette() {
             <Home className="mr-2 h-4 w-4" />
             Home
           </CommandItem>
-          <CommandItem onSelect={() => { router.push('/dashboard'); setOpen(false) }}>
-            <LayoutDashboard className="mr-2 h-4 w-4" />
-            Dashboard
+          <CommandItem onSelect={() => { router.push('/updates'); setOpen(false) }}>
+            <Bell className="mr-2 h-4 w-4" />
+            Updates
           </CommandItem>
           <CommandItem onSelect={() => { router.push('/new-objectives'); setOpen(false) }}>
             <Target className="mr-2 h-4 w-4" />
