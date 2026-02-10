@@ -41,6 +41,7 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowRight,
+  ArrowDown,
   Box,
   ScanLine,
   Users,
@@ -51,6 +52,12 @@ import {
   Clock,
   Star,
   CircleDot,
+  Package,
+  FlaskConical,
+  Truck,
+  ClipboardCheck,
+  Gauge,
+  HelpCircle,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -65,6 +72,8 @@ import {
   matchSuppliersAction,
   generateImagesAction,
 } from "@/actions/xray"
+
+import { XRaySchematic } from "../components/xray-schematic"
 
 import type { XRaySpec, ModuleSpec, Discipline, TransformationDiagnostic } from "../services/xray-schema"
 import type { PersonMatch } from "../services/people"
@@ -502,6 +511,18 @@ function ModuleCard({
     : true
   const processClass = m.diagnostic?.derivedProcessClass || ((m as Record<string, unknown>).reactionDiag as ReactionDiagnostic | undefined)?.derivedProcessClass
   const accentColor = chipColor(m.id)
+  const derivedRisks = m.diagnostic?.derivedRisks || []
+
+  // Group expert questions by discipline for organized display
+  const disciplineGroups = useMemo(() => {
+    const groups = new Map<string, Array<{ q: string }>>()
+    for (const eq of m.detail.expertQuestions) {
+      const existing = groups.get(eq.discipline) || []
+      existing.push({ q: eq.q })
+      groups.set(eq.discipline, existing)
+    }
+    return groups
+  }, [m.detail.expertQuestions])
 
   return (
     <Card className={cn(
@@ -509,9 +530,9 @@ function ModuleCard({
       isGating && !diagComplete && "ring-1 ring-status-warning"
     )}>
       {/* Colored accent bar */}
-      <div className="h-1 w-full" style={{ backgroundColor: accentColor }} />
+      <div className="h-1.5 w-full" style={{ backgroundColor: accentColor }} />
 
-      <CardContent className="pt-5 space-y-4">
+      <CardContent className="pt-5 space-y-5">
         {/* Module image header */}
         {m.imageUrl && m.imageStatus === "complete" && (
           <div className="rounded-xl overflow-hidden -mx-6 mb-2 relative">
@@ -530,7 +551,7 @@ function ModuleCard({
           </div>
         )}
 
-        {/* Header row */}
+        {/* ── SECTION 1: Header ────────────────────────────────────── */}
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1.5 min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -538,6 +559,11 @@ function ModuleCard({
                 <Box className="h-4 w-4" style={{ color: accentColor }} />
               </div>
               <h3 className="text-base font-display font-semibold text-foreground truncate">{m.name}</h3>
+              {isGating && (
+                <Badge variant={diagComplete ? "success" : "warning"} className="text-[10px] shrink-0">
+                  {diagComplete ? "Gating set" : "Gating"}
+                </Badge>
+              )}
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">{m.purpose}</p>
           </div>
@@ -568,148 +594,232 @@ function ModuleCard({
           </div>
         </div>
 
-        {/* Readiness progress bar */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-1.5 bg-muted/50 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${r.pct}%`,
-                backgroundColor: r.pct === 100 ? "#10b981" : r.pct > 0 ? "#3b82f6" : "#94a3b8",
-              }}
-            />
-          </div>
-          <span className="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">
-            {r.answered}/{r.total} answers
-          </span>
-          {r.risks > 0 && (
-            <span className="text-[11px] text-status-warning-dark tabular-nums whitespace-nowrap">
-              {r.risks} risks
+        {/* ── SECTION 2: Quick Stats Row ───────────────────────────── */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Readiness progress */}
+          <div className="flex items-center gap-2 flex-1 min-w-[160px]">
+            <div className="flex-1 h-1.5 bg-muted/50 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${r.pct}%`,
+                  backgroundColor: r.pct === 100 ? "#10b981" : r.pct > 0 ? "#3b82f6" : "#94a3b8",
+                }}
+              />
+            </div>
+            <span className="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">
+              {r.answered}/{r.total} answers
             </span>
+          </div>
+          {/* Lead time */}
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            <span className="font-medium">{m.requirements.leadWeeks}w lead</span>
+          </div>
+          {/* Key parts count */}
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Package className="h-3 w-3" />
+            <span>{m.keyParts.length} parts</span>
+          </div>
+          {/* Tests count */}
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <ClipboardCheck className="h-3 w-3" />
+            <span>{m.tests.length} tests</span>
+          </div>
+          {/* Risk indicators */}
+          {(m.detail.commonFailureModes.length > 0 || m.detail.unknownsToResolve.length > 0) && (
+            <div className="flex items-center gap-1.5 text-[11px] text-status-warning-dark">
+              <AlertTriangle className="h-3 w-3" />
+              <span>{m.detail.commonFailureModes.length} risks, {m.detail.unknownsToResolve.length} unknowns</span>
+            </div>
           )}
         </div>
 
-        {/* IO grid */}
-        <div className="grid md:grid-cols-3 gap-3">
-          <div className="rounded-xl bg-muted/40 p-3 space-y-1">
-            <div className="flex items-center gap-1.5">
-              <ArrowRight className="h-3 w-3 text-chart-2" />
-              <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Inputs</h4>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {m.io.in.map((x, i) => (
-                <span key={i} className="inline-block rounded bg-background px-1.5 py-0.5 text-xs text-foreground">{x}</span>
-              ))}
-            </div>
+        {/* ── SECTION 3: Technical Description ─────────────────────── */}
+        <div className="rounded-xl bg-muted/30 border p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <Lightbulb className="h-3.5 w-3.5 text-chart-1 shrink-0" />
+            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Technical description</h4>
           </div>
-          <div className="rounded-xl bg-muted/40 p-3 space-y-1">
-            <div className="flex items-center gap-1.5">
-              <ArrowRight className="h-3 w-3 text-chart-3 rotate-180" />
-              <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Outputs</h4>
+          <p className="text-sm text-muted-foreground leading-relaxed">{m.detail.whatItIs}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed italic">{m.detail.whyItMatters}</p>
+        </div>
+
+        {/* ── SECTION 4: Process Flow (IO) ─────────────────────────── */}
+        <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
+          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+            <Gauge className="h-3.5 w-3.5 text-chart-2" />
+            Process flow
+          </h4>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Inputs */}
+            <div className="flex items-center gap-2">
+              <ArrowRight className="h-3.5 w-3.5 text-chart-2 shrink-0" />
+              <div className="flex flex-wrap gap-1">
+                {m.io.in.map((x, i) => (
+                  <span key={i} className="inline-flex items-center rounded-md bg-chart-2/10 border border-chart-2/20 px-2 py-0.5 text-xs font-medium text-foreground">{x}</span>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1">
-              {m.io.out.map((x, i) => (
-                <span key={i} className="inline-block rounded bg-background px-1.5 py-0.5 text-xs text-foreground">{x}</span>
-              ))}
+            {/* Arrow */}
+            <ArrowDown className="h-4 w-4 text-muted-foreground rotate-[-90deg] shrink-0" />
+            {/* Module box */}
+            <div className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 border-2" style={{ borderColor: accentColor + "40", backgroundColor: accentColor + "08" }}>
+              <Box className="h-3.5 w-3.5" style={{ color: accentColor }} />
+              <span className="text-xs font-semibold text-foreground">{m.name}</span>
             </div>
-          </div>
-          <div className="rounded-xl bg-muted/40 p-3 space-y-1">
-            <div className="flex items-center gap-1.5">
-              <Wrench className="h-3 w-3 text-chart-4" />
-              <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Key parts</h4>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {m.keyParts.slice(0, 5).map((x, i) => (
-                <span key={i} className="inline-block rounded bg-background px-1.5 py-0.5 text-xs text-foreground">{x}</span>
-              ))}
-              {m.keyParts.length > 5 && (
-                <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">+{m.keyParts.length - 5}</span>
-              )}
+            {/* Arrow */}
+            <ArrowDown className="h-4 w-4 text-muted-foreground rotate-[-90deg] shrink-0" />
+            {/* Outputs */}
+            <div className="flex items-center gap-2">
+              <div className="flex flex-wrap gap-1">
+                {m.io.out.map((x, i) => (
+                  <span key={i} className="inline-flex items-center rounded-md bg-chart-3/10 border border-chart-3/20 px-2 py-0.5 text-xs font-medium text-foreground">{x}</span>
+                ))}
+              </div>
+              <ArrowRight className="h-3.5 w-3.5 text-chart-3 shrink-0" />
             </div>
           </div>
         </div>
 
-        {processClass && (
-          <div className="rounded-xl bg-status-success-light/30 border border-status-success/20 p-3 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-status-success shrink-0" />
-            <div>
-              <h4 className="text-xs font-semibold text-foreground">Derived process class</h4>
-              <p className="text-sm text-foreground">{processClass}</p>
+        {/* ── SECTION 5: Key Components ────────────────────────────── */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+            <Package className="h-3.5 w-3.5 text-chart-4" />
+            Key components ({m.keyParts.length})
+          </h4>
+          <div className="flex flex-wrap gap-1.5">
+            {m.keyParts.map((part, i) => (
+              <span key={i} className="inline-flex items-center rounded-lg bg-muted/50 border px-2.5 py-1 text-xs text-foreground">
+                <Wrench className="h-2.5 w-2.5 mr-1.5 text-muted-foreground" />
+                {part}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* ── SECTION 6: Acceptance Tests ──────────────────────────── */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+            <ClipboardCheck className="h-3.5 w-3.5 text-chart-3" />
+            Acceptance tests ({m.tests.length})
+          </h4>
+          <div className="grid sm:grid-cols-2 gap-1.5">
+            {m.tests.map((test, i) => (
+              <div key={i} className="flex items-start gap-2 rounded-lg bg-muted/30 border px-2.5 py-1.5">
+                <CheckCircle2 className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
+                <span className="text-xs text-foreground">{test}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── SECTION 7: Procurement ───────────────────────────────── */}
+        <div className="rounded-xl bg-chart-2/5 border border-chart-2/15 p-4 flex items-start gap-3">
+          <Truck className="h-4 w-4 text-chart-2 shrink-0 mt-0.5" />
+          <div className="space-y-1 flex-1">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-semibold text-foreground">Procurement &amp; lead time</h4>
+              <Badge variant="secondary" className="text-[10px]">
+                <Clock className="h-2.5 w-2.5 mr-1" />
+                {m.requirements.leadWeeks} weeks
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">{m.requirements.notes}</p>
+          </div>
+        </div>
+
+        {/* ── SECTION 8: Risk Summary ──────────────────────────────── */}
+        {(m.detail.commonFailureModes.length > 0 || derivedRisks.length > 0) && (
+          <div className="rounded-xl bg-status-warning-light/20 border border-status-warning/15 p-4 space-y-3">
+            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
+              Risk indicators
+            </h4>
+            <div className="grid sm:grid-cols-2 gap-2">
+              {m.detail.commonFailureModes.map((x, i) => (
+                <div key={`fm-${i}`} className="flex items-start gap-2 text-sm">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-status-warning mt-1.5 shrink-0" />
+                  <span className="text-muted-foreground">{x}</span>
+                </div>
+              ))}
+              {derivedRisks.map((x, i) => (
+                <div key={`dr-${i}`} className="flex items-start gap-2 text-sm">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-destructive mt-1.5 shrink-0" />
+                  <span className="text-muted-foreground">{x}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Deep dive toggle */}
+        {/* Derived process class */}
+        {processClass && (
+          <div className="rounded-xl bg-status-success-light/30 border border-status-success/20 p-4 flex items-center gap-3">
+            <FlaskConical className="h-5 w-5 text-status-success shrink-0" />
+            <div>
+              <h4 className="text-xs font-semibold text-foreground">Derived process class</h4>
+              <p className="text-sm font-medium text-foreground">{processClass}</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── SECTION 9: Deep Dive Toggle ──────────────────────────── */}
         <button
           onClick={() => setOpen((v) => !v)}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full py-1"
         >
           {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          <span className="font-medium">{open ? "Hide details" : "Deep dive"}</span>
+          <span className="font-medium">{open ? "Hide engineering detail" : "Engineering detail"}</span>
+          <span className="text-[10px] text-muted-foreground ml-auto">
+            {m.detail.unknownsToResolve.length} unknowns &middot; {m.detail.expertQuestions.length} expert questions
+          </span>
         </button>
 
-        {/* Expandable detail section */}
+        {/* Expandable deep dive */}
         <div className={cn(
           "overflow-hidden transition-all duration-300",
-          open ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"
+          open ? "max-h-[3000px] opacity-100" : "max-h-0 opacity-0"
         )}>
-          <div className="rounded-xl bg-muted/30 border p-5 space-y-5">
-            <div className="grid md:grid-cols-2 gap-5">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Lightbulb className="h-3.5 w-3.5 text-chart-1" />
-                  <h4 className="text-sm font-semibold text-foreground">What it is</h4>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">{m.detail.whatItIs}</p>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Star className="h-3.5 w-3.5 text-chart-2" />
-                  <h4 className="text-sm font-semibold text-foreground">Why it matters</h4>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">{m.detail.whyItMatters}</p>
-              </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-5">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
-                  <h4 className="text-sm font-semibold text-foreground">Common failure modes</h4>
-                </div>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  {m.detail.commonFailureModes.map((x, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-status-warning mt-1.5 shrink-0" />
-                      {x}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <CircleDot className="h-3.5 w-3.5 text-chart-5" />
-                  <h4 className="text-sm font-semibold text-foreground">Unknowns to resolve</h4>
-                </div>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  {m.detail.unknownsToResolve.map((x, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-chart-5 mt-1.5 shrink-0" />
-                      {x}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+          <div className="rounded-xl bg-muted/30 border p-5 space-y-6">
+
+            {/* Unknowns to resolve */}
             <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-foreground">Questions to ask experts</h4>
-              <div className="space-y-2">
-                {m.detail.expertQuestions.map((q, i) => (
-                  <div key={i} className="flex items-start gap-2 rounded-lg bg-background p-2.5">
-                    <Badge variant="secondary" className="text-[10px] shrink-0 mt-0.5">{q.discipline}</Badge>
-                    <span className="text-sm text-foreground">{q.q}</span>
-                  </div>
-                ))}
+              <div className="flex items-center gap-2">
+                <HelpCircle className="h-3.5 w-3.5 text-chart-5" />
+                <h4 className="text-sm font-semibold text-foreground">Unknowns to resolve before design</h4>
               </div>
+              <ul className="space-y-1.5">
+                {m.detail.unknownsToResolve.map((x, i) => (
+                  <li key={i} className="flex items-start gap-2 rounded-lg bg-background border px-3 py-2">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-chart-5/15 text-[10px] font-bold text-chart-5 shrink-0 mt-0.5">{i + 1}</span>
+                    <span className="text-sm text-foreground">{x}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Expert questions by discipline */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Users className="h-3.5 w-3.5 text-chart-1" />
+                <h4 className="text-sm font-semibold text-foreground">Expert questions by discipline</h4>
+              </div>
+              {Array.from(disciplineGroups.entries()).map(([discipline, questions]) => (
+                <div key={discipline} className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-[10px]">{discipline}</Badge>
+                    <span className="text-[10px] text-muted-foreground">{questions.length} question{questions.length !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="space-y-1">
+                    {questions.map((q, i) => (
+                      <div key={i} className="flex items-start gap-2 rounded-lg bg-background border px-3 py-2">
+                        <span className="text-sm text-foreground">{q.q}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -718,9 +828,10 @@ function ModuleCard({
   )
 }
 
-// ─── Schematic ───────────────────────────────────────────────────────
+// ─── Old Schematic removed — now uses XRaySchematic from components/xray-schematic.tsx ──
 
-function Schematic({
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _OldSchematic({
   spec,
   onOpenDiagnostic,
 }: {
@@ -1017,6 +1128,8 @@ function XRayView({
   isGeneratingImages,
   onOpenInterview,
   onOpenDiagnostic,
+  scanId,
+  onGenerateImages,
 }: {
   spec: XRaySpec
   setSpec: (s: XRaySpec) => void
@@ -1025,6 +1138,8 @@ function XRayView({
   isGeneratingImages: boolean
   onOpenInterview: (m: ModuleSpec) => void
   onOpenDiagnostic: (m: ModuleSpec) => void
+  scanId: string | null
+  onGenerateImages: () => void
 }) {
   const [localIdea, setLocalIdea] = useState(spec.idea)
   useEffect(() => setLocalIdea(spec.idea), [spec.idea])
@@ -1100,7 +1215,23 @@ function XRayView({
             </Alert>
           )}
 
-          <Schematic spec={spec} onOpenDiagnostic={onOpenDiagnostic} />
+          {/* Generate images button — visible when scan exists but no images */}
+          {scanId && !isGeneratingImages && spec.modules.length > 0 &&
+            !spec.modules.some((m) => m.imageStatus === "complete") && (
+            <div className="flex items-center justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onGenerateImages}
+                className="rounded-full"
+              >
+                <ImageIcon className="h-4 w-4 mr-2" />
+                Generate blueprint images
+              </Button>
+            </div>
+          )}
+
+          <XRaySchematic spec={spec} onOpenDiagnostic={onOpenDiagnostic} />
 
           <div className="grid lg:grid-cols-2 gap-4">
             <Pill label="Assumptions" items={spec.assumptions} />
@@ -1662,6 +1793,31 @@ export default function ForgeOS_CompanyScan_Demo({
             isGeneratingImages={isGeneratingImages}
             onOpenInterview={setInterviewModule}
             onOpenDiagnostic={setDiagnosticModule}
+            scanId={scanId}
+            onGenerateImages={() => {
+              if (!scanId) {
+                toast.error("Save a scan first before generating images")
+                return
+              }
+              setIsGeneratingImages(true)
+              toast.info("Generating blueprint images...")
+              generateImagesAction(scanId)
+                .then((imgResult) => {
+                  if ("spec" in imgResult) {
+                    setSpec(imgResult.spec)
+                    const successCount = imgResult.spec.modules.filter(m => m.imageStatus === "complete").length
+                    if (successCount > 0) toast.success(`Generated ${successCount} module images`)
+                    if (imgResult.spec.systemImageStatus === "complete") toast.success("System diagram generated")
+                  } else {
+                    toast.error(imgResult.error || "Image generation failed")
+                  }
+                })
+                .catch((err) => {
+                  toast.error("Image generation failed: " + (err instanceof Error ? err.message : "Unknown error"))
+                  console.error("[XRay] Image generation error:", err)
+                })
+                .finally(() => setIsGeneratingImages(false))
+            }}
           />
         </TabsContent>
 

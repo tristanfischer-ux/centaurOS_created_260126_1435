@@ -129,20 +129,29 @@ async function callGeminiImage(
     },
   }
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+  } catch (fetchError) {
+    const msg = fetchError instanceof Error ? fetchError.message : "Network error"
+    console.error("[XRayImageGen] Fetch failed:", { model, error: msg })
+    throw new Error(`[XRayImageGen] Network error calling Gemini: ${msg}`)
+  }
 
   if (!response.ok) {
     const errText = await response.text()
-    throw new Error(`[XRayImageGen] Gemini API error (${response.status}): ${errText}`)
+    console.error("[XRayImageGen] Gemini API error:", { model, status: response.status, body: errText.slice(0, 500) })
+    throw new Error(`[XRayImageGen] Gemini API error (${response.status}): ${errText.slice(0, 200)}`)
   }
 
   const data = (await response.json()) as GeminiImageResponse
 
   if (data.error) {
+    console.error("[XRayImageGen] Gemini returned error:", { model, error: data.error.message })
     throw new Error(`[XRayImageGen] Gemini error: ${data.error.message}`)
   }
 
@@ -150,7 +159,8 @@ async function callGeminiImage(
   const imagePart = parts_.find((p) => p.inlineData)
 
   if (!imagePart?.inlineData) {
-    throw new Error("[XRayImageGen] No image data returned from Gemini")
+    console.error("[XRayImageGen] No image in response:", { model, partsCount: parts_.length, hasText: parts_.some(p => p.text) })
+    throw new Error("[XRayImageGen] No image data returned from Gemini — model may have returned text-only response")
   }
 
   return imagePart.inlineData
