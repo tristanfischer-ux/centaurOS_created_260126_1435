@@ -23,10 +23,13 @@ const MAX_ZOOM = 2.5
 const ZOOM_STEP = 0.08
 const ZOOM_BTN_STEP = 0.2
 
+/** Default Y offset so the orbit starts higher on the page (negative = upward) */
+const DEFAULT_PAN = { x: 0, y: -60 }
+
 export function PanZoomCanvas({ children, onBackgroundClick }: PanZoomCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [pan, setPan] = useState(DEFAULT_PAN)
   const [isDragging, setIsDragging] = useState(false)
   const dragStart = useRef({ x: 0, y: 0, px: 0, py: 0 })
 
@@ -81,7 +84,7 @@ export function PanZoomCanvas({ children, onBackgroundClick }: PanZoomCanvasProp
   const zoomOut = () => setZoom((z) => Math.max(MIN_ZOOM, z - ZOOM_BTN_STEP))
   const fitView = () => {
     setZoom(1)
-    setPan({ x: 0, y: 0 })
+    setPan(DEFAULT_PAN)
   }
 
   return (
