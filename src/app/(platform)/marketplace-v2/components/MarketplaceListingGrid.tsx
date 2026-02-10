@@ -5,6 +5,7 @@ import { MarketCardV2 } from './MarketCardV2'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ViewToggle } from '@/components/ui/view-toggle'
 import { cn } from '@/lib/utils'
 import {
     getCategoryBadgeClasses,
@@ -344,36 +345,14 @@ export function MarketplaceListingGrid({
                         </>
                     )}
                 </div>
-                <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
-                    <button
-                        onClick={() => setViewMode('cards')}
-                        className={cn(
-                            'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all',
-                            viewMode === 'cards'
-                                ? 'bg-background text-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground'
-                        )}
-                        aria-label="Card view"
-                        aria-pressed={viewMode === 'cards'}
-                    >
-                        <LayoutGrid className="w-3.5 h-3.5" />
-                        Cards
-                    </button>
-                    <button
-                        onClick={() => setViewMode('list')}
-                        className={cn(
-                            'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all',
-                            viewMode === 'list'
-                                ? 'bg-background text-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground'
-                        )}
-                        aria-label="List view"
-                        aria-pressed={viewMode === 'list'}
-                    >
-                        <List className="w-3.5 h-3.5" />
-                        List
-                    </button>
-                </div>
+                <ViewToggle
+                    options={[
+                        { value: 'cards', label: 'Cards', icon: LayoutGrid, ariaLabel: 'Card view' },
+                        { value: 'list', label: 'List', icon: List, ariaLabel: 'List view' },
+                    ]}
+                    value={viewMode}
+                    onValueChange={(v) => setViewMode(v as ViewMode)}
+                />
             </div>
 
             {/* Card view */}

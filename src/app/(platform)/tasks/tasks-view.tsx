@@ -10,6 +10,7 @@ import { SearchInput } from "@/components/ui/search-input"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
 import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronRight, CalendarDays, Inbox, History, AlertTriangle, CircleDashed } from "lucide-react"
+import { ViewToggle } from "@/components/ui/view-toggle"
 import { UserAvatar, UserAvatarStack } from "@/components/ui/user-avatar"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
 import { deleteObjectives } from "@/actions/objectives"
@@ -754,59 +755,15 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     </Popover>
 
                                     {/* View Mode Switcher */}
-                                    <div className="bg-muted/50 p-1 rounded-xl flex items-center border border-muted">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setViewMode('grid')}
-                                            className={cn(
-                                                "h-8 w-8 p-0 rounded-md transition-all duration-200",
-                                                viewMode === 'grid' 
-                                                    ? 'bg-international-orange/10 text-international-orange shadow-sm' 
-                                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                                            )}
-                                            aria-label="Grid view"
-                                        >
-                                            <LayoutGrid className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setViewMode('list')}
-                                            className={cn(
-                                                "h-8 w-8 p-0 rounded-md transition-all duration-200",
-                                                viewMode === 'list' 
-                                                    ? 'bg-international-orange/10 text-international-orange shadow-sm' 
-                                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                                            )}
-                                            aria-label="List view"
-                                        >
-                                            <List className="h-4 w-4" />
-                                        </Button>
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => setViewMode('timeline')}
-                                                        className={cn(
-                                                            "h-8 w-8 p-0 rounded-md transition-all duration-200",
-                                                            viewMode === 'timeline' 
-                                                                ? 'bg-international-orange/10 text-international-orange shadow-sm' 
-                                                                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                                                        )}
-                                                        aria-label="Timeline view"
-                                                    >
-                                                        <CalendarDays className="h-4 w-4" />
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Timeline (Gantt chart view)</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    </div>
+                                    <ViewToggle
+                                        options={[
+                                            { value: 'grid', icon: LayoutGrid, ariaLabel: 'Grid view' },
+                                            { value: 'list', icon: List, ariaLabel: 'List view' },
+                                            { value: 'timeline', icon: CalendarDays, ariaLabel: 'Timeline (Gantt chart view)' },
+                                        ]}
+                                        value={viewMode}
+                                        onValueChange={(v) => setViewMode(v as 'grid' | 'list' | 'timeline')}
+                                    />
 
                                     {/* Collapse All (for grid view) */}
                                     {viewMode === 'grid' && hasExpandedCard && (

@@ -112,7 +112,7 @@ export function InviteMemberDialog() {
             else setOpen(true)
         }}>
             <DialogTrigger asChild>
-                <Button variant="secondary">
+                <Button variant="secondary" size="sm">
                     <UserPlus className="h-4 w-4" />
                     Invite Member
                 </Button>

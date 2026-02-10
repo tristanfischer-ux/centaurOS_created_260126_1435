@@ -62,6 +62,7 @@ import {
   Sparkles,
   Map,
 } from 'lucide-react'
+import { ViewToggle } from '@/components/ui/view-toggle'
 import { toast } from 'sonner'
 
 interface BlueprintDetailViewProps {
@@ -268,31 +269,15 @@ export function BlueprintDetailView({
             </div>
 
             {/* View mode toggle */}
-            <div className="flex items-center gap-1 border rounded-md p-1">
-              <Button
-                variant={viewMode === 'visual' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('visual')}
-                className={viewMode === 'visual' ? 'bg-international-orange hover:bg-international-orange/90' : ''}
-              >
-                <Sparkles className="h-4 w-4 mr-1" />
-                Visual
-              </Button>
-              <Button
-                variant={viewMode === 'tree' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('tree')}
-              >
-                <ListTree className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-            </div>
+            <ViewToggle
+              options={[
+                { value: 'visual', label: 'Visual', icon: Sparkles, ariaLabel: 'Visual view' },
+                { value: 'tree', icon: ListTree, ariaLabel: 'Tree view' },
+                { value: 'list', icon: List, ariaLabel: 'List view' },
+              ]}
+              value={viewMode}
+              onValueChange={(v) => setViewMode(v as 'visual' | 'tree' | 'list')}
+            />
 
             {/* Show all toggle */}
             <div className="flex items-center gap-2">

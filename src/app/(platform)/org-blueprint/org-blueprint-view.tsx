@@ -33,6 +33,7 @@ import {
     LayoutGrid,
     List,
 } from 'lucide-react'
+import { ViewToggle } from '@/components/ui/view-toggle'
 import { cn } from '@/lib/utils'
 import { CoverageRadar } from '@/components/org-blueprint/coverage-radar'
 import { AssessmentModal } from '@/components/org-blueprint/assessment-modal'
@@ -498,24 +499,14 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
                     <span className="text-sm text-muted-foreground">
                         {filteredFunctions.length} functions
                     </span>
-                    <div className="bg-muted p-1 flex items-center rounded-lg">
-                        <Button
-                            variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                            size="sm"
-                            onClick={() => setViewMode('grid')}
-                            className="h-8 w-8 p-0"
-                        >
-                            <LayoutGrid className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant={viewMode === 'list' ? 'default' : 'ghost'}
-                            size="sm"
-                            onClick={() => setViewMode('list')}
-                            className="h-8 w-8 p-0"
-                        >
-                            <List className="h-4 w-4" />
-                        </Button>
-                    </div>
+                    <ViewToggle
+                        options={[
+                            { value: 'grid', icon: LayoutGrid, ariaLabel: 'Grid view' },
+                            { value: 'list', icon: List, ariaLabel: 'List view' },
+                        ]}
+                        value={viewMode}
+                        onValueChange={(v) => setViewMode(v as 'grid' | 'list')}
+                    />
                 </div>
             </div>
 

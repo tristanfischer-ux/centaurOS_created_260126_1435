@@ -22,8 +22,8 @@ import type { ModuleSpec, XRaySpec } from "./xray-schema"
 // ─── Constants ───────────────────────────────────────────────────────
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-const MODULE_MODEL = "gemini-2.0-flash-exp" // Fast module images
-const SYSTEM_MODEL = "gemini-2.0-flash-exp" // System diagram (using flash for now, upgrade to pro when available)
+const MODULE_MODEL = "gemini-2.5-flash-image" // Nano Banana — fast module blueprints
+const SYSTEM_MODEL = "gemini-3-pro-image-preview" // Nano Banana Pro — professional system P&ID diagrams
 const STORAGE_BUCKET = "xray-images"
 
 // ─── Types ───────────────────────────────────────────────────────────

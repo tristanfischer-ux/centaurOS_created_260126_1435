@@ -12,6 +12,7 @@ import {
   Loader2,
   ArrowUpDown,
 } from "lucide-react"
+import { ViewToggle } from "@/components/ui/view-toggle"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
@@ -107,24 +108,14 @@ export function SearchResults({
 
         {/* View mode toggle */}
         {onViewModeChange && (
-          <div className="bg-muted p-1 rounded flex items-center">
-            <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => onViewModeChange("grid")}
-              className="h-7 w-7 p-0"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => onViewModeChange("list")}
-              className="h-7 w-7 p-0"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
+          <ViewToggle
+            options={[
+              { value: "grid", icon: LayoutGrid, ariaLabel: "Grid view" },
+              { value: "list", icon: List, ariaLabel: "List view" },
+            ]}
+            value={viewMode}
+            onValueChange={(v) => onViewModeChange(v as "grid" | "list")}
+          />
         )}
       </div>
     </div>

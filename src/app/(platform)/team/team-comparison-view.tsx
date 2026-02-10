@@ -17,6 +17,7 @@ import {
     ArrowRight, UserPlus, Plus, Activity, ShieldCheck, ChevronRight,
     BarChart3
 } from "lucide-react"
+import { ViewToggle } from "@/components/ui/view-toggle"
 import { createTeam, addTeamMember, deleteMember } from "@/actions/team"
 import { startDirectMessage } from "@/actions/messaging"
 import { deleteTeam, updateTeamName } from "@/actions/teams"
@@ -806,36 +807,14 @@ export function TeamComparisonView({ founders, executives, apprentices, teams, c
 
                     {/* View toggle (members only) */}
                     {activeTab === 'members' && (
-                        <div className="flex bg-muted/50 p-1 rounded-xl border border-muted">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setViewMode('grid')}
-                                className={cn(
-                                    "h-7 w-7 p-0 rounded-md transition-all duration-200",
-                                    viewMode === 'grid'
-                                        ? 'bg-international-orange/10 text-international-orange shadow-sm'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                                )}
-                                aria-label="Grid view"
-                            >
-                                <LayoutGrid className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setViewMode('list')}
-                                className={cn(
-                                    "h-7 w-7 p-0 rounded-md transition-all duration-200",
-                                    viewMode === 'list'
-                                        ? 'bg-international-orange/10 text-international-orange shadow-sm'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                                )}
-                                aria-label="List view"
-                            >
-                                <List className="h-3.5 w-3.5" />
-                            </Button>
-                        </div>
+                        <ViewToggle
+                            options={[
+                                { value: 'grid', icon: LayoutGrid, ariaLabel: 'Grid view' },
+                                { value: 'list', icon: List, ariaLabel: 'List view' },
+                            ]}
+                            value={viewMode}
+                            onValueChange={(v) => setViewMode(v as 'grid' | 'list')}
+                        />
                     )}
                 </div>
             </div>

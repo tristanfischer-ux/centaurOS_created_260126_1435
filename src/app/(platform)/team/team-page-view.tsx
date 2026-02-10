@@ -17,6 +17,7 @@ import {
     BarChart3, ShieldCheck, Zap, MoreHorizontal, Loader2,
     AlertTriangle, Check, Store, Orbit, Settings
 } from 'lucide-react'
+import { ViewToggle } from '@/components/ui/view-toggle'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -894,68 +895,31 @@ export function TeamPageView({
                 <div className="flex items-center gap-2 shrink-0">
                     {/* 3-way view toggle (members tab only) */}
                     {activeTab === 'members' && (
-                        <div className="flex bg-muted/50 p-1 rounded-xl border border-muted">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setViewMode('orbit')}
-                                className={cn(
-                                    'h-7 px-2 rounded-md transition-all duration-200 text-xs font-bold gap-1',
-                                    viewMode === 'orbit'
-                                        ? 'bg-international-orange/10 text-international-orange shadow-sm'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                                )}
-                                aria-label="Orbit view"
-                            >
-                                <Orbit className="h-3.5 w-3.5" />
-                                Orbit
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setViewMode('cards')}
-                                className={cn(
-                                    'h-7 w-7 p-0 rounded-md transition-all duration-200',
-                                    viewMode === 'cards'
-                                        ? 'bg-international-orange/10 text-international-orange shadow-sm'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                                )}
-                                aria-label="Cards view"
-                            >
-                                <LayoutGrid className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setViewMode('list')}
-                                className={cn(
-                                    'h-7 w-7 p-0 rounded-md transition-all duration-200',
-                                    viewMode === 'list'
-                                        ? 'bg-international-orange/10 text-international-orange shadow-sm'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                                )}
-                                aria-label="List view"
-                            >
-                                <List className="h-3.5 w-3.5" />
-                            </Button>
-                        </div>
+                        <ViewToggle
+                            options={[
+                                { value: 'orbit', label: 'Orbit', icon: Orbit, ariaLabel: 'Orbit view' },
+                                { value: 'cards', icon: LayoutGrid, ariaLabel: 'Cards view' },
+                                { value: 'list', icon: List, ariaLabel: 'List view' },
+                            ]}
+                            value={viewMode}
+                            onValueChange={(v) => setViewMode(v as 'orbit' | 'cards' | 'list')}
+                        />
                     )}
                     {foundryId && (
                         <Button
                             variant="secondary"
                             size="sm"
                             onClick={() => setShowEditFunctions(true)}
-                            className="h-8"
                         >
-                            <Settings className="h-3.5 w-3.5 mr-1.5" />
+                            <Settings className="h-4 w-4" />
                             Functions
                         </Button>
                     )}
                     <RefreshButton />
                     <InviteMemberDialog />
                     <Link href="/team/new">
-                        <Button size="sm" className="bg-international-orange hover:bg-international-orange/90 text-white shadow-sm h-8">
-                            <Plus className="h-3.5 w-3.5 mr-1.5" />
+                        <Button size="sm" className="bg-international-orange hover:bg-international-orange/90 text-white shadow-sm">
+                            <Plus className="h-4 w-4" />
                             New Team
                         </Button>
                     </Link>
