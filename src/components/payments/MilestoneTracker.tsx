@@ -26,7 +26,7 @@ import {
   Clock,
   Send,
   AlertTriangle,
-  DollarSign,
+  PoundSterling,
   Flag,
   Loader2,
   CalendarDays,
@@ -75,7 +75,7 @@ const STATUS_CONFIG: Record<
   paid: {
     label: 'Paid',
     color: 'text-status-success',
-    icon: <DollarSign className="h-4 w-4" />,
+    icon: <PoundSterling className="h-4 w-4" />,
     bgColor: 'bg-status-success-light',
   },
 }
@@ -187,7 +187,7 @@ function MilestoneItem({
         {/* Details */}
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-1 text-muted-foreground">
-            <DollarSign className="h-4 w-4" />
+            <PoundSterling className="h-4 w-4" />
             <span className="font-medium">{formatCurrency(milestone.amount, currency)}</span>
           </div>
           {milestone.dueDate && (

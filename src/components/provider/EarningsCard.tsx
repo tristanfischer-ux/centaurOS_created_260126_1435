@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { TrendingUp, TrendingDown, Clock, DollarSign } from "lucide-react"
+import { TrendingUp, TrendingDown, Clock, PoundSterling } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface EarningsCardProps {
@@ -43,7 +43,7 @@ export function EarningsCard({
         <Card className={cn("", className)}>
             <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-status-success" />
+                    <PoundSterling className="h-5 w-5 text-status-success" />
                     Earnings Overview
                 </CardTitle>
                 <CardDescription>Your earnings summary</CardDescription>

@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
     Calendar, 
     Check, 
-    DollarSign, 
+    PoundSterling, 
     Loader2, 
     Pause,
     Settings,
@@ -184,7 +184,7 @@ export default function PricingPage() {
             <Tabs defaultValue="pricing" className="space-y-6">
                 <TabsList className="grid w-full max-w-md grid-cols-2">
                     <TabsTrigger value="pricing" className="gap-2">
-                        <DollarSign className="h-4 w-4" />
+                        <PoundSterling className="h-4 w-4" />
                         Pricing
                     </TabsTrigger>
                     <TabsTrigger value="capacity" className="gap-2">

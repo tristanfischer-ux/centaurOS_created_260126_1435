@@ -7,7 +7,7 @@ import {
   ChevronUp,
   MapPin,
   Star,
-  DollarSign,
+  PoundSterling,
   Shield,
   Calendar,
   Briefcase,
@@ -163,7 +163,7 @@ export function SearchFilters({
       {/* Price Range Filter */}
       <FilterSection
         title="Price"
-        icon={<DollarSign className="h-3.5 w-3.5" />}
+        icon={<PoundSterling className="h-3.5 w-3.5" />}
         isOpen={expandedSections.price}
         onToggle={() => toggleSection("price")}
         hasValue={filters.priceRange?.min !== undefined || filters.priceRange?.max !== undefined}

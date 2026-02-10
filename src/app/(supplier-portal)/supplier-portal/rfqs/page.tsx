@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { typography } from "@/lib/design-system"
-import { FileText, Clock, DollarSign, Users, ArrowRight } from "lucide-react"
+import { FileText, Clock, PoundSterling, Users, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 function RFQsSkeleton() {
@@ -132,7 +132,7 @@ async function RFQsContent() {
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           {rfq.budget_max && (
                             <span className="flex items-center gap-1">
-                              <DollarSign className="h-3 w-3" />
+                              <PoundSterling className="h-3 w-3" />
                               Budget: {rfq.currency} {rfq.budget_min?.toLocaleString()} - {rfq.budget_max.toLocaleString()}
                             </span>
                           )}

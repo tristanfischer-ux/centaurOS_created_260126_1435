@@ -13,7 +13,7 @@ import {
   Clock, 
   User, 
   Package, 
-  DollarSign,
+  PoundSterling,
   MessageSquare,
   CheckCircle2
 } from "lucide-react"
@@ -226,7 +226,7 @@ async function OrderDetailContent({ orderId }: { orderId: string }) {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
+                <PoundSterling className="h-5 w-5" />
                 Payment
               </CardTitle>
             </CardHeader>

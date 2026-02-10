@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { 
   ShoppingCart, 
   FileText, 
-  DollarSign, 
+  PoundSterling, 
   Star,
   ArrowRight,
   Package,
@@ -138,7 +138,7 @@ export function SupplierDashboard({
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-status-info-light">
-                <DollarSign className="h-5 w-5 text-status-info" />
+                <PoundSterling className="h-5 w-5 text-status-info" />
               </div>
               <div>
                 <p className="text-2xl font-bold">

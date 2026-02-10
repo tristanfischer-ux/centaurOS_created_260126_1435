@@ -5,7 +5,7 @@ import {
   ChevronRight,
   Clock,
   Calendar,
-  DollarSign,
+  PoundSterling,
   TrendingUp,
   User,
   Settings,
@@ -193,7 +193,7 @@ export default async function RetainerDetailPage({ params }: RetainerDetailPageP
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <DollarSign className="h-4 w-4" />
+                <PoundSterling className="h-4 w-4" />
                 <span className="text-sm">{isBuyer ? 'Total Spend' : 'Total Earned'}</span>
               </div>
               <p className="text-2xl font-bold">

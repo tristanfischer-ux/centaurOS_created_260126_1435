@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
-  Briefcase, User, DollarSign, MapPin, Sparkles,
+  Briefcase, User, PoundSterling, MapPin, Sparkles,
   ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -32,7 +32,7 @@ import { typography } from '@/lib/design-system'
 
 const STEPS = [
   { id: 'headline' as const, title: 'Headline & Bio', icon: Briefcase },
-  { id: 'rates' as const, title: 'Rates & Experience', icon: DollarSign },
+  { id: 'rates' as const, title: 'Rates & Experience', icon: PoundSterling },
   { id: 'location' as const, title: 'Location & Links', icon: MapPin },
   { id: 'skills' as const, title: 'Skills', icon: Sparkles },
 ]

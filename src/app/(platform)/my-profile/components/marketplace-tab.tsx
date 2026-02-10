@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  Briefcase, DollarSign, Sparkles, Edit3, ArrowRight,
+  Briefcase, PoundSterling, Sparkles, Edit3, ArrowRight,
 } from 'lucide-react'
 import { ProfileStrengthGauge } from './profile-strength-gauge'
 import { ListingOptimizer } from '../listing-optimizer'
@@ -117,7 +117,7 @@ export function MarketplaceTab({
                   Day Rate
                 </p>
                 <p className="text-lg font-bold text-foreground flex items-center gap-1">
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <PoundSterling className="h-4 w-4 text-muted-foreground" />
                   {currencySymbol}{providerProfile.day_rate.toLocaleString()}
                   <span className="text-sm font-normal text-muted-foreground">/day</span>
                 </p>

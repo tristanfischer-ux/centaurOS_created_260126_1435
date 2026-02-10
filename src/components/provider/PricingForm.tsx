@@ -18,7 +18,7 @@ import {
 import { 
     AlertCircle,
     Check, 
-    DollarSign, 
+    PoundSterling, 
     Eye,
     Info,
     Loader2, 
@@ -182,7 +182,7 @@ export function PricingForm({
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-muted-foreground" />
+                        <PoundSterling className="h-5 w-5 text-muted-foreground" />
                         Day Rate Pricing
                     </CardTitle>
                     <CardDescription>

@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   Download, 
   RefreshCw, 
-  DollarSign, 
+  PoundSterling, 
   Users,
   User,
   ShoppingCart,
@@ -202,7 +202,7 @@ export function AdminDashboard({
                   {formatCurrency(analytics.totalGmv)}
                 </p>
               </div>
-              <DollarSign className="h-10 w-10 text-status-info opacity-80" />
+              <PoundSterling className="h-10 w-10 text-status-info opacity-80" />
             </div>
             {gmvChange !== null && (
               <div className={cn(

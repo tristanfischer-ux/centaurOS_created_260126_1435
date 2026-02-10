@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { 
   Download, 
   RefreshCw, 
-  DollarSign, 
+  PoundSterling, 
   ShoppingCart, 
   TrendingUp,
   Users,
@@ -179,7 +179,7 @@ export function SupplierDashboard({
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-status-success-light">
-                <DollarSign className="h-5 w-5 text-status-success" />
+                <PoundSterling className="h-5 w-5 text-status-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Lifetime GMV</p>

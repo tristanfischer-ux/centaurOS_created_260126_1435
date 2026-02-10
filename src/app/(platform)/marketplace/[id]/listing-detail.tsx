@@ -15,7 +15,7 @@ import {
     GraduationCap,
     Briefcase,
     Building2,
-    DollarSign,
+    PoundSterling,
     Zap,
     Target,
     Award,
@@ -192,17 +192,17 @@ function KeyMetricsCard({ category, attrs }: { category: string; attrs: Record<s
     const metrics: { label: string; value: any; icon: React.ReactNode }[] = []
 
     if (category === 'People') {
-        if (attrs.rate) metrics.push({ label: 'Rate', value: attrs.rate, icon: <DollarSign className="h-4 w-4" /> })
+        if (attrs.rate) metrics.push({ label: 'Rate', value: attrs.rate, icon: <PoundSterling className="h-4 w-4" /> })
         if (attrs.years_experience) metrics.push({ label: 'Experience', value: `${attrs.years_experience} years`, icon: <Briefcase className="h-4 w-4" /> })
         if (attrs.projects_completed) metrics.push({ label: 'Projects', value: attrs.projects_completed, icon: <CheckCircle2 className="h-4 w-4" /> })
         if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
     } else if (category === 'Products') {
-        if (attrs.cost || attrs.price) metrics.push({ label: 'Price', value: attrs.cost || attrs.price, icon: <DollarSign className="h-4 w-4" /> })
+        if (attrs.cost || attrs.price) metrics.push({ label: 'Price', value: attrs.cost || attrs.price, icon: <PoundSterling className="h-4 w-4" /> })
         if (attrs.lead_time) metrics.push({ label: 'Lead Time', value: attrs.lead_time, icon: <Timer className="h-4 w-4" /> })
         if (attrs.moq) metrics.push({ label: 'MOQ', value: attrs.moq, icon: <Package className="h-4 w-4" /> })
         if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
     } else if (category === 'Services') {
-        if (attrs.rate || attrs.pricing) metrics.push({ label: 'Rate', value: attrs.rate || attrs.pricing, icon: <DollarSign className="h-4 w-4" /> })
+        if (attrs.rate || attrs.pricing) metrics.push({ label: 'Rate', value: attrs.rate || attrs.pricing, icon: <PoundSterling className="h-4 w-4" /> })
         if (attrs.turnaround) metrics.push({ label: 'Turnaround', value: attrs.turnaround, icon: <Clock className="h-4 w-4" /> })
         if (attrs.capacity) metrics.push({ label: 'Capacity', value: attrs.capacity, icon: <Gauge className="h-4 w-4" /> })
         if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
