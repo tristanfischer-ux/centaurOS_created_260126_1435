@@ -62,15 +62,15 @@ async function loginAsPlatformUser(
   // Submit form
   await page.click('button:has-text("Access Foundry")')
   
-  // Wait for redirect to a platform page (today or dashboard)
-  await page.waitForURL(/\/(today|dashboard)/, { timeout: 30000 })
+  // Wait for redirect to a platform page (today, dashboard, or updates)
+  await page.waitForURL(/\/(today|dashboard|updates|new-objectives|new-tasks)/, { timeout: 30000 })
   
   // Dismiss all onboarding modals so walkthrough videos show the real app
   await dismissAllOnboardingModals(page)
   
   // Reload so the dismissed state takes effect before saving
   await page.reload()
-  await page.waitForURL(/\/(today|dashboard)/, { timeout: 15000 })
+  await page.waitForURL(/\/(today|dashboard|updates|new-objectives|new-tasks)/, { timeout: 15000 })
   
   // Save auth state (includes cookies + localStorage with onboarding flags)
   await page.context().storageState({ path: storagePath })
