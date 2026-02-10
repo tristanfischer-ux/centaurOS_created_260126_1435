@@ -27,6 +27,7 @@ import {
   Trash2,
   Link2,
   AlertTriangle,
+  Save,
 } from 'lucide-react'
 
 import {
@@ -34,6 +35,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog'
 import {
   AlertDialog,
@@ -105,45 +107,7 @@ function isTaskDetails(d: ItemDetails): d is CanvasTaskDetails {
 }
 
 // ============================================================================
-// DEBOUNCE HOOK
-// ============================================================================
-
-/**
- * Debounces a callback by `delay` ms. Returns [debouncedFn, isPending].
- */
-function useDebouncedSave(
-  delay: number
-): [(fn: () => Promise<void>) => void, boolean] {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
-
-  const debouncedSave = useCallback(
-    (fn: () => Promise<void>) => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(async () => {
-        setIsSaving(true)
-        try {
-          await fn()
-        } finally {
-          setIsSaving(false)
-        }
-      }, delay)
-    },
-    [delay]
-  )
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-    }
-  }, [])
-
-  return [debouncedSave, isSaving]
-}
-
-// ============================================================================
-// STATUS OPTIONS
+// STATUS OPTIONS & DESCRIPTIONS
 // ============================================================================
 
 const GOAL_STATUSES = ['In Progress', 'Completed', 'On Hold'] as const
@@ -151,6 +115,34 @@ const MILESTONE_STATUSES = ['Not Started', 'In Progress', 'Done', 'Blocked'] as 
 const OBJECTIVE_STATUSES = ['In Progress', 'Completed', 'On Hold'] as const
 const TASK_STATUSES = ['Pending', 'Accepted', 'Rejected', 'Amended', 'Amended_Pending_Approval'] as const
 const RISK_LEVELS = ['Low', 'Medium', 'High'] as const
+
+/** Descriptions shown when user changes status, so they understand what it means */
+const GOAL_STATUS_DESCRIPTIONS = {
+  'In Progress': 'This goal is actively being worked on. Milestones and objectives under it are being pursued.',
+  'Completed': 'This goal has been achieved. All milestones and objectives should be complete.',
+  'On Hold': 'Work on this goal is paused. No active progress is expected until it resumes.',
+} satisfies Record<(typeof GOAL_STATUSES)[number], string>
+
+const MILESTONE_STATUS_DESCRIPTIONS = {
+  'Not Started': 'This milestone hasn\u2019t begun yet. It\u2019s planned for the future.',
+  'In Progress': 'Active work is underway toward this milestone.',
+  'Done': 'This milestone has been achieved.',
+  'Blocked': 'Progress on this milestone is blocked by a dependency or issue.',
+} satisfies Record<(typeof MILESTONE_STATUSES)[number], string>
+
+const OBJECTIVE_STATUS_DESCRIPTIONS = {
+  'In Progress': 'This objective is actively being worked on.',
+  'Completed': 'This objective has been achieved.',
+  'On Hold': 'Work on this objective is paused.',
+} satisfies Record<(typeof OBJECTIVE_STATUSES)[number], string>
+
+const TASK_STATUS_DESCRIPTIONS = {
+  'Pending': 'This task is waiting to be picked up.',
+  'Accepted': 'This task has been accepted and is in progress.',
+  'Rejected': 'This task was rejected and will not be done.',
+  'Amended': 'This task has been modified since its original scope.',
+  'Amended_Pending_Approval': 'This task was amended and is waiting for approval.',
+} satisfies Record<(typeof TASK_STATUSES)[number], string>
 
 // ============================================================================
 // COMPONENT
@@ -175,6 +167,8 @@ export function NodeDetailsDialog({
   // -- State --
   const [details, setDetails] = useState<ItemDetails | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
   const [members, setMembers] = useState<FoundryMember[]>([])
   const [objectivesForLinking, setObjectivesForLinking] = useState<
     Array<{ id: string; title: string }>
@@ -182,7 +176,8 @@ export function NodeDetailsDialog({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmReject, setConfirmReject] = useState(false)
   const [isPending, startTransition] = useTransition()
-  const [debouncedSave, isSaving] = useDebouncedSave(300)
+  /** Accumulates all changed fields since last save */
+  const pendingChangesRef = useRef<Record<string, string | null>>({})
 
   // -- Fetch details + members on open --
   useEffect(() => {
@@ -219,61 +214,25 @@ export function NodeDetailsDialog({
     })
   }, [open, nodeId, nodeType, isUnlinked])
 
-  // -- Auto-save helper --
-  const saveField = useCallback(
-    (field: string, value: string | null) => {
-      if (!details) return
-      const itemType = nodeType === 'goal' || nodeType === 'milestone' ? 'objective' : nodeType
-      debouncedSave(async () => {
-        const result = await updateCanvasItem(itemType, nodeId, {
-          [field]: value,
-        })
-        if ('error' in result) {
-          toast.error(`Failed to save: ${result.error}`)
-        } else {
-          onUpdate()
-        }
-      })
-    },
-    [details, nodeType, nodeId, debouncedSave, onUpdate]
-  )
-
-  // -- Immediate save (for selects, no debounce needed) --
-  const saveFieldImmediate = useCallback(
-    async (field: string, value: string | null) => {
-      if (!details) return
-      const itemType = nodeType === 'goal' || nodeType === 'milestone' ? 'objective' : nodeType
-      const result = await updateCanvasItem(itemType, nodeId, {
-        [field]: value,
-      })
-      if ('error' in result) {
-        toast.error(`Failed to save: ${result.error}`)
-      } else {
-        onUpdate()
-      }
-    },
-    [details, nodeType, nodeId, onUpdate]
-  )
-
-  // -- Update local state + trigger save --
+  // -- Update local state + track dirty field (no auto-save) --
   const handleFieldChange = useCallback(
     (field: string, value: string) => {
       if (!details) return
       setDetails((prev) => (prev ? { ...prev, [field]: value } : prev))
-      saveField(field, value || null)
+      pendingChangesRef.current[field] = value || null
+      setIsDirty(true)
     },
-    [details, saveField]
+    [details]
   )
 
   const handleSelectChange = useCallback(
     (field: string, value: string) => {
       if (!details) return
       setDetails((prev) => (prev ? { ...prev, [field]: value } : prev))
-      startTransition(() => {
-        saveFieldImmediate(field, value)
-      })
+      pendingChangesRef.current[field] = value
+      setIsDirty(true)
     },
-    [details, saveFieldImmediate]
+    [details]
   )
 
   const handleDateChange = useCallback(
@@ -281,12 +240,32 @@ export function NodeDetailsDialog({
       if (!details) return
       const value = date ? date.toISOString().split('T')[0] : null
       setDetails((prev) => (prev ? { ...prev, [field]: value } : prev))
-      startTransition(() => {
-        saveFieldImmediate(field, value)
-      })
+      pendingChangesRef.current[field] = value
+      setIsDirty(true)
     },
-    [details, saveFieldImmediate]
+    [details]
   )
+
+  // -- Explicit save: persists all pending changes at once --
+  const handleSave = useCallback(async () => {
+    if (!details || !isDirty) return
+    const changes = { ...pendingChangesRef.current }
+    if (Object.keys(changes).length === 0) return
+
+    setIsSaving(true)
+    const itemType = nodeType === 'goal' || nodeType === 'milestone' ? 'objective' : nodeType
+    const result = await updateCanvasItem(itemType, nodeId, changes)
+
+    if ('error' in result) {
+      toast.error(`Failed to save: ${result.error}`)
+    } else {
+      pendingChangesRef.current = {}
+      setIsDirty(false)
+      toast.success('Changes saved')
+      onUpdate()
+    }
+    setIsSaving(false)
+  }, [details, isDirty, nodeType, nodeId, onUpdate])
 
   // -- Ghost actions --
   const handleAcceptGhost = useCallback(async () => {
@@ -363,6 +342,8 @@ export function NodeDetailsDialog({
       if (!isOpen) {
         setDetails(null)
         setObjectivesForLinking([])
+        pendingChangesRef.current = {}
+        setIsDirty(false)
       }
       onOpenChange(isOpen)
     },
@@ -384,15 +365,7 @@ export function NodeDetailsDialog({
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent size="md" className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {dialogTitle}
-              {isSaving && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground font-normal">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Saving…
-                </span>
-              )}
-            </DialogTitle>
+            <DialogTitle>{dialogTitle}</DialogTitle>
           </DialogHeader>
 
           {/* Loading skeleton */}
@@ -470,6 +443,37 @@ export function NodeDetailsDialog({
                 />
               )}
             </div>
+          )}
+
+          {/* Footer with explicit Save */}
+          {!isLoading && details && (
+            <DialogFooter>
+              <div className="flex w-full items-center justify-between">
+                <Button
+                  variant="secondary"
+                  onClick={() => handleOpenChange(false)}
+                >
+                  {isDirty ? 'Discard' : 'Close'}
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={!isDirty || isSaving}
+                  className="gap-1.5"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogFooter>
           )}
         </DialogContent>
       </Dialog>
@@ -605,6 +609,11 @@ function GoalFields({
             ))}
           </SelectContent>
         </Select>
+        {details.status && GOAL_STATUS_DESCRIPTIONS[details.status as keyof typeof GOAL_STATUS_DESCRIPTIONS] && (
+          <p className="text-xs text-muted-foreground">
+            {GOAL_STATUS_DESCRIPTIONS[details.status as keyof typeof GOAL_STATUS_DESCRIPTIONS]}
+          </p>
+        )}
       </div>
 
       {/* Success criteria / description */}
@@ -688,6 +697,11 @@ function MilestoneFields({
             ))}
           </SelectContent>
         </Select>
+        {details.status && MILESTONE_STATUS_DESCRIPTIONS[details.status as keyof typeof MILESTONE_STATUS_DESCRIPTIONS] && (
+          <p className="text-xs text-muted-foreground">
+            {MILESTONE_STATUS_DESCRIPTIONS[details.status as keyof typeof MILESTONE_STATUS_DESCRIPTIONS]}
+          </p>
+        )}
       </div>
 
       {/* Owner */}
@@ -833,6 +847,11 @@ function ObjectiveFields({
             ))}
           </SelectContent>
         </Select>
+        {details.status && OBJECTIVE_STATUS_DESCRIPTIONS[details.status as keyof typeof OBJECTIVE_STATUS_DESCRIPTIONS] && (
+          <p className="text-xs text-muted-foreground">
+            {OBJECTIVE_STATUS_DESCRIPTIONS[details.status as keyof typeof OBJECTIVE_STATUS_DESCRIPTIONS]}
+          </p>
+        )}
       </div>
 
       {/* Owner */}
@@ -1013,6 +1032,11 @@ function TaskFields({
             ))}
           </SelectContent>
         </Select>
+        {details.status && TASK_STATUS_DESCRIPTIONS[details.status as keyof typeof TASK_STATUS_DESCRIPTIONS] && (
+          <p className="text-xs text-muted-foreground">
+            {TASK_STATUS_DESCRIPTIONS[details.status as keyof typeof TASK_STATUS_DESCRIPTIONS]}
+          </p>
+        )}
       </div>
 
       {/* Assignee */}
