@@ -34,7 +34,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, LayoutGrid } from 'lucide-react'
 
 import { StrategyNode, type StrategyNodeData } from './strategy-node'
 import { ObjectiveNode, type ObjectiveNodeData } from './objective-node'
@@ -215,6 +215,8 @@ function buildNodesAndEdges(
 
 interface LinkCanvasProps extends StrategyLinkViewProps {
   visibleStrategies: Set<string>
+  /** Increment to trigger a full re-layout (tidy up) */
+  tidyKey: number
 }
 
 /**
@@ -224,7 +226,7 @@ interface LinkCanvasProps extends StrategyLinkViewProps {
  * @description Handles drag-to-link and delete-to-unlink interactions,
  * with optimistic UI updates and server-side persistence.
  */
-function LinkCanvas({ strategicObjectives, regularObjectives, visibleStrategies }: LinkCanvasProps) {
+function LinkCanvas({ strategicObjectives, regularObjectives, visibleStrategies, tidyKey }: LinkCanvasProps) {
   const router = useRouter()
   const { fitView } = useReactFlow()
 
@@ -237,12 +239,13 @@ function LinkCanvas({ strategicObjectives, regularObjectives, visibleStrategies 
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [isLinking, setIsLinking] = useState(false)
 
-  // Track previous visibility to detect toggle changes
+  // Track previous visibility and tidy key to detect layout-reset triggers
   const prevVisibleRef = useRef(visibleStrategies)
+  const prevTidyKeyRef = useRef(tidyKey)
 
-  // Sync nodes/edges when data or visibility changes.
+  // Sync nodes/edges when data, visibility, or tidy key changes.
   // Preserves user-dragged positions on server data refresh;
-  // only resets layout when visibility toggles change.
+  // resets to computed layout when visibility toggles change or tidy is triggered.
   useEffect(() => {
     const { nodes: newNodes, edges: newEdges } = buildNodesAndEdges(
       strategicObjectives,
@@ -251,10 +254,12 @@ function LinkCanvas({ strategicObjectives, regularObjectives, visibleStrategies 
     )
 
     const visibilityChanged = prevVisibleRef.current !== visibleStrategies
+    const tidyTriggered = prevTidyKeyRef.current !== tidyKey
 
-    if (visibilityChanged) {
-      // Full re-layout when toggles change
+    if (visibilityChanged || tidyTriggered) {
+      // Full re-layout when toggles change or tidy up is triggered
       prevVisibleRef.current = visibleStrategies
+      prevTidyKeyRef.current = tidyKey
       setNodes(newNodes)
       setEdges(newEdges)
       setTimeout(() => fitView({ padding: 0.3 }), 100)
@@ -269,7 +274,7 @@ function LinkCanvas({ strategicObjectives, regularObjectives, visibleStrategies 
       })
       setEdges(newEdges)
     }
-  }, [strategicObjectives, regularObjectives, visibleStrategies, setNodes, setEdges, fitView])
+  }, [strategicObjectives, regularObjectives, visibleStrategies, tidyKey, setNodes, setEdges, fitView])
 
   /**
    * Handle new connection: drag from objective (source) to strategy (target).
@@ -391,6 +396,14 @@ export function StrategyLinkView({ strategicObjectives, regularObjectives }: Str
     () => new Set(strategicObjectives.map((s) => s.id))
   )
 
+  // Tidy up: increment to trigger a full re-layout
+  const [tidyKey, setTidyKey] = useState(0)
+
+  /** Reset all node positions to the computed column layout. */
+  const handleTidyUp = useCallback(() => {
+    setTidyKey((prev) => prev + 1)
+  }, [])
+
   /**
    * Toggle a strategy's visibility on/off.
    * When hidden, the strategy node and all its linked objectives are removed from the canvas.
@@ -469,7 +482,7 @@ export function StrategyLinkView({ strategicObjectives, regularObjectives }: Str
         })}
       </div>
 
-      {/* Legend */}
+      {/* Legend + Tidy button */}
       <div className="flex items-center gap-4 mb-3 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-2 rounded-sm bg-international-orange" />
@@ -483,8 +496,18 @@ export function StrategyLinkView({ strategicObjectives, regularObjectives }: Str
           <span className="w-6 h-0.5 bg-international-orange" />
           Linked
         </span>
-        <span className="ml-auto text-[10px]">
-          Drag from an objective to a strategy to link &bull; Select edge + Delete/Backspace to unlink &bull; Re-drag to move between strategies
+        <span className="ml-auto flex items-center gap-3">
+          <span className="text-[10px]">
+            Drag from an objective to a strategy to link &bull; Select edge + Delete/Backspace to unlink &bull; Re-drag to move between strategies
+          </span>
+          <button
+            onClick={handleTidyUp}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-muted"
+            title="Reset layout to tidy columns"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Tidy up
+          </button>
         </span>
       </div>
 
@@ -493,6 +516,7 @@ export function StrategyLinkView({ strategicObjectives, regularObjectives }: Str
           strategicObjectives={strategicObjectives}
           regularObjectives={regularObjectives}
           visibleStrategies={visibleStrategies}
+          tidyKey={tidyKey}
         />
       </ReactFlowProvider>
     </div>
