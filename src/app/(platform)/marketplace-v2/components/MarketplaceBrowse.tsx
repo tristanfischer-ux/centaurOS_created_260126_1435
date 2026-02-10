@@ -2,15 +2,11 @@
 
 import { useState, useCallback } from 'react'
 import { cn } from '@/lib/utils'
-import { MarketplaceCategoryNav } from './MarketplaceCategoryNav'
-import { MarketplaceSearchToolbar } from './MarketplaceSearchToolbar'
+import { MarketplaceToolbar } from './MarketplaceToolbar'
 import { MarketplaceFilterPanel } from './MarketplaceFilterPanel'
 import { MarketplaceListingGrid } from './MarketplaceListingGrid'
 import { MarketplaceDetailDialog } from './MarketplaceDetailDialog'
 import { MarketplaceRecommendations } from './MarketplaceRecommendations'
-import { MarketplaceIntentPrompt } from './MarketplaceIntentPrompt'
-import { MarketplaceCategoryGuide } from './MarketplaceCategoryGuide'
-import { FeaturedBanner } from './FeaturedBanner'
 import { MarketplaceSavedView } from './MarketplaceSavedView'
 import { MarketplaceCompareView } from './MarketplaceCompareView'
 import { useMarketplaceState, type MarketplaceCategory } from '../hooks/useMarketplaceState'
@@ -46,6 +42,14 @@ const TABS: { id: MarketplaceTab; label: string; icon: React.ElementType }[] = [
     { id: 'saved', label: 'Saved', icon: Heart },
 ]
 
+/**
+ * Main marketplace browse component with consolidated toolbar layout.
+ *
+ * @description Combines category navigation, search, sort, and filters into a compact
+ * toolbar to minimize the vertical distance between the page header and listing results.
+ * Replaces the former stacked layout of IntentPrompt + CategoryNav + CategoryGuide +
+ * SearchToolbar with a single unified MarketplaceToolbar.
+ */
 export function MarketplaceBrowse({
     initialListings,
     recommendations: initialRecommendations,
@@ -57,20 +61,6 @@ export function MarketplaceBrowse({
     const [activeTab, setActiveTab] = useState<MarketplaceTab>('browse')
     const [compareListings, setCompareListings] = useState<MarketplaceListing[]>([])
     const [compareOrigin, setCompareOrigin] = useState<'browse' | 'saved'>('browse')
-
-    // Top-rated listings: verified, sorted by rating then bookings, limit 4
-    // Excludes AI listings to match the filtered browse experience
-    const featuredListings = initialListings
-        .filter(l => l.is_verified && l.category !== 'AI')
-        .sort((a, b) => {
-            const ratingA = (a.attributes?.rating_average as number) || 0
-            const ratingB = (b.attributes?.rating_average as number) || 0
-            if (ratingB !== ratingA) return ratingB - ratingA
-            const bookingsA = (a.attributes?.total_bookings as number) || 0
-            const bookingsB = (b.attributes?.total_bookings as number) || 0
-            return bookingsB - bookingsA
-        })
-        .slice(0, 4)
 
     // Handle recommendation click
     const handleApplyRecommendation = useCallback((category: MarketplaceCategory, searchTerm?: string) => {
@@ -91,15 +81,9 @@ export function MarketplaceBrowse({
         }
     }, [])
 
-    // Handle intent search from the prompt component
+    // Handle intent search from recommendations gap suggestions
     const handleIntentSearch = useCallback((query: string) => {
         state.setSearchQuery(query)
-    }, [state])
-
-    // Handle subcategory selection from the category guide
-    const handleGuideSubcategorySelect = useCallback((subcategory: string) => {
-        state.toggleSubcategory(subcategory)
-        state.setShowFilters(true)
     }, [state])
 
     // Enter compare mode from browse
@@ -208,44 +192,33 @@ export function MarketplaceBrowse({
             {/* Browse tab content */}
             {activeTab === 'browse' && (
                 <>
-                    {/* Intent-driven entry point: "What do you need help with?" */}
-                    <MarketplaceIntentPrompt
+                    {/* AI + Gap Recommendations (compact, dismissible) */}
+                    <MarketplaceRecommendations
+                        recommendations={initialRecommendations}
+                        onApplyRecommendation={handleApplyRecommendation}
+                        onDismiss={handleDismissRecommendation}
                         foundryContext={foundryContext}
                         onSearch={handleIntentSearch}
                         onCategoryChange={state.handleCategoryChange}
                     />
 
-                    {/* AI Recommendations */}
-                    <MarketplaceRecommendations
-                        recommendations={initialRecommendations}
-                        onApplyRecommendation={handleApplyRecommendation}
-                        onDismiss={handleDismissRecommendation}
-                    />
-
-                    {/* Featured banner - only when no filters active and on "All" */}
-                    {!state.hasActiveFilters && featuredListings.length > 0 && state.activeCategory === 'All' && (
-                        <FeaturedBanner
-                            listings={featuredListings}
-                            onViewDetail={state.setSelectedListing}
-                        />
-                    )}
-
-                    {/* Category navigation */}
-                    <MarketplaceCategoryNav
+                    {/* Unified toolbar: categories + search + sort + filters */}
+                    <MarketplaceToolbar
                         activeCategory={state.activeCategory}
                         onCategoryChange={state.handleCategoryChange}
                         counts={state.categoryCounts}
+                        searchQuery={state.searchQuery}
+                        onSearchChange={state.setSearchQuery}
+                        sortBy={state.sortBy}
+                        onSortChange={state.setSortBy}
+                        showFilters={state.showFilters}
+                        onToggleFilters={() => state.setShowFilters(!state.showFilters)}
+                        hasActiveFilters={state.hasActiveFilters}
+                        onClearAll={state.clearFilters}
+                        resultCount={state.filteredListings.length}
                     />
 
-                    {/* Guided category landing: "What kind of person are you looking for?" */}
-                    <MarketplaceCategoryGuide
-                        activeCategory={state.activeCategory}
-                        foundryContext={foundryContext}
-                        onSelectSubcategory={handleGuideSubcategorySelect}
-                        hasFiltersActive={state.hasActiveFilters || state.selectedSubcategories.size > 0}
-                    />
-
-                    {/* Technique filter banner */}
+                    {/* Technique filter banner (conditional - when arriving from Techniques Explorer) */}
                     {state.activeTechnique && (
                         <Card className="bg-gradient-to-r from-international-orange/5 to-background border-international-orange/20">
                             <CardContent className="py-3">
@@ -293,25 +266,13 @@ export function MarketplaceBrowse({
                         </Card>
                     )}
 
-                    {/* Search + Sort + Filters */}
-                    <MarketplaceSearchToolbar
-                        searchQuery={state.searchQuery}
-                        onSearchChange={state.setSearchQuery}
-                        sortBy={state.sortBy}
-                        onSortChange={state.setSortBy}
-                        showFilters={state.showFilters}
-                        onToggleFilters={() => state.setShowFilters(!state.showFilters)}
-                        hasActiveFilters={state.hasActiveFilters}
-                        onClearAll={state.clearFilters}
-                        resultCount={state.filteredListings.length}
-                    />
-
-                    {/* Filter panel (collapsible) */}
+                    {/* Filter panel - auto-shown when category selected */}
                     {state.showFilters && (
                         <MarketplaceFilterPanel
                             subcategories={state.availableSubcategories}
                             selectedSubcategories={state.selectedSubcategories}
                             onToggleSubcategory={state.toggleSubcategory}
+                            activeCategory={state.activeCategory}
                             onClear={() => {
                                 state.availableSubcategories.forEach(sub => {
                                     if (state.selectedSubcategories.has(sub)) {

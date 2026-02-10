@@ -73,10 +73,17 @@ export function useMarketplaceState({ initialListings, initialSavedIds }: UseMar
         router.push(newURL, { scroll: false })
     }, [pathname, router])
 
-    // Category change handler
+    // Category change handler — auto-expands filters for non-All categories
     const handleCategoryChange = useCallback((cat: MarketplaceCategory) => {
         setActiveCategory(cat)
         setSelectedSubcategories(new Set())
+        // Auto-show filter panel when selecting a specific category so users
+        // can immediately refine by subcategory (replaces the former CategoryGuide)
+        if (cat !== 'All') {
+            setShowFilters(true)
+        } else {
+            setShowFilters(false)
+        }
         updateURL(searchQuery, cat)
     }, [searchQuery, updateURL])
 
