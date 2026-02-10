@@ -1,3 +1,15 @@
+/**
+ * @file product-xray-view.tsx — Persistence wrapper for X-Ray Workbench
+ *
+ * @description Renders the standard page header then mounts the workbench
+ * with localStorage-based state restoration as offline cache.
+ * When a scanId is available, loads from Supabase DB instead.
+ *
+ * @related
+ * - Server actions: src/actions/xray.ts
+ * - Demo component: ./demo/ForgeOS_CompanyScan_Demo.tsx
+ */
+
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
@@ -8,20 +20,19 @@ import ForgeOS_CompanyScan_Demo from "./demo/ForgeOS_CompanyScan_Demo"
 
 import type { XRaySpec } from "./demo/ForgeOS_CompanyScan_Demo"
 
-// ---------------- localStorage persistence ----------------
+// ─── localStorage persistence (offline cache) ────────────────────────
 
 const STORAGE_KEY = "xray-workbench-state"
 
 interface PersistedState {
   spec: XRaySpec
   activeTab: string
+  scanId?: string
   savedAt: string
 }
 
 /**
  * Reads persisted X-Ray workbench state from localStorage.
- *
- * @returns The stored state, or null if nothing is stored or parse fails.
  */
 function readPersistedState(): PersistedState | null {
   if (typeof window === "undefined") return null
@@ -29,7 +40,6 @@ function readPersistedState(): PersistedState | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as PersistedState
-    // Basic shape validation
     if (parsed && typeof parsed.spec === "object" && typeof parsed.activeTab === "string") {
       return parsed
     }
@@ -52,34 +62,32 @@ function writePersistedState(state: PersistedState): void {
   }
 }
 
-// ---------------- Main wrapper ----------------
+// ─── Main wrapper ────────────────────────────────────────────────────
 
 /**
- * ProductXRayView — Persistence wrapper around the X-Ray Workbench demo.
+ * ProductXRayView — Persistence wrapper around the X-Ray Workbench.
  *
  * @description Renders the standard page header (orange accent bar) then mounts
- * the demo component with localStorage-based state restoration. On every spec
- * or tab change the demo emits, the wrapper writes to localStorage so the user
- * can refresh without losing progress.
- *
- * Future: the service stubs in ./services/ will be wired in here to replace
- * mock data with real Supabase queries and AI-powered scanning.
+ * the workbench with localStorage-based state restoration. On every spec
+ * or tab change, the wrapper writes to localStorage so the user can refresh
+ * without losing progress.
  */
 export function ProductXRayView() {
   const [restored, setRestored] = useState<PersistedState | null>(null)
   const [isHydrated, setIsHydrated] = useState(false)
 
-  // Track latest values for combined persistence writes
   const specRef = React.useRef<XRaySpec | null>(null)
   const tabRef = React.useRef<string>("A")
+  const scanIdRef = React.useRef<string | undefined>(undefined)
 
-  // Read localStorage on mount (client-side only)
+  // Read localStorage on mount
   useEffect(() => {
     const persisted = readPersistedState()
     if (persisted) {
       setRestored(persisted)
       specRef.current = persisted.spec
       tabRef.current = persisted.activeTab
+      scanIdRef.current = persisted.scanId
     }
     setIsHydrated(true)
   }, [])
@@ -89,6 +97,7 @@ export function ProductXRayView() {
     writePersistedState({
       spec,
       activeTab: tabRef.current,
+      scanId: scanIdRef.current,
       savedAt: new Date().toISOString(),
     })
   }, [])
@@ -99,12 +108,12 @@ export function ProductXRayView() {
       writePersistedState({
         spec: specRef.current,
         activeTab: tab,
+        scanId: scanIdRef.current,
         savedAt: new Date().toISOString(),
       })
     }
   }, [])
 
-  // Don't render demo until we've checked localStorage (prevents flash)
   if (!isHydrated) {
     return (
       <div className="space-y-8">
@@ -122,6 +131,7 @@ export function ProductXRayView() {
       <ForgeOS_CompanyScan_Demo
         initialSpec={restored?.spec}
         initialTab={restored?.activeTab}
+        initialScanId={restored?.scanId}
         onSpecChange={handleSpecChange}
         onTabChange={handleTabChange}
         hideHeader
@@ -130,12 +140,9 @@ export function ProductXRayView() {
   )
 }
 
-// ---------------- Page Header ----------------
+// ─── Page Header ─────────────────────────────────────────────────────
 
-/**
- * Standard platform page header with orange accent bar.
- */
-function PageHeader() {
+function PageHeader(): React.ReactNode {
   return (
     <div className="pb-4 border-b border-muted">
       <div className={typography.pageHeader}>

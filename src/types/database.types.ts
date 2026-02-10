@@ -452,6 +452,161 @@ export type Database = {
           },
         ]
       }
+      agent_artifact_versions: {
+        Row: {
+          artifact_id: string
+          change_summary: string | null
+          content: string
+          created_at: string
+          edited_by: string | null
+          foundry_id: string
+          id: string
+          title: string
+          version_number: number
+        }
+        Insert: {
+          artifact_id: string
+          change_summary?: string | null
+          content: string
+          created_at?: string
+          edited_by?: string | null
+          foundry_id: string
+          id?: string
+          title: string
+          version_number: number
+        }
+        Update: {
+          artifact_id?: string
+          change_summary?: string | null
+          content?: string
+          created_at?: string
+          edited_by?: string | null
+          foundry_id?: string
+          id?: string
+          title?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_artifact_versions_artifact_id_fkey"
+            columns: ["artifact_id"]
+            isOneToOne: false
+            referencedRelation: "agent_artifacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_artifact_versions_edited_by_fkey"
+            columns: ["edited_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_artifact_versions_edited_by_fkey"
+            columns: ["edited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_artifact_versions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_artifacts: {
+        Row: {
+          content: string
+          content_type: string
+          created_at: string
+          created_by: string | null
+          foundry_id: string
+          id: string
+          is_shared_with_foundry: boolean
+          is_starred: boolean
+          metadata: Json
+          run_id: string | null
+          shared_with: string[] | null
+          title: string
+          updated_at: string
+          version_number: number
+          workflow_id: string | null
+        }
+        Insert: {
+          content?: string
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          foundry_id: string
+          id?: string
+          is_shared_with_foundry?: boolean
+          is_starred?: boolean
+          metadata?: Json
+          run_id?: string | null
+          shared_with?: string[] | null
+          title: string
+          updated_at?: string
+          version_number?: number
+          workflow_id?: string | null
+        }
+        Update: {
+          content?: string
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          foundry_id?: string
+          id?: string
+          is_shared_with_foundry?: boolean
+          is_starred?: boolean
+          metadata?: Json
+          run_id?: string | null
+          shared_with?: string[] | null
+          title?: string
+          updated_at?: string
+          version_number?: number
+          workflow_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_artifacts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_artifacts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_artifacts_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_artifacts_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_artifacts_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "agent_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_custom_prompts: {
         Row: {
           category: string
@@ -521,6 +676,80 @@ export type Database = {
             columns: ["foundry_id"]
             isOneToOne: false
             referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_workflow_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          foundry_id: string
+          id: string
+          node_count: number
+          node_outputs: Json
+          nodes_completed: number
+          run_by: string | null
+          started_at: string
+          status: string
+          workflow_id: string | null
+          workflow_name: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          foundry_id: string
+          id?: string
+          node_count?: number
+          node_outputs?: Json
+          nodes_completed?: number
+          run_by?: string | null
+          started_at?: string
+          status?: string
+          workflow_id?: string | null
+          workflow_name?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          node_count?: number
+          node_outputs?: Json
+          nodes_completed?: number
+          run_by?: string | null
+          started_at?: string
+          status?: string
+          workflow_id?: string | null
+          workflow_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_workflow_runs_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_workflow_runs_run_by_fkey"
+            columns: ["run_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_workflow_runs_run_by_fkey"
+            columns: ["run_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_workflow_runs_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "agent_workflows"
             referencedColumns: ["id"]
           },
         ]
@@ -10690,6 +10919,39 @@ export type Database = {
           id?: string
           to_item_id?: string
           to_item_type?: string
+        }
+        Relationships: []
+      }
+      xray_scans: {
+        Row: {
+          created_at: string
+          created_by: string
+          foundry_id: string
+          id: string
+          idea: string
+          spec: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          foundry_id: string
+          id?: string
+          idea: string
+          spec?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          foundry_id?: string
+          id?: string
+          idea?: string
+          spec?: Json
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }

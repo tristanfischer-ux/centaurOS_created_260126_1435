@@ -1,0 +1,988 @@
+'use server'
+
+/**
+ * @file agent-artifacts.ts
+ *
+ * @description Server actions for managing agent workflow runs and artifacts.
+ * Artifacts are first-class documents produced by workflow executions.
+ * Users can browse, search, export, share, and send artifacts to external tools.
+ *
+ * @security All operations require authentication and enforce foundry isolation
+ * via RLS policies. Only the creator can update/delete their own artifacts.
+ *
+ * @related
+ * - supabase/migrations/20260211000000_agent_artifacts.sql - Schema
+ * - src/app/(platform)/agents/artifacts/page.tsx - Listing page
+ * - src/app/(platform)/agents/agents-workflow-view.tsx - Creates artifacts on chain completion
+ */
+
+import { createClient } from '@/lib/supabase/server'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { getGoogleClient } from '@/lib/google/client'
+import { google } from 'googleapis'
+import type { Json } from '@/types/database.types'
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+/** Content types for artifacts */
+export type ArtifactContentType = 'document' | 'email' | 'report' | 'presentation' | 'checklist'
+
+/** Database row shape for agent_workflow_runs */
+export interface AgentWorkflowRunRow {
+  id: string
+  workflow_id: string | null
+  foundry_id: string
+  run_by: string | null
+  status: 'running' | 'completed' | 'failed' | 'partial'
+  workflow_name: string
+  node_count: number
+  nodes_completed: number
+  node_outputs: unknown[]
+  started_at: string
+  completed_at: string | null
+  created_at: string
+}
+
+/** Database row shape for agent_artifacts */
+export interface AgentArtifactRow {
+  id: string
+  run_id: string | null
+  workflow_id: string | null
+  foundry_id: string
+  created_by: string | null
+  title: string
+  content: string
+  content_type: ArtifactContentType
+  metadata: Record<string, unknown>
+  is_starred: boolean
+  shared_with: string[]
+  is_shared_with_foundry: boolean
+  version_number: number
+  created_at: string
+  updated_at: string
+}
+
+/** Database row shape for agent_artifact_versions */
+export interface AgentArtifactVersionRow {
+  id: string
+  artifact_id: string
+  foundry_id: string
+  edited_by: string | null
+  title: string
+  content: string
+  version_number: number
+  change_summary: string | null
+  created_at: string
+}
+
+/** Input for creating a workflow run */
+export interface CreateRunInput {
+  workflowId: string | null
+  workflowName: string
+  nodeCount: number
+}
+
+/** Input for creating an artifact */
+export interface CreateArtifactInput {
+  runId?: string | null
+  workflowId?: string | null
+  title: string
+  content: string
+  contentType?: ArtifactContentType
+  metadata?: Record<string, unknown>
+}
+
+/** Filters for listing artifacts */
+export interface ArtifactFilters {
+  search?: string
+  contentType?: ArtifactContentType
+  starredOnly?: boolean
+  workflowId?: string
+  limit?: number
+  offset?: number
+}
+
+// ============================================================================
+// WORKFLOW RUN ACTIONS
+// ============================================================================
+
+/**
+ * Create a new workflow run record.
+ *
+ * @param input - Run data (workflowId, name, nodeCount)
+ * @returns The created run row
+ * @security RLS enforces foundry isolation
+ */
+export async function createWorkflowRun(input: CreateRunInput): Promise<{
+  data: AgentWorkflowRunRow | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+
+  // AUTH: Verify user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { data: null, error: 'Not authenticated' }
+  }
+
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) {
+    return { data: null, error: 'No active foundry' }
+  }
+
+  const { data, error } = await supabase
+    .from('agent_workflow_runs')
+    .insert({
+      workflow_id: input.workflowId || null,
+      foundry_id: foundryId,
+      run_by: user.id,
+      status: 'running',
+      workflow_name: input.workflowName || 'Untitled Workflow',
+      node_count: input.nodeCount,
+      nodes_completed: 0,
+      node_outputs: [] as Json,
+      started_at: new Date().toISOString(),
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to create workflow run:', {
+      userId: user.id,
+      foundryId,
+      error: error.message,
+    })
+    return { data: null, error: sanitizeErrorMessage(error) }
+  }
+
+  return { data: data as unknown as AgentWorkflowRunRow, error: null }
+}
+
+/**
+ * Complete a workflow run with final outputs.
+ *
+ * @param runId - UUID of the run to complete
+ * @param status - Final status (completed, failed, partial)
+ * @param nodeOutputs - Snapshot of all node outputs
+ * @param nodesCompleted - Number of nodes that completed
+ * @returns The updated run row
+ * @security RLS enforces ownership
+ */
+export async function completeWorkflowRun(
+  runId: string,
+  status: 'completed' | 'failed' | 'partial',
+  nodeOutputs: unknown[],
+  nodesCompleted: number
+): Promise<{ data: AgentWorkflowRunRow | null; error: string | null }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { data: null, error: 'Not authenticated' }
+  }
+
+  const { data, error } = await supabase
+    .from('agent_workflow_runs')
+    .update({
+      status,
+      node_outputs: nodeOutputs as unknown as Json,
+      nodes_completed: nodesCompleted,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', runId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to complete workflow run:', {
+      runId,
+      userId: user.id,
+      error: error.message,
+    })
+    return { data: null, error: sanitizeErrorMessage(error) }
+  }
+
+  return { data: data as unknown as AgentWorkflowRunRow, error: null }
+}
+
+/**
+ * Get workflow runs for a specific workflow (run history).
+ *
+ * @param workflowId - UUID of the workflow
+ * @param limit - Max runs to return (default 20)
+ * @returns Run history ordered by most recent first
+ * @security RLS enforces foundry isolation
+ */
+export async function getWorkflowRuns(
+  workflowId: string,
+  limit: number = 20
+): Promise<{ data: AgentWorkflowRunRow[] | null; error: string | null }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { data: null, error: 'Not authenticated' }
+  }
+
+  const { data, error } = await supabase
+    .from('agent_workflow_runs')
+    .select('*')
+    .eq('workflow_id', workflowId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to fetch workflow runs:', {
+      workflowId,
+      userId: user.id,
+      error: error.message,
+    })
+    return { data: null, error: sanitizeErrorMessage(error) }
+  }
+
+  return { data: data as unknown as AgentWorkflowRunRow[], error: null }
+}
+
+// ============================================================================
+// ARTIFACT ACTIONS
+// ============================================================================
+
+/**
+ * Create a new artifact from workflow output.
+ *
+ * @description Called automatically when a workflow chain completes.
+ * Stores the combined output as a first-class document.
+ *
+ * @param input - Artifact data (title, content, type, metadata)
+ * @returns The created artifact row
+ * @security RLS enforces foundry isolation
+ * @audit Artifact creation tracked via created_at
+ */
+export async function createArtifact(input: CreateArtifactInput): Promise<{
+  data: AgentArtifactRow | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+
+  // AUTH: Verify user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { data: null, error: 'Not authenticated' }
+  }
+
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) {
+    return { data: null, error: 'No active foundry' }
+  }
+
+  // VALIDATION: Title and content required
+  if (!input.title?.trim()) {
+    return { data: null, error: 'Artifact title is required' }
+  }
+
+  const now = new Date().toISOString()
+
+  const { data, error } = await supabase
+    .from('agent_artifacts')
+    .insert({
+      run_id: input.runId || null,
+      workflow_id: input.workflowId || null,
+      foundry_id: foundryId,
+      created_by: user.id,
+      title: input.title.trim(),
+      content: input.content || '',
+      content_type: input.contentType || 'document',
+      metadata: (input.metadata || {}) as unknown as Json,
+      is_starred: false,
+      version_number: 1,
+      created_at: now,
+      updated_at: now,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to create artifact:', {
+      userId: user.id,
+      foundryId,
+      error: error.message,
+    })
+    return { data: null, error: sanitizeErrorMessage(error) }
+  }
+
+  console.info('[AgentArtifacts] Artifact created:', {
+    artifactId: (data as { id: string }).id,
+    title: input.title.trim(),
+    contentType: input.contentType || 'document',
+    foundryId,
+  })
+
+  return { data: data as unknown as AgentArtifactRow, error: null }
+}
+
+/**
+ * List artifacts for the current user's foundry with optional filters.
+ *
+ * @param filters - Search, content type, starred, pagination
+ * @returns Filtered artifacts ordered by most recent first
+ * @security RLS enforces foundry isolation
+ */
+export async function getArtifacts(filters?: ArtifactFilters): Promise<{
+  data: AgentArtifactRow[] | null
+  error: string | null
+  total: number
+}> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { data: null, error: 'Not authenticated', total: 0 }
+  }
+
+  let query = supabase
+    .from('agent_artifacts')
+    .select('*', { count: 'exact' })
+
+  // Filter by content type
+  if (filters?.contentType) {
+    query = query.eq('content_type', filters.contentType)
+  }
+
+  // Filter starred only
+  if (filters?.starredOnly) {
+    query = query.eq('is_starred', true)
+  }
+
+  // Filter by workflow
+  if (filters?.workflowId) {
+    query = query.eq('workflow_id', filters.workflowId)
+  }
+
+  // Full-text search on title
+  if (filters?.search?.trim()) {
+    query = query.ilike('title', `%${filters.search.trim()}%`)
+  }
+
+  // Pagination
+  const limit = filters?.limit || 50
+  const offset = filters?.offset || 0
+
+  query = query
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  const { data, error, count } = await query
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to fetch artifacts:', {
+      userId: user.id,
+      filters,
+      error: error.message,
+    })
+    return { data: null, error: sanitizeErrorMessage(error), total: 0 }
+  }
+
+  return { data: data as unknown as AgentArtifactRow[], error: null, total: count || 0 }
+}
+
+/**
+ * Get a single artifact by ID.
+ *
+ * @param artifactId - UUID of the artifact
+ * @returns The artifact row or null
+ * @security RLS enforces foundry isolation
+ */
+export async function getArtifact(artifactId: string): Promise<{
+  data: AgentArtifactRow | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { data: null, error: 'Not authenticated' }
+  }
+
+  if (!artifactId) {
+    return { data: null, error: 'Artifact ID is required' }
+  }
+
+  const { data, error } = await supabase
+    .from('agent_artifacts')
+    .select('*')
+    .eq('id', artifactId)
+    .single()
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to fetch artifact:', {
+      artifactId,
+      userId: user.id,
+      error: error.message,
+    })
+    return { data: null, error: sanitizeErrorMessage(error) }
+  }
+
+  return { data: data as unknown as AgentArtifactRow, error: null }
+}
+
+/**
+ * Update an artifact (title, content, metadata, starred).
+ *
+ * @param artifactId - UUID of the artifact to update
+ * @param updates - Partial artifact data to update
+ * @returns The updated artifact row
+ * @security RLS enforces ownership (only creator can update)
+ */
+export async function updateArtifact(
+  artifactId: string,
+  updates: {
+    title?: string
+    content?: string
+    contentType?: ArtifactContentType
+    metadata?: Record<string, unknown>
+    is_starred?: boolean
+  }
+): Promise<{ data: AgentArtifactRow | null; error: string | null }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { data: null, error: 'Not authenticated' }
+  }
+
+  if (!artifactId) {
+    return { data: null, error: 'Artifact ID is required' }
+  }
+
+  // Build update object — only include provided fields
+  const updateData: {
+    updated_at: string
+    title?: string
+    content?: string
+    content_type?: string
+    metadata?: Json
+    is_starred?: boolean
+  } = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (updates.title !== undefined) updateData.title = updates.title.trim()
+  if (updates.content !== undefined) updateData.content = updates.content
+  if (updates.contentType !== undefined) updateData.content_type = updates.contentType
+  if (updates.metadata !== undefined) updateData.metadata = updates.metadata as unknown as Json
+  if (updates.is_starred !== undefined) updateData.is_starred = updates.is_starred
+
+  const { data, error } = await supabase
+    .from('agent_artifacts')
+    .update(updateData)
+    .eq('id', artifactId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to update artifact:', {
+      artifactId,
+      userId: user.id,
+      error: error.message,
+    })
+    return { data: null, error: sanitizeErrorMessage(error) }
+  }
+
+  return { data: data as unknown as AgentArtifactRow, error: null }
+}
+
+/**
+ * Toggle starred status on an artifact.
+ *
+ * @param artifactId - UUID of the artifact
+ * @returns Updated starred status
+ * @security RLS enforces ownership
+ */
+export async function toggleArtifactStar(artifactId: string): Promise<{
+  isStarred: boolean
+  error: string | null
+}> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { isStarred: false, error: 'Not authenticated' }
+  }
+
+  // Fetch current state
+  const { data: current } = await supabase
+    .from('agent_artifacts')
+    .select('is_starred')
+    .eq('id', artifactId)
+    .single()
+
+  if (!current) {
+    return { isStarred: false, error: 'Artifact not found' }
+  }
+
+  const newStarred = !current.is_starred
+
+  const { error } = await supabase
+    .from('agent_artifacts')
+    .update({ is_starred: newStarred, updated_at: new Date().toISOString() })
+    .eq('id', artifactId)
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to toggle star:', {
+      artifactId,
+      userId: user.id,
+      error: error.message,
+    })
+    return { isStarred: !newStarred, error: sanitizeErrorMessage(error) }
+  }
+
+  return { isStarred: newStarred, error: null }
+}
+
+/**
+ * Delete an artifact.
+ *
+ * @param artifactId - UUID of the artifact to delete
+ * @security RLS enforces ownership (only creator can delete)
+ */
+export async function deleteArtifact(artifactId: string): Promise<{
+  error: string | null
+}> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Not authenticated' }
+  }
+
+  if (!artifactId) {
+    return { error: 'Artifact ID is required' }
+  }
+
+  const { error } = await supabase
+    .from('agent_artifacts')
+    .delete()
+    .eq('id', artifactId)
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to delete artifact:', {
+      artifactId,
+      userId: user.id,
+      error: error.message,
+    })
+    return { error: sanitizeErrorMessage(error) }
+  }
+
+  return { error: null }
+}
+
+// ============================================================================
+// PHASE 2: EXTERNAL INTEGRATIONS
+// ============================================================================
+
+/**
+ * Export an artifact to Google Docs.
+ *
+ * @description Creates a new Google Doc with the artifact's content.
+ * Requires the user to have connected their Google account.
+ *
+ * @param artifactId - UUID of the artifact to export
+ * @returns The Google Doc URL or error
+ * @security Requires authenticated user with Google OAuth connected
+ */
+export async function exportArtifactToGoogleDocs(artifactId: string): Promise<{
+  docUrl: string | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+
+  // AUTH: Verify user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { docUrl: null, error: 'Not authenticated' }
+  }
+
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) {
+    return { docUrl: null, error: 'No active foundry' }
+  }
+
+  // Fetch the artifact
+  const { data: artifact, error: fetchError } = await getArtifact(artifactId)
+  if (fetchError || !artifact) {
+    return { docUrl: null, error: fetchError || 'Artifact not found' }
+  }
+
+  // Get Google client
+  const client = await getGoogleClient(user.id, foundryId)
+  if (!client) {
+    return { docUrl: null, error: 'Google account not connected. Please connect in Settings.' }
+  }
+
+  try {
+    const docs = google.docs({ version: 'v1', auth: client })
+
+    // Create a new Google Doc
+    const createRes = await docs.documents.create({
+      requestBody: {
+        title: artifact.title,
+      },
+    })
+
+    const docId = createRes.data.documentId
+    if (!docId) {
+      return { docUrl: null, error: 'Failed to create Google Doc' }
+    }
+
+    // Insert the artifact content into the doc
+    // We insert as plain text (Google Docs doesn't accept markdown natively)
+    await docs.documents.batchUpdate({
+      documentId: docId,
+      requestBody: {
+        requests: [
+          {
+            insertText: {
+              location: { index: 1 },
+              text: artifact.content,
+            },
+          },
+        ],
+      },
+    })
+
+    const docUrl = `https://docs.google.com/document/d/${docId}/edit`
+
+    // Update artifact metadata to track the export
+    await updateArtifact(artifactId, {
+      metadata: {
+        ...artifact.metadata,
+        googleDocUrl: docUrl,
+        googleDocId: docId,
+        exportedToGoogleAt: new Date().toISOString(),
+      },
+    })
+
+    console.info('[AgentArtifacts] Exported artifact to Google Docs:', {
+      artifactId,
+      docId,
+      userId: user.id,
+    })
+
+    return { docUrl, error: null }
+  } catch (err) {
+    console.error('[AgentArtifacts] Failed to export to Google Docs:', {
+      artifactId,
+      userId: user.id,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    })
+    return { docUrl: null, error: 'Failed to create Google Doc. Check your Google connection.' }
+  }
+}
+
+/**
+ * Send an artifact as an email via Resend.
+ *
+ * @param artifactId - UUID of the artifact to send
+ * @param recipients - Array of email addresses
+ * @param subject - Email subject line
+ * @returns Success status
+ * @security Requires authenticated user
+ */
+export async function sendArtifactAsEmail(
+  artifactId: string,
+  recipients: string[],
+  subject: string
+): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+
+  // AUTH: Verify user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Not authenticated' }
+  }
+
+  // VALIDATION: Recipients and subject required
+  if (!recipients.length) {
+    return { error: 'At least one recipient is required' }
+  }
+  if (!subject?.trim()) {
+    return { error: 'Subject is required' }
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const invalidEmails = recipients.filter(e => !emailRegex.test(e))
+  if (invalidEmails.length > 0) {
+    return { error: `Invalid email addresses: ${invalidEmails.join(', ')}` }
+  }
+
+  // Fetch the artifact
+  const { data: artifact, error: fetchError } = await getArtifact(artifactId)
+  if (fetchError || !artifact) {
+    return { error: fetchError || 'Artifact not found' }
+  }
+
+  // Import email sending dynamically to avoid circular deps
+  const { sendEmail } = await import('@/lib/notifications/channels/email')
+
+  // Send to each recipient individually (sendEmail expects a single address)
+  const errors: string[] = []
+  for (const recipient of recipients) {
+    const result = await sendEmail({
+      to: recipient,
+      subject: subject.trim(),
+      body: artifact.content,
+    })
+
+    if (result.error) {
+      errors.push(`${recipient}: ${result.error}`)
+    }
+  }
+
+  if (errors.length > 0) {
+    console.error('[AgentArtifacts] Failed to send artifact email:', {
+      artifactId,
+      failedCount: errors.length,
+      totalRecipients: recipients.length,
+      errors,
+    })
+    return { error: `Failed to send to ${errors.length} recipient(s)` }
+  }
+
+  // Update artifact metadata to track the send
+  await updateArtifact(artifactId, {
+    metadata: {
+      ...artifact.metadata,
+      lastEmailSent: {
+        to: recipients,
+        subject: subject.trim(),
+        sentAt: new Date().toISOString(),
+      },
+    },
+  })
+
+  console.info('[AgentArtifacts] Artifact sent as email:', {
+    artifactId,
+    recipients: recipients.length,
+  })
+
+  return { error: null }
+}
+
+// ============================================================================
+// PHASE 3: VERSIONING
+// ============================================================================
+
+/**
+ * Update artifact content and create a version record.
+ *
+ * @param artifactId - UUID of the artifact to update
+ * @param content - New content
+ * @param title - New title
+ * @param changeSummary - Description of what changed
+ * @returns Updated artifact
+ * @security RLS enforces ownership
+ */
+export async function updateArtifactContent(
+  artifactId: string,
+  content: string,
+  title: string,
+  changeSummary?: string
+): Promise<{ data: AgentArtifactRow | null; error: string | null }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { data: null, error: 'Not authenticated' }
+  }
+
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) {
+    return { data: null, error: 'No active foundry' }
+  }
+
+  // Fetch current artifact to get version number
+  const { data: current, error: fetchError } = await getArtifact(artifactId)
+  if (fetchError || !current) {
+    return { data: null, error: fetchError || 'Artifact not found' }
+  }
+
+  const newVersion = current.version_number + 1
+
+  // Create version snapshot of the CURRENT state before updating
+  const { error: versionError } = await supabase
+    .from('agent_artifact_versions')
+    .insert({
+      artifact_id: artifactId,
+      foundry_id: foundryId,
+      edited_by: user.id,
+      title: current.title,
+      content: current.content,
+      version_number: current.version_number,
+      change_summary: changeSummary || null,
+    })
+
+  if (versionError) {
+    console.error('[AgentArtifacts] Failed to create version:', {
+      artifactId,
+      error: versionError.message,
+    })
+    // Non-blocking — still update the artifact
+  }
+
+  // Update the artifact with new content
+  const { data, error } = await supabase
+    .from('agent_artifacts')
+    .update({
+      title: title.trim(),
+      content,
+      version_number: newVersion,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', artifactId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to update artifact content:', {
+      artifactId,
+      userId: user.id,
+      error: error.message,
+    })
+    return { data: null, error: sanitizeErrorMessage(error) }
+  }
+
+  return { data: data as unknown as AgentArtifactRow, error: null }
+}
+
+/**
+ * Get version history for an artifact.
+ *
+ * @param artifactId - UUID of the artifact
+ * @returns Version history ordered by most recent first
+ * @security RLS enforces foundry isolation
+ */
+export async function getArtifactVersions(artifactId: string): Promise<{
+  data: AgentArtifactVersionRow[] | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { data: null, error: 'Not authenticated' }
+  }
+
+  const { data, error } = await supabase
+    .from('agent_artifact_versions')
+    .select('*')
+    .eq('artifact_id', artifactId)
+    .order('version_number', { ascending: false })
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to fetch versions:', {
+      artifactId,
+      error: error.message,
+    })
+    return { data: null, error: sanitizeErrorMessage(error) }
+  }
+
+  return { data: data as unknown as AgentArtifactVersionRow[], error: null }
+}
+
+/**
+ * Restore an artifact to a previous version.
+ *
+ * @param artifactId - UUID of the artifact
+ * @param versionId - UUID of the version to restore
+ * @returns Updated artifact
+ * @security RLS enforces ownership
+ */
+export async function restoreArtifactVersion(
+  artifactId: string,
+  versionId: string
+): Promise<{ data: AgentArtifactRow | null; error: string | null }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { data: null, error: 'Not authenticated' }
+  }
+
+  // Fetch the version to restore
+  const { data: version, error: versionError } = await supabase
+    .from('agent_artifact_versions')
+    .select('*')
+    .eq('id', versionId)
+    .eq('artifact_id', artifactId)
+    .single()
+
+  if (versionError || !version) {
+    return { data: null, error: 'Version not found' }
+  }
+
+  // Update artifact content using the versioned update (which creates a new version snapshot)
+  return updateArtifactContent(
+    artifactId,
+    (version as unknown as AgentArtifactVersionRow).content,
+    (version as unknown as AgentArtifactVersionRow).title,
+    `Restored to version ${(version as unknown as AgentArtifactVersionRow).version_number}`
+  )
+}
+
+/**
+ * Share an artifact with specific users or the entire foundry.
+ *
+ * @param artifactId - UUID of the artifact
+ * @param userIds - Specific user IDs to share with
+ * @param shareWithFoundry - Whether to share with entire foundry
+ * @returns Success status
+ * @security RLS enforces ownership for updates
+ */
+export async function shareArtifact(
+  artifactId: string,
+  userIds?: string[],
+  shareWithFoundry?: boolean
+): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Not authenticated' }
+  }
+
+  const updateData: {
+    updated_at: string
+    shared_with?: string[] | null
+    is_shared_with_foundry?: boolean
+  } = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (userIds !== undefined) {
+    updateData.shared_with = userIds
+  }
+  if (shareWithFoundry !== undefined) {
+    updateData.is_shared_with_foundry = shareWithFoundry
+  }
+
+  const { error } = await supabase
+    .from('agent_artifacts')
+    .update(updateData)
+    .eq('id', artifactId)
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to share artifact:', {
+      artifactId,
+      userId: user.id,
+      error: error.message,
+    })
+    return { error: sanitizeErrorMessage(error) }
+  }
+
+  return { error: null }
+}
+
