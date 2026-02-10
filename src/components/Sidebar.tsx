@@ -16,6 +16,7 @@ import {
     Bell,
     Sparkles,
     Waypoints,
+    ScanSearch,
     MessageSquarePlus,
     Plus,
     Coins,
@@ -74,6 +75,7 @@ const companyNavigation = [
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Agents", href: "/agents", icon: Bot, tooltip: "Prompt workflows — build, chain, and copy prompts" },
+    { name: "Product X-Ray", href: "/product-xray", icon: ScanSearch, tooltip: "Deep product analysis across strategy, team, and marketplace" },
     { name: "Marketplace Orders", href: "/marketplace-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
     { name: "Settings", href: "/settings", icon: Settings, tooltip: "Company configuration, integrations, and preferences" },
 ]

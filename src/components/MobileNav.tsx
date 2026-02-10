@@ -22,6 +22,7 @@ import {
     BookOpen,
     LayoutDashboard,
     ShoppingBag,
+    ScanSearch,
     Coins,
     ArrowLeftRight,
 } from "lucide-react"
@@ -62,6 +63,7 @@ const companyMoreNavigation = [
     { name: "Objectives", href: "/new-objectives", icon: Target },
     { name: "Team", href: "/team", icon: Users },
     { name: "Agents", href: "/agents", icon: Bot },
+    { name: "Product X-Ray", href: "/product-xray", icon: ScanSearch },
     { name: "Marketplace Orders", href: "/marketplace-orders", icon: ShoppingBag },
     { name: "Settings", href: "/settings", icon: Settings },
 ]
