@@ -1,7 +1,7 @@
 /**
  * @file scan.ts — X-Ray AI scan service
  *
- * @description Decomposes a product idea into a structured machine spec (XRaySpec)
+ * @description Reverse engineers a product idea into a structured machine spec (XRaySpec)
  * using AI-powered analysis. Supports multiple AI providers via env configuration.
  *
  * Uses OpenAI's structured output (zodResponseFormat) as the primary provider,
@@ -32,7 +32,7 @@ const USE_MOCK = process.env.XRAY_USE_MOCK === "true"
 
 const SCAN_SYSTEM_PROMPT = `You are a senior industrial systems engineer with 25 years of experience designing, building, and commissioning machines across chemical processing, electronics manufacturing, pharmaceutical production, food processing, robotics, and clean energy.
 
-Your task: decompose a vague product idea into a physically buildable machine composed of parallel subsystems (modules).
+Your task: reverse engineer a vague product idea into a physically buildable machine composed of parallel subsystems (modules).
 
 ## Requirements
 
@@ -74,7 +74,7 @@ Return a JSON object matching the provided schema exactly. Every module's IO sho
 // ─── AI Scan Implementation ─────────────────────────────────────────
 
 /**
- * Calls the AI to decompose a product idea into a structured machine spec.
+ * Calls the AI to reverse engineer a product idea into a structured machine spec.
  *
  * @param idea - The raw product/machine idea text
  * @returns The AI-generated XRaySpec (without runtime fields)
@@ -95,7 +95,7 @@ async function callScanAI(idea: string): Promise<AIScanOutput> {
     model: "gpt-4o-2024-08-06",
     messages: [
       { role: "system", content: SCAN_SYSTEM_PROMPT },
-      { role: "user", content: `Product idea to decompose:\n\n${idea}` },
+      { role: "user", content: `Product idea to reverse engineer:\n\n${idea}` },
     ],
     response_format: zodResponseFormat(AIScanOutputSchema, "xray_scan"),
     max_tokens: 8192,
@@ -118,12 +118,12 @@ async function callScanAI(idea: string): Promise<AIScanOutput> {
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**
- * Scans an idea and decomposes it into a structured machine spec.
+ * Scans an idea and reverse engineers it into a structured machine spec.
  *
  * @param idea - The raw product/machine idea text
  * @returns A structured XRaySpec with modules, materials, processes, and validation
  *
- * @description Uses AI for real decomposition, or mock data if XRAY_USE_MOCK=true.
+ * @description Uses AI for reverse engineering, or mock data if XRAY_USE_MOCK=true.
  * The AI generates domain-specific diagnostic questions for the gating module.
  */
 export async function scanIdea(idea: string): Promise<XRaySpec> {
@@ -145,6 +145,17 @@ export async function scanIdea(idea: string): Promise<XRaySpec> {
     validation: aiOutput.validation,
     modules: aiOutput.modules.map((m) => ({
       ...m,
+      // Convert nullable AI output back to optional runtime types
+      diagnostic: m.diagnostic ? {
+        ...m.diagnostic,
+        freeform: m.diagnostic.freeform ?? undefined,
+        derivedProcessClass: m.diagnostic.derivedProcessClass ?? undefined,
+        derivedRisks: m.diagnostic.derivedRisks ?? undefined,
+        questions: m.diagnostic.questions.map((q) => ({
+          ...q,
+          answer: q.answer ?? undefined,
+        })),
+      } : undefined,
       // Initialize image generation fields
       imageStatus: "pending" as const,
     })),

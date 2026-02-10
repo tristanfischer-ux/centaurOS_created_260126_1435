@@ -145,6 +145,28 @@ export type XRaySpec = z.infer<typeof XRaySpecSchema>
  * Excludes runtime-only fields (imageUrl, imageStatus, interview, supplier, etc.)
  * that the AI shouldn't generate.
  */
+/**
+ * OpenAI structured outputs requires `.nullable()` instead of `.optional()`
+ * on all non-required fields. These AI-specific schemas use `.nullable()`
+ * while the shared runtime schemas above use `.optional()`.
+ */
+const AIDiagnosticQuestionSchema = z.object({
+  id: z.string().describe("Stable key like 'where_product_exists' or 'assembly_method'"),
+  question: z.string().describe("The question to ask the user"),
+  options: z.array(z.string()).min(3).max(8).describe("Mutually exclusive answer choices"),
+  answer: z.string().nullable().describe("User's selected answer, or null if not yet answered"),
+})
+
+const AITransformationDiagnosticSchema = z.object({
+  questions: z.array(AIDiagnosticQuestionSchema).min(3).max(8)
+    .describe("AI-generated domain-specific diagnostic questions"),
+  freeform: z.string().nullable().describe("Optional user-provided context or notes"),
+  derivedProcessClass: z.string().nullable()
+    .describe("AI-derived process class after user answers (e.g. 'Precipitation reactor', 'SMT pick-and-place')"),
+  derivedRisks: z.array(z.string()).nullable()
+    .describe("AI-derived domain-specific risks based on diagnostic answers"),
+})
+
 export const AIScanOutputSchema = z.object({
   function: z.string().describe("One-sentence system function description"),
   assumptions: z.array(z.string()).min(1).describe("Key engineering assumptions"),
@@ -177,8 +199,8 @@ export const AIScanOutputSchema = z.object({
     }),
     isGatingModule: z.boolean()
       .describe("True if this is the gating transformation step. Exactly one module must be the gating module."),
-    diagnostic: TransformationDiagnosticSchema.optional()
-      .describe("Only present on the gating module. Contains AI-generated diagnostic questions."),
+    diagnostic: AITransformationDiagnosticSchema.nullable()
+      .describe("Only present on the gating module (null for non-gating modules). Contains AI-generated diagnostic questions."),
   })).min(3).max(8)
     .describe("Sub-assemblies. Exactly one must have isGatingModule=true with diagnostic questions."),
 })
