@@ -169,13 +169,13 @@ export function StrategicPlannerView({ objectiveId }: StrategicPlannerViewProps)
         <div className="flex items-center gap-3">
           {/* View mode toggle */}
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as CanvasViewMode)}>
-            <TabsList className="h-8">
-              <TabsTrigger value="canvas" className="text-xs px-3 h-7">
-                <LayoutGrid className="h-3.5 w-3.5 mr-1.5" />
+            <TabsList className="h-9">
+              <TabsTrigger value="canvas" className="text-xs gap-1.5 px-3">
+                <LayoutGrid className="h-3.5 w-3.5" />
                 Canvas
               </TabsTrigger>
-              <TabsTrigger value="gantt" className="text-xs px-3 h-7">
-                <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+              <TabsTrigger value="gantt" className="text-xs gap-1.5 px-3">
+                <BarChart3 className="h-3.5 w-3.5" />
                 Gantt
               </TabsTrigger>
             </TabsList>
@@ -183,13 +183,13 @@ export function StrategicPlannerView({ objectiveId }: StrategicPlannerViewProps)
 
           {/* Grouping toggle */}
           <Tabs value={grouping} onValueChange={(v) => setGrouping(v as CanvasGrouping)}>
-            <TabsList className="h-8">
-              <TabsTrigger value="phase" className="text-xs px-3 h-7">
-                <Target className="h-3.5 w-3.5 mr-1.5" />
+            <TabsList className="h-9">
+              <TabsTrigger value="phase" className="text-xs gap-1.5 px-3">
+                <Target className="h-3.5 w-3.5" />
                 By Phase
               </TabsTrigger>
-              <TabsTrigger value="person" className="text-xs px-3 h-7">
-                <Users className="h-3.5 w-3.5 mr-1.5" />
+              <TabsTrigger value="person" className="text-xs gap-1.5 px-3">
+                <Users className="h-3.5 w-3.5" />
                 By Person
               </TabsTrigger>
             </TabsList>

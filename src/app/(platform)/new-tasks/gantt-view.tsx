@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Gantt, Task as GanttTask, ViewMode } from 'gantt-task-react'
 import 'gantt-task-react/dist/index.css'
 import { cn } from '@/lib/utils'
+import { ViewToggle } from '@/components/ui/view-toggle'
 import { Button } from '@/components/ui/button'
 import {
   ChevronLeft, ChevronRight, CalendarDays, GanttChartSquare,
@@ -337,26 +338,15 @@ export function TasksGanttView({ tasks, selectedId, onSelect }: TasksGanttViewPr
         {/* View mode + navigation */}
         <div className="flex items-center gap-2">
           {/* View mode pills */}
-          <div className="flex gap-0.5 bg-muted/60 p-0.5 rounded-lg">
-            {[
-              { mode: ViewMode.Day, label: 'Day' },
-              { mode: ViewMode.Week, label: 'Week' },
-              { mode: ViewMode.Month, label: 'Month' },
-            ].map(v => (
-              <button
-                key={v.label}
-                onClick={() => setViewMode(v.mode)}
-                className={cn(
-                  'px-3 py-1 text-xs font-medium rounded-md transition-all duration-200',
-                  viewMode === v.mode
-                    ? 'bg-white text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
+          <ViewToggle
+            options={[
+              { value: 'day', label: 'Day', ariaLabel: 'Day view' },
+              { value: 'week', label: 'Week', ariaLabel: 'Week view' },
+              { value: 'month', label: 'Month', ariaLabel: 'Month view' },
+            ]}
+            value={viewMode === ViewMode.Day ? 'day' : viewMode === ViewMode.Week ? 'week' : 'month'}
+            onValueChange={(v) => setViewMode(v === 'day' ? ViewMode.Day : v === 'week' ? ViewMode.Week : ViewMode.Month)}
+          />
 
           {/* Date navigation */}
           <div className="flex items-center gap-1">
