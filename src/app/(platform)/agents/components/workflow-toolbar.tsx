@@ -178,7 +178,7 @@ export function WorkflowToolbar({
             </div>
 
             {/* Right: actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <Button
