@@ -20,7 +20,7 @@ This script ensures core platform features remain functional for all user roles.
 
 ### Environment
 
-- **Test URL**: `https://staging.centauros.io` (or local: `http://localhost:3000`)
+- **Test URL**: `https://staging.fractionalforge.app` (or local: `http://localhost:3000`)
 - **Browser**: Chrome (latest) with DevTools open for console errors
 - **Mobile**: Test on iOS Safari or Chrome Android for responsive checks
 

@@ -34,7 +34,7 @@ Today we fixed **ALL** signup and application processes:
 ## Test Each Signup Flow
 
 ### 1. Founder Signup ✅
-**URL:** https://centaurdynamics.io/join/founder
+**URL:** https://fractionalforge.app/join/founder
 
 **Test Steps:**
 1. Fill out form:
@@ -56,7 +56,7 @@ Today we fixed **ALL** signup and application processes:
 ---
 
 ### 2. Executive Signup ✅
-**URL:** https://centaurdynamics.io/join/executive
+**URL:** https://fractionalforge.app/join/executive
 
 **Test Steps:**
 1. Fill out form:
@@ -74,7 +74,7 @@ Today we fixed **ALL** signup and application processes:
 ---
 
 ### 3. Apprentice Signup ✅
-**URL:** https://centaurdynamics.io/join/apprentice
+**URL:** https://fractionalforge.app/join/apprentice
 
 **Test Steps:**
 1. Fill out form:
@@ -92,7 +92,7 @@ Today we fixed **ALL** signup and application processes:
 ---
 
 ### 4. Supplier Signup ✅
-**URL:** https://centaurdynamics.io/join/supplier
+**URL:** https://fractionalforge.app/join/supplier
 
 **Test Steps:**
 1. Fill out form:
@@ -113,7 +113,7 @@ Today we fixed **ALL** signup and application processes:
 ---
 
 ### 5. VC Application ✅
-**URL:** https://centaurdynamics.io/join/vc
+**URL:** https://fractionalforge.app/join/vc
 
 **Test Steps:**
 1. Fill out form:
@@ -136,7 +136,7 @@ Today we fixed **ALL** signup and application processes:
 ---
 
 ### 6. Factory Application ✅
-**URL:** https://centaurdynamics.io/join/factory
+**URL:** https://fractionalforge.app/join/factory
 
 **Test Steps:**
 1. Fill out form:
@@ -158,7 +158,7 @@ Today we fixed **ALL** signup and application processes:
 ---
 
 ### 7. University Application ✅
-**URL:** https://centaurdynamics.io/join/university
+**URL:** https://fractionalforge.app/join/university
 
 **Test Steps:**
 1. Fill out form:
@@ -183,7 +183,7 @@ Today we fixed **ALL** signup and application processes:
 ---
 
 ### 8. Network Partner Application ✅
-**URL:** https://centaurdynamics.io/join/network
+**URL:** https://fractionalforge.app/join/network
 
 **Test Steps:**
 1. Fill out form:

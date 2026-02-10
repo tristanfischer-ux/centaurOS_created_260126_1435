@@ -29,8 +29,8 @@ TEST_APPRENTICE_PASSWORD=your-secure-password
 GITHUB_TOKEN=ghp_your_personal_access_token
 GITHUB_REPO=your-org/centauros
 
-STAGING_URL=https://staging.centauros.io
-PRODUCTION_URL=https://centauros.io
+STAGING_URL=https://staging.fractionalforge.app
+PRODUCTION_URL=https://fractionalforge.app
 ```
 
 #### GitHub Token Setup
@@ -154,7 +154,7 @@ INSERT INTO conversations (
 ### Via API
 
 ```bash
-curl -X POST https://centauros.io/api/admin/qa-tests \
+curl -X POST https://fractionalforge.app/api/admin/qa-tests \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_SESSION_TOKEN" \
   -d '{"environment": "staging"}'

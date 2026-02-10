@@ -2,7 +2,7 @@
 
 **Date:** February 5, 2026  
 **Scope:** All signup flows (Founder, Executive, Apprentice, Supplier) + Login  
-**Environment:** Production (centaurdynamics.io)
+**Environment:** Production (fractionalforge.app)
 
 ---
 
@@ -338,15 +338,15 @@ e2e/
 ## 8. Appendix: Test URLs
 
 ### Production URLs
-- Founder signup: https://centaurdynamics.io/join/founder
-- Executive signup: https://centaurdynamics.io/join/executive
-- Apprentice signup: https://centaurdynamics.io/join/apprentice
-- Supplier signup: https://centaurdynamics.io/join/supplier
-- Login: https://centaurdynamics.io/login
+- Founder signup: https://fractionalforge.app/join/founder
+- Executive signup: https://fractionalforge.app/join/executive
+- Apprentice signup: https://fractionalforge.app/join/apprentice
+- Supplier signup: https://fractionalforge.app/join/supplier
+- Login: https://fractionalforge.app/login
 
 ### Demo Mode URLs
 Add `?demo=true` to any signup URL for pre-filled forms:
-- https://centaurdynamics.io/join/founder?demo=true
+- https://fractionalforge.app/join/founder?demo=true
 
 ### Test Credentials
 | Role | Email | Password |

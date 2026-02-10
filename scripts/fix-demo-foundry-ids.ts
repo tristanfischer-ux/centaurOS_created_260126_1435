@@ -23,12 +23,12 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 
 // Demo accounts and their correct foundry assignments
 const DEMO_ACCOUNT_FOUNDRIES = [
-  { email: 'demo.founder@forgeos.io', foundry_id: 'centaur-guild', account_type: 'team_builder' },
-  { email: 'demo.executive@forgeos.io', foundry_id: 'centaur-guild', account_type: 'team_builder' },
-  { email: 'demo.apprentice@forgeos.io', foundry_id: 'centaur-guild', account_type: 'team_builder' },
-  { email: 'demo.vc@forgeos.io', foundry_id: 'centaur-guild', account_type: 'team_builder' },
-  { email: 'demo.supplier@forgeos.io', foundry_id: 'centaur-suppliers', account_type: 'supplier' },
-  { email: 'demo.university@forgeos.io', foundry_id: 'centaur-guild', account_type: 'team_builder' }
+  { email: 'demo.founder@fractionalforge.app', foundry_id: 'centaur-guild', account_type: 'team_builder' },
+  { email: 'demo.executive@fractionalforge.app', foundry_id: 'centaur-guild', account_type: 'team_builder' },
+  { email: 'demo.apprentice@fractionalforge.app', foundry_id: 'centaur-guild', account_type: 'team_builder' },
+  { email: 'demo.vc@fractionalforge.app', foundry_id: 'centaur-guild', account_type: 'team_builder' },
+  { email: 'demo.supplier@fractionalforge.app', foundry_id: 'centaur-suppliers', account_type: 'supplier' },
+  { email: 'demo.university@fractionalforge.app', foundry_id: 'centaur-guild', account_type: 'team_builder' }
 ]
 
 async function fixDemoFoundryIds() {

@@ -141,7 +141,7 @@ All use the same `submitApplication()` flow and were broken for the same reason.
 
 To test VC applications:
 
-1. Visit: https://centaurdynamics.io/join/vc
+1. Visit: https://fractionalforge.app/join/vc
 2. Click "Apply for Access"
 3. Fill out form:
    - Name: Test VC

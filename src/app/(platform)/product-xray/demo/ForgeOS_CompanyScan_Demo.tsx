@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
 
 const moneyGBP = (n: number): string => `£${Math.round(n).toLocaleString()}`;
 
@@ -289,11 +291,20 @@ function suggestSuppliersForModule(m: ModuleSpec) {
     .map((x) => x.c);
 }
 
+// Chart token CSS variables for SVG node accent colors (replaces hardcoded hex)
+const CHART_COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+  "hsl(var(--chart-6))",
+];
+
 function chipColor(id: string): string {
-  const colors = ["#F59E0B", "#60A5FA", "#34D399", "#A78BFA", "#F472B6", "#94A3B8"]; // airy palette
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return colors[h % colors.length];
+  return CHART_COLORS[h % CHART_COLORS.length];
 }
 
 function readinessFor(m: ModuleSpec) {
@@ -373,22 +384,20 @@ function ReactionDiagnosticPanel({
 
   const SelectRow = ({ label, value, options, onChange }: { label: string; value: string | undefined; options: string[]; onChange: (v: string) => void }) => (
     <div className="space-y-2">
-      <div className="text-sm font-semibold">{label}</div>
+      <h4 className="text-sm font-semibold">{label}</h4>
       <div className="flex flex-wrap gap-2">
         {options.map((opt: string) => {
-          const active = value === opt;
+          const isActive = value === opt;
           return (
-            <button
+            <Button
               key={opt}
+              variant={isActive ? "default" : "outline"}
+              size="sm"
               onClick={() => onChange(opt)}
-              className={
-                "px-3 py-2 rounded-xl text-sm ring-1 " +
-                (active ? "bg-foreground text-background ring-foreground" : "bg-background text-foreground ring-muted hover:bg-muted")
-              }
               type="button"
             >
               {opt}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -396,19 +405,19 @@ function ReactionDiagnosticPanel({
   );
 
   return (
-    <Card className="rounded-2xl">
-      <CardContent className="p-5 space-y-4">
+    <Card>
+      <CardContent className="pt-6 space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <div className="font-semibold">Guided diagnostic — {module.name}</div>
-            <div className="text-xs text-muted-foreground">Answer 5 decisive questions. ForgeOS derives the likely process class.</div>
+            <h3 className="text-base font-semibold">Guided diagnostic — {module.name}</h3>
+            <p className="text-xs text-muted-foreground">Answer 5 decisive questions. ForgeOS derives the likely process class.</p>
           </div>
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-4">
+        <div className="grid lg:grid-cols-2 gap-6">
           <SelectRow
             label="1) Where does the product exist right now?"
             value={diag.whereProductExists}
@@ -452,29 +461,29 @@ function ReactionDiagnosticPanel({
           />
 
           <div className="space-y-2">
-            <div className="text-sm font-semibold">Notes (optional)</div>
+            <h4 className="text-sm font-semibold">Notes (optional)</h4>
             <Input value={diag.freeform || ""} onChange={(e) => setDiag({ ...diag, freeform: e.target.value })} placeholder="Any extra context..." />
           </div>
         </div>
 
-        <div className="rounded-2xl ring-1 ring-muted bg-background p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold">Derived process class</div>
-            <Badge>Auto</Badge>
-          </div>
-          <div className="text-sm text-foreground">{derived.cls}</div>
-          <div className="text-xs text-muted-foreground">This will drive which experts/suppliers are shown next.</div>
-
-          {derived.risks.length > 0 && (
-            <div className="mt-3 space-y-1">
-              <div className="text-sm font-semibold">Derived risks / unknowns</div>
-              <ul className="list-disc pl-5 text-sm text-foreground">
-                {derived.risks.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
+        <div className="rounded-lg bg-muted/50 p-6 space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold">Derived process class</h4>
+              <Badge>Auto</Badge>
             </div>
-          )}
+            <p className="text-sm text-foreground">{derived.cls}</p>
+            <p className="text-xs text-muted-foreground">This will drive which experts/suppliers are shown next.</p>
+
+            {derived.risks.length > 0 && (
+              <div className="mt-4 space-y-1">
+                <h4 className="text-sm font-semibold">Derived risks / unknowns</h4>
+                <ul className="list-disc pl-5 text-sm text-foreground">
+                  {derived.risks.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -520,22 +529,22 @@ function InterviewPanel({ module, onClose, onSave }: { module: ModuleSpec; onClo
   };
 
   return (
-    <Card className="rounded-2xl">
-      <CardContent className="p-5 space-y-4">
+    <Card>
+      <CardContent className="pt-6 space-y-6">
         <div className="flex items-center justify-between">
-          <div className="font-semibold">Interview — {module.name}</div>
+          <h3 className="text-base font-semibold">Interview — {module.name}</h3>
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
         </div>
 
-        <div className="text-xs text-muted-foreground">Capture answers live. Save writes back into module unknowns.</div>
+        <p className="text-xs text-muted-foreground">Capture answers live. Save writes back into module unknowns.</p>
 
         {module.detail.expertQuestions.map((q, i) => (
-          <div key={i} className="space-y-1">
+          <div key={i} className="space-y-2">
             <div className="flex items-center gap-2">
               <Badge variant="secondary">{q.discipline}</Badge>
-              <div className="text-sm">{q.q}</div>
+              <span className="text-sm">{q.q}</span>
             </div>
             <Input
               value={answers[q.q] || ""}
@@ -546,7 +555,7 @@ function InterviewPanel({ module, onClose, onSave }: { module: ModuleSpec; onClo
         ))}
 
         <div className="space-y-2">
-          <div className="text-sm font-semibold">Risks / Unknowns discovered</div>
+          <h4 className="text-sm font-semibold">Risks / Unknowns discovered</h4>
           {risks.map((r, i) => (
             <Input
               key={i}
@@ -560,8 +569,8 @@ function InterviewPanel({ module, onClose, onSave }: { module: ModuleSpec; onClo
           </Button>
         </div>
 
-        <div className="space-y-1">
-          <div className="text-sm font-semibold">General notes</div>
+        <div className="space-y-2">
+          <h4 className="text-sm font-semibold">General notes</h4>
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Freeform notes" />
         </div>
 
@@ -574,20 +583,22 @@ function InterviewPanel({ module, onClose, onSave }: { module: ModuleSpec; onClo
 // ---------------- UI components ----------------
 function Pill({ label, items }: { label: string; items: string[] }) {
   return (
-    <div className="rounded-2xl ring-1 ring-muted bg-background p-4 space-y-2">
-      <div className="text-sm font-semibold">{label}</div>
-      <div className="flex flex-wrap gap-2">
-        {items.length === 0 ? (
-          <span className="text-xs text-muted-foreground">—</span>
-        ) : (
-          items.map((x, i) => (
-            <Badge key={i} variant="secondary">
-              {x}
-            </Badge>
-          ))
-        )}
-      </div>
-    </div>
+    <Card>
+      <CardContent className="pt-6 space-y-2">
+        <h4 className="text-sm font-semibold">{label}</h4>
+        <div className="flex flex-wrap gap-2">
+          {items.length === 0 ? (
+            <span className="text-xs text-muted-foreground">—</span>
+          ) : (
+            items.map((x, i) => (
+              <Badge key={i} variant="secondary">
+                {x}
+              </Badge>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -609,97 +620,99 @@ function ModuleCard({
     : true;
 
   return (
-    <div className="rounded-2xl ring-1 ring-muted bg-background p-4 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <div className="font-semibold">{m.name}</div>
-          <div className="text-xs text-muted-foreground">{m.purpose}</div>
-        </div>
-        <div className="flex items-center gap-2">
-          {isReaction && (diagComplete ? <Badge>Diagnostic set</Badge> : <Badge variant="secondary">Needs diagnostic</Badge>)}
-          <Badge variant="secondary">Answers {r.answered}/{r.total} • Risks {r.risks}</Badge>
-          <Button variant="outline" onClick={() => setOpen((v) => !v)}>
-            {open ? "Hide" : "Deep dive"}
-          </Button>
-          {isReaction ? (
-            <Button onClick={() => onOpenReactionDiag(m)}>Diagnostic</Button>
-          ) : (
-            <Button onClick={() => onOpenInterview(m)}>Interview</Button>
-          )}
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-3">
-        <div className="rounded-xl bg-muted p-3 ring-1 ring-muted">
-          <div className="text-xs font-semibold">Inputs</div>
-          <div className="text-xs text-muted-foreground">{m.io.in.join(", ")}</div>
-        </div>
-        <div className="rounded-xl bg-muted p-3 ring-1 ring-muted">
-          <div className="text-xs font-semibold">Outputs</div>
-          <div className="text-xs text-muted-foreground">{m.io.out.join(", ")}</div>
-        </div>
-        <div className="rounded-xl bg-muted p-3 ring-1 ring-muted">
-          <div className="text-xs font-semibold">Key parts</div>
-          <div className="text-xs text-muted-foreground">
-            {m.keyParts.slice(0, 4).join(", ")}
-            {m.keyParts.length > 4 ? "…" : ""}
+    <Card>
+      <CardContent className="pt-6 space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold">{m.name}</h3>
+            <p className="text-xs text-muted-foreground">{m.purpose}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {isReaction && (diagComplete ? <Badge>Diagnostic set</Badge> : <Badge variant="secondary">Needs diagnostic</Badge>)}
+            <Badge variant="secondary">Answers {r.answered}/{r.total} • Risks {r.risks}</Badge>
+            <Button variant="outline" onClick={() => setOpen((v) => !v)}>
+              {open ? "Hide" : "Deep dive"}
+            </Button>
+            {isReaction ? (
+              <Button onClick={() => onOpenReactionDiag(m)}>Diagnostic</Button>
+            ) : (
+              <Button variant="outline" onClick={() => onOpenInterview(m)}>Interview</Button>
+            )}
           </div>
         </div>
-      </div>
 
-      {isReaction && m.reactionDiag?.derivedProcessClass && (
-        <div className="rounded-xl bg-background ring-1 ring-muted p-3">
-          <div className="text-sm font-semibold">Derived process class</div>
-          <div className="text-sm text-foreground">{m.reactionDiag.derivedProcessClass}</div>
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="rounded-lg bg-muted p-4">
+            <h4 className="text-xs font-semibold">Inputs</h4>
+            <p className="text-xs text-muted-foreground">{m.io.in.join(", ")}</p>
+          </div>
+          <div className="rounded-lg bg-muted p-4">
+            <h4 className="text-xs font-semibold">Outputs</h4>
+            <p className="text-xs text-muted-foreground">{m.io.out.join(", ")}</p>
+          </div>
+          <div className="rounded-lg bg-muted p-4">
+            <h4 className="text-xs font-semibold">Key parts</h4>
+            <p className="text-xs text-muted-foreground">
+              {m.keyParts.slice(0, 4).join(", ")}
+              {m.keyParts.length > 4 ? "…" : ""}
+            </p>
+          </div>
         </div>
-      )}
 
-      {open && (
-        <div className="rounded-2xl bg-muted ring-1 ring-muted p-4 space-y-3">
-          <div className="grid md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <div className="text-sm font-semibold">What it is</div>
-              <div className="text-sm text-foreground">{m.detail.whatItIs}</div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-sm font-semibold">Why it matters</div>
-              <div className="text-sm text-foreground">{m.detail.whyItMatters}</div>
-            </div>
+        {isReaction && m.reactionDiag?.derivedProcessClass && (
+          <div className="rounded-lg bg-muted p-4">
+            <h4 className="text-sm font-semibold">Derived process class</h4>
+            <p className="text-sm text-foreground">{m.reactionDiag.derivedProcessClass}</p>
           </div>
+        )}
 
-          <div className="grid md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <div className="text-sm font-semibold">Common failure modes</div>
-              <ul className="list-disc pl-5 text-sm text-foreground">
-                {m.detail.commonFailureModes.map((x, i) => (
-                  <li key={i}>{x}</li>
-                ))}
-              </ul>
+        {open && (
+          <div className="rounded-lg bg-muted p-6 space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold">What it is</h4>
+                <p className="text-sm text-foreground">{m.detail.whatItIs}</p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold">Why it matters</h4>
+                <p className="text-sm text-foreground">{m.detail.whyItMatters}</p>
+              </div>
             </div>
-            <div className="space-y-1">
-              <div className="text-sm font-semibold">Unknowns to resolve</div>
-              <ul className="list-disc pl-5 text-sm text-foreground">
-                {m.detail.unknownsToResolve.map((x, i) => (
-                  <li key={i}>{x}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <div className="text-sm font-semibold">Questions to ask experts</div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold">Common failure modes</h4>
+                <ul className="list-disc pl-5 text-sm text-foreground">
+                  {m.detail.commonFailureModes.map((x, i) => (
+                    <li key={i}>{x}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold">Unknowns to resolve</h4>
+                <ul className="list-disc pl-5 text-sm text-foreground">
+                  {m.detail.unknownsToResolve.map((x, i) => (
+                    <li key={i}>{x}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
             <div className="space-y-2">
-              {m.detail.expertQuestions.map((q, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Badge variant="secondary">{q.discipline}</Badge>
-                  <div className="text-sm text-foreground">{q.q}</div>
-                </div>
-              ))}
+              <h4 className="text-sm font-semibold">Questions to ask experts</h4>
+              <div className="space-y-2">
+                {m.detail.expertQuestions.map((q, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Badge variant="secondary">{q.discipline}</Badge>
+                    <span className="text-sm text-foreground">{q.q}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -717,9 +730,9 @@ function Schematic({
 
   if (n === 0) {
     return (
-      <Card className="rounded-2xl">
-        <CardContent className="p-5">
-          <div className="text-sm text-muted-foreground">Scan to populate the schematic.</div>
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-sm text-muted-foreground">Scan to populate the schematic.</p>
         </CardContent>
       </Card>
     );
@@ -786,6 +799,7 @@ function Schematic({
 
   const redBlock = !reactionComplete;
 
+  // SVG fill colors are an allowed exception per color-consistency rules
   const renderNode = (m: ModuleSpec) => {
     const p = pos[m.id];
     const c = chipColor(m.id);
@@ -812,12 +826,12 @@ function Schematic({
   };
 
   return (
-    <Card className="rounded-2xl">
-      <CardContent className="p-5 space-y-3">
+    <Card>
+      <CardContent className="pt-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-semibold">X‑Ray schematic</div>
-            <div className="text-xs text-muted-foreground">Parallel branches run in parallel then merge. Reaction diagnostic is a gating step.</div>
+            <h3 className="text-base font-semibold">X‑Ray schematic</h3>
+            <p className="text-xs text-muted-foreground">Parallel branches run in parallel then merge. Reaction diagnostic is a gating step.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">
@@ -830,74 +844,80 @@ function Schematic({
         </div>
 
         {redBlock && react && (
-          <div className="rounded-2xl ring-1 ring-status-warning bg-status-warning-light p-4 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold">Stop: Reaction subsystem undefined</div>
-              <div className="text-xs text-status-warning-dark">Complete the Reaction diagnostic. Until then, supplier quotes will be unreliable.</div>
-            </div>
-            <Button onClick={() => onOpenReactionDiag(react)}>Run diagnostic</Button>
-          </div>
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between gap-4">
+              <div>
+                <span className="font-semibold">Stop: Reaction subsystem undefined.</span>{" "}
+                <span className="text-muted-foreground">Complete the Reaction diagnostic. Until then, supplier quotes will be unreliable.</span>
+              </div>
+              <Button onClick={() => onOpenReactionDiag(react)} className="shrink-0">Run diagnostic</Button>
+            </AlertDescription>
+          </Alert>
         )}
 
-        <div className="rounded-2xl ring-1 ring-muted bg-background overflow-hidden">
-          <div className="w-full overflow-x-auto">
-            <div style={{ minWidth: W }} className="p-4">
-              <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[280px]">
-                <defs>
-                  <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#0f172a" floodOpacity="0.10" />
-                  </filter>
-                </defs>
+        <Card className="overflow-hidden bg-muted/30">
+          <CardContent className="p-0">
+            <div className="w-full overflow-x-auto">
+              <div style={{ minWidth: W }} className="p-6">
+                {/* SVG fill colors are an allowed exception per color-consistency rules */}
+                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[280px]">
+                  <defs>
+                    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#0f172a" floodOpacity="0.10" />
+                    </filter>
+                  </defs>
 
-                <rect x="26" y="70" width={W - 52} height="230" rx="22" fill="#F8FAFC" />
-                <text x="40" y="60" fontSize="12" fill="#64748b">
-                  PARALLEL BUILD (DAG)
-                </text>
+                  <rect x="26" y="70" width={W - 52} height="230" rx="22" fill="#F8FAFC" />
+                  <text x="40" y="60" fontSize="12" fill="#64748b">
+                    PARALLEL BUILD (DAG)
+                  </text>
 
-                {edges.map((e, idx) => {
-                  const a = pos[e.from];
-                  const b = pos[e.to];
-                  if (!a || !b) return null;
-                  return <path key={idx} d={path(a, b)} fill="none" stroke="#CBD5E1" strokeWidth="3" />;
-                })}
+                  {edges.map((e, idx) => {
+                    const a = pos[e.from];
+                    const b = pos[e.to];
+                    if (!a || !b) return null;
+                    return <path key={idx} d={path(a, b)} fill="none" stroke="#CBD5E1" strokeWidth="3" />;
+                  })}
 
-                <g filter="url(#softShadow)">
-                  {renderNode(start)}
-                  {branchA.map(renderNode)}
-                  {branchB.map(renderNode)}
+                  <g filter="url(#softShadow)">
+                    {renderNode(start)}
+                    {branchA.map(renderNode)}
+                    {branchB.map(renderNode)}
 
-                  <g key={mergeId}>
-                    <rect x={pos[mergeId].x} y={pos[mergeId].y - nodeH / 2} width={nodeW} height={nodeH} rx={16} fill="#fff" />
-                    <rect x={pos[mergeId].x} y={pos[mergeId].y - nodeH / 2} width={10} height={nodeH} rx={10} fill="#94A3B8" />
-                    <text x={pos[mergeId].x + 18} y={pos[mergeId].y - 6} fontSize="13" fill="#0f172a" fontWeight="600">
-                      Merge / Assembly
-                    </text>
-                    <text x={pos[mergeId].x + 18} y={pos[mergeId].y + 14} fontSize="11" fill="#64748b">
-                      Interfaces, tolerances, integration
-                    </text>
+                    <g key={mergeId}>
+                      <rect x={pos[mergeId].x} y={pos[mergeId].y - nodeH / 2} width={nodeW} height={nodeH} rx={16} fill="#fff" />
+                      <rect x={pos[mergeId].x} y={pos[mergeId].y - nodeH / 2} width={10} height={nodeH} rx={10} fill="#94A3B8" />
+                      <text x={pos[mergeId].x + 18} y={pos[mergeId].y - 6} fontSize="13" fill="#0f172a" fontWeight="600">
+                        Merge / Assembly
+                      </text>
+                      <text x={pos[mergeId].x + 18} y={pos[mergeId].y + 14} fontSize="11" fill="#64748b">
+                        Interfaces, tolerances, integration
+                      </text>
+                    </g>
+
+                    {renderNode(end)}
                   </g>
+                </svg>
 
-                  {renderNode(end)}
-                </g>
-              </svg>
-
-              <div className="mt-2 flex flex-wrap gap-2">
-                {modules.map((m) => (
-                  <Button
-                    key={m.id}
-                    variant="outline"
-                    onClick={() => document.getElementById(`module-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  >
-                    View {m.name}
-                  </Button>
-                ))}
-                {react && <Button onClick={() => onOpenReactionDiag(react)}>Reaction diagnostic</Button>}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {modules.map((m) => (
+                    <Button
+                      key={m.id}
+                      variant="outline"
+                      onClick={() => document.getElementById(`module-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    >
+                      View {m.name}
+                    </Button>
+                  ))}
+                  {react && <Button onClick={() => onOpenReactionDiag(react)}>Reaction diagnostic</Button>}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="text-xs text-muted-foreground">Next: make branches editable, and generate supplier lists conditioned on derived process class.</div>
+        <p className="text-xs text-muted-foreground">Next: make branches editable, and generate supplier lists conditioned on derived process class.</p>
       </CardContent>
     </Card>
   );
@@ -921,13 +941,13 @@ function XRayView({
   React.useEffect(() => setLocalIdea(spec.idea), [spec.idea]);
 
   return (
-    <div className="space-y-4">
-      <Card className="rounded-2xl">
-        <CardContent className="p-5 space-y-3">
-          <div className="flex items-center justify-between gap-3">
+    <div className="space-y-6">
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-semibold">Idea</div>
-              <div className="text-xs text-muted-foreground">Scan to generate machine spec (X‑Ray)</div>
+              <h3 className="text-base font-semibold">Idea</h3>
+              <p className="text-xs text-muted-foreground">Scan to generate machine spec (X‑Ray)</p>
             </div>
             <Button onClick={() => onScan(localIdea)}>Scan</Button>
           </div>
@@ -940,35 +960,35 @@ function XRayView({
               setSpec({ ...spec, idea: v });
             }}
           />
-          {spec.function && <div className="text-sm text-foreground">{spec.function}</div>}
+          {spec.function && <p className="text-sm text-foreground">{spec.function}</p>}
         </CardContent>
       </Card>
 
       <Schematic spec={spec} onOpenReactionDiag={onOpenReactionDiag} />
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-2 gap-6">
         <Pill label="Assumptions" items={spec.assumptions} />
         <Pill label="Materials" items={spec.materials} />
         <Pill label="Manufacturing processes" items={spec.processes} />
         <Pill label="Validation" items={spec.validation} />
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold">Modules (sub‑assemblies)</div>
+          <h2 className="text-base font-semibold">Modules (sub‑assemblies)</h2>
           <Badge variant="secondary">Reaction has guided diagnostic; others use interviews</Badge>
         </div>
 
         {spec.modules.length === 0 ? (
-          <Card className="rounded-2xl">
-            <CardContent className="p-5">
-              <div className="text-sm text-foreground">
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-foreground">
                 No modules yet. Tap <span className="font-semibold">Scan</span> to generate the X‑Ray.
-              </div>
+              </p>
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {spec.modules.map((m) => (
               <div key={m.id} id={`module-${m.id}`}>
                 <ModuleCard m={m} onOpenInterview={onOpenInterview} onOpenReactionDiag={onOpenReactionDiag} />
@@ -987,36 +1007,40 @@ function PeopleMarket({ spec }: { spec: XRaySpec }) {
   const cls = reaction?.reactionDiag?.derivedProcessClass;
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-2xl ring-1 ring-muted bg-background p-4">
-        <div className="text-sm font-semibold">Why these people?</div>
-        <div className="text-sm text-foreground">
-          Derived from X‑Ray modules{cls ? `, and Reaction class: ${cls}.` : "."}
-        </div>
-        {!cls && <div className="text-xs text-muted-foreground mt-1">Tip: run the Reaction diagnostic to sharpen matching.</div>}
-      </div>
+    <div className="space-y-6">
+      <Card>
+        <CardContent className="pt-6">
+          <h3 className="text-base font-semibold">Why these people?</h3>
+          <p className="text-sm text-foreground">
+            Derived from X‑Ray modules{cls ? `, and Reaction class: ${cls}.` : "."}
+          </p>
+          {!cls && <p className="text-xs text-muted-foreground mt-1">Tip: run the Reaction diagnostic to sharpen matching.</p>}
+        </CardContent>
+      </Card>
 
       {needs.map((n) => {
         const matches = matchPeopleForNeed(n);
         return (
-          <Card key={n.discipline} className="rounded-2xl">
-            <CardContent className="p-4 space-y-3">
+          <Card key={n.discipline}>
+            <CardContent className="pt-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <div className="font-semibold">{n.discipline} expertise needed</div>
-                  <div className="text-xs text-muted-foreground">Because modules include {n.discipline} questions</div>
+                  <h3 className="text-base font-semibold">{n.discipline} expertise needed</h3>
+                  <p className="text-xs text-muted-foreground">Because modules include {n.discipline} questions</p>
                 </div>
                 <Badge>Top 3</Badge>
               </div>
 
-              <div className="grid md:grid-cols-3 gap-3">
+              <div className="grid md:grid-cols-3 gap-4">
                 {matches.map((p) => (
-                  <div key={p.id} className="rounded-xl ring-1 ring-muted p-3">
-                    <div className="font-medium">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">{p.role}</div>
-                    <div className="text-xs text-muted-foreground">{p.rate}</div>
-                    <Button className="mt-2">Shortlist</Button>
-                  </div>
+                  <Card key={p.id}>
+                    <CardContent className="pt-6">
+                      <p className="font-medium">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">{p.role}</p>
+                      <p className="text-xs text-muted-foreground">{p.rate}</p>
+                      <Button variant="outline" className="mt-4">Shortlist</Button>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             </CardContent>
@@ -1037,39 +1061,53 @@ function SupplierMatch({ spec, setSpec }: { spec: XRaySpec; setSpec: (s: XRaySpe
   const blocked = !cls;
 
   return (
-    <div className="space-y-4">
-      <div className={"rounded-2xl p-4 ring-1 " + (blocked ? "bg-status-warning-light ring-status-warning" : "bg-background ring-muted")}>
-        <div className="text-sm font-semibold">Supplier matching</div>
-        <div className="text-sm text-foreground">{blocked ? "Blocked until Reaction diagnostic is completed." : `Conditioned on Reaction class: ${cls}.`}</div>
-        <div className="text-xs text-muted-foreground mt-1">This preserves transparency: no bespoke negotiation, just clarity-first quoting.</div>
-      </div>
+    <div className="space-y-6">
+      {blocked ? (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <span className="font-semibold">Supplier matching blocked</span> — complete the Reaction diagnostic first. This preserves transparency: no bespoke negotiation, just clarity-first quoting.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Card>
+          <CardContent className="pt-6">
+            <h3 className="text-base font-semibold">Supplier matching</h3>
+            <p className="text-sm text-foreground">Conditioned on Reaction class: {cls}.</p>
+            <p className="text-xs text-muted-foreground mt-1">This preserves transparency: no bespoke negotiation, just clarity-first quoting.</p>
+          </CardContent>
+        </Card>
+      )}
 
       {spec.modules.map((m) => {
         const sug = suggestSuppliersForModule(m);
         return (
-          <Card key={m.id} className="rounded-2xl">
-            <CardContent className="p-4 space-y-3">
+          <Card key={m.id}>
+            <CardContent className="pt-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <div className="font-semibold">{m.name}</div>
-                  <div className="text-xs text-muted-foreground">Why these: based on {m.keyParts.slice(0, 3).join(", ")}</div>
+                  <h3 className="text-base font-semibold">{m.name}</h3>
+                  <p className="text-xs text-muted-foreground">Why these: based on {m.keyParts.slice(0, 3).join(", ")}</p>
                 </div>
                 {m.supplier ? <Badge>Selected: {m.supplier}</Badge> : <Badge variant="secondary">Pick 1</Badge>}
               </div>
 
-              <div className={"grid md:grid-cols-3 gap-2 " + (blocked ? "opacity-50 pointer-events-none" : "")}
-              >
+              <div className={"grid md:grid-cols-3 gap-4 " + (blocked ? "opacity-50 pointer-events-none" : "")}>
                 {sug.map((c) => (
-                  <button
+                  <Card
                     key={c.id}
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => assign(m.id, c.name)}
-                    className="rounded-xl ring-1 ring-muted p-3 text-left hover:bg-muted"
-                    type="button"
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") assign(m.id, c.name); }}
                   >
-                    <div className="font-medium">{c.name}</div>
-                    <div className="text-xs text-muted-foreground">{c.capabilities.join(" • ")}</div>
-                    <div className="text-xs text-muted-foreground">Lead {c.typicalLeadWeeks}w • Warranty {c.warrantyMonths}m</div>
-                  </button>
+                    <CardContent className="pt-6">
+                      <p className="font-medium">{c.name}</p>
+                      <p className="text-xs text-muted-foreground">{c.capabilities.join(" • ")}</p>
+                      <p className="text-xs text-muted-foreground">Lead {c.typicalLeadWeeks}w • Warranty {c.warrantyMonths}m</p>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             </CardContent>
@@ -1086,12 +1124,12 @@ function RFQView({ spec }: { spec: XRaySpec }) {
   const cls = reaction?.reactionDiag?.derivedProcessClass;
 
   return (
-    <Card className="rounded-2xl">
-      <CardContent className="p-5 space-y-2">
-        <div className="text-sm font-semibold">RFQ</div>
-        <div className="text-xs text-muted-foreground">(Demo stub) Next: generate a spec pack from diagnostic + interviews + selected suppliers.</div>
-        <div className="text-sm">Reaction class: <span className="font-semibold">{cls || "(unset)"}</span></div>
-        <div>Total estimated: {moneyGBP(total)}</div>
+    <Card>
+      <CardContent className="pt-6 space-y-2">
+        <h3 className="text-base font-semibold">RFQ</h3>
+        <p className="text-xs text-muted-foreground">(Demo stub) Next: generate a spec pack from diagnostic + interviews + selected suppliers.</p>
+        <p className="text-sm">Reaction class: <span className="font-semibold">{cls || "(unset)"}</span></p>
+        <p className="text-sm">Total estimated: {moneyGBP(total)}</p>
       </CardContent>
     </Card>
   );
@@ -1187,8 +1225,8 @@ export default function ForgeOS_CompanyScan_Demo({
   };
 
   return (
-    <div className="space-y-6">
-      {!hideHeader && <div className="text-2xl font-semibold">ForgeOS</div>}
+    <div className="space-y-8">
+      {!hideHeader && <h2 className="text-2xl font-semibold">ForgeOS</h2>}
 
       <Tabs defaultValue={initialTab ?? "A"} onValueChange={onTabChange}>
         <TabsList>

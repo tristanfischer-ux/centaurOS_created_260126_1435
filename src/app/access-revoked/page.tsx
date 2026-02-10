@@ -62,7 +62,7 @@ export default function AccessRevokedPage() {
                             asChild
                             className="w-full"
                         >
-                            <a href="mailto:support@centauros.io">
+                            <a href="mailto:support@fractionalforge.app">
                                 <Mail className="h-4 w-4 mr-2" />
                                 Contact Support
                             </a>

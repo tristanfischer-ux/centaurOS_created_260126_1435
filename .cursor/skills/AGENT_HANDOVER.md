@@ -132,7 +132,7 @@ Lines 246-262 contain hardcoded user context:
 | Field | Value |
 |-------|-------|
 | **Name** | Tristan Fischer |
-| **Email** | Tristan.fischer@centaurdynamics.io |
+| **Email** | Tristan.fischer@fractionalforge.app |
 ```
 
 **Replace with:**

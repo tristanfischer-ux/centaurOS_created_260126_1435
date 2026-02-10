@@ -3,7 +3,7 @@
 ## ✅ Deployment Status: SUCCESSFUL
 
 ### Production URL
-- **Live Site**: https://centauros.io
+- **Live Site**: https://fractionalforge.app
 - **Status**: ✅ 200 OK
 - **Latest Deployment**: https://centaur-os-created-260126-1435-qwnmhzp80.vercel.app
 

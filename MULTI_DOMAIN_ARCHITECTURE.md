@@ -3,13 +3,15 @@
 **Date:** January 30, 2026
 **Status:** ✅ LIVE AND OPERATIONAL
 
+> **UPDATE (February 2026):** The architecture has been consolidated to a **single domain**: `fractionalforge.app`. The dual-domain split described below is no longer in effect. All routes (marketing, app, ops, staging) now live under `fractionalforge.app`.
+
 ---
 
 ## 🎯 Architecture Overview
 
-CentaurOS now operates on a **dual-domain architecture** that separates public marketing from the authenticated application:
+CentaurOS now operates on a **single-domain architecture** under `fractionalforge.app`:
 
-### 🏢 Company Domain: **centaurdynamics.io**
+### 🏢 Company Domain: **fractionalforge.app**
 - **Purpose**: Public-facing marketing and information
 - **Routes**:
   - `/` - Marketing homepage
@@ -17,7 +19,7 @@ CentaurOS now operates on a **dual-domain architecture** that separates public m
 - **Audience**: Prospective users, general public
 - **Features**: No authentication required
 
-### 🚀 App Domain: **centauros.io**  
+### 🚀 App Domain: **fractionalforge.app**  
 - **Purpose**: Authenticated application (the actual CentaurOS platform)
 - **Routes**:
   - `/login` - Login page
@@ -32,16 +34,16 @@ CentaurOS now operates on a **dual-domain architecture** that separates public m
 ## 🔄 User Flow
 
 ### New User Journey:
-1. User visits **centaurdynamics.io** (marketing site)
-2. Clicks "Login" → redirects to **centauros.io/login**
-3. Enters credentials → redirects to **centauros.io/dashboard**
-4. All subsequent navigation happens on **centauros.io**
+1. User visits **fractionalforge.app** (marketing site)
+2. Clicks "Login" → redirects to **fractionalforge.app/login**
+3. Enters credentials → redirects to **fractionalforge.app/dashboard**
+4. All subsequent navigation happens on **fractionalforge.app**
 
 ### Signup Flow:
-1. User visits **centaurdynamics.io**
+1. User visits **fractionalforge.app**
 2. Clicks "Begin Induction" (or other signup CTA)
-3. Completes signup at **centaurdynamics.io/join/founder** (etc.)
-4. After signup → redirects to **centauros.io/dashboard**
+3. Completes signup at **fractionalforge.app/join/founder** (etc.)
+4. After signup → redirects to **fractionalforge.app/dashboard**
 
 ---
 
@@ -49,9 +51,9 @@ CentaurOS now operates on a **dual-domain architecture** that separates public m
 
 ### 1. Middleware (`middleware.ts`)
 Handles domain-based routing:
-- Redirects marketing routes (/, /join/*) from centauros.io → centaurdynamics.io
-- Redirects app routes from centaurdynamics.io → centauros.io
-- Redirects /login from centaurdynamics.io → centauros.io
+- Redirects marketing routes (/, /join/*) from fractionalforge.app → fractionalforge.app
+- Redirects app routes from fractionalforge.app → fractionalforge.app
+- Redirects /login from fractionalforge.app → fractionalforge.app
 
 ### 2. Supabase Middleware (`src/lib/supabase/middleware.ts`)
 Handles authentication:
@@ -62,21 +64,21 @@ Handles authentication:
 ### 3. Marketing Page (`src/app/page.tsx`)
 Updated all login links to use full URLs:
 ```javascript
-const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://centauros.io'
+const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://fractionalforge.app'
 // All login buttons link to: `${APP_DOMAIN}/login`
 ```
 
 ### 4. Login Page (`src/app/login/page.tsx`)
 "Return to Site" link points to marketing domain:
 ```javascript
-const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://centaurdynamics.io'
+const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://fractionalforge.app'
 ```
 
 ### 5. Environment Variables
 Added to Vercel:
 ```bash
-NEXT_PUBLIC_MARKETING_DOMAIN=https://centaurdynamics.io
-NEXT_PUBLIC_APP_DOMAIN=https://centauros.io
+NEXT_PUBLIC_MARKETING_DOMAIN=https://fractionalforge.app
+NEXT_PUBLIC_APP_DOMAIN=https://fractionalforge.app
 ```
 
 ---
@@ -85,25 +87,25 @@ NEXT_PUBLIC_APP_DOMAIN=https://centauros.io
 
 ### Test 1: Marketing Site
 ```bash
-curl -I https://centaurdynamics.io
+curl -I https://fractionalforge.app
 # Expected: 200 OK (shows marketing page)
 ```
 
 ### Test 2: Login Page
 ```bash
-curl -I https://centauros.io/login
+curl -I https://fractionalforge.app/login
 # Expected: 200 OK (shows login page)
 ```
 
 ### Test 3: App Root Redirect
 ```bash
-curl -I https://centauros.io
-# Expected: 307 redirect to https://centaurdynamics.io/
+curl -I https://fractionalforge.app
+# Expected: 307 redirect to https://fractionalforge.app/
 ```
 
 ### Test 4: Cross-Domain Login Link
-Visit https://centaurdynamics.io, click "Login" button
-# Expected: Redirects to https://centauros.io/login
+Visit https://fractionalforge.app, click "Login" button
+# Expected: Redirects to https://fractionalforge.app/login
 
 ---
 
@@ -120,13 +122,13 @@ Visit https://centaurdynamics.io, click "Login" button
 
 ### DNS Records (Namecheap)
 
-**centauros.io:**
+**fractionalforge.app:**
 ```
 A Record:    @ → 76.76.21.21
 CNAME Record: www → cname.vercel-dns.com
 ```
 
-**centaurdynamics.io:**
+**fractionalforge.app:**
 ```
 A Record:    @ → 76.76.21.21
 CNAME Record: www → cname.vercel-dns.com
@@ -137,8 +139,8 @@ CNAME Record: www → cname.vercel-dns.com
 Both domains point to the same Vercel project:
 - Project: `centaur-os-created-260126-1435`
 - Domains:
-  - ✅ centauros.io
-  - ✅ centaurdynamics.io
+  - ✅ fractionalforge.app
+  - ✅ fractionalforge.app
 
 The middleware handles routing based on hostname.
 
@@ -164,15 +166,15 @@ The middleware handles routing based on hostname.
 
 ### Phase 2 (Optional):
 1. **Separate Marketing Repo**: Move marketing site to separate Next.js project
-2. **Blog on Marketing Domain**: Add /blog to centaurdynamics.io
-3. **Documentation Site**: docs.centaurdynamics.io or docs.centauros.io
-4. **Status Page**: status.centauros.io for uptime monitoring
-5. **API Documentation**: api.centauros.io for API docs
+2. **Blog on Marketing Domain**: Add /blog to fractionalforge.app
+3. **Documentation Site**: docs.fractionalforge.app or docs.fractionalforge.app
+4. **Status Page**: status.fractionalforge.app for uptime monitoring
+5. **API Documentation**: api.fractionalforge.app for API docs
 
 ### Advanced Optimizations:
 1. **CDN Configuration**: Optimize caching for marketing vs. app content
 2. **Analytics Split**: Separate analytics for marketing vs. app
-3. **A/B Testing**: Test marketing page variations on centaurdynamics.io
+3. **A/B Testing**: Test marketing page variations on fractionalforge.app
 4. **Multi-Region**: Deploy marketing site closer to target audiences
 
 ---
@@ -187,16 +189,16 @@ The middleware handles routing based on hostname.
 - ✅ Deployed and verified both domains
 
 **Live URLs:**
-- **Marketing**: https://centaurdynamics.io
-- **App**: https://centauros.io
+- **Marketing**: https://fractionalforge.app
+- **App**: https://fractionalforge.app
 
 **User Experience:**
-- Marketing site on company domain (centaurdynamics.io)
-- App on product domain (centauros.io)
+- Marketing site on company domain (fractionalforge.app)
+- App on product domain (fractionalforge.app)
 - Seamless login flow between domains
 - Clear separation of concerns
 
 ---
 
 **Status**: ✅ Complete and Operational
-**Next Steps**: User can now test the full flow by visiting https://centaurdynamics.io
+**Next Steps**: User can now test the full flow by visiting https://fractionalforge.app

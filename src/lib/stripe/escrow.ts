@@ -328,7 +328,7 @@ async function recordEscrowTransaction(params: {
         milestoneId: data.milestone_id,
         type: data.type as EscrowTransactionType,
         amount: data.amount,
-        stripeTransferId: data.stripe_transfer_id,
+        stripeTransferId: data.stripe_transfer_id || undefined,
         createdAt: data.created_at,
       },
       error: null,
@@ -523,7 +523,7 @@ export async function releaseEscrow(
     // Create the transfer to seller
     const transferResult = await transferToSeller({
       amount: sellerAmount,
-      currency: order.currency,
+      currency: order.currency || 'gbp',
       sellerAccountId: sellerProfile.stripe_account_id,
       orderId,
       milestoneId,

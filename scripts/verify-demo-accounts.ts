@@ -19,12 +19,12 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 })
 
 const DEMO_EMAILS = [
-  'demo.founder@forgeos.io',
-  'demo.executive@forgeos.io',
-  'demo.apprentice@forgeos.io',
-  'demo.vc@forgeos.io',
-  'demo.supplier@forgeos.io',
-  'demo.university@forgeos.io'
+  'demo.founder@fractionalforge.app',
+  'demo.executive@fractionalforge.app',
+  'demo.apprentice@fractionalforge.app',
+  'demo.vc@fractionalforge.app',
+  'demo.supplier@fractionalforge.app',
+  'demo.university@fractionalforge.app'
 ]
 
 async function verifyAndFixDemoAccounts() {

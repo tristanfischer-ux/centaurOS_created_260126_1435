@@ -109,7 +109,7 @@ export async function processWeeklyBilling(
         // Create payment intent with metadata to identify this as a retainer payment
         const { paymentIntent, error: paymentError } = await createPaymentIntent({
           amount: amountInSmallestUnit,
-          currency: timesheet.retainer.currency.toLowerCase(),
+          currency: (timesheet.retainer.currency || 'gbp').toLowerCase(),
           orderId: timesheet.id, // Using timesheet ID as reference
           buyerId: timesheet.retainer.buyer_id,
           description: `Retainer payment for week of ${timesheet.week_start}`,
@@ -235,7 +235,7 @@ export async function generateWeeklyInvoice(
       vatAmount,
       vatRate: VAT_RATE,
       total,
-      currency: timesheet.retainer.currency,
+      currency: timesheet.retainer.currency || 'gbp',
       status: timesheet.status as TimesheetStatus,
     }
 
@@ -394,7 +394,7 @@ export async function getPendingBilling(
         vatAmount,
         vatRate: VAT_RATE,
         total,
-        currency: timesheet.retainer.currency,
+        currency: timesheet.retainer.currency || 'gbp',
         status: timesheet.status as TimesheetStatus,
       }
     })
@@ -460,7 +460,7 @@ export async function getBillingHistory(
         vatAmount,
         vatRate: VAT_RATE,
         total,
-        currency: timesheet.retainer.currency,
+        currency: timesheet.retainer.currency || 'gbp',
         status: timesheet.status as TimesheetStatus,
       }
     })

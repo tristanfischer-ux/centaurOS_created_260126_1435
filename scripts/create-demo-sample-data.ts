@@ -20,9 +20,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 })
 
 const DEMO_ACCOUNTS = [
-  { email: 'demo.founder@forgeos.io', role: 'founder' },
-  { email: 'demo.executive@forgeos.io', role: 'executive' },
-  { email: 'demo.apprentice@forgeos.io', role: 'apprentice' }
+  { email: 'demo.founder@fractionalforge.app', role: 'founder' },
+  { email: 'demo.executive@fractionalforge.app', role: 'executive' },
+  { email: 'demo.apprentice@fractionalforge.app', role: 'apprentice' }
 ]
 
 async function createSampleDataForUser(userId: string, foundryId: string, role: string) {

@@ -6,7 +6,7 @@ import { OpsNav } from "./ops-nav"
 /**
  * Platform Operations Layout
  * 
- * @description Standalone layout for the ops subdomain (ops.centauros.io).
+ * @description Standalone layout for the ops subdomain (ops.fractionalforge.app).
  * Completely separate from the main platform layout -- no sidebar, no
  * foundry context, no user-facing navigation.
  * 

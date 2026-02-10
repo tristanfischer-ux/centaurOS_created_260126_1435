@@ -36,7 +36,7 @@ interface DemoAccount {
 const DEMO_ACCOUNTS: DemoAccount[] = [
   {
     role: 'founder',
-    email: 'demo.founder@forgeos.io',
+    email: 'demo.founder@fractionalforge.app',
     password: 'DemoFounder2026!',
     fullName: 'Alex Founder',
     additionalData: {
@@ -47,19 +47,19 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     role: 'executive',
-    email: 'demo.executive@forgeos.io',
+    email: 'demo.executive@fractionalforge.app',
     password: 'DemoExecutive2026!',
     fullName: 'Jordan Executive'
   },
   {
     role: 'apprentice',
-    email: 'demo.apprentice@forgeos.io',
+    email: 'demo.apprentice@fractionalforge.app',
     password: 'DemoApprentice2026!',
     fullName: 'Sam Apprentice'
   },
   {
     role: 'vc',
-    email: 'demo.vc@forgeos.io',
+    email: 'demo.vc@fractionalforge.app',
     password: 'DemoVC2026!',
     fullName: 'Taylor Venture',
     additionalData: {
@@ -69,7 +69,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     role: 'supplier',
-    email: 'demo.supplier@forgeos.io',
+    email: 'demo.supplier@fractionalforge.app',
     password: 'DemoSupplier2026!',
     fullName: 'Morgan Manufacturer',
     additionalData: {
@@ -80,7 +80,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     role: 'university',
-    email: 'demo.university@forgeos.io',
+    email: 'demo.university@fractionalforge.app',
     password: 'DemoUniversity2026!',
     fullName: 'Dr. Casey Academic',
     additionalData: {

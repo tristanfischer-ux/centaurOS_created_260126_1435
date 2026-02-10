@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart TD
-    Start[User visits centaurdynamics.io] --> Marketing[Marketing Homepage]
+    Start[User visits fractionalforge.app] --> Marketing[Marketing Homepage]
     Marketing --> Network[Scrolls to THE NETWORK section]
     Network --> Supplier[Sees Marketplace Suppliers card]
     Supplier --> Click[Clicks Start Selling button]

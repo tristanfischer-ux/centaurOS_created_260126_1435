@@ -185,7 +185,7 @@ npx supabase db push
 ## Testing
 
 ### Test Supplier Signup:
-1. Visit: https://centaurdynamics.io/join/supplier
+1. Visit: https://fractionalforge.app/join/supplier
 2. Fill out form:
    - Name: Test Supplier
    - Email: supplier@test.com
@@ -195,7 +195,7 @@ npx supabase db push
 4. ✅ Should create account and redirect to success
 
 ### Test Executive Signup:
-1. Visit: https://centaurdynamics.io/join/executive
+1. Visit: https://fractionalforge.app/join/executive
 2. Fill out form:
    - Name: Test Executive
    - Email: exec@test.com
@@ -204,7 +204,7 @@ npx supabase db push
 4. ✅ Should create account and redirect to success
 
 ### Test Apprentice Signup:
-1. Visit: https://centaurdynamics.io/join/apprentice
+1. Visit: https://fractionalforge.app/join/apprentice
 2. Fill out form:
    - Name: Test Apprentice
    - Email: apprentice@test.com

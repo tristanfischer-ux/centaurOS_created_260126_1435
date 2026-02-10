@@ -7,13 +7,13 @@
 
 ## ✅ LIVE RIGHT NOW:
 
-### https://centaurdynamics.io
+### https://fractionalforge.app
 - ✅ DNS configured and propagated
 - ✅ SSL certificate active
 - ✅ Vercel deployment connected
 - ✅ **FULLY OPERATIONAL**
 
-### https://www.centaurdynamics.io
+### https://www.fractionalforge.app
 - ✅ DNS configured and propagated
 - ✅ SSL certificate active
 - ✅ **FULLY OPERATIONAL**
@@ -22,12 +22,12 @@
 
 ## ⏳ PENDING (5-15 minutes):
 
-### https://centauros.io
+### https://fractionalforge.app
 - ✅ DNS configured and propagated globally
 - ⏳ SSL certificate being issued by Vercel
 - ⏳ Will be live automatically once SSL completes
 
-### https://www.centauros.io
+### https://www.fractionalforge.app
 - ✅ DNS configured and propagated globally
 - ⏳ SSL certificate being issued by Vercel
 - ⏳ Will be live automatically once SSL completes
@@ -38,7 +38,7 @@
 
 **Open in browser:**
 ```
-https://centaurdynamics.io
+https://fractionalforge.app
 ```
 
 You should see:
@@ -50,13 +50,13 @@ You should see:
 
 ## 📊 DNS Records Configured:
 
-### centauros.io
+### fractionalforge.app
 ```
 A Record:     @ → 76.76.21.21
 CNAME Record: www → cname.vercel-dns.com
 ```
 
-### centaurdynamics.io
+### fractionalforge.app
 ```
 A Record:     @ → 76.76.21.21
 CNAME Record: www → cname.vercel-dns.com
@@ -73,8 +73,8 @@ Run this command to check if both domains are working:
 
 Or manually check:
 ```bash
-curl -I https://centaurdynamics.io
-curl -I https://centauros.io
+curl -I https://fractionalforge.app
+curl -I https://fractionalforge.app
 ```
 
 ---
@@ -82,11 +82,11 @@ curl -I https://centauros.io
 ## ✅ Phase 1 Complete!
 
 ### What We Accomplished:
-1. ✅ Purchased domains: centauros.io & centaurdynamics.io
+1. ✅ Purchased domains: fractionalforge.app & fractionalforge.app
 2. ✅ Added domains to Vercel
 3. ✅ Configured DNS records in Namecheap
-4. ✅ SSL certificates issued (centaurdynamics.io)
-5. ✅ SSL certificates in progress (centauros.io)
+4. ✅ SSL certificates issued (fractionalforge.app)
+5. ✅ SSL certificates in progress (fractionalforge.app)
 6. ✅ Sites deployed and live
 
 ---
@@ -94,9 +94,9 @@ curl -I https://centauros.io
 ## 🎯 Next Steps (Phase 2):
 
 ### Optional Future Enhancements:
-1. **Set up email** - Configure email@centaurdynamics.io
-2. **Company website** - Build separate marketing site for centaurdynamics.io
-3. **Redirects** - Set up centaurdynamics.io → centauros.io (or keep separate)
+1. **Set up email** - Configure email@fractionalforge.app
+2. **Company website** - Build separate marketing site for fractionalforge.app
+3. **Redirects** - Set up fractionalforge.app → fractionalforge.app (or keep separate)
 4. **Monitoring** - Set up uptime monitoring
 5. **Analytics** - Add domain to Google Analytics / Plausible
 
@@ -107,8 +107,8 @@ curl -I https://centauros.io
 **Registrar:** Namecheap
 **Owner:** Tristan Fischer (tristan.fischer@gmail.com)
 **Expiration:** 
-- centauros.io: January 30, 2027
-- centaurdynamics.io: January 30, 2027
+- fractionalforge.app: January 30, 2027
+- fractionalforge.app: January 30, 2027
 **Auto-renew:** Enabled
 
 ---
@@ -125,7 +125,7 @@ curl -I https://centauros.io
 ## 🎉 Congratulations!
 
 Your CentaurOS platform is now live on custom domains:
-- **Main App:** https://centauros.io (ready in minutes)
-- **Company:** https://centaurdynamics.io (live now!)
+- **Main App:** https://fractionalforge.app (ready in minutes)
+- **Company:** https://fractionalforge.app (live now!)
 
 **Go visit your live site!** 🚀

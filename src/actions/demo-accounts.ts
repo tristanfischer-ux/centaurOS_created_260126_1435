@@ -27,7 +27,7 @@ export interface DemoAccountData {
 
 const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
   founder: {
-    email: 'demo.founder@centauros.io',
+    email: 'demo.founder@fractionalforge.app',
     password: 'DemoFounder2026!',
     fullName: 'Alex Founder',
     companyName: 'RocketTech Industries',
@@ -35,24 +35,24 @@ const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
     stage: 'Seed'
   },
   executive: {
-    email: 'demo.executive@centauros.io',
+    email: 'demo.executive@fractionalforge.app',
     password: 'DemoExecutive2026!',
     fullName: 'Jordan Executive'
   },
   apprentice: {
-    email: 'demo.apprentice@centauros.io',
+    email: 'demo.apprentice@fractionalforge.app',
     password: 'DemoApprentice2026!',
     fullName: 'Sam Apprentice'
   },
   vc: {
-    email: 'demo.vc@centauros.io',
+    email: 'demo.vc@fractionalforge.app',
     password: 'DemoVC2026!',
     fullName: 'Taylor Venture',
     firm: 'Demo Ventures',
     aum: '$50M - $100M'
   },
   supplier: {
-    email: 'demo.supplier@centauros.io',
+    email: 'demo.supplier@fractionalforge.app',
     password: 'DemoSupplier2026!',
     fullName: 'Morgan Manufacturer',
     companyName: 'Precision Parts Co',
@@ -60,7 +60,7 @@ const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
     location: 'Austin, TX'
   },
   factory: {
-    email: 'demo.supplier@centauros.io',
+    email: 'demo.supplier@fractionalforge.app',
     password: 'DemoSupplier2026!',
     fullName: 'Morgan Manufacturer',
     companyName: 'Precision Parts Co',
@@ -68,20 +68,20 @@ const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
     location: 'Austin, TX'
   },
   university: {
-    email: 'demo.university@centauros.io',
+    email: 'demo.university@fractionalforge.app',
     password: 'DemoUniversity2026!',
     fullName: 'Dr. Casey Academic',
     institution: 'Demo Tech University',
     department: 'Mechanical Engineering'
   },
   network: {
-    email: 'demo.network@centauros.io',
+    email: 'demo.network@fractionalforge.app',
     password: 'DemoNetwork2026!',
     fullName: 'River Network',
     companyName: 'Global Logistics Partners'
   },
   general: {
-    email: 'demo.general@centauros.io',
+    email: 'demo.general@fractionalforge.app',
     password: 'DemoGeneral2026!',
     fullName: 'Jamie General'
   }

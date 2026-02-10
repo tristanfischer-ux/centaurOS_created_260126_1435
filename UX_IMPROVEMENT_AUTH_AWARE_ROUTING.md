@@ -9,15 +9,15 @@
 
 **Previous Behavior:**
 ```
-User types: centauros.io
-└─> Always redirects to: centaurdynamics.io (marketing)
+User types: fractionalforge.app
+└─> Always redirects to: fractionalforge.app (marketing)
     └─> User clicks "Login"
-        └─> Goes to: centauros.io/login
-            └─> After login: centauros.io/dashboard
+        └─> Goes to: fractionalforge.app/login
+            └─> After login: fractionalforge.app/dashboard
 ```
 
 **Issues:**
-- ❌ Logged-in users couldn't bookmark `centauros.io`
+- ❌ Logged-in users couldn't bookmark `fractionalforge.app`
 - ❌ Extra click required every time (go to marketing → click login)
 - ❌ Not standard SaaS UX pattern
 - ❌ Annoying for returning users
@@ -30,18 +30,18 @@ User types: centauros.io
 
 ### For Authenticated Users:
 ```
-User types: centauros.io
+User types: fractionalforge.app
 └─> Checks auth status: ✅ Logged in
-    └─> Direct redirect to: centauros.io/dashboard
+    └─> Direct redirect to: fractionalforge.app/dashboard
 ```
 
 ### For Non-Authenticated Users:
 ```
-User types: centauros.io
+User types: fractionalforge.app
 └─> Checks auth status: ❌ Not logged in
-    └─> Redirects to: centaurdynamics.io (marketing)
+    └─> Redirects to: fractionalforge.app (marketing)
         └─> User clicks "Login"
-            └─> Goes to: centauros.io/login
+            └─> Goes to: fractionalforge.app/login
 ```
 
 ---
@@ -49,7 +49,7 @@ User types: centauros.io
 ## 🎁 Benefits
 
 ### ✅ For Logged-In Users:
-1. **Bookmark-Friendly**: Can bookmark `centauros.io` and go straight to dashboard
+1. **Bookmark-Friendly**: Can bookmark `fractionalforge.app` and go straight to dashboard
 2. **Faster Access**: No extra clicks through marketing page
 3. **Better UX**: Matches expected behavior (Gmail, Notion, Linear, etc.)
 4. **Mobile-Friendly**: Easier to access on mobile devices
@@ -72,7 +72,7 @@ User types: centauros.io
 
 ```typescript
 // Special handling for app domain root: authenticated users go to dashboard
-if (hostname.includes('centauros.io') && pathname === '/') {
+if (hostname.includes('fractionalforge.app') && pathname === '/') {
     if (user) {
         // User is logged in, redirect to dashboard
         const dashboardUrl = request.nextUrl.clone()
@@ -84,7 +84,7 @@ if (hostname.includes('centauros.io') && pathname === '/') {
 ```
 
 **How It Works:**
-1. Check if request is to `centauros.io/` (root)
+1. Check if request is to `fractionalforge.app/` (root)
 2. Check if user has valid session (authenticated)
 3. If yes → redirect to `/dashboard`
 4. If no → continue with existing logic (redirect to marketing)
@@ -96,62 +96,62 @@ if (hostname.includes('centauros.io') && pathname === '/') {
 ### Before:
 ```
 ┌─────────────────┐
-│ centauros.io    │
+│ fractionalforge.app    │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────────┐
-│ centaurdynamics.io  │  ← ALL users (even logged in!)
+│ fractionalforge.app  │  ← ALL users (even logged in!)
 │ (Marketing Page)    │
 └────────┬────────────┘
          │
          │ Click "Login"
          ▼
 ┌─────────────────────┐
-│ centauros.io/login  │
+│ fractionalforge.app/login  │
 └────────┬────────────┘
          │
          │ Enter credentials
          ▼
 ┌──────────────────────┐
-│centauros.io/dashboard│
+│fractionalforge.app/dashboard│
 └──────────────────────┘
 ```
 
 ### After (Logged-In User):
 ```
 ┌─────────────────┐
-│ centauros.io    │
+│ fractionalforge.app    │
 └────────┬────────┘
          │
          ▼ (Check auth: ✅)
 ┌──────────────────────┐
-│centauros.io/dashboard│  ← Direct access!
+│fractionalforge.app/dashboard│  ← Direct access!
 └──────────────────────┘
 ```
 
 ### After (Non-Logged-In User):
 ```
 ┌─────────────────┐
-│ centauros.io    │
+│ fractionalforge.app    │
 └────────┬────────┘
          │
          ▼ (Check auth: ❌)
 ┌─────────────────────┐
-│ centaurdynamics.io  │
+│ fractionalforge.app  │
 │ (Marketing Page)    │
 └────────┬────────────┘
          │
          │ Click "Login"
          ▼
 ┌─────────────────────┐
-│ centauros.io/login  │
+│ fractionalforge.app/login  │
 └────────┬────────────┘
          │
          │ Enter credentials
          ▼
 ┌──────────────────────┐
-│centauros.io/dashboard│
+│fractionalforge.app/dashboard│
 └──────────────────────┘
 ```
 
@@ -160,17 +160,17 @@ if (hostname.includes('centauros.io') && pathname === '/') {
 ## 🧪 How to Test
 
 ### Test 1: Logged-In User
-1. **Log in** to your account at centauros.io/login
-2. **Type** `centauros.io` in browser address bar
+1. **Log in** to your account at fractionalforge.app/login
+2. **Type** `fractionalforge.app` in browser address bar
 3. **Expected**: Instantly redirects to `/dashboard` ✅
 
 ### Test 2: Non-Logged-In User
 1. **Log out** (or use incognito mode)
-2. **Type** `centauros.io` in browser address bar
-3. **Expected**: Redirects to `centaurdynamics.io` (marketing) ✅
+2. **Type** `fractionalforge.app` in browser address bar
+3. **Expected**: Redirects to `fractionalforge.app` (marketing) ✅
 
 ### Test 3: Bookmark Behavior
-1. **While logged in**, bookmark `centauros.io`
+1. **While logged in**, bookmark `fractionalforge.app`
 2. **Close browser** completely
 3. **Open bookmark**
 4. **Expected**: Goes straight to dashboard ✅
@@ -231,7 +231,7 @@ This pattern is used by major SaaS products:
 ## 🎉 Summary
 
 **What Changed:**
-- `centauros.io` now checks if user is authenticated
+- `fractionalforge.app` now checks if user is authenticated
 - Authenticated users → straight to dashboard
 - Non-authenticated users → marketing site (as before)
 
@@ -243,11 +243,11 @@ This pattern is used by major SaaS products:
 
 **User Impact:**
 - Logged-in users save 2-3 clicks per session
-- Can bookmark and share `centauros.io` directly
+- Can bookmark and share `fractionalforge.app` directly
 - Faster access to the app
 - More intuitive experience
 
 ---
 
 **Status**: ✅ Live and Ready to Test
-**Test Now**: Visit https://centauros.io while logged in!
+**Test Now**: Visit https://fractionalforge.app while logged in!

@@ -74,7 +74,7 @@ export async function broadcastRFQ(
       providers.map((p) => ({
         provider_id: p.id,
         timezone: p.timezone || 'UTC',
-        tier: p.tier,
+        tier: (p.tier as SupplierTier) || 'pending',
       }))
     )
 

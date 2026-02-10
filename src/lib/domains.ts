@@ -1,19 +1,23 @@
 /**
  * Domain configuration utilities
  *
- * @description Single source of truth for app and marketing domain URLs.
+ * @description Single source of truth for the app domain URL.
  * All code needing the base URL should import from here instead of
  * reading env vars directly. This ensures consistent fallback behaviour
  * and prevents localhost URLs from leaking into production.
  *
+ * Architecture: Single-domain setup on fractionalforge.app.
+ * Marketing (/, /join/*) and app (/dashboard, /tasks, etc.) share one domain.
+ * The ops dashboard lives on ops.fractionalforge.app.
+ *
  * Env vars used:
- * - NEXT_PUBLIC_APP_DOMAIN — the canonical app domain (e.g. https://centauros.io)
- * - NEXT_PUBLIC_MARKETING_DOMAIN — the marketing site (e.g. https://centaurdynamics.io)
+ * - NEXT_PUBLIC_APP_DOMAIN — the canonical domain (e.g. https://fractionalforge.app)
+ * - NEXT_PUBLIC_MARKETING_DOMAIN — same as app domain in single-domain setup
  * - VERCEL_URL — auto-set by Vercel on every deployment (preview URL)
  */
 
-export const MARKETING_DOMAIN = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://centaurdynamics.io'
-export const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://centauros.io'
+export const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://fractionalforge.app'
+export const MARKETING_DOMAIN = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://fractionalforge.app'
 
 /**
  * Get the base URL for the application.
@@ -25,7 +29,7 @@ export const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://centaur
  *
  * Server actions, API routes, and email links should all use this.
  *
- * @returns The base URL without trailing slash (e.g. "https://centauros.io")
+ * @returns The base URL without trailing slash (e.g. "https://fractionalforge.app")
  */
 export function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_APP_DOMAIN) {
@@ -53,15 +57,27 @@ export function getAppUrl(path: string = '/updates'): string {
 }
 
 /**
- * Check if current hostname is the marketing domain
+ * Check if current hostname is the main app domain
+ *
+ * @description Checks for fractionalforge.app as well as legacy domains
+ * (centauros.io, forgeos.io, centaurdynamics.io) during migration period.
  */
-export function isMarketingDomain(hostname: string): boolean {
-  return hostname.includes('centaurdynamics.io') || hostname.includes('fractionalforge.io')
+export function isAppDomain(hostname: string): boolean {
+  return (
+    hostname.includes('fractionalforge.app') ||
+    hostname.includes('centauros.io') ||
+    hostname.includes('forgeos.io') ||
+    hostname.includes('centaurdynamics.io')
+  )
 }
 
 /**
- * Check if current hostname is the app domain
+ * Check if current hostname is a marketing domain
+ *
+ * @description In single-domain architecture, marketing and app share the
+ * same domain. This function exists for backward compatibility and returns
+ * true for the main domain. Legacy domains are also matched during migration.
  */
-export function isAppDomain(hostname: string): boolean {
-  return hostname.includes('centauros.io') || hostname.includes('forgeos.io')
+export function isMarketingDomain(hostname: string): boolean {
+  return isAppDomain(hostname)
 }

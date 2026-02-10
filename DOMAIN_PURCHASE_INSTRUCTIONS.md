@@ -2,7 +2,7 @@
 
 **Date:** January 30, 2026
 **Domains to Purchase:**
-1. centauros.io (Primary)
+1. fractionalforge.app (Primary)
 2. centaurdynamics.ai (Company)
 3. centauros.app (Optional backup)
 
@@ -14,7 +14,7 @@
 Visit: https://www.namecheap.com/
 
 ### Search and Add Domains
-1. Search for: **centauros.io**
+1. Search for: **fractionalforge.app**
    - Click "Add to cart" ($29.98/year typically)
    
 2. Search for: **centaurdynamics.ai**
@@ -43,7 +43,7 @@ You'll receive email confirmations with:
 - Account access details
 
 **Estimated Total Cost:**
-- centauros.io: ~$30
+- fractionalforge.app: ~$30
 - centaurdynamics.ai: ~$90
 - centauros.app (optional): ~$15
 - **Total: ~$120-135/year**
@@ -75,7 +75,7 @@ Once you've purchased the domains, come back and I'll help you:
 ## Quick Purchase Links
 
 **Namecheap Direct Search:**
-- [Search centauros.io](https://www.namecheap.com/domains/registration/results/?domain=centauros.io)
+- [Search fractionalforge.app](https://www.namecheap.com/domains/registration/results/?domain=fractionalforge.app)
 - [Search centaurdynamics.ai](https://www.namecheap.com/domains/registration/results/?domain=centaurdynamics.ai)
 - [Search centauros.app](https://www.namecheap.com/domains/registration/results/?domain=centauros.app)
 
@@ -111,6 +111,6 @@ Then I'll guide you through connecting them to your Vercel deployment!
 https://centaur-os-created-260126-1435-133n2wel3.vercel.app
 
 **Target URLs (after setup):**
-- https://centauros.io (Primary)
-- https://www.centauros.io (www redirect)
+- https://fractionalforge.app (Primary)
+- https://www.fractionalforge.app (www redirect)
 - https://centaurdynamics.ai (Company site)

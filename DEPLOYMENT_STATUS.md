@@ -62,8 +62,8 @@
 | `OPENAI_API_KEY` | [From your .env.local] |
 | `STRIPE_SECRET_KEY` | [From your .env.local] |
 | `STRIPE_WEBHOOK_SECRET` | [From your .env.local] |
-| `NEXT_PUBLIC_MARKETING_DOMAIN` | `https://centaurdynamics.io` |
-| `NEXT_PUBLIC_APP_DOMAIN` | `https://centauros.io` |
+| `NEXT_PUBLIC_MARKETING_DOMAIN` | `https://fractionalforge.app` |
+| `NEXT_PUBLIC_APP_DOMAIN` | `https://fractionalforge.app` |
 
 **For each variable:**
 1. Click "Add New"

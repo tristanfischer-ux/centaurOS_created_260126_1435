@@ -191,16 +191,16 @@ async function runTests() {
   // Test 7: Check live deployment
   console.log('\n7️⃣  Live deployment check...')
   try {
-    const response = await fetch('https://centauros.io/login')
+    const response = await fetch('https://fractionalforge.app/login')
     if (response.ok) {
-      console.log(`   ✅ centauros.io responding (status: ${response.status})`)
+      console.log(`   ✅ fractionalforge.app responding (status: ${response.status})`)
       passed++
     } else {
-      console.log(`   ⚠️  centauros.io returned ${response.status}`)
+      console.log(`   ⚠️  fractionalforge.app returned ${response.status}`)
       passed++
     }
   } catch (e) {
-    console.log(`   ❌ Failed to reach centauros.io`)
+    console.log(`   ❌ Failed to reach fractionalforge.app`)
     failed++
   }
 

@@ -19,9 +19,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 })
 
 const DEMO_EMAILS = [
-  'demo.founder@forgeos.io',
-  'demo.executive@forgeos.io',
-  'demo.apprentice@forgeos.io'
+  'demo.founder@fractionalforge.app',
+  'demo.executive@fractionalforge.app',
+  'demo.apprentice@fractionalforge.app'
 ]
 
 async function resetDemoData() {

@@ -9,7 +9,7 @@ const DEMO_ROLES = [
     name: 'Founder',
     description: 'Test the founder onboarding flow with pre-filled startup details',
     icon: User,
-    email: 'demo.founder@centauros.io',
+    email: 'demo.founder@fractionalforge.app',
     password: 'DemoFounder2026!'
   },
   {
@@ -17,7 +17,7 @@ const DEMO_ROLES = [
     name: 'Executive',
     description: 'Test the executive cadre application with fractional expertise profile',
     icon: Briefcase,
-    email: 'demo.executive@centauros.io',
+    email: 'demo.executive@fractionalforge.app',
     password: 'DemoExecutive2026!'
   },
   {
@@ -25,7 +25,7 @@ const DEMO_ROLES = [
     name: 'Apprentice',
     description: 'Test the Guild entry flow for Founder-in-Training apprentices',
     icon: GraduationCap,
-    email: 'demo.apprentice@centauros.io',
+    email: 'demo.apprentice@fractionalforge.app',
     password: 'DemoApprentice2026!'
   },
   {
@@ -33,7 +33,7 @@ const DEMO_ROLES = [
     name: 'Venture Capital',
     description: 'Test the VC application flow with firm and AUM details',
     icon: Building2,
-    email: 'demo.vc@centauros.io',
+    email: 'demo.vc@fractionalforge.app',
     password: 'DemoVC2026!'
   },
   {
@@ -41,7 +41,7 @@ const DEMO_ROLES = [
     name: 'Supplier / Factory',
     description: 'Test marketplace supplier onboarding with manufacturing capabilities',
     icon: Factory,
-    email: 'demo.supplier@centauros.io',
+    email: 'demo.supplier@fractionalforge.app',
     password: 'DemoSupplier2026!'
   },
   {
@@ -49,7 +49,7 @@ const DEMO_ROLES = [
     name: 'University',
     description: 'Test academic partnership application with institution details',
     icon: BookOpen,
-    email: 'demo.university@centauros.io',
+    email: 'demo.university@fractionalforge.app',
     password: 'DemoUniversity2026!'
   },
   {
@@ -57,7 +57,7 @@ const DEMO_ROLES = [
     name: 'Network Partner',
     description: 'Test network partner application for infrastructure providers',
     icon: Network,
-    email: 'demo.network@centauros.io',
+    email: 'demo.network@fractionalforge.app',
     password: 'DemoNetwork2026!'
   },
   {
@@ -65,7 +65,7 @@ const DEMO_ROLES = [
     name: 'General Signup',
     description: 'Test the general signup flow without a specific role',
     icon: Users,
-    email: 'demo.general@centauros.io',
+    email: 'demo.general@fractionalforge.app',
     password: 'DemoGeneral2026!'
   }
 ]

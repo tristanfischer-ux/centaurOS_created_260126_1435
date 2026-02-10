@@ -237,7 +237,7 @@ export async function calculateRiskScore(
     for (const signal of typeSignals) {
       const severity = signal.severity as FraudSeverity
       const multiplier = SEVERITY_MULTIPLIERS[severity]
-      const recencyFactor = getRecencyFactor(signal.created_at)
+      const recencyFactor = getRecencyFactor(signal.created_at || '')
       typeScore += baseWeight * multiplier * recencyFactor
     }
 

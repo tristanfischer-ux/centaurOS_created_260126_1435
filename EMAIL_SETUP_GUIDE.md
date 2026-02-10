@@ -1,9 +1,9 @@
 # Email Setup Guide for CentaurOS
 
-**Domain:** centaurdynamics.io  
+**Domain:** fractionalforge.app  
 **Date:** January 30, 2026
 
-To send and receive emails from `@centaurdynamics.io` (e.g., `tristan@centaurdynamics.io`), you need an **Email Hosting Provider**. This is separate from your website hosting (Vercel) and domain registration (Namecheap).
+To send and receive emails from `@fractionalforge.app` (e.g., `tristan@fractionalforge.app`), you need an **Email Hosting Provider**. This is separate from your website hosting (Vercel) and domain registration (Namecheap).
 
 ## Option 1: Google Workspace (Recommended for Startups)
 
@@ -17,10 +17,10 @@ Standard for business. Includes Gmail, Docs, Drive, Calendar, and Meet.
     *   Enter your business name ("Centaur Dynamics").
     *   Enter your contact info.
     *   When asked "Does your business have a domain?", select **"Yes, I have one that I can use"**.
-    *   Enter `centaurdynamics.io`.
+    *   Enter `fractionalforge.app`.
 
 2.  **Create Your Account:**
-    *   Create your primary email (e.g., `tristan@centaurdynamics.io`).
+    *   Create your primary email (e.g., `tristan@fractionalforge.app`).
     *   Set a secure password.
 
 3.  **Verify Domain Ownership:**
@@ -33,7 +33,7 @@ Standard for business. Includes Gmail, Docs, Drive, Calendar, and Meet.
         *   Save.
     *   **If your DNS is managed on Vercel:**
         *   Log in to Vercel -> Select Project -> Settings -> Domains.
-        *   Click "Edit" or "View DNS Records" for `centaurdynamics.io`.
+        *   Click "Edit" or "View DNS Records" for `fractionalforge.app`.
         *   Add a TXT record.
         *   Name: `@`
         *   Value: [Paste the code from Google]
@@ -59,12 +59,12 @@ Good if you just want email and don't need Google Docs/Drive integration.
 1.  **Purchase:**
     *   Log in to Namecheap.
     *   Go to **Email** -> **Professional Email**.
-    *   Select a plan and purchase for `centaurdynamics.io`.
+    *   Select a plan and purchase for `fractionalforge.app`.
 
 2.  **Create Mailbox:**
     *   In Namecheap Dashboard, go to the Private Email subscription.
     *   Click "Create Mailbox".
-    *   Enter `tristan` (for `tristan@centaurdynamics.io`) and a password.
+    *   Enter `tristan` (for `tristan@fractionalforge.app`) and a password.
 
 3.  **Configure DNS:**
     *   Since you bought the domain on Namecheap, there's usually a button to "Auto-configure DNS" in the email setup page.
@@ -81,7 +81,7 @@ Good for bootstrapping with $0 cost (Forever Free plan for up to 5 users, web ac
 ### Steps:
 1.  Go to [Zoho Mail](https://www.zoho.com/mail/).
 2.  Sign up for the "Forever Free" plan (scroll down to find it).
-3.  Enter `centaurdynamics.io`.
+3.  Enter `fractionalforge.app`.
 4.  Follow the verification steps (add TXT record to DNS).
 5.  Update MX records in your DNS to point to Zoho.
 
@@ -97,7 +97,7 @@ For the app (CentaurOS), we should use a developer-focused service like **Resend
 
 **Recommended Setup for App:**
 1.  Sign up for [Resend.com](https://resend.com).
-2.  Add domain `centaurdynamics.io`.
+2.  Add domain `fractionalforge.app`.
 3.  Add the DNS records they provide to your DNS manager (Vercel/Namecheap).
 4.  Get an API Key.
 5.  Add `RESEND_API_KEY` to your `.env` file.

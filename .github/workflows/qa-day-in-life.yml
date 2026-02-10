@@ -27,8 +27,8 @@ on:
 
 env:
   # Test URLs by environment
-  STAGING_URL: ${{ secrets.STAGING_URL || 'https://staging.centauros.io' }}
-  PRODUCTION_URL: ${{ secrets.PRODUCTION_URL || 'https://centauros.io' }}
+  STAGING_URL: ${{ secrets.STAGING_URL || 'https://staging.fractionalforge.app' }}
+  PRODUCTION_URL: ${{ secrets.PRODUCTION_URL || 'https://fractionalforge.app' }}
 
 jobs:
   qa-tests:

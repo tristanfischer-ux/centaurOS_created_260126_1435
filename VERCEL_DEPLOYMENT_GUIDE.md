@@ -47,8 +47,8 @@ The deployment failed because these environment variables are missing:
 ```
 NEXT_PUBLIC_SUPABASE_URL = https://jyarhvinengfyrwgtskq.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY = sb_publishable_X8C_-6wHZuRbKpPQGj22og_LrTT70VK
-NEXT_PUBLIC_MARKETING_DOMAIN = https://centaurdynamics.io
-NEXT_PUBLIC_APP_DOMAIN = https://centauros.io
+NEXT_PUBLIC_MARKETING_DOMAIN = https://fractionalforge.app
+NEXT_PUBLIC_APP_DOMAIN = https://fractionalforge.app
 OPENAI_API_KEY = [your-openai-key]
 STRIPE_SECRET_KEY = [your-stripe-key]
 STRIPE_WEBHOOK_SECRET = [your-stripe-webhook-secret]

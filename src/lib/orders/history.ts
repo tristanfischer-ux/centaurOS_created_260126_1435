@@ -185,7 +185,7 @@ export async function buildOrderTimeline(
         total_amount: order.total_amount,
         order_type: order.order_type,
       },
-      actor_id: order.buyer_id,
+      actor_id: order.buyer_id || '',
       created_at: order.created_at,
     })
 

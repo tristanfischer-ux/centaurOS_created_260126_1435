@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-const TEST_URL = process.env.TEST_URL || 'https://centaurdynamics.io'
+const TEST_URL = process.env.TEST_URL || 'https://fractionalforge.app'
 
 /**
  * Signup Flow E2E Tests

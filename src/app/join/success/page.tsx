@@ -210,7 +210,7 @@ export default async function SuccessPage({
         {/* Support Link */}
         <p className="mt-8 sm:mt-10 text-xs text-white/30">
           Questions?{" "}
-          <a href="mailto:support@centauros.io" className="underline hover:text-white/50">
+          <a href="mailto:support@fractionalforge.app" className="underline hover:text-white/50">
             Contact support
           </a>
         </p>

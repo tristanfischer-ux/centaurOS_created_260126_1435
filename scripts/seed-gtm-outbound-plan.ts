@@ -74,7 +74,7 @@ async function seedGTMPlan() {
     // 2. Create the Objective
     const objectiveDescription = `## Multi-Channel Cold Outbound GTM Strategy
 
-A systematic approach to acquiring Centaur Dynamics' first customers through coordinated LinkedIn, Email, and Twitter outreach.
+A systematic approach to acquiring Fractional Forge's first customers through coordinated LinkedIn, Email, and Twitter outreach.
 
 ### Target: 
 - **Month 1:** 10 discovery calls, 3-5 pilot users
@@ -178,9 +178,9 @@ A systematic approach to acquiring Centaur Dynamics' first customers through coo
             description: `Purchase secondary domains for email warming and sending.
 
 **Domains to buy:**
-1. centaurdynamics.io
-2. centaurdynamics.co  
-3. trycentaur.com (or similar)
+1. fractionalforge.app
+2. fractionalforge.co  
+3. tryforge.com (or similar)
 
 **Where to buy:**
 - Namecheap or Cloudflare (cheapest)
@@ -215,10 +215,10 @@ A systematic approach to acquiring Centaur Dynamics' first customers through coo
 4. Set daily sending limits (20/account initially)
 
 **Email Account Structure:**
-- tristan@centaurdynamics.io
-- hello@centaurdynamics.io
-- team@centaurdynamics.io
-- (repeat for .co and trycentaur.com)
+- tristan@fractionalforge.app
+- hello@fractionalforge.app
+- team@fractionalforge.app
+- (repeat for .co and tryforge.com)
 
 **Acceptance Criteria:**
 - [ ] Apollo account active with credits

@@ -56,7 +56,11 @@ export async function sendMessageOptimistic(
     optimistic: true,
     status: 'sending',
     retryCount: 0,
-    localId
+    localId,
+    is_read: true,
+    last_reply_at: null,
+    read_at: null,
+    reply_count: 0
   }
   
   // Show optimistic message immediately

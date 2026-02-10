@@ -80,7 +80,7 @@ export async function getTaxProfile(
       vatNumber: data.vat_number,
       vatVerified: data.vat_verified || false,
       taxExempt: data.tax_exempt || false,
-      createdAt: data.created_at,
+      createdAt: data.created_at || new Date().toISOString(),
     }
 
     return { data: taxProfile, error: null }
@@ -138,7 +138,7 @@ export async function createTaxProfile(
       vatNumber: data.vat_number,
       vatVerified: data.vat_verified || false,
       taxExempt: data.tax_exempt || false,
-      createdAt: data.created_at,
+      createdAt: data.created_at || new Date().toISOString(),
     }
 
     return { data: taxProfile, error: null }
@@ -202,7 +202,7 @@ export async function updateTaxProfile(
       vatNumber: data.vat_number,
       vatVerified: data.vat_verified || false,
       taxExempt: data.tax_exempt || false,
-      createdAt: data.created_at,
+      createdAt: data.created_at || new Date().toISOString(),
     }
 
     return { data: taxProfile, error: null }

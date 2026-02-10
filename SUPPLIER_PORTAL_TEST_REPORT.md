@@ -21,7 +21,7 @@
 
 ## 📊 Detailed Test Results
 
-### 1. Marketing Page (https://centauros.io/)
+### 1. Marketing Page (https://fractionalforge.app/)
 
 **Status:** ✅ **PASS**
 
@@ -48,7 +48,7 @@
 
 ---
 
-### 2. Supplier Signup Page (https://centauros.io/join/supplier)
+### 2. Supplier Signup Page (https://fractionalforge.app/join/supplier)
 
 **Status:** ✅ **PASS**
 
@@ -146,7 +146,7 @@ Or wait for automatic migration on next Supabase sync.
 ### Test Case 1: New Supplier Signup
 
 **Steps:**
-1. Go to https://centauros.io/
+1. Go to https://fractionalforge.app/
 2. Scroll to "THE NETWORK" section
 3. Click "Start Selling" on Marketplace Suppliers card
 4. Fill signup form:
