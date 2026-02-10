@@ -1,14 +1,24 @@
 'use client'
 
+import { useTransition } from 'react'
 import { cn } from '@/lib/utils'
 import { ProgressRing, getHealthVariant } from '@/components/ui/progress-ring'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { AlertTriangle, ListChecks, Trash, Pencil } from 'lucide-react'
-import type { ObjectiveWithTasks } from './types'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { AlertTriangle, ListChecks, Trash, Pencil, Flag, Link2, Loader2 } from 'lucide-react'
+import { linkObjectiveToStrategic } from '@/actions/objectives'
+import { toast } from 'sonner'
+import type { ObjectiveWithTasks, StrategicObjective } from './types'
 
 interface ObjectiveCardProps {
   objective: ObjectiveWithTasks
+  /** Available strategic objectives for linking */
+  strategicObjectives?: StrategicObjective[]
   isSelected: boolean
   onSelect: (id: string) => void
   onEdit?: (objective: ObjectiveWithTasks) => void
@@ -31,9 +41,23 @@ const HEALTH_LABEL: Record<string, { text: string; className: string }> = {
   'not-started': { text: 'Not Started', className: 'bg-muted text-muted-foreground border-muted-foreground/20' },
 }
 
-export function ObjectiveCard({ objective, isSelected, onSelect, onEdit, onDelete }: ObjectiveCardProps) {
-  const { title, description, progress, health, totalTasks, completedTasks, overdueTasks, tasks } = objective
+export function ObjectiveCard({ objective, strategicObjectives = [], isSelected, onSelect, onEdit, onDelete }: ObjectiveCardProps) {
+  const { title, description, progress, health, totalTasks, completedTasks, overdueTasks, tasks, parent_objective_id } = objective
   const variant = getHealthVariant(progress)
+  const [isLinking, startLinking] = useTransition()
+
+  // Find linked strategic objective
+  const linkedStrategic = strategicObjectives.find(s => s.id === parent_objective_id) || null
+
+  /** Handle linking/unlinking to a strategic objective */
+  const handleLink = (strategicId: string | null) => {
+    startLinking(async () => {
+      const result = await linkObjectiveToStrategic(objective.id, strategicId)
+      if (result.error) {
+        toast.error(result.error)
+      }
+    })
+  }
 
   // Get unique assignees across all tasks
   const uniqueAssignees = new Map<string, { id: string; full_name: string | null }>()
@@ -102,6 +126,75 @@ export function ObjectiveCard({ objective, isSelected, onSelect, onEdit, onDelet
             {healthInfo.text}
           </Badge>
         </div>
+
+        {/* Strategic Objective Link */}
+        {strategicObjectives.length > 0 && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className={cn(
+                  'flex items-center gap-1.5 text-[11px] rounded-md px-2 py-0.5 transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  linkedStrategic
+                    ? 'bg-international-orange/5 text-international-orange hover:bg-international-orange/10'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                )}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {isLinking ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : linkedStrategic ? (
+                  <Flag className="h-3 w-3" />
+                ) : (
+                  <Link2 className="h-3 w-3" />
+                )}
+                <span className="truncate max-w-[160px]">
+                  {linkedStrategic ? linkedStrategic.title : 'Link to strategy'}
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-56 p-1"
+              align="start"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-xs font-medium text-muted-foreground px-2 py-1.5">
+                Link to strategic objective
+              </div>
+              {/* Unlink option */}
+              {linkedStrategic && (
+                <button
+                  className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-muted transition-colors text-muted-foreground"
+                  onClick={() => handleLink(null)}
+                >
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+                  Unlink
+                </button>
+              )}
+              {/* Strategic objective options */}
+              {strategicObjectives.map((s) => (
+                <button
+                  key={s.id}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-muted transition-colors',
+                    s.id === parent_objective_id
+                      ? 'text-international-orange font-medium'
+                      : 'text-foreground'
+                  )}
+                  onClick={() => handleLink(s.id === parent_objective_id ? null : s.id)}
+                >
+                  <span
+                    className={cn(
+                      'h-2 w-2 rounded-full',
+                      s.id === parent_objective_id ? 'bg-international-orange' : 'bg-muted-foreground/30'
+                    )}
+                  />
+                  <span className="truncate">{s.title}</span>
+                </button>
+              ))}
+            </PopoverContent>
+          </Popover>
+        )}
 
         {/* Description */}
         {description && (

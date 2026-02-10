@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { StrategyHealthBar } from './strategy-health-bar'
+import { StrategicObjectivesManager } from './strategic-objectives-manager'
 import { ObjectiveCard } from './objective-card'
 import { ObjectiveDetailPanel } from './objective-detail-panel'
 import { ObjectivesTreeView } from './objectives-tree-view'
@@ -31,7 +32,7 @@ import { CompanyPurposeWrapper } from '@/components/objectives/company-purpose-w
 import { deleteObjective } from '@/actions/objectives'
 import { toast } from 'sonner'
 import type { FoundryPurposeData } from '@/types/foundry'
-import type { ObjectiveWithTasks, ObjectiveTask, Member, Team } from './types'
+import type { ObjectiveWithTasks, ObjectiveTask, Member, Team, StrategicObjective } from './types'
 import type { TaskWithData } from '../new-tasks/types'
 
 const LARGE_BREAKPOINT = 1280
@@ -72,6 +73,8 @@ function toTaskWithData(task: ObjectiveTask, parentObjective: ObjectiveWithTasks
 
 interface ObjectivesBoardProps {
   objectives: ObjectiveWithTasks[]
+  /** High-level strategic objectives that regular objectives can be grouped under */
+  strategicObjectives: StrategicObjective[]
   objectivesForDialog: { id: string; title: string }[]
   members: Member[]
   teams: Team[]
@@ -89,6 +92,7 @@ type ViewMode = 'board' | 'tree' | 'timeline'
 
 export function ObjectivesBoard({
   objectives,
+  strategicObjectives,
   objectivesForDialog,
   members,
   teams,
@@ -100,6 +104,7 @@ export function ObjectivesBoard({
 }: ObjectivesBoardProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('board')
   const [healthFilter, setHealthFilter] = useState<string | null>(null)
+  const [strategicFilter, setStrategicFilter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -150,6 +155,11 @@ export function ObjectivesBoard({
   const filteredObjectives = useMemo(() => {
     let result = objectives
 
+    // Strategic objective filter
+    if (strategicFilter) {
+      result = result.filter(o => o.parent_objective_id === strategicFilter)
+    }
+
     // Health filter
     if (healthFilter) {
       result = result.filter(o => o.health === healthFilter)
@@ -165,7 +175,7 @@ export function ObjectivesBoard({
     }
 
     return result
-  }, [objectives, healthFilter, searchQuery])
+  }, [objectives, strategicFilter, healthFilter, searchQuery])
 
   const selectedObjective = useMemo(
     () => objectives.find(o => o.id === selectedId) || null,
@@ -309,6 +319,14 @@ export function ObjectivesBoard({
         />
       )}
 
+      {/* Strategic Objectives - high-level pillars for grouping */}
+      <StrategicObjectivesManager
+        strategicObjectives={strategicObjectives}
+        objectives={objectives}
+        activeFilter={strategicFilter}
+        onFilterChange={setStrategicFilter}
+      />
+
       {/* Strategy Health Bar */}
       <StrategyHealthBar
         total={stats.total}
@@ -381,6 +399,7 @@ export function ObjectivesBoard({
           {viewMode === 'board' && (
             <BoardView
               objectives={filteredObjectives}
+              strategicObjectives={strategicObjectives}
               selectedId={selectedId}
               onSelect={handleSelect}
               onEdit={setObjectiveToEdit}
@@ -448,12 +467,14 @@ export function ObjectivesBoard({
 // Board view: grid of cards
 function BoardView({
   objectives,
+  strategicObjectives,
   selectedId,
   onSelect,
   onEdit,
   onDelete,
 }: {
   objectives: ObjectiveWithTasks[]
+  strategicObjectives: StrategicObjective[]
   selectedId: string | null
   onSelect: (id: string) => void
   onEdit?: (objective: ObjectiveWithTasks) => void
@@ -467,9 +488,7 @@ function BoardView({
         </div>
         <h3 className="text-base font-semibold text-foreground mb-1">No objectives found</h3>
         <p className="text-sm text-muted-foreground max-w-sm">
-          {objectives.length === 0
-            ? 'Create your first strategic objective to start tracking progress.'
-            : 'No objectives match your current filters.'}
+          Create your first objective to start tracking progress.
         </p>
       </div>
     )
@@ -481,6 +500,7 @@ function BoardView({
         <ObjectiveCard
           key={obj.id}
           objective={obj}
+          strategicObjectives={strategicObjectives}
           isSelected={selectedId === obj.id}
           onSelect={onSelect}
           onEdit={onEdit}

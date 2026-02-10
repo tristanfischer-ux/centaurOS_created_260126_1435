@@ -725,3 +725,344 @@ export async function getObjectiveShares(objectiveId: string): Promise<{
 
     return { data: targets }
 }
+
+// ============================================================================
+// STRATEGIC OBJECTIVES (high-level pillars that regular objectives link to)
+// ============================================================================
+
+/**
+ * Fetches all strategic objectives for the current user's foundry.
+ *
+ * @description Returns objectives where is_strategic_goal = true,
+ * ordered by creation date. These serve as high-level grouping pillars
+ * on the Strategy page.
+ *
+ * @returns Array of strategic objectives or error
+ *
+ * @security Scoped to user's foundry via foundry_id check
+ */
+export async function getStrategicObjectives(): Promise<{
+    data: { id: string; title: string; created_at: string }[]
+    error?: string
+}> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: [], error: 'Unauthorized' }
+
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { data: [], error: 'User not in a foundry' }
+
+    const { data, error } = await supabase
+        .from('objectives')
+        .select('id, title, created_at')
+        .eq('foundry_id', foundry_id)
+        .eq('is_strategic_goal', true)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true })
+
+    if (error) {
+        console.error('[ObjectiveService] Failed to fetch strategic objectives:', {
+            foundryId: foundry_id,
+            error: error.message,
+        })
+        return { data: [], error: error.message }
+    }
+
+    return { data: data || [] }
+}
+
+/**
+ * Creates a new strategic objective (high-level pillar).
+ *
+ * @description Creates an objective row with is_strategic_goal = true.
+ * These serve as grouping labels for regular objectives on the Strategy page.
+ *
+ * @param title - The strategic objective title
+ * @returns The created strategic objective or error
+ *
+ * @throws {UnauthorizedError} If user is not authenticated
+ * @security Requires authenticated user with foundry membership
+ * @audit Logs strategic_objective_created event
+ */
+export async function createStrategicObjective(title: string): Promise<{
+    data?: { id: string; title: string; created_at: string }
+    error?: string
+}> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // VALIDATION: Title must be non-empty
+    const trimmed = title.trim()
+    if (!trimmed || trimmed.length > 200) {
+        return { error: 'Title must be between 1 and 200 characters' }
+    }
+
+    const { data, error } = await supabase
+        .from('objectives')
+        .insert({
+            title: trimmed,
+            creator_id: user.id,
+            foundry_id,
+            is_strategic_goal: true,
+        })
+        .select('id, title, created_at')
+        .single()
+
+    if (error) {
+        console.error('[ObjectiveService] Failed to create strategic objective:', {
+            foundryId: foundry_id,
+            error: error.message,
+        })
+        return { error: error.message }
+    }
+
+    // AUDIT: Log creation
+    console.info('[ObjectiveService] Strategic objective created:', {
+        id: data.id,
+        title: trimmed,
+        createdBy: user.id,
+        foundryId: foundry_id,
+    })
+
+    revalidatePath('/new-objectives')
+    return { data }
+}
+
+/**
+ * Updates a strategic objective's title.
+ *
+ * @description Updates the title of a strategic objective (is_strategic_goal = true).
+ *
+ * @param id - The strategic objective ID
+ * @param title - The new title
+ * @returns Success or error
+ *
+ * @security Verifies objective belongs to user's foundry and is a strategic goal
+ * @audit Logs strategic_objective_updated event
+ */
+export async function updateStrategicObjective(
+    id: string,
+    title: string
+): Promise<{ error?: string }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // VALIDATION: Title must be non-empty
+    const trimmed = title.trim()
+    if (!trimmed || trimmed.length > 200) {
+        return { error: 'Title must be between 1 and 200 characters' }
+    }
+
+    // SECURITY: Verify objective exists, belongs to foundry, and is a strategic goal
+    const { data: existing, error: fetchError } = await supabase
+        .from('objectives')
+        .select('id, foundry_id, is_strategic_goal')
+        .eq('id', id)
+        .single()
+
+    if (fetchError || !existing) return { error: 'Strategic objective not found' }
+    if (existing.foundry_id !== foundry_id) {
+        console.warn(`[SECURITY] User ${user.id} attempted to update strategic objective ${id} from different foundry`)
+        return { error: 'Strategic objective not found' }
+    }
+    if (!existing.is_strategic_goal) {
+        return { error: 'Not a strategic objective' }
+    }
+
+    const { error: updateError } = await supabase
+        .from('objectives')
+        .update({ title: trimmed, updated_at: new Date().toISOString() })
+        .eq('id', id)
+
+    if (updateError) {
+        console.error('[ObjectiveService] Failed to update strategic objective:', {
+            id,
+            error: updateError.message,
+        })
+        return { error: updateError.message }
+    }
+
+    // AUDIT: Log update
+    console.info('[ObjectiveService] Strategic objective updated:', {
+        id,
+        newTitle: trimmed,
+        updatedBy: user.id,
+        foundryId: foundry_id,
+    })
+
+    revalidatePath('/new-objectives')
+    return {}
+}
+
+/**
+ * Deletes a strategic objective and unlinks all child objectives.
+ *
+ * @description Hard-deletes the strategic objective and sets parent_objective_id = null
+ * on any regular objectives that were linked to it.
+ *
+ * @param id - The strategic objective ID
+ * @returns Success or error
+ *
+ * @security Verifies objective belongs to user's foundry, is a strategic goal,
+ * and user has elevated permissions (Founder/Executive)
+ * @audit Logs strategic_objective_deleted event
+ */
+export async function deleteStrategicObjective(id: string): Promise<{ error?: string }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // SECURITY: Verify objective exists, belongs to foundry, and is a strategic goal
+    const { data: existing, error: fetchError } = await supabase
+        .from('objectives')
+        .select('id, foundry_id, is_strategic_goal, creator_id')
+        .eq('id', id)
+        .single()
+
+    if (fetchError || !existing) return { error: 'Strategic objective not found' }
+    if (existing.foundry_id !== foundry_id) {
+        console.warn(`[SECURITY] User ${user.id} attempted to delete strategic objective ${id} from different foundry`)
+        return { error: 'Strategic objective not found' }
+    }
+    if (!existing.is_strategic_goal) {
+        return { error: 'Not a strategic objective' }
+    }
+
+    // AUTH: Check permissions — creator or elevated role
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+    const canDelete = existing.creator_id === user.id ||
+        profile?.role === 'Founder' || profile?.role === 'Executive'
+
+    if (!canDelete) {
+        return { error: 'Only the creator or admins can delete strategic objectives' }
+    }
+
+    // Unlink child objectives first (set parent_objective_id to null)
+    const { error: unlinkError } = await supabase
+        .from('objectives')
+        .update({ parent_objective_id: null })
+        .eq('parent_objective_id', id)
+
+    if (unlinkError) {
+        console.error('[ObjectiveService] Failed to unlink children before deleting strategic objective:', {
+            id,
+            error: unlinkError.message,
+        })
+        // Continue with delete anyway — orphaned references are less harmful than leaving stale strategic objectives
+    }
+
+    // Delete the strategic objective
+    const { error: deleteError } = await supabase
+        .from('objectives')
+        .delete()
+        .eq('id', id)
+
+    if (deleteError) {
+        console.error('[ObjectiveService] Failed to delete strategic objective:', {
+            id,
+            error: deleteError.message,
+        })
+        return { error: deleteError.message }
+    }
+
+    // AUDIT: Log deletion
+    console.info('[ObjectiveService] Strategic objective deleted:', {
+        id,
+        deletedBy: user.id,
+        foundryId: foundry_id,
+    })
+
+    revalidatePath('/new-objectives')
+    return {}
+}
+
+/**
+ * Links or unlinks a regular objective to/from a strategic objective.
+ *
+ * @description Sets or clears parent_objective_id on a regular objective
+ * to associate it with a strategic objective pillar.
+ *
+ * @param objectiveId - The regular objective to link
+ * @param strategicObjectiveId - The strategic objective to link to, or null to unlink
+ * @returns Success or error
+ *
+ * @security Verifies both objectives belong to user's foundry
+ * @audit Logs objective_linked / objective_unlinked event
+ */
+export async function linkObjectiveToStrategic(
+    objectiveId: string,
+    strategicObjectiveId: string | null
+): Promise<{ error?: string }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // SECURITY: Verify the objective exists and belongs to foundry
+    const { data: objective, error: fetchError } = await supabase
+        .from('objectives')
+        .select('id, foundry_id, is_strategic_goal')
+        .eq('id', objectiveId)
+        .single()
+
+    if (fetchError || !objective) return { error: 'Objective not found' }
+    if (objective.foundry_id !== foundry_id) return { error: 'Objective not found' }
+    if (objective.is_strategic_goal) return { error: 'Cannot link a strategic objective to another' }
+
+    // SECURITY: If linking (not unlinking), verify strategic objective exists and belongs to foundry
+    if (strategicObjectiveId) {
+        const { data: strategic, error: stratError } = await supabase
+            .from('objectives')
+            .select('id, foundry_id, is_strategic_goal')
+            .eq('id', strategicObjectiveId)
+            .single()
+
+        if (stratError || !strategic) return { error: 'Strategic objective not found' }
+        if (strategic.foundry_id !== foundry_id) return { error: 'Strategic objective not found' }
+        if (!strategic.is_strategic_goal) return { error: 'Target is not a strategic objective' }
+    }
+
+    // Update the link
+    const { error: updateError } = await supabase
+        .from('objectives')
+        .update({ parent_objective_id: strategicObjectiveId })
+        .eq('id', objectiveId)
+
+    if (updateError) {
+        console.error('[ObjectiveService] Failed to link objective to strategic:', {
+            objectiveId,
+            strategicObjectiveId,
+            error: updateError.message,
+        })
+        return { error: updateError.message }
+    }
+
+    // AUDIT: Log the link/unlink
+    console.info('[ObjectiveService] Objective link updated:', {
+        objectiveId,
+        strategicObjectiveId: strategicObjectiveId || 'unlinked',
+        updatedBy: user.id,
+        foundryId: foundry_id,
+    })
+
+    revalidatePath('/new-objectives')
+    return {}
+}

@@ -37,11 +37,19 @@ export interface ObjectiveWithTasks {
   created_at: string
   updated_at: string
   is_private?: boolean
+  is_strategic_goal?: boolean | null
   tasks: ObjectiveTask[]
   totalTasks: number
   completedTasks: number
   overdueTasks: number
   health: 'on-track' | 'at-risk' | 'off-track' | 'completed' | 'not-started'
+}
+
+/** A high-level strategic objective pillar that regular objectives can be linked to */
+export interface StrategicObjective {
+  id: string
+  title: string
+  created_at: string
 }
 
 export interface Member {
