@@ -91,23 +91,29 @@ export default async function CompanySettingsPage({ searchParams }: CompanySetti
     const { status: googleStatus } = await getGoogleConnectionStatus()
     const configStatus = getIntegrationConfigStatus()
 
+    const isFounder = profile?.role === 'Founder'
+
     return (
         <div className="space-y-6">
             <CompanyProfileCard
                 companyProfile={companyProfile}
                 foundryId={profile?.foundry_id || ''}
                 userId={user.id}
-                isFounder={profile?.role === 'Founder'}
+                isFounder={isFounder}
             />
 
-            <AIProviders />
+            {/* SECURITY: AI Provider API keys are Founder-only (sensitive credentials) */}
+            {isFounder && <AIProviders />}
 
             {/* Integrations Section */}
             <div className="space-y-6">
-                <IntegrationSetupGuide
-                    isGoogleConfigured={configStatus.isGoogleConfigured}
-                    isResendConfigured={configStatus.isResendConfigured}
-                />
+                {/* SECURITY: Integration setup (env vars, Google Cloud Console) is Founder-only */}
+                {isFounder && (
+                    <IntegrationSetupGuide
+                        isGoogleConfigured={configStatus.isGoogleConfigured}
+                        isResendConfigured={configStatus.isResendConfigured}
+                    />
+                )}
 
                 {configStatus.isGoogleConfigured && googleStatus && (
                     <GoogleWorkspaceSettings

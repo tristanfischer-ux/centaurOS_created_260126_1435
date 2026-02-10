@@ -11,6 +11,8 @@ import { LinksTab } from './components/links-tab'
 import { MarketplaceEditWizard } from './components/marketplace-edit-wizard'
 import { EditProfileDialog } from './components/edit-profile-dialog'
 import { CompanySwitcher } from './components/company-switcher'
+import { TelegramLink } from '@/components/settings/telegram-link'
+import { ReportPreferences } from '@/components/settings/report-preferences'
 import { switchFoundry } from '@/actions/foundry-switching'
 
 import type { ProfileHubData } from '@/actions/profile-hub'
@@ -25,19 +27,32 @@ interface FoundryInfo {
   joinedAt: string
 }
 
+interface ProfileHubViewProps {
+  data: ProfileHubData
+  foundries: FoundryInfo[]
+  /** Existing Telegram link data, or null if not linked */
+  telegramLink: {
+    id: string
+    platform_username: string | null
+    verified_at: string | null
+  } | null
+  /** Telegram bot username for generating link */
+  botUsername: string
+}
+
 /**
  * ProfileHubView - Main profile page orchestrator with tabs.
  *
  * @description Renders the profile hub with a hero card, company switcher,
- * tabbed content (Overview, Marketplace, Links & Social), and edit dialogs.
- * Adapts to all user roles: Founders, Executives, and Apprentices.
+ * tabbed content (Overview, Marketplace, Links & Social, Preferences),
+ * and edit dialogs. Adapts to all user roles: Founders, Executives, and Apprentices.
  *
  * @component
  *
  * @example
- * <ProfileHubView data={profileHubData} foundries={foundries} />
+ * <ProfileHubView data={profileHubData} foundries={foundries} telegramLink={null} botUsername="ForgeOSBot" />
  */
-export function ProfileHubView({ data, foundries }: { data: ProfileHubData; foundries: FoundryInfo[] }) {
+export function ProfileHubView({ data, foundries, telegramLink, botUsername }: ProfileHubViewProps) {
   const { profile, providerProfile, listing, strength, isProvider, foundryName, stats } = data
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
@@ -113,6 +128,7 @@ export function ProfileHubView({ data, foundries }: { data: ProfileHubData; foun
             <TabsTrigger value="marketplace">Marketplace</TabsTrigger>
           )}
           <TabsTrigger value="links">Links & Social</TabsTrigger>
+          <TabsTrigger value="preferences">Preferences</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -159,6 +175,19 @@ export function ProfileHubView({ data, foundries }: { data: ProfileHubData; foun
             isProvider={isProvider}
             onEditClick={isProvider ? () => setIsWizardOpen(true) : () => setIsEditProfileOpen(true)}
           />
+        </TabsContent>
+
+        {/* Preferences Tab (Telegram + Daily Pulse) */}
+        <TabsContent value="preferences" className="mt-6">
+          <div className="space-y-6">
+            <TelegramLink
+              initialLink={telegramLink}
+              botUsername={botUsername}
+            />
+            <ReportPreferences
+              hasTelegramLinked={!!telegramLink?.verified_at}
+            />
+          </div>
         </TabsContent>
       </Tabs>
 
