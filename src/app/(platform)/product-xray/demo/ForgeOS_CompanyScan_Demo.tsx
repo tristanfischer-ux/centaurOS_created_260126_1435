@@ -23,12 +23,38 @@ import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { AlertTriangle, Loader2, ImageIcon } from "lucide-react"
+import { EmptyState } from "@/components/ui/empty-state"
+import {
+  AlertTriangle,
+  Loader2,
+  ImageIcon,
+  Zap,
+  Lightbulb,
+  Layers,
+  Wrench,
+  ShieldCheck,
+  ChevronDown,
+  ChevronUp,
+  ArrowRight,
+  Box,
+  ScanLine,
+  Users,
+  Building2,
+  FileText,
+  Lock,
+  CheckCircle2,
+  Clock,
+  Star,
+  Bookmark,
+  CircleDot,
+} from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 import {
   scanIdeaAction,
@@ -400,16 +426,41 @@ function InterviewPanel({
 
 // ─── UI Components ───────────────────────────────────────────────────
 
+/** Category config for Pill/Stats cards */
+const PILL_CONFIG = {
+  Assumptions: { icon: Lightbulb, colorClass: "bg-chart-1/10 text-chart-1" },
+  Materials: { icon: Layers, colorClass: "bg-chart-2/10 text-chart-2" },
+  "Manufacturing processes": { icon: Wrench, colorClass: "bg-chart-3/10 text-chart-3" },
+  Validation: { icon: ShieldCheck, colorClass: "bg-chart-4/10 text-chart-4" },
+} satisfies Record<string, { icon: React.ElementType; colorClass: string }>
+
 function Pill({ label, items }: { label: string; items: string[] }) {
+  const config = PILL_CONFIG[label as keyof typeof PILL_CONFIG] ?? { icon: Box, colorClass: "bg-muted text-muted-foreground" }
+  const Icon = config.icon
+
   return (
-    <Card>
-      <CardContent className="pt-6 space-y-2">
-        <h4 className="text-sm font-semibold">{label}</h4>
-        <div className="flex flex-wrap gap-2">
+    <Card className="rounded-xl shadow-sm hover:shadow-md transition-shadow">
+      <CardContent className="pt-5 pb-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", config.colorClass)}>
+              <Icon className="h-5 w-5" />
+            </div>
+            <h4 className="text-sm font-display font-semibold text-foreground">{label}</h4>
+          </div>
+          <Badge variant="secondary" className="text-[10px] tabular-nums">
+            {items.length}
+          </Badge>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
           {items.length === 0 ? (
-            <span className="text-xs text-muted-foreground">--</span>
+            <span className="text-xs text-muted-foreground italic">No items yet</span>
           ) : (
-            items.map((x, i) => (<Badge key={i} variant="secondary">{x}</Badge>))
+            items.map((x, i) => (
+              <span key={i} className="inline-flex items-center rounded-md bg-muted/60 px-2 py-0.5 text-xs text-foreground">
+                {x}
+              </span>
+            ))
           )}
         </div>
       </CardContent>
@@ -434,105 +485,218 @@ function ModuleCard({
     ? !!(m.diagnostic?.derivedProcessClass || (m as Record<string, unknown>).reactionDiag && ((m as Record<string, unknown>).reactionDiag as ReactionDiagnostic)?.derivedProcessClass)
     : true
   const processClass = m.diagnostic?.derivedProcessClass || ((m as Record<string, unknown>).reactionDiag as ReactionDiagnostic | undefined)?.derivedProcessClass
+  const accentColor = chipColor(m.id)
 
   return (
-    <Card>
-      <CardContent className="pt-6 space-y-4">
+    <Card className={cn(
+      "rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden",
+      isGating && !diagComplete && "ring-1 ring-status-warning"
+    )}>
+      {/* Colored accent bar */}
+      <div className="h-1 w-full" style={{ backgroundColor: accentColor }} />
+
+      <CardContent className="pt-5 space-y-4">
         {/* Module image header */}
         {m.imageUrl && m.imageStatus === "complete" && (
-          <div className="rounded-t-lg overflow-hidden -mx-6 -mt-6 mb-4">
+          <div className="rounded-xl overflow-hidden -mx-6 mb-2 relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={m.imageUrl} alt={`Blueprint: ${m.name}`} className="w-full h-48 object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+            <div className="absolute bottom-3 left-4">
+              <span className="text-white text-sm font-semibold drop-shadow-sm">{m.name}</span>
+            </div>
           </div>
         )}
         {m.imageStatus === "generating" && (
-          <div className="rounded-t-lg -mx-6 -mt-6 mb-4">
-            <Skeleton className="h-48 w-full rounded-t-lg" />
+          <div className="rounded-xl -mx-6 mb-2 overflow-hidden">
+            <Skeleton className="h-48 w-full" />
             <p className="text-xs text-muted-foreground text-center py-2">Generating blueprint...</p>
           </div>
         )}
 
+        {/* Header row */}
         <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <h3 className="text-base font-semibold">{m.name}</h3>
-            <p className="text-xs text-muted-foreground">{m.purpose}</p>
+          <div className="space-y-1.5 min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: accentColor + "18" }}>
+                <Box className="h-4 w-4" style={{ color: accentColor }} />
+              </div>
+              <h3 className="text-base font-display font-semibold text-foreground truncate">{m.name}</h3>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">{m.purpose}</p>
           </div>
-          <div className="flex items-center gap-2">
-            {isGating && (diagComplete ? <Badge>Diagnostic set</Badge> : <Badge variant="secondary">Needs diagnostic</Badge>)}
-            <Badge variant="secondary">Answers {r.answered}/{r.total} • Risks {r.risks}</Badge>
-            <Button variant="outline" onClick={() => setOpen((v) => !v)}>
-              {open ? "Hide" : "Deep dive"}
-            </Button>
+          <div className="flex items-center gap-2 shrink-0">
             {isGating && hasDiagnostic ? (
-              <Button onClick={() => onOpenDiagnostic(m)}>Diagnostic</Button>
+              <Button
+                size="sm"
+                className={cn(
+                  "rounded-full",
+                  diagComplete
+                    ? "bg-status-success-light text-status-success-dark hover:bg-status-success-light/80"
+                    : "bg-international-orange hover:bg-international-orange-hover text-white"
+                )}
+                onClick={() => onOpenDiagnostic(m)}
+              >
+                {diagComplete ? (
+                  <><CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Diagnostic set</>
+                ) : (
+                  <><AlertTriangle className="h-3.5 w-3.5 mr-1.5" />Run diagnostic</>
+                )}
+              </Button>
             ) : (
-              <Button variant="outline" onClick={() => onOpenInterview(m)}>Interview</Button>
+              <Button variant="outline" size="sm" className="rounded-full" onClick={() => onOpenInterview(m)}>
+                <Users className="h-3.5 w-3.5 mr-1.5" />
+                Interview
+              </Button>
             )}
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4">
-          <div className="rounded-lg bg-muted p-4">
-            <h4 className="text-xs font-semibold">Inputs</h4>
-            <p className="text-xs text-muted-foreground">{m.io.in.join(", ")}</p>
+        {/* Readiness progress bar */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-1.5 bg-muted/50 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${r.pct}%`,
+                backgroundColor: r.pct === 100 ? "#10b981" : r.pct > 0 ? "#3b82f6" : "#94a3b8",
+              }}
+            />
           </div>
-          <div className="rounded-lg bg-muted p-4">
-            <h4 className="text-xs font-semibold">Outputs</h4>
-            <p className="text-xs text-muted-foreground">{m.io.out.join(", ")}</p>
+          <span className="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">
+            {r.answered}/{r.total} answers
+          </span>
+          {r.risks > 0 && (
+            <span className="text-[11px] text-status-warning-dark tabular-nums whitespace-nowrap">
+              {r.risks} risks
+            </span>
+          )}
+        </div>
+
+        {/* IO grid */}
+        <div className="grid md:grid-cols-3 gap-3">
+          <div className="rounded-xl bg-muted/40 p-3 space-y-1">
+            <div className="flex items-center gap-1.5">
+              <ArrowRight className="h-3 w-3 text-chart-2" />
+              <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Inputs</h4>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {m.io.in.map((x, i) => (
+                <span key={i} className="inline-block rounded bg-background px-1.5 py-0.5 text-xs text-foreground">{x}</span>
+              ))}
+            </div>
           </div>
-          <div className="rounded-lg bg-muted p-4">
-            <h4 className="text-xs font-semibold">Key parts</h4>
-            <p className="text-xs text-muted-foreground">
-              {m.keyParts.slice(0, 4).join(", ")}
-              {m.keyParts.length > 4 ? "…" : ""}
-            </p>
+          <div className="rounded-xl bg-muted/40 p-3 space-y-1">
+            <div className="flex items-center gap-1.5">
+              <ArrowRight className="h-3 w-3 text-chart-3 rotate-180" />
+              <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Outputs</h4>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {m.io.out.map((x, i) => (
+                <span key={i} className="inline-block rounded bg-background px-1.5 py-0.5 text-xs text-foreground">{x}</span>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl bg-muted/40 p-3 space-y-1">
+            <div className="flex items-center gap-1.5">
+              <Wrench className="h-3 w-3 text-chart-4" />
+              <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Key parts</h4>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {m.keyParts.slice(0, 5).map((x, i) => (
+                <span key={i} className="inline-block rounded bg-background px-1.5 py-0.5 text-xs text-foreground">{x}</span>
+              ))}
+              {m.keyParts.length > 5 && (
+                <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">+{m.keyParts.length - 5}</span>
+              )}
+            </div>
           </div>
         </div>
 
         {processClass && (
-          <div className="rounded-lg bg-muted p-4">
-            <h4 className="text-sm font-semibold">Derived process class</h4>
-            <p className="text-sm text-foreground">{processClass}</p>
+          <div className="rounded-xl bg-status-success-light/30 border border-status-success/20 p-3 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-status-success shrink-0" />
+            <div>
+              <h4 className="text-xs font-semibold text-foreground">Derived process class</h4>
+              <p className="text-sm text-foreground">{processClass}</p>
+            </div>
           </div>
         )}
 
-        {open && (
-          <div className="rounded-lg bg-muted p-6 space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <h4 className="text-sm font-semibold">What it is</h4>
-                <p className="text-sm text-foreground">{m.detail.whatItIs}</p>
+        {/* Deep dive toggle */}
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full py-1"
+        >
+          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          <span className="font-medium">{open ? "Hide details" : "Deep dive"}</span>
+        </button>
+
+        {/* Expandable detail section */}
+        <div className={cn(
+          "overflow-hidden transition-all duration-300",
+          open ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"
+        )}>
+          <div className="rounded-xl bg-muted/30 border p-5 space-y-5">
+            <div className="grid md:grid-cols-2 gap-5">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="h-3.5 w-3.5 text-chart-1" />
+                  <h4 className="text-sm font-semibold text-foreground">What it is</h4>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{m.detail.whatItIs}</p>
               </div>
-              <div className="space-y-1">
-                <h4 className="text-sm font-semibold">Why it matters</h4>
-                <p className="text-sm text-foreground">{m.detail.whyItMatters}</p>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Star className="h-3.5 w-3.5 text-chart-2" />
+                  <h4 className="text-sm font-semibold text-foreground">Why it matters</h4>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{m.detail.whyItMatters}</p>
               </div>
             </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <h4 className="text-sm font-semibold">Common failure modes</h4>
-                <ul className="list-disc pl-5 text-sm text-foreground">
-                  {m.detail.commonFailureModes.map((x, i) => (<li key={i}>{x}</li>))}
+            <div className="grid md:grid-cols-2 gap-5">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
+                  <h4 className="text-sm font-semibold text-foreground">Common failure modes</h4>
+                </div>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {m.detail.commonFailureModes.map((x, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-status-warning mt-1.5 shrink-0" />
+                      {x}
+                    </li>
+                  ))}
                 </ul>
               </div>
-              <div className="space-y-1">
-                <h4 className="text-sm font-semibold">Unknowns to resolve</h4>
-                <ul className="list-disc pl-5 text-sm text-foreground">
-                  {m.detail.unknownsToResolve.map((x, i) => (<li key={i}>{x}</li>))}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <CircleDot className="h-3.5 w-3.5 text-chart-5" />
+                  <h4 className="text-sm font-semibold text-foreground">Unknowns to resolve</h4>
+                </div>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {m.detail.unknownsToResolve.map((x, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-chart-5 mt-1.5 shrink-0" />
+                      {x}
+                    </li>
+                  ))}
                 </ul>
               </div>
             </div>
             <div className="space-y-2">
-              <h4 className="text-sm font-semibold">Questions to ask experts</h4>
-              {m.detail.expertQuestions.map((q, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Badge variant="secondary">{q.discipline}</Badge>
-                  <span className="text-sm text-foreground">{q.q}</span>
-                </div>
-              ))}
+              <h4 className="text-sm font-semibold text-foreground">Questions to ask experts</h4>
+              <div className="space-y-2">
+                {m.detail.expertQuestions.map((q, i) => (
+                  <div key={i} className="flex items-start gap-2 rounded-lg bg-background p-2.5">
+                    <Badge variant="secondary" className="text-[10px] shrink-0 mt-0.5">{q.discipline}</Badge>
+                    <span className="text-sm text-foreground">{q.q}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </CardContent>
     </Card>
   )
@@ -606,23 +770,53 @@ function Schematic({
   const diagComplete = isGatingDiagComplete(spec)
   const needsDiagBlock = !diagComplete
 
+  // Module readiness status for node indicators
+  const getNodeStatus = (m: ModuleSpec): "complete" | "needs-diagnostic" | "partial" | "not-started" => {
+    const isGatingNode = m.isGatingModule || m.id === "react"
+    if (isGatingNode && !diagComplete) return "needs-diagnostic"
+    const r = readinessFor(m)
+    if (r.pct === 100) return "complete"
+    if (r.pct > 0) return "partial"
+    return "not-started"
+  }
+
+  const statusDotColor = (status: ReturnType<typeof getNodeStatus>): string => {
+    switch (status) {
+      case "complete": return "#10b981"
+      case "needs-diagnostic": return "#f59e0b"
+      case "partial": return "#3b82f6"
+      default: return "#94a3b8"
+    }
+  }
+
   // SVG fill colors are an allowed exception per color-consistency rules
   const renderNode = (m: ModuleSpec): React.ReactNode => {
     const p = pos[m.id]
     if (!p) return null
     const c = chipColor(m.id)
-    const isGating = m.isGatingModule || m.id === "react"
-    const nodeNeedsDiag = isGating && !diagComplete
+    const isGatingNode = m.isGatingModule || m.id === "react"
+    const nodeNeedsDiag = isGatingNode && !diagComplete
+    const status = getNodeStatus(m)
 
     return (
-      <g key={m.id}>
-        <rect x={p.x} y={p.y - nodeH / 2} width={nodeW} height={nodeH} rx={16} fill="#fff" />
+      <g
+        key={m.id}
+        className="cursor-pointer transition-transform"
+        onClick={() => document.getElementById(`module-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        role="button"
+        tabIndex={0}
+      >
+        <rect x={p.x} y={p.y - nodeH / 2} width={nodeW} height={nodeH} rx={16} fill="#fff" stroke="#e2e8f0" strokeWidth="1" />
         <rect x={p.x} y={p.y - nodeH / 2} width={10} height={nodeH} rx={10} fill={c} />
-        <text x={p.x + 18} y={p.y - 10} fontSize="13" fill="#0f172a" fontWeight="600">{m.name}</text>
-        <text x={p.x + 18} y={p.y + 10} fontSize="11" fill="#64748b">{m.purpose}</text>
-        {isGating && (
-          <text x={p.x + 18} y={p.y + 28} fontSize="11" fill={nodeNeedsDiag ? "#B45309" : "#64748b"}>
-            {nodeNeedsDiag ? "Needs diagnostic" : `Class: ${getDerivedProcessClass(spec) || "set"}`}
+        {/* Status dot */}
+        <circle cx={p.x + nodeW - 16} cy={p.y - nodeH / 2 + 16} r={5} fill={statusDotColor(status)} />
+        <text x={p.x + 18} y={p.y - 8} fontSize="13" fill="#0f172a" fontWeight="600">{m.name}</text>
+        <text x={p.x + 18} y={p.y + 10} fontSize="11" fill="#64748b">
+          {m.purpose.length > 35 ? m.purpose.slice(0, 32) + "..." : m.purpose}
+        </text>
+        {isGatingNode && (
+          <text x={p.x + 18} y={p.y + 26} fontSize="10" fill={nodeNeedsDiag ? "#B45309" : "#64748b"} fontWeight="500">
+            {nodeNeedsDiag ? "⚠ Needs diagnostic" : `Class: ${getDerivedProcessClass(spec) || "set"}`}
           </text>
         )}
       </g>
@@ -630,12 +824,17 @@ function Schematic({
   }
 
   return (
-    <Card>
+    <Card className="rounded-xl shadow-sm">
       <CardContent className="pt-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-semibold">X-Ray schematic</h3>
-            <p className="text-xs text-muted-foreground">Parallel branches run in parallel then merge. Diagnostic is a gating step.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-7 bg-electric-blue rounded-full" />
+              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">X-Ray schematic</h3>
+            </div>
+            <p className="text-sm text-muted-foreground ml-[1.375rem]">
+              Parallel branches run in parallel then merge. Click any node to jump to its detail.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {spec.systemImageUrl && (
@@ -644,8 +843,14 @@ function Schematic({
                 {showVisual ? "Functional" : "Visual Blueprint"}
               </Button>
             )}
-            <Badge variant="secondary">Modules: <span className="ml-1 font-semibold">{n}</span></Badge>
-            <Badge variant="secondary">Last scan: <span className="ml-1 font-semibold">{lastScannedLabel}</span></Badge>
+            <Badge variant="secondary" className="text-xs">
+              <Box className="h-3 w-3 mr-1" />
+              {n} modules
+            </Badge>
+            <Badge variant="secondary" className="text-xs">
+              <Clock className="h-3 w-3 mr-1" />
+              {lastScannedLabel}
+            </Badge>
           </div>
         </div>
 
@@ -657,43 +862,60 @@ function Schematic({
                 <span className="font-semibold">Stop: {gating.name} undefined.</span>{" "}
                 <span className="text-muted-foreground">Complete the diagnostic. Until then, supplier quotes will be unreliable.</span>
               </div>
-              <Button onClick={() => onOpenDiagnostic(gating)} className="shrink-0">Run diagnostic</Button>
+              <Button onClick={() => onOpenDiagnostic(gating)} className="shrink-0 bg-international-orange hover:bg-international-orange-hover text-white">Run diagnostic</Button>
             </AlertDescription>
           </Alert>
         )}
 
         {showVisual && spec.systemImageUrl ? (
-          <Card className="overflow-hidden bg-muted/30">
-            <CardContent className="p-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={spec.systemImageUrl} alt="System diagram" className="w-full rounded-lg" />
-            </CardContent>
-          </Card>
+          <div className="rounded-xl overflow-hidden border bg-muted/20">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={spec.systemImageUrl} alt="System diagram" className="w-full" />
+          </div>
         ) : (
-          <Card className="overflow-hidden bg-muted/30">
-            <CardContent className="p-0">
-              <div className="w-full overflow-x-auto">
-                <div style={{ minWidth: W }} className="p-6">
+          <div className="rounded-xl overflow-hidden border bg-muted/20">
+            <div className="w-full overflow-x-auto">
+              <div style={{ minWidth: W }} className="p-6 relative">
+                {/* Dot grid background pattern */}
+                <div className="absolute inset-0 opacity-[0.4]" style={{
+                  backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
+                  backgroundSize: "20px 20px",
+                }} />
+                <div className="relative">
                   {/* SVG fill colors are an allowed exception per color-consistency rules */}
                   <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[280px]">
                     <defs>
                       <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-                        <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#0f172a" floodOpacity="0.10" />
+                        <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#0f172a" floodOpacity="0.08" />
                       </filter>
                     </defs>
-                    <rect x="26" y="70" width={W - 52} height="230" rx="22" fill="#F8FAFC" />
-                    <text x="40" y="60" fontSize="12" fill="#64748b">PARALLEL BUILD (DAG)</text>
+                    <rect x="26" y="70" width={W - 52} height="230" rx="22" fill="#fff" fillOpacity="0.6" />
+                    <text x="40" y="60" fontSize="10" fill="#94a3b8" fontWeight="600" letterSpacing="0.1em">
+                      PARALLEL BUILD (DAG)
+                    </text>
                     {edges.map((e, idx) => {
                       const a = pos[e.from]; const b = pos[e.to]
                       if (!a || !b) return null
-                      return <path key={idx} d={svgPath(a, b)} fill="none" stroke="#CBD5E1" strokeWidth="3" />
+                      const toModule = modules.find((m) => m.id === e.to)
+                      const isIncomplete = toModule && getNodeStatus(toModule) === "needs-diagnostic"
+                      return (
+                        <path
+                          key={idx}
+                          d={svgPath(a, b)}
+                          fill="none"
+                          stroke={isIncomplete ? "#f59e0b" : "#cbd5e1"}
+                          strokeWidth="2.5"
+                          strokeDasharray={isIncomplete ? "8 4" : "none"}
+                          className={isIncomplete ? "animate-[dash_1.5s_linear_infinite]" : ""}
+                        />
+                      )
                     })}
                     <g filter="url(#softShadow)">
                       {renderNode(start)}
                       {branchA.map(renderNode)}
                       {branchB.map(renderNode)}
                       <g key={mergeId}>
-                        <rect x={pos[mergeId].x} y={pos[mergeId].y - nodeH / 2} width={nodeW} height={nodeH} rx={16} fill="#fff" />
+                        <rect x={pos[mergeId].x} y={pos[mergeId].y - nodeH / 2} width={nodeW} height={nodeH} rx={16} fill="#fff" stroke="#e2e8f0" strokeWidth="1" />
                         <rect x={pos[mergeId].x} y={pos[mergeId].y - nodeH / 2} width={10} height={nodeH} rx={10} fill="#94A3B8" />
                         <text x={pos[mergeId].x + 18} y={pos[mergeId].y - 6} fontSize="13" fill="#0f172a" fontWeight="600">Merge / Assembly</text>
                         <text x={pos[mergeId].x + 18} y={pos[mergeId].y + 14} fontSize="11" fill="#64748b">Interfaces, tolerances, integration</text>
@@ -701,18 +923,58 @@ function Schematic({
                       {renderNode(end)}
                     </g>
                   </svg>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {modules.map((m) => (
-                      <Button key={m.id} variant="outline" onClick={() => document.getElementById(`module-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}>
-                        View {m.name}
+                </div>
+                {/* Navigation buttons */}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {modules.map((m) => {
+                    const status = getNodeStatus(m)
+                    return (
+                      <Button
+                        key={m.id}
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full"
+                        onClick={() => document.getElementById(`module-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      >
+                        <CircleDot className="h-3 w-3 mr-1.5" style={{ color: statusDotColor(status) }} />
+                        {m.name}
                       </Button>
-                    ))}
-                    {gating && <Button onClick={() => onOpenDiagnostic(gating)}>Diagnostic</Button>}
+                    )
+                  })}
+                  {gating && !diagComplete && (
+                    <Button
+                      size="sm"
+                      className="rounded-full bg-international-orange hover:bg-international-orange-hover text-white"
+                      onClick={() => onOpenDiagnostic(gating)}
+                    >
+                      <AlertTriangle className="h-3 w-3 mr-1.5" />
+                      Run diagnostic
+                    </Button>
+                  )}
+                </div>
+                {/* Status legend */}
+                <div className="mt-4 flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
+                  <span className="font-medium">Status:</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#10b981" }} />
+                    Complete
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#3b82f6" }} />
+                    In progress
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#f59e0b" }} />
+                    Needs diagnostic
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#94a3b8" }} />
+                    Not started
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -740,28 +1002,46 @@ function XRayView({
   useEffect(() => setLocalIdea(spec.idea), [spec.idea])
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardContent className="pt-6 space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h3 className="text-base font-semibold">Idea</h3>
-              <p className="text-xs text-muted-foreground">Scan to generate machine spec (X-Ray)</p>
+    <div className="space-y-8">
+      {/* Hero Idea Input */}
+      <Card className="relative overflow-hidden rounded-xl shadow-sm">
+        <div className="absolute top-0 right-0 w-48 h-48 pointer-events-none opacity-[0.04]">
+          <ScanLine className="w-full h-full text-international-orange" />
+        </div>
+        <CardContent className="pt-6 pb-6 space-y-5 relative">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-7 bg-international-orange rounded-full" />
+              <h3 className="text-xl font-display font-bold tracking-tight text-foreground">Your idea</h3>
             </div>
-            <Button onClick={() => onScan(localIdea)} disabled={isScanning}>
-              {isScanning ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Scanning...</>
-              ) : (
-                "Scan"
-              )}
-            </Button>
+            <p className="text-sm text-muted-foreground ml-[1.375rem]">
+              Describe your product concept and we&apos;ll decompose it into buildable modules, experts, and suppliers.
+            </p>
           </div>
-          <Input
+          <Textarea
             value={localIdea}
             onChange={(e) => { setLocalIdea(e.target.value); setSpec({ ...spec, idea: e.target.value }) }}
             disabled={isScanning}
+            rows={3}
+            className="resize-none text-base"
+            placeholder="e.g. A brine machine that extracts salts from desalination brine"
           />
-          {spec.function && <p className="text-sm text-foreground">{spec.function}</p>}
+          <Button
+            onClick={() => onScan(localIdea)}
+            disabled={isScanning}
+            className="w-full bg-international-orange hover:bg-international-orange-hover text-white h-11"
+          >
+            {isScanning ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-2" />Scanning your idea...</>
+            ) : (
+              <><Zap className="h-4 w-4 mr-2" />Scan &amp; decompose</>
+            )}
+          </Button>
+          {spec.function && (
+            <div className="flex items-start gap-3 rounded-lg bg-muted/40 p-4 border-l-4 border-l-international-orange/40">
+              <p className="text-sm text-foreground leading-relaxed italic">{spec.function}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -850,19 +1130,23 @@ function PeopleView({ spec, scanId }: { spec: XRaySpec; scanId: string | null })
   }, [people])
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardContent className="pt-6">
+    <div className="space-y-8">
+      {/* Header card */}
+      <Card className="rounded-xl shadow-sm">
+        <CardContent className="pt-6 pb-5">
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-semibold">Why these people?</h3>
-              <p className="text-sm text-foreground">
-                Derived from X-Ray modules{processClass ? `, and process class: ${processClass}.` : "."}
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-7 bg-chart-2 rounded-full" />
+                <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">Matched experts</h3>
+              </div>
+              <p className="text-sm text-muted-foreground ml-[1.375rem]">
+                Derived from X-Ray modules{processClass ? ` and process class: ${processClass}` : ""}.
+                {!processClass && " Run the diagnostic to sharpen matching."}
               </p>
-              {!processClass && <p className="text-xs text-muted-foreground mt-1">Tip: run the diagnostic to sharpen matching.</p>}
             </div>
             {hasLoaded && (
-              <Button variant="ghost" size="sm" onClick={() => loadPeople(true)} disabled={isLoading}>
+              <Button variant="outline" size="sm" className="rounded-full" onClick={() => loadPeople(true)} disabled={isLoading}>
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
               </Button>
             )}
@@ -871,44 +1155,93 @@ function PeopleView({ spec, scanId }: { spec: XRaySpec; scanId: string | null })
       </Card>
 
       {isLoading && (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-48 rounded-xl" />)}
+        <div className="grid md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-52 rounded-xl" />)}
         </div>
       )}
 
       {!isLoading && people.length === 0 && hasLoaded && (
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">No matching experts found. Try scanning a different idea or check that marketplace listings exist.</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          title="No matching experts found"
+          description="Try scanning a different idea or check that marketplace listings exist in your foundry."
+          action={
+            <Button variant="outline" onClick={() => loadPeople(true)}>
+              <Users className="h-4 w-4 mr-2" />
+              Retry matching
+            </Button>
+          }
+        />
       )}
 
       {Array.from(grouped.entries()).map(([discipline, matches]) => (
-        <Card key={discipline}>
-          <CardContent className="pt-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <h3 className="text-base font-semibold">{discipline} expertise needed</h3>
+        <div key={discipline} className="space-y-4">
+          {/* Discipline section header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-6 bg-chart-3 rounded-full" />
+              <div>
+                <h3 className="text-base font-display font-semibold text-foreground">{discipline} expertise</h3>
                 <p className="text-xs text-muted-foreground">Because modules include {discipline} questions</p>
               </div>
-              <Badge>Top {Math.min(matches.length, 3)}</Badge>
             </div>
-            <div className="grid md:grid-cols-3 gap-4">
-              {matches.slice(0, 3).map((p) => (
-                <Card key={p.id}>
-                  <CardContent className="pt-6">
-                    <p className="font-medium">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">{p.role}</p>
-                    <p className="text-xs text-muted-foreground">{p.rate}</p>
-                    {p.isVerified && <Badge variant="secondary" className="mt-2">Verified</Badge>}
-                    <Button variant="outline" className="mt-4">Shortlist</Button>
+            <Badge variant="secondary" className="text-xs">Top {Math.min(matches.length, 3)}</Badge>
+          </div>
+          <div className="grid md:grid-cols-3 gap-4">
+            {matches.slice(0, 3).map((p) => {
+              const initials = p.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+              const matchPct = Math.round(p.matchScore * 100)
+
+              return (
+                <Card key={p.id} className="rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
+                  <CardContent className="pt-5 pb-5 space-y-3">
+                    <div className="flex items-start gap-3">
+                      {/* Initials avatar */}
+                      <div className="h-10 w-10 rounded-full bg-chart-2/15 text-chart-2 flex items-center justify-center text-sm font-semibold shrink-0">
+                        {initials}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-sm text-foreground truncate">{p.name}</p>
+                          {p.isVerified && (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{p.role}</p>
+                      </div>
+                    </div>
+                    {/* Match score bar */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-chart-2"
+                          style={{ width: `${matchPct}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] text-muted-foreground tabular-nums font-medium">{matchPct}%</span>
+                    </div>
+                    {/* Tags */}
+                    {p.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {p.tags.slice(0, 3).map((t, i) => (
+                          <span key={i} className="inline-block rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">{t}</span>
+                        ))}
+                        {p.tags.length > 3 && (
+                          <span className="inline-block rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">+{p.tags.length - 3}</span>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-xs font-medium text-foreground">{p.rate}</span>
+                      <Button variant="ghost" size="sm" className="h-8 px-2 rounded-full">
+                        <Bookmark className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              )
+            })}
+          </div>
+        </div>
       ))}
     </div>
   )
@@ -1142,11 +1475,29 @@ export default function ForgeOS_CompanyScan_Demo({
       {!hideHeader && <h2 className="text-2xl font-semibold">ForgeOS</h2>}
 
       <Tabs defaultValue={initialTab ?? "A"} onValueChange={onTabChange}>
-        <TabsList>
-          <TabsTrigger value="A">A -- X-Ray</TabsTrigger>
-          <TabsTrigger value="B">B -- People</TabsTrigger>
-          <TabsTrigger value="C">C -- Suppliers</TabsTrigger>
-          <TabsTrigger value="D">D -- RFQ</TabsTrigger>
+        <TabsList className="bg-muted/50 p-1 rounded-xl border border-muted h-auto">
+          <TabsTrigger value="A" className="rounded-lg gap-2 data-[state=active]:shadow-sm px-4 py-2.5">
+            <ScanLine className="h-4 w-4" />
+            <span>X-Ray</span>
+            {spec.modules.length > 0 && (
+              <span className="ml-1 inline-block w-2 h-2 rounded-full bg-status-success" />
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="B" className="rounded-lg gap-2 data-[state=active]:shadow-sm px-4 py-2.5">
+            <Users className="h-4 w-4" />
+            <span>People</span>
+          </TabsTrigger>
+          <TabsTrigger value="C" className="rounded-lg gap-2 data-[state=active]:shadow-sm px-4 py-2.5">
+            <Building2 className="h-4 w-4" />
+            <span>Suppliers</span>
+            {!isGatingDiagComplete(spec) && (
+              <Lock className="h-3 w-3 text-muted-foreground" />
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="D" className="rounded-lg gap-2 data-[state=active]:shadow-sm px-4 py-2.5">
+            <FileText className="h-4 w-4" />
+            <span>RFQ</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="A">
