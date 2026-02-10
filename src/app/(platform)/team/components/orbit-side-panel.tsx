@@ -3,7 +3,8 @@
 /**
  * OrbitSidePanel — detail panel on the right side of the orbital view.
  *
- * @description When no function is selected, shows legend + description.
+ * @description When no function is selected, shows a Team Capacity overview
+ * with workload distribution, busiest/available members, and a compact legend.
  * When a function is selected, shows executives, apprentices, and
  * marketplace candidates for that function with real action links.
  *
@@ -12,9 +13,11 @@
  * @param props.teamCoverage - Coverage data per function id
  * @param props.marketplaceCandidates - All marketplace candidates
  * @param props.marketplaceListingMap - id → original listing for link wiring
+ * @param props.teamData - Pre-computed team data including all members and stats
  * @param props.onViewProfile - Callback to open profile modal for real members
  */
 
+import { useMemo } from 'react'
 import Link from 'next/link'
 import {
   STATUS_COLORS, getCoverageStatus,
@@ -22,7 +25,9 @@ import {
 import type {
   FunctionId, CoverageStatus, BusinessFunction,
   FunctionCoverage, MarketplaceCandidate, MarketplacePersonListing,
+  TeamMember,
 } from '../types'
+import type { TeamDataResult } from '../hooks/use-team-data'
 
 interface OrbitSidePanelProps {
   selected: FunctionId | null
@@ -31,6 +36,8 @@ interface OrbitSidePanelProps {
   marketplaceCandidates: MarketplaceCandidate[]
   /** Mapping from marketplace listing id → original listing data */
   marketplaceListingMap: Record<string, MarketplacePersonListing>
+  /** Pre-computed team data for capacity overview */
+  teamData: TeamDataResult
   /** Callback to open the real profile modal for internal team members */
   onViewProfile?: (memberId: string) => void
 }
@@ -41,41 +48,232 @@ const STATUS_LABELS: Record<CoverageStatus, string> = {
   red: 'Gap',
 }
 
+/**
+ * Computes a bandwidth score for a team member.
+ *
+ * @description Higher score = more loaded. Based on active tasks (weight 20)
+ * and pending tasks (weight 10), capped at 100.
+ *
+ * @param member - Team member with active/pending task counts
+ * @returns Score from 0 (idle) to 100 (fully loaded)
+ */
+function getBandwidthScore(member: TeamMember): number {
+  return Math.min(100, member.active * 20 + member.pending * 10)
+}
+
 export function OrbitSidePanel({
   selected,
   functions,
   teamCoverage,
   marketplaceCandidates,
   marketplaceListingMap,
+  teamData,
   onViewProfile,
 }: OrbitSidePanelProps) {
-  // ── Default state (nothing selected) ───────────────────────
+  // ── Capacity data (computed once for default view) ─────────
+  const capacityData = useMemo(() => {
+    const allMembers = [
+      ...teamData.founders,
+      ...teamData.allExecs,
+      ...teamData.allApprentices,
+    ]
+
+    // Categorize members by workload
+    const withCapacity: TeamMember[] = []
+    const atCapacity: TeamMember[] = []
+    const overloaded: TeamMember[] = []
+
+    allMembers.forEach((m) => {
+      const score = getBandwidthScore(m)
+      if (score <= 40) {
+        withCapacity.push(m)
+      } else if (score <= 70) {
+        atCapacity.push(m)
+      } else {
+        overloaded.push(m)
+      }
+    })
+
+    // Sort for busiest (highest active first) and most available (lowest active first)
+    const busiest = [...allMembers]
+      .sort((a, b) => b.active - a.active || b.pending - a.pending)
+      .slice(0, 3)
+
+    const available = [...allMembers]
+      .filter((m) => getBandwidthScore(m) <= 40)
+      .sort((a, b) => a.active - b.active || a.pending - b.pending)
+      .slice(0, 3)
+
+    const total = allMembers.length
+
+    return { withCapacity, atCapacity, overloaded, busiest, available, total }
+  }, [teamData])
+
+  // ── Default state (nothing selected) — Team Capacity ───────
   if (!selected) {
+    const { withCapacity, atCapacity, overloaded, busiest, available, total } = capacityData
+
+    // Bar segment widths as percentages
+    const greenPct = total > 0 ? (withCapacity.length / total) * 100 : 0
+    const yellowPct = total > 0 ? (atCapacity.length / total) * 100 : 0
+    const redPct = total > 0 ? (overloaded.length / total) * 100 : 0
+
     return (
-      <div className="p-8">
-        <div className="text-[22px] font-extrabold text-foreground mb-2">
-          Company Orbit
+      <div className="p-7 space-y-6">
+        {/* Header */}
+        <div>
+          <div className="text-[22px] font-extrabold text-foreground mb-1">
+            Team Capacity
+          </div>
+          <div className="text-[13px] text-muted-foreground">
+            {total} member{total !== 1 ? 's' : ''} · avg {teamData.stats.avgCapacity} available
+          </div>
         </div>
-        <div className="text-[13px] text-muted-foreground leading-relaxed mb-6">
-          Click any function segment to see team details and marketplace
-          candidates.
-        </div>
-        {([
-          { sc: STATUS_COLORS.green, label: 'Covered', desc: 'Executive(s) assigned' },
-          { sc: STATUS_COLORS.yellow, label: 'Founder covering', desc: "You're handling this" },
-          { sc: STATUS_COLORS.red, label: 'Gap', desc: 'Nobody covering' },
-        ] as const).map((s) => (
-          <div key={s.label} className="flex gap-3 mb-2.5">
-            <div
-              className="w-8 h-3.5 rounded-[7px] shrink-0 mt-0.5"
-              style={{ background: s.sc.fill, border: `2px solid ${s.sc.arc}` }}
-            />
-            <div>
-              <div className="text-[13px] font-bold text-foreground">{s.label}</div>
-              <div className="text-[11px] text-muted-foreground">{s.desc}</div>
+
+        {/* Capacity bar */}
+        <div>
+          <div className="flex h-3 rounded-full overflow-hidden bg-muted">
+            {greenPct > 0 && (
+              <div
+                className="h-full bg-status-success transition-all"
+                style={{ width: `${greenPct}%` }}
+              />
+            )}
+            {yellowPct > 0 && (
+              <div
+                className="h-full bg-status-warning transition-all"
+                style={{ width: `${yellowPct}%` }}
+              />
+            )}
+            {redPct > 0 && (
+              <div
+                className="h-full bg-destructive transition-all"
+                style={{ width: `${redPct}%` }}
+              />
+            )}
+          </div>
+          <div className="flex items-center gap-4 mt-2.5 text-[11px]">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-status-success" />
+              <span className="text-muted-foreground">
+                <span className="font-bold text-foreground">{withCapacity.length}</span> available
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-status-warning" />
+              <span className="text-muted-foreground">
+                <span className="font-bold text-foreground">{atCapacity.length}</span> busy
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-destructive" />
+              <span className="text-muted-foreground">
+                <span className="font-bold text-foreground">{overloaded.length}</span> maxed
+              </span>
             </div>
           </div>
-        ))}
+        </div>
+
+        {/* Busiest members */}
+        {busiest.length > 0 && (
+          <div>
+            <div className="text-[10px] text-muted-foreground tracking-[1.5px] uppercase font-bold mb-2.5">
+              Busiest
+            </div>
+            <div className="space-y-1.5">
+              {busiest.map((m) => {
+                const score = getBandwidthScore(m)
+                const isOverloaded = score > 70
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => onViewProfile?.(m.id)}
+                    className="flex items-center gap-3 p-2.5 rounded-xl w-full text-left cursor-pointer hover:bg-muted/60 transition-colors"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0"
+                      style={{
+                        background: isOverloaded ? '#FEF2F2' : '#FFFBEB',
+                        border: `2px solid ${isOverloaded ? '#FECACA' : '#FDE68A'}`,
+                        color: isOverloaded ? '#DC2626' : '#D97706',
+                      }}
+                    >
+                      {m.initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-bold text-foreground truncate">{m.name}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {m.active} active · {m.pending} pending
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground shrink-0">View →</div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Available members */}
+        {available.length > 0 && (
+          <div>
+            <div className="text-[10px] text-muted-foreground tracking-[1.5px] uppercase font-bold mb-2.5">
+              Available
+            </div>
+            <div className="space-y-1.5">
+              {available.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => onViewProfile?.(m.id)}
+                  className="flex items-center gap-3 p-2.5 rounded-xl w-full text-left cursor-pointer hover:bg-muted/60 transition-colors"
+                >
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0"
+                    style={{
+                      background: '#F0FDF4',
+                      border: '2px solid #BBF7D0',
+                      color: '#16A34A',
+                    }}
+                  >
+                    {m.initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-bold text-foreground truncate">{m.name}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {m.active === 0 ? 'No active tasks' : `${m.active} active`}
+                      {m.done > 0 ? ` · ${m.done} done` : ''}
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground shrink-0">View →</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Compact legend */}
+        <div className="pt-2 border-t border-border">
+          <div className="text-[10px] text-muted-foreground tracking-[1.5px] uppercase font-bold mb-2">
+            Orbit Legend
+          </div>
+          <div className="flex items-center gap-4">
+            {([
+              { sc: STATUS_COLORS.green, label: 'Covered' },
+              { sc: STATUS_COLORS.yellow, label: 'Founder' },
+              { sc: STATUS_COLORS.red, label: 'Gap' },
+            ] as const).map((s) => (
+              <div key={s.label} className="flex items-center gap-1.5">
+                <div
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ background: s.sc.arc }}
+                />
+                <span className="text-[11px] text-muted-foreground font-medium">{s.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }

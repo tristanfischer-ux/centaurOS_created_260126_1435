@@ -68,6 +68,7 @@ export function OrbitalView({
             Object.values(teamData.marketplaceByFunction).flat()
           }
           marketplaceListingMap={teamData.marketplaceListingMap}
+          teamData={teamData}
           onViewProfile={onViewProfile}
         />
       </div>
