@@ -392,33 +392,107 @@ export async function listScansAction(): Promise<
 
 /**
  * Matches experts to X-Ray modules based on discipline needs.
+ * Results are persisted to the scan's people_matches column.
  *
+ * @param scanId - The scan ID to persist results against
  * @param modules - The modules to match experts for
+ * @param forceRefresh - If true, re-query even if cached data exists
  * @returns Ranked list of person matches
+ *
+ * @security Requires authenticated user with foundry context
  */
 export async function matchPeopleAction(
+  scanId: string | null,
   modules: ModuleSpec[],
+  forceRefresh = false,
 ): Promise<{ people: PersonMatch[] } | { error: string }> {
-  return withAuth(async () => {
+  return withAuth(async ({ supabase }) => {
+    // Check for cached data first
+    if (scanId && !forceRefresh) {
+      const { data: scan } = await supabase
+        .from("xray_scans")
+        .select("people_matches")
+        .eq("id", scanId)
+        .single()
+
+      if (scan?.people_matches) {
+        return { people: scan.people_matches as unknown as PersonMatch[] }
+      }
+    }
+
+    // Fresh query
     const people = await matchPeopleForModules(modules)
+
+    // Persist to scan if we have a scanId
+    if (scanId) {
+      const { error: updateError } = await supabase
+        .from("xray_scans")
+        .update({ people_matches: people as unknown as Json })
+        .eq("id", scanId)
+
+      if (updateError) {
+        console.warn("[XRay] Failed to cache people matches:", updateError.message)
+      }
+    }
+
     return { people }
   })
 }
 
 /**
- * Matches suppliers to a module (gated on diagnostic completion).
+ * Matches suppliers to all modules (gated on diagnostic completion).
+ * Results are persisted to the scan's supplier_matches column.
  *
- * @param module - The module to match suppliers for
+ * @param scanId - The scan ID to persist results against
+ * @param modules - The modules to match suppliers for
  * @param isGatingDiagComplete - Whether the gating diagnostic is complete
- * @returns Ranked list of supplier matches
+ * @param forceRefresh - If true, re-query even if cached data exists
+ * @returns Map of moduleId -> SupplierMatch[]
+ *
+ * @security Requires authenticated user with foundry context
  */
 export async function matchSuppliersAction(
-  module: ModuleSpec,
+  scanId: string | null,
+  modules: ModuleSpec[],
   isGatingDiagComplete: boolean,
-): Promise<{ suppliers: SupplierMatch[] } | { error: string }> {
-  return withAuth(async () => {
-    const suppliers = await matchSuppliersForModule(module, isGatingDiagComplete)
-    return { suppliers }
+  forceRefresh = false,
+): Promise<{ suppliersByModule: Record<string, SupplierMatch[]> } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    // Check for cached data first
+    if (scanId && !forceRefresh) {
+      const { data: scan } = await supabase
+        .from("xray_scans")
+        .select("supplier_matches")
+        .eq("id", scanId)
+        .single()
+
+      if (scan?.supplier_matches) {
+        return { suppliersByModule: scan.supplier_matches as unknown as Record<string, SupplierMatch[]> }
+      }
+    }
+
+    // Fresh query for each module
+    const suppliersByModule: Record<string, SupplierMatch[]> = {}
+    await Promise.all(
+      modules.map(async (module) => {
+        const suppliers = await matchSuppliersForModule(module, isGatingDiagComplete)
+        suppliersByModule[module.id] = suppliers
+      }),
+    )
+
+    // Persist to scan
+    if (scanId) {
+      const { error: updateError } = await supabase
+        .from("xray_scans")
+        .update({ supplier_matches: suppliersByModule as unknown as Json })
+        .eq("id", scanId)
+
+      if (updateError) {
+        console.warn("[XRay] Failed to cache supplier matches:", updateError.message)
+      }
+    }
+
+    return { suppliersByModule }
   })
 }
 
@@ -426,15 +500,49 @@ export async function matchSuppliersAction(
 
 /**
  * Enriches modules with Inspiration data (techniques, domains, packs).
+ * Results are persisted to the scan's enrichments column.
  *
+ * @param scanId - The scan ID to persist results against
  * @param spec - The X-Ray spec to enrich
+ * @param forceRefresh - If true, re-query even if cached data exists
  * @returns Array of enrichment data per module
+ *
+ * @security Requires authenticated user with foundry context
  */
 export async function enrichModulesAction(
+  scanId: string | null,
   spec: XRaySpec,
+  forceRefresh = false,
 ): Promise<{ enrichments: ModuleEnrichment[] } | { error: string }> {
-  return withAuth(async () => {
+  return withAuth(async ({ supabase }) => {
+    // Check for cached data first
+    if (scanId && !forceRefresh) {
+      const { data: scan } = await supabase
+        .from("xray_scans")
+        .select("enrichments")
+        .eq("id", scanId)
+        .single()
+
+      if (scan?.enrichments) {
+        return { enrichments: scan.enrichments as unknown as ModuleEnrichment[] }
+      }
+    }
+
+    // Fresh query
     const enrichments = await enrichModules(spec)
+
+    // Persist to scan
+    if (scanId) {
+      const { error: updateError } = await supabase
+        .from("xray_scans")
+        .update({ enrichments: enrichments as unknown as Json })
+        .eq("id", scanId)
+
+      if (updateError) {
+        console.warn("[XRay] Failed to cache enrichments:", updateError.message)
+      }
+    }
+
     return { enrichments }
   })
 }

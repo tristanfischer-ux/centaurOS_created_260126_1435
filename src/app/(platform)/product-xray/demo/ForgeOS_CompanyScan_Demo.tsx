@@ -815,23 +815,28 @@ function XRayView({
   )
 }
 
-function PeopleView({ spec }: { spec: XRaySpec }) {
+function PeopleView({ spec, scanId }: { spec: XRaySpec; scanId: string | null }) {
   const [people, setPeople] = useState<PersonMatch[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
   const processClass = getDerivedProcessClass(spec)
 
-  useEffect(() => {
-    if (spec.modules.length === 0 || hasLoaded) return
+  const loadPeople = useCallback((forceRefresh = false) => {
+    if (spec.modules.length === 0) return
     setIsLoading(true)
-    matchPeopleAction(spec.modules)
+    matchPeopleAction(scanId, spec.modules, forceRefresh)
       .then((result) => {
         if ("people" in result) setPeople(result.people)
         else console.error("[PeopleView]", result.error)
       })
       .catch((err) => console.error("[PeopleView] Error:", err))
       .finally(() => { setIsLoading(false); setHasLoaded(true) })
-  }, [spec.modules, hasLoaded])
+  }, [scanId, spec.modules])
+
+  useEffect(() => {
+    if (hasLoaded) return
+    loadPeople(false)
+  }, [loadPeople, hasLoaded])
 
   // Group by discipline
   const grouped = useMemo(() => {
@@ -848,11 +853,20 @@ function PeopleView({ spec }: { spec: XRaySpec }) {
     <div className="space-y-6">
       <Card>
         <CardContent className="pt-6">
-          <h3 className="text-base font-semibold">Why these people?</h3>
-          <p className="text-sm text-foreground">
-            Derived from X-Ray modules{processClass ? `, and process class: ${processClass}.` : "."}
-          </p>
-          {!processClass && <p className="text-xs text-muted-foreground mt-1">Tip: run the diagnostic to sharpen matching.</p>}
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-semibold">Why these people?</h3>
+              <p className="text-sm text-foreground">
+                Derived from X-Ray modules{processClass ? `, and process class: ${processClass}.` : "."}
+              </p>
+              {!processClass && <p className="text-xs text-muted-foreground mt-1">Tip: run the diagnostic to sharpen matching.</p>}
+            </div>
+            {hasLoaded && (
+              <Button variant="ghost" size="sm" onClick={() => loadPeople(true)} disabled={isLoading}>
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -900,33 +914,29 @@ function PeopleView({ spec }: { spec: XRaySpec }) {
   )
 }
 
-function SupplierView({ spec, setSpec }: { spec: XRaySpec; setSpec: (s: XRaySpec) => void }) {
+function SupplierView({ spec, setSpec, scanId }: { spec: XRaySpec; setSpec: (s: XRaySpec) => void; scanId: string | null }) {
   const processClass = getDerivedProcessClass(spec)
   const diagComplete = isGatingDiagComplete(spec)
   const [suppliersByModule, setSuppliersByModule] = useState<Record<string, SupplierMatch[]>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
 
-  useEffect(() => {
-    if (!diagComplete || spec.modules.length === 0 || hasLoaded) return
+  const loadSuppliers = useCallback((forceRefresh = false) => {
+    if (!diagComplete || spec.modules.length === 0) return
     setIsLoading(true)
-    Promise.all(
-      spec.modules.map((m) =>
-        matchSuppliersAction(m, diagComplete)
-          .then((result) => {
-            if ("suppliers" in result) return { moduleId: m.id, suppliers: result.suppliers }
-            return { moduleId: m.id, suppliers: [] }
-          })
-          .catch(() => ({ moduleId: m.id, suppliers: [] as SupplierMatch[] }))
-      )
-    )
-      .then((results) => {
-        const map: Record<string, SupplierMatch[]> = {}
-        for (const r of results) map[r.moduleId] = r.suppliers
-        setSuppliersByModule(map)
+    matchSuppliersAction(scanId, spec.modules, diagComplete, forceRefresh)
+      .then((result) => {
+        if ("suppliersByModule" in result) setSuppliersByModule(result.suppliersByModule)
+        else console.error("[SupplierView]", result.error)
       })
+      .catch((err) => console.error("[SupplierView] Error:", err))
       .finally(() => { setIsLoading(false); setHasLoaded(true) })
-  }, [diagComplete, spec.modules, hasLoaded])
+  }, [scanId, spec.modules, diagComplete])
+
+  useEffect(() => {
+    if (!diagComplete || hasLoaded) return
+    loadSuppliers(false)
+  }, [diagComplete, loadSuppliers, hasLoaded])
 
   const assign = (moduleId: string, supplierName: string): void => {
     setSpec({ ...spec, modules: spec.modules.map((m) => (m.id === moduleId ? { ...m, supplier: supplierName } : m)) })
@@ -944,9 +954,18 @@ function SupplierView({ spec, setSpec }: { spec: XRaySpec; setSpec: (s: XRaySpec
       ) : (
         <Card>
           <CardContent className="pt-6">
-            <h3 className="text-base font-semibold">Supplier matching</h3>
-            <p className="text-sm text-foreground">Conditioned on process class: {processClass}.</p>
-            <p className="text-xs text-muted-foreground mt-1">This preserves transparency: no bespoke negotiation, just clarity-first quoting.</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold">Supplier matching</h3>
+                <p className="text-sm text-foreground">Conditioned on process class: {processClass}.</p>
+                <p className="text-xs text-muted-foreground mt-1">This preserves transparency: no bespoke negotiation, just clarity-first quoting.</p>
+              </div>
+              {hasLoaded && (
+                <Button variant="ghost" size="sm" onClick={() => loadSuppliers(true)} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -1142,11 +1161,11 @@ export default function ForgeOS_CompanyScan_Demo({
         </TabsContent>
 
         <TabsContent value="B">
-          <PeopleView spec={spec} />
+          <PeopleView spec={spec} scanId={scanId} />
         </TabsContent>
 
         <TabsContent value="C">
-          <SupplierView spec={spec} setSpec={setSpec} />
+          <SupplierView spec={spec} setSpec={setSpec} scanId={scanId} />
         </TabsContent>
 
         <TabsContent value="D">

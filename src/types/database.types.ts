@@ -10926,31 +10926,40 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          enrichments: Json | null
           foundry_id: string
           id: string
           idea: string
+          people_matches: Json | null
           spec: Json
           status: string
+          supplier_matches: Json | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           created_by: string
+          enrichments?: Json | null
           foundry_id: string
           id?: string
           idea: string
+          people_matches?: Json | null
           spec?: Json
           status?: string
+          supplier_matches?: Json | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           created_by?: string
+          enrichments?: Json | null
           foundry_id?: string
           id?: string
           idea?: string
+          people_matches?: Json | null
           spec?: Json
           status?: string
+          supplier_matches?: Json | null
           updated_at?: string
         }
         Relationships: []
