@@ -300,13 +300,8 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
       onMouseUp={onMU}
       onMouseLeave={onMU}
     >
-      {/* Header */}
-      <div style={{ padding: '20px 28px 14px', background: 'white', borderBottom: '1px solid #E5E7EB' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          <div style={{ width: 4, height: 24, borderRadius: 2, background: '#F97316' }} />
-          <span style={{ fontSize: 22, fontWeight: 800, color: '#0F172A' }}>Strategy</span>
-        </div>
-
+      {/* Toolbar — status badges, zoom, objective pills */}
+      <div style={{ padding: '14px 28px 14px', background: 'white', borderBottom: '1px solid #E5E7EB' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' as const }}>
           {[
             { bg: '#ECFDF5', c: '#059669', text: `✓ ${doneTasks} done` },

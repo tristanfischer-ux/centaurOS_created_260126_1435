@@ -28,6 +28,7 @@ import { StrategicObjectivesManager } from '../new-objectives/strategic-objectiv
 import { StrategyLinkView } from './strategy-link-view'
 import { CompanyPurposeWrapper } from '@/components/objectives/company-purpose-wrapper'
 import { EmptyState } from '@/components/ui/empty-state'
+import { typography } from '@/lib/design-system/typography'
 import type { GoalBundle } from '@/types/canvas'
 import type { MilestoneOption } from '@/types/canvas'
 import type { StrategicObjective } from '../new-objectives/types'
@@ -162,6 +163,17 @@ export function CanvasShell({
 
   return (
     <div>
+      {/* Page header */}
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-4 border-b border-slate-100">
+        <div className={typography.pageHeader}>
+          <div className={typography.pageHeaderAccent} />
+          <h1 className={typography.h1}>Strategy</h1>
+        </div>
+        <p className={typography.pageSubtitle}>
+          Define your high-level goals, then link objectives to them
+        </p>
+      </div>
+
       {/* Company Purpose — foundational context for strategy */}
       <div className="px-4 sm:px-6 lg:px-8 pt-4">
         <CompanyPurposeWrapper
