@@ -35,12 +35,14 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertTriangle,
   Box,
   Clock,
   CircleDot,
   ImageIcon,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -207,6 +209,7 @@ export function XRaySchematic({ spec, onOpenDiagnostic }: XRaySchematicProps) {
     ? new Date(spec.lastScannedAt).toLocaleString()
     : "Not scanned yet"
   const [showVisual, setShowVisual] = useState(false)
+  const [systemImageDialogOpen, setSystemImageDialogOpen] = useState(false)
 
   const diagComplete = isGatingDiagComplete(spec)
   const gating = findGatingModule(modules)
@@ -274,7 +277,7 @@ export function XRaySchematic({ spec, onOpenDiagnostic }: XRaySchematicProps) {
                 onClick={() => setShowVisual((v) => !v)}
               >
                 <ImageIcon className="h-4 w-4 mr-2" />
-                {showVisual ? "Functional" : "Visual Blueprint"}
+                {showVisual ? "Show Interactive Schematic" : "Show System Diagram"}
               </Button>
             )}
             <Badge variant="secondary" className="text-xs">
@@ -314,13 +317,21 @@ export function XRaySchematic({ spec, onOpenDiagnostic }: XRaySchematicProps) {
 
         {/* Visual Blueprint or React Flow schematic */}
         {showVisual && spec.systemImageUrl ? (
-          <div className="rounded-xl overflow-hidden border bg-muted/20">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={spec.systemImageUrl}
-              alt="System diagram"
-              className="w-full"
-            />
+          <div className="rounded-xl overflow-hidden border bg-muted/10 p-6">
+            <button 
+              onClick={() => setSystemImageDialogOpen(true)}
+              className="w-full cursor-zoom-in hover:opacity-90 transition-opacity"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={spec.systemImageUrl}
+                alt="System P&ID diagram"
+                className="w-full h-auto object-contain"
+              />
+            </button>
+            <p className="text-xs text-muted-foreground text-center mt-4 font-medium">
+              System-Level Process Flow Diagram (P&ID) — Click to enlarge
+            </p>
           </div>
         ) : (
           <div className="rounded-xl overflow-hidden border bg-muted/20">
@@ -425,6 +436,31 @@ export function XRaySchematic({ spec, onOpenDiagnostic }: XRaySchematicProps) {
           </div>
         </div>
       </CardContent>
+
+      {/* System diagram lightbox */}
+      <Dialog open={systemImageDialogOpen} onOpenChange={setSystemImageDialogOpen}>
+        <DialogContent size="xl" className="max-w-[95vw] max-h-[95vh] p-0">
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 z-10 bg-background/80 hover:bg-background"
+              onClick={() => setSystemImageDialogOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <div className="overflow-auto max-h-[95vh] p-6">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={spec.systemImageUrl || ""}
+                alt="System P&ID diagram"
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
+          <DialogTitle className="sr-only">System Process Flow Diagram</DialogTitle>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

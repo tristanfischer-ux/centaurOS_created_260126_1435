@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/ui/empty-state"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertTriangle,
   Loader2,
@@ -58,6 +59,7 @@ import {
   ClipboardCheck,
   Gauge,
   HelpCircle,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -503,6 +505,7 @@ function ModuleCard({
   onOpenDiagnostic: (m: ModuleSpec) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [imageDialogOpen, setImageDialogOpen] = useState(false)
   const r = readinessFor(m)
   const isGating = m.isGatingModule || m.id === "react"
   const hasDiagnostic = !!(m.diagnostic?.questions?.length)
@@ -533,15 +536,23 @@ function ModuleCard({
       <div className="h-1.5 w-full" style={{ backgroundColor: accentColor }} />
 
       <CardContent className="pt-5 space-y-5">
-        {/* Module image header */}
+        {/* Module blueprint image - full size, illustrated and annotated */}
         {m.imageUrl && m.imageStatus === "complete" && (
-          <div className="rounded-xl overflow-hidden -mx-6 mb-2 relative">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={m.imageUrl} alt={`Blueprint: ${m.name}`} className="w-full h-48 object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-            <div className="absolute bottom-3 left-4">
-              <span className="text-white text-sm font-semibold drop-shadow-sm">{m.name}</span>
-            </div>
+          <div className="rounded-xl overflow-hidden border bg-muted/10 p-4 -mx-6 mb-2">
+            <button 
+              onClick={() => setImageDialogOpen(true)}
+              className="w-full cursor-zoom-in hover:opacity-90 transition-opacity"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src={m.imageUrl} 
+                alt={`Technical blueprint: ${m.name}`} 
+                className="w-full h-auto object-contain max-h-[600px]"
+              />
+            </button>
+            <p className="text-xs text-muted-foreground text-center mt-2 font-medium">
+              {m.name} — Technical Illustration (click to enlarge)
+            </p>
           </div>
         )}
         {m.imageStatus === "generating" && (
@@ -824,6 +835,31 @@ function ModuleCard({
           </div>
         </div>
       </CardContent>
+
+      {/* Image lightbox dialog */}
+      <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+        <DialogContent size="xl" className="max-w-[95vw] max-h-[95vh] p-0">
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 z-10 bg-background/80 hover:bg-background"
+              onClick={() => setImageDialogOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <div className="overflow-auto max-h-[95vh] p-6">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={m.imageUrl || ""}
+                alt={`Technical blueprint: ${m.name}`}
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
+          <DialogTitle className="sr-only">{m.name} Technical Blueprint</DialogTitle>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
@@ -1229,6 +1265,54 @@ function XRayView({
                 Generate blueprint images
               </Button>
             </div>
+          )}
+
+          {/* System-level diagram - full size at top */}
+          {spec.systemImageUrl && spec.systemImageStatus === "complete" && (
+            <Card className="rounded-xl shadow-sm">
+              <CardContent className="pt-6 space-y-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-7 bg-international-orange rounded-full" />
+                    <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">
+                      System Overview
+                    </h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground ml-[1.375rem]">
+                    Complete system-level process flow diagram showing all modules and their connections.
+                  </p>
+                </div>
+                <div className="rounded-xl overflow-hidden border bg-muted/10 p-6 cursor-zoom-in hover:opacity-90 transition-opacity"
+                  onClick={() => {
+                    const dialog = document.createElement('dialog')
+                    dialog.className = 'fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4'
+                    dialog.innerHTML = `
+                      <div class="relative max-w-[95vw] max-h-[95vh] bg-background rounded-xl overflow-auto">
+                        <button onclick="this.closest('dialog').remove()" class="absolute top-2 right-2 z-10 bg-background/80 hover:bg-background rounded-lg p-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        </button>
+                        <img src="${spec.systemImageUrl}" alt="System diagram" class="w-full h-auto p-6" />
+                      </div>
+                    `
+                    dialog.onclick = (e) => { if (e.target === dialog) dialog.remove() }
+                    document.body.appendChild(dialog)
+                    dialog.showModal()
+                  }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={spec.systemImageUrl}
+                    alt="System P&ID diagram"
+                    className="w-full h-auto object-contain"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground text-center font-medium">
+                  System-Level P&ID Diagram — Click to view at full resolution
+                </p>
+              </CardContent>
+            </Card>
           )}
 
           <XRaySchematic spec={spec} onOpenDiagnostic={onOpenDiagnostic} />

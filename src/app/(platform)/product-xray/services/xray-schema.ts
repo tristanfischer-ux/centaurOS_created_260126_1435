@@ -94,6 +94,12 @@ export const ModuleSpecSchema = z.object({
   detail: z.object({
     whatItIs: z.string().describe("2-3 sentence technical description including operating principles and material considerations"),
     whyItMatters: z.string().describe("Why this module is critical to the system"),
+    operatingPrinciples: z.string().optional()
+      .describe("Deep explanation of the physics, chemistry, thermodynamics, or mechanics that govern this module"),
+    materialJustification: z.string().optional()
+      .describe("Why specific materials were chosen, citing standards (ASTM, ISO, DIN) and trade-offs"),
+    tolerancesAndSpecs: z.string().optional()
+      .describe("Key dimensional, thermal, pressure, or performance tolerances and specifications"),
     commonFailureModes: z.array(z.string()).min(1)
       .describe("Typical failure modes an engineer should watch for"),
     unknownsToResolve: z.array(z.string()).min(1)
@@ -101,6 +107,12 @@ export const ModuleSpecSchema = z.object({
     expertQuestions: z.array(ExpertQuestionSchema).min(2)
       .describe("Questions spanning different disciplines for expert interviews"),
   }),
+  // Inter-module connections
+  systemInterconnections: z.array(z.string()).optional()
+    .describe("How this module connects to others — physical, electrical, signal, thermal, material flow"),
+  // AI-crafted image prompt
+  moduleImagePrompt: z.string().optional()
+    .describe("AI-crafted detailed prompt for generating this module's engineering blueprint image via Gemini"),
   // Generalized gating diagnostic (replaces old reactionDiag)
   isGatingModule: z.boolean().optional()
     .describe("True if this is the gating transformation step"),
