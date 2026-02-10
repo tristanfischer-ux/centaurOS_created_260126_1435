@@ -153,8 +153,6 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
         if (isBeta) {
             const featureName = getFeatureNameByRoute(item.href)
             badgeContent = <BetaBadge onClick={() => openFeedback(featureName)} />
-        } else if (item.href === '/marketplace') {
-            badgeContent = <NewBadge customText="Demo" />
         } else if (item.href !== '/objectives' && item.href !== '/settings') {
             badgeContent = <NewBadge route={item.href} />
         }

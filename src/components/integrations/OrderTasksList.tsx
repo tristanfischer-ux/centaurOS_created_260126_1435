@@ -229,7 +229,7 @@ export function OrderTasksList({
                       return (
                         <Link
                           key={task.id}
-                          href={`/tasks/${task.id}`}
+                          href={`/new-tasks?taskId=${task.id}`}
                           className="flex items-center justify-between p-2 rounded-lg hover:bg-accent transition-colors group"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">

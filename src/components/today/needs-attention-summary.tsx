@@ -54,7 +54,7 @@ export function NeedsAttentionSummary({
         <div className="space-y-2">
           {overdueCount > 0 && (
             <Link 
-              href="/tasks?filter=overdue"
+              href="/new-tasks?filter=overdue"
               className="flex items-center justify-between p-2 rounded-md hover:bg-muted transition-colors group"
             >
               <div className="flex items-center gap-2">
@@ -72,7 +72,7 @@ export function NeedsAttentionSummary({
 
           {approvalsCount > 0 && (
             <Link 
-              href="/tasks?filter=pending-approval"
+              href="/new-tasks?filter=pending-approval"
               className="flex items-center justify-between p-2 rounded-md hover:bg-muted transition-colors group"
             >
               <div className="flex items-center gap-2">

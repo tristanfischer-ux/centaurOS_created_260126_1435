@@ -2,29 +2,32 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Linkedin, Globe, MapPin, Clock, Edit3, ExternalLink } from 'lucide-react'
+import { Linkedin, Globe, MapPin, Clock, Edit3, ExternalLink, Phone } from 'lucide-react'
 
 /**
- * LinksTab - Social links, location, and timezone management.
+ * LinksTab - Social links, location, and contact management.
  *
- * @description Displays the user's external links and location info.
- * Available to all users, but only populated for providers.
+ * @description Displays the user's external links, location, and contact info.
+ * Available to all users. Non-providers see their profile-level data;
+ * providers see their provider_profiles data. All users can edit.
  *
  * @component
  */
 
 interface LinksTabProps {
-  /** LinkedIn URL */
+  /** LinkedIn URL (merged: provider or profile-level) */
   linkedinUrl: string | null
-  /** Personal website URL */
+  /** Personal website URL (provider only) */
   websiteUrl: string | null
-  /** User location */
+  /** User location (provider only) */
   location: string | null
-  /** Timezone string */
+  /** Timezone string (provider only) */
   timezone: string | null
-  /** Whether the user is a provider (has editable links) */
+  /** Phone number (from profiles table) */
+  phoneNumber: string | null
+  /** Whether the user is a provider */
   isProvider: boolean
-  /** Callback to open the edit wizard */
+  /** Callback to open the appropriate edit dialog */
   onEditClick: () => void
 }
 
@@ -33,23 +36,22 @@ export function LinksTab({
   websiteUrl,
   location,
   timezone,
+  phoneNumber,
   isProvider,
   onEditClick,
 }: LinksTabProps) {
-  const hasAnyData = linkedinUrl || websiteUrl || location || timezone
+  const hasAnyData = linkedinUrl || websiteUrl || location || timezone || phoneNumber
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Links & Location</CardTitle>
-            {isProvider && (
-              <Button size="sm" variant="outline" onClick={onEditClick}>
-                <Edit3 className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
-            )}
+            <CardTitle className="text-base">Links & Contact</CardTitle>
+            <Button size="sm" variant="outline" onClick={onEditClick}>
+              <Edit3 className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -69,6 +71,13 @@ export function LinksTab({
                   label="Website"
                   href={websiteUrl}
                   displayText={formatUrl(websiteUrl)}
+                />
+              )}
+              {phoneNumber && (
+                <InfoRow
+                  icon={Phone}
+                  label="Phone"
+                  value={phoneNumber}
                 />
               )}
               {location && (
@@ -92,18 +101,16 @@ export function LinksTab({
               <p className="text-sm text-muted-foreground">
                 {isProvider
                   ? 'Add your links and location to help clients find and connect with you.'
-                  : 'No links or location information added yet.'}
+                  : 'Add your LinkedIn and contact details so your team can connect with you.'}
               </p>
-              {isProvider && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onEditClick}
-                  className="mt-3"
-                >
-                  Add Links
-                </Button>
-              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onEditClick}
+                className="mt-3"
+              >
+                Add Links
+              </Button>
             </div>
           )}
         </CardContent>
@@ -150,7 +157,7 @@ function LinkRow({
   )
 }
 
-/** Info row for non-link data (location, timezone). */
+/** Info row for non-link data (location, timezone, phone). */
 function InfoRow({
   icon: Icon,
   label,

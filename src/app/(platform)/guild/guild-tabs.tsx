@@ -3,7 +3,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { 
@@ -12,8 +11,6 @@ import {
     Calendar, 
     Users
 } from "lucide-react"
-import { toast } from "sonner"
-
 interface GuildEvent {
     id: string
     title: string
@@ -34,10 +31,11 @@ interface Member {
 interface GuildTabsProps {
     events: GuildEvent[]
     members: Member[]
-    isExecutive: boolean
+    /** @deprecated No longer needed -- events are pre-filtered server-side */
+    isExecutive?: boolean
 }
 
-export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
+export function GuildTabs({ events, members }: GuildTabsProps) {
     const getRoleBadgeClass = (role: string | null) => {
         switch (role) {
             case 'Founder':
@@ -62,35 +60,28 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                 </TabsTrigger>
                 <TabsTrigger value="network" className="gap-2">
                     <Users className="h-4 w-4" />
-                    <span className="hidden sm:inline">Network</span>
+                    <span className="hidden sm:inline">Members</span>
                 </TabsTrigger>
             </TabsList>
 
             {/* Events Tab */}
             <TabsContent value="events" className="space-y-4">
-                <div className="flex justify-between items-center">
-                    <p className="text-sm text-muted-foreground">
-                        Offline-to-Online (O2O) networking events and workshops.
-                    </p>
-                    <div className="text-xs text-international-orange border border-international-orange/20 bg-international-orange-light px-3 py-1 rounded-full flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        Showing events near you
-                    </div>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                    Networking events and workshops for the Guild community.
+                </p>
 
+                {/* Events are pre-filtered server-side -- executive-only events
+                    are removed before reaching the client for non-executives */}
                 <div className="grid gap-4">
-                    {/* SECURITY: Filter out executive-only events for non-executives */}
-                    {(() => {
-                        const visibleEvents = events.filter(e => !e.is_executive_only || isExecutive)
-                        return visibleEvents.length === 0 ? (
+                    {events.length === 0 ? (
                         <EmptyState
                             icon={<Calendar className="h-8 w-8" />}
                             title="No Upcoming Events"
-                            description="There are no events visible to your tier at this time. Check back soon for new networking opportunities."
+                            description="Check back soon for new networking opportunities."
                             className="border-2 border-dashed border-muted"
                         />
                     ) : (
-                        visibleEvents.map(event => (
+                        events.map(event => (
                             <Card key={event.id} className="bg-card flex flex-col md:flex-row overflow-hidden">
                                 <div className="bg-muted p-6 flex flex-col items-center justify-center min-w-[120px]">
                                     <span className="text-2xl font-bold text-foreground">
@@ -112,26 +103,18 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                                         )}
                                     </div>
                                     <h3 className="text-lg font-semibold text-foreground mb-2">{event.title}</h3>
-                                    <p className="text-muted-foreground text-sm mb-4">{event.description}</p>
-                                    <Button 
-                                        size="sm" 
-                                        variant="default"
-                                        onClick={() => toast.info("RSVP coming soon — we're finalising event bookings.")}
-                                    >
-                                        RSVP
-                                    </Button>
+                                    <p className="text-muted-foreground text-sm">{event.description}</p>
                                 </div>
                             </Card>
                         ))
-                    )
-                    })()}
+                    )}
                 </div>
             </TabsContent>
 
-            {/* Network Tab */}
+            {/* Members Tab */}
             <TabsContent value="network" className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                    Connect with other members of The Guild community.
+                    Guild community members.
                 </p>
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

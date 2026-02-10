@@ -118,7 +118,7 @@ function MessageContextTag({
     <div className="mb-1 flex items-center gap-1">
       {task && (
         <Link 
-          href={`/tasks?taskId=${task.id}`}
+          href={`/new-tasks?taskId=${task.id}`}
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <Badge variant="secondary" className="text-xs px-1.5 py-0 gap-1">

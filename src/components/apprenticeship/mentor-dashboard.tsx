@@ -73,15 +73,15 @@ export function MentorDashboard({ mentees }: MentorDashboardProps) {
     <OTJTApprovalPanel open={approvalPanelOpen} onOpenChange={setApprovalPanelOpen} />
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="h-1 w-8 bg-international-orange rounded-full" />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="h-8 w-1 bg-international-orange rounded-full" />
+            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
+              Mentor Dashboard
+            </h1>
           </div>
-          <h1 className="text-2xl font-display font-medium text-foreground">
-            Mentor Dashboard
-          </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm font-medium pl-4">
             {mentees.length} apprentice{mentees.length !== 1 ? 's' : ''} under your guidance
           </p>
         </div>

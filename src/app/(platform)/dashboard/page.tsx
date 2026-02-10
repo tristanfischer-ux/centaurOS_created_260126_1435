@@ -10,16 +10,17 @@ type Task = Database['public']['Tables']['tasks']['Row']
 type Objective = Database['public']['Tables']['objectives']['Row']
 
 /**
- * Dashboard Home Page - The new command center experience
- * 
- * A beautiful, personalized dashboard that provides:
- * - Welcome hero with daily focus
- * - Smart priority queue
+ * Dashboard Home Page - Command center for your foundry.
+ *
+ * @description Fetches all dashboard data in parallel and passes it to
+ * DashboardClient. Provides:
+ * - Personalised greeting with daily focus
+ * - Priority queue (urgency-ranked tasks)
  * - Objective progress cards
  * - Team pulse with live presence
- * - Real-time activity feed
- * - Quick actions panel
- * - Productivity visualizations
+ * - Unread updates link
+ * - Contextual recommendations
+ * - Productivity chart (shown after 3+ days of activity)
  */
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -70,7 +71,6 @@ export default async function DashboardPage() {
     blockersResult,
     pendingDecisionsResult,
     unreadCountsResult,
-    featuredListingsResult,
   ] = await Promise.all([
     // My current tasks (primary assignee)
     supabase
@@ -97,7 +97,7 @@ export default async function DashboardPage() {
     supabase
       .from('objectives')
       .select(`
-        id, title, description, status, progress, start_date, end_date, created_at, is_strategic_goal,
+        id, title, description, status, progress, end_date, created_at, is_strategic_goal,
         creator:profiles!creator_id(id, full_name, avatar_url)
       `)
       .eq('foundry_id', foundryId)
@@ -191,18 +191,7 @@ export default async function DashboardPage() {
     
     // Unread message counts
     fetchUnreadCounts(supabase, foundryId, user.id),
-
-    // Featured marketplace listings (for Marketplace Spotlight)
-    supabase
-      .from('marketplace_listings')
-      .select('id, title, description, category, subcategory, is_verified, image_url, attributes')
-      .eq('is_verified', true)
-      .order('created_at', { ascending: false })
-      .limit(3),
   ])
-
-  // Build workflow template previews from the static templates
-  const workflowTemplates = getWorkflowTemplatePreviews()
 
   // Merge primary-assigned tasks with multi-assigned tasks to get complete "my tasks" list.
   // This matches the logic in get_daily_pulse() which checks both assignee_id AND task_assignees.
@@ -273,47 +262,9 @@ export default async function DashboardPage() {
       pendingDecisions={pendingDecisionsResult.data || []}
       unreadCounts={unreadCountsResult}
       isExecutiveOrFounder={isExecutiveOrFounder}
-      featuredListings={featuredListingsResult.data || []}
-      workflowTemplates={workflowTemplates}
       dailyFocus={dailyFocus}
     />
   )
-}
-
-/**
- * Get a curated selection of workflow template previews.
- * These come from the static WORKFLOW_TEMPLATES list.
- */
-function getWorkflowTemplatePreviews() {
-  // Import the templates inline to avoid circular deps
-  // We just need a few representative ones for the preview
-  const featured = [
-    {
-      id: 'seed-round-fundraise',
-      name: 'Seed Round Fundraise',
-      description: 'The full raise pipeline: from vision to post-raise comms.',
-      category: 'startup',
-      nodeCount: 8,
-      icon: 'TrendingUp',
-    },
-    {
-      id: 'go-to-market-launch',
-      name: 'Go-to-Market Launch',
-      description: 'Plan and execute a product launch from positioning to post-launch analysis.',
-      category: 'marketing',
-      nodeCount: 6,
-      icon: 'Rocket',
-    },
-    {
-      id: 'hiring-pipeline',
-      name: 'Hiring Pipeline',
-      description: 'End-to-end hiring from role definition through offer letter.',
-      category: 'hiring',
-      nodeCount: 5,
-      icon: 'Users',
-    },
-  ]
-  return featured
 }
 
 /**
@@ -534,6 +485,7 @@ async function fetchTaskCompletionStats(
   }
   
   completedTasks?.forEach(task => {
+    if (!task.updated_at) return
     const dateStr = format(new Date(task.updated_at), 'yyyy-MM-dd')
     if (byDay[dateStr]) {
       if (task.assignee_id === currentUserId) {

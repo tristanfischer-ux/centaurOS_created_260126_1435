@@ -162,7 +162,7 @@ export function PendingApprovalsWidget({ userRole }: PendingApprovalsWidgetProps
                         
                         {tasks.length > 3 && (
                             <Link 
-                                href="/tasks?filter=pending_approval"
+                                href="/new-tasks?filter=pending_approval"
                                 className="flex items-center justify-center gap-1 text-sm text-primary hover:text-primary/80 py-2"
                             >
                                 View all {tasks.length} pending

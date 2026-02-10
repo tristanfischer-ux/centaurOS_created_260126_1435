@@ -11,8 +11,10 @@ import {
   Store,
   GraduationCap,
   UserCircle,
+  Plus,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { typography } from '@/lib/design-system'
 import { cn } from '@/lib/utils'
 import { switchFoundry } from '@/actions/foundry-switching'
@@ -134,13 +136,24 @@ export function PersonHub({
         <h2 className={cn(typography.label, 'mb-4')}>Your Companies</h2>
 
         {foundries.length === 0 ? (
-          <Card className="rounded-xl border shadow-sm">
-            <CardContent className="p-8 text-center">
-              <Building2 className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">
+          <Card className="rounded-xl border border-dashed shadow-sm">
+            <CardContent className="py-12 text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                <Building2 className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                No companies yet
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
                 You&apos;re not part of any company yet. Ask a founder to invite
-                you, or create your own.
+                you, or start your own company to get going.
               </p>
+              <Button asChild className="bg-international-orange hover:bg-international-orange/90">
+                <Link href="/join/founder">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create a Company
+                </Link>
+              </Button>
             </CardContent>
           </Card>
         ) : (

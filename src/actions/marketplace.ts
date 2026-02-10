@@ -3,7 +3,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { Database } from "@/types/database.types"
-import { createRFQSchema, validate } from "@/lib/validations"
 import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
 
 
@@ -141,68 +140,6 @@ export async function getSavedResources() {
     })
 
     return { data, error: null }
-}
-
-/**
- * @deprecated This function is deprecated. Use createNewRFQ from @/actions/rfq instead.
- * This function stores RFQs in the manufacturing_rfqs table which is being deprecated
- * in favor of the unified rfqs table with full race mechanics.
- */
-export async function submitRFQ(formData: {
-    title: string;
-    specifications: string;
-    budget_range: string;
-}) {
-    const supabase = await createClient()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: "Not authenticated" }
-
-    const foundry_id = await getFoundryIdCached()
-    if (!foundry_id) return { error: "User not in a foundry" }
-
-    // Early validation for formData structure
-    if (!formData || typeof formData !== 'object') {
-        return { error: "Invalid request data" }
-    }
-
-    // Sanitize and prepare input for Zod validation
-    // Zod schema handles: title (1-200 chars), specifications (10-5000 chars), budgetRange (format: "$X - $Y")
-    const rawData = {
-        title: typeof formData.title === 'string' ? formData.title.trim() : '',
-        specifications: typeof formData.specifications === 'string' && formData.specifications.trim() 
-            ? formData.specifications.trim() 
-            : undefined,
-        budgetRange: typeof formData.budget_range === 'string' && formData.budget_range.trim()
-            ? formData.budget_range.trim()
-            : undefined
-    }
-
-    const validation = validate(createRFQSchema, rawData)
-    if (!validation.success) {
-        return { error: 'error' in validation ? validation.error : 'Validation failed' }
-    }
-
-    const { title: validatedTitle, specifications: validatedSpecifications, budgetRange: validatedBudgetRange } = validation.data
-
-    const { error } = await supabase
-        .from("manufacturing_rfqs")
-        .insert({
-            title: validatedTitle as string,
-            specifications: validatedSpecifications || '',
-            budget_range: validatedBudgetRange || null,
-            foundry_id: foundry_id as string,
-            created_by: user.id,
-            status: "Open"
-        })
-
-    if (error) {
-        console.error("RFQ Error:", error)
-        return { error: "Failed to submit RFQ" }
-    }
-
-    revalidatePath("/marketplace")
-    return { success: true }
 }
 
 export interface MarketplaceListing {

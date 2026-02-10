@@ -17,6 +17,9 @@ export interface ProfileHubData {
     account_type: string | null
     foundry_id: string | null
     created_at: string | null
+    bio: string | null
+    phone_number: string | null
+    linkedin_url: string | null
   } | null
   providerProfile: {
     id: string
@@ -91,7 +94,7 @@ export async function getProfileHubData(): Promise<ProfileHubData | null> {
   const [profileResult, providerResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, email, full_name, role, avatar_url, account_type, foundry_id, created_at')
+      .select('id, email, full_name, role, avatar_url, account_type, foundry_id, created_at, bio, phone_number, linkedin_url')
       .eq('id', user.id)
       .single(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -395,6 +398,160 @@ export async function updateMarketplaceProfile(formData: FormData): Promise<{ su
 
   revalidatePath('/my-profile')
   return { success: true }
+}
+
+/**
+ * Update basic profile fields on the profiles table.
+ *
+ * @description Updates the user's own basic profile fields (name, bio, phone, LinkedIn).
+ * Available to ALL user roles — this is the primary profile editing action.
+ *
+ * @param {Object} data - Profile fields to update
+ * @param {string} data.fullName - User's full name (required, non-empty)
+ * @param {string | null} data.bio - User's bio/about text
+ * @param {string | null} data.phoneNumber - User's phone number
+ * @param {string | null} data.linkedinUrl - User's LinkedIn URL
+ *
+ * @returns {Promise<{success: boolean; error?: string}>}
+ *
+ * @security Requires authenticated user. Updates scoped to own profile only.
+ */
+export async function updateBasicProfile(data: {
+  fullName: string
+  bio: string | null
+  phoneNumber: string | null
+  linkedinUrl: string | null
+}): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  // AUTH: Verify user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  // VALIDATION: Name is required
+  if (!data.fullName.trim()) {
+    return { success: false, error: 'Full name is required' }
+  }
+
+  // VALIDATION: Bio length
+  if (data.bio && data.bio.length > 2000) {
+    return { success: false, error: 'Bio must be 2000 characters or less' }
+  }
+
+  // VALIDATION: LinkedIn URL format
+  if (data.linkedinUrl && !data.linkedinUrl.startsWith('http')) {
+    return { success: false, error: 'LinkedIn URL must start with https://' }
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      full_name: data.fullName.trim(),
+      bio: data.bio || null,
+      phone_number: data.phoneNumber || null,
+      linkedin_url: data.linkedinUrl || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', user.id)
+
+  if (error) {
+    console.error('[ProfileHub] Failed to update basic profile:', {
+      userId: user.id,
+      error: error.message,
+    })
+    return { success: false, error: 'Failed to update profile' }
+  }
+
+  revalidatePath('/my-profile')
+  revalidatePath('/team')
+  return { success: true }
+}
+
+/**
+ * Upload a user avatar to Supabase Storage and update the profile.
+ *
+ * @description Handles avatar upload: validates the file, uploads to the
+ * `avatars` bucket under the user's folder, and updates `profiles.avatar_url`.
+ * Replaces any existing avatar.
+ *
+ * @param {FormData} formData - Must contain a 'file' field with the image
+ * @returns {Promise<{success: boolean; error?: string; avatarUrl?: string}>}
+ *
+ * @security Requires authenticated user. Uploads scoped to own user ID folder.
+ */
+export async function uploadAvatar(formData: FormData): Promise<{
+  success: boolean
+  error?: string
+  avatarUrl?: string
+}> {
+  const supabase = await createClient()
+
+  // AUTH: Verify user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  const file = formData.get('file') as File | null
+  if (!file) return { success: false, error: 'No file provided' }
+
+  // VALIDATION: Check file size (5MB max)
+  if (file.size > 5 * 1024 * 1024) {
+    return { success: false, error: 'File must be smaller than 5MB' }
+  }
+
+  // VALIDATION: Check mime type
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+  if (!allowedTypes.includes(file.type)) {
+    return { success: false, error: 'File must be a JPEG, PNG, GIF, or WebP image' }
+  }
+
+  // Build file path: {userId}/avatar.{ext}
+  const ext = file.name.split('.').pop() || 'jpg'
+  const filePath = `${user.id}/avatar.${ext}`
+
+  // Upload to Supabase Storage (upsert to replace existing)
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(filePath, file, {
+      upsert: true,
+      contentType: file.type,
+    })
+
+  if (uploadError) {
+    console.error('[ProfileHub] Avatar upload failed:', {
+      userId: user.id,
+      error: uploadError.message,
+    })
+    return { success: false, error: 'Failed to upload avatar' }
+  }
+
+  // Get public URL
+  const { data: urlData } = supabase.storage
+    .from('avatars')
+    .getPublicUrl(filePath)
+
+  // Bust cache by appending timestamp
+  const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`
+
+  // Update profile with new avatar URL
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({
+      avatar_url: avatarUrl,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', user.id)
+
+  if (updateError) {
+    console.error('[ProfileHub] Failed to update avatar URL:', {
+      userId: user.id,
+      error: updateError.message,
+    })
+    return { success: false, error: 'Failed to update profile' }
+  }
+
+  revalidatePath('/my-profile')
+  revalidatePath('/team')
+  return { success: true, avatarUrl }
 }
 
 /**

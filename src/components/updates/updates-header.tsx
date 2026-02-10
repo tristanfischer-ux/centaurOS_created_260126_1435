@@ -58,7 +58,7 @@ export function UpdatesHeader({
             )}
           </div>
           <p className={typography.pageSubtitle}>
-            Notes, comments, and changes across all your work
+            Stay on top of everything happening in your company
           </p>
         </div>
 

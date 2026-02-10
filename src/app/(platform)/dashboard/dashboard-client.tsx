@@ -6,13 +6,10 @@ import { PriorityQueue } from '@/components/dashboard/priority-queue'
 import { ObjectiveCards } from '@/components/dashboard/objective-cards'
 import { TeamPulse } from '@/components/dashboard/team-pulse'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
-import { QuickActions } from '@/components/dashboard/quick-actions'
 import { ProductivityChart } from '@/components/dashboard/productivity-chart'
-import { StatsCards } from '@/components/dashboard/stats-cards'
 import { RecommendedForYou } from '@/components/dashboard/recommended-for-you'
-import { MarketplaceSpotlight } from '@/components/dashboard/marketplace-spotlight'
-import { WorkflowTemplatesPreview } from '@/components/dashboard/workflow-templates-preview'
 import { FoundingMemberCard } from '@/components/dashboard/founding-member-card'
+import { UnreadUpdatesCard } from '@/components/dashboard/unread-updates-card'
 
 interface User {
   id: string
@@ -21,134 +18,47 @@ interface User {
   avatarUrl: string | null
 }
 
-interface Task {
-  id: string
-  title: string
-  status: string
-  start_date: string | null
-  end_date: string | null
-  task_number?: number
-  created_at: string
-  objective?: { id: string; title: string; status: string } | null
-  creator?: { id: string; full_name: string | null } | null
-  assignee?: { id: string; full_name: string | null; avatar_url?: string | null } | null
-}
-
-interface Objective {
-  id: string
-  title: string
-  description?: string | null
-  status: string
-  progress?: number | null
-  start_date: string | null
-  end_date: string | null
-  created_at: string
-  creator?: { id: string; full_name: string | null; avatar_url?: string | null } | null
-  is_strategic_goal?: boolean | null
-}
-
-interface TeamMember {
-  id: string
-  full_name: string | null
-  avatar_url: string | null
-  role: string | null
-  status: 'online' | 'away' | 'focus' | 'offline'
-  last_seen: string | null
-  current_task: { id: string; title: string; task_number?: number } | null
-}
-
-interface Activity {
-  type: string
-  timestamp: string
-  task_id?: string
-  task_title?: string
-  task_number?: number
-  objective_id?: string
-  objective_title?: string
-  user: { id: string; full_name: string | null; avatar_url?: string | null } | null
-}
-
-interface TaskCompletionStat {
-  date: string
-  label: string
-  myTasks: number
-  teamTasks: number
-}
-
-interface Blocker {
-  id: string
-  blockers: string
-  blocker_severity: string | null
-  needs_help: boolean
-  user: { id: string; full_name: string | null; avatar_url?: string | null }
-}
-
-interface UnreadCounts {
-  direct: number
-  task: number
-  total: number
-}
-
-interface FeaturedListing {
-  id: string
-  title: string
-  description: string | null
-  category: string
-  subcategory: string
-  is_verified: boolean | null
-  image_url: string | null
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  attributes: any
-}
-
-interface WorkflowTemplate {
-  id: string
-  name: string
-  description: string
-  category: string
-  nodeCount: number
-  icon: string
-}
+// Using `any` for props that come directly from Supabase query results
+// in the server component. The generated Supabase types use union enums
+// and nullable columns that don't align 1:1 with the client interfaces.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type TaskCompletionStat = { date: string; label: string; myTasks: number; teamTasks: number }
+type UnreadCounts = { direct: number; task: number; total: number }
 
 export interface DashboardClientProps {
   user: User
   foundryId: string
-  myTasks: Task[]
-  objectives: Objective[]
-  teamPresence: TeamMember[]
-  recentActivity: Activity[]
+  myTasks: any[]
+  objectives: any[]
+  teamPresence: any[]
+  recentActivity: any[]
   taskCompletionStats: TaskCompletionStat[]
-  overdueTasks: Task[]
-  tasksDueToday: Task[]
-  tasksDueThisWeek: Task[]
-  blockers: Blocker[]
-  pendingDecisions: Task[]
+  overdueTasks: any[]
+  tasksDueToday: any[]
+  tasksDueThisWeek: any[]
+  blockers: any[]
+  pendingDecisions: any[]
   unreadCounts: UnreadCounts
   isExecutiveOrFounder: boolean
-  featuredListings: FeaturedListing[]
-  workflowTemplates: WorkflowTemplate[]
   dailyFocus: string
 }
 
 /**
- * Dashboard Client Component
- * 
- * Redesigned command center that drives action:
- * - Hero with daily focus and clickable metrics
- * - Priority queue + Quick Actions with Discovery section
- * - Objectives with contextual nudges
- * - Recommended for You (revenue driver)
- * - Marketplace Spotlight (revenue driver)
- * - Workflow Templates (revenue driver)
- * - Team pulse + Activity feed
- * - Productivity chart
- * 
- * Mobile ordering prioritises: Priority Queue -> Quick Actions -> 
- * Recommendations -> Objectives -> Marketplace -> Workflows -> Team -> Activity
+ * Dashboard Client - Streamlined command center.
+ *
+ * @description Pruned from 12+ widgets to 7 focused ones:
+ * - Hero with consolidated metrics (6 cards)
+ * - Two-column overview: PriorityQueue (left) + Objectives/Team/Recommendations (right)
+ * - My Tasks and Team Activity view tabs
+ *
+ * Removed: StatsCards (merged into Hero), QuickActions (duplicate of sidebar),
+ * MarketplaceSpotlight (double-selling), WorkflowTemplatesPreview (sidebar link),
+ * full ActivityFeed (replaced with UnreadUpdatesCard linking to Updates page).
+ *
+ * Mobile ordering: PriorityQueue first, then Objectives, Team, Recommendations.
  */
 export function DashboardClient({
   user,
-  foundryId,
   myTasks,
   objectives,
   teamPresence,
@@ -156,31 +66,25 @@ export function DashboardClient({
   taskCompletionStats,
   overdueTasks,
   tasksDueToday,
-  tasksDueThisWeek,
-  blockers,
-  pendingDecisions,
   unreadCounts,
-  isExecutiveOrFounder,
-  featuredListings,
-  workflowTemplates,
   dailyFocus,
 }: DashboardClientProps) {
   const [selectedView, setSelectedView] = useState<'overview' | 'tasks' | 'team'>('overview')
-  
+
   // Calculate key metrics
   const totalTasks = myTasks.length
-  const todayTasks = tasksDueToday.filter(t => 
-    myTasks.some(mt => mt.id === t.id)
+  const todayTasks = tasksDueToday.filter(t => myTasks.some(mt => mt.id === t.id)).length
+  const overdueCount = overdueTasks.filter(t => myTasks.some(mt => mt.id === t.id)).length
+  const activeObjectives = objectives.filter(
+    o => o.status === 'Active' || o.status === 'In_Progress'
   ).length
-  const overdueCount = overdueTasks.filter(t => 
-    myTasks.some(mt => mt.id === t.id)
+  const teamOnline = teamPresence.filter(
+    m => m.status === 'online' || m.status === 'focus'
   ).length
-  const activeObjectives = objectives.filter(o => o.status === 'Active' || o.status === 'In_Progress').length
-  const teamOnline = teamPresence.filter(m => m.status === 'online' || m.status === 'focus').length
-  
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30">
-      {/* Hero Section */}
+    <div className="min-h-screen">
+      {/* Hero Section — greeting + consolidated metrics + view tabs */}
       <DashboardHero
         userName={user.fullName}
         userRole={user.role}
@@ -189,34 +93,21 @@ export function DashboardClient({
         overdueCount={overdueCount}
         unreadCount={unreadCounts.total}
         activeObjectives={activeObjectives}
+        teamOnline={teamOnline}
+        teamTotal={teamPresence.length}
         dailyFocus={dailyFocus}
         onViewChange={setSelectedView}
         selectedView={selectedView}
       />
-      
-      {/* Main Dashboard Grid */}
-      <div className="px-4 sm:px-6 lg:px-8 pb-8 space-y-6">
-        {/* Stats Cards Row */}
-        <StatsCards
-          totalTasks={totalTasks}
-          todayTasks={todayTasks}
-          overdueCount={overdueCount}
-          activeObjectives={activeObjectives}
-          teamOnline={teamOnline}
-          teamTotal={teamPresence.length}
-          unreadMessages={unreadCounts.total}
-          isExecutiveOrFounder={isExecutiveOrFounder}
-          blockersCount={blockers.length}
-          pendingDecisionsCount={pendingDecisions.length}
-        />
-        
-        {/* Main Content Grid */}
+
+      {/* Main Dashboard Content */}
+      <div className="px-4 sm:px-6 lg:px-8 pb-8 space-y-6 mt-6">
+        {/* ─── OVERVIEW TAB ─── */}
         {selectedView === 'overview' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - Actions & Priority */}
-            <div className="lg:col-span-1 space-y-6 order-2 lg:order-1">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column — What to do */}
+            <div className="space-y-6 order-2 lg:order-1">
               <FoundingMemberCard />
-              <QuickActions foundryId={foundryId} />
               <PriorityQueue
                 myTasks={myTasks}
                 overdueTasks={overdueTasks}
@@ -225,28 +116,23 @@ export function DashboardClient({
               />
               <ProductivityChart data={taskCompletionStats} />
             </div>
-            
-            {/* Middle Column - Objectives & Recommendations */}
-            <div className="lg:col-span-1 space-y-6 order-1 lg:order-2">
+
+            {/* Right Column — Awareness & growth */}
+            <div className="space-y-6 order-1 lg:order-2">
+              <ObjectiveCards objectives={objectives} />
+              <TeamPulse teamMembers={teamPresence} />
               <RecommendedForYou
                 objectives={objectives}
                 teamSize={teamPresence.length}
                 taskCount={totalTasks}
                 hasWorkflows={false}
               />
-              <ObjectiveCards objectives={objectives} />
-            </div>
-            
-            {/* Right Column - Discovery (Revenue) & Team */}
-            <div className="lg:col-span-1 space-y-6 order-3">
-              <MarketplaceSpotlight featuredListings={featuredListings} />
-              <WorkflowTemplatesPreview templates={workflowTemplates} />
-              <TeamPulse teamMembers={teamPresence} />
-              <ActivityFeed activities={recentActivity} />
+              <UnreadUpdatesCard unreadCount={unreadCounts.total} />
             </div>
           </div>
         )}
-        
+
+        {/* ─── MY TASKS TAB ─── */}
         {selectedView === 'tasks' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <PriorityQueue
@@ -261,7 +147,8 @@ export function DashboardClient({
             </div>
           </div>
         )}
-        
+
+        {/* ─── TEAM ACTIVITY TAB ─── */}
         {selectedView === 'team' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <TeamPulse teamMembers={teamPresence} expanded />

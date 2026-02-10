@@ -53,14 +53,14 @@ export function AdminDashboard({ enrollments, foundryId, userRole }: AdminDashbo
     <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="h-1 w-8 bg-international-orange rounded-full" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="h-8 w-1 bg-international-orange rounded-full" />
+            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
+              Apprenticeship Management
+            </h1>
           </div>
-          <h1 className="text-2xl font-display font-medium text-foreground">
-            Apprenticeship Management
-          </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm font-medium pl-4">
             Manage apprenticeship programmes and track progress
           </p>
         </div>

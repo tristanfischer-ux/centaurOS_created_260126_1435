@@ -16,7 +16,7 @@ import { ApprenticePoolBrowser } from "@/components/guild/ApprenticePoolBrowser"
 import { ProjectAssignmentsList } from "@/components/guild/ProjectAssignmentsList"
 import { GuildTabs } from "./guild-tabs"
 import { getMyAssignments } from "@/actions/project-assignments"
-import { getGuildEvents, type GuildEvent } from "@/actions/guild-events"
+import type { GuildEvent } from "@/actions/guild-events"
 import { formatDistanceToNow } from "date-fns"
 
 interface GuildPageContentProps {
@@ -30,6 +30,8 @@ interface GuildPageContentProps {
         email: string | null
         foundry_name?: string
     }[]
+    /** Events pre-filtered server-side (executive-only events removed for non-executives) */
+    initialEvents: GuildEvent[]
 }
 
 interface MyAssignment {
@@ -42,36 +44,28 @@ interface MyAssignment {
     assignedByName: string
 }
 
-export function GuildPageContent({ isManager, isApprentice, isExecutive, members }: GuildPageContentProps) {
+export function GuildPageContent({ isManager, isApprentice, isExecutive, members, initialEvents }: GuildPageContentProps) {
     const [myAssignments, setMyAssignments] = useState<MyAssignment[]>([])
-    const [events, setEvents] = useState<GuildEvent[]>([])
-    const [loading, setLoading] = useState(true)
+    const [loading, setLoading] = useState(isApprentice)
 
     useEffect(() => {
-        const loadData = async () => {
+        if (!isApprentice) return
+        
+        const loadAssignments = async () => {
             setLoading(true)
             try {
-                // Load events for everyone
-                const eventsResult = await getGuildEvents({ upcoming: true, limit: 10 })
-                if (eventsResult.data) {
-                    setEvents(eventsResult.data)
-                }
-                
-                // Load assignments for apprentices
-                if (isApprentice) {
-                    const result = await getMyAssignments()
-                    if (result.assignments) {
-                        setMyAssignments(result.assignments)
-                    }
+                const result = await getMyAssignments()
+                if (result.assignments) {
+                    setMyAssignments(result.assignments)
                 }
             } catch (error) {
-                console.error('[Guild] Failed to load data:', error instanceof Error ? error.message : 'Unknown error')
+                console.error('[Guild] Failed to load assignments:', error instanceof Error ? error.message : 'Unknown error')
             } finally {
                 setLoading(false)
             }
         }
         
-        loadData()
+        loadAssignments()
     }, [isApprentice])
 
     // Manager view - can browse pool and manage assignments
@@ -117,7 +111,7 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
 
                     <TabsContent value="community">
                         <GuildTabs 
-                            events={events} 
+                            events={initialEvents} 
                             members={members} 
                             isExecutive={isExecutive} 
                         />
@@ -266,7 +260,7 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
 
                     <TabsContent value="community">
                         <GuildTabs 
-                            events={events} 
+                            events={initialEvents} 
                             members={members} 
                             isExecutive={isExecutive} 
                         />

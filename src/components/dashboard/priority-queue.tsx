@@ -22,7 +22,11 @@ interface PriorityQueueProps {
 }
 
 /**
- * Smart Priority Queue - AI-suggested next tasks with urgency indicators
+ * Priority Queue - Next tasks ranked by urgency and due date.
+ *
+ * @description Shows up to 8 tasks sorted by a priority score derived from
+ * overdue status, due date proximity, and workflow state. Urgency badges
+ * give users an at-a-glance sense of what needs attention first.
  */
 export function PriorityQueue({
   myTasks,
@@ -41,16 +45,16 @@ export function PriorityQueue({
     .slice(0, 8) // Show top 8
   
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-orange-50/50 to-transparent">
+      <div className="p-6 border-b bg-gradient-to-r from-orange-50/50 to-transparent">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-international-orange/10 rounded-lg">
               <Flame className="w-5 h-5 text-international-orange" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Smart Priority Queue</h2>
+              <h2 className="text-lg font-semibold text-foreground">Priority Queue</h2>
               <p className="text-sm text-muted-foreground">Your most important tasks right now</p>
             </div>
           </div>
@@ -58,11 +62,11 @@ export function PriorityQueue({
       </div>
       
       {/* Task List */}
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-muted">
         {prioritizedTasks.length === 0 ? (
           <div className="p-8 text-center">
-            <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Clock className="w-8 h-8 text-green-600" />
+            <div className="w-16 h-16 bg-status-success-light rounded-full flex items-center justify-center mx-auto mb-3">
+              <Clock className="w-8 h-8 text-status-success" />
             </div>
             <p className="text-sm text-muted-foreground">
               All caught up! No urgent tasks at the moment.
@@ -72,17 +76,17 @@ export function PriorityQueue({
           prioritizedTasks.map((task, index) => (
             <Link
               key={task.id}
-              href={`/tasks/${task.id}`}
-              className="block p-4 hover:bg-slate-50 transition-colors group"
+              href={`/new-tasks?taskId=${task.id}`}
+              className="block p-4 hover:bg-muted/50 transition-colors group"
             >
               <div className="flex items-start gap-3">
                 {/* Priority Badge */}
                 <div className={cn(
                   "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm",
-                  index === 0 ? "bg-red-100 text-red-700" :
-                  index === 1 ? "bg-orange-100 text-orange-700" :
-                  index === 2 ? "bg-amber-100 text-amber-700" :
-                  "bg-slate-100 text-slate-600"
+                  index === 0 ? "bg-status-error-light text-destructive" :
+                  index === 1 ? "bg-international-orange/10 text-international-orange" :
+                  index === 2 ? "bg-status-warning-light text-status-warning-dark" :
+                  "bg-muted text-muted-foreground"
                 )}>
                   {index + 1}
                 </div>
@@ -99,7 +103,7 @@ export function PriorityQueue({
                         </p>
                       )}
                     </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-international-orange transition-colors flex-shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-international-orange transition-colors flex-shrink-0" />
                   </div>
                   
                   <div className="flex items-center gap-2 mt-2">
@@ -120,9 +124,9 @@ export function PriorityQueue({
       
       {/* Footer */}
       {prioritizedTasks.length > 0 && (
-        <div className="p-4 bg-slate-50 border-t border-slate-100">
+        <div className="p-4 bg-muted/50 border-t">
           <Link
-            href="/tasks"
+            href="/new-tasks"
             className="text-sm text-international-orange hover:text-orange-700 font-medium flex items-center gap-1 group w-fit"
           >
             View all tasks
@@ -136,10 +140,10 @@ export function PriorityQueue({
 
 function UrgencyBadge({ urgency }: { urgency: 'critical' | 'high' | 'medium' | 'low' }) {
   const styles = {
-    critical: 'bg-red-100 text-red-700 border-red-200',
-    high: 'bg-orange-100 text-orange-700 border-orange-200',
-    medium: 'bg-amber-100 text-amber-700 border-amber-200',
-    low: 'bg-slate-100 text-slate-600 border-slate-200'
+    critical: 'bg-status-error-light text-destructive border-destructive/20',
+    high: 'bg-international-orange/10 text-international-orange border-international-orange/20',
+    medium: 'bg-status-warning-light text-status-warning-dark border-status-warning/20',
+    low: 'bg-muted text-muted-foreground border-muted'
   }
   
   const labels = {

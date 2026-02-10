@@ -39,13 +39,13 @@ export function ObjectiveCards({ objectives }: ObjectiveCardsProps) {
   ).slice(0, 3) // Show top 3
   
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-blue-50/50 to-transparent">
+      <div className="p-6 border-b bg-gradient-to-r from-status-info-light/50 to-transparent">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Target className="w-5 h-5 text-blue-600" />
+            <div className="p-2 bg-status-info-light rounded-lg">
+              <Target className="w-5 h-5 text-status-info" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-foreground">Active Objectives</h2>
@@ -59,8 +59,8 @@ export function ObjectiveCards({ objectives }: ObjectiveCardsProps) {
       <div className="p-6 space-y-4">
         {activeObjectives.length === 0 ? (
           <div className="text-center py-8">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Target className="w-8 h-8 text-slate-400" />
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
+              <Target className="w-8 h-8 text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground mb-4">
               No active objectives yet
@@ -75,7 +75,7 @@ export function ObjectiveCards({ objectives }: ObjectiveCardsProps) {
               <span className="text-muted-foreground hidden sm:inline">&middot;</span>
               <Link
                 href="/inspiration"
-                className="inline-flex items-center justify-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                className="inline-flex items-center justify-center gap-1 text-sm text-status-info hover:text-status-info-dark font-medium"
               >
                 <Lightbulb className="w-3.5 h-3.5" />
                 Browse objective packs
@@ -91,7 +91,7 @@ export function ObjectiveCards({ objectives }: ObjectiveCardsProps) {
       
       {/* Footer */}
       {activeObjectives.length > 0 && (
-        <div className="p-4 bg-slate-50 border-t border-slate-100">
+        <div className="p-4 bg-muted/50 border-t">
           <Link
             href="/new-objectives"
             className="text-sm text-international-orange hover:text-orange-700 font-medium flex items-center gap-1 group w-fit"
@@ -113,10 +113,10 @@ function ObjectiveCard({ objective }: { objective: Objective }) {
   const nudge = getObjectiveNudge(objective, progress, daysRemaining)
   
   return (
-    <div className="rounded-xl border border-slate-200 overflow-hidden">
+    <div className="rounded-xl border overflow-hidden">
       <Link
         href={`/objectives/${objective.id}`}
-        className="block p-4 hover:bg-slate-50/50 transition-all duration-200 group"
+        className="block p-4 hover:bg-muted/30 transition-all duration-200 group"
       >
         <div className="space-y-3">
           {/* Title and Progress */}
@@ -124,7 +124,7 @@ function ObjectiveCard({ objective }: { objective: Objective }) {
             <h3 className="text-sm font-semibold text-foreground group-hover:text-international-orange transition-colors line-clamp-2 flex-1">
               {objective.title}
             </h3>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-international-orange transition-colors flex-shrink-0" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-international-orange transition-colors flex-shrink-0" />
           </div>
           
           {/* Progress Bar */}
@@ -133,22 +133,22 @@ function ObjectiveCard({ objective }: { objective: Objective }) {
               <span className="text-muted-foreground">Progress</span>
               <span className={cn(
                 "font-bold",
-                progress >= 75 ? "text-green-600" :
-                progress >= 50 ? "text-blue-600" :
-                progress >= 25 ? "text-amber-600" :
-                "text-slate-600"
+                progress >= 75 ? "text-status-success" :
+                progress >= 50 ? "text-status-info" :
+                progress >= 25 ? "text-status-warning" :
+                "text-muted-foreground"
               )}>
                 {progress}%
               </span>
             </div>
             <Progress 
               value={progress} 
-              className="h-2"
-              indicatorClassName={cn(
-                progress >= 75 ? "bg-green-500" :
-                progress >= 50 ? "bg-blue-500" :
-                progress >= 25 ? "bg-amber-500" :
-                "bg-slate-400"
+              className={cn(
+                "h-2",
+                progress >= 75 ? "[&>div]:bg-status-success" :
+                progress >= 50 ? "[&>div]:bg-status-info" :
+                progress >= 25 ? "[&>div]:bg-status-warning" :
+                "[&>div]:bg-muted-foreground"
               )}
             />
           </div>

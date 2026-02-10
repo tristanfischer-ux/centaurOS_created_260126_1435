@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { GuildPageContent } from './guild-page-content'
+import { getGuildEvents } from '@/actions/guild-events'
 
 export default async function GuildPage() {
     const supabase = await createClient()
@@ -32,22 +33,34 @@ export default async function GuildPage() {
     }
 
     // Fetch guild-relevant members for the network tab
-    // Filter to Apprentice, Executive, and Founder roles (guild participants)
     const { data: members } = await supabase
         .from('profiles')
-        .select('id, full_name, role, email')
+        .select('id, full_name, role, email, foundry_id')
         .in('role', ['Apprentice', 'Executive', 'Founder'])
         .order('full_name', { ascending: true })
         .limit(50)
 
-    // Map members with foundry name (simplified for now)
+    // Resolve foundry names via a separate query to avoid FK join issues
+    const foundryIds = [...new Set((members || []).map(m => m.foundry_id).filter(Boolean))]
+    const { data: foundries } = foundryIds.length > 0
+        ? await supabase.from('foundries').select('id, name').in('id', foundryIds)
+        : { data: [] }
+    const foundryNameMap = new Map((foundries || []).map(f => [f.id, f.name]))
+
     const membersWithFoundry = (members || []).map(m => ({
         id: m.id,
         full_name: m.full_name,
         role: m.role,
         email: m.email,
-        foundry_name: undefined
+        foundry_name: m.foundry_id ? foundryNameMap.get(m.foundry_id) : undefined,
     }))
+
+    // SECURITY: Fetch events server-side and filter executive-only events
+    // before passing to client. Non-executives never receive executive-only event data.
+    const eventsResult = await getGuildEvents({ upcoming: true, limit: 10 })
+    const filteredEvents = (eventsResult.data || []).filter(
+        e => !e.is_executive_only || isExecutive
+    )
 
     return (
         <GuildPageContent 
@@ -55,6 +68,7 @@ export default async function GuildPage() {
             isApprentice={isApprentice} 
             isExecutive={isExecutive}
             members={membersWithFoundry}
+            initialEvents={filteredEvents}
         />
     )
 }

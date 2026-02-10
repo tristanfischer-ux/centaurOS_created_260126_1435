@@ -67,13 +67,13 @@ export function RecommendedForYou({
   const displayed = recommendations.slice(0, 3)
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-amber-50/50 to-transparent">
+      <div className="p-6 border-b bg-gradient-to-r from-status-warning-light/50 to-transparent">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-lg">
-              <Sparkles className="w-5 h-5 text-amber-600" />
+            <div className="p-2 bg-status-warning-light rounded-lg">
+              <Sparkles className="w-5 h-5 text-status-warning-dark" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-foreground">Recommended for You</h2>
@@ -99,7 +99,7 @@ function RecommendationCard({ recommendation }: { recommendation: Recommendation
   return (
     <Link
       href={recommendation.href}
-      className="group flex items-start gap-4 p-4 rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-md transition-all duration-200"
+      className="group flex items-start gap-4 p-4 rounded-xl border hover:shadow-md transition-all duration-200"
     >
       {/* Icon */}
       <div className={cn(
@@ -126,7 +126,7 @@ function RecommendationCard({ recommendation }: { recommendation: Recommendation
         </span>
       </div>
 
-      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-international-orange transition-colors flex-shrink-0 mt-1" />
+      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-international-orange transition-colors flex-shrink-0 mt-1" />
     </Link>
   )
 }

@@ -159,7 +159,7 @@ export function UpdatesThreadPanel({
   const isTask = source.type === 'task'
   const isConversation = source.type === 'conversation'
   const linkHref = isTask
-    ? `/tasks?taskId=${source.id}`
+    ? `/new-tasks?taskId=${source.id}`
     : isConversation
       ? `/updates`
       : `/objectives`

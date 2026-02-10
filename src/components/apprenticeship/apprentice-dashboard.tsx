@@ -16,15 +16,13 @@ import {
   AlertCircle,
   CheckCircle2,
   BookOpen,
-  Calendar,
-  MessageSquare
+  Calendar
 } from 'lucide-react'
 import { OTJTLoggerDialog } from './otjt-logger-dialog'
 import { ModuleProgressList } from './module-progress-list'
 import { SkillsGapChart } from './skills-gap-chart'
 import { DocumentSigningPanel } from './document-signing-panel'
 import Link from 'next/link'
-import { toast } from 'sonner'
 import type { Enrollment, WeeklySummary } from '@/types/apprenticeship'
 
 interface ApprenticeDashboardProps {
@@ -101,8 +99,13 @@ export function ApprenticeDashboard({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="h-1 w-8 bg-international-orange rounded-full" />
+          <div className="flex items-center gap-3 mb-1">
+            <div className="h-8 w-1 bg-international-orange rounded-full" />
+            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
+              Your Apprenticeship
+            </h1>
+          </div>
+          <div className="flex items-center gap-2 mt-2 pl-4">
             <Badge variant="secondary" className="text-xs">
               <GraduationCap className="h-3 w-3 mr-1" />
               {enrollment.programme?.title} • Level {enrollment.programme?.level}
@@ -113,9 +116,6 @@ export function ApprenticeDashboard({
               </Badge>
             )}
           </div>
-          <h1 className="text-2xl font-display font-medium text-foreground">
-            Your Apprenticeship
-          </h1>
           <p className="text-muted-foreground">
             {daysRemaining > 0 ? `${daysRemaining} days remaining` : 'Programme ending soon'} • 
             Started {new Date(enrollment.start_date).toLocaleDateString()}
@@ -260,14 +260,9 @@ export function ApprenticeDashboard({
             </CardHeader>
             <CardContent>
               <ModuleProgressList 
-                modules={moduleProgress.modules.slice(0, 5)} 
+                modules={moduleProgress.modules} 
                 enrollmentId={enrollment.id}
               />
-              {moduleProgress.modules.length > 5 && (
-                <Button variant="ghost" className="w-full mt-4">
-                  View All {moduleProgress.summary.total} Modules
-                </Button>
-              )}
             </CardContent>
           </Card>
           
@@ -348,9 +343,6 @@ export function ApprenticeDashboard({
                     <p className="font-medium truncate">{enrollment.senior_mentor.full_name}</p>
                     <p className="text-xs text-muted-foreground">Senior Mentor</p>
                   </div>
-                  <Button size="sm" variant="ghost" aria-label="Message mentor">
-                    <MessageSquare className="h-4 w-4" />
-                  </Button>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No senior mentor assigned yet</p>
@@ -368,9 +360,6 @@ export function ApprenticeDashboard({
                     <p className="font-medium truncate">{enrollment.workplace_buddy.full_name}</p>
                     <p className="text-xs text-muted-foreground">Workplace Buddy</p>
                   </div>
-                  <Button size="sm" variant="ghost" aria-label="Message buddy">
-                    <MessageSquare className="h-4 w-4" />
-                  </Button>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No workplace buddy assigned yet</p>
@@ -393,14 +382,6 @@ export function ApprenticeDashboard({
               <Button variant="outline" className="w-full justify-start" onClick={() => setDocumentsOpen(true)}>
                 <FileText className="h-4 w-4 mr-2" />
                 View Documents
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start"
-                onClick={() => toast.info("OTJT log history coming soon.")}
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                OTJT Log History
               </Button>
             </CardContent>
           </Card>

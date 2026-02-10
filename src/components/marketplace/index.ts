@@ -1,6 +1,2 @@
 export { MarketCard } from './market-card'
 export { MarketplaceListingDialog } from './marketplace-listing-dialog'
-export { ComparisonBar } from './comparison-bar'
-export { ComparisonModal } from './comparison-modal'
-export { MarketplaceFilters } from './MarketplaceFilters'
-export { MarketplaceResultsList } from './MarketplaceResultsList'

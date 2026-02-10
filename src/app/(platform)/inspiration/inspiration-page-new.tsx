@@ -323,6 +323,12 @@ export function InspirationPageNew({
   const ctx = foundryContext || null
   const hasContext = !!(ctx?.stage || ctx?.industry || (ctx?.gapCategories && ctx.gapCategories.length > 0))
 
+  // Only show manufacturing-specific Techniques tab when industry is relevant
+  const MANUFACTURING_INDUSTRIES = ['manufacturing', 'industrial', 'engineering', 'automotive', 'aerospace', 'hardware']
+  const isManufacturingIndustry = ctx?.industry
+    ? MANUFACTURING_INDUSTRIES.some(mi => ctx.industry!.toLowerCase().includes(mi))
+    : false
+
   // Context-aware recommendations with "why" tags
   const recommendedPacks = useMemo(
     () => getContextAwareRecommendations(packs, savedPackIds, ctx),
@@ -334,11 +340,10 @@ export function InspirationPageNew({
     [packs, savedPackIds],
   )
 
-  // Popular packs (all packs sorted by task count -- proxy for popularity)
+  // All packs sorted by task count (most comprehensive first)
   const popularPacks = useMemo(() => {
     return [...packs]
       .sort((a, b) => (b.items?.length || 0) - (a.items?.length || 0))
-      .slice(0, 12)
   }, [packs])
 
   // "By Need" grouped packs
@@ -459,6 +464,7 @@ export function InspirationPageNew({
         savedCount={savedPackIds.size}
         techniquesCount={ALL_TECHNIQUES.length}
         gapCount={ctx?.gapCategories.length}
+        showTechniques={isManufacturingIndustry}
       />
 
       {/* ================================================================== */}
@@ -741,16 +747,16 @@ export function InspirationPageNew({
       {activeTab === 'techniques' && <TechniquesExplorer />}
 
       {/* ================================================================== */}
-      {/* POPULAR tab                                                        */}
+      {/* ALL PACKS tab                                                      */}
       {/* ================================================================== */}
       {activeTab === 'popular' && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <TrendingUp className="h-5 w-5 text-status-success" />
-            <h2 className="text-lg font-semibold">Popular Packs</h2>
+            <h2 className="text-lg font-semibold">All Packs</h2>
           </div>
           <p className="text-sm text-muted-foreground mb-5">
-            The most comprehensive packs used across the platform.
+            Browse all available objective packs, sorted by comprehensiveness.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">

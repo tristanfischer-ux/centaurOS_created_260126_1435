@@ -39,6 +39,8 @@ interface CategoryTabsProps {
   techniquesCount?: number
   /** Number of identified gaps to display as a badge on "By Need" */
   gapCount?: number
+  /** Whether to show the manufacturing-specific Techniques tab */
+  showTechniques?: boolean
 }
 
 export function CategoryTabs({
@@ -50,6 +52,7 @@ export function CategoryTabs({
   savedCount,
   techniquesCount,
   gapCount,
+  showTechniques = false,
 }: CategoryTabsProps) {
   const tabs: Tab[] = [
     {
@@ -77,18 +80,19 @@ export function CategoryTabs({
       iconColor: 'text-chart-5',
       activeClasses: 'bg-chart-5/10 text-chart-5 border-chart-5',
     },
-    {
-      id: 'techniques',
+    // Only show manufacturing-specific Techniques tab when relevant
+    ...(showTechniques ? [{
+      id: 'techniques' as TabId,
       label: 'Techniques',
       icon: Factory,
       count: techniquesCount,
       iconColor: 'text-international-orange',
       activeClasses:
         'bg-international-orange/10 text-international-orange border-international-orange',
-    },
+    }] : []),
     {
       id: 'popular',
-      label: 'Popular',
+      label: 'All Packs',
       icon: TrendingUp,
       count: popularCount,
       iconColor: 'text-status-success',

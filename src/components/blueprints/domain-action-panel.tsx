@@ -454,7 +454,7 @@ export function DomainActionPanel({
                 label="Expert Review"
               />
               <ActionButton
-                href={`/tasks?prefill=${encodeURIComponent(`Research: ${domain.name}`)}`}
+                href={`/new-tasks?prefill=${encodeURIComponent(`Research: ${domain.name}`)}`}
                 icon={CheckSquare}
                 iconColor="text-electric-blue"
                 label="Add Task"
