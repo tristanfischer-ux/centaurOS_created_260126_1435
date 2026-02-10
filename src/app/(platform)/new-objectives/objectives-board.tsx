@@ -8,8 +8,10 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import {
   LayoutGrid, GitBranch, GanttChartSquare, Search, Target, X, Loader2,
-  ChevronRight, ChevronDown, Flag,
+  ChevronRight, ChevronDown, Flag, AlertTriangle,
 } from 'lucide-react'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Label } from '@/components/ui/label'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -100,6 +102,7 @@ export function ObjectivesBoard({
   const [showSearch, setShowSearch] = useState(false)
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1400)
   const [objectiveToDelete, setObjectiveToDelete] = useState<string | null>(null)
+  const [deleteChildAction, setDeleteChildAction] = useState<'keep' | 'cascade'>('keep')
   const [objectiveToEdit, setObjectiveToEdit] = useState<ObjectiveWithTasks | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -181,18 +184,25 @@ export function ObjectivesBoard({
     setSelectedTaskId(prev => prev === taskId ? null : taskId)
   }, [])
 
+  // Count children of the objective being deleted (for the confirmation dialog)
+  const childrenOfDeleteTarget = useMemo(() => {
+    if (!objectiveToDelete) return []
+    return objectives.filter(o => o.parent_objective_id === objectiveToDelete)
+  }, [objectiveToDelete, objectives])
+
   const handleDelete = useCallback(async () => {
     if (!objectiveToDelete) return
 
     setIsDeleting(true)
     try {
-      const result = await deleteObjective(objectiveToDelete)
+      const result = await deleteObjective(objectiveToDelete, deleteChildAction)
 
       if (result?.error) {
         toast.error(result.error)
       } else {
         toast.success('Objective deleted')
         setObjectiveToDelete(null)
+        setDeleteChildAction('keep')
         // Clear selection if deleted objective was selected
         if (selectedId === objectiveToDelete) {
           setSelectedId(null)
@@ -203,7 +213,7 @@ export function ObjectivesBoard({
     } finally {
       setIsDeleting(false)
     }
-  }, [objectiveToDelete, selectedId])
+  }, [objectiveToDelete, selectedId, deleteChildAction])
 
   // Find the selected task and its parent objective
   const selectedTaskData: TaskWithData | null = useMemo(() => {
@@ -221,13 +231,53 @@ export function ObjectivesBoard({
   return (
     <div className="space-y-6">
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!objectiveToDelete} onOpenChange={(open) => !open && setObjectiveToDelete(null)}>
+      <AlertDialog open={!!objectiveToDelete} onOpenChange={(open) => {
+        if (!open) {
+          setObjectiveToDelete(null)
+          setDeleteChildAction('keep')
+        }
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Objective?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this objective and all associated tasks.
-              This action cannot be undone.
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <p>
+                  This will permanently delete this objective and its tasks.
+                  This action cannot be undone.
+                </p>
+
+                {childrenOfDeleteTarget.length > 0 && (
+                  <div className="rounded-md border border-status-warning bg-status-warning-light p-3 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-status-warning-dark mt-0.5 shrink-0" />
+                      <p className="text-sm text-status-warning-dark font-medium">
+                        This objective has {childrenOfDeleteTarget.length} sub-objective{childrenOfDeleteTarget.length > 1 ? 's' : ''}.
+                        What should happen to {childrenOfDeleteTarget.length > 1 ? 'them' : 'it'}?
+                      </p>
+                    </div>
+
+                    <RadioGroup
+                      value={deleteChildAction}
+                      onValueChange={(v) => setDeleteChildAction(v as 'keep' | 'cascade')}
+                      className="space-y-2"
+                    >
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem value="keep" id="keep-children" className="mt-0.5" />
+                        <Label htmlFor="keep-children" className="text-sm font-normal leading-snug cursor-pointer">
+                          <span className="font-medium">Keep them</span> — sub-objectives become standalone top-level objectives
+                        </Label>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem value="cascade" id="cascade-children" className="mt-0.5" />
+                        <Label htmlFor="cascade-children" className="text-sm font-normal leading-snug cursor-pointer">
+                          <span className="font-medium">Delete them too</span> — permanently remove all {childrenOfDeleteTarget.length} sub-objective{childrenOfDeleteTarget.length > 1 ? 's' : ''} and their tasks
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

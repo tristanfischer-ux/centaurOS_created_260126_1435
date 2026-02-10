@@ -5,7 +5,7 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { useDebounce } from "@/hooks/useDebounce"
 import { RefreshButton } from "@/components/RefreshButton"
 import { SearchInput } from "@/components/ui/search-input"
-import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2, Plus, FileText, Pencil, Lock, Map } from "lucide-react"
+import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2, Plus, FileText, Pencil, Lock, Map, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -29,6 +29,8 @@ import { CreateTaskDialog } from "@/app/(platform)/tasks/create-task-dialog"
 import { FullTaskView } from "@/components/tasks/full-task-view"
 import { getStatusBadgeClass } from "@/lib/status-colors"
 import { ObjectivesAnalytics } from "@/components/objectives/objectives-analytics"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
 
 
 
@@ -59,6 +61,7 @@ interface Objective {
     is_private?: boolean
     creator_id?: string
     is_strategic_goal?: boolean
+    parent_objective_id?: string | null
 }
 
 interface ObjectivesListViewProps {
@@ -86,6 +89,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [objectiveToDelete, setObjectiveToDelete] = useState<string | null>(null)
+    const [deleteChildAction, setDeleteChildAction] = useState<'keep' | 'cascade'>('keep')
     const [objectiveToEdit, setObjectiveToEdit] = useState<Objective | null>(null)
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false)
     const [isDeletingSingle, setIsDeletingSingle] = useState(false)
@@ -112,19 +116,26 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
     
     const isSearching = debouncedQuery.trim() !== ''
 
+    // Count children of the objective being deleted (for the confirmation dialog)
+    const childrenOfDeleteTarget = useMemo(() => {
+        if (!objectiveToDelete) return []
+        return objectives.filter(o => o.parent_objective_id === objectiveToDelete)
+    }, [objectiveToDelete, objectives])
+
     // Handle single deletion
     const handleDeleteSingle = async () => {
         if (!objectiveToDelete) return
 
         setIsDeletingSingle(true)
         try {
-            const result = await deleteObjective(objectiveToDelete)
+            const result = await deleteObjective(objectiveToDelete, deleteChildAction)
 
             if (result?.error) {
                 toast.error(result.error)
             } else {
                 toast.success("Objective deleted")
                 setObjectiveToDelete(null)
+                setDeleteChildAction('keep')
                 // Remove from selection if it was there
                 const newSelected = new Set(selectedIds)
                 newSelected.delete(objectiveToDelete)
@@ -243,13 +254,53 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
             <ObjectivesAnalytics objectives={objectives} />
 
             {/* Hoisted Delete Dialog (Single) */}
-            <AlertDialog open={!!objectiveToDelete} onOpenChange={(open) => !open && setObjectiveToDelete(null)}>
+            <AlertDialog open={!!objectiveToDelete} onOpenChange={(open) => {
+                if (!open) {
+                    setObjectiveToDelete(null)
+                    setDeleteChildAction('keep')
+                }
+            }}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete Objective?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently delete this objective and all associated tasks.
-                            This action cannot be undone.
+                        <AlertDialogDescription asChild>
+                            <div className="space-y-4">
+                                <p>
+                                    This will permanently delete this objective and its tasks.
+                                    This action cannot be undone.
+                                </p>
+
+                                {childrenOfDeleteTarget.length > 0 && (
+                                    <div className="rounded-md border border-status-warning bg-status-warning-light p-3 space-y-3">
+                                        <div className="flex items-start gap-2">
+                                            <AlertTriangle className="h-4 w-4 text-status-warning-dark mt-0.5 shrink-0" />
+                                            <p className="text-sm text-status-warning-dark font-medium">
+                                                This objective has {childrenOfDeleteTarget.length} sub-objective{childrenOfDeleteTarget.length > 1 ? 's' : ''}.
+                                                What should happen to {childrenOfDeleteTarget.length > 1 ? 'them' : 'it'}?
+                                            </p>
+                                        </div>
+
+                                        <RadioGroup
+                                            value={deleteChildAction}
+                                            onValueChange={(v) => setDeleteChildAction(v as 'keep' | 'cascade')}
+                                            className="space-y-2"
+                                        >
+                                            <div className="flex items-start gap-2">
+                                                <RadioGroupItem value="keep" id="list-keep-children" className="mt-0.5" />
+                                                <Label htmlFor="list-keep-children" className="text-sm font-normal leading-snug cursor-pointer">
+                                                    <span className="font-medium">Keep them</span> — sub-objectives become standalone top-level objectives
+                                                </Label>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <RadioGroupItem value="cascade" id="list-cascade-children" className="mt-0.5" />
+                                                <Label htmlFor="list-cascade-children" className="text-sm font-normal leading-snug cursor-pointer">
+                                                    <span className="font-medium">Delete them too</span> — permanently remove all {childrenOfDeleteTarget.length} sub-objective{childrenOfDeleteTarget.length > 1 ? 's' : ''} and their tasks
+                                                </Label>
+                                            </div>
+                                        </RadioGroup>
+                                    </div>
+                                )}
+                            </div>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -539,18 +590,22 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                                         </Badge>
 
                                                         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                                                            {task.assignee?.full_name && (
-                                                                <div className="flex items-center gap-1 hidden sm:flex">
-                                                                    <UserAvatar 
-                                                                        name={task.assignee.full_name} 
-                                                                        role={task.assignee.role} 
-                                                                        size="xs" 
-                                                                    />
-                                                                    <span className="text-xs text-muted-foreground max-w-[80px] sm:max-w-[120px] truncate">
-                                                                        {task.assignee.full_name}
-                                                                    </span>
-                                                                </div>
-                                                            )}
+                                                            {/* Prefer task_assignees over legacy assignee_id */}
+                                                            {(() => {
+                                                                const primary = task.assignees?.length > 0 ? task.assignees[0] : task.assignee
+                                                                return primary?.full_name ? (
+                                                                    <div className="flex items-center gap-1 hidden sm:flex">
+                                                                        <UserAvatar 
+                                                                            name={primary.full_name} 
+                                                                            role={primary.role} 
+                                                                            size="xs" 
+                                                                        />
+                                                                        <span className="text-xs text-muted-foreground max-w-[80px] sm:max-w-[120px] truncate">
+                                                                            {primary.full_name}
+                                                                        </span>
+                                                                    </div>
+                                                                ) : null
+                                                            })()}
 
                                                             {/* Meta Icons */}
                                                             <div className="flex items-center gap-1 sm:gap-2">

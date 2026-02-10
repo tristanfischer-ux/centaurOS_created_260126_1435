@@ -377,7 +377,25 @@ export async function updateObjective(
     revalidatePath(`/objectives/${objectiveId}`)
     return { success: true }
 }
-export async function deleteObjective(id: string) {
+/**
+ * Deletes an objective, handling child objectives based on the specified action.
+ *
+ * @description When an objective has children (sub-objectives that reference it via
+ * parent_objective_id), the caller must specify how to handle them. Without this,
+ * the database foreign key constraint would block the delete.
+ *
+ * @param id - The objective ID to delete
+ * @param childAction - What to do with child objectives:
+ *   'keep' = unlink children (set parent_objective_id to null, they become top-level)
+ *   'cascade' = delete children recursively along with the parent
+ *   Defaults to 'keep' for safety.
+ *
+ * @returns Success or error result
+ *
+ * @security Requires authenticated user who is the creator or has Executive/Founder role
+ * @audit Foundry isolation enforced — cannot delete across foundries
+ */
+export async function deleteObjective(id: string, childAction: 'keep' | 'cascade' = 'keep') {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -416,14 +434,52 @@ export async function deleteObjective(id: string) {
         return { error: 'Unauthorized: Only the creator or admins can delete this objective' }
     }
 
-    // 2. Perform delete - RLS handles authorization
+    // 2. Handle child objectives before deleting
+    if (childAction === 'cascade') {
+        // Recursively find all descendant objectives to delete in one pass
+        const { data: children } = await supabase
+            .from('objectives')
+            .select('id')
+            .eq('parent_objective_id', id)
+
+        if (children && children.length > 0) {
+            // Recurse into each child (depth-first) so leaves are deleted before parents
+            for (const child of children) {
+                const result = await deleteObjective(child.id, 'cascade')
+                if (result?.error) {
+                    console.error('[ObjectiveService] Failed to cascade-delete child:', {
+                        parentId: id,
+                        childId: child.id,
+                        error: result.error,
+                    })
+                    return { error: `Failed to delete sub-objective: ${result.error}` }
+                }
+            }
+        }
+    } else {
+        // 'keep' — unlink children so they become top-level objectives
+        const { error: unlinkError } = await supabase
+            .from('objectives')
+            .update({ parent_objective_id: null })
+            .eq('parent_objective_id', id)
+
+        if (unlinkError) {
+            console.error('[ObjectiveService] Failed to unlink children before delete:', {
+                id,
+                error: unlinkError.message,
+            })
+            return { error: 'Failed to unlink sub-objectives before deleting' }
+        }
+    }
+
+    // 3. Perform delete — children are now handled
     const { error: deleteError } = await supabase
         .from('objectives')
         .delete()
         .eq('id', id)
 
     if (deleteError) {
-        console.error('Delete error:', deleteError)
+        console.error('[ObjectiveService] Delete error:', { id, error: deleteError.message })
         return { error: deleteError.message }
     }
 
@@ -431,7 +487,15 @@ export async function deleteObjective(id: string) {
     return { success: true }
 }
 
-export async function deleteObjectives(ids: string[]) {
+/**
+ * Bulk-deletes multiple objectives, handling child objectives via childAction.
+ *
+ * @param ids - Array of objective IDs to delete
+ * @param childAction - 'keep' (unlink children) or 'cascade' (delete children too). Defaults to 'keep'.
+ *
+ * @security Foundry isolation + creator/admin permission check on each objective
+ */
+export async function deleteObjectives(ids: string[], childAction: 'keep' | 'cascade' = 'keep') {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -467,15 +531,19 @@ export async function deleteObjectives(ids: string[]) {
 
     if (idsToDelete.length === 0) return { error: 'No authorized objectives to delete' }
 
-    // 2. Perform delete - RLS handles authorization
-    const { error: deleteError } = await supabase
-        .from('objectives')
-        .delete()
-        .in('id', idsToDelete)
+    // 2. Handle children for each objective using the single-delete function
+    // This ensures consistent child-handling logic in one place
+    const errors: string[] = []
+    for (const id of idsToDelete) {
+        const result = await deleteObjective(id, childAction)
+        if (result?.error) {
+            errors.push(`${id}: ${result.error}`)
+        }
+    }
 
-    if (deleteError) {
-        console.error('Bulk delete error:', deleteError)
-        return { error: deleteError.message }
+    if (errors.length > 0) {
+        console.error('[ObjectiveService] Bulk delete partial failures:', errors)
+        return { error: `Failed to delete ${errors.length} objective(s)` }
     }
 
     revalidatePath('/objectives')
