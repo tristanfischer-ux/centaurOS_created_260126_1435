@@ -64,7 +64,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     fullName: 'Taylor Venture',
     additionalData: {
       firm: 'Demo Ventures',
-      aum: '$50M - $100M'
+      aum: '£50M - £100M'
     }
   },
   {

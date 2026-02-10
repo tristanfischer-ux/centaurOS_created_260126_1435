@@ -79,13 +79,13 @@ A systematic approach to acquiring Fractional Forge's first customers through co
 ### Target: 
 - **Month 1:** 10 discovery calls, 3-5 pilot users
 - **Month 2:** 30-50 calls, 10+ pilots  
-- **Month 3:** 50+ calls, $1,000+ MRR
+- **Month 3:** 50+ calls, £1,000+ MRR
 
-### Budget: ~$500/month
-- LinkedIn Sales Navigator: $99/month
-- Email tools (Apollo + Instantly): $150/month
-- LinkedIn automation (Expandi): $99/month
-- Extra domains: $30/month
+### Budget: ~£500/month
+- LinkedIn Sales Navigator: £99/month
+- Email tools (Apollo + Instantly): £150/month
+- LinkedIn automation (Expandi): £99/month
+- Extra domains: £30/month
 
 ### Primary ICP:
 - Creative agency founders (10-50 employees)
@@ -127,11 +127,11 @@ A systematic approach to acquiring Fractional Forge's first customers through co
         // ========================================
         {
             title: '🔧 Set up LinkedIn Sales Navigator account',
-            description: `Sign up for LinkedIn Sales Navigator ($99/month).
+            description: `Sign up for LinkedIn Sales Navigator (£99/month).
 
 **Steps:**
 1. Go to linkedin.com/sales/signup
-2. Choose Professional tier ($99/month)
+2. Choose Professional tier (£99/month)
 3. Complete payment
 4. Set up search preferences
 
@@ -184,7 +184,7 @@ A systematic approach to acquiring Fractional Forge's first customers through co
 
 **Where to buy:**
 - Namecheap or Cloudflare (cheapest)
-- ~$10-15 per domain
+- ~£10-15 per domain
 
 **After purchase:**
 - Point MX records to Google Workspace
@@ -202,13 +202,13 @@ A systematic approach to acquiring Fractional Forge's first customers through co
             title: '📬 Set up email infrastructure (Apollo + Instantly)',
             description: `Configure email finding and sending tools.
 
-**Apollo.io Setup ($99/month):**
+**Apollo.io Setup (£99/month):**
 1. Sign up at apollo.io
 2. Connect LinkedIn (for enrichment)
 3. Upload ICP criteria
 4. Verify email accuracy settings
 
-**Instantly.ai Setup ($37-97/month):**
+**Instantly.ai Setup (£37-97/month):**
 1. Sign up at instantly.ai
 2. Connect email accounts (3 per domain = 9 total)
 3. Enable email warming (2-week warmup)
@@ -587,7 +587,7 @@ Twitter:
             title: '🤖 Set up LinkedIn automation (Expandi)',
             description: `Configure LinkedIn automation for scale.
 
-**Expandi Setup ($99/month):**
+**Expandi Setup (£99/month):**
 1. Sign up at expandi.io
 2. Connect LinkedIn account (use dedicated browser profile)
 3. Import lead lists from Sales Navigator
@@ -734,11 +734,11 @@ Twitter:
 - Pilot users signed: ___
 
 **CAC Calculation:**
-- Total spend: $___
+- Total spend: £___
 - Calls booked: ___
-- Cost per call: $___
+- Cost per call: £___
 - Pilots signed: ___
-- Cost per pilot: $___
+- Cost per pilot: £___
 
 **Month 2 Targets:**
 Based on learnings, set realistic targets:
@@ -937,8 +937,8 @@ Based on learnings, set realistic targets:
 5. Close or set follow-up
 
 **Pricing Options:**
-- Starter: $49/seat/month
-- Growth: $99/seat/month
+- Starter: £49/seat/month
+- Growth: £99/seat/month
 - Custom: Enterprise pricing
 
 **Objection Handling:**
@@ -950,21 +950,21 @@ Based on learnings, set realistic targets:
 **Acceptance Criteria:**
 - [ ] All pilots have closing call
 - [ ] 3-5 convert to paid
-- [ ] First MRR achieved: $___
+- [ ] First MRR achieved: £___
 - [ ] Payment processing working`,
             start_date: toISO(addDays(today, 56)),
             end_date: toISO(addDays(today, 75)),
             risk_level: 'High'
         },
         {
-            title: '📈 Reach $1,000 MRR milestone',
+            title: '📈 Reach £1,000 MRR milestone',
             description: `Hit first significant revenue milestone.
 
 **MRR Calculation:**
-- Customer 1: $__ x __ seats = $__/month
-- Customer 2: $__ x __ seats = $__/month
-- Customer 3: $__ x __ seats = $__/month
-- Total MRR: $___
+- Customer 1: £__ x __ seats = £__/month
+- Customer 2: £__ x __ seats = £__/month
+- Customer 3: £__ x __ seats = £__/month
+- Total MRR: £___
 
 **If Behind Target:**
 - Accelerate outreach volume
@@ -978,7 +978,7 @@ Based on learnings, set realistic targets:
 - Consider hiring help
 
 **Acceptance Criteria:**
-- [ ] $1,000+ MRR achieved
+- [ ] £1,000+ MRR achieved
 - [ ] All customers onboarded
 - [ ] Payment recurring properly
 - [ ] Churn risk assessed`,
@@ -993,8 +993,8 @@ Based on learnings, set realistic targets:
 **Report Sections:**
 
 1. **Executive Summary**
-   - Total spend: $___
-   - Total revenue: $___
+   - Total spend: £___
+   - Total revenue: £___
    - ROI: ___%
    - Key learnings
 

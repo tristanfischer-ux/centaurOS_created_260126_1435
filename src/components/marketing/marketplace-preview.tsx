@@ -22,7 +22,7 @@
  *       description: 'Specialized in React, Node.js, and cloud architecture...',
  *       attributes: {
  *         role: 'Senior Engineer',
- *         rate: '$150/hr',
+ *         rate: '£150/hr',
  *         location: 'San Francisco',
  *         years_experience: 8,
  *         skills: ['React', 'Node.js', 'AWS'],

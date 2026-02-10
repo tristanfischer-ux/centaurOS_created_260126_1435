@@ -12,7 +12,7 @@ import {
     RefreshCw,
     Users,
     Building2,
-    DollarSign,
+    PoundSterling,
     Package,
     type LucideIcon
 } from "lucide-react"
@@ -29,7 +29,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
     RefreshCw,
     Users,
     Building2,
-    DollarSign,
+    PoundSterling,
     Package,
 }
 

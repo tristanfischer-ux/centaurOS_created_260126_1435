@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Bookmark, BookmarkX, ExternalLink, DollarSign, Clock, Star, ArrowRight, Sparkles } from 'lucide-react'
+import { Bookmark, BookmarkX, ExternalLink, PoundSterling, Clock, Star, ArrowRight, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { removeFromStack } from '@/actions/marketplace'
 import { useRouter } from 'next/navigation'
@@ -154,7 +154,7 @@ export function SavedResourcesView({ savedResources: initialResources, error }: 
                                         <div className="space-y-2 text-sm">
                                             {listing.hourly_rate_min && listing.hourly_rate_max && (
                                                 <div className="flex items-center gap-2 text-muted-foreground">
-                                                    <DollarSign className="h-4 w-4" />
+                                                    <PoundSterling className="h-4 w-4" />
                                                     <span>${listing.hourly_rate_min}-${listing.hourly_rate_max}/hr</span>
                                                 </div>
                                             )}

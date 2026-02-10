@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { typography } from "@/lib/design-system"
-import { ShoppingCart, Package, ArrowRight, Clock, DollarSign } from "lucide-react"
+import { ShoppingCart, Package, ArrowRight, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const statusColors: Record<string, string> = {

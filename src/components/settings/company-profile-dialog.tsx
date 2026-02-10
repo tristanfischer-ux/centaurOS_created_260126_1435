@@ -35,7 +35,7 @@ import {
   Building2,
   Users,
   TrendingUp,
-  BadgeDollarSign,
+  BadgePoundSterling,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -72,7 +72,7 @@ type FormStep = 'basics' | 'business' | 'funding' | 'review'
 const STEPS: { id: FormStep; title: string; icon: React.ElementType }[] = [
   { id: 'basics', title: 'Company Basics', icon: Building2 },
   { id: 'business', title: 'Business Model', icon: TrendingUp },
-  { id: 'funding', title: 'Funding', icon: BadgeDollarSign },
+  { id: 'funding', title: 'Funding', icon: BadgePoundSterling },
   { id: 'review', title: 'Review', icon: CheckCircle2 },
 ]
 

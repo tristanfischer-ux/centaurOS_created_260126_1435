@@ -59,7 +59,7 @@ export const CATEGORY_META: Record<PromptCategory, CategoryMeta> = {
         color: "text-blue-600",
         bgColor: "bg-blue-50",
         borderColor: "border-blue-300",
-        icon: "DollarSign",
+        icon: "PoundSterling",
     },
     strategy: {
         id: "strategy",

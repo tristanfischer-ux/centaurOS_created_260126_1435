@@ -20,6 +20,7 @@ import { BoardView } from './board-view'
 import { ListView } from './list-view'
 import { TaskDetailPanel } from './task-detail-panel'
 import { CreateTaskDialog } from '../tasks/create-task-dialog'
+import { EditTaskDialog } from '@/components/tasks/edit-task-dialog'
 import { TasksGanttView } from './gantt-view'
 import type { TaskWithData, Member, Team } from './types'
 
@@ -54,6 +55,7 @@ export function TasksCommandCenter({
   const [selectedId, setSelectedId] = useState<string | null>(initialTaskId || null)
   const [groupBy, setGroupBy] = useState<GroupBy>('none')
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1400)
+  const [editingTask, setEditingTask] = useState<TaskWithData | null>(null)
 
   // Track window width
   useEffect(() => {
@@ -356,6 +358,7 @@ export function TasksCommandCenter({
             <TaskDetailPanel
               task={selectedTask}
               onClose={() => setSelectedId(null)}
+              onEdit={setEditingTask}
             />
           </div>
         )}
@@ -367,8 +370,19 @@ export function TasksCommandCenter({
           <TaskDetailPanel
             task={selectedTask}
             onClose={() => setSelectedId(null)}
+            onEdit={setEditingTask}
           />
         </div>
+      )}
+
+      {/* Edit Task Dialog */}
+      {editingTask && (
+        <EditTaskDialog
+          open={!!editingTask}
+          onOpenChange={(open) => { if (!open) setEditingTask(null) }}
+          task={editingTask as any}
+          members={members.map(m => ({ id: m.id, full_name: m.full_name, role: m.role || 'Member' }))}
+        />
       )}
     </div>
   )

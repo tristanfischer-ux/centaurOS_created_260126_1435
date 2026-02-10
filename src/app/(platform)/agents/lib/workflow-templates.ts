@@ -403,7 +403,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
                     "Identify top 5 largest expense line items",
                 ],
             },
-            { type: "prompt", promptId: "finance-cash-flow", label: "Cash Flow Assessment", category: "finance", icon: "DollarSign" },
+            { type: "prompt", promptId: "finance-cash-flow", label: "Cash Flow Assessment", category: "finance", icon: "PoundSterling" },
             { type: "prompt", promptId: "strategy-crisis-response", label: "Crisis Response Plan", category: "strategy", icon: "Shield" },
             { type: "prompt", promptId: "strategy-scenario-planner", label: "Scenario Planning", category: "strategy", icon: "GitBranch" },
             {
@@ -417,7 +417,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
                     "Agree on communication approach for team",
                 ],
             },
-            { type: "prompt", promptId: "finance-procurement", label: "Vendor Renegotiation", category: "finance", icon: "DollarSign" },
+            { type: "prompt", promptId: "finance-procurement", label: "Vendor Renegotiation", category: "finance", icon: "PoundSterling" },
             { type: "prompt", promptId: "strategy-board-presentation", label: "Board Communication", category: "strategy", icon: "Presentation" },
             { type: "prompt", promptId: "startup-90-day-plan", label: "Recovery 90-Day Plan", category: "startup-strategy", icon: "Map" },
             {
@@ -760,7 +760,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
                     "Assign interview stages to panel members",
                 ],
             },
-            { type: "prompt", promptId: "hr-compensation", label: "Compensation Benchmark", category: "hr", icon: "DollarSign" },
+            { type: "prompt", promptId: "hr-compensation", label: "Compensation Benchmark", category: "hr", icon: "PoundSterling" },
             { type: "prompt", promptId: "hr-onboarding", label: "Onboarding Checklist", category: "hr", icon: "ListChecks" },
             { type: "prompt", promptId: "hr-culture", label: "Culture Statement", category: "hr", icon: "Heart" },
             {
@@ -1033,7 +1033,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             },
             { type: "prompt", promptId: "finance-kpi-dashboard", label: "KPI Dashboard", category: "finance", icon: "BarChart3" },
             { type: "prompt", promptId: "data-trend-analysis", label: "Trend Analysis", category: "data-analytics", icon: "TrendingUp" },
-            { type: "prompt", promptId: "finance-cash-flow", label: "Cash Flow Review", category: "finance", icon: "DollarSign" },
+            { type: "prompt", promptId: "finance-cash-flow", label: "Cash Flow Review", category: "finance", icon: "PoundSterling" },
             {
                 type: "human-task",
                 label: "Review with department leads",
@@ -1411,7 +1411,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
-            whyItMatters: "Choosing the wrong manufacturing technique costs hardware startups an average of $50K-200K in wasted tooling and 3-6 months of delays. This workflow guides you through technique selection, material choice, cost estimation, and RFQ creation — the same process a $300/hr manufacturing consultant would follow.",
+            whyItMatters: "Choosing the wrong manufacturing technique costs hardware startups an average of £50K-200K in wasted tooling and 3-6 months of delays. This workflow guides you through technique selection, material choice, cost estimation, and RFQ creation — the same process a £300/hr manufacturing consultant would follow.",
             estimatedTime: "4-8 hours",
         }
     })(),

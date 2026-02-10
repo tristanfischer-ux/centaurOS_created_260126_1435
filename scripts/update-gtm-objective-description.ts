@@ -20,19 +20,19 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Short description (shown in lists)
-const shortDescription = `Acquire Centaur Dynamics' first 10+ customers and reach $1,000 MRR through systematic LinkedIn + Email + Twitter cold outreach over 90 days.`
+const shortDescription = `Acquire Centaur Dynamics' first 10+ customers and reach £1,000 MRR through systematic LinkedIn + Email + Twitter cold outreach over 90 days.`
 
 // Extended description (full context)
 const extendedDescription = `## Overview
 
-This objective implements a multi-channel cold outbound go-to-market strategy based on the "LinkedIn + Email + Twitter = $100M Cold Outbound" framework. The goal is to acquire our first paying customers systematically rather than relying on slow content marketing or expensive paid ads.
+This objective implements a multi-channel cold outbound go-to-market strategy based on the "LinkedIn + Email + Twitter = £100M Cold Outbound" framework. The goal is to acquire our first paying customers systematically rather than relying on slow content marketing or expensive paid ads.
 
 ## Why This Approach
 
 | Acquisition Method | Cost | Time to First Customer | Scalability |
 |--------------------|------|------------------------|-------------|
-| **Cold Outbound** | ~$500/month | 2-4 weeks | High |
-| Paid Ads (Google/LinkedIn) | $5k+/month | 2-4 weeks | Medium |
+| **Cold Outbound** | ~£500/month | 2-4 weeks | High |
+| Paid Ads (Google/LinkedIn) | £5k+/month | 2-4 weeks | Medium |
 | Content Marketing | Minimal | 12-18 months | High |
 | Referrals | Free | Unpredictable | Low |
 
@@ -65,13 +65,13 @@ Cold outbound gives us the fastest, most predictable path to first customers whi
 ## Channel Strategy
 
 ### LinkedIn (Primary - 50% of effort)
-- **Tool Stack:** Sales Navigator ($99/mo) + Expandi ($99/mo)
+- **Tool Stack:** Sales Navigator (£99/mo) + Expandi (£99/mo)
 - **Volume:** 50-75 connections/day, 50 messages/day
 - **Approach:** Value-first, no pitch in connection request
 - **Sequence:** View profile → Connect → 4-message nurture sequence → Call booking
 
 ### Email (Secondary - 30% of effort)
-- **Tool Stack:** Apollo.io ($99/mo) + Instantly ($97/mo)
+- **Tool Stack:** Apollo.io (£99/mo) + Instantly (£97/mo)
 - **Volume:** 100-150 emails/day across 9 sending accounts
 - **Domains:** 3 secondary domains (warmed for 2 weeks)
 - **Sequence:** 3-email sequence over 6 days
@@ -123,7 +123,7 @@ Cold outbound gives us the fastest, most predictable path to first customers whi
 | Total outreach | 10,000+ |
 | Discovery calls | 50+ |
 | Paying customers | 5+ |
-| MRR | $1,000+ |
+| MRR | £1,000+ |
 
 ---
 
@@ -131,12 +131,12 @@ Cold outbound gives us the fastest, most predictable path to first customers whi
 
 | Tool | Monthly Cost |
 |------|--------------|
-| LinkedIn Sales Navigator | $99 |
-| Expandi (LinkedIn automation) | $99 |
-| Apollo.io (email finding) | $99 |
-| Instantly (email sending) | $97 |
-| Extra domains (3) | $10 |
-| **Total** | **~$404/month** |
+| LinkedIn Sales Navigator | £99 |
+| Expandi (LinkedIn automation) | £99 |
+| Apollo.io (email finding) | £99 |
+| Instantly (email sending) | £97 |
+| Extra domains (3) | £10 |
+| **Total** | **~£404/month** |
 
 This is 10x cheaper than paid ads and provides 10x more reach.
 
@@ -165,10 +165,10 @@ This is 10x cheaper than paid ads and provides 10x more reach.
 
 By the end of this 90-day objective:
 - ✅ 5+ paying customers acquired
-- ✅ $1,000+ MRR established
+- ✅ £1,000+ MRR established
 - ✅ Repeatable outbound playbook documented
 - ✅ CAC validated and optimized
-- ✅ Foundation for scaling to $10k+ MRR
+- ✅ Foundation for scaling to £10k+ MRR
 `
 
 async function updateObjective() {

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, ShieldCheck, MapPin, Briefcase, Clock, DollarSign } from "lucide-react";
+import { ArrowRight, ShieldCheck, MapPin, Briefcase, Clock } from "lucide-react";
 
 interface MarketplaceListing {
     id: string;

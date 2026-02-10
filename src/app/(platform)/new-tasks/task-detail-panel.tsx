@@ -1,20 +1,40 @@
 'use client'
 
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { getStatusBadgeClass } from '@/lib/status-colors'
+import { acceptTask, completeTask } from '@/actions/tasks'
+import { toast } from 'sonner'
 import {
   X, Calendar, Clock, User, Target, FileText, AlertTriangle,
-  MessageSquare, Paperclip, Shield, Eye,
+  MessageSquare, Paperclip, Shield, Eye, Pencil,
 } from 'lucide-react'
-import type { TaskWithData } from './types'
+import type { TaskWithData, Member } from './types'
+
+/** Status options a user can move a task to */
+const STATUS_OPTIONS = [
+  { value: 'Pending', label: 'Pending' },
+  { value: 'Accepted', label: 'In Progress' },
+  { value: 'Completed', label: 'Completed' },
+] as const
 
 interface TaskDetailPanelProps {
   task: TaskWithData
   onClose: () => void
+  /** Callback to open the edit dialog for this task */
+  onEdit?: (task: TaskWithData) => void
 }
 
 function DetailRow({ icon: Icon, label, children }: { icon: React.ComponentType<{ className?: string }>; label: string; children: React.ReactNode }) {
@@ -33,9 +53,41 @@ function DetailRow({ icon: Icon, label, children }: { icon: React.ComponentType<
   )
 }
 
-export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
+export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
   const isOverdue = task.end_date && task.status !== 'Completed' && task.status !== 'Rejected' && new Date(task.end_date) < new Date()
   const statusBadge = getStatusBadgeClass(task.status)
+
+  /**
+   * @description Handle inline status change from the detail panel.
+   * Uses acceptTask / completeTask server actions to properly transition status.
+   */
+  const handleStatusChange = (newStatus: string): void => {
+    if (newStatus === task.status) return
+
+    startTransition(async () => {
+      let result: { error?: string; success?: boolean }
+
+      if (newStatus === 'Accepted') {
+        result = await acceptTask(task.id)
+      } else if (newStatus === 'Completed') {
+        result = await completeTask(task.id)
+      } else {
+        // For other transitions, we'd need additional actions
+        // For now, acceptTask handles Pending -> Accepted and completeTask handles -> Completed
+        toast.error('This status transition is not yet supported from here')
+        return
+      }
+
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success(`Task moved to ${newStatus === 'Accepted' ? 'In Progress' : newStatus}`)
+        router.refresh()
+      }
+    })
+  }
 
   return (
     <div className="h-full flex flex-col bg-white border-l border-slate-100 overflow-hidden">
@@ -64,9 +116,16 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
             {task.title}
           </h2>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} className="flex-shrink-0 h-8 w-8" aria-label="Close panel">
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {onEdit && (
+            <Button variant="ghost" size="icon" onClick={() => onEdit(task)} className="h-8 w-8" aria-label="Edit task">
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8" aria-label="Close panel">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <ScrollArea className="flex-1 w-full">
@@ -88,6 +147,32 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
 
           {/* Metadata */}
           <div className="space-y-1">
+            {/* Status (editable) */}
+            <div className="flex items-start gap-3 py-2">
+              <Target className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
+                  Status
+                </div>
+                <Select
+                  value={task.status}
+                  onValueChange={handleStatusChange}
+                  disabled={isPending || task.status === 'Completed' || task.status === 'Rejected'}
+                >
+                  <SelectTrigger className="h-8 text-sm w-full max-w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             {/* Assignee */}
             <DetailRow icon={User} label="Assignee">
               {task.assignees && task.assignees.length > 0 ? (

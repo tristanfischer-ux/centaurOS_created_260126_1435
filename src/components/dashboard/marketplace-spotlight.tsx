@@ -166,7 +166,7 @@ function SpotlightCard({ listing }: { listing: FeaturedListing }) {
           )}
           {rate && (
             <span className="text-xs font-medium text-foreground">
-              {typeof rate === 'number' ? `$${rate}` : String(rate)}
+              {typeof rate === 'number' ? `£${rate}` : String(rate)}
             </span>
           )}
         </div>

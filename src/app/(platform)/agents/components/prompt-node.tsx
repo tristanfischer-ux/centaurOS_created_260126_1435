@@ -4,7 +4,7 @@ import React, { memo } from "react"
 import { Handle, Position, type NodeProps } from "@xyflow/react"
 import { CATEGORY_ACCENT_COLORS, CATEGORY_META, type PromptCategory, type ExecutionStatus } from "../lib/agent-types"
 import {
-    Rocket, TrendingUp, Megaphone, DollarSign, Compass, Package,
+    Rocket, TrendingUp, Megaphone, PoundSterling, Compass, Package,
     Calculator, Users, Heart, Scale, Palette, BarChart3, Sparkles,
     Target, Layers, UserPlus, CheckCircle, Shield, PieChart, Calendar,
     Map, RefreshCcw, Mail, Presentation, Send, FileText, HelpCircle,
@@ -22,7 +22,7 @@ import type { LucideIcon } from "lucide-react"
 
 /** Map icon names to lucide components */
 const ICON_MAP: Record<string, LucideIcon> = {
-    Rocket, TrendingUp, Megaphone, DollarSign, Compass, Package,
+    Rocket, TrendingUp, Megaphone, PoundSterling, Compass, Package,
     Calculator, Users, Heart, Scale, Palette, BarChart3, Sparkles,
     Target, Layers, UserPlus, CheckCircle, Shield, PieChart, Calendar,
     Map, RefreshCcw, Mail, Presentation, Send, FileText, HelpCircle,

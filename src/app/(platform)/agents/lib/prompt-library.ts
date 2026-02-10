@@ -227,7 +227,7 @@ Build a complete Go-to-Market strategy:
 **If the product is B2C**, focus on community, content, product-led growth, and viral mechanics.
 **If pricing/ICP isn't clear**, flag this first — the acquisition strategy depends entirely on who you're selling to and at what price.
 
-First, determine: What is the price point? ($10/mo = product-led growth. $1,000/mo = sales-led. $10,000+/mo = enterprise sales.) The acquisition strategy is COMPLETELY different at each price point. Also: Does the founder have an existing audience or network? If yes, leverage it. If no, start with manual outreach.
+First, determine: What is the price point? (£10/mo = product-led growth. £1,000/mo = sales-led. £10,000+/mo = enterprise sales.) The acquisition strategy is COMPLETELY different at each price point. Also: Does the founder have an existing audience or network? If yes, leverage it. If no, start with manual outreach.
 
 Create a tactical plan to get from 0 to 100 customers:
 
@@ -255,7 +255,7 @@ For each phase, be specific:
 - Expected conversion rates (be conservative)
 - What to track and when to pivot
 
-**Example (B2B, $500/mo product):**
+**Example (B2B, £500/mo product):**
 Phase 1: "Week 1-2: Identify 50 target companies on LinkedIn matching ICP. Send 10 personalized connection requests per day using template: '[Name], I noticed [specific thing]. We built [product] to help [persona] with [problem]. Would love to show you — free pilot, no commitment.' Expected: 30% accept, 10% book demo, 5% convert = 2-3 customers from 50 prospects."
 
 **Before finalizing, verify:** (1) Are the tactics specific enough that the founder could execute them TODAY? (2) Are conversion rate assumptions realistic for the stage? (3) Is Phase 1 focused on learning (not scaling)?`,
@@ -811,7 +811,7 @@ Tone: confident but honest. Data-driven. No fluff.
         description: "Write a compelling pitch deck narrative, slide by slide",
         category: "fundraising",
         icon: "Presentation",
-        defaultPrompt: `You are a pitch deck expert who has helped raise $500M+ across 100+ rounds. You also have an eye for visual design — you know that a great deck is 50% narrative and 50% visual impact.
+        defaultPrompt: `You are a pitch deck expert who has helped raise £500M+ across 100+ rounds. You also have an eye for visual design — you know that a great deck is 50% narrative and 50% visual impact.
 
 {{input}}
 
@@ -825,7 +825,7 @@ Write the narrative for a pitch deck (slide by slide). For EACH slide provide AL
 3. **Speaker Notes** — what the presenter says out loud (conversational, 3-4 sentences)
 4. **Visual Direction** — describe exactly what should appear on the slide visually:
    - **Layout**: e.g., "Title + single hero stat centered", "Two-column: text left, image right", "Full-bleed photo with white text overlay"
-   - **Visual Element**: specific chart, diagram, image, or icon description. Be precise enough that a designer or AI tool (Gamma, Napkin AI, Beautiful.ai) could create it directly. E.g., "Bar chart: 3 bars showing TAM ($15B), SAM ($2B), SOM ($200M) in descending order, brand orange color"
+   - **Visual Element**: specific chart, diagram, image, or icon description. Be precise enough that a designer or AI tool (Gamma, Napkin AI, Beautiful.ai) could create it directly. E.g., "Bar chart: 3 bars showing TAM (£15B), SAM (£2B), SOM (£200M) in descending order, brand orange color"
    - **Mood**: e.g., "Bold and confident — large numbers, dark background", "Clean and minimal — lots of whitespace", "Warm and human — team photo, casual setting"
 
 ---
@@ -1022,9 +1022,9 @@ Make the numbers tell a story. Show the "why" behind every number.
 **Example metrics table format:**
 | Metric | Year 1 | Year 2 | Year 3 |
 |--------|--------|--------|--------|
-| ARR | $480K [CALCULATED] | $1.8M [ASSUMPTION: 275% growth] | $5.4M [ASSUMPTION: 200% growth] |
+| ARR | £480K [CALCULATED] | £1.8M [ASSUMPTION: 275% growth] | £5.4M [ASSUMPTION: 200% growth] |
 | Customers | 40 | 120 | 300 |
-| ARPU | $1,000/mo | $1,250/mo | $1,500/mo |
+| ARPU | £1,000/mo | £1,250/mo | £1,500/mo |
 | Gross Margin | 72% | 78% | 82% |`,
         inputLabel: "Current metrics, pricing & growth assumptions",
         outputLabel: "3-year financial projections",
@@ -1357,7 +1357,7 @@ First, identify: What's the SINGLE most important thing to communicate this mont
 Keep it under 500 words. Investors get dozens of these — make it scannable.
 
 **Example Highlights section:**
-- Closed our first enterprise deal ($48K ACV) with [Company] — 3x our average deal size
+- Closed our first enterprise deal (£48K ACV) with [Company] — 3x our average deal size
 - Launched AI workflow builder — 40% of users activated within first week
 - Hired VP Engineering from [Company] — starts March 1
 
@@ -1394,7 +1394,7 @@ Explain the funding instrument in plain language:
 
 **Worked Example**
 Walk through a specific scenario:
-- Investment amount: $X at $Y cap with Z% discount
+- Investment amount: £X at £Y cap with Z% discount
 - Show the math for conversion at different future valuations
 - Compare SAFE vs. convertible note for this scenario
 
@@ -1464,7 +1464,7 @@ Create a tiered list:
 **If the input is a general company description**, design the investor criteria and provide a framework for building the list.
 **If the founder already has a list**, review and improve the targeting and sequencing strategy.
 
-First, identify: What's the round size and stage? This narrows the universe dramatically. A $2M seed has very different investors than a $15M Series A. Also: Does the founder have ANY warm connections to investors? Always start warm.
+First, identify: What's the round size and stage? This narrows the universe dramatically. A £2M seed has very different investors than a £15M Series A. Also: Does the founder have ANY warm connections to investors? Always start warm.
 
 **Data Integrity:** Do not fabricate specific investor names, portfolio companies, or firm details. Instead, describe the TYPE of investor and criteria to search for on Crunchbase, PitchBook, or AngelList. If you reference specific firms, mark them as [VERIFY: confirm current stage/sector focus].
 
@@ -1533,7 +1533,7 @@ Make the reader feel the momentum. Numbers alone don't sell — the story around
         title: "Valuation Justification Brief",
         description: "Build a defensible case for your valuation to present to investors",
         category: "fundraising",
-        icon: "DollarSign",
+        icon: "PoundSterling",
         defaultPrompt: `You are a venture capital valuation expert who has assessed 200+ startup valuations across stages, using comparable transaction analysis, the VC method, and Aswath Damodaran's framework for valuing young companies.
 
 {{input}}
@@ -1609,7 +1609,7 @@ Create a post-raise communication plan:
 - Founder's personal LinkedIn post (this often gets more engagement than the company post)
 
 **Day 5-7: Recruitment Push**
-- "We just raised $X — join us" job posts
+- "We just raised £X — join us" job posts
 - Updated careers page messaging
 - Outreach to specific target candidates (funding news creates a window of interest)
 
@@ -1980,8 +1980,8 @@ Also provide:
 - Suggested media outlets to pitch
 - Social media summary (for sharing the news)
 
-**Example headline:** "[Company] Raises $12M Series A to Bring AI-Powered Financial Planning to 10,000+ Startups"
-**Example lead:** "[City], [Date] — [Company], the AI-powered operating system for startup founders, today announced $12M in Series A funding led by [Investor], with participation from [Investor] and [Investor]. The round brings total funding to $15M."
+**Example headline:** "[Company] Raises £12M Series A to Bring AI-Powered Financial Planning to 10,000+ Startups"
+**Example lead:** "[City], [Date] — [Company], the AI-powered operating system for startup founders, today announced £12M in Series A funding led by [Investor], with participation from [Investor] and [Investor]. The round brings total funding to £15M."
 
 **Before finalizing, verify:** (1) Does the headline pass the "would a journalist write this?" test? (2) Is the lead paragraph complete (who, what, when, where, why)? (3) Are the quotes authentic-sounding, not corporate boilerplate?`,
         inputLabel: "News details & company info",
@@ -2129,7 +2129,7 @@ For each, include:
         description: "Create ad copy for Google, Meta, LinkedIn, and other platforms",
         category: "marketing",
         icon: "Megaphone",
-        defaultPrompt: `You are a performance marketing copywriter who has managed $10M+ in ad spend across Google, Meta, and LinkedIn, consistently achieving 2-3x ROAS by applying direct-response copywriting principles to each platform's ad format constraints.
+        defaultPrompt: `You are a performance marketing copywriter who has managed £10M+ in ad spend across Google, Meta, and LinkedIn, consistently achieving 2-3x ROAS by applying direct-response copywriting principles to each platform's ad format constraints.
 
 {{input}}
 
@@ -2634,7 +2634,7 @@ First, analyze: What is this prospect's #1 business priority right now? What's t
 - Talking point: "Most companies in [their industry] are still doing X, but the top performers have shifted to Y"
 
 **Slide 3: The Cost of Inaction** (2 min)
-- Quantify their specific problem: "$X per year in lost [productivity/revenue/time]"
+- Quantify their specific problem: "£X per year in lost [productivity/revenue/time]"
 - Show what happens if they do nothing for 12 months
 - Use THEIR numbers if possible, industry benchmarks if not [ESTIMATED]
 
@@ -2659,7 +2659,7 @@ First, analyze: What is this prospect's #1 business priority right now? What's t
 - Address their likely concerns proactively
 
 **Slide 8: Investment** (2 min)
-- Frame as investment, not cost ("$X/month → saves $Y/month = Z% ROI")
+- Frame as investment, not cost ("£X/month → saves £Y/month = Z% ROI")
 - Show 2-3 options (anchor with recommended)
 - Include what's included at each level
 
@@ -2690,7 +2690,7 @@ First, analyze: What is this prospect's #1 business priority right now? What's t
 - Data > adjectives ("3x faster" not "much faster")
 - ONE visual focus per slide — if someone squints, they should still get the message
 
-**Example Slide 2 headline:** "Your industry is spending $4.2B/year on a process that's 80% automatable."
+**Example Slide 2 headline:** "Your industry is spending £4.2B/year on a process that's 80% automatable."
 
 **Before finalizing, verify:** (1) Could someone build these slides in Gamma or Canva using ONLY your Visual Direction? (2) Is the ROI story specific enough for their CFO? (3) Is there ONE clear next step at the end? (4) Is every Visual Element specific enough to render without guessing?`,
         inputLabel: "Product, prospect & deal details",
@@ -2764,7 +2764,7 @@ Write a proposal:
 
 Tone: professional, confident, focused on THEIR outcomes, not your features.
 
-**Example Executive Summary opening:** "Acme Corp is losing ~$2.4M/year in engineering time to manual deployment processes. This proposal outlines how [Product] will automate 80% of those workflows, saving your team 1,200+ engineering hours in Year 1 — with an expected ROI of 4.2x."
+**Example Executive Summary opening:** "Acme Corp is losing ~£2.4M/year in engineering time to manual deployment processes. This proposal outlines how [Product] will automate 80% of those workflows, saving your team 1,200+ engineering hours in Year 1 — with an expected ROI of 4.2x."
 
 **Before finalizing, verify:** (1) Does the executive summary lead with THEIR problem, not your product? (2) Is every ROI claim backed by specific math? (3) Are the next steps clear enough that the prospect knows exactly what to do?`,
         inputLabel: "Prospect needs, product details & pricing",
@@ -2850,7 +2850,7 @@ First, assess: What stage is this deal in? (Discovery → Demo → Proposal → 
         title: "Pricing Strategy Analyzer",
         description: "Analyze and optimize your pricing model",
         category: "sales",
-        icon: "DollarSign",
+        icon: "PoundSterling",
         defaultPrompt: `You are a pricing strategy consultant who has optimized pricing for 80+ SaaS and marketplace companies, drawing on Patrick Campbell's (ProfitWell) value-based pricing methodology and the Van Westendorp price sensitivity model — consistently helping companies increase ARPU 20-40% without increasing churn.
 
 {{input}}
@@ -2862,9 +2862,9 @@ First, identify: What is the core VALUE this product delivers? (Time saved, reve
 
 **1. Value Analysis** (the foundation of pricing)
 - What measurable outcome does the customer get?
-- What's it worth to them? (e.g., "saves 10 hours/week × $50/hour = $500/week value")
+- What's it worth to them? (e.g., "saves 10 hours/week × £50/hour = £500/week value")
 - Value-to-price ratio: best-in-class SaaS captures 10-20% of the value delivered
-- Your target: $[value delivered] × 10-20% = $[price range]
+- Your target: £[value delivered] × 10-20% = £[price range]
 
 **2. Current Model Assessment** (if existing pricing)
 - Model type and structure
@@ -2886,18 +2886,18 @@ First, identify: What is the core VALUE this product delivers? (Time saved, reve
 
 **4. Recommended Pricing Structure**
 
-**Tier 1: [Name]** — $X/mo
+**Tier 1: [Name]** — £X/mo
 - Who it's for: [persona]
 - What's included: [features]
 - Limitations: [what's capped]
 - Purpose: low-friction entry, conversion to Tier 2
 
-**Tier 2: [Name]** — $Y/mo ← THIS IS YOUR "RECOMMENDED" TIER
+**Tier 2: [Name]** — £Y/mo ← THIS IS YOUR "RECOMMENDED" TIER
 - Who it's for: [persona]
 - What's included: [everything in Tier 1 + these features]
 - Purpose: where most customers should land (design pricing to steer here)
 
-**Tier 3: [Name]** — $Z/mo or "Contact Us"
+**Tier 3: [Name]** — £Z/mo or "Contact Us"
 - Who it's for: [persona]
 - What's included: [everything + premium]
 - Purpose: capture value from enterprise, enable sales conversations
@@ -2906,7 +2906,7 @@ First, identify: What is the core VALUE this product delivers? (Time saved, reve
 - Anchor: show Tier 3 first (makes Tier 2 feel like a deal)
 - Decoy: design Tier 1 to make Tier 2 obviously better value
 - Annual discount: 15-20% (standard), displayed as "2 months free"
-- Monthly pricing displayed annually: "$X/mo, billed annually" (not "$X×12/year")
+- Monthly pricing displayed annually: "£X/mo, billed annually" (not "£X×12/year")
 
 **5. Competitive Positioning**
 | Competitor | Price | Model | Positioning | Our Opportunity |
@@ -2921,7 +2921,7 @@ First, identify: What is the core VALUE this product delivers? (Time saved, reve
 - Metrics to watch: conversion rate, ARPU, churn, expansion revenue
 
 **Example value-based pricing calculation:**
-"Product saves a 10-person marketing team 15 hours/week on reporting. At a blended cost of $55/hour, that's $825/week or $3,575/month in value. Capturing 15% of that value = $536/month target price. Current price at $199/month suggests significant room to increase, especially for the Pro tier."
+"Product saves a 10-person marketing team 15 hours/week on reporting. At a blended cost of £55/hour, that's £825/week or £3,575/month in value. Capturing 15% of that value = £536/month target price. Current price at £199/month suggests significant room to increase, especially for the Pro tier."
 
 **Data Integrity:** Label competitive prices as [FROM PUBLIC PRICING PAGE] or [ESTIMATED]. Don't fabricate competitor pricing.
 
@@ -3046,8 +3046,8 @@ First, analyze: What are this prospect's top 2-3 pain points? What will make the
 **ROI Moment (2 min)** — Make the value concrete
 - "Based on what you told me — [their team size], [their volume], [their current process] — here's what this looks like for you:"
 - Time saved: X hours/week × team size = Y hours/month
-- Cost saved: Y hours × hourly rate = $Z/month
-- ROI: "$Z saved vs. $[price] investment = [multiple]x return"
+- Cost saved: Y hours × hourly rate = £Z/month
+- ROI: "£Z saved vs. £[price] investment = [multiple]x return"
 - Source all numbers: [FROM THEIR INPUT] or [INDUSTRY BENCHMARK]
 
 **Close (2 min)** — Clear next step
@@ -3360,7 +3360,7 @@ Ranked list with reasoning, suggested timeline, and resource allocation.
         description: "Build a growth strategy using proven frameworks",
         category: "strategy",
         icon: "TrendingUp",
-        defaultPrompt: `You are a growth strategy consultant who has built growth engines for 60+ startups from $0 to $10M ARR, drawing on the Ansoff Matrix, Sean Ellis's growth hacking methodology, and Reforge's systematic growth frameworks.
+        defaultPrompt: `You are a growth strategy consultant who has built growth engines for 60+ startups from £0 to £10M ARR, drawing on the Ansoff Matrix, Sean Ellis's growth hacking methodology, and Reforge's systematic growth frameworks.
 
 {{input}}
 
@@ -3464,7 +3464,7 @@ Write a board presentation. For EACH slide provide ALL of the following:
 3. **Speaker Notes** — what the CEO says aloud (3-4 sentences, strategic tone)
 4. **Visual Direction** — describe exactly what should appear on the slide:
    - **Layout**: e.g., "Dashboard grid: 2x3 metric cards", "Single large chart with 3 callouts", "Traffic light status table"
-   - **Visual Element**: specific chart, table, or diagram with exact data. E.g., "Line chart: revenue last 4 quarters ($180K, $240K, $350K, $480K) with trend line, green when above target, red when below"
+   - **Visual Element**: specific chart, table, or diagram with exact data. E.g., "Line chart: revenue last 4 quarters (£180K, £240K, £350K, £480K) with trend line, green when above target, red when below"
    - **Mood**: e.g., "Data-rich but clean — board members should grasp the story in 3 seconds", "Transparent — red/amber/green status indicators, don't hide bad news"
 
 ---
@@ -4062,7 +4062,7 @@ First, assess: What is the strategic priority this budget supports? What's the c
 - What: one sentence describing what this budget funds
 - Why: the business case in 2-3 sentences (tied to revenue, cost savings, or risk reduction)
 - How much: total ask, broken into one-time vs. recurring
-- ROI headline: "For every $1 invested, we expect $X in return over [timeframe]"
+- ROI headline: "For every £1 invested, we expect £X in return over [timeframe]"
 
 **2. Strategic Alignment**
 - Which company OKR or strategic priority does this support?
@@ -4077,10 +4077,10 @@ First, assess: What is the strategic priority this budget supports? What's the c
 - For each line item: what it is, why it's needed, and what happens without it
 
 **4. Budget Summary**
-- Total one-time costs: $X
-- Total monthly recurring: $Y/mo ($Z annually)
-- Total Year 1 cost: $[one-time + 12 × monthly]
-- Total Year 2 cost: $[recurring only, unless additional one-time]
+- Total one-time costs: £X
+- Total monthly recurring: £Y/mo (£Z annually)
+- Total Year 1 cost: £[one-time + 12 × monthly]
+- Total Year 2 cost: £[recurring only, unless additional one-time]
 
 **5. Timeline & Cash Flow**
 | Month | Expense | Cumulative | Key Milestone |
@@ -4088,9 +4088,9 @@ First, assess: What is the strategic priority this budget supports? What's the c
 - Are there trigger-based expenses (only if milestone X is hit)?
 
 **6. ROI Projection**
-- Revenue impact: $X in additional revenue over [timeframe]
-- Cost savings: $Y saved per month/year
-- Productivity gains: Z hours/month freed up (valued at $W)
+- Revenue impact: £X in additional revenue over [timeframe]
+- Cost savings: £Y saved per month/year
+- Productivity gains: Z hours/month freed up (valued at £W)
 - Payback period: when the investment breaks even
 - 12-month ROI: [%]
 
@@ -4108,11 +4108,11 @@ Show the math. Label all estimates: [FROM QUOTES], [ESTIMATED], [BENCHMARKED].
 - Explain why the proposed budget is the best option
 
 **9. Approval Request**
-- Specific ask: "Requesting approval of $X to be allocated by [date]"
+- Specific ask: "Requesting approval of £X to be allocated by [date]"
 - Decision criteria: what would make this a clear "yes"
-- Governance: who approves what amount (under $5K = manager, $5-25K = VP, $25K+ = exec team)
+- Governance: who approves what amount (under £5K = manager, £5-25K = VP, £25K+ = exec team)
 
-**Example executive summary:** "Requesting $45,000 to implement an automated testing pipeline (one-time: $15K for setup, recurring: $2,500/mo for tooling). This will reduce our QA cycle from 5 days to 8 hours, enabling weekly releases instead of monthly. Based on similar implementations, we expect this to accelerate feature delivery by 40%, directly supporting our Q3 OKR to increase shipping velocity. Expected ROI: 3.2x in Year 1 through reduced manual QA costs ($38K) and faster time-to-market."
+**Example executive summary:** "Requesting £45,000 to implement an automated testing pipeline (one-time: £15K for setup, recurring: £2,500/mo for tooling). This will reduce our QA cycle from 5 days to 8 hours, enabling weekly releases instead of monthly. Based on similar implementations, we expect this to accelerate feature delivery by 40%, directly supporting our Q3 OKR to increase shipping velocity. Expected ROI: 3.2x in Year 1 through reduced manual QA costs (£38K) and faster time-to-market."
 
 **Before finalizing, verify:** (1) Could the CFO approve this without a follow-up meeting? (2) Is every line item justified with a clear "why"? (3) Is the ROI calculation honest — not inflated to win approval?`,
         inputLabel: "Project/department details & requirements",
@@ -4237,7 +4237,7 @@ This visual direction lets a designer or AI tool (Gamma, Notion, Figma) build th
         description: "Analyze spending patterns and identify savings opportunities",
         category: "finance",
         icon: "Receipt",
-        defaultPrompt: `You are a cost optimization consultant who has identified $50M+ in savings across 100+ startup and scale-up engagements, using activity-based costing, vendor benchmarking, and the "80/20 spend analysis" methodology.
+        defaultPrompt: `You are a cost optimization consultant who has identified £50M+ in savings across 100+ startup and scale-up engagements, using activity-based costing, vendor benchmarking, and the "80/20 spend analysis" methodology.
 
 {{input}}
 
@@ -4260,7 +4260,7 @@ First, categorize all expenses into standard buckets (People, Software/SaaS, Inf
 **4. Benchmarking**
 - Spend as % of revenue by category vs. stage-appropriate benchmarks
 - Headcount costs as % of total (target varies by stage: 60-75% for most startups)
-- SaaS spend per employee (typical range: $2K-$5K/year for early-stage)
+- SaaS spend per employee (typical range: £2K-£5K/year for early-stage)
 
 **5. Savings Opportunities** (ranked by impact)
 For each opportunity:
@@ -4503,7 +4503,7 @@ For each: what to change, estimated cost, expected savings, timeline
 - Month 2-3: Automation investments (tools, integrations)
 - Quarterly: Review and iterate
 
-**Example finding:** "The monthly reporting process takes 3 people 2 days each (48 person-hours/month). 80% of the time is spent manually pulling data from 4 different systems. Recommendation: Implement an automated data pipeline (Fivetran + dbt) — setup cost ~$5K, saves 38 hours/month = $4,750/month in loaded labor costs. Payback: 1 month."
+**Example finding:** "The monthly reporting process takes 3 people 2 days each (48 person-hours/month). 80% of the time is spent manually pulling data from 4 different systems. Recommendation: Implement an automated data pipeline (Fivetran + dbt) — setup cost ~£5K, saves 38 hours/month = £4,750/month in loaded labor costs. Payback: 1 month."
 
 **Before finalizing, verify:** (1) Are time estimates based on actual observation, not assumptions? (2) Do the quick wins genuinely require no budget? (3) Would the team welcome these changes or resist them? (4) Are savings estimates conservative?`,
         inputLabel: "Current operations & processes",
@@ -4531,7 +4531,7 @@ First, analyze the dispute to determine the strongest negotiating position. Then
 
 **Communication Draft:**
 
-**1. Subject Line** — Professional, specific (e.g., "Invoice #1234 — Discrepancy of $X — Request for Review")
+**1. Subject Line** — Professional, specific (e.g., "Invoice #1234 — Discrepancy of £X — Request for Review")
 
 **2. Opening** — Acknowledge the relationship and the specific invoice(s) in question
 
@@ -4836,7 +4836,7 @@ Write the requested handbook section following this structure:
         title: "Compensation Benchmarker",
         description: "Benchmark compensation against market data",
         category: "hr",
-        icon: "DollarSign",
+        icon: "PoundSterling",
         defaultPrompt: `You are a compensation analyst who has benchmarked 1,000+ roles across startups and scale-ups, using data-driven methodology from Pave, Carta Total Comp, and Levels.fyi to create competitive offers that balance cash, equity, and total compensation.
 
 {{input}}
@@ -5411,7 +5411,7 @@ For each account (or top 10 if many):
 First, calculate: What is the total value this customer has received? (Time saved, revenue generated, costs avoided, risks mitigated.) This "value delivered" number must be significantly larger than their subscription cost — that's what makes the renewal a no-brainer.
 
 **1. Value Delivered Summary** (the most important section)
-- ROI calculation: "You invested $X and received $Y in value" (aim for 3-10x ROI)
+- ROI calculation: "You invested £X and received £Y in value" (aim for 3-10x ROI)
 - Key achievements during the contract period (3-5, with specific metrics)
 - Comparison: where they were BEFORE vs. where they are NOW
 - Quote from their team that captures the value (draft an approvable quote)
@@ -5448,7 +5448,7 @@ First, calculate: What is the total value this customer has received? (Time save
 - Decision deadline (with gentle urgency)
 - Specific next step: "Let's schedule a 30-minute call on [date] to walk through this together"
 
-**Example value summary:** "Over the past 12 months, your team used [Product] to process 2,400 orders, reducing manual processing time from 45 minutes to 8 minutes per order. That's 1,480 hours saved — equivalent to $74,000 in team productivity on a $12,000 investment. That's a 6.2x ROI."
+**Example value summary:** "Over the past 12 months, your team used [Product] to process 2,400 orders, reducing manual processing time from 45 minutes to 8 minutes per order. That's 1,480 hours saved — equivalent to £74,000 in team productivity on a £12,000 investment. That's a 6.2x ROI."
 
 **Before finalizing, verify:** (1) Is the ROI calculation credible and specific? (2) Does the recommended plan align with their actual usage and growth? (3) Would the customer's champion feel confident forwarding this to their CFO?`,
         inputLabel: "Customer usage data & contract details",
@@ -5852,14 +5852,14 @@ First, assess: Is this regulation already in effect or upcoming? Does it apply t
 
 | Area | Impact Level | Description | Cost Estimate |
 |------|-------------|-------------|---------------|
-| Product/Technology | H/M/L | What changes to your product or systems | $ range |
-| Operations/Process | H/M/L | Process and workflow changes | $ range |
-| Legal/Documentation | H/M/L | Policies, contracts, terms updates | $ range |
-| People/Training | H/M/L | Training, new hires, role changes | $ range |
-| Customer-Facing | H/M/L | Impact on customer experience or pricing | $ range |
+| Product/Technology | H/M/L | What changes to your product or systems | £ range |
+| Operations/Process | H/M/L | Process and workflow changes | £ range |
+| Legal/Documentation | H/M/L | Policies, contracts, terms updates | £ range |
+| People/Training | H/M/L | Training, new hires, role changes | £ range |
+| Customer-Facing | H/M/L | Impact on customer experience or pricing | £ range |
 
-**Total estimated compliance cost:** $ range
-**Ongoing annual cost:** $ range
+**Total estimated compliance cost:** £ range
+**Ongoing annual cost:** £ range
 
 **4. Detailed Requirements** (for each applicable provision)
 | Requirement | Current State | Gap | Action Needed | Effort | Deadline |
@@ -5928,13 +5928,13 @@ Categories to audit:
 - File in which jurisdictions? (US, EU, key markets)
 - Word mark vs. design mark (file word mark first — broader protection)
 - Monitoring strategy for infringement
-- Cost: $250-$800 per class per jurisdiction (USPTO), more with attorney
+- Cost: £250-£800 per class per jurisdiction (USPTO), more with attorney
 
 **Patents** (expensive — be selective)
 - Is this truly novel and non-obvious? (honest assessment)
 - Provisional vs. non-provisional: provisional buys 12 months at lower cost
 - Consider: will a patent actually stop a competitor, or will they design around it?
-- Cost: $5K-$15K+ for provisional, $15K-$50K+ for full patent prosecution
+- Cost: £5K-£15K+ for provisional, £15K-£50K+ for full patent prosecution
 
 **Trade Secrets** (often the best protection for startups)
 - Documentation requirements (what to write down, how to store it)
@@ -5946,7 +5946,7 @@ Categories to audit:
 - What to register (increases statutory damages if infringed)
 - Open source compliance (are you using GPL code in proprietary product?)
 - Content licensing and ownership (employee vs. contractor work)
-- Cost: $55-$85 per registration (US Copyright Office)
+- Cost: £55-£85 per registration (US Copyright Office)
 
 **4. Risk Assessment**
 
@@ -5960,17 +5960,17 @@ Categories to audit:
 
 **5. Budget-Conscious Roadmap**
 
-**Immediate (this month, <$2K):**
+**Immediate (this month, <£2K):**
 - File trademark applications for brand name
 - Implement trade secret protocols (NDAs, access controls, documentation)
 - Audit open source dependencies for license compliance
 
-**Short-term (this quarter, $2K-$10K):**
+**Short-term (this quarter, £2K-£10K):**
 - Provisional patent for core innovation (if warranted)
 - Register key copyrights
 - Review all contractor agreements for IP assignment
 
-**Medium-term (this year, $10K-$30K):**
+**Medium-term (this year, £10K-£30K):**
 - Full patent prosecution (if provisional showed promise)
 - International trademark filings in key markets
 - Annual IP audit process
@@ -6276,7 +6276,7 @@ For each scene, present as a structured card:
 - Props and wardrobe
 - Brand elements: logo placement, color consistency, font for text overlays
 - Music: specific mood references (e.g., "like the energy of a Stripe product video")
-- Estimated production budget range: $ / $$ / $$$
+- Estimated production budget range: £ / ££ / £££
 
 **Platform Adaptations:**
 - Vertical (9:16) version: which scenes to keep, which to cut
@@ -6634,7 +6634,7 @@ After the written summary, provide a **"Deck-Ready Visual Direction"** section t
 For each slide:
 - **Slide title**: max 8 words
 - **Layout**: e.g., "3 large stat cards side by side", "Table with RAG status column"
-- **Visual Element**: specific chart or diagram with data. E.g., "Line chart: revenue trend Q1-Q4 ($180K, $240K, $350K, $480K), target line at $300K shown as dashed"
+- **Visual Element**: specific chart or diagram with data. E.g., "Line chart: revenue trend Q1-Q4 (£180K, £240K, £350K, £480K), target line at £300K shown as dashed"
 - **Mood**: e.g., "Confident — green tones, upward momentum", "Cautious — amber highlights on risk items"
 
 This section lets the reader quickly convert the written summary into a visual presentation using tools like Gamma, Napkin AI, or Canva.
@@ -6649,7 +6649,7 @@ This section lets the reader quickly convert the written summary into a visual p
 - No filler phrases ("It is important to note that..." — just say the thing)
 
 **Example TL;DR:**
-"• Q4 revenue hit $1.2M, 15% above target, driven by enterprise expansion. • Customer churn increased to 4.2% (from 3.1% in Q3) — concentrated in the SMB segment after the October price increase. • Recommend: Launch a targeted SMB retention campaign by Feb 15 and defer the next price increase to Q3."
+"• Q4 revenue hit £1.2M, 15% above target, driven by enterprise expansion. • Customer churn increased to 4.2% (from 3.1% in Q3) — concentrated in the SMB segment after the October price increase. • Recommend: Launch a targeted SMB retention campaign by Feb 15 and defer the next price increase to Q3."
 
 **Before finalizing, verify:** (1) Does the TL;DR work as a standalone communication? (2) Are recommendations specific enough that the reader knows exactly what to approve? (3) Could someone who only reads the first 3 sentences brief their boss accurately? (4) Is the Visualization Guide specific enough that someone could build a slide deck from it without re-reading the full summary?`,
         inputLabel: "Full report or data",
@@ -6761,7 +6761,7 @@ First, check for red flags: Was the sample size sufficient for the minimum detec
 **4. Effect Size & Practical Significance**
 - Statistical significance ≠ practical significance
 - Is the effect large enough to matter for the business?
-- Calculate: "This change would generate approximately $X additional revenue per month" (or save Y hours, improve Z retention)
+- Calculate: "This change would generate approximately £X additional revenue per month" (or save Y hours, improve Z retention)
 - Compare to the cost of implementing and maintaining the change
 
 **5. Segment Analysis**
@@ -6789,7 +6789,7 @@ Explain the reasoning behind the recommendation. If "iterate," specify exactly w
 - Implication for the product strategy
 - Next experiment to run (with specific hypothesis)
 
-**Example recommendation:** "SHIP — The variant increased checkout conversion by 3.2% (95% CI: 1.8%-4.6%, p=0.002) across 45,000 users over 14 days. No negative impact on AOV or return rate. At current traffic, this represents ~$18K additional monthly revenue. Effect is consistent across segments except mobile Safari (no effect — investigate separately)."
+**Example recommendation:** "SHIP — The variant increased checkout conversion by 3.2% (95% CI: 1.8%-4.6%, p=0.002) across 45,000 users over 14 days. No negative impact on AOV or return rate. At current traffic, this represents ~£18K additional monthly revenue. Effect is consistent across segments except mobile Safari (no effect — investigate separately)."
 
 **Before finalizing, verify:** (1) Did you check statistical validity BEFORE interpreting results? (2) Is the recommendation based on practical significance, not just p-values? (3) Would a product manager know exactly what to do and what to test next?`,
         inputLabel: "A/B test data & context",
@@ -6863,7 +6863,7 @@ For each alert: what triggers it, how it's delivered (email, Slack, in-app), and
 - Don't show data without context (always include comparison or benchmark)
 
 **Example metric specification:**
-"Metric: Monthly Recurring Revenue (MRR). Question: 'Are we growing revenue fast enough?' Definition: Sum of all active subscription amounts, normalized to monthly. Source: Stripe subscriptions API + billing table. Visualization: Area chart with MoM growth rate overlay. Target: $50K (green ≥$50K, yellow $40-50K, red <$40K). Drill-down: by plan tier, by cohort, by geography. Alert: if MRR drops >5% WoW, notify finance team via Slack."
+"Metric: Monthly Recurring Revenue (MRR). Question: 'Are we growing revenue fast enough?' Definition: Sum of all active subscription amounts, normalized to monthly. Source: Stripe subscriptions API + billing table. Visualization: Area chart with MoM growth rate overlay. Target: £50K (green ≥£50K, yellow £40-50K, red <£40K). Drill-down: by plan tier, by cohort, by geography. Alert: if MRR drops >5% WoW, notify finance team via Slack."
 
 **Before finalizing, verify:** (1) Does every metric map to a specific decision? (2) Could a new team member understand what each metric means without asking? (3) Is the layout scannable in 10 seconds for the headline story?`,
         inputLabel: "Business context & data sources",
@@ -7664,7 +7664,7 @@ Label properties as [DATASHEET] (from manufacturer data) vs [TYPICAL] (general r
         description: "Get a DFM analysis to identify issues before sending your design to suppliers",
         category: "manufacturing",
         icon: "ClipboardCheck",
-        defaultPrompt: `You are a DFM (Design for Manufacturability) consultant who has reviewed 500+ product designs before they went to tooling. You specialise in catching expensive mistakes early — the kind that add $10K-100K to tooling costs or cause 2-3 month delays when discovered during production.
+        defaultPrompt: `You are a DFM (Design for Manufacturability) consultant who has reviewed 500+ product designs before they went to tooling. You specialise in catching expensive mistakes early — the kind that add £10K-100K to tooling costs or cause 2-3 month delays when discovered during production.
 
 {{company_context}}
 
