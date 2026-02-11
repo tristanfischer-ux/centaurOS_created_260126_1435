@@ -365,6 +365,10 @@ export function ForgeProjectProvider({
         setIsScanning(false)
         setScanStatus("complete")
         toast.success(`Refined: ${result.spec.modules.length} modules updated`)
+
+        // Auto-generate blueprints after successful refine so the user
+        // sees the system diagram without needing to click "Generate Blueprints"
+        handleGenerateImages()
       })
       .catch((error) => {
         toast.error("Refine failed. Please try again.")
@@ -372,7 +376,7 @@ export function ForgeProjectProvider({
         setIsScanning(false)
         setScanStatus("idle")
       })
-  }, [scanId])
+  }, [scanId, handleGenerateImages])
 
   // ── Refine module ──
   const handleRefineModule = useCallback(async (editedModule: ModuleSpec): Promise<ModuleSpec> => {
