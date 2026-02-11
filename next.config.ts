@@ -115,6 +115,8 @@ const nextConfig: NextConfig = {
               "font-src 'self' data:",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.stripe.com https://api.openai.com https://*.sentry.io https://*.ingest.sentry.io",
               "frame-src 'self' https://*.stripe.com",
+              // SECURITY: worker-src allows Three.js Web Workers for 3D rendering (blob: URLs)
+              "worker-src 'self' blob:",
               "frame-ancestors 'self'",
               "form-action 'self'",
               "base-uri 'self'",

@@ -16,7 +16,7 @@
 import React, { Suspense, useRef, useState, useEffect, useMemo } from "react"
 
 import { Canvas, useLoader, useThree } from "@react-three/fiber"
-import { OrbitControls, Environment, ContactShadows } from "@react-three/drei"
+import { OrbitControls, ContactShadows } from "@react-three/drei"
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js"
 import * as THREE from "three"
 
@@ -172,13 +172,11 @@ export function StlViewer({
             camera={{ position: [5, 4, 6], fov: 45, near: 0.1, far: 100 }}
             style={{ width: "100%", height: "100%" }}
           >
-            {/* Lighting */}
-            <ambientLight intensity={0.4} />
-            <directionalLight position={[8, 10, 5]} intensity={0.8} castShadow />
-            <directionalLight position={[-5, 5, -5]} intensity={0.3} />
-
-            {/* Environment for realistic reflections */}
-            <Environment preset="city" />
+            {/* Lighting — self-contained, no external CDN dependencies */}
+            <ambientLight intensity={0.5} />
+            <directionalLight position={[8, 10, 5]} intensity={1.0} castShadow />
+            <directionalLight position={[-5, 5, -5]} intensity={0.4} />
+            <hemisphereLight args={["#b1e1ff", "#b97a20", 0.5]} />
 
             {/* Model */}
             <StlModel stlUrl={stlUrl} />
