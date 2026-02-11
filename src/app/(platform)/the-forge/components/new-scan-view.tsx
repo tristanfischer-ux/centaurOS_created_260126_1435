@@ -83,17 +83,38 @@ export function NewScanView(): React.ReactNode {
 
 // ─── Scanning Animation ──────────────────────────────────────────────
 
+/**
+ * ScanningPlaceholder — Skeleton preview of what the output will look like.
+ *
+ * @description Shows a ghost preview of the system blueprint and module
+ * cards that will appear once the scan completes, so the user knows
+ * what to expect.
+ */
 function ScanningPlaceholder(): React.ReactNode {
   return (
-    <div className="space-y-6 animate-pulse">
-      <div className="h-[300px] rounded-xl bg-muted/40 flex items-center justify-center">
-        <p className="text-sm text-muted-foreground font-medium">
-          Scanning your idea into modules...
-        </p>
+    <div className="space-y-6">
+      {/* Ghost system blueprint */}
+      <div className="rounded-xl border border-dashed border-muted-foreground/20 bg-muted/20 p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="h-5 w-5 rounded bg-muted animate-pulse" />
+          <div className="h-4 w-48 rounded bg-muted animate-pulse" />
+        </div>
+        <div className="h-[200px] rounded-lg bg-muted/30 flex items-center justify-center animate-pulse">
+          <p className="text-sm text-muted-foreground font-medium">
+            System diagram will appear here
+          </p>
+        </div>
       </div>
+      {/* Ghost module cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-24 rounded-xl bg-muted/30" />
+          <div
+            key={i}
+            className="h-24 rounded-xl border border-dashed border-muted-foreground/15 bg-muted/15 flex items-center justify-center animate-pulse"
+            style={{ animationDelay: `${i * 150}ms` }}
+          >
+            <span className="text-xs text-muted-foreground/50">Module {i + 1}</span>
+          </div>
         ))}
       </div>
     </div>

@@ -15,7 +15,9 @@
 
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useRef, useEffect } from "react"
+
+import { motion, AnimatePresence } from "framer-motion"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -97,6 +99,34 @@ function isGatingDiagComplete(spec: XRaySpec): boolean {
   return !!gating.diagnostic?.derivedProcessClass
 }
 
+// ─── Animation Variants ──────────────────────────────────────────────
+
+/** Parent container variant — orchestrates stagger timing */
+const gridContainerVariants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.12,
+      delayChildren: 0.1,
+    },
+  },
+}
+
+/** Individual module card variant — fade + scale + slide up */
+const moduleCardVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: "spring",
+      stiffness: 300,
+      damping: 24,
+    },
+  },
+}
+
 // ─── Props ────────────────────────────────────────────────────────────
 
 interface SystemBlueprintProps {
@@ -114,6 +144,8 @@ interface SystemBlueprintProps {
   onGenerateImages: () => void
   /** Whether a scanId exists (needed to generate) */
   canGenerate: boolean
+  /** Whether a scan just completed (triggers stagger animation) */
+  justScanned?: boolean
 }
 
 // ─── Component ────────────────────────────────────────────────────────
@@ -134,8 +166,18 @@ export function SystemBlueprint({
   hasImages,
   onGenerateImages,
   canGenerate,
+  justScanned = false,
 }: SystemBlueprintProps): React.ReactNode {
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  // Track whether we've already shown the stagger animation to avoid replaying on re-renders
+  const hasAnimatedRef = useRef(false)
+  const shouldAnimate = justScanned && !hasAnimatedRef.current
+
+  useEffect(() => {
+    if (justScanned && !hasAnimatedRef.current) {
+      hasAnimatedRef.current = true
+    }
+  }, [justScanned])
 
   const modules = spec.modules || []
   const n = modules.length

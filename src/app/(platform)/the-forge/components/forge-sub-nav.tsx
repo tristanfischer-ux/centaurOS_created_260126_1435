@@ -73,8 +73,12 @@ function getStagesWithData(spec: XRaySpec): Set<ForgeStage> {
     stages.add("dossier")
   }
 
-  // People: has expert questions defined (always available after scan)
-  if (spec.modules.some((m) => m.detail?.expertQuestions?.length > 0)) {
+  // People: user has answered at least one expert question (actual engagement)
+  if (spec.modules.some((m) => {
+    const answers = m.interview?.answers
+    if (!answers) return false
+    return Object.values(answers).some((v) => String(v ?? "").trim().length > 0)
+  })) {
     stages.add("people")
   }
 
@@ -128,7 +132,7 @@ export function ForgeSubNav({ projectId, spec, className }: ForgeSubNavProps): R
       <div className="flex items-start w-full max-w-2xl">
         {STAGES.map((stage, index) => {
           const href = `/the-forge/${projectId}/${stage.segment}`
-          const isActive = pathname.includes(`/${stage.segment}`)
+          const isActive = pathname.endsWith(`/${stage.segment}`)
           const hasData = stagesWithData.has(stage.id)
           const isCompleted = hasData && !isActive
           const Icon = stage.icon

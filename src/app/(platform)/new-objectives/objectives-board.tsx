@@ -26,6 +26,7 @@ import { StrategyHealthBar } from './strategy-health-bar'
 import { ObjectiveCard } from './objective-card'
 import { ObjectiveDetailPanel } from './objective-detail-panel'
 import { ObjectivesTreeView } from './objectives-tree-view'
+import { getStrategyColor } from './strategy-colors'
 import { CreateObjectiveDialog } from '../objectives/create-objective-dialog'
 import { EditObjectiveDialog } from '@/components/objectives/edit-objective-dialog'
 import { ObjectivesGanttView } from './gantt-view'
@@ -580,12 +581,36 @@ function BoardView({
 
   return (
     <div className="space-y-6">
+      {/* Strategy color legend */}
+      {grouped.length > 1 && (
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          <span className="text-muted-foreground font-medium text-xs">Strategies:</span>
+          {grouped.map(({ strategy }, index) => {
+            const color = getStrategyColor(index)
+            return (
+              <div key={strategy.id} className="flex items-center gap-2">
+                <div className={cn('h-2 w-8 rounded-full', color.swatch)} />
+                <span className="text-muted-foreground text-xs">{strategy.title}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Strategy sections */}
-      {grouped.map(({ strategy, objectives: stratObjectives }) => {
+      {grouped.map(({ strategy, objectives: stratObjectives }, index) => {
         const isCollapsed = collapsedStrategies.has(strategy.id)
+        const color = getStrategyColor(index)
 
         return (
-          <div key={strategy.id} className="space-y-3">
+          <div
+            key={strategy.id}
+            className={cn(
+              'rounded-xl border-l-4 p-4 space-y-3 transition-colors',
+              color.border,
+              color.bg,
+            )}
+          >
             {/* Strategy header */}
             <button
               onClick={() => toggleCollapse(strategy.id)}
@@ -596,7 +621,7 @@ function BoardView({
               ) : (
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
               )}
-              <Flag className="h-3.5 w-3.5 text-international-orange" />
+              <Flag className={cn('h-3.5 w-3.5', color.icon)} />
               <span className="text-sm font-semibold text-foreground">
                 {strategy.title}
               </span>
@@ -608,7 +633,7 @@ function BoardView({
             {/* Objectives grid */}
             {!isCollapsed && (
               stratObjectives.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pl-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {stratObjectives.map(obj => (
                     <ObjectiveCard
                       key={obj.id}
@@ -622,7 +647,7 @@ function BoardView({
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground pl-6 py-2">
+                <p className="text-xs text-muted-foreground py-2">
                   No objectives linked to this strategy yet.
                 </p>
               )

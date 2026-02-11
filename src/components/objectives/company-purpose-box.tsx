@@ -24,6 +24,8 @@ interface CompanyPurposeBoxProps {
   isFounder: boolean
   /** Callback when user clicks "Define Purpose" or "Edit" */
   onOpenDialog: () => void
+  /** Display variant: 'card' for full card (Objectives page), 'inline' for compact (Strategy page) */
+  variant?: 'card' | 'inline'
   /** Additional CSS classes */
   className?: string
 }
@@ -51,9 +53,15 @@ export function CompanyPurposeBox({
   purposeData,
   isFounder,
   onOpenDialog,
+  variant = 'card',
   className,
 }: CompanyPurposeBoxProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+
+  // ── Inline variant (compact, for Strategy page header) ──
+  if (variant === 'inline') {
+    return <CompanyPurposeInline purposeData={purposeData} isFounder={isFounder} onOpenDialog={onOpenDialog} className={className} />
+  }
   
   // Show "Define Purpose" CTA for founders when purpose is empty
   if (!purposeData && isFounder) {
@@ -198,5 +206,97 @@ export function CompanyPurposeBox({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+// ============================================================================
+// INLINE VARIANT (compact, for Strategy page header)
+// ============================================================================
+
+/**
+ * CompanyPurposeInline - Compact inline display for the Strategy page header.
+ *
+ * @description Renders purpose as a slim element instead of a full card.
+ * Empty state shows a small CTA button; filled state shows a collapsible
+ * single-line summary. Saves ~60px of vertical space vs. the card variant.
+ */
+function CompanyPurposeInline({
+  purposeData,
+  isFounder,
+  onOpenDialog,
+  className,
+}: Omit<CompanyPurposeBoxProps, 'variant'>) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  // Empty state: show compact CTA or subtle hint
+  if (!purposeData) {
+    if (isFounder) {
+      return (
+        <button
+          onClick={onOpenDialog}
+          className={cn(
+            'flex items-center gap-2 text-sm text-international-orange hover:text-international-orange-hover transition-colors font-medium',
+            className
+          )}
+        >
+          <Compass className="h-4 w-4" />
+          Define Purpose
+        </button>
+      )
+    }
+    return (
+      <div className={cn('flex items-center gap-2 text-xs text-muted-foreground', className)}>
+        <Info className="h-3.5 w-3.5" />
+        <span>Company purpose not yet defined</span>
+      </div>
+    )
+  }
+
+  // Filled state: collapsible single-line summary
+  const hasMissionOrVision = purposeData.mission || purposeData.vision
+
+  return (
+    <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+      <div className={cn('flex items-center gap-3', className)}>
+        <Compass className="h-4 w-4 text-international-orange flex-shrink-0" />
+        <CollapsibleTrigger asChild>
+          <button className="text-sm text-foreground font-medium hover:text-international-orange transition-colors truncate max-w-xl text-left">
+            {purposeData.purpose}
+          </button>
+        </CollapsibleTrigger>
+        {hasMissionOrVision && (
+          <CollapsibleTrigger asChild>
+            <button className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0" aria-label={isExpanded ? 'Collapse purpose details' : 'Expand purpose details'}>
+              {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </button>
+          </CollapsibleTrigger>
+        )}
+        {isFounder && (
+          <button
+            onClick={onOpenDialog}
+            className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+            aria-label="Edit company purpose"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {hasMissionOrVision && (
+        <CollapsibleContent className="mt-2 ml-7 space-y-2">
+          {purposeData.mission && (
+            <div className="bg-muted/30 rounded-md px-3 py-2">
+              <p className="text-xs font-semibold text-foreground">Mission</p>
+              <p className="text-xs text-muted-foreground">{purposeData.mission}</p>
+            </div>
+          )}
+          {purposeData.vision && (
+            <div className="bg-muted/30 rounded-md px-3 py-2">
+              <p className="text-xs font-semibold text-foreground">Vision</p>
+              <p className="text-xs text-muted-foreground">{purposeData.vision}</p>
+            </div>
+          )}
+        </CollapsibleContent>
+      )}
+    </Collapsible>
   )
 }

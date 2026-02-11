@@ -65,6 +65,12 @@ interface StrategyRiverProps {
   onMilestoneClick?: (milestoneId: string) => void
   /** Called when a strategic goal title/node is clicked */
   onGoalClick?: (goalId: string) => void
+  /** Called when the "+" button on a river lane is clicked */
+  onAddToRiver?: (strategicObjectiveId: string) => void
+  /** Externally controlled set of expanded objective IDs (overrides internal state) */
+  expandedObjectiveIds?: Set<string>
+  /** Called when expansion should change (when controlled externally) */
+  onExpandToggle?: (objectiveId: string) => void
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -117,17 +123,21 @@ function riverSegPath(x1: number, y: number, w1: number, x2: number, w2: number)
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onTaskClick, onMilestoneClick, onGoalClick }) => {
+const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onTaskClick, onMilestoneClick, onGoalClick, onAddToRiver, expandedObjectiveIds, onExpandToggle }) => {
   const NOW = today ?? new Date()
 
-  // Per-milestone expansion — clicking a milestone toggles its tasks
-  const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(() => {
-    // Start with the first SO's milestones expanded
+  // Per-milestone expansion — controlled externally or managed internally
+  const isControlled = expandedObjectiveIds !== undefined
+  const [internalExpanded, setInternalExpanded] = useState<Set<string>>(() => {
     if (strategicObjectives.length > 0) {
       return new Set(strategicObjectives[0].objectives.map((o) => o.id))
     }
     return new Set()
   })
+  const expandedMilestones = isControlled ? expandedObjectiveIds : internalExpanded
+  const setExpandedMilestones = isControlled
+    ? () => {} // No-op: parent controls via onExpandToggle
+    : setInternalExpanded
 
   const [hovTask, setHovTask] = useState<string | null>(null)
   const [hovObj, setHovObj] = useState<string | null>(null)
@@ -265,12 +275,16 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
   }
   const onMU = (): void => { dragRef.current = null }
 
-  // Toggle ALL milestones within an SO (header button)
+  // Toggle ALL milestones within an SO
   const toggleExpand = (soId: string): void => {
+    if (isControlled && onExpandToggle) {
+      onExpandToggle(soId)
+      return
+    }
     const so = strategicObjectives.find((s) => s.id === soId)
     if (!so) return
     const msIds = so.objectives.map((o) => o.id)
-    setExpandedMilestones((prev) => {
+    setInternalExpanded((prev) => {
       const next = new Set(prev)
       const anyExpanded = msIds.some((id) => next.has(id))
       if (anyExpanded) {
@@ -284,7 +298,11 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
 
   // Toggle a single milestone (clicking a milestone node on the river)
   const toggleMilestone = (milestoneId: string): void => {
-    setExpandedMilestones((prev) => {
+    if (isControlled && onExpandToggle) {
+      onExpandToggle(milestoneId)
+      return
+    }
+    setInternalExpanded((prev) => {
       const next = new Set(prev)
       if (next.has(milestoneId)) next.delete(milestoneId); else next.add(milestoneId)
       return next
@@ -295,65 +313,30 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
 
   return (
     <div
-      style={{ background: '#F8FAFC', fontFamily: FONT }}
+      style={{ background: '#F8FAFC', fontFamily: FONT, position: 'relative' }}
       onMouseMove={onMM}
       onMouseUp={onMU}
       onMouseLeave={onMU}
     >
-      {/* Toolbar — status badges, zoom, objective pills */}
-      <div style={{ padding: '14px 28px 14px', background: 'white', borderBottom: '1px solid #E5E7EB' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' as const }}>
-          {[
-            { bg: '#ECFDF5', c: '#059669', text: `✓ ${doneTasks} done` },
-            { bg: '#FFF7ED', c: '#EA580C', text: `⚡ ${ipTasks} in progress` },
-            { bg: '#F1F5F9', c: '#64748B', text: `○ ${totalTasks - doneTasks - ipTasks} not started` },
-          ].map((p) => (
-            <span key={p.text} style={{ fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 14, background: p.bg, color: p.c }}>
-              {p.text}
-            </span>
-          ))}
-
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 3, background: '#F1F5F9', borderRadius: 8, padding: '3px 5px' }}>
-            <ZoomBtn onClick={() => setPan((p) => Math.max(p - 80, -200))}>◀</ZoomBtn>
-            <ZoomBtn onClick={() => setZoom((z) => { const n = Math.max(z - 0.25, 0.5); if (n <= 1) setPan(0); return n })}>−</ZoomBtn>
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B', minWidth: 32, textAlign: 'center' as const }}>
-              {Math.round(zoom * 100)}%
-            </span>
-            <ZoomBtn onClick={() => setZoom((z) => Math.min(z + 0.25, 4))}>+</ZoomBtn>
-            <ZoomBtn onClick={() => setPan((p) => Math.min(p + 80, 800))}>▶</ZoomBtn>
-            {zoom !== 1 && (
-              <ZoomBtn onClick={() => { setZoom(1); setPan(0) }} style={{ fontSize: 8, width: 'auto', padding: '0 6px' }}>
-                Reset
-              </ZoomBtn>
-            )}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
-          {strategicObjectives.map((so) => {
-            const msIds = so.objectives.map((o) => o.id)
-            const isExp = msIds.some((id) => expandedMilestones.has(id))
-            return (
-              <button
-                key={so.id}
-                onClick={() => toggleExpand(so.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 7, padding: '7px 14px',
-                  borderRadius: 10,
-                  border: `2px solid ${so.color}${isExp ? '40' : '18'}`,
-                  background: isExp ? so.color + '08' : 'white',
-                  cursor: 'pointer', fontFamily: FONT, fontSize: 12, fontWeight: 700, color: '#0F172A',
-                }}
-              >
-                <div style={{ width: 7, height: 7, borderRadius: '50%', background: so.color }} />
-                {so.title}
-                <span style={{ fontSize: 11, color: '#94A3B8', transform: isExp ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-                  ▾
-                </span>
-              </button>
-            )
-          })}
-        </div>
+      {/* Floating zoom controls (top-right corner of the river) */}
+      <div style={{
+        position: 'absolute', top: 10, right: 28, zIndex: 10,
+        display: 'flex', alignItems: 'center', gap: 3,
+        background: 'white', borderRadius: 8, padding: '3px 5px',
+        boxShadow: '0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04)',
+      }}>
+        <ZoomBtn onClick={() => setPan((p) => Math.max(p - 80, -200))}>◀</ZoomBtn>
+        <ZoomBtn onClick={() => setZoom((z) => { const n = Math.max(z - 0.25, 0.5); if (n <= 1) setPan(0); return n })}>−</ZoomBtn>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B', minWidth: 32, textAlign: 'center' as const }}>
+          {Math.round(zoom * 100)}%
+        </span>
+        <ZoomBtn onClick={() => setZoom((z) => Math.min(z + 0.25, 4))}>+</ZoomBtn>
+        <ZoomBtn onClick={() => setPan((p) => Math.min(p + 80, 800))}>▶</ZoomBtn>
+        {zoom !== 1 && (
+          <ZoomBtn onClick={() => { setZoom(1); setPan(0) }} style={{ fontSize: 8, width: 'auto', padding: '0 6px' }}>
+            Reset
+          </ZoomBtn>
+        )}
       </div>
 
       {/* SVG Canvas */}
@@ -504,6 +487,24 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                     {pct}% · {new Date(so.targetDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
                   </text>
                 </g>
+
+                {/* Add-to-river "+" button next to SO label */}
+                {onAddToRiver && (
+                  <foreignObject x={PAD_L - 30} y={ry - 10} width={20} height={20}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onAddToRiver(so.id) }}
+                      title={`Add milestone to ${so.title}`}
+                      style={{
+                        width: 20, height: 20, borderRadius: '50%', border: `1.5px solid ${so.color}40`,
+                        background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                        color: so.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontFamily: FONT, lineHeight: 1, padding: 0, transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = so.color + '12'; e.currentTarget.style.borderColor = so.color }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = so.color + '40' }}
+                    >+</button>
+                  </foreignObject>
+                )}
               </g>
             )
           })}
@@ -514,6 +515,29 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
 }
 
 export default StrategyRiver
+
+/**
+ * Computes task status counts from river data.
+ *
+ * @description Used by the parent shell to render status badges
+ * in the tab bar without duplicating the toolbar inside the river.
+ *
+ * @param data - Array of river strategic objectives
+ * @returns Object with done, inProgress, and notStarted counts
+ */
+export function computeRiverStats(data: RiverStrategicObjective[]): { done: number; inProgress: number; notStarted: number } {
+  let done = 0, inProgress = 0, total = 0
+  for (const so of data) {
+    for (const obj of so.objectives) {
+      for (const t of obj.tasks) {
+        total++
+        if (t.status === 'done') done++
+        else if (t.status === 'in_progress') inProgress++
+      }
+    }
+  }
+  return { done, inProgress, notStarted: total - done - inProgress }
+}
 
 // ─── Zoom button ─────────────────────────────────────────────────────────────
 

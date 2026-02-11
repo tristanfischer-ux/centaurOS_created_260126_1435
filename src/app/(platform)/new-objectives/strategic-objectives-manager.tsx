@@ -190,13 +190,10 @@ export function StrategicObjectivesManager({
       </AlertDialog>
 
       {/* Strategic Objectives Row */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="flex items-center gap-2 text-sm">
           <Flag className="h-4 w-4 text-international-orange" />
           <span className="font-semibold text-foreground">Strategic Objectives</span>
-          <span className="text-muted-foreground text-xs">
-            — define your high-level goals, then link objectives to them
-          </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

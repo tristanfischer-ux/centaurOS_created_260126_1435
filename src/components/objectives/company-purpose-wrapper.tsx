@@ -17,6 +17,8 @@ interface CompanyPurposeWrapperProps {
   isFounder: boolean
   foundryId: string
   userId: string
+  /** Display variant: 'card' for full card (Objectives page), 'inline' for compact (Strategy page) */
+  variant?: 'card' | 'inline'
 }
 
 /**
@@ -30,6 +32,7 @@ export function CompanyPurposeWrapper({
   isFounder,
   foundryId,
   userId,
+  variant = 'card',
 }: CompanyPurposeWrapperProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
@@ -39,6 +42,7 @@ export function CompanyPurposeWrapper({
         purposeData={purposeData}
         isFounder={isFounder}
         onOpenDialog={() => setIsDialogOpen(true)}
+        variant={variant}
       />
       
       <CompanyPurposeDialog

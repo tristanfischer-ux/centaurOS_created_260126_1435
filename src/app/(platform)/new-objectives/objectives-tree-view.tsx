@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { ChevronRight, ChevronDown, ListChecks, AlertTriangle, Pencil, Trash, Flag } from 'lucide-react'
 import type { ObjectiveWithTasks, StrategicObjective } from './types'
+import { getStrategyColor, type StrategyColor } from './strategy-colors'
 
 interface ObjectivesTreeViewProps {
   objectives: ObjectiveWithTasks[]
@@ -202,11 +203,13 @@ function StrategyRow({
   objectiveCount,
   expanded,
   onToggle,
+  color,
 }: {
   strategy: StrategicObjective
   objectiveCount: number
   expanded: boolean
   onToggle: () => void
+  color: StrategyColor
 }) {
   return (
     <button
@@ -218,7 +221,7 @@ function StrategyRow({
       ) : (
         <ChevronRight className="h-4 w-4 text-muted-foreground" />
       )}
-      <Flag className="h-3.5 w-3.5 text-international-orange" />
+      <Flag className={cn('h-3.5 w-3.5', color.icon)} />
       <span className="text-sm text-foreground">{strategy.title}</span>
       <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
         {objectiveCount}
@@ -297,24 +300,75 @@ export function ObjectivesTreeView({ objectives, strategicObjectives = [], selec
   }
 
   return (
-    <div className="space-y-0.5 bg-background rounded-xl border border-slate-100 p-2">
-      <TreeHeader />
-      <Separator />
+    <div className="space-y-2">
+      {/* Strategy color legend */}
+      {grouped.length > 1 && (
+        <div className="flex flex-wrap items-center gap-4 text-sm px-2">
+          <span className="text-muted-foreground font-medium text-xs">Strategies:</span>
+          {grouped.map(({ strategy }, index) => {
+            const color = getStrategyColor(index)
+            return (
+              <div key={strategy.id} className="flex items-center gap-2">
+                <div className={cn('h-2 w-8 rounded-full', color.swatch)} />
+                <span className="text-muted-foreground text-xs">{strategy.title}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
-      {/* Strategy sections */}
-      {grouped.map(({ strategy, objectives: stratObjectives }) => {
-        const isCollapsed = collapsedStrategies.has(strategy.id)
-        const tree = buildTree(stratObjectives)
+      <div className="space-y-0.5 bg-background rounded-xl border border-slate-100 p-2">
+        <TreeHeader />
+        <Separator />
 
-        return (
-          <div key={strategy.id}>
-            <StrategyRow
-              strategy={strategy}
-              objectiveCount={stratObjectives.length}
-              expanded={!isCollapsed}
-              onToggle={() => toggleStrategy(strategy.id)}
-            />
-            {!isCollapsed && tree.map(node => (
+        {/* Strategy sections */}
+        {grouped.map(({ strategy, objectives: stratObjectives }, index) => {
+          const isCollapsed = collapsedStrategies.has(strategy.id)
+          const tree = buildTree(stratObjectives)
+          const color = getStrategyColor(index)
+
+          return (
+            <div
+              key={strategy.id}
+              className={cn(
+                'rounded-lg border-l-4 my-1',
+                color.border,
+                color.bg,
+              )}
+            >
+              <StrategyRow
+                strategy={strategy}
+                objectiveCount={stratObjectives.length}
+                expanded={!isCollapsed}
+                onToggle={() => toggleStrategy(strategy.id)}
+                color={color}
+              />
+              {!isCollapsed && tree.map(node => (
+                <TreeItem
+                  key={node.objective.id}
+                  node={node}
+                  depth={1}
+                  selectedId={selectedId}
+                  onSelect={onSelect}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                />
+              ))}
+            </div>
+          )
+        })}
+
+        {/* Unlinked */}
+        {unlinked.length > 0 && (
+          <div>
+            <div className="flex items-center gap-3 py-2.5 px-3 text-sm font-semibold text-muted-foreground">
+              <div className="w-4" />
+              <span>Unlinked Objectives</span>
+              <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded tabular-nums">
+                {unlinked.length}
+              </span>
+            </div>
+            {buildTree(unlinked).map(node => (
               <TreeItem
                 key={node.objective.id}
                 node={node}
@@ -326,32 +380,8 @@ export function ObjectivesTreeView({ objectives, strategicObjectives = [], selec
               />
             ))}
           </div>
-        )
-      })}
-
-      {/* Unlinked */}
-      {unlinked.length > 0 && (
-        <div>
-          <div className="flex items-center gap-3 py-2.5 px-3 text-sm font-semibold text-muted-foreground">
-            <div className="w-4" />
-            <span>Unlinked Objectives</span>
-            <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded tabular-nums">
-              {unlinked.length}
-            </span>
-          </div>
-          {buildTree(unlinked).map(node => (
-            <TreeItem
-              key={node.objective.id}
-              node={node}
-              depth={1}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
-          ))}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

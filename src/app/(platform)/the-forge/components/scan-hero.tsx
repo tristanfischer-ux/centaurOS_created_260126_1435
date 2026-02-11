@@ -1,15 +1,21 @@
 /**
- * @file scan-hero.tsx — Idea input + scan CTA
+ * @file scan-hero.tsx — Idea input + scan CTA with educational progress
  *
  * @description Compact card for entering a product idea and triggering
  * the scan. Shows the derived function statement as a blockquote.
  * After a scan exists, offers "Fresh Re-scan" and "Refine with changes"
  * options so users can iterate on their idea.
+ *
+ * While scanning is in progress, displays an animated educational explainer
+ * that cycles through messages describing each stage of the reverse-engineering
+ * process. This turns the wait into a learning moment about systems engineering.
  */
 
 "use client"
 
 import React, { useState, useEffect } from "react"
+
+import { AnimatePresence, motion } from "framer-motion"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -24,7 +30,208 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Zap, Loader2, RefreshCw, Sparkles } from "lucide-react"
+import {
+  Zap,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+  Search,
+  Layers,
+  GitBranch,
+  ShieldAlert,
+  ClipboardList,
+  Package,
+  ArrowRight,
+  Diff,
+  CheckCircle2,
+  Puzzle,
+} from "lucide-react"
+
+// ─── Educational Progress Steps ─────────────────────────────────────
+
+interface InsightStep {
+  /** Lucide icon component */
+  icon: React.ElementType
+  /** Short title for this stage */
+  title: string
+  /** Educational description of what's happening */
+  description: string
+}
+
+/** Steps shown during a fresh scan — explains the full reverse-engineering process */
+const SCAN_INSIGHTS: InsightStep[] = [
+  {
+    icon: Search,
+    title: "Analysing your concept",
+    description:
+      "Breaking down your idea into its core engineering challenge — what physical transformation needs to happen?",
+  },
+  {
+    icon: Layers,
+    title: "Identifying subsystems",
+    description:
+      "Every machine is a collection of modules. We're mapping the distinct physical sub-assemblies your product needs.",
+  },
+  {
+    icon: GitBranch,
+    title: "Mapping material flows",
+    description:
+      "What goes in, what comes out — tracing the input-output chain so each module's interface is clearly defined.",
+  },
+  {
+    icon: ShieldAlert,
+    title: "Finding the gating module",
+    description:
+      "One module defines your entire design. Until it's specified, supplier quotes for everything else are meaningless.",
+  },
+  {
+    icon: ClipboardList,
+    title: "Generating diagnostic questions",
+    description:
+      "For your critical module, we're creating questions that collapse the design space — answering them unlocks real quotes.",
+  },
+  {
+    icon: Package,
+    title: "Cataloguing components & risks",
+    description:
+      "Listing specific parts, failure modes, and expert questions — the kind of detail you'd need for a real design review.",
+  },
+]
+
+/** Steps shown during a refine — explains the incremental update process */
+const REFINE_INSIGHTS: InsightStep[] = [
+  {
+    icon: Diff,
+    title: "Comparing your changes",
+    description:
+      "Reviewing what you've updated and figuring out which modules are affected by the revised concept.",
+  },
+  {
+    icon: CheckCircle2,
+    title: "Preserving existing work",
+    description:
+      "Modules that haven't changed keep their images, supplier data, and diagnostic answers — nothing is lost.",
+  },
+  {
+    icon: Puzzle,
+    title: "Updating affected modules",
+    description:
+      "Adding, removing, or modifying modules so the system matches your revised idea while staying internally consistent.",
+  },
+  {
+    icon: GitBranch,
+    title: "Re-validating material flows",
+    description:
+      "Ensuring every module's inputs and outputs still chain together logically after the changes.",
+  },
+  {
+    icon: Package,
+    title: "Refreshing components & risks",
+    description:
+      "Updating key parts, failure modes, and expert questions for any modules that were modified.",
+  },
+]
+
+/** What-happens-next steps shown below the cycling insight */
+const NEXT_STEPS = [
+  "Review the engineering breakdown of your product",
+  "Answer diagnostic questions to lock in the core design",
+  "Generate technical illustrations for each module",
+  "Connect with domain experts and source suppliers",
+]
+
+/** Interval (ms) between cycling to the next insight step */
+const INSIGHT_CYCLE_MS = 4500
+
+// ─── ScanProgressExplainer ──────────────────────────────────────────
+
+interface ScanProgressExplainerProps {
+  /** Whether this is a refine (true) or fresh scan (false) */
+  isRefine: boolean
+}
+
+/**
+ * ScanProgressExplainer — Animated educational progress during AI scanning.
+ *
+ * @description Cycles through insight steps explaining each phase of the
+ * reverse-engineering process, plus a "what happens next" preview. Turns
+ * wait time into a learning moment about how product engineering works.
+ *
+ * @param props.isRefine - Shows refine-specific messages when true
+ */
+function ScanProgressExplainer({ isRefine }: ScanProgressExplainerProps): React.ReactNode {
+  const insights = isRefine ? REFINE_INSIGHTS : SCAN_INSIGHTS
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % insights.length)
+    }, INSIGHT_CYCLE_MS)
+    return () => clearInterval(timer)
+  }, [insights.length])
+
+  const current = insights[currentIndex]
+  const Icon = current.icon
+
+  return (
+    <div className="space-y-5 pt-2">
+      {/* Progress dots */}
+      <div className="flex items-center justify-center gap-1.5">
+        {insights.map((_, i) => (
+          <div
+            key={i}
+            className={`h-1.5 rounded-full transition-all duration-500 ${
+              i === currentIndex
+                ? "w-6 bg-international-orange"
+                : i < currentIndex
+                  ? "w-1.5 bg-international-orange/40"
+                  : "w-1.5 bg-muted"
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Cycling insight card */}
+      <div className="relative min-h-[88px]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentIndex}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="flex items-start gap-3 rounded-lg bg-muted/30 px-4 py-3"
+          >
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-international-orange/10">
+              <Icon className="h-4 w-4 text-international-orange" />
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-sm font-semibold text-foreground">{current.title}</p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {current.description}
+              </p>
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* What happens next */}
+      <div className="rounded-lg border border-dashed border-muted-foreground/20 px-4 py-3 space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          What happens next
+        </p>
+        <ol className="space-y-1.5">
+          {NEXT_STEPS.map((step, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+              <ArrowRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-international-orange/60" />
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  )
+}
 
 // ─── Props ───────────────────────────────────────────────────────────
 
@@ -54,6 +261,9 @@ interface ScanHeroProps {
  * shows a single "Scan & reverse engineer" CTA. After a scan exists,
  * shows two options: "Fresh Re-scan" (with confirmation) and "Refine
  * with changes" (sends existing spec + updated idea to AI).
+ *
+ * While scanning, an educational explainer cycles through messages
+ * explaining each phase of the reverse-engineering process.
  */
 export function ScanHero({
   idea,
@@ -66,6 +276,8 @@ export function ScanHero({
 }: ScanHeroProps): React.ReactNode {
   const [localIdea, setLocalIdea] = useState(idea)
   const [showRescanConfirm, setShowRescanConfirm] = useState(false)
+  // Track whether the last action was a refine (vs fresh scan) for insight messages
+  const [lastActionWasRefine, setLastActionWasRefine] = useState(false)
 
   useEffect(() => {
     setLocalIdea(idea)
@@ -78,7 +290,13 @@ export function ScanHero({
 
   const handleFreshRescan = (): void => {
     setShowRescanConfirm(false)
+    setLastActionWasRefine(false)
     onScan(localIdea)
+  }
+
+  const handleRefine = (): void => {
+    setLastActionWasRefine(true)
+    onRefine(localIdea)
   }
 
   return (
@@ -128,7 +346,7 @@ export function ScanHero({
                 )}
               </Button>
               <Button
-                onClick={() => onRefine(localIdea)}
+                onClick={handleRefine}
                 disabled={isScanning || !localIdea.trim()}
                 className="flex-1 bg-international-orange hover:bg-international-orange-hover text-white h-11"
               >
@@ -166,7 +384,12 @@ export function ScanHero({
             </Button>
           )}
 
-          {functionStatement && (
+          {/* Educational progress explainer — shown while scanning */}
+          {isScanning && (
+            <ScanProgressExplainer isRefine={lastActionWasRefine && hasExistingSpec} />
+          )}
+
+          {functionStatement && !isScanning && (
             <blockquote className="border-l-4 border-international-orange/40 pl-4 py-2 bg-muted/20 rounded-r-lg">
               <p className="text-sm text-foreground leading-relaxed italic">
                 {functionStatement}
