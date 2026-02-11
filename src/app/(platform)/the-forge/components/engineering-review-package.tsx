@@ -43,6 +43,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+import { ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import type { XRaySpec, ModuleSpec, SystemAnalysis } from "../services/xray-schema"
 
 // ─── Props ───────────────────────────────────────────────────────────
@@ -134,6 +135,7 @@ function ExecutiveSummary({
         <CardTitle className="flex items-center gap-2 text-base">
           <BarChart3 className="h-5 w-5 text-international-orange" />
           Executive Summary
+          <ForgeInfoTip text={FORGE_EXPLANATIONS.executiveSummary.description} />
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -168,24 +170,28 @@ function ExecutiveSummary({
             label="Total Mass"
             value={sa?.totalMass_kg != null ? formatMass(sa.totalMass_kg) : "N/A"}
             icon={<Scale className="h-4 w-4" />}
+            tip={FORGE_EXPLANATIONS.massProperties.description}
           />
           <MetricCell
             label="Structural"
             value={gradeLabel(sa?.structuralGrade)}
             icon={<ShieldCheck className="h-4 w-4" />}
             status={gradeStatus(sa?.structuralGrade)}
+            tip={FORGE_EXPLANATIONS.feaAnalysis.description}
           />
           <MetricCell
             label="DFM"
             value={gradeLabel(sa?.manufacturabilityGrade)}
             icon={<Printer className="h-4 w-4" />}
             status={gradeStatus(sa?.manufacturabilityGrade)}
+            tip={FORGE_EXPLANATIONS.dfmCheck.description}
           />
           <MetricCell
             label="Convergence"
             value={sa?.convergenceStatus === "converged" ? "Converged" : sa?.convergenceStatus ?? "N/A"}
             icon={<RotateCcw className="h-4 w-4" />}
             status={sa?.convergenceStatus === "converged" ? "pass" : sa?.convergenceStatus === "not_started" ? "neutral" : "warning"}
+            tip={FORGE_EXPLANATIONS.convergenceAnalysis.description}
           />
         </div>
 
@@ -215,6 +221,7 @@ function StructuralSection({ modules }: { modules: ModuleSpec[] }): React.ReactN
         <CardTitle className="flex items-center gap-2 text-base">
           <ShieldCheck className="h-5 w-5 text-international-orange" />
           Structural Analysis (FEA)
+          <ForgeInfoTip text={FORGE_EXPLANATIONS.feaAnalysis.description} />
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -272,6 +279,7 @@ function ThermalSection({ modules }: { modules: ModuleSpec[] }): React.ReactNode
         <CardTitle className="flex items-center gap-2 text-base">
           <Thermometer className="h-5 w-5 text-international-orange" />
           Thermal Analysis
+          <ForgeInfoTip text={FORGE_EXPLANATIONS.thermalAnalysis.description} />
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -330,6 +338,7 @@ function DfmSection({ modules }: { modules: ModuleSpec[] }): React.ReactNode {
         <CardTitle className="flex items-center gap-2 text-base">
           <Printer className="h-5 w-5 text-international-orange" />
           Design for Manufacturing
+          <ForgeInfoTip text={FORGE_EXPLANATIONS.dfmCheck.description} />
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -377,6 +386,7 @@ function ConvergenceSection({ sa }: { sa: SystemAnalysis }): React.ReactNode {
         <CardTitle className="flex items-center gap-2 text-base">
           <RotateCcw className="h-5 w-5 text-international-orange" />
           Convergence Analysis
+          <ForgeInfoTip text={FORGE_EXPLANATIONS.convergenceAnalysis.description} />
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -446,6 +456,7 @@ function ActionItemsSection({ items }: { items: ActionItem[] }): React.ReactNode
         <CardTitle className="flex items-center gap-2 text-base">
           <Zap className="h-5 w-5 text-international-orange" />
           Action Items ({items.length})
+          <ForgeInfoTip text={FORGE_EXPLANATIONS.actionItems.description} />
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -494,17 +505,20 @@ function MetricCell({
   value,
   icon,
   status = "neutral",
+  tip,
 }: {
   label: string
   value: string
   icon: React.ReactNode
   status?: "pass" | "warning" | "fail" | "neutral"
+  tip?: string
 }): React.ReactNode {
   return (
     <div className="p-3 rounded-lg bg-muted/30 space-y-1">
       <div className="flex items-center gap-2 text-muted-foreground">
         {icon}
         <span className="text-[10px] uppercase tracking-wider">{label}</span>
+        {tip && <ForgeInfoTip text={tip} className="h-2.5 w-2.5" />}
       </div>
       <p className={cn(
         "text-sm font-semibold",

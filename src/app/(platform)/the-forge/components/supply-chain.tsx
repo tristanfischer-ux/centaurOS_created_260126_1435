@@ -25,6 +25,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+import { ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import type { XRaySpec } from "../services/xray-schema"
 import type { SupplierMatch } from "../services/suppliers"
 
@@ -78,11 +79,12 @@ export function SupplyChain({
           <div className="flex items-center gap-3">
             <div className="w-1 h-7 bg-chart-4 rounded-full" />
             <div>
-              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">
+              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground inline-flex items-center gap-2">
                 Supply Chain
+                <ForgeInfoTip text={FORGE_EXPLANATIONS.supplyChain.description} />
               </h3>
               <p className="text-xs text-muted-foreground">
-                Suppliers matched by module{processClass ? ` — process class: ${processClass}` : ""}
+                Suppliers matched by module{processClass ? <> — process class: <span className="font-medium text-foreground">{processClass}</span> <ForgeInfoTip text={FORGE_EXPLANATIONS.processClass.description} className="h-2.5 w-2.5" /></> : ""}
               </p>
             </div>
           </div>
@@ -181,14 +183,16 @@ export function SupplyChain({
                               <span key={i} className="inline-block rounded bg-muted/60 px-1.5 py-0.5 text-[9px] text-muted-foreground">{c}</span>
                             ))}
                           </div>
-                          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <Clock className="h-2.5 w-2.5" />
                               {s.typicalLeadWeeks}w lead
+                              <ForgeInfoTip text={FORGE_EXPLANATIONS.leadTime.description} className="h-2 w-2" />
                             </div>
                             <div className="flex items-center gap-1">
                               <ShieldCheck className="h-2.5 w-2.5" />
                               {s.warrantyMonths}m warranty
+                              <ForgeInfoTip text={FORGE_EXPLANATIONS.warranty.description} className="h-2 w-2" />
                             </div>
                           </div>
                         </CardContent>

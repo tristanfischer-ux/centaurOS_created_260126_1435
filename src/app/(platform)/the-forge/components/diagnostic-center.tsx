@@ -27,6 +27,7 @@ import {
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
+import { ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import type { XRaySpec, ModuleSpec } from "../services/xray-schema"
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -94,8 +95,9 @@ function DiagnosticSummary({ gating }: { gating: ModuleSpec }): React.ReactNode 
           <div className="flex items-center gap-3">
             <div className="w-1 h-7 bg-status-success rounded-full" />
             <div>
-              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">
+              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground inline-flex items-center gap-2">
                 Gating Diagnostic
+                <ForgeInfoTip text={FORGE_EXPLANATIONS.gatingDiagnostic.description} />
               </h3>
               <p className="text-xs text-muted-foreground">
                 {gating.name} — diagnostic complete
@@ -112,7 +114,7 @@ function DiagnosticSummary({ gating }: { gating: ModuleSpec }): React.ReactNode 
         <div className="rounded-xl bg-status-success-light/30 border border-status-success/20 p-4 flex items-center gap-3">
           <FlaskConical className="h-5 w-5 text-status-success shrink-0" />
           <div>
-            <h4 className="text-xs font-semibold text-foreground">Derived process class</h4>
+            <h4 className="text-xs font-semibold text-foreground inline-flex items-center gap-1.5">Derived process class <ForgeInfoTip text={FORGE_EXPLANATIONS.derivedProcessClass.description} /></h4>
             <p className="text-sm font-medium text-foreground">{processClass}</p>
           </div>
         </div>
@@ -208,8 +210,9 @@ function DiagnosticQuestionnaire({
           <div className="flex items-center gap-3">
             <div className="w-1 h-7 bg-status-warning rounded-full" />
             <div>
-              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">
+              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground inline-flex items-center gap-2">
                 Gating Diagnostic
+                <ForgeInfoTip text={FORGE_EXPLANATIONS.gatingDiagnostic.description} />
               </h3>
               <p className="text-xs text-muted-foreground">
                 {gating.name} — answer {diagnostic.questions.length} questions to unlock supplier matching

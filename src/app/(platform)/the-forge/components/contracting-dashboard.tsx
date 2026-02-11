@@ -42,6 +42,8 @@ import {
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
+import { ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
+
 import {
   getForgeContractsAction,
   generateRfqPackAction,
@@ -257,8 +259,9 @@ export function ContractingDashboard({
       <div className="flex items-center gap-3">
         <div className="w-1 h-7 bg-chart-5 rounded-full" />
         <div>
-          <h2 className="text-lg font-display font-semibold tracking-tight text-foreground">
+          <h2 className="text-lg font-display font-semibold tracking-tight text-foreground inline-flex items-center gap-2">
             Contracting & Procurement
+            <ForgeInfoTip text="Generate professional procurement documents — RFQs, contracts, and NDAs — from your project data. These are the documents you'd normally pay a procurement consultant to draft." />
           </h2>
           <p className="text-xs text-muted-foreground">
             Generate procurement documents from your project data
@@ -271,6 +274,7 @@ export function ContractingDashboard({
           <TabsTrigger value="rfq">
             <FileText className="h-3.5 w-3.5 mr-1.5" />
             RFQ Pack
+            <ForgeInfoTip text={FORGE_EXPLANATIONS.rfqPack.description} className="ml-1 h-3 w-3" />
           </TabsTrigger>
           <TabsTrigger value="contracts">
             <ScrollText className="h-3.5 w-3.5 mr-1.5" />
@@ -282,6 +286,7 @@ export function ContractingDashboard({
           <TabsTrigger value="readiness">
             <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
             Readiness
+            <ForgeInfoTip text={FORGE_EXPLANATIONS.rfqReadiness.description} className="ml-1 h-3 w-3" />
           </TabsTrigger>
         </TabsList>
 
@@ -297,7 +302,7 @@ export function ContractingDashboard({
                 </div>
                 {processClass && (
                   <div>
-                    <p className="text-xs text-muted-foreground">Process Class</p>
+                    <p className="text-xs text-muted-foreground inline-flex items-center gap-1">Process Class <ForgeInfoTip text={FORGE_EXPLANATIONS.processClass.description} className="h-2.5 w-2.5" /></p>
                     <p className="text-sm font-semibold text-foreground">{processClass}</p>
                   </div>
                 )}
@@ -315,7 +320,7 @@ export function ContractingDashboard({
                 )}
                 {criticalPath > 0 && (
                   <div>
-                    <p className="text-xs text-muted-foreground">Critical Path</p>
+                    <p className="text-xs text-muted-foreground inline-flex items-center gap-1">Critical Path <ForgeInfoTip text={FORGE_EXPLANATIONS.criticalPath.description} className="h-2.5 w-2.5" /></p>
                     <p className="text-sm font-semibold text-foreground">{criticalPath} weeks</p>
                   </div>
                 )}
@@ -423,6 +428,7 @@ export function ContractingDashboard({
                           >
                             <ScrollText className="h-3 w-3 mr-1" />
                             SOW
+                            <ForgeInfoTip text={FORGE_EXPLANATIONS.sow.description} className="ml-1 h-2.5 w-2.5" />
                           </Button>
                           <Button
                             variant="outline"
@@ -433,6 +439,7 @@ export function ContractingDashboard({
                           >
                             <ShieldCheck className="h-3 w-3 mr-1" />
                             NDA
+                            <ForgeInfoTip text={FORGE_EXPLANATIONS.nda.description} className="ml-1 h-2.5 w-2.5" />
                           </Button>
                         </div>
                       </div>
@@ -492,8 +499,9 @@ export function ContractingDashboard({
         <TabsContent value="readiness" className="space-y-4 mt-4">
           <Card className="rounded-xl shadow-sm">
             <CardContent className="pt-6 space-y-5">
-              <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+              <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider inline-flex items-center gap-1.5">
                 RFQ Readiness
+                <ForgeInfoTip text={FORGE_EXPLANATIONS.rfqReadiness.description} />
               </h4>
               <div className="space-y-2">
                 <ReadinessItem
@@ -519,8 +527,9 @@ export function ContractingDashboard({
               </div>
 
               {/* Module-level readiness */}
-              <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider pt-4">
+              <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider pt-4 inline-flex items-center gap-1.5">
                 Module Readiness
+                <ForgeInfoTip text={FORGE_EXPLANATIONS.moduleReadiness.description} />
               </h4>
               <div className="space-y-1.5">
                 {spec.modules.map((m) => {

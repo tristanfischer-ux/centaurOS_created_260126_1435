@@ -18,6 +18,8 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { Users, Loader2, RefreshCw, CheckCircle2, ExternalLink } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
+
+import { ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import { MarketCardV2 } from "@/app/(platform)/marketplace-v2/components/MarketCardV2"
 
 import type { XRaySpec } from "../services/xray-schema"
@@ -104,8 +106,9 @@ export function TeamMap({
           <div className="flex items-center gap-3">
             <div className="w-1 h-7 bg-chart-3 rounded-full" />
             <div>
-              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">
+              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground inline-flex items-center gap-2">
                 Team &amp; Capabilities
+                <ForgeInfoTip text={FORGE_EXPLANATIONS.teamCapabilities.description} />
               </h3>
               <p className="text-xs text-muted-foreground">
                 Expertise needed based on module expert questions
@@ -133,7 +136,10 @@ export function TeamMap({
                 key={discipline}
                 className="rounded-xl border bg-muted/10 p-3 space-y-1.5"
               >
-                <p className="text-xs font-semibold text-foreground">{discipline}</p>
+                <p className="text-xs font-semibold text-foreground inline-flex items-center gap-1">
+                  {discipline}
+                  <ForgeInfoTip text={`Your project needs ${discipline} expertise. ${info.count} technical questions across ${info.modules.length} module${info.modules.length !== 1 ? "s" : ""} require a specialist in this field.`} className="h-2.5 w-2.5" />
+                </p>
                 <p className="text-[10px] text-muted-foreground">
                   {info.count} questions across {info.modules.length} module{info.modules.length !== 1 ? "s" : ""}
                 </p>
@@ -172,7 +178,7 @@ export function TeamMap({
               <div key={discipline} className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Users className="h-3.5 w-3.5 text-chart-3" />
-                  <span className="text-sm font-semibold text-foreground">{discipline} experts</span>
+                  <span className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">{discipline} experts <ForgeInfoTip text={FORGE_EXPLANATIONS.expertMatching.description} /></span>
                   <Badge variant="secondary" className="text-[10px]">{matches.length}</Badge>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
