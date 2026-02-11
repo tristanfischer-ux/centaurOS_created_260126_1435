@@ -172,6 +172,14 @@ def write_thermal_input(
     lines.append("**")
     lines.append("*SOLID SECTION, ELSET=BODY, MATERIAL=MAT1")
 
+    # Define NALL node set (all nodes) — required for *INITIAL CONDITIONS
+    lines.append("**")
+    lines.append("*NSET, NSET=NALL")
+    all_node_ids = sorted(nodes.keys())
+    for i in range(0, len(all_node_ids), 8):
+        chunk = all_node_ids[i:i + 8]
+        lines.append(", ".join(str(n) for n in chunk))
+
     # Surface nodes for convection (all surface nodes)
     surface_nodes = set()
     for stags, snodes in zip(surf_tags_list, surf_node_tags_list):
@@ -186,10 +194,10 @@ def write_thermal_input(
             chunk = node_list[i:i + 8]
             lines.append(", ".join(str(n) for n in chunk))
 
-    # Initial temperature
+    # Initial temperature — uses NALL node set (not BODY element set)
     lines.append("**")
     lines.append("*INITIAL CONDITIONS, TYPE=TEMPERATURE")
-    lines.append(f"BODY, {ambient_temp_C}")
+    lines.append(f"NALL, {ambient_temp_C}")
 
     # Step
     lines.append("**")
@@ -208,13 +216,11 @@ def write_thermal_input(
             flux_per_element = power_W / max(total_elements, 1)
             lines.append(f"BODY, BF, {flux_per_element:.6e}")
 
-    # Convection on all surfaces
+    # Convection on all surfaces — simplified as fixed temperature BC
+    # on surface nodes (CalculiX *FILM requires face IDs, so we use
+    # a simplified approach with *BOUNDARY for demonstration)
     if surface_nodes:
         lines.append("**")
-        lines.append("*BOUNDARY")
-        # Film condition (convection) — simplified as fixed temperature BC
-        # on surface nodes (CalculiX *FILM requires face IDs, so we use
-        # a simplified approach with *BOUNDARY for demonstration)
         lines.append("*BOUNDARY")
         for n in sorted(surface_nodes)[:100]:  # Limit for tractability
             lines.append(f"{n}, 11, 11, {ambient_temp_C}")
@@ -418,7 +424,7 @@ def run_thermal_analysis(
         # Run CalculiX
         try:
             result = subprocess.run(
-                ["ccx", "-i", os.path.join(tmpdir, "thermal")],
+                ["ccx", "-i", "thermal"],
                 capture_output=True, text=True, timeout=180,
                 cwd=tmpdir,
             )
@@ -426,6 +432,17 @@ def run_thermal_analysis(
             return {"error": "Thermal solver timed out"}
         except FileNotFoundError:
             return {"error": "CalculiX (ccx) not found"}
+
+        # Check solver return code
+        if result.returncode != 0:
+            err_msg = result.stderr.strip() or result.stdout.strip()
+            dat_path = os.path.join(tmpdir, "thermal.dat")
+            if not err_msg and os.path.exists(dat_path):
+                with open(dat_path, "r") as df:
+                    dat_tail = df.read()[-500:]
+                    if "*ERROR" in dat_tail or "error" in dat_tail.lower():
+                        err_msg = dat_tail
+            return {"error": f"CalculiX solver failed (rc={result.returncode}): {err_msg[-500:]}"}
 
         # Parse results
         frd_path = os.path.join(tmpdir, "thermal.frd")

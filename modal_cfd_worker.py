@@ -13,7 +13,7 @@ Environment:
     Requires MODAL_TOKEN_ID and MODAL_TOKEN_SECRET configured.
 
 Container stack:
-    Ubuntu + OpenFOAM v2312 + CadQuery (for STEP→STL) + matplotlib
+    OpenFOAM v2412 (pre-built Docker image) + CadQuery + matplotlib
 """
 
 import modal
@@ -26,23 +26,34 @@ import tempfile
 import traceback
 
 # ─── Container Image ──────────────────────────────────────────────────
+# Uses the official OpenCFD pre-built Docker image from Docker Hub.
+# This avoids the fragile apt repository dependency that caused 404 errors
+# when installing OpenFOAM from dl.openfoam.com.
 
 cfd_image = (
-    modal.Image.from_registry("ubuntu:22.04")
+    modal.Image.from_registry("opencfd/openfoam-default:2412")
     .run_commands(
-        # Install OpenFOAM and dependencies
-        "apt-get update -qq",
-        "apt-get install -y -qq wget software-properties-common gnupg2 curl",
-        "wget -qO - https://dl.openfoam.com/add-debian-repo.sh | bash",
-        "apt-get update -qq",
-        "apt-get install -y -qq openfoam2406-default",
+        # Install Mesa GL libraries (needed by CadQuery for STEP processing)
+        # Note: libgl1-mesa-glx replaced by libgl1 in newer Ubuntu
+        "apt-get update -qq && apt-get install -y -qq "
+        "libosmesa6 libgl1 libglu1-mesa wget && apt-get clean",
         # Install miniconda for CadQuery (STEP→STL conversion)
         "wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/mc.sh",
         "bash /tmp/mc.sh -b -p /opt/conda && rm /tmp/mc.sh",
-        "/opt/conda/bin/conda install -y -c conda-forge cadquery=2.4 gmsh=4.12 matplotlib=3.8 -q",
+        # Create a separate env with Python 3.11 (latest Miniconda base is 3.13,
+        # which conflicts with CadQuery 2.4's ocp dependency)
+        "/opt/conda/bin/conda create -y -n cq --override-channels -c conda-forge "
+        "python=3.11 cadquery=2.4 matplotlib=3.8 -q",
         "/opt/conda/bin/conda clean -afy",
     )
-    .env({"PATH": "/opt/conda/bin:/usr/lib/openfoam/openfoam2406/bin:/usr/lib/openfoam/openfoam2406/platforms/linux64GccDPInt32Opt/bin:$PATH"})
+    .env({
+        "PATH": "/opt/conda/envs/cq/bin:/usr/lib/openfoam/openfoam2412/bin:"
+                "/usr/lib/openfoam/openfoam2412/platforms/linux64GccDPInt32Opt/bin:"
+                "/usr/bin:/bin:/usr/sbin:/sbin",
+        # OpenFOAM environment variables
+        "WM_PROJECT_DIR": "/usr/lib/openfoam/openfoam2412",
+        "FOAM_ETC": "/usr/lib/openfoam/openfoam2412/etc",
+    })
     .pip_install("fastapi[standard]")
 )
 
@@ -752,7 +763,7 @@ def run_cfd(
         # Step 4: Run meshing pipeline
         try:
             # Source OpenFOAM environment and run
-            of_prefix = "source /usr/lib/openfoam/openfoam2406/etc/bashrc && "
+            of_prefix = "source /usr/lib/openfoam/openfoam2412/etc/bashrc && "
 
             # blockMesh — background mesh
             r = subprocess.run(

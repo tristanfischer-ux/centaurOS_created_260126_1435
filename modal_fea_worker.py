@@ -176,6 +176,10 @@ def write_calculix_input(
     Writes a CalculiX input file (.inp) with material properties,
     boundary conditions, and load cases.
 
+    Parses the gmsh-generated INP to extract node/element IDs and
+    creates proper NALL, EALL, and FIXED node/element sets that
+    CalculiX requires.
+
     Args:
         mesh_inp_path: Path to gmsh-generated INP mesh file
         output_path: Path to write the CalculiX input file
@@ -190,9 +194,141 @@ def write_calculix_input(
     with open(mesh_inp_path, "r") as f:
         mesh_content = f.read()
 
+    # Parse node IDs, coordinates, and element IDs from gmsh INP.
+    # IMPORTANT: gmsh exports both 3D volume elements (C3D4, C3D10) and
+    # 2D surface elements (CPS3, S3, etc.). Only 3D elements can be
+    # assigned to a *SOLID SECTION — including 2D elements causes
+    # "first thickness is zero" errors in CalculiX.
+    node_ids = []
+    nodes_by_id = {}
+    element_ids_3d = []  # Only 3D volume elements for EALL
+    all_element_ids = []
+    in_node = False
+    in_element_3d = False
+    in_element_any = False
+
+    # 3D element types in CalculiX/Abaqus notation
+    SOLID_3D_TYPES = {"C3D4", "C3D10", "C3D8", "C3D20", "C3D6", "C3D15"}
+
+    for line in mesh_content.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("**"):
+            continue
+        upper = stripped.upper()
+        if upper.startswith("*NODE"):
+            in_node = True
+            in_element_3d = False
+            in_element_any = False
+            continue
+        elif upper.startswith("*ELEMENT"):
+            in_node = False
+            in_element_any = True
+            # Check if this element block is a 3D type
+            # Parse TYPE= from the *ELEMENT header
+            in_element_3d = False
+            for part in stripped.split(","):
+                kv = part.strip().upper()
+                if kv.startswith("TYPE="):
+                    etype = kv.split("=")[1].strip()
+                    if etype in SOLID_3D_TYPES:
+                        in_element_3d = True
+            continue
+        elif stripped.startswith("*"):
+            in_node = False
+            in_element_3d = False
+            in_element_any = False
+            continue
+
+        if in_node:
+            parts = stripped.split(",")
+            if len(parts) >= 4:
+                try:
+                    nid = int(parts[0].strip())
+                    x = float(parts[1].strip())
+                    y = float(parts[2].strip())
+                    z = float(parts[3].strip())
+                    node_ids.append(nid)
+                    nodes_by_id[nid] = (x, y, z)
+                except (ValueError, IndexError):
+                    pass
+        elif in_element_any:
+            parts = stripped.split(",")
+            if len(parts) >= 2:
+                try:
+                    eid = int(parts[0].strip())
+                    all_element_ids.append(eid)
+                    if in_element_3d:
+                        element_ids_3d.append(eid)
+                except (ValueError, IndexError):
+                    pass
+
+    # Use only 3D elements for solid section assignment
+    element_ids = element_ids_3d if element_ids_3d else all_element_ids
+
+    # Find bottom face nodes (lowest Z within 5% tolerance)
+    if nodes_by_id:
+        z_vals = [z for _, _, z in nodes_by_id.values()]
+        min_z = min(z_vals)
+        max_z = max(z_vals)
+        z_tol = (max_z - min_z) * 0.05 if max_z > min_z else 0.1
+        bottom_nodes = [nid for nid, (x, y, z) in nodes_by_id.items()
+                        if z <= min_z + z_tol]
+    else:
+        bottom_nodes = node_ids[:1]  # Fallback
+
+    def write_set_lines(f, ids, per_line=8):
+        """Write set member IDs in CalculiX format (max 8 per line)."""
+        for i in range(0, len(ids), per_line):
+            chunk = ids[i:i + per_line]
+            f.write(", ".join(str(n) for n in chunk) + "\n")
+
+    # Rebuild mesh content excluding 2D surface element blocks.
+    # CalculiX requires ALL elements to have a section assignment;
+    # orphaned 2D elements cause "first thickness is zero" errors.
+    filtered_lines = []
+    skip_block = False
+    for line in mesh_content.splitlines():
+        stripped = line.strip()
+        upper = stripped.upper()
+        if upper.startswith("*ELEMENT"):
+            # Check element type — skip non-3D blocks
+            is_3d = False
+            for part in stripped.split(","):
+                kv = part.strip().upper()
+                if kv.startswith("TYPE="):
+                    etype = kv.split("=")[1].strip()
+                    if etype in SOLID_3D_TYPES:
+                        is_3d = True
+            skip_block = not is_3d
+            if not skip_block:
+                filtered_lines.append(line)
+            continue
+        elif stripped.startswith("*") and not stripped.startswith("**"):
+            skip_block = False
+            filtered_lines.append(line)
+            continue
+
+        if not skip_block:
+            filtered_lines.append(line)
+
+    clean_mesh = "\n".join(filtered_lines)
+
     with open(output_path, "w") as f:
-        # Include mesh data
-        f.write(mesh_content)
+        # Include only 3D mesh data (no surface elements)
+        f.write(clean_mesh)
+        f.write("\n")
+
+        # Define node and element sets that CalculiX requires
+        f.write("** Node and element sets\n")
+        f.write("*NSET, NSET=NALL\n")
+        write_set_lines(f, node_ids)
+
+        f.write("*ELSET, ELSET=EALL\n")
+        write_set_lines(f, element_ids)
+
+        f.write("*NSET, NSET=FIXED\n")
+        write_set_lines(f, bottom_nodes)
+
         f.write("\n")
 
         # Material definition
@@ -207,10 +343,10 @@ def write_calculix_input(
         f.write("*SOLID SECTION, ELSET=EALL, MATERIAL=MATERIAL1\n")
         f.write("\n")
 
-        # Boundary conditions: fix the lowest Z-face nodes
+        # Boundary conditions: fix bottom face nodes (not all nodes)
         f.write("** Boundary conditions: Fixed support at bottom face\n")
         f.write("*BOUNDARY\n")
-        f.write("NALL, 1, 3, 0.0\n")  # Simplified: fix all nodes (will be refined by load case service)
+        f.write("FIXED, 1, 3, 0.0\n")
         f.write("\n")
 
         # Load step
@@ -231,7 +367,6 @@ def write_calculix_input(
                 magnitude = lc.get("magnitude_N", 10.0)
                 direction = lc.get("direction", [0, 0, -1])
                 f.write("*CLOAD\n")
-                # Apply to a representative node set (simplified)
                 for axis_idx, val in enumerate(direction):
                     if abs(val) > 0.001:
                         f.write(f"NALL, {axis_idx + 1}, {magnitude * val}\n")
@@ -270,8 +405,16 @@ def run_calculix(input_path: str, work_dir: str) -> dict:
         )
 
         if result.returncode != 0:
+            # CalculiX may write errors to stdout, stderr, or .dat file
+            err_msg = result.stderr.strip() or result.stdout.strip()
+            dat_path = os.path.join(work_dir, f"{job_name}.dat")
+            if not err_msg and os.path.exists(dat_path):
+                with open(dat_path, "r") as df:
+                    dat_tail = df.read()[-500:]
+                    if "*ERROR" in dat_tail or "error" in dat_tail.lower():
+                        err_msg = dat_tail
             return {
-                "error": f"CalculiX solver failed: {result.stderr[-500:]}",
+                "error": f"CalculiX solver failed: {err_msg[-500:]}",
                 "max_von_mises_MPa": 0,
                 "max_deformation_mm": 0,
             }
