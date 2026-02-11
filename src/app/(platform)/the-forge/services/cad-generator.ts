@@ -345,7 +345,7 @@ async function callOpus(
 
   console.info("[XRayCadGen] All Anthropic models refused — falling back to Gemini")
 
-  const geminiModel = "gemini-2.5-flash"
+  const geminiModel = "gemini-2.5-pro"
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`
 
   const geminiResponse = await fetch(url, {
