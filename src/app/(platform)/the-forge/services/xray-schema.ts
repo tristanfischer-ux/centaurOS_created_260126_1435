@@ -416,6 +416,11 @@ export const XRaySpecSchema = z.object({
   systemImageUrl: z.string().optional().describe("URL of Gemini-generated system diagram"),
   systemImageStatus: z.enum(["pending", "generating", "complete", "failed"]).optional()
     .describe("System image generation status"),
+  // System-level 3D CAD model
+  systemCadUrl: z.string().optional().describe("URL of system-level STL file for 3D viewer"),
+  systemCadStatus: z.enum(["pending", "generating", "complete", "failed"]).optional()
+    .describe("System CAD model generation status"),
+  systemCadSvgUrl: z.string().optional().describe("URL of isometric SVG view of system CAD model"),
   // System-level engineering analysis (aggregated across all modules)
   systemAnalysis: SystemAnalysisSchema.optional()
     .describe("Aggregated engineering analysis across all modules"),

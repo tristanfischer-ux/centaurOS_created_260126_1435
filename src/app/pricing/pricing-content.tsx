@@ -26,7 +26,7 @@ import {
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { SUBSCRIPTION_PLANS } from '@/lib/billing/subscriptions'
+import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 
 type BillingPeriod = 'monthly' | 'annual'
 

@@ -26,8 +26,8 @@ import {
   Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { SUBSCRIPTION_PLANS } from '@/lib/billing/subscriptions'
-import type { SubscriptionTier, SubscriptionPlan } from '@/lib/billing/subscriptions'
+import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
+import type { SubscriptionTier, SubscriptionPlan } from '@/lib/billing/plans'
 import type { MonthlyUsage } from '@/lib/ai/usage-tracking'
 
 interface BillingContentProps {

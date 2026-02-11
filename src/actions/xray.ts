@@ -341,11 +341,15 @@ export async function deriveProcessClassAction(
 // ─── Image Generation Actions ────────────────────────────────────────
 
 /**
- * Generates blueprint images for all modules in a scan.
- * Runs in background after text scan completes.
+ * Generates the system diagram image FIRST and returns immediately.
  *
- * @param scanId - The scan ID to generate images for
- * @returns Updated spec with image URLs, or error
+ * @description This is the "fast visual" — generates only the system-level
+ * process flow diagram (~15s) and persists it, so the concept page can
+ * show something visually impactful as fast as possible. Module images
+ * are generated separately via generateModuleImagesAction.
+ *
+ * @param scanId - The scan ID to generate the system image for
+ * @returns Updated spec with system image URL, or error
  *
  * @security Requires authenticated user with foundry context
  */
@@ -366,7 +370,68 @@ export async function generateImagesAction(scanId: string): Promise<
 
     const spec = scan.spec as unknown as XRaySpec
 
-    // Generate module images in parallel batches
+    // PRIORITY: Generate system diagram first (fastest visual impact)
+    let systemImageUrl = spec.systemImageUrl
+    let systemImageStatus = spec.systemImageStatus
+    try {
+      systemImageUrl = await generateSystemImage(scanId, spec)
+      systemImageStatus = "complete"
+    } catch (error) {
+      console.error("[XRay] Failed to generate system image:", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+      systemImageStatus = "failed"
+    }
+
+    // Progressive save — system image available to UI immediately
+    const updatedSpec: XRaySpec = {
+      ...spec,
+      systemImageUrl,
+      systemImageStatus,
+    }
+
+    const { error: updateError } = await supabase
+      .from("xray_scans")
+      .update({ spec: updatedSpec as unknown as Json })
+      .eq("id", scanId)
+
+    if (updateError) {
+      console.error("[XRay] Failed to persist system image:", updateError.message)
+    }
+
+    return { spec: updatedSpec }
+  })
+}
+
+/**
+ * Generates blueprint images for all modules in a scan (background task).
+ *
+ * @description Called after the system image is already visible on the
+ * concept page. Generates per-module blueprint images in batches and
+ * saves progressively so the module status grid updates in real-time
+ * via the Supabase Realtime subscription.
+ *
+ * @param scanId - The scan ID to generate module images for
+ * @returns Updated spec with all module image URLs, or error
+ *
+ * @security Requires authenticated user with foundry context
+ */
+export async function generateModuleImagesAction(scanId: string): Promise<
+  { spec: XRaySpec } | { error: string }
+> {
+  return withAuth(async ({ supabase }) => {
+    // Load latest scan (may have been updated by system image action)
+    const { data: scan, error: loadError } = await supabase
+      .from("xray_scans")
+      .select("id, spec")
+      .eq("id", scanId)
+      .single()
+
+    if (loadError || !scan) {
+      return { error: "Scan not found" }
+    }
+
+    const spec = scan.spec as unknown as XRaySpec
     const BATCH_SIZE = 3
     const updatedModules = [...spec.modules]
 
@@ -397,40 +462,28 @@ export async function generateImagesAction(scanId: string): Promise<
           updatedModules[moduleIndex] = result.value
         }
       }
+
+      // Progressive save after each batch — UI updates via Realtime
+      const batchSpec: XRaySpec = { ...spec, modules: updatedModules }
+      await supabase
+        .from("xray_scans")
+        .update({ spec: batchSpec as unknown as Json })
+        .eq("id", scanId)
     }
 
-    // Generate system diagram
-    let systemImageUrl = spec.systemImageUrl
-    let systemImageStatus = spec.systemImageStatus
-    try {
-      systemImageUrl = await generateSystemImage(scanId, { ...spec, modules: updatedModules })
-      systemImageStatus = "complete"
-    } catch (error) {
-      console.error("[XRay] Failed to generate system image:", {
-        error: error instanceof Error ? error.message : "Unknown error",
-      })
-      systemImageStatus = "failed"
-    }
+    const finalSpec: XRaySpec = { ...spec, modules: updatedModules }
 
-    // Build updated spec
-    const updatedSpec: XRaySpec = {
-      ...spec,
-      modules: updatedModules,
-      systemImageUrl,
-      systemImageStatus,
-    }
-
-    // Persist
+    // Final persist
     const { error: updateError } = await supabase
       .from("xray_scans")
-      .update({ spec: updatedSpec as unknown as Json })
+      .update({ spec: finalSpec as unknown as Json })
       .eq("id", scanId)
 
     if (updateError) {
-      console.error("[XRay] Failed to persist images:", updateError.message)
+      console.error("[XRay] Failed to persist module images:", updateError.message)
     }
 
-    return { spec: updatedSpec }
+    return { spec: finalSpec }
   })
 }
 
