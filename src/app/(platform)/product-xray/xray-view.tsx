@@ -49,6 +49,7 @@ import { SupplyChain } from "./components/supply-chain"
 import { DiagnosticCenter } from "./components/diagnostic-center"
 import { EngineeringSummary } from "./components/engineering-summary"
 import { InterviewPanel } from "./components/interview-panel"
+import { EditModuleDialog } from "./components/edit-module-dialog"
 import { RfqSection } from "./components/rfq-section"
 
 import type { XRaySpec, ModuleSpec } from "./services/xray-schema"
@@ -134,6 +135,9 @@ export function XRayView(): React.ReactNode {
 
   // Interview state (ported from v1)
   const [interviewModule, setInterviewModule] = useState<ModuleSpec | null>(null)
+
+  // Edit module dialog state
+  const [editingModule, setEditingModule] = useState<ModuleSpec | null>(null)
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -529,6 +533,7 @@ export function XRayView(): React.ReactNode {
             onDeriveProcessClass={handleDeriveProcessClass}
             onGenerateCadModel={handleGenerateCadModel}
             onOpenInterview={setInterviewModule}
+            onEditModule={setEditingModule}
           />
 
           {/* Section 5b: Engineering Analysis Summary */}
@@ -586,6 +591,19 @@ export function XRayView(): React.ReactNode {
               open={!!interviewModule}
               onClose={() => setInterviewModule(null)}
               onSave={handleModuleUpdate}
+            />
+          )}
+
+          {/* Edit Module Dialog (manual editing + AI refine) */}
+          {editingModule && (
+            <EditModuleDialog
+              module={editingModule}
+              spec={spec}
+              scanId={scanId}
+              open={!!editingModule}
+              onClose={() => setEditingModule(null)}
+              onSave={handleModuleUpdate}
+              onRefineWithAI={handleRefineModule}
             />
           )}
         </>

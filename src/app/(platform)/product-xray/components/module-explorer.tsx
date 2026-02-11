@@ -50,6 +50,7 @@ import {
   Zap,
   RefreshCw,
   Shield,
+  Pencil,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -87,6 +88,8 @@ interface ModuleExplorerProps {
   onGenerateCadModel?: (moduleId: string) => Promise<void>
   /** Callback to open the expert interview panel for a module */
   onOpenInterview?: (m: ModuleSpec) => void
+  /** Callback to open the edit module dialog for a module */
+  onEditModule?: (m: ModuleSpec) => void
 }
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -104,6 +107,7 @@ export function ModuleExplorer({
   onDeriveProcessClass,
   onGenerateCadModel,
   onOpenInterview,
+  onEditModule,
 }: ModuleExplorerProps): React.ReactNode {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -141,6 +145,7 @@ export function ModuleExplorer({
             onDeriveProcessClass={onDeriveProcessClass}
             onGenerateCadModel={onGenerateCadModel}
             onOpenInterview={onOpenInterview}
+            onEditModule={onEditModule}
           />
         ))}
       </div>
@@ -159,6 +164,7 @@ function ModuleRow({
   onDeriveProcessClass,
   onGenerateCadModel,
   onOpenInterview,
+  onEditModule,
 }: {
   module: ModuleSpec
   isExpanded: boolean
@@ -168,6 +174,7 @@ function ModuleRow({
   onDeriveProcessClass: (moduleId: string, answers: Record<string, string>) => Promise<void>
   onGenerateCadModel?: (moduleId: string) => Promise<void>
   onOpenInterview?: (m: ModuleSpec) => void
+  onEditModule?: (m: ModuleSpec) => void
 }): React.ReactNode {
   const r = readinessFor(m)
   const accentColor = chipColor(m.id)
@@ -240,6 +247,22 @@ function ModuleRow({
           </div>
           <span className="text-[10px] tabular-nums text-muted-foreground">{r.pct}%</span>
         </div>
+
+        {/* Edit button */}
+        {onEditModule && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={(e) => {
+              e.stopPropagation()
+              onEditModule(m)
+            }}
+            aria-label={`Edit ${m.name}`}
+          >
+            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+          </Button>
+        )}
 
         {/* Chevron */}
         {isExpanded ? (
