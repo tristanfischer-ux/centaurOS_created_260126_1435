@@ -5,13 +5,28 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 
-// Types
+// ==========================================
+// TYPES
+// ==========================================
+
+/** @description Valid event types for Guild events */
+export type EventType = 'speed_networking' | 'workshop' | 'career_fair' | 'meetup' | 'summit'
+
+/** @description Event format (in-person, online, or hybrid) */
+export type EventFormat = 'in_person' | 'online' | 'hybrid'
+
+/** @description RSVP status for event attendees */
+export type AttendeeStatus = 'going' | 'maybe' | 'cancelled'
+
 export interface GuildEvent {
     id: string
     foundry_id: string | null
     title: string
     description: string | null
     event_date: string
+    event_type: EventType
+    event_format: EventFormat
+    event_url: string | null
     location_geo: string | null
     location_address: string | null
     is_executive_only: boolean
@@ -24,6 +39,22 @@ export interface GuildEvent {
         full_name: string | null
         role: string | null
     }
+    attendee_count?: number
+}
+
+export interface EventAttendee {
+    id: string
+    event_id: string
+    user_id: string
+    status: AttendeeStatus
+    checked_in_at: string | null
+    rsvp_at: string
+    profile?: {
+        id: string
+        full_name: string | null
+        role: string | null
+        avatar_url: string | null
+    }
 }
 
 // ==========================================
@@ -31,12 +62,22 @@ export interface GuildEvent {
 // ==========================================
 
 /**
- * Create a new guild event
+ * Create a new guild event.
+ *
+ * @description Creates an event visible to Guild members. Requires Executive or Founder role.
+ * @param data - Event details including title, date, type, format, and location
+ * @returns The created event or an error message
+ *
+ * @security Requires authenticated user. Role enforcement happens in the UI layer.
+ * @audit Event creation is logged via Supabase audit trail.
  */
 export async function createGuildEvent(data: {
     title: string
     description?: string
     eventDate: string
+    eventType?: EventType
+    eventFormat?: EventFormat
+    eventUrl?: string
     locationGeo?: string
     locationAddress?: string
     isExecutiveOnly?: boolean
@@ -56,6 +97,9 @@ export async function createGuildEvent(data: {
                 title: data.title.trim(),
                 description: data.description?.trim() || null,
                 event_date: data.eventDate,
+                event_type: data.eventType || 'meetup',
+                event_format: data.eventFormat || 'in_person',
+                event_url: data.eventUrl?.trim() || null,
                 location_geo: data.locationGeo || null,
                 location_address: data.locationAddress || null,
                 is_executive_only: data.isExecutiveOnly || false,
@@ -69,21 +113,24 @@ export async function createGuildEvent(data: {
             .single()
 
         if (error) {
-            console.error('Error creating guild event:', error)
+            console.error('[GuildEvents] createGuildEvent failed:', error)
             return { data: null, error: error.message }
         }
 
-        revalidatePath('/events')
-        revalidatePath('/dashboard')
+        revalidatePath('/guild')
         return { data: event as GuildEvent, error: null }
     } catch (err) {
-        console.error('Failed to create guild event:', err)
+        console.error('[GuildEvents] createGuildEvent exception:', err)
         return { data: null, error: 'Failed to create event' }
     }
 }
 
 /**
- * Get all guild events (respects RLS for executive-only visibility)
+ * Get all guild events (respects RLS for executive-only visibility).
+ *
+ * @description Fetches guild events with optional upcoming/past filtering.
+ * @param options - Optional filters: upcoming, past, limit
+ * @returns Array of events or an error
  */
 export async function getGuildEvents(options?: {
     upcoming?: boolean
@@ -118,26 +165,32 @@ export async function getGuildEvents(options?: {
         const { data, error } = await query
 
         if (error) {
-            console.error('Error fetching guild events:', error)
+            console.error('[GuildEvents] getGuildEvents failed:', error)
             return { data: [], error: error.message }
         }
 
         return { data: (data || []) as GuildEvent[], error: null }
     } catch (err) {
-        console.error('Failed to fetch guild events:', err)
+        console.error('[GuildEvents] getGuildEvents exception:', err)
         return { data: [], error: 'Failed to fetch events' }
     }
 }
 
 /**
- * Get upcoming guild events for dashboard widget
+ * Get upcoming guild events for the widget.
+ *
+ * @param limit - Maximum number of events to return (default: 3)
+ * @returns Array of upcoming events
  */
 export async function getUpcomingGuildEvents(limit: number = 3): Promise<{ data: GuildEvent[]; error: string | null }> {
     return getGuildEvents({ upcoming: true, limit })
 }
 
 /**
- * Get a single guild event by ID
+ * Get a single guild event by ID.
+ *
+ * @param eventId - The event to fetch
+ * @returns The event or null if not found
  */
 export async function getGuildEvent(eventId: string): Promise<{ data: GuildEvent | null; error: string | null }> {
     try {
@@ -153,19 +206,24 @@ export async function getGuildEvent(eventId: string): Promise<{ data: GuildEvent
             .single()
 
         if (error) {
-            console.error('Error fetching guild event:', error)
+            console.error('[GuildEvents] getGuildEvent failed:', error)
             return { data: null, error: error.message }
         }
 
         return { data: data as GuildEvent, error: null }
     } catch (err) {
-        console.error('Failed to fetch guild event:', err)
+        console.error('[GuildEvents] getGuildEvent exception:', err)
         return { data: null, error: 'Failed to fetch event' }
     }
 }
 
 /**
- * Update a guild event
+ * Update a guild event.
+ *
+ * @description Updates event details. Only the creator or Founders can update.
+ * @param eventId - The event to update
+ * @param data - Fields to update
+ * @returns Success status or error
  */
 export async function updateGuildEvent(
     eventId: string,
@@ -173,6 +231,9 @@ export async function updateGuildEvent(
         title?: string
         description?: string
         eventDate?: string
+        eventType?: EventType
+        eventFormat?: EventFormat
+        eventUrl?: string
         locationGeo?: string
         locationAddress?: string
         isExecutiveOnly?: boolean
@@ -188,6 +249,9 @@ export async function updateGuildEvent(
                 ...(data.title && { title: data.title.trim() }),
                 ...(data.description !== undefined && { description: data.description?.trim() || null }),
                 ...(data.eventDate && { event_date: data.eventDate }),
+                ...(data.eventType && { event_type: data.eventType }),
+                ...(data.eventFormat && { event_format: data.eventFormat }),
+                ...(data.eventUrl !== undefined && { event_url: data.eventUrl?.trim() || null }),
                 ...(data.locationGeo !== undefined && { location_geo: data.locationGeo || null }),
                 ...(data.locationAddress !== undefined && { location_address: data.locationAddress || null }),
                 ...(data.isExecutiveOnly !== undefined && { is_executive_only: data.isExecutiveOnly }),
@@ -197,21 +261,23 @@ export async function updateGuildEvent(
             .eq('id', eventId)
 
         if (error) {
-            console.error('Error updating guild event:', error)
+            console.error('[GuildEvents] updateGuildEvent failed:', error)
             return { success: false, error: error.message }
         }
 
-        revalidatePath('/events')
-        revalidatePath('/dashboard')
+        revalidatePath('/guild')
         return { success: true, error: null }
     } catch (err) {
-        console.error('Failed to update guild event:', err)
+        console.error('[GuildEvents] updateGuildEvent exception:', err)
         return { success: false, error: 'Failed to update event' }
     }
 }
 
 /**
- * Delete a guild event
+ * Delete a guild event.
+ *
+ * @param eventId - The event to delete
+ * @returns Success status or error
  */
 export async function deleteGuildEvent(eventId: string): Promise<{ success: boolean; error: string | null }> {
     try {
@@ -223,21 +289,233 @@ export async function deleteGuildEvent(eventId: string): Promise<{ success: bool
             .eq('id', eventId)
 
         if (error) {
-            console.error('Error deleting guild event:', error)
+            console.error('[GuildEvents] deleteGuildEvent failed:', error)
             return { success: false, error: error.message }
         }
 
-        revalidatePath('/events')
-        revalidatePath('/dashboard')
+        revalidatePath('/guild')
         return { success: true, error: null }
     } catch (err) {
-        console.error('Failed to delete guild event:', err)
+        console.error('[GuildEvents] deleteGuildEvent exception:', err)
         return { success: false, error: 'Failed to delete event' }
     }
 }
 
+// ==========================================
+// RSVP / ATTENDEE MANAGEMENT
+// ==========================================
+
 /**
- * Get guild events summary for dashboard
+ * Toggle RSVP for the current user on an event.
+ *
+ * @description If already RSVP'd, cancels the RSVP. If not, creates one.
+ * Checks event capacity before allowing new RSVPs.
+ *
+ * @param eventId - The event to RSVP to
+ * @returns Whether the user is now attending, the updated count, or an error
+ *
+ * @security Requires authenticated user. RLS on event_attendees enforces
+ * that users can only manage their own RSVPs.
+ */
+export async function toggleRSVP(eventId: string): Promise<{
+    attending: boolean
+    attendeeCount: number
+    error: string | null
+}> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { attending: false, attendeeCount: 0, error: 'Not authenticated' }
+
+        // Check if already RSVP'd
+        const { data: existing } = await supabase
+            .from('event_attendees')
+            .select('id, status')
+            .eq('event_id', eventId)
+            .eq('user_id', user.id)
+            .maybeSingle()
+
+        if (existing && existing.status === 'going') {
+            // Cancel RSVP
+            await supabase
+                .from('event_attendees')
+                .delete()
+                .eq('id', existing.id)
+        } else if (existing) {
+            // Re-activate cancelled RSVP
+            await supabase
+                .from('event_attendees')
+                .update({ status: 'going', updated_at: new Date().toISOString() })
+                .eq('id', existing.id)
+        } else {
+            // SECURITY: Check capacity before inserting
+            const { data: event } = await supabase
+                .from('guild_events')
+                .select('max_attendees')
+                .eq('id', eventId)
+                .single()
+
+            if (event?.max_attendees) {
+                const { count } = await supabase
+                    .from('event_attendees')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('event_id', eventId)
+                    .eq('status', 'going')
+
+                if (count !== null && count >= event.max_attendees) {
+                    return { attending: false, attendeeCount: count, error: 'Event is at capacity' }
+                }
+            }
+
+            // Create new RSVP
+            const { error: insertError } = await supabase
+                .from('event_attendees')
+                .insert({ event_id: eventId, user_id: user.id, status: 'going' })
+
+            if (insertError) {
+                console.error('[GuildEvents] toggleRSVP insert failed:', insertError)
+                return { attending: false, attendeeCount: 0, error: insertError.message }
+            }
+        }
+
+        // Get updated count
+        const { count: newCount } = await supabase
+            .from('event_attendees')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', eventId)
+            .eq('status', 'going')
+
+        const isNowAttending = !existing || existing.status !== 'going'
+
+        revalidatePath('/guild')
+        return { attending: isNowAttending, attendeeCount: newCount || 0, error: null }
+    } catch (err) {
+        console.error('[GuildEvents] toggleRSVP exception:', err)
+        return { attending: false, attendeeCount: 0, error: 'Failed to update RSVP' }
+    }
+}
+
+/**
+ * Get attendees for an event.
+ *
+ * @description Returns the list of users who RSVP'd "going" to an event.
+ * @param eventId - The event to get attendees for
+ * @param limit - Maximum number of attendees to return
+ * @returns List of attendees with profile info and total count
+ */
+export async function getEventAttendees(eventId: string, limit: number = 50): Promise<{
+    data: EventAttendee[]
+    totalCount: number
+    error: string | null
+}> {
+    try {
+        const supabase = await createClient()
+
+        const { data, error, count } = await supabase
+            .from('event_attendees')
+            .select(`
+                *,
+                profile:profiles!event_attendees_user_id_fkey(id, full_name, role, avatar_url)
+            `, { count: 'exact' })
+            .eq('event_id', eventId)
+            .eq('status', 'going')
+            .order('rsvp_at', { ascending: true })
+            .limit(limit)
+
+        if (error) {
+            console.error('[GuildEvents] getEventAttendees failed:', error)
+            return { data: [], totalCount: 0, error: error.message }
+        }
+
+        return { data: (data || []) as EventAttendee[], totalCount: count || 0, error: null }
+    } catch (err) {
+        console.error('[GuildEvents] getEventAttendees exception:', err)
+        return { data: [], totalCount: 0, error: 'Failed to fetch attendees' }
+    }
+}
+
+/**
+ * Check if the current user is attending a specific event.
+ *
+ * @param eventId - The event to check
+ * @returns Whether the user has an active RSVP
+ */
+export async function isAttending(eventId: string): Promise<boolean> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return false
+
+        const { data } = await supabase
+            .from('event_attendees')
+            .select('id')
+            .eq('event_id', eventId)
+            .eq('user_id', user.id)
+            .eq('status', 'going')
+            .maybeSingle()
+
+        return !!data
+    } catch {
+        return false
+    }
+}
+
+/**
+ * Get RSVP status and attendee count for multiple events at once.
+ *
+ * @description Batch query for efficient rendering of event lists.
+ * Returns a map of event ID to { attending, count }.
+ *
+ * @param eventIds - Array of event IDs to check
+ * @returns Map of event ID to RSVP status
+ */
+export async function getEventRSVPStatuses(eventIds: string[]): Promise<{
+    data: Record<string, { attending: boolean; count: number }>
+    error: string | null
+}> {
+    try {
+        if (eventIds.length === 0) return { data: {}, error: null }
+
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        // Get all attendees for these events in one query
+        const { data: attendees, error } = await supabase
+            .from('event_attendees')
+            .select('event_id, user_id')
+            .in('event_id', eventIds)
+            .eq('status', 'going')
+
+        if (error) {
+            console.error('[GuildEvents] getEventRSVPStatuses failed:', error)
+            return { data: {}, error: error.message }
+        }
+
+        // Build the result map
+        const result: Record<string, { attending: boolean; count: number }> = {}
+        for (const eventId of eventIds) {
+            const eventAttendees = (attendees || []).filter(a => a.event_id === eventId)
+            result[eventId] = {
+                attending: user ? eventAttendees.some(a => a.user_id === user.id) : false,
+                count: eventAttendees.length,
+            }
+        }
+
+        return { data: result, error: null }
+    } catch (err) {
+        console.error('[GuildEvents] getEventRSVPStatuses exception:', err)
+        return { data: {}, error: 'Failed to fetch RSVP statuses' }
+    }
+}
+
+// ==========================================
+// DASHBOARD & SUMMARY
+// ==========================================
+
+/**
+ * Get guild events summary for widgets.
+ *
+ * @returns Upcoming count, next event, and total this month
  */
 export async function getGuildEventsSummary(): Promise<{
     data: {
@@ -287,7 +565,7 @@ export async function getGuildEventsSummary(): Promise<{
             error: null
         }
     } catch (err) {
-        console.error('Failed to get guild events summary:', err)
+        console.error('[GuildEvents] getGuildEventsSummary exception:', err)
         return { data: null, error: 'Failed to get summary' }
     }
 }

@@ -3,26 +3,40 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-    GraduationCap, 
-    Briefcase, 
+import {
+    GraduationCap,
+    Briefcase,
     Building2,
     Clock,
     Loader2,
-    Users
+    Users,
+    Plus
 } from "lucide-react"
 import { ApprenticePoolBrowser } from "@/components/guild/ApprenticePoolBrowser"
 import { ProjectAssignmentsList } from "@/components/guild/ProjectAssignmentsList"
 import { GuildTabs } from "./guild-tabs"
+import { CreateEventDialog } from "@/components/guild/create-event-dialog"
+import { UpcomingEvents } from "@/components/guild/upcoming-events"
 import { getMyAssignments } from "@/actions/project-assignments"
-import type { GuildEvent } from "@/actions/guild-events"
+import { getGuildEvents, getEventRSVPStatuses, type GuildEvent } from "@/actions/guild-events"
 import { formatDistanceToNow } from "date-fns"
 
+// ==========================================
+// TYPES
+// ==========================================
+
 interface GuildPageContentProps {
+    /** Whether user can manage assignments (Founder/Executive) */
     isManager: boolean
+    /** Whether user is an Apprentice */
     isApprentice: boolean
+    /** Whether user is Executive/Founder (can create events) */
     isExecutive: boolean
+    /** Current authenticated user's ID */
+    currentUserId: string
+    /** Guild community members with resolved foundry names */
     members: {
         id: string
         full_name: string | null
@@ -30,8 +44,6 @@ interface GuildPageContentProps {
         email: string | null
         foundry_name?: string
     }[]
-    /** Events pre-filtered server-side (executive-only events removed for non-executives) */
-    initialEvents: GuildEvent[]
 }
 
 interface MyAssignment {
@@ -44,29 +56,71 @@ interface MyAssignment {
     assignedByName: string
 }
 
-export function GuildPageContent({ isManager, isApprentice, isExecutive, members, initialEvents }: GuildPageContentProps) {
-    const [myAssignments, setMyAssignments] = useState<MyAssignment[]>([])
-    const [loading, setLoading] = useState(isApprentice)
+// ==========================================
+// COMPONENT
+// ==========================================
 
-    useEffect(() => {
-        if (!isApprentice) return
-        
-        const loadAssignments = async () => {
-            setLoading(true)
-            try {
+/**
+ * Main Guild page content with role-based views.
+ *
+ * @description Managers see: Apprentice Pool, Assignments, Community tabs.
+ * Apprentices see: My Assignments, Community tabs.
+ * Community tab includes events with RSVP and member network.
+ */
+export function GuildPageContent({ isManager, isApprentice, isExecutive, currentUserId, members }: GuildPageContentProps) {
+    const [myAssignments, setMyAssignments] = useState<MyAssignment[]>([])
+    const [events, setEvents] = useState<GuildEvent[]>([])
+    const [rsvpStatuses, setRsvpStatuses] = useState<Record<string, { attending: boolean; count: number }>>({})
+    const [loading, setLoading] = useState(true)
+    const [createEventOpen, setCreateEventOpen] = useState(false)
+
+    const loadData = async (): Promise<void> => {
+        setLoading(true)
+
+        try {
+            // Load events for everyone
+            const eventsResult = await getGuildEvents({ upcoming: true, limit: 10 })
+            if (eventsResult.data) {
+                // SECURITY: Filter executive-only events for non-executives client-side
+                // (server-side filtering is primary, this is a defense-in-depth measure)
+                const filteredEvents = isExecutive
+                    ? eventsResult.data
+                    : eventsResult.data.filter(e => !e.is_executive_only)
+                setEvents(filteredEvents)
+
+                // Load RSVP statuses for all visible events
+                const eventIds = filteredEvents.map(e => e.id)
+                if (eventIds.length > 0) {
+                    const rsvpResult = await getEventRSVPStatuses(eventIds)
+                    if (rsvpResult.data) {
+                        setRsvpStatuses(rsvpResult.data)
+                    }
+                }
+            }
+
+            // Load assignments for apprentices
+            if (isApprentice) {
                 const result = await getMyAssignments()
                 if (result.assignments) {
                     setMyAssignments(result.assignments)
                 }
-            } catch (error) {
-                console.error('[Guild] Failed to load assignments:', error instanceof Error ? error.message : 'Unknown error')
-            } finally {
-                setLoading(false)
             }
+        } catch (err) {
+            console.error('[Guild] Failed to load data:', err instanceof Error ? err.message : 'Unknown error')
+        } finally {
+            setLoading(false)
         }
-        
-        loadAssignments()
-    }, [isApprentice])
+    }
+
+    useEffect(() => {
+        loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isApprentice, isExecutive])
+
+    const handleEventCreated = (): void => {
+        setCreateEventOpen(false)
+        loadData()
+    }
 
     // Manager view - can browse pool and manage assignments
     if (isManager) {
@@ -80,10 +134,19 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                             <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Guild</h1>
                         </div>
                         <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
-                            Browse and assign apprentices from the Guild pool to your projects
+                            Manage apprentices, assignments, events, and the Guild community
                         </p>
                     </div>
+                    {isExecutive && (
+                        <Button onClick={() => setCreateEventOpen(true)} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Create Event
+                        </Button>
+                    )}
                 </div>
+
+                {/* Upcoming Events highlight widget */}
+                <UpcomingEvents />
 
                 <Tabs defaultValue="pool" className="space-y-6">
                     <TabsList className="bg-muted">
@@ -110,13 +173,20 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                     </TabsContent>
 
                     <TabsContent value="community">
-                        <GuildTabs 
-                            events={initialEvents} 
-                            members={members} 
-                            isExecutive={isExecutive} 
+                        <GuildTabs
+                            events={events}
+                            members={members}
+                            isExecutive={isExecutive}
+                            rsvpStatuses={rsvpStatuses}
                         />
                     </TabsContent>
                 </Tabs>
+
+                <CreateEventDialog
+                    open={createEventOpen}
+                    onOpenChange={setCreateEventOpen}
+                    onCreated={handleEventCreated}
+                />
             </div>
         )
     }
@@ -140,6 +210,9 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                         </p>
                     </div>
                 </div>
+
+                {/* Upcoming Events highlight widget */}
+                <UpcomingEvents />
 
                 <Tabs defaultValue="assignments" className="space-y-6">
                     <TabsList className="bg-muted">
@@ -167,7 +240,7 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                                     <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                                     <h3 className="text-lg font-semibold text-foreground mb-2">No Assignments Yet</h3>
                                     <p className="text-muted-foreground">
-                                        You haven't been assigned to any projects yet. Companies can find you in the Guild pool and assign you to their projects.
+                                        You haven&apos;t been assigned to any projects yet. Companies can find you in the Guild pool and assign you to their projects.
                                     </p>
                                 </CardContent>
                             </Card>
@@ -238,7 +311,7 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                                                                 <span>{assignment.foundryName}</span>
                                                             </div>
                                                         </div>
-                                                        <Badge 
+                                                        <Badge
                                                             variant="outline"
                                                             className={
                                                                 assignment.status === 'completed'
@@ -259,10 +332,11 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                     </TabsContent>
 
                     <TabsContent value="community">
-                        <GuildTabs 
-                            events={initialEvents} 
-                            members={members} 
-                            isExecutive={isExecutive} 
+                        <GuildTabs
+                            events={events}
+                            members={members}
+                            isExecutive={isExecutive}
+                            rsvpStatuses={rsvpStatuses}
                         />
                     </TabsContent>
                 </Tabs>
