@@ -189,6 +189,7 @@ export function SystemBlueprint({
 }: SystemBlueprintProps): React.ReactNode {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [heroView, setHeroView] = useState<HeroView>("diagram")
+  const [stlLoadFailed, setStlLoadFailed] = useState(false)
   const hasAnimatedRef = useRef(false)
   const shouldAnimate = justScanned && !hasAnimatedRef.current
 
@@ -310,10 +311,20 @@ export function SystemBlueprint({
           </div>
 
           {/* Hero Section — 3D viewer or system diagram */}
-          {heroView === "3d" && hasSystemCad ? (
+          {heroView === "3d" && hasSystemCad && !stlLoadFailed ? (
             <div className="space-y-2">
               <Suspense fallback={<Skeleton className="h-[500px] w-full rounded-xl" />}>
-                <StlViewer stlUrl={spec.systemCadUrl!} height={500} />
+                <StlViewer
+                  stlUrl={spec.systemCadUrl!}
+                  height={500}
+                  onLoadError={() => {
+                    // Auto-fallback to diagram view when 3D fails to load
+                    setStlLoadFailed(true)
+                    if (hasSystemImage) {
+                      setHeroView("diagram")
+                    }
+                  }}
+                />
               </Suspense>
               <p className="text-xs text-muted-foreground text-center font-medium">
                 Interactive 3D Product Model — Drag to rotate, scroll to zoom

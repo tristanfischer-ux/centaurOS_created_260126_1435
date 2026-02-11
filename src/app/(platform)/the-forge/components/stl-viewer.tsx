@@ -32,6 +32,8 @@ interface StlViewerProps {
   className?: string
   /** Container height (default: 500px) */
   height?: number
+  /** Called when the 3D model fails to load (CORS, file not found, WebGL, etc.) */
+  onLoadError?: () => void
 }
 
 // ─── Inner Scene Components ──────────────────────────────────────────
@@ -130,8 +132,17 @@ export function StlViewer({
   stlUrl,
   className,
   height = 500,
+  onLoadError,
 }: StlViewerProps): React.ReactNode {
   const [hasError, setHasError] = useState(false)
+
+  const handleError = (): void => {
+    console.error("[StlViewer] Failed to load STL from URL:", {
+      url: stlUrl?.slice(0, 200),
+    })
+    setHasError(true)
+    onLoadError?.()
+  }
 
   if (hasError) {
     return (
@@ -155,7 +166,7 @@ export function StlViewer({
       style={{ height }}
     >
       <Suspense fallback={<ViewerSkeleton height={height} />}>
-        <ErrorBoundary onError={() => setHasError(true)}>
+        <ErrorBoundary onError={handleError}>
           <Canvas
             shadows
             camera={{ position: [5, 4, 6], fov: 45, near: 0.1, far: 100 }}
@@ -205,6 +216,8 @@ interface ErrorBoundaryState {
 /**
  * Simple error boundary for the 3D canvas.
  * Catches WebGL or loading errors without crashing the whole page.
+ *
+ * @security Logs errors for diagnostics but does not expose internal details to UI
  */
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
@@ -216,7 +229,12 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     return { hasError: true }
   }
 
-  componentDidCatch(): void {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
+    console.error("[StlViewer] 3D rendering failed:", {
+      error: error.message,
+      stack: error.stack?.slice(0, 500),
+      componentStack: errorInfo.componentStack?.slice(0, 300),
+    })
     this.props.onError()
   }
 

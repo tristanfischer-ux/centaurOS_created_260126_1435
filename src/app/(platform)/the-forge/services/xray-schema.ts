@@ -422,6 +422,7 @@ export const XRaySpecSchema = z.object({
   systemCadStatus: z.enum(["pending", "generating", "complete", "failed"]).optional()
     .describe("System CAD model generation status"),
   systemCadSvgUrl: z.string().optional().describe("URL of isometric SVG view of system CAD model"),
+  systemCadQueryCode: z.string().optional().describe("CadQuery source code (persisted on failure for debugging)"),
   // System-level engineering analysis (aggregated across all modules)
   systemAnalysis: SystemAnalysisSchema.optional()
     .describe("Aggregated engineering analysis across all modules"),
