@@ -300,6 +300,16 @@ async function callOpus(
     messages: [{ role: "user", content: userPrompt }],
   })
 
+  // Log response metadata for debugging
+  const blockTypes = response.content.map((b) => b.type)
+  console.info("[XRayCadGen] Opus response:", {
+    stopReason: response.stop_reason,
+    blockTypes,
+    blockCount: response.content.length,
+    inputTokens: response.usage?.input_tokens,
+    outputTokens: response.usage?.output_tokens,
+  })
+
   const texts: string[] = []
   for (const block of response.content) {
     if (block.type === "text") {
@@ -307,8 +317,27 @@ async function callOpus(
     }
   }
 
+  // Fallback: if no text blocks but thinking blocks exist, extract from thinking
   if (texts.length === 0) {
-    throw new Error("[XRayCadGen] Opus returned no text content")
+    for (const block of response.content) {
+      if ("thinking" in block && typeof (block as Record<string, unknown>).thinking === "string") {
+        texts.push((block as Record<string, unknown>).thinking as string)
+      }
+    }
+    if (texts.length > 0) {
+      console.warn("[XRayCadGen] No text blocks found — extracted content from thinking blocks")
+    }
+  }
+
+  if (texts.length === 0) {
+    console.error("[XRayCadGen] Opus returned no usable content:", {
+      stopReason: response.stop_reason,
+      blockTypes,
+      rawContent: JSON.stringify(response.content).slice(0, 500),
+    })
+    throw new Error(
+      `[XRayCadGen] Opus returned no text content (stop_reason: ${response.stop_reason}, blocks: [${blockTypes.join(", ")}])`,
+    )
   }
 
   return texts.join("\n")
