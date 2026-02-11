@@ -1,4 +1,3 @@
-// @ts-nocheck - Tables exist but types not regenerated after money_map migration
 'use server'
 
 /**

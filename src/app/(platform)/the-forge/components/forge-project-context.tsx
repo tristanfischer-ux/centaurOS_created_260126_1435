@@ -226,6 +226,10 @@ export function ForgeProjectProvider({
   const scanId = project.scanId
   const [scanStatus, setScanStatus] = useState<ScanStatus>(initialProject.scanStatus || "idle")
 
+  // Track last known scan_status so the Realtime callback only toasts
+  // on a genuine transition to "complete", not on every spec UPDATE.
+  const lastStatusRef = useRef<string>(initialProject.scanStatus || "idle")
+
   // ── Supabase Realtime subscription ──
   // Listens for scan_status changes on this scan row so the UI
   // auto-updates when a background scan completes (user can navigate away).
@@ -248,13 +252,22 @@ export function ForgeProjectProvider({
             spec?: XRaySpec
           }
 
+          const previousStatus = lastStatusRef.current
+
           // Update scan status
           if (newRow.scan_status) {
             setScanStatus(newRow.scan_status as ScanStatus)
+            lastStatusRef.current = newRow.scan_status
           }
 
-          // When scan completes in background, update the spec from the DB row
-          if (newRow.scan_status === "complete" && newRow.spec) {
+          // Only toast when scan_status TRANSITIONS to "complete" (not on every update).
+          // Without this guard, every spec persistence (e.g. typing in the idea field)
+          // would re-trigger the toast because scan_status is already "complete".
+          if (
+            newRow.scan_status === "complete" &&
+            previousStatus !== "complete" &&
+            newRow.spec
+          ) {
             const updatedSpec = newRow.spec as XRaySpec
             // Only update if the new spec has modules (completed scan)
             if (updatedSpec.modules && updatedSpec.modules.length > 0) {

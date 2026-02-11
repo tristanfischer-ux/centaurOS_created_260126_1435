@@ -1,4 +1,3 @@
-// @ts-nocheck - pitch_prep_requests table exists but types not regenerated
 "use server"
 
 import { createClient } from "@/lib/supabase/server"

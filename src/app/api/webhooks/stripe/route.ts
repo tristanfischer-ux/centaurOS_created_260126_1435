@@ -1,4 +1,3 @@
-// @ts-nocheck - billing tables exist but types not regenerated
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe/client'
@@ -198,8 +197,8 @@ async function handleBalanceTopUp(paymentIntent: Stripe.PaymentIntent, userId: s
     userId,
     title: 'Balance Top-Up Complete',
     body: `${formatAmount(paymentIntent.amount, paymentIntent.currency)} has been added to your account balance.`,
-    type: 'payment',
     priority: 'medium',
+    metadata: { type: 'payment' },
   })
 }
 
