@@ -11,7 +11,7 @@
 
 "use client"
 
-import React, { useMemo, useCallback } from "react"
+import React, { useMemo, useCallback, useRef, useState, useEffect } from "react"
 import {
   ReactFlow,
   Background,
@@ -24,7 +24,7 @@ import "@xyflow/react/dist/style.css"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Box, CircleDot } from "lucide-react"
+import { Box, ChevronLeft, ChevronRight, CircleDot } from "lucide-react"
 
 import { ArchitectureNode } from "./architecture-node"
 import type { ArchitectureNodeData } from "./architecture-node"
@@ -166,6 +166,35 @@ export function ArchitectureMap({ spec }: ArchitectureMapProps): React.ReactNode
 
   const canvasWidth = Math.max(600, CANVAS_PADDING * 2 + n * (NODE_WIDTH + NODE_GAP_X))
 
+  // Scroll affordance: track whether left/right overflow exists
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const updateScrollIndicators = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 4)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }, [])
+
+  useEffect(() => {
+    updateScrollIndicators()
+    const el = scrollRef.current
+    if (!el) return
+    el.addEventListener("scroll", updateScrollIndicators, { passive: true })
+    const ro = new ResizeObserver(updateScrollIndicators)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener("scroll", updateScrollIndicators)
+      ro.disconnect()
+    }
+  }, [updateScrollIndicators])
+
+  const scrollBy = useCallback((delta: number) => {
+    scrollRef.current?.scrollBy({ left: delta, behavior: "smooth" })
+  }, [])
+
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     const moduleId = node.id.replace("arch-", "")
     document.getElementById(`module-v2-${moduleId}`)?.scrollIntoView({
@@ -198,9 +227,26 @@ export function ArchitectureMap({ spec }: ArchitectureMapProps): React.ReactNode
           </Badge>
         </div>
 
-        {/* React Flow canvas */}
-        <div className="rounded-xl overflow-hidden border bg-muted/10">
-          <div className="overflow-x-auto">
+        {/* React Flow canvas with scroll affordance */}
+        <div className="relative rounded-xl overflow-hidden border bg-muted/10">
+          {/* Left fade + arrow */}
+          <div
+            className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center transition-opacity duration-200"
+            style={{ opacity: canScrollLeft ? 1 : 0, width: 48 }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-background/80 to-transparent" />
+            <button
+              type="button"
+              aria-label="Scroll left"
+              className="pointer-events-auto relative ml-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 shadow-sm border border-border/50 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => scrollBy(-300)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Scrollable canvas */}
+          <div ref={scrollRef} className="overflow-x-auto">
             <div style={{ width: canvasWidth, height: 220 }}>
               <ReactFlow
                 nodes={nodes}
@@ -230,6 +276,22 @@ export function ArchitectureMap({ spec }: ArchitectureMapProps): React.ReactNode
                 />
               </ReactFlow>
             </div>
+          </div>
+
+          {/* Right fade + arrow */}
+          <div
+            className="pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center justify-end transition-opacity duration-200"
+            style={{ opacity: canScrollRight ? 1 : 0, width: 48 }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-l from-background/80 to-transparent" />
+            <button
+              type="button"
+              aria-label="Scroll right"
+              className="pointer-events-auto relative mr-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 shadow-sm border border-border/50 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => scrollBy(300)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
