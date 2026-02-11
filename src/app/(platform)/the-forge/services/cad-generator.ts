@@ -3,29 +3,24 @@
  *
  * @description Two-tier CAD generation pipeline:
  *
- * **System model (HERO):** Opus 4.6 with 32K tokens produces a highly detailed,
- * manufacturing-quality CadQuery model of the complete assembled product. This is
- * THE 3D visualization — it gets the royal treatment (300-800 lines, shell bodies,
- * internal structure, surface detail).
+ * **System model (HERO):** Opus 4.6 generates CadQuery DIRECTLY from the full
+ * XRay spec (32K tokens). No structural brief intermediary — Opus uses its own
+ * visual/domain knowledge of what the product looks like to produce realistic
+ * geometry. This is the key insight: Claude knows what a drone/pump/robot looks
+ * like and encodes that knowledge directly into parametric dimensions and shapes.
  *
  * **Module models (SCHEMATICS):** Gemini 2.5 Pro produces clean, reliable
- * schematic-quality CadQuery models of individual sub-assemblies. These are
- * supporting visuals — recognizable and well-proportioned, but focused on
- * clarity over manufacturing detail (100-250 lines, key features only).
- *
- * This split is intentional: one amazing hero model is far more impactful than
- * 8 mediocre ones. Gemini handles modules because it's faster, cheaper, and
- * less prone to safety refusals on industrial/drone/agricultural components.
+ * schematic-quality CadQuery models via structural brief. These are supporting
+ * visuals — recognizable but focused on clarity over manufacturing detail.
  *
  * @security
  * - ANTHROPIC_API_KEY for Opus (system model)
  * - GOOGLE_AI_API_KEY for Gemini (module models + Opus fallback)
  * - MODAL_CAD_ENDPOINT_URL for CadQuery execution
  * - Modal containers are sandboxed (no ForgeOS infra access)
- * - Generated code is validated for blocked patterns before execution
  *
  * @related
- * - Structural brief: ./structural-brief.ts (Opus orchestrator for consistency)
+ * - Structural brief: ./structural-brief.ts (used for module schematics + images)
  * - Image generator: ./image-generator.ts (parallel 2D pipeline)
  * - Schema: ./xray-schema.ts (cadModel field on ModuleSpec)
  * - Modal worker: /modal_cad_worker.py (Python execution environment)
@@ -35,7 +30,7 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 
 import type { ModuleSpec, ModuleAnalysis, XRaySpec } from "./xray-schema"
-import type { StructuralBrief, SystemStructuralBrief } from "./structural-brief"
+import type { StructuralBrief } from "./structural-brief"
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -787,84 +782,109 @@ export interface SystemCadResult {
 }
 
 /**
- * System-level CadQuery prompt — creates the overall product form factor.
+ * System-level CadQuery prompt — generates hero model directly from spec.
+ *
+ * @description This prompt deliberately avoids generic "component recipes" and
+ * instead tells Opus to use its own visual/domain knowledge. When Claude writes
+ * CadQuery directly from knowing what a product looks like, it produces dramatically
+ * better models than when working from an abstract structural brief.
  */
-const SYSTEM_CAD_PROMPT = `You are a world-class CAD engineer. Write CadQuery Python code to create a HIGHLY DETAILED 3D model of an ENTIRE assembled product/system.
+const SYSTEM_CAD_PROMPT = `You are a world-class CAD engineer writing CadQuery Python code for a detailed, realistic 3D model of a complete product.
 
-## Quality Bar
-This is the HERO model — the main 3D visualization of the complete product. It must be impressive and immediately recognizable. Think DJI Mavic drone level of detail: shell bodies with wall thickness, realistic proportions, surface features, mounting hardware, sensor recesses, ventilation, ports. NOT simplified blocks.
+## YOUR KEY ADVANTAGE
+You know what real-world products look like. A drone has aerodynamic bodies with dome tops, angled motor arms, camera gimbals. A pump has volute housings, impeller chambers, flanged ports. A robot has articulated joints, servo housings, cable routing. USE THAT KNOWLEDGE. Don't just build boxes with labels — build geometry that looks like the real thing.
 
 ## Rules
-1. Output ONLY valid Python code using CadQuery. No markdown fences.
+1. Output ONLY valid Python code using CadQuery. No markdown fences, no explanation.
 2. Import only \`cadquery as cq\` and \`math\`. No other imports.
-3. All dimensions in millimeters.
+3. All dimensions in millimeters. Use realistic dimensions from your domain knowledge.
 4. The final model MUST be stored in a variable called \`result\`.
-5. Create a FULLY DETAILED assembled model — shell bodies, internal structure, surface features.
-6. Each module/subsystem should be recognizable as a distinct component with realistic geometry.
-7. Use .union() to combine components and .cut() for hollow bodies, cavities, and cutouts.
-8. Apply realistic proportions from the structural brief. Include wall thicknesses.
-9. Start with a comprehensive PARAMETERS block covering ALL key dimensions.
-10. Target 300-800 lines of code. This is the main product model — it deserves detail.
-11. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or file I/O.
-12. Build incrementally with numbered sections and intermediate variables.
+5. Start with a comprehensive PARAMETERS block (50+ parameters covering every major dimension, wall thickness, fillet radius, bolt size, clearance).
+6. Target 400-900 lines of code. This is the HERO model — it deserves full detail.
+7. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or file I/O.
+8. Build incrementally with numbered sections and intermediate variables.
 
-## What Makes the System Model Great
-1. **Shell bodies** — Main housing has wall thickness, not a solid block.
-2. **Distinct sub-assemblies** — Each module is recognizable, not just a labeled box.
-3. **Connection features** — Pipes, cables, mounting brackets between modules.
-4. **Surface detail** — Ventilation grilles, sensor recesses, port cutouts, LED channels.
-5. **Structural frame** — Ribs, cross-members, mounting points.
-6. **External features** — Handles, panels, connectors, indicators visible from outside.
+## What Makes a Model Look REAL
+- **Shell bodies with wall thickness** — outer shape minus inner cutout via .cut(). This is the single most important technique. Every housing, enclosure, and body should be hollow.
+- **Aerodynamic/organic shaping** — top domes, nose tapers, compound fillets. Real products are not rectangular.
+- **Realistic proportions from domain knowledge** — you know what these products look like. Use real-world proportions, not arbitrary ones.
+- **Functional features** — sensor recesses, ventilation grilles, port cutouts, LED channels, screw bosses, bolt patterns.
+- **Internal structure** — ribs, cross-members, standoffs, PCB mounting posts visible through the shell.
+- **Distinct sub-assemblies** — each subsystem is a recognizable shape, not a box placeholder.
 
-## Reliability Techniques
-1. Wrap \`.fillet()\` in try/except — fall back to \`.chamfer()\` at half radius.
-2. Do NOT use \`.shell()\` on complex shapes — build hollow bodies with \`.cut()\`.
-3. Use tuples for \`.transformed(offset=(x,y,z))\`.
-4. Build incrementally — assign to intermediate variables.
-5. Use numbered section comments (# === 1. MAIN FRAME ===) for organization.
+## Reliability (CRITICAL)
+1. NEVER use \`.shell()\` — it crashes on complex shapes. Always build hollow bodies with outer.cut(inner).
+2. Wrap EVERY \`.fillet()\` call in try/except — fall back to \`.chamfer()\` at half the radius.
+3. Keep fillet radius under 30% of smallest adjacent edge.
+4. Use tuples for \`.transformed(offset=(x,y,z))\` — not lists.
+5. Build incrementally — assign to intermediate variables, don't chain 10+ operations.
+6. Use numbered section comments (# === 1. MAIN BODY === ) for organization.
+7. Verify shapes physically overlap before \`.cut()\` or \`.union()\`.
 
 Output just the Python code.`
 
 /**
- * Builds the user prompt for system-level CadQuery generation.
+ * Builds the user prompt for system-level CadQuery generation DIRECTLY from
+ * the XRay spec — no structural brief intermediary.
  *
- * @param spec - The full XRay spec
- * @param brief - The system structural brief from Opus orchestrator
- * @returns Formatted prompt string
+ * @description This is the key architectural change: instead of routing through
+ * a lossy structural brief, we pass the full product context and let Opus use
+ * its visual/domain knowledge to generate realistic geometry. The original idea
+ * text (spec.idea) often contains the richest physical description and was
+ * previously never passed to the CadQuery generator.
+ *
+ * @param spec - The full XRay spec including original idea text
+ * @returns Formatted prompt string with maximum context
  */
-function buildSystemCadPrompt(spec: XRaySpec, brief: SystemStructuralBrief): string {
-  const moduleSummaries = spec.modules
-    .map((m) => `- **${m.name}:** ${m.purpose}\n  Key parts: ${m.keyParts.slice(0, 5).join(", ")}`)
-    .join("\n")
+function buildDirectSystemPrompt(spec: XRaySpec): string {
+  // Build rich module descriptions with ALL available physical detail
+  const moduleDetails = spec.modules
+    .map((m) => {
+      const parts = m.keyParts.join(", ")
+      const inputs = m.io.in.join(", ")
+      const outputs = m.io.out.join(", ")
+      const whatItIs = m.detail?.whatItIs ?? ""
+      const principles = m.detail?.operatingPrinciples ?? ""
+      const materials = m.detail?.materialJustification ?? ""
 
-  return `Generate a HIGHLY DETAILED 3D CadQuery model for the COMPLETE assembled product. This is the HERO model — the main visualization that represents the entire product. It must be impressive.
+      let detail = `### ${m.name}\n**Purpose:** ${m.purpose}\n**What it is:** ${whatItIs}`
+      if (principles) detail += `\n**Operating principles:** ${principles}`
+      if (materials) detail += `\n**Materials:** ${materials}`
+      detail += `\n**Key physical components:** ${parts}`
+      detail += `\n**Inputs:** ${inputs} | **Outputs:** ${outputs}`
+      return detail
+    })
+    .join("\n\n")
 
-**Product Function:** ${spec.function}
+  return `Generate a detailed, realistic 3D CadQuery model of this complete product. You know what this type of product looks like — use that knowledge for realistic geometry, proportions, and features.
 
-**Overall Dimensions:** ${brief.overallDimensions}
+## The Product
 
-**Physical Structure:**
-${brief.physicalDescription}
+**Original description:** ${spec.idea}
 
-**CadQuery Build Instructions:**
-${brief.cadInstructions}
+**System function:** ${spec.function}
 
-**Modules (each should be a recognizable sub-assembly in the model):**
-${moduleSummaries}
+**Key materials:** ${spec.materials.join(", ")}
 
-**Key Materials:** ${spec.materials.slice(0, 5).join(", ")}
+**Manufacturing processes:** ${spec.processes.join(", ")}
 
-## Requirements
-- Build the main body/frame as a shell with wall thickness (not a solid block).
-- Each module should be a recognizable, detailed sub-assembly — NOT a simplified box or cylinder placeholder.
-- Include structural connections between modules (mounting brackets, pipe runs, cable trays).
-- Add surface features: ventilation, sensor recesses, ports, indicators, access panels.
-- Include mounting hardware: screw bosses, bolt patterns, standoffs.
-- Target 300-800 lines of detailed CadQuery code.
-- Build in numbered sections (# === 1. MAIN FRAME ===, # === 2. MODULE A ===, etc.)
-- Start with a comprehensive PARAMETERS block.
+## Modules (each should be a distinct, recognizable sub-assembly)
 
-The assembled model should be immediately recognizable as the described product and impressive enough to serve as a hero visualization.
+${moduleDetails}
+
+## What I Need
+
+Build a HERO model — the main 3D visualization of this complete product. Someone looking at the 3D model should immediately say "that's a ${spec.function.toLowerCase().replace(/\.$/, "")}."
+
+Use your knowledge of what this type of product actually looks like in the real world:
+- Real-world proportions and dimensions (not arbitrary)
+- Aerodynamic or organic shapes where appropriate (not everything is a box)
+- Shell bodies with wall thickness for all housings/enclosures
+- Each module as a recognizable, distinct sub-assembly
+- Functional features: sensors, ports, vents, indicators, mounting hardware
+- Internal structure visible through shells: ribs, standoffs, PCB mounts
+
+Build in numbered sections. Start with a comprehensive PARAMETERS block (50+ parameters). Target 400-900 lines.
 
 Store the final model in a variable called \`result\`.`
 }
@@ -872,12 +892,17 @@ Store the final model in a variable called \`result\`.`
 /**
  * Generates a system-level 3D CAD model representing the overall product.
  *
- * @description Pipeline: Structural brief -> Opus writes CadQuery for the full
- * product -> Modal executes -> STL + SVG uploaded to storage.
+ * @description Direct generation pipeline — NO structural brief intermediary.
+ * Opus receives the full XRay spec (including original idea text) and uses its
+ * own visual/domain knowledge to generate realistic CadQuery code. This produces
+ * dramatically better models because the AI's knowledge of real-world product
+ * geometry is preserved rather than compressed through an abstract brief.
+ *
+ * Pipeline: Full XRay spec -> Opus generates CadQuery directly (32K tokens) ->
+ * Modal executes -> STL + SVG uploaded to storage.
  *
  * @param scanId - The scan ID for storage namespacing
- * @param spec - The full XRay spec
- * @param brief - Optional system structural brief (generated if not provided)
+ * @param spec - The full XRay spec (idea, function, modules, materials, etc.)
  * @returns URLs for STL and isometric SVG, plus the source code
  *
  * @throws CadGenerationError if all retry attempts fail
@@ -885,18 +910,11 @@ Store the final model in a variable called \`result\`.`
 export async function generateSystemCadModel(
   scanId: string,
   spec: XRaySpec,
-  brief?: SystemStructuralBrief,
 ): Promise<SystemCadResult> {
-  // Generate structural brief if not provided
-  if (!brief) {
-    const { generateSystemStructuralBrief } = await import("./structural-brief")
-    brief = await generateSystemStructuralBrief(spec)
-  }
+  // Stage 1: Opus generates CadQuery DIRECTLY from the full spec (32K tokens, no brief)
+  const userPrompt = buildDirectSystemPrompt(spec)
 
-  // Stage 1: Opus generates CadQuery code for the full product (32K tokens — hero model)
-  const userPrompt = buildSystemCadPrompt(spec, brief)
-
-  console.info("[XRayCadGen] Generating HERO system CadQuery code with Opus (32K tokens)")
+  console.info("[XRayCadGen] Generating HERO system CadQuery directly from spec (Opus, 32K tokens)")
 
   let cadQueryCode = stripCodeFences(await callOpus(SYSTEM_CAD_PROMPT, userPrompt, 0.3, 32768))
 
@@ -915,11 +933,11 @@ export async function generateSystemCadModel(
 
     try {
       if (isFinalAttempt) {
-        // Final attempt: Gemini with simplified fallback
+        // Final attempt: Gemini with full spec context (still no brief)
         cadQueryCode = stripCodeFences(
           await callGemini(
-            "You are an expert CadQuery engineer. Generate valid, crash-proof Python code that creates detailed, recognizable 3D models. Use shell bodies (outer.cut(inner) for wall thickness), multi-component assemblies with .union(), and include surface detail. Never output just boxes.",
-            generateSimplifiedSystemPrompt(spec, brief),
+            SYSTEM_CAD_PROMPT,
+            buildDirectSystemFallbackPrompt(spec),
           ),
         )
       } else {
@@ -927,8 +945,9 @@ export async function generateSystemCadModel(
         cadQueryCode = stripCodeFences(
           await callOpus(
             SYSTEM_CAD_PROMPT,
-            `${userPrompt}\n\nThe previous code failed with this error:\n\n${modalResult.error.slice(0, 1000)}\n\nPrevious code:\n\`\`\`python\n${cadQueryCode}\n\`\`\`\n\nFix the code. Output ONLY the corrected Python code.`,
+            `${userPrompt}\n\nThe previous code failed with this error:\n\n${modalResult.error.slice(0, 1000)}\n\nPrevious code:\n\`\`\`python\n${cadQueryCode}\n\`\`\`\n\nFix the geometry error. Keep the model detailed and realistic. Output ONLY the corrected Python code.`,
             0.2,
+            32768,
           ),
         )
       }
@@ -969,40 +988,41 @@ export async function generateSystemCadModel(
 }
 
 /**
- * Builds a simplified system fallback prompt for Gemini.
+ * Builds a Gemini fallback prompt for system-level CAD — uses spec directly, no brief.
+ *
+ * @description Simpler than the Opus prompt but still uses the full spec context.
+ * Gemini gets the original idea text and module details to preserve domain knowledge.
  *
  * @param spec - The full XRay spec
- * @param brief - The system structural brief
  * @returns Fallback prompt string
  */
-function generateSimplifiedSystemPrompt(spec: XRaySpec, brief: SystemStructuralBrief): string {
+function buildDirectSystemFallbackPrompt(spec: XRaySpec): string {
   const moduleSummary = spec.modules
-    .map((m) => `- **${m.name}:** ${m.purpose} (parts: ${m.keyParts.slice(0, 3).join(", ")})`)
+    .map((m) => `- **${m.name}:** ${m.purpose}\n  Key parts: ${m.keyParts.join(", ")}`)
     .join("\n")
 
-  return `Generate CadQuery Python code for a RECOGNIZABLE model of this complete product: "${spec.function}".
+  return `Generate CadQuery Python code for a realistic, recognizable 3D model of this product.
 
-**Structural guidance:**
-Overall dimensions: ${brief.overallDimensions}
-Physical description: ${brief.physicalDescription}
-${brief.cadInstructions}
+**What it is:** ${spec.idea}
 
-**Modules (subsystems):**
+**System function:** ${spec.function}
+
+**Materials:** ${spec.materials.slice(0, 8).join(", ")}
+
+**Modules:**
 ${moduleSummary}
 
+You know what this type of product looks like. Use realistic proportions and shapes from your domain knowledge.
+
 CONSTRAINTS:
-- Target 200-350 lines of code
-- Do NOT use .shell() — build hollow bodies with .cut() instead
+- Target 200-400 lines of code
+- NEVER use .shell() — build hollow bodies with outer.cut(inner)
 - Wrap .fillet() in try/except, falling back to .chamfer()
 - Use .union() and .cut() for multi-component assemblies
-- Build the main body as a shell (outer minus inner for wall thickness)
-- Each module should be a recognizable shape (not a plain box)
-- Include structural connections between modules
-- Add surface features: vents, ports, sensors, panels
+- Shell bodies with wall thickness for all housings
+- Each module as a recognizable sub-assembly (not a box)
 - Start with a PARAMETERS block
 - Store the final model in a variable called \`result\`
-
-The model must be immediately recognizable as the described product with realistic proportions. Use shell bodies, not solid blocks.
 
 Output ONLY the Python code. No markdown fences, no explanation.`
 }
