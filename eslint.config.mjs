@@ -1,6 +1,8 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import reactPlugin from "eslint-plugin-react";
+import reactHooksPlugin from "eslint-plugin-react-hooks";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -28,6 +30,10 @@ const eslintConfig = defineConfig([
   ]),
   // Downgrade non-critical rules to warnings for CI to pass
   {
+    plugins: {
+      react: reactPlugin,
+      "react-hooks": reactHooksPlugin,
+    },
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "warn",

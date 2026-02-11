@@ -558,14 +558,16 @@ export async function generateCadModelsAction(
               },
             }
           } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : "Unknown error"
             console.error(`[XRay] Failed to generate CAD model for module ${xrayModule.id}:`, {
-              error: error instanceof Error ? error.message : "Unknown error",
+              error: errorMsg,
             })
             return {
               moduleIndex,
               cadModel: {
                 status: "failed" as const,
                 generatedAt: new Date().toISOString(),
+                errorMessage: errorMsg,
               },
             }
           }

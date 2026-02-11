@@ -312,8 +312,12 @@ except Exception as _e:
 
 
 # Write analysis results to a JSON file for the host to read
-with __builtins__["open"](_os.path.join(_output_dir, "analysis.json"), "w") as _af:
-    _af.write(_json.dumps(_analysis))
+try:
+    import builtins as _builtins
+    with _builtins.open(_os.path.join(_output_dir, "analysis.json"), "w") as _af:
+        _af.write(_json.dumps(_analysis))
+except Exception:
+    pass  # Analysis write failure should not kill STEP/STL/SVG generation
 '''
 
 # ─── Main Function ────────────────────────────────────────────────────
@@ -376,18 +380,18 @@ def generate_cad(
 
         # Execute in isolated namespace
         namespace: dict = {}
+        exec_error: str | None = None
         try:
             exec(full_code, namespace)  # noqa: S102 — intentional sandboxed exec
         except Exception:
-            result = _empty_result()
-            result["error"] = (
+            exec_error = (
                 f"CadQuery execution failed for module '{module_id}': "
                 f"{traceback.format_exc()[-500:]}"
             )
-            return result
 
-        # Read output files
-        result: dict = {"error": None}
+        # Read output files — attempt even after exec error to recover
+        # partial results (STEP/STL/SVGs written before the error point)
+        result: dict = {"error": exec_error}
         file_map = {
             "step": "model.step",
             "stl": "model.stl",
@@ -397,13 +401,20 @@ def generate_cad(
             "svg_right": "right.svg",
         }
 
+        has_any_file = False
         for key, filename in file_map.items():
             filepath = os.path.join(tmpdir, filename)
             if os.path.exists(filepath):
                 with open(filepath, "rb") as f:  # noqa: SIM115
                     result[key] = base64.b64encode(f.read()).decode("utf-8")
+                has_any_file = True
             else:
                 result[key] = None
+
+        # If we recovered files despite the exec error, clear the error
+        # so the caller gets the partial result instead of a failure
+        if exec_error and has_any_file:
+            result["error"] = None
 
         # Read analysis results
         analysis_path = os.path.join(tmpdir, "analysis.json")

@@ -388,6 +388,7 @@ export const ModuleSpecSchema = z.object({
     svgRightUrl: z.string().optional().describe("URL of right-side SVG engineering view"),
     cadQueryCode: z.string().optional().describe("The AI-generated CadQuery Python code"),
     generatedAt: z.string().optional().describe("ISO timestamp of generation"),
+    errorMessage: z.string().optional().describe("Error message from the last failed generation attempt"),
     // Engineering analysis results (computed alongside or after CAD generation)
     analysis: ModuleAnalysisSchema.optional()
       .describe("Engineering analysis results for this module's CAD model"),

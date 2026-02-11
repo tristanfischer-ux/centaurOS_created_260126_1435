@@ -31,6 +31,8 @@ import type { ModuleSpec, ModuleAnalysis, MassProperties, DfmAnalysis } from "./
 
 const STORAGE_BUCKET = "xray-images"
 const MODAL_TIMEOUT_MS = 90_000
+/** Number of retry attempts when CadQuery execution fails on Modal */
+const MAX_RETRY_ATTEMPTS = 1
 
 // ─── Common Material Densities (kg/m³) ───────────────────────────────
 
@@ -245,6 +247,83 @@ async function generateCadQueryCode(module: ModuleSpec): Promise<string> {
 }
 
 /**
+ * Regenerates CadQuery code after a failed execution attempt.
+ *
+ * Feeds the original code and Modal error message back to GPT-4o
+ * so it can produce a corrected version. This is the retry path
+ * in the generate-execute-retry loop.
+ *
+ * @param module - The module spec for context
+ * @param failedCode - The CadQuery code that failed execution
+ * @param errorMessage - The error returned by Modal (traceback excerpt)
+ * @returns Corrected CadQuery Python code
+ *
+ * @throws Error if AI call fails
+ */
+async function regenerateCadQueryCode(
+  module: ModuleSpec,
+  failedCode: string,
+  errorMessage: string,
+): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error("[XRayCadGen] OPENAI_API_KEY is not configured")
+  }
+
+  const openai = new OpenAI({ apiKey })
+
+  const retryPrompt = `The following CadQuery code for the "${module.name}" module failed during execution.
+
+**Error:**
+\`\`\`
+${errorMessage.slice(0, 800)}
+\`\`\`
+
+**Failed code:**
+\`\`\`python
+${failedCode}
+\`\`\`
+
+Fix the code so it executes without errors. Common CadQuery pitfalls to check:
+- \`.shell()\` can fail on complex shapes — simplify geometry or remove shell if needed
+- \`.fillet()\` fails if the radius is too large for the edge — reduce fillet radii
+- Boolean operations (\`.cut()\`, \`.union()\`) fail if shapes don't overlap — verify positioning
+- \`.transformed(offset=(x,y,z))\` uses tuples, not lists
+- Workplane selectors like \`">Z"\` or \`"|Z"\` must match existing geometry
+- Avoid deeply nested boolean operations — build incrementally
+
+Output ONLY the corrected Python code. No markdown fences, no explanation.
+Store the final model in a variable called \`result\`.`
+
+  console.info("[XRayCadGen] Retrying with error feedback for module:", {
+    moduleId: module.id,
+    errorSnippet: errorMessage.slice(0, 120),
+  })
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: CAD_SYSTEM_PROMPT },
+      { role: "user", content: retryPrompt },
+    ],
+    temperature: 0.2,
+    max_tokens: 4000,
+  })
+
+  const rawCode = completion.choices[0]?.message?.content
+  if (!rawCode) {
+    throw new Error("[XRayCadGen] AI returned empty response on retry")
+  }
+
+  const code = rawCode
+    .replace(/^```(?:python)?\n?/gm, "")
+    .replace(/\n?```$/gm, "")
+    .trim()
+
+  return code
+}
+
+/**
  * Builds the user prompt for CadQuery code generation from a module spec.
  *
  * @param module - The module spec
@@ -388,10 +467,40 @@ export async function generateModuleCadModel(
   const { density: materialDensity, name: materialName } = inferMaterialDensity(module)
 
   // Stage 1: AI generates CadQuery code
-  const cadQueryCode = await generateCadQueryCode(module)
+  let cadQueryCode = await generateCadQueryCode(module)
 
-  // Stage 2: Modal executes the code (now also computes analysis)
-  const modalResult = await executeCadQueryOnModal(cadQueryCode, module.id, materialDensity)
+  // Stage 2: Modal executes the code (with auto-retry on failure)
+  let modalResult = await executeCadQueryOnModal(cadQueryCode, module.id, materialDensity)
+
+  // Retry loop: if Modal returns an execution error, feed it back to AI for a fix
+  if (modalResult.error) {
+    let lastError: string = modalResult.error
+    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+      console.warn("[XRayCadGen] Execution failed, retrying with error feedback:", {
+        moduleId: module.id,
+        attempt,
+        error: lastError.slice(0, 200),
+      })
+
+      try {
+        cadQueryCode = await regenerateCadQueryCode(module, cadQueryCode, lastError)
+        modalResult = await executeCadQueryOnModal(cadQueryCode, module.id, materialDensity)
+
+        if (!modalResult.error) {
+          console.info("[XRayCadGen] Retry succeeded on attempt:", { moduleId: module.id, attempt })
+          break
+        }
+        lastError = modalResult.error
+      } catch (retryError) {
+        console.error("[XRayCadGen] Retry attempt failed:", {
+          moduleId: module.id,
+          attempt,
+          error: retryError instanceof Error ? retryError.message : "Unknown",
+        })
+        // Fall through to the final error check below
+      }
+    }
+  }
 
   if (modalResult.error) {
     throw new Error(`[XRayCadGen] Modal execution failed: ${modalResult.error}`)

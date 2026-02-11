@@ -681,13 +681,18 @@ function CadModelSection({
 
   // Failed state
   if (cadModel.status === "failed") {
+    // Strip internal prefixes like [XRayCadGen] for user-facing display
+    const displayError = cadModel.errorMessage
+      ? cadModel.errorMessage.replace(/\[XRayCadGen\]\s*/g, "").slice(0, 200)
+      : "The generated code could not produce a valid model"
+
     return (
       <div className="rounded-xl border border-destructive/20 bg-status-error-light/10 p-6 flex flex-col items-center gap-3">
         <AlertTriangle className="h-6 w-6 text-destructive" />
         <div className="text-center">
           <p className="text-sm font-medium text-foreground">3D model generation failed</p>
           <p className="text-xs text-muted-foreground mt-1">
-            The generated code could not produce a valid model
+            {displayError}
           </p>
         </div>
         {onGenerate && (
