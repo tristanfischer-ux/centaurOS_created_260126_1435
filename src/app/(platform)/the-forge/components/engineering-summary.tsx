@@ -18,6 +18,7 @@ import React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/ui/empty-state"
 import {
   Scale,
   CircleDot,
@@ -96,8 +97,16 @@ export function EngineeringSummary({
     (m) => m.cadModel?.status === "complete",
   )
 
-  // Don't render if no modules have CAD or analysis
-  if (modulesWithCad.length === 0) return null
+  // Show empty state when no modules have CAD models generated yet
+  if (modulesWithCad.length === 0) {
+    return (
+      <EmptyState
+        icon={<FlaskConical className="h-10 w-10" />}
+        title="No CAD models to analyze"
+        description="Generate CAD models for your modules first. Once at least one module has a completed CAD model, you can run engineering analysis here."
+      />
+    )
+  }
 
   const hasAnalysis = modulesWithAnalysis.length > 0
 
