@@ -123,7 +123,7 @@ export function ExecutiveDashboard({ spec }: ExecutiveDashboardProps): React.Rea
     },
     {
       label: "Critical Path",
-      value: `${m.criticalPathWeeks}w`,
+      value: `${m.criticalPathWeeks} wks`,
       sub: "longest lead time",
       icon: Clock,
       color: "text-chart-2",
