@@ -166,47 +166,97 @@ interface ModalAnalysisPayload {
  * manufacturing detail. These are supporting visuals for individual modules
  * while the system-level model (Opus) is the hero.
  */
-const MODULE_SCHEMATIC_PROMPT = `You are an expert CadQuery engineer creating clean, recognizable 3D schematic models of engineering sub-assemblies.
+const MODULE_SCHEMATIC_PROMPT = `You are an expert CadQuery mechanical engineer creating recognizable, detailed 3D schematic models of engineering sub-assemblies.
 
 ## Goal
-Create a model that clearly shows WHAT this component is and HOW it works. Focus on recognizability and spatial relationships, not manufacturing detail. Think "engineering textbook cutaway" — clean geometry that teaches, not a production CAD file.
+Create a model that clearly shows WHAT this component is and HOW it works. Think "engineering textbook cutaway" — clean geometry that teaches, with enough mechanical detail to be convincing. This is a schematic that should look like a real engineered part, not a toy.
+
+## MANDATORY: Engineering Thinking Process
+Before writing code, think through:
+A. **What IS this component?** Identify the product archetype. A pump? A motor? A heat exchanger? A circuit board housing? You know what these look like — use that knowledge.
+B. **What are the 5-8 key sub-parts?** Decompose into recognizable functional elements (e.g., for a motor: stator, rotor, shaft, bearing mounts, housing, cooling fins, terminal block).
+C. **What are the real-world dimensions?** Use standard sizes from your domain knowledge. Don't guess — be specific (motor shaft Ø8mm, bearing ID 10mm, PCB thickness 1.6mm, etc.).
+D. **Build each sub-part as a numbered section** with its own intermediate variable.
 
 ## Rules
 1. Output ONLY valid Python code using CadQuery. No markdown fences, no explanation.
 2. Import only \`cadquery as cq\` and \`math\`. No other imports.
 3. All dimensions in millimeters.
 4. The final model MUST be stored in a variable called \`result\`.
-5. Target 100-250 lines. Enough for a recognizable multi-component assembly.
-6. NEVER produce fewer than 80 lines.
-7. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or file I/O.
-8. Do NOT include print statements.
+5. Target 200-400 lines. Enough for a detailed multi-component schematic.
+6. NEVER produce fewer than 150 lines.
+7. Use 30+ parameters in the PARAMETERS block — real dimensions, not made-up numbers.
+8. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or file I/O.
+9. Do NOT include print statements.
 
 ## What Makes a Good Schematic Model
 1. **Recognizable overall shape** — the silhouette tells you what it is.
-2. **Key functional components visible** — the 3-5 most important parts as distinct shapes.
+2. **Key functional components visible** — 5-8 most important parts as distinct shapes.
 3. **Clear spatial arrangement** — where things sit relative to each other.
 4. **Connection points visible** — pipe stubs, mounting flanges, ports show how it connects.
-5. **Proportionally accurate** — realistic dimensions from the brief.
+5. **Proportionally accurate** — realistic dimensions from domain knowledge.
+6. **Hollow bodies** — housings should be shelled (outer.cut(inner)), not solid blocks.
+7. **Mounting features** — screw bosses, bolt holes, or flanges where parts attach.
 
-## What to SKIP (save detail for the hero model)
-- Internal ribs and structural reinforcement
-- Screw bosses and bolt patterns
-- Wire channels and cable routing
-- Ventilation grilles and decorative features
-- Manufacturing tolerances
+## CadQuery Technique Catalog (use these patterns)
+
+### HOLLOW BODY (housing/enclosure)
+\`\`\`python
+outer = cq.Workplane("XY").box(w, d, h)
+inner = cq.Workplane("XY").box(w - 2*wall, d - 2*wall, h - wall).translate((0, 0, wall/2))
+body = outer.cut(inner)
+\`\`\`
+
+### MOUNTING FLANGE
+\`\`\`python
+flange = (cq.Workplane("XY")
+    .circle(flange_od / 2).extrude(flange_t)
+    .faces(">Z").workplane()
+    .pushPoints([(r*math.cos(a), r*math.sin(a)) for a in [i*math.pi/2 for i in range(4)]])
+    .circle(bolt_clear / 2).cutThrough())
+\`\`\`
+
+### PIPE / PORT STUB
+\`\`\`python
+stub = (cq.Workplane("XY")
+    .circle(od / 2).extrude(length)
+    .faces(">Z").workplane().circle(id / 2).cutThrough())
+\`\`\`
+
+### COOLING FINS / RIBS
+\`\`\`python
+for i in range(n_fins):
+    y_pos = -total_span/2 + i * pitch
+    fin = cq.Workplane("XZ").center(0, h/2).rect(w, fin_h).extrude(fin_t).translate((0, y_pos, 0))
+    body = body.union(fin)
+\`\`\`
+
+### SHAFT / CYLINDRICAL FEATURE
+\`\`\`python
+shaft = (cq.Workplane("XY")
+    .circle(shaft_d / 2).extrude(shaft_len))
+# Add keyway
+shaft = shaft.cut(
+    cq.Workplane("XY").center(shaft_d/2 - key_depth, 0)
+    .rect(key_depth, key_width).extrude(key_length))
+\`\`\`
 
 ## Build Strategy
-1. Start with a PARAMETERS block.
-2. Build the main body (use .cut() for hollow bodies where the cavity matters functionally).
-3. Add 3-5 key components via .union().
-4. Add input/output stubs (pipes, flanges, connectors).
-5. Apply fillets for clean appearance — wrap in try/except.
+1. Start with a comprehensive PARAMETERS block (30+ values).
+2. Build the main body/housing — use outer.cut(inner) for hollow enclosures.
+3. Build each functional sub-component as a numbered section (# === 1. MAIN BODY ===).
+4. Add connection interfaces (flanges, ports, mounting holes).
+5. Union all parts into \`result\`.
+6. Apply fillets for clean appearance — every fillet wrapped in try/except.
 
-## Reliability
-- Do NOT use \`.shell()\` — build hollow bodies with \`.cut()\`.
-- Wrap \`.fillet()\` in try/except, fall back to \`.chamfer()\` at half radius.
-- Use tuples for \`.transformed(offset=(x,y,z))\`.
-- Build incrementally with intermediate variables.
+## Reliability (CRITICAL)
+1. NEVER use \`.shell()\` — it crashes on complex shapes. Always build hollow bodies with outer.cut(inner).
+2. Wrap EVERY \`.fillet()\` call in try/except — fall back to \`.chamfer()\` at half the radius, or skip.
+3. Keep fillet radius under 30% of smallest adjacent edge.
+4. Use tuples for \`.transformed(offset=(x,y,z))\` — not lists.
+5. Build incrementally — assign to intermediate variables, don't chain 10+ operations.
+6. Use numbered section comments (# === 1. MAIN BODY === ) for organization.
+7. Verify shapes physically overlap before \`.cut()\` or \`.union()\`.
 
 Output just the Python code.`
 
@@ -1472,17 +1522,39 @@ ${moduleSummary}
 
 You know what this type of product looks like. Use realistic proportions and shapes from your domain knowledge.
 
-CONSTRAINTS:
-- Target 400-600 lines of code. NEVER fewer than 300 lines.
-- NEVER use .shell() — build hollow bodies with outer.cut(inner)
-- Wrap .fillet() in try/except, falling back to .chamfer() at half radius
-- Use .union() and .cut() for multi-component assemblies
-- Shell bodies with wall thickness for all housings (1.5-3mm)
-- Each module as a recognizable sub-assembly (not a box)
-- Start with a comprehensive PARAMETERS block (40+ parameters)
-- Include internal ribs, screw bosses, port cutouts, and ventilation grilles
-- Use real-world dimensions: M3 clearance = 3.2mm, USB-C = 9.0x3.4mm, etc.
-- Store the final model in a variable called \`result\`
+MANDATORY ENGINEERING PROCESS:
+A. Identify the product archetype — you know what this type of product looks like.
+B. Decompose into 8-12 subsystems (each as a separate CadQuery variable).
+C. Define real interfaces: mounting bolt patterns, port dimensions, wall thicknesses.
+D. Build each subsystem in a numbered section (# === 1. MAIN BODY ===).
 
+CONSTRAINTS:
+- Target 500-800 lines of code. NEVER fewer than 400 lines.
+- NEVER use .shell() — build hollow bodies with outer.cut(inner)
+- Wrap EVERY .fillet() in try/except, falling back to .chamfer() at half radius
+- Use .union() and .cut() for multi-component assemblies
+- Shell ALL housings (wall thickness 1.5-3mm)
+- Each module as a recognizable sub-assembly (not a box)
+- Start with a comprehensive PARAMETERS block (50+ parameters)
+- Include internal ribs, screw bosses, port cutouts, and ventilation grilles
+- Use real-world dimensions: M3 clearance = 3.2mm, USB-C = 9.0x3.4mm, M2.5 screw boss OD = 6mm
+- Build each subsystem as a SEPARATE variable before unioning
+
+REQUIRED — EXPLODED VIEW:
+After creating \`result\` (assembled model), also create \`result_exploded\`:
+1. Keep each major subsystem as a separate variable.
+2. After unioning into \`result\`, translate each subsystem outward from center along its assembly axis.
+3. Union the translated parts into \`result_exploded\`.
+4. Center body at origin, parts above go UP, below go DOWN, sides go OUTWARD.
+5. Wrap in try/except so it never blocks \`result\`.
+
+Pattern:
+\`\`\`
+result_exploded = body_shell  # center stays
+for part, offset in [(motor, (60,0,30)), (battery, (0,0,-50)), ...]:
+    result_exploded = result_exploded.union(part.translate(offset))
+\`\`\`
+
+Store assembled model in \`result\`, exploded in \`result_exploded\`.
 Output ONLY the Python code. No markdown fences, no explanation.`
 }
