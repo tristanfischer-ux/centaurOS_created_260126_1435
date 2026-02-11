@@ -338,6 +338,70 @@ export function ForgeProjectProvider({
     setSpec(next)
   }, [setSpec])
 
+  // ── Generate images (orchestrated: system image first, then CAD + module images in parallel) ──
+  // Defined before handleRefineScan because it's referenced in its dependency array.
+  const handleGenerateImages = useCallback((): void => {
+    setIsGeneratingImages(true)
+    toast.info("Generating system blueprint...")
+
+    // Phase 1: System image first (fast, ~15s) — shows on concept page immediately
+    generateImagesAction(scanId)
+      .then((imgResult) => {
+        if ("spec" in imgResult) {
+          setSpecInternal(imgResult.spec)
+          specRef.current = imgResult.spec
+          toast.success("System blueprint ready")
+
+          // Update thumbnail from system image
+          if (imgResult.spec.systemImageUrl) {
+            updateProjectMetadataAction(scanId, { thumbnailUrl: imgResult.spec.systemImageUrl })
+          }
+        } else {
+          toast.error(imgResult.error || "System image generation failed")
+        }
+      })
+      .catch(() => toast.error("System image generation failed"))
+      .finally(() => {
+        setIsGeneratingImages(false)
+
+        // Phase 2: Fire-and-forget — system CAD + module images in parallel
+        // These run in the background while the user views the system diagram
+
+        // 2a: System-level 3D CAD model (slower, ~60-120s)
+        setIsGeneratingSystemCad(true)
+        generateSystemCadAction(scanId)
+          .then((cadResult) => {
+            if ("spec" in cadResult) {
+              setSpecInternal(cadResult.spec)
+              specRef.current = cadResult.spec
+              toast.success("3D product model ready — switch to 3D view")
+            } else {
+              console.error("[Forge] System CAD generation failed:", cadResult.error)
+              toast.error("3D model generation failed. You can still use the system diagram.")
+            }
+          })
+          .catch((err) => {
+            console.error("[Forge] System CAD generation failed:", err instanceof Error ? err.message : "Unknown")
+            toast.error("3D model generation failed. You can still use the system diagram.")
+          })
+          .finally(() => setIsGeneratingSystemCad(false))
+
+        // 2b: Module blueprint images (background, progressive via Realtime)
+        generateModuleImagesAction(scanId)
+          .then((modResult) => {
+            if ("spec" in modResult) {
+              setSpecInternal(modResult.spec)
+              specRef.current = modResult.spec
+              const count = modResult.spec.modules.filter(m => m.imageStatus === "complete").length
+              if (count > 0) toast.success(`${count} module blueprints ready`)
+            }
+          })
+          .catch(() => {
+            console.error("[Forge] Module image generation failed")
+          })
+      })
+  }, [scanId])
+
   // ── Refine scan (background-safe) ──
   // The scan runs as a server action. Realtime subscription picks up the
   // completed result, so the user can navigate away during the scan.
@@ -400,69 +464,6 @@ export function ForgeProjectProvider({
       toast.error("Failed to derive process class")
       console.error("[Forge] Diagnostic error:", error instanceof Error ? error.message : "Unknown")
     }
-  }, [scanId])
-
-  // ── Generate images (orchestrated: system image first, then CAD + module images in parallel) ──
-  const handleGenerateImages = useCallback((): void => {
-    setIsGeneratingImages(true)
-    toast.info("Generating system blueprint...")
-
-    // Phase 1: System image first (fast, ~15s) — shows on concept page immediately
-    generateImagesAction(scanId)
-      .then((imgResult) => {
-        if ("spec" in imgResult) {
-          setSpecInternal(imgResult.spec)
-          specRef.current = imgResult.spec
-          toast.success("System blueprint ready")
-
-          // Update thumbnail from system image
-          if (imgResult.spec.systemImageUrl) {
-            updateProjectMetadataAction(scanId, { thumbnailUrl: imgResult.spec.systemImageUrl })
-          }
-        } else {
-          toast.error(imgResult.error || "System image generation failed")
-        }
-      })
-      .catch(() => toast.error("System image generation failed"))
-      .finally(() => {
-        setIsGeneratingImages(false)
-
-        // Phase 2: Fire-and-forget — system CAD + module images in parallel
-        // These run in the background while the user views the system diagram
-
-        // 2a: System-level 3D CAD model (slower, ~60-120s)
-        setIsGeneratingSystemCad(true)
-        generateSystemCadAction(scanId)
-          .then((cadResult) => {
-            if ("spec" in cadResult) {
-              setSpecInternal(cadResult.spec)
-              specRef.current = cadResult.spec
-              toast.success("3D product model ready — switch to 3D view")
-            } else {
-              console.error("[Forge] System CAD generation failed:", cadResult.error)
-              toast.error("3D model generation failed. You can still use the system diagram.")
-            }
-          })
-          .catch((err) => {
-            console.error("[Forge] System CAD generation failed:", err instanceof Error ? err.message : "Unknown")
-            toast.error("3D model generation failed. You can still use the system diagram.")
-          })
-          .finally(() => setIsGeneratingSystemCad(false))
-
-        // 2b: Module blueprint images (background, progressive via Realtime)
-        generateModuleImagesAction(scanId)
-          .then((modResult) => {
-            if ("spec" in modResult) {
-              setSpecInternal(modResult.spec)
-              specRef.current = modResult.spec
-              const count = modResult.spec.modules.filter(m => m.imageStatus === "complete").length
-              if (count > 0) toast.success(`${count} module blueprints ready`)
-            }
-          })
-          .catch(() => {
-            console.error("[Forge] Module image generation failed")
-          })
-      })
   }, [scanId])
 
   // ── Generate CAD model (fire-and-forget for background processing) ──
