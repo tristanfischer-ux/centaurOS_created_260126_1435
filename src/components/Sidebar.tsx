@@ -68,6 +68,7 @@ const companyNavigation = [
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Agents", href: "/agents", icon: Bot, tooltip: "Prompt workflows — build, chain, and copy prompts" },
     { name: "Product X-Ray", href: "/product-xray", icon: ScanSearch, tooltip: "Deep product analysis across strategy, team, and marketplace" },
+    { name: "X-Ray v2", href: "/product-xray-v2", icon: Sparkles, tooltip: "Redesigned product dossier — single-page engineering report" },
     { name: "Marketplace Orders", href: "/marketplace-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
     { name: "Settings", href: "/settings", icon: Settings, tooltip: "Company configuration, integrations, and preferences" },
 ]
