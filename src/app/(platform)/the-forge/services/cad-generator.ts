@@ -1,18 +1,25 @@
 /**
- * @file cad-generator.ts — AI-powered 3D CAD model generation for X-Ray modules
+ * @file cad-generator.ts — AI-powered 3D CAD model generation for X-Ray
  *
- * @description Two-stage pipeline with Opus orchestration:
- * 1. Opus generates a structural brief (shared with image generator)
- * 2. Opus generates CadQuery Python code from that brief
- * 3. Code executes on Modal.com to produce STEP, STL, and SVG files
+ * @description Two-tier CAD generation pipeline:
  *
- * AI model strategy:
- * - Primary: Claude Opus 4.6 (Anthropic) — disciplined code generation
- * - Retry fallback: Gemini 2.5 Pro (Google) — fresh perspective on final attempt
+ * **System model (HERO):** Opus 4.6 with 32K tokens produces a highly detailed,
+ * manufacturing-quality CadQuery model of the complete assembled product. This is
+ * THE 3D visualization — it gets the royal treatment (300-800 lines, shell bodies,
+ * internal structure, surface detail).
+ *
+ * **Module models (SCHEMATICS):** Gemini 2.5 Pro produces clean, reliable
+ * schematic-quality CadQuery models of individual sub-assemblies. These are
+ * supporting visuals — recognizable and well-proportioned, but focused on
+ * clarity over manufacturing detail (100-250 lines, key features only).
+ *
+ * This split is intentional: one amazing hero model is far more impactful than
+ * 8 mediocre ones. Gemini handles modules because it's faster, cheaper, and
+ * less prone to safety refusals on industrial/drone/agricultural components.
  *
  * @security
- * - ANTHROPIC_API_KEY for Opus code generation
- * - GOOGLE_AI_API_KEY for Gemini fallback
+ * - ANTHROPIC_API_KEY for Opus (system model)
+ * - GOOGLE_AI_API_KEY for Gemini (module models + Opus fallback)
  * - MODAL_CAD_ENDPOINT_URL for CadQuery execution
  * - Modal containers are sandboxed (no ForgeOS infra access)
  * - Generated code is validated for blocked patterns before execution
@@ -33,7 +40,7 @@ import type { StructuralBrief, SystemStructuralBrief } from "./structural-brief"
 // ─── Constants ───────────────────────────────────────────────────────
 
 const STORAGE_BUCKET = "xray-images"
-const MODAL_TIMEOUT_MS = 90_000
+const MODAL_TIMEOUT_MS = 180_000
 /** Number of retry attempts when CadQuery execution fails on Modal */
 const MAX_RETRY_ATTEMPTS = 3
 
@@ -154,118 +161,58 @@ interface ModalAnalysisPayload {
   } | null
 }
 
-// ─── System Prompt ───────────────────────────────────────────────────
+// ─── Module Schematic Prompt (Gemini) ────────────────────────────────
 
-const CAD_SYSTEM_PROMPT = `You are an expert CAD engineer who writes CadQuery Python code to create detailed, recognizable 3D parametric models of mechanical and industrial components.
-
-## Rules
-1. Output ONLY valid Python code using CadQuery. No markdown fences, no explanation text.
-2. Import only \`cadquery as cq\` and \`math\`. No other imports.
-3. All dimensions in millimeters.
-4. The final model MUST be stored in a variable called \`result\` (a cq.Workplane object).
-5. Use realistic proportions and dimensions based on the structural brief provided.
-6. Build multi-component assemblies using \`.union()\` — the model should show distinct parts, not just a box.
-7. Include pipe stubs, mounting features, flanges, and internal cavities where appropriate.
-8. Target 80-250 lines of code. Complex modules with many components should use more lines.
-9. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or any file I/O. The export is handled externally.
-10. Do NOT include any print statements or comments that reference file paths.
-
-## CRITICAL: Parametric Design Parameters
-
-Your code MUST start with a clearly marked PARAMETERS block immediately after the imports:
-
-\`\`\`python
-import cadquery as cq
-import math
-
-# ── PARAMETERS ──────────────────────────────────────────────────────
-BODY_LENGTH = 120.0        # mm — overall length of the housing
-BODY_WIDTH = 80.0          # mm — overall width
-BODY_HEIGHT = 45.0         # mm — overall height
-WALL_THICKNESS = 3.0       # mm — shell wall thickness
-FILLET_RADIUS = 4.0        # mm — edge fillet radius
-# ── END PARAMETERS ──────────────────────────────────────────────────
-\`\`\`
-
-## Assembly Strategy — Build Incrementally
-
-Build the model using intermediate variables. This is the most reliable approach:
-
-\`\`\`python
-# 1. Create the main body/housing
-base_frame = cq.Workplane("XY").box(FRAME_LENGTH, FRAME_WIDTH, FRAME_HEIGHT)
-
-# 2. Create and position major components
-tank = cq.Workplane("XY").transformed(offset=(tank_x, tank_y, tank_z)).circle(TANK_RADIUS).extrude(TANK_HEIGHT)
-
-# 3. Combine with union
-result = base_frame.union(tank)
-
-# 4. Add smaller features
-pipe_stub = cq.Workplane("XY").transformed(offset=(pipe_x, pipe_y, pipe_z)).circle(PIPE_RADIUS).extrude(PIPE_LENGTH)
-result = result.union(pipe_stub)
-
-# 5. Apply detail features with safe fallbacks
-try:
-    result = result.edges("|Z").fillet(FILLET_RADIUS)
-except Exception:
-    result = result.edges("|Z").chamfer(FILLET_RADIUS * 0.4)
-\`\`\`
-
-## Industrial Component Recipes
-
-Use these CadQuery patterns for common industrial components:
-
-**Cylindrical tanks/vessels:**
-\`\`\`python
-tank = cq.Workplane("XY").transformed(offset=(x, y, z)).circle(radius).extrude(height)
-\`\`\`
-
-**Pipe stubs (horizontal):**
-\`\`\`python
-pipe = cq.Workplane("YZ").transformed(offset=(x, y, z)).circle(pipe_r).extrude(pipe_len)
-\`\`\`
-
-**Rectangular chambers with cavity:**
-\`\`\`python
-outer = cq.Workplane("XY").transformed(offset=(x, y, z)).box(l, w, h)
-inner = cq.Workplane("XY").transformed(offset=(x, y, z + wall)).box(l - 2*wall, w - 2*wall, h - wall)
-chamber = outer.cut(inner)
-\`\`\`
-
-**Mounting base plate with bolt holes:**
-\`\`\`python
-plate = cq.Workplane("XY").box(l, w, thickness)
-plate = plate.faces(">Z").workplane().rect(l - margin, w - margin, forConstruction=True).vertices().hole(bolt_d)
-\`\`\`
-
-**Flanges on pipe ends:**
-\`\`\`python
-flange = cq.Workplane("XY").transformed(offset=(x, y, z)).circle(flange_r).extrude(flange_t)
-\`\`\`
-
-**Array of tubes (heat exchanger):**
-\`\`\`python
-tubes = cq.Workplane("XY").transformed(offset=(x, y, z))
-for i in range(n_tubes):
-    tube = cq.Workplane("XY").transformed(offset=(x + i * spacing, y, z)).circle(tube_r).extrude(tube_len)
-    tubes = tubes.union(tube) if i > 0 else tube
-\`\`\`
-
-## Reliability Techniques
-
-1. **Always wrap \`.fillet()\` in try/except** — fall back to \`.chamfer()\` at half the radius.
-2. **Keep fillet radius under 30%** of the smallest adjacent edge length.
-3. **Do NOT use \`.shell()\`** on complex or boolean-combined shapes — build hollow bodies with \`.cut()\` instead.
-4. **Use tuples for \`.transformed(offset=(x,y,z))\`** — not lists.
-5. **Verify boolean overlap** — shapes must physically intersect for \`.cut()\` or \`.union()\` to work.
-6. **Build incrementally** — assign to intermediate variables, don't chain 10+ operations.
+/**
+ * System prompt for Gemini-generated module schematics.
+ *
+ * @description Optimized for clean, reliable, recognizable models — not
+ * manufacturing detail. These are supporting visuals for individual modules
+ * while the system-level model (Opus) is the hero.
+ */
+const MODULE_SCHEMATIC_PROMPT = `You are an expert CadQuery engineer creating clean, recognizable 3D schematic models of engineering sub-assemblies.
 
 ## Goal
-Create a model that an engineer would immediately recognize as the described component. Show the key external and structural features. A detailed multi-component assembly is far more valuable than a simple box.
+Create a model that clearly shows WHAT this component is and HOW it works. Focus on recognizability and spatial relationships, not manufacturing detail. Think "engineering textbook cutaway" — clean geometry that teaches, not a production CAD file.
 
-## Output Format
-Just the Python code. The variable \`result\` must be the final assembled CadQuery Workplane object.`
+## Rules
+1. Output ONLY valid Python code using CadQuery. No markdown fences, no explanation.
+2. Import only \`cadquery as cq\` and \`math\`. No other imports.
+3. All dimensions in millimeters.
+4. The final model MUST be stored in a variable called \`result\`.
+5. Target 100-250 lines. Enough for a recognizable multi-component assembly.
+6. NEVER produce fewer than 80 lines.
+7. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or file I/O.
+8. Do NOT include print statements.
+
+## What Makes a Good Schematic Model
+1. **Recognizable overall shape** — the silhouette tells you what it is.
+2. **Key functional components visible** — the 3-5 most important parts as distinct shapes.
+3. **Clear spatial arrangement** — where things sit relative to each other.
+4. **Connection points visible** — pipe stubs, mounting flanges, ports show how it connects.
+5. **Proportionally accurate** — realistic dimensions from the brief.
+
+## What to SKIP (save detail for the hero model)
+- Internal ribs and structural reinforcement
+- Screw bosses and bolt patterns
+- Wire channels and cable routing
+- Ventilation grilles and decorative features
+- Manufacturing tolerances
+
+## Build Strategy
+1. Start with a PARAMETERS block.
+2. Build the main body (use .cut() for hollow bodies where the cavity matters functionally).
+3. Add 3-5 key components via .union().
+4. Add input/output stubs (pipes, flanges, connectors).
+5. Apply fillets for clean appearance — wrap in try/except.
+
+## Reliability
+- Do NOT use \`.shell()\` — build hollow bodies with \`.cut()\`.
+- Wrap \`.fillet()\` in try/except, fall back to \`.chamfer()\` at half radius.
+- Use tuples for \`.transformed(offset=(x,y,z))\`.
+- Build incrementally with intermediate variables.
+
+Output just the Python code.`
 
 // ─── AI Provider Helpers ─────────────────────────────────────────────
 
@@ -283,6 +230,7 @@ async function callOpus(
   systemPrompt: string,
   userPrompt: string,
   temperature: number = 0.3,
+  maxTokens: number = 16384,
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
@@ -298,7 +246,7 @@ async function callOpus(
     try {
       const response = await client.messages.create({
         model,
-        max_tokens: 4096,
+        max_tokens: maxTokens,
         temperature,
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
@@ -354,7 +302,7 @@ async function callOpus(
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ parts: [{ text: userPrompt }] }],
-      generationConfig: { maxOutputTokens: 4096, temperature },
+      generationConfig: { maxOutputTokens: maxTokens, temperature },
     }),
   })
 
@@ -390,6 +338,7 @@ async function callOpus(
 async function callGemini(
   systemPrompt: string,
   userPrompt: string,
+  maxTokens: number = 16384,
 ): Promise<string> {
   const apiKey = process.env.GOOGLE_AI_API_KEY
   if (!apiKey) {
@@ -405,7 +354,7 @@ async function callGemini(
       { role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] },
     ],
     generationConfig: {
-      maxOutputTokens: 4096,
+      maxOutputTokens: maxTokens,
       temperature: 0.3,
     },
   })
@@ -431,10 +380,14 @@ function stripCodeFences(raw: string): string {
     .trim()
 }
 
-// ─── AI Code Generation ──────────────────────────────────────────────
+// ─── Module Code Generation (Gemini — schematic quality) ─────────────
 
 /**
- * Generates CadQuery Python code for a module using Claude Opus 4.6.
+ * Generates CadQuery Python code for a module schematic using Gemini 2.5 Pro.
+ *
+ * @description Uses Gemini for module schematics because it's faster, cheaper,
+ * and less prone to safety refusals. The system-level model (Opus) is the hero;
+ * modules are clean supporting visuals.
  *
  * @param module - The module spec for context
  * @param brief - The structural brief from Opus orchestrator
@@ -442,23 +395,23 @@ function stripCodeFences(raw: string): string {
  *
  * @throws Error if AI call fails
  */
-async function generateCadQueryCode(
+async function generateModuleSchematicCode(
   module: ModuleSpec,
   brief: StructuralBrief,
 ): Promise<string> {
-  const userPrompt = buildModulePrompt(module, brief)
+  const userPrompt = buildModuleSchematicPrompt(module, brief)
 
-  console.info("[XRayCadGen] Generating CadQuery code with Opus for module:", {
+  console.info("[XRayCadGen] Generating schematic CadQuery with Gemini for module:", {
     moduleId: module.id,
     moduleName: module.name,
   })
 
-  const raw = await callOpus(CAD_SYSTEM_PROMPT, userPrompt, 0.3)
+  const raw = await callGemini(MODULE_SCHEMATIC_PROMPT, userPrompt, 8192)
   return stripCodeFences(raw)
 }
 
 /**
- * Regenerates CadQuery code after a failed execution attempt using Opus.
+ * Regenerates module CadQuery code after a failed execution using Gemini.
  *
  * @param module - The module spec for context
  * @param brief - The structural brief
@@ -468,7 +421,7 @@ async function generateCadQueryCode(
  *
  * @throws Error if AI call fails
  */
-async function regenerateCadQueryCode(
+async function regenerateModuleSchematicCode(
   module: ModuleSpec,
   brief: StructuralBrief,
   failedCode: string,
@@ -478,7 +431,7 @@ async function regenerateCadQueryCode(
 
 **Error:**
 \`\`\`
-${errorMessage.slice(0, 800)}
+${errorMessage.slice(0, 1200)}
 \`\`\`
 
 **Failed code:**
@@ -486,89 +439,40 @@ ${errorMessage.slice(0, 800)}
 ${failedCode}
 \`\`\`
 
-**Original structural brief for reference:**
+**Structural brief for reference:**
 Overall dimensions: ${brief.overallDimensions}
 ${brief.cadInstructions}
 
-Fix the code so it executes without errors. Common CadQuery pitfalls to check:
-- \`.shell()\` crashes on complex shapes — simplify geometry or build hollow with \`.cut()\`
-- \`.fillet()\` fails if radius is too large — reduce radii or wrap in try/except
+Fix the code so it executes without errors. Common CadQuery pitfalls:
+- NEVER use \`.shell()\` — build hollow bodies with \`.cut()\` instead
+- \`.fillet()\` fails if radius is too large — reduce radii or wrap in try/except with .chamfer() fallback
 - Boolean ops (\`.cut()\`, \`.union()\`) fail if shapes don't overlap — verify positioning
 - \`.transformed(offset=(x,y,z))\` uses tuples, not lists
-- Workplane selectors like \`">Z"\` must match existing geometry
 
-Output ONLY the corrected Python code. No markdown fences, no explanation.
+Fix the error while keeping the model recognizable. Output ONLY the corrected Python code.
 Store the final model in a variable called \`result\`.`
 
-  console.info("[XRayCadGen] Retrying with Opus error feedback for module:", {
+  console.info("[XRayCadGen] Retrying module schematic with Gemini:", {
     moduleId: module.id,
     errorSnippet: errorMessage.slice(0, 120),
   })
 
-  const raw = await callOpus(CAD_SYSTEM_PROMPT, retryPrompt, 0.2)
+  const raw = await callGemini(MODULE_SCHEMATIC_PROMPT, retryPrompt, 8192)
   return stripCodeFences(raw)
 }
 
 /**
- * Generates a simplified but recognizable CadQuery model as a last-resort fallback.
- * Uses Gemini 2.5 Pro for a fresh perspective when Opus retries are exhausted.
+ * Builds the user prompt for module schematic generation.
  *
- * @description Asks Gemini to produce a simplified but multi-component assembly
- * (not just a box). Allows boolean operations and chamfers for reliability.
- *
- * @param module - The module spec for context
- * @param brief - The structural brief for guidance
- * @returns Simplified CadQuery Python code
- *
- * @throws Error if AI call fails
- */
-async function generateSimplifiedFallbackCode(
-  module: ModuleSpec,
-  brief: StructuralBrief,
-): Promise<string> {
-  const fallbackPrompt = `Generate CadQuery Python code for a SIMPLIFIED but RECOGNIZABLE model of: "${module.name}" (${module.purpose}).
-
-**Structural guidance:**
-Overall dimensions: ${brief.overallDimensions}
-${brief.cadInstructions}
-
-CONSTRAINTS:
-- Maximum 80 lines of code
-- Do NOT use .shell() — it crashes on non-trivial shapes
-- Wrap .fillet() in try/except, falling back to .chamfer()
-- You CAN use .union() and .cut() for multi-component assemblies
-- You CAN use .chamfer() for edge treatment
-- Build the main body PLUS 2-3 key attached components (pipes, tanks, features)
-- Each component should be a recognizable geometric form
-- Store the final model in a variable called \`result\`
-
-The model should be immediately recognizable as a ${module.name} — NOT just a plain box.
-Show the main housing/body with key external features attached via .union().
-
-Output ONLY the Python code. No markdown fences, no explanation.`
-
-  console.info("[XRayCadGen] Generating simplified fallback with Gemini for module:", {
-    moduleId: module.id,
-    moduleName: module.name,
-  })
-
-  const raw = await callGemini(
-    "You are a CadQuery expert. Generate valid, crash-proof Python code that creates recognizable 3D models. Build multi-component assemblies using .union() — never just a box.",
-    fallbackPrompt,
-  )
-
-  return stripCodeFences(raw)
-}
-
-/**
- * Builds the user prompt for CadQuery code generation from a structural brief.
+ * @description Focused on recognizability and spatial clarity — not manufacturing
+ * detail. The system-level model handles the hero visualization.
  *
  * @param module - The module spec
  * @param brief - The structural brief from Opus orchestrator
  * @returns Formatted prompt string
  */
-function buildModulePrompt(module: ModuleSpec, brief: StructuralBrief): string {
-  return `Generate a 3D CadQuery model for this engineering module using the structural brief below.
+function buildModuleSchematicPrompt(module: ModuleSpec, brief: StructuralBrief): string {
+  return `Create a clean 3D schematic model of this engineering sub-assembly.
 
 **Module:** ${module.name}
 **Purpose:** ${module.purpose}
@@ -581,13 +485,19 @@ ${brief.physicalDescription}
 **CadQuery Build Instructions:**
 ${brief.cadInstructions}
 
-**Key Physical Components:**
+**Key Components (show these as recognizable shapes):**
 ${module.keyParts.map((p) => `- ${p}`).join("\n")}
 
 **Inputs:** ${module.io.in.join(", ")}
 **Outputs:** ${module.io.out.join(", ")}
 
-Create a multi-component 3D model following the structural brief. Build the main body first, then union the key components. The model should be immediately recognizable as a ${module.name} to an engineer.
+## What to Build
+1. Main body/housing with correct overall proportions.
+2. The 3-5 most important components as distinct geometric features.
+3. Input/output connection points (pipe stubs, flanges, ports).
+4. Where cavities matter functionally, use .cut() for hollow bodies.
+
+The model should be immediately recognizable as a ${module.name} — the silhouette and key features should tell you what it is.
 
 Store the final model in a variable called \`result\`.`
 }
@@ -690,10 +600,11 @@ async function uploadCadFile(
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**
- * Generates a 3D CAD model for a single module.
+ * Generates a 3D schematic CAD model for a single module using Gemini.
  *
- * Pipeline: Structural brief (from Opus) -> Opus generates CadQuery code ->
- * Modal executes it -> files uploaded to storage.
+ * @description Pipeline: Structural brief -> Gemini generates schematic CadQuery ->
+ * Modal executes it -> files uploaded to storage. Uses Gemini exclusively (no Opus)
+ * because module models are supporting schematics, not hero visualizations.
  *
  * @param scanId - The scan ID for storage namespacing
  * @param module - The module to generate a CAD model for
@@ -716,49 +627,42 @@ export async function generateModuleCadModel(
   // Stage 0b: Infer material density from module spec
   const { density: materialDensity, name: materialName } = inferMaterialDensity(module)
 
-  // Stage 1: Opus generates CadQuery code using the structural brief
-  let cadQueryCode = await generateCadQueryCode(module, brief)
+  // Stage 1: Gemini generates schematic CadQuery code
+  let cadQueryCode = await generateModuleSchematicCode(module, brief)
 
   // Stage 2: Modal executes the code (with auto-retry on failure)
   let modalResult = await executeCadQueryOnModal(cadQueryCode, module.id, materialDensity)
 
-  // Retry loop: Opus retries with error feedback, Gemini as final fallback
+  // Retry loop: Gemini retries with error feedback (all Gemini, no Opus needed)
   if (modalResult.error) {
     let lastError: string = modalResult.error
     for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
-      const isFinalAttempt = attempt === MAX_RETRY_ATTEMPTS
-
-      console.warn("[XRayCadGen] Execution failed, retrying:", {
+      console.warn("[XRayCadGen] Module schematic execution failed, retrying:", {
         moduleId: module.id,
         attempt,
         maxRetries: MAX_RETRY_ATTEMPTS,
-        isFinalAttempt,
-        provider: isFinalAttempt ? "gemini" : "opus",
         error: lastError.slice(0, 200),
       })
 
       try {
-        // Final attempt: switch to Gemini for fresh perspective
-        cadQueryCode = isFinalAttempt
-          ? await generateSimplifiedFallbackCode(module, brief)
-          : await regenerateCadQueryCode(module, brief, cadQueryCode, lastError)
+        cadQueryCode = await regenerateModuleSchematicCode(
+          module, brief, cadQueryCode, lastError,
+        )
 
         modalResult = await executeCadQueryOnModal(cadQueryCode, module.id, materialDensity)
 
         if (!modalResult.error) {
-          console.info("[XRayCadGen] Retry succeeded on attempt:", {
+          console.info("[XRayCadGen] Module schematic retry succeeded:", {
             moduleId: module.id,
             attempt,
-            provider: isFinalAttempt ? "gemini" : "opus",
           })
           break
         }
         lastError = modalResult.error
       } catch (retryError) {
-        console.error("[XRayCadGen] Retry attempt failed:", {
+        console.error("[XRayCadGen] Module schematic retry failed:", {
           moduleId: module.id,
           attempt,
-          provider: isFinalAttempt ? "gemini" : "opus",
           error: retryError instanceof Error ? retryError.message : "Unknown",
         })
       }
@@ -767,7 +671,7 @@ export async function generateModuleCadModel(
 
   if (modalResult.error) {
     throw new CadGenerationError(
-      `[XRayCadGen] Modal execution failed: ${modalResult.error}`,
+      `[XRayCadGen] Module schematic execution failed: ${modalResult.error}`,
       cadQueryCode,
     )
   }
@@ -799,7 +703,7 @@ export async function generateModuleCadModel(
   // Stage 4: Convert analysis results from Modal format to schema format
   const analysis = convertModalAnalysis(modalResult.analysis, materialName)
 
-  console.info("[XRayCadGen] CAD model generated and uploaded:", {
+  console.info("[XRayCadGen] Module schematic generated and uploaded:", {
     moduleId: module.id,
     hasStep: !!stepUrl,
     hasStl: !!stlUrl,
@@ -885,27 +789,39 @@ export interface SystemCadResult {
 /**
  * System-level CadQuery prompt — creates the overall product form factor.
  */
-const SYSTEM_CAD_PROMPT = `You are an expert CAD engineer. Write CadQuery Python code to create a 3D conceptual model of an ENTIRE product/system.
+const SYSTEM_CAD_PROMPT = `You are a world-class CAD engineer. Write CadQuery Python code to create a HIGHLY DETAILED 3D model of an ENTIRE assembled product/system.
+
+## Quality Bar
+This is the HERO model — the main 3D visualization of the complete product. It must be impressive and immediately recognizable. Think DJI Mavic drone level of detail: shell bodies with wall thickness, realistic proportions, surface features, mounting hardware, sensor recesses, ventilation, ports. NOT simplified blocks.
 
 ## Rules
 1. Output ONLY valid Python code using CadQuery. No markdown fences.
 2. Import only \`cadquery as cq\` and \`math\`. No other imports.
 3. All dimensions in millimeters.
 4. The final model MUST be stored in a variable called \`result\`.
-5. Create a SINGLE assembled model showing the overall product form factor.
-6. Show the main structural frame and key module blocks as distinct components.
-7. Use .union() to combine the frame, module blocks, and external features.
-8. Apply realistic overall proportions and dimensions from the structural brief.
-9. Include a PARAMETERS block with key dimensions.
-10. Target 80-200 lines of code.
+5. Create a FULLY DETAILED assembled model — shell bodies, internal structure, surface features.
+6. Each module/subsystem should be recognizable as a distinct component with realistic geometry.
+7. Use .union() to combine components and .cut() for hollow bodies, cavities, and cutouts.
+8. Apply realistic proportions from the structural brief. Include wall thicknesses.
+9. Start with a comprehensive PARAMETERS block covering ALL key dimensions.
+10. Target 300-800 lines of code. This is the main product model — it deserves detail.
 11. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or file I/O.
-12. Build incrementally with intermediate variables.
+12. Build incrementally with numbered sections and intermediate variables.
+
+## What Makes the System Model Great
+1. **Shell bodies** — Main housing has wall thickness, not a solid block.
+2. **Distinct sub-assemblies** — Each module is recognizable, not just a labeled box.
+3. **Connection features** — Pipes, cables, mounting brackets between modules.
+4. **Surface detail** — Ventilation grilles, sensor recesses, port cutouts, LED channels.
+5. **Structural frame** — Ribs, cross-members, mounting points.
+6. **External features** — Handles, panels, connectors, indicators visible from outside.
 
 ## Reliability Techniques
 1. Wrap \`.fillet()\` in try/except — fall back to \`.chamfer()\` at half radius.
 2. Do NOT use \`.shell()\` on complex shapes — build hollow bodies with \`.cut()\`.
 3. Use tuples for \`.transformed(offset=(x,y,z))\`.
 4. Build incrementally — assign to intermediate variables.
+5. Use numbered section comments (# === 1. MAIN FRAME ===) for organization.
 
 Output just the Python code.`
 
@@ -918,10 +834,10 @@ Output just the Python code.`
  */
 function buildSystemCadPrompt(spec: XRaySpec, brief: SystemStructuralBrief): string {
   const moduleSummaries = spec.modules
-    .map((m) => `- ${m.name}: ${m.purpose} (key parts: ${m.keyParts.slice(0, 3).join(", ")})`)
+    .map((m) => `- **${m.name}:** ${m.purpose}\n  Key parts: ${m.keyParts.slice(0, 5).join(", ")}`)
     .join("\n")
 
-  return `Generate a 3D CadQuery model for the COMPLETE assembled product using the structural brief:
+  return `Generate a HIGHLY DETAILED 3D CadQuery model for the COMPLETE assembled product. This is the HERO model — the main visualization that represents the entire product. It must be impressive.
 
 **Product Function:** ${spec.function}
 
@@ -933,12 +849,22 @@ ${brief.physicalDescription}
 **CadQuery Build Instructions:**
 ${brief.cadInstructions}
 
-**Modules (subsystems):**
+**Modules (each should be a recognizable sub-assembly in the model):**
 ${moduleSummaries}
 
 **Key Materials:** ${spec.materials.slice(0, 5).join(", ")}
 
-Create a single 3D model showing the assembled product. Build the main frame first, then union module blocks and external features.
+## Requirements
+- Build the main body/frame as a shell with wall thickness (not a solid block).
+- Each module should be a recognizable, detailed sub-assembly — NOT a simplified box or cylinder placeholder.
+- Include structural connections between modules (mounting brackets, pipe runs, cable trays).
+- Add surface features: ventilation, sensor recesses, ports, indicators, access panels.
+- Include mounting hardware: screw bosses, bolt patterns, standoffs.
+- Target 300-800 lines of detailed CadQuery code.
+- Build in numbered sections (# === 1. MAIN FRAME ===, # === 2. MODULE A ===, etc.)
+- Start with a comprehensive PARAMETERS block.
+
+The assembled model should be immediately recognizable as the described product and impressive enough to serve as a hero visualization.
 
 Store the final model in a variable called \`result\`.`
 }
@@ -967,12 +893,12 @@ export async function generateSystemCadModel(
     brief = await generateSystemStructuralBrief(spec)
   }
 
-  // Stage 1: Opus generates CadQuery code for the full product
+  // Stage 1: Opus generates CadQuery code for the full product (32K tokens — hero model)
   const userPrompt = buildSystemCadPrompt(spec, brief)
 
-  console.info("[XRayCadGen] Generating system-level CadQuery code with Opus")
+  console.info("[XRayCadGen] Generating HERO system CadQuery code with Opus (32K tokens)")
 
-  let cadQueryCode = stripCodeFences(await callOpus(SYSTEM_CAD_PROMPT, userPrompt, 0.3))
+  let cadQueryCode = stripCodeFences(await callOpus(SYSTEM_CAD_PROMPT, userPrompt, 0.3, 32768))
 
   // Stage 2: Execute on Modal with retry loop
   let modalResult = await executeCadQueryOnModal(cadQueryCode, "system", 1240)
@@ -992,7 +918,7 @@ export async function generateSystemCadModel(
         // Final attempt: Gemini with simplified fallback
         cadQueryCode = stripCodeFences(
           await callGemini(
-            "You are a CadQuery expert. Generate valid, crash-proof Python code that creates recognizable 3D models.",
+            "You are an expert CadQuery engineer. Generate valid, crash-proof Python code that creates detailed, recognizable 3D models. Use shell bodies (outer.cut(inner) for wall thickness), multi-component assemblies with .union(), and include surface detail. Never output just boxes.",
             generateSimplifiedSystemPrompt(spec, brief),
           ),
         )
@@ -1051,26 +977,32 @@ export async function generateSystemCadModel(
  */
 function generateSimplifiedSystemPrompt(spec: XRaySpec, brief: SystemStructuralBrief): string {
   const moduleSummary = spec.modules
-    .map((m) => `- ${m.name}`)
+    .map((m) => `- **${m.name}:** ${m.purpose} (parts: ${m.keyParts.slice(0, 3).join(", ")})`)
     .join("\n")
 
-  return `Generate CadQuery Python code for a SIMPLIFIED but RECOGNIZABLE model of this product: "${spec.function}".
+  return `Generate CadQuery Python code for a RECOGNIZABLE model of this complete product: "${spec.function}".
 
 **Structural guidance:**
 Overall dimensions: ${brief.overallDimensions}
+Physical description: ${brief.physicalDescription}
 ${brief.cadInstructions}
 
-Modules: ${moduleSummary}
+**Modules (subsystems):**
+${moduleSummary}
 
 CONSTRAINTS:
-- Maximum 80 lines of code
-- Do NOT use .shell()
+- Target 200-350 lines of code
+- Do NOT use .shell() — build hollow bodies with .cut() instead
 - Wrap .fillet() in try/except, falling back to .chamfer()
-- You CAN use .union() and .cut() for multi-component assemblies
-- Build a main frame/body, then union simplified module blocks on top
+- Use .union() and .cut() for multi-component assemblies
+- Build the main body as a shell (outer minus inner for wall thickness)
+- Each module should be a recognizable shape (not a plain box)
+- Include structural connections between modules
+- Add surface features: vents, ports, sensors, panels
+- Start with a PARAMETERS block
 - Store the final model in a variable called \`result\`
 
-The model should be recognizable as the assembled product — NOT just a box.
+The model must be immediately recognizable as the described product with realistic proportions. Use shell bodies, not solid blocks.
 
 Output ONLY the Python code. No markdown fences, no explanation.`
 }

@@ -89,12 +89,15 @@ Write a prompt (80-150 words) for Gemini image generation. This should produce a
 - Cutaway or transparency if needed to show internal components
 
 ### CAD INSTRUCTIONS
-Write specific instructions (100-200 words) for generating CadQuery Python code. Include:
-- What CadQuery primitives to use for each component (e.g., "Main tank: cq.Workplane('XY').cylinder(height=800, radius=300)")
-- Assembly strategy: build base first, then union major components, then add smaller features
-- Specific dimensions for the 3-5 most important components
-- Which components to represent as simplified forms (e.g., "represent the heat exchanger as a rectangular block with tube stubs on each end")
-- DO NOT write actual CadQuery code — just describe what the code should build
+Write detailed instructions (200-400 words) for generating CadQuery Python code. This drives a 200-600 line CadQuery model, so be thorough. Include:
+- What CadQuery primitives to use for each component (e.g., "Main body: box with .cut() for shell wall thickness 2mm")
+- Assembly strategy: build main body shell first, then internal structure, then major sub-components, then detail features, then cutouts
+- Specific dimensions for ALL major components (not just 3-5)
+- How to make each component RECOGNIZABLE — not just a box placeholder. Describe the actual geometry: "motor mount is a cylinder with center bore and 4-bolt pattern on 16mm circle"
+- Shell body construction: specify wall thicknesses, which bodies should be hollow
+- Internal features: ribs, standoffs, mounting bosses
+- Surface features: where to add ventilation grilles, port cutouts, sensor recesses
+- DO NOT write actual CadQuery code — describe what the code should build in enough detail that a CAD engineer could write 300+ lines from your description
 
 ## Rules
 - Be physically realistic — dimensions should make engineering sense
@@ -125,12 +128,15 @@ Describe the assembled product (150-250 words):
 Write a prompt (80-120 words) for a process flow diagram showing all modules as connected blocks with flow arrows. Clean, modern style.
 
 ### CAD INSTRUCTIONS
-Instructions (100-200 words) for a CadQuery model of the assembled product:
-- Overall frame/body dimensions
-- Where each major module sits within the frame
-- Use simplified blocks/cylinders for modules (don't model internal details)
-- Key external features (pipe stubs, panels, mounting points)
-- Build strategy: frame first, then union module blocks, then add external features`
+Detailed instructions (200-400 words) for a CadQuery model of the assembled product. This is the HERO model — the main visualization. Be thorough:
+- Overall frame/body dimensions and shell wall thickness
+- Where each major module sits within the frame (specific coordinates/offsets)
+- Each module should be a RECOGNIZABLE shape with key geometric features — NOT a plain box
+- For each module, describe its external geometry: shape, ports, mounting, distinguishing features
+- Structural connections: mounting brackets, pipe runs, cable routing between modules
+- Surface features: ventilation, access panels, indicator locations, sensor recesses
+- Build strategy: main body shell first (outer.cut(inner) for wall thickness), then internal ribs/structure, then each module sub-assembly, then external features and cutouts
+- DO NOT write actual code — describe what to build in enough detail for 300-800 lines of CadQuery`
 
 // ─── Opus API Call ───────────────────────────────────────────────────
 
@@ -151,7 +157,7 @@ Instructions (100-200 words) for a CadQuery model of the assembled product:
  *
  * @param systemPrompt - System prompt for the model
  * @param userPrompt - User prompt with module details
- * @param maxTokens - Max tokens for Anthropic models (default 4096)
+ * @param maxTokens - Max tokens for Anthropic models (default 6144)
  * @returns The model's text response
  *
  * @throws Error if ALL models fail (Opus, Sonnet, and Gemini)
@@ -159,7 +165,7 @@ Instructions (100-200 words) for a CadQuery model of the assembled product:
 async function callOpus(
   systemPrompt: string,
   userPrompt: string,
-  maxTokens: number = 4096,
+  maxTokens: number = 6144,
 ): Promise<string> {
   // ── Stage 1: Try Anthropic models (Opus → Sonnet) ──
   const anthropicKey = process.env.ANTHROPIC_API_KEY
