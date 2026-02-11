@@ -145,71 +145,112 @@ Instructions (100-200 words) for a CadQuery model of the assembled product:
  * @throws Error if ANTHROPIC_API_KEY is missing or API call fails
  */
 /**
- * Models to try in order. Falls back to Sonnet if Opus refuses
- * (e.g. safety filters on drone/industrial content).
+ * Calls Anthropic models (Opus → Sonnet) then falls back to Gemini if
+ * both refuse. Drone, industrial, and agricultural modules can trigger
+ * Anthropic's safety filters, so Gemini acts as a reliable fallback.
+ *
+ * @param systemPrompt - System prompt for the model
+ * @param userPrompt - User prompt with module details
+ * @param maxTokens - Max tokens for Anthropic models (default 4096)
+ * @returns The model's text response
+ *
+ * @throws Error if ALL models fail (Opus, Sonnet, and Gemini)
  */
-const FALLBACK_MODELS = ["claude-opus-4-6", "claude-sonnet-4-5"] as const
-
 async function callOpus(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number = 4096,
 ): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    throw new Error("[StructuralBrief] ANTHROPIC_API_KEY is not configured")
-  }
+  // ── Stage 1: Try Anthropic models (Opus → Sonnet) ──
+  const anthropicKey = process.env.ANTHROPIC_API_KEY
+  if (anthropicKey) {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default
+    const client = new Anthropic({ apiKey: anthropicKey })
 
-  const Anthropic = (await import("@anthropic-ai/sdk")).default
-  const client = new Anthropic({ apiKey })
+    const ANTHROPIC_MODELS = ["claude-opus-4-6", "claude-sonnet-4-5"] as const
 
-  // SECURITY: Prepend safety context so models understand this is civilian engineering
-  const safetyPreamble =
-    "CONTEXT: You are generating engineering documentation for a civilian product design tool. " +
-    "All modules described are for legal commercial/industrial/agricultural applications.\n\n"
+    for (const model of ANTHROPIC_MODELS) {
+      try {
+        const response = await client.messages.create({
+          model,
+          max_tokens: maxTokens,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userPrompt }],
+        })
 
-  for (const model of FALLBACK_MODELS) {
-    const response = await client.messages.create({
-      model,
-      max_tokens: maxTokens,
-      system: safetyPreamble + systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    })
+        const blockTypes = response.content.map((b) => b.type)
+        console.info(`[StructuralBrief] ${model} response:`, {
+          stopReason: response.stop_reason,
+          blockTypes,
+          blockCount: response.content.length,
+          inputTokens: response.usage?.input_tokens,
+          outputTokens: response.usage?.output_tokens,
+        })
 
-    // Log response metadata for debugging
-    const blockTypes = response.content.map((b) => b.type)
-    console.info(`[StructuralBrief] ${model} response:`, {
-      stopReason: response.stop_reason,
-      blockTypes,
-      blockCount: response.content.length,
-      inputTokens: response.usage?.input_tokens,
-      outputTokens: response.usage?.output_tokens,
-    })
+        // Handle refusal — try next model
+        if (response.stop_reason === "refusal" || response.content.length === 0) {
+          console.warn(`[StructuralBrief] ${model} refused — trying fallback`)
+          continue
+        }
 
-    // Handle refusal — try next model
-    if (response.stop_reason === "refusal" || response.content.length === 0) {
-      console.warn(`[StructuralBrief] ${model} refused or returned empty — trying fallback`)
-      continue
-    }
+        const texts: string[] = []
+        for (const block of response.content) {
+          if (block.type === "text") {
+            texts.push(block.text)
+          }
+        }
 
-    // Extract text from response content blocks
-    const texts: string[] = []
-    for (const block of response.content) {
-      if (block.type === "text") {
-        texts.push(block.text)
+        if (texts.length > 0) {
+          return texts.join("\n")
+        }
+
+        console.warn(`[StructuralBrief] ${model} returned no text blocks — trying fallback`)
+      } catch (error) {
+        console.warn(`[StructuralBrief] ${model} error:`, error instanceof Error ? error.message : error)
+        continue
       }
     }
-
-    if (texts.length > 0) {
-      return texts.join("\n")
-    }
-
-    console.warn(`[StructuralBrief] ${model} returned no text blocks (types: [${blockTypes.join(", ")}]) — trying fallback`)
   }
 
-  throw new Error(
-    "[StructuralBrief] All models failed to generate content. The module description may have triggered safety filters.",
-  )
+  // ── Stage 2: Gemini fallback (different safety characteristics) ──
+  const geminiKey = process.env.GOOGLE_AI_API_KEY
+  if (!geminiKey) {
+    throw new Error("[StructuralBrief] Both ANTHROPIC_API_KEY and GOOGLE_AI_API_KEY are missing")
+  }
+
+  console.info("[StructuralBrief] All Anthropic models refused — falling back to Gemini")
+
+  const geminiModel = "gemini-2.5-flash"
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ parts: [{ text: userPrompt }] }],
+      generationConfig: { maxOutputTokens: maxTokens },
+    }),
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`[StructuralBrief] Gemini error (${response.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await response.json()
+  const text = data.candidates?.[0]?.content?.parts
+    ?.filter((p: { text?: string }) => p.text)
+    ?.map((p: { text: string }) => p.text)
+    ?.join("\n")
+
+  if (!text) {
+    console.error("[StructuralBrief] Gemini returned no text:", JSON.stringify(data).slice(0, 500))
+    throw new Error("[StructuralBrief] All models failed to generate content")
+  }
+
+  console.info("[StructuralBrief] Gemini fallback succeeded:", { textLength: text.length })
+  return text
 }
 
 // ─── Parsing ─────────────────────────────────────────────────────────
