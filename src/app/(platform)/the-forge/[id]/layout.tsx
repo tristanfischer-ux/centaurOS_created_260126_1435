@@ -66,11 +66,13 @@ export default async function ForgeProjectLayout({
 
   return (
     <ForgeProjectProvider initialProject={project}>
-      <div className="space-y-6">
+      <div>
         {/* Project header with name and idea */}
-        <ForgeProjectHeader />
+        <div className="mb-6">
+          <ForgeProjectHeader />
+        </div>
 
-        {/* Stage sub-navigation */}
+        {/* Stage sub-navigation — tight gap to children so tabs feel connected */}
         <ForgeSubNav projectId={id} spec={result.spec} />
 
         {/* Active stage page */}

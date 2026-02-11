@@ -82,7 +82,7 @@ export function DossierView(): React.ReactNode {
   return (
     <>
       <Tabs defaultValue="modules">
-        <TabsList className="mb-6">
+        <TabsList className="mb-4 border-t border-slate-100 pt-2 rounded-t-none">
           <TabsTrigger value="modules" className="gap-2">
             <Boxes className="h-4 w-4" />
             Modules

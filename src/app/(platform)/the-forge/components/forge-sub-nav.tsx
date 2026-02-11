@@ -124,7 +124,7 @@ export function ForgeSubNav({ projectId, spec, className }: ForgeSubNavProps): R
   return (
     <nav
       className={cn(
-        "flex items-center justify-center py-4 px-2 sm:px-4",
+        "flex items-center py-4 px-2 sm:px-4",
         className,
       )}
       aria-label="Forge project stages"
