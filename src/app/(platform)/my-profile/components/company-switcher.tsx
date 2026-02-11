@@ -48,9 +48,9 @@ function getInitials(name: string): string {
 function getRoleBadgeClasses(role: string): string {
   switch (role) {
     case 'Founder':
-      return 'bg-orange-100 text-international-orange border-orange-200'
+      return 'bg-international-orange-light text-international-orange border-international-orange/20'
     case 'Executive':
-      return 'bg-orange-50 text-international-orange border-orange-100'
+      return 'bg-international-orange-light/50 text-international-orange border-international-orange/10'
     case 'Apprentice':
       return 'bg-muted text-muted-foreground border-border'
     default:
@@ -107,13 +107,18 @@ export function CompanySwitcher({
             return (
               <Card
                 key={foundry.foundryId}
+                role="button"
+                tabIndex={0}
+                aria-label={`Switch to ${foundry.foundryName}${foundry.isActive ? ' (currently active)' : ''}`}
                 className={cn(
                   'relative cursor-pointer transition-all duration-200 rounded-xl border shadow-sm',
                   'hover:shadow-lg hover:-translate-y-0.5',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   foundry.isActive && 'ring-2 ring-international-orange',
                   isCurrentlySwitching && 'opacity-70 pointer-events-none'
                 )}
                 onClick={() => onCompanyClick(foundry.foundryId)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCompanyClick(foundry.foundryId) } }}
               >
                 <CardContent className="p-6">
                   <div className="flex items-start gap-4">

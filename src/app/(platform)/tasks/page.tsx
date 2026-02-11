@@ -61,7 +61,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
 
     if (error) {
         // SECURITY: Log detailed error server-side only, show generic message to user
-        console.error("Error loading tasks:", error)
+        console.error('[TasksPage] Failed to load tasks:', { foundryId: foundry_id, error: error.message, code: error.code })
         return (
             <div className="p-8">
                 <h1 className="font-bold mb-2 text-destructive">Error loading tasks</h1>
@@ -72,32 +72,55 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         )
     }
 
-    // Fetch message counts for all tasks
-    const tasksWithMessageCounts = await Promise.all(
-        (tasks || []).map(async (task) => {
-            const { count } = await supabase
-                .from('messages')
-                .select('*', { count: 'exact', head: true })
-                .eq('task_id', task.id)
+    // Fetch message counts for all tasks in a single query instead of N+1
+    const taskIds = (tasks || []).map(t => t.id)
+    let messageCounts: Record<string, number> = {}
 
-            return {
-                ...task,
-                message_count: count || 0
-            }
-        })
-    )
+    if (taskIds.length > 0) {
+        const { data: messageData, error: msgError } = await supabase
+            .from('messages')
+            .select('task_id')
+            .in('task_id', taskIds)
+
+        if (msgError) {
+            console.error('[TasksPage] Failed to fetch message counts:', { foundryId: foundry_id, error: msgError.message })
+        } else {
+            // Count messages per task_id
+            messageCounts = (messageData || []).reduce<Record<string, number>>((acc, msg) => {
+                if (msg.task_id) {
+                    acc[msg.task_id] = (acc[msg.task_id] || 0) + 1
+                }
+                return acc
+            }, {})
+        }
+    }
+
+    const tasksWithMessageCounts = (tasks || []).map(task => ({
+        ...task,
+        message_count: messageCounts[task.id] || 0
+    }))
 
     // SECURITY: Filter all queries by foundry_id to ensure data isolation
     // Note: Profiles RLS is disabled due to recursion issues, so app-level filtering is CRITICAL
     const [
-        { data: objectives },
-        { data: membersData },
-        { data: teamsData }
+        { data: objectives, error: objError },
+        { data: membersData, error: membersError },
+        { data: teamsData, error: teamsError }
     ] = await Promise.all([
         supabase.from('objectives').select('id, title').eq('foundry_id', foundry_id).eq('is_ghost', false).is('deleted_at', null),
         supabase.from('profiles').select('id, full_name, role, email').eq('foundry_id', foundry_id),
         supabase.from('teams').select('id, name').eq('foundry_id', foundry_id)
     ])
+
+    if (objError) {
+        console.error('[TasksPage] Failed to fetch objectives:', { foundryId: foundry_id, error: objError.message })
+    }
+    if (membersError) {
+        console.error('[TasksPage] Failed to fetch members:', { foundryId: foundry_id, error: membersError.message })
+    }
+    if (teamsError) {
+        console.error('[TasksPage] Failed to fetch teams:', { foundryId: foundry_id, error: teamsError.message })
+    }
 
     const currentUserRole = userProfile?.role
     const objectivesList = objectives || []

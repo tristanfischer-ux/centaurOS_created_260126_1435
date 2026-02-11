@@ -98,8 +98,8 @@ export function WhiteboardList({ whiteboards, objectives }: WhiteboardListProps)
       {whiteboards.length === 0 ? (
         <div className="flex items-center justify-center py-16">
           <div className="text-center max-w-sm">
-            <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center mx-auto mb-4">
-              <Pencil className="w-7 h-7 text-orange-400" />
+            <div className="w-14 h-14 rounded-2xl bg-international-orange-light border border-international-orange/10 flex items-center justify-center mx-auto mb-4">
+              <Pencil className="w-7 h-7 text-international-orange/60" />
             </div>
             <h3 className="font-display text-base font-semibold text-foreground mb-1.5">
               No whiteboards yet
@@ -127,10 +127,14 @@ export function WhiteboardList({ whiteboards, objectives }: WhiteboardListProps)
             const isDeleting = deletingId === wb.id
 
             return (
-              <button
+              <div
                 key={wb.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => router.push(`/canvas/whiteboard/${wb.id}`)}
-                className="group text-left bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 transition-all duration-200"
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/canvas/whiteboard/${wb.id}`) } }}
+                aria-label={`Open whiteboard: ${wb.title}`}
+                className="group text-left bg-card rounded-xl border p-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {/* Preview area */}
                 <div className="h-28 bg-muted/30 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
@@ -162,7 +166,7 @@ export function WhiteboardList({ whiteboards, objectives }: WhiteboardListProps)
                     )}
                   </button>
                 </div>
-              </button>
+              </div>
             )
           })}
         </div>

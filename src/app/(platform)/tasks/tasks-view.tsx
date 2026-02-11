@@ -1114,7 +1114,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                                             name={task.assignee.full_name}
                                                                             role={task.assignee.role}
                                                                             size="xs"
-                                                                            className="border border-white"
+                                                                            className="border border-background"
                                                                         />
                                                                         <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-accent font-medium")}>{task.assignee.full_name}</span>
                                                                     </>
@@ -1258,7 +1258,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                                         name={task.assignee.full_name}
                                                                         role={task.assignee.role}
                                                                         size="xs"
-                                                                        className="border border-white"
+                                                                        className="border border-background"
                                                                     />
                                                                     <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-accent font-medium")}>{task.assignee.full_name}</span>
                                                                 </>

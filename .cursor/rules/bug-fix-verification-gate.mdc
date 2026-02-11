@@ -1,0 +1,118 @@
+# Bug Fix Verification Gate
+
+**After completing ANY bug fix, you MUST pass the verification gate before asking the user to build or deploy.**
+
+No exceptions. No "it's a small change." No "I'm confident it works." Prove it.
+
+## The Rule
+
+```
+Fix applied
+    │
+    ▼
+Run verification gate (you do this, not the user)
+    │
+    ▼
+All checks pass?
+    │
+   YES → Tell user: "Fix verified, ready to build."
+    │
+   NO  → Fix the issue. Re-run gate. Do NOT ask user to build.
+```
+
+## Verification Gate Checklist
+
+Run these checks **yourself** after every bug fix. Do not ask the user to run them.
+
+### 1. TypeScript Compilation
+
+```bash
+npx tsc --noEmit
+```
+
+**Must pass with zero errors.** If your fix introduced type errors, fix them before proceeding.
+
+### 2. Build Check
+
+```bash
+npm run build
+```
+
+**Must succeed.** If the build breaks, your fix broke something. Fix it.
+
+### 3. Lint Check
+
+```bash
+npm run lint
+```
+
+**Must pass.** Fix any lint errors your changes introduced.
+
+### 4. Diff Review
+
+```bash
+git diff --stat
+git diff
+```
+
+Review every changed line. Ask yourself:
+- Does every change serve the bug fix? Remove anything unrelated.
+- Did I accidentally modify a shared utility? Check its consumers.
+- Are there any leftover debug logs? Remove them.
+
+### 5. Impact Verification
+
+For every file you modified:
+
+```bash
+# What imports this file?
+rg "from ['\"].*<filename>" src/ --type ts --type-add 'tsx:*.tsx' --type tsx
+```
+
+If the file is imported by 3+ other files, verify those consumers aren't broken by your change. At minimum, confirm the types still align and the function signatures haven't changed in a breaking way.
+
+### 6. Linter Errors on Edited Files
+
+Run ReadLints on every file you edited. Fix any errors you introduced.
+
+## What "Ready to Build" Means
+
+Only after ALL checks pass, report to the user:
+
+```
+Bug fix complete and verified:
+- TypeScript: ✓ No errors
+- Build: ✓ Passes
+- Lint: ✓ Clean
+- Diff: ✓ Only bug fix changes, no unrelated modifications
+- Impact: ✓ No downstream breakage detected
+
+Ready to build when you are.
+```
+
+If any check fails, do NOT report to the user. Fix the issue first, re-run the gate, and only then report.
+
+## What This Prevents
+
+| Problem | How the Gate Catches It |
+|---|---|
+| Fix introduces type errors | `tsc --noEmit` fails |
+| Fix breaks the build | `npm run build` fails |
+| Fix introduces lint violations | `npm run lint` fails |
+| Fix accidentally changes unrelated code | Diff review catches it |
+| Fix breaks a consumer of shared code | Impact verification catches it |
+| Leftover debug logs | Diff review catches them |
+
+## Anti-Patterns
+
+| Anti-Pattern | Why It's Wrong |
+|---|---|
+| "Fix looks good, want me to build?" | You haven't verified anything |
+| Running only `tsc` and skipping build | Build catches issues `tsc` doesn't |
+| Skipping diff review | You might have unrelated changes |
+| Asking user to run the checks | This is YOUR job, not theirs |
+| "It's just a one-line change" | One-line changes break builds too |
+
+## Summary
+
+**You fix it. You verify it. You prove it doesn't break anything. Then you ask the user to build.**

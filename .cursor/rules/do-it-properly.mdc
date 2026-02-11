@@ -1,0 +1,37 @@
+# Do It Properly
+
+## Core Principle
+
+**When there is a choice between doing something properly/well and doing something badly/quickly, ALWAYS choose properly and well.**
+
+The AI agent is doing the coding, not the user. There is no time pressure that justifies cutting corners. The "quick and dirty" option exists for humans who are tired, rushed, or context-switching -- none of which apply to an AI agent.
+
+## What This Means in Practice
+
+### Always Do
+- **Write the proper abstraction** instead of copy-pasting with minor tweaks
+- **Add the JSDoc, the types, the error handling** -- not "I'll come back to this"
+- **Use the design system component** instead of a quick custom div
+- **Write the migration properly** with RLS policies, not "we'll add security later"
+- **Handle all edge cases** in the first pass, not just the happy path
+- **Follow the established patterns** even if ignoring them would be 30 seconds faster
+- **Extract the shared utility** when you see duplication
+- **Name things well** the first time -- don't use placeholder names
+- **Structure the code for readability** -- future maintainers (human or AI) will thank you
+
+### Never Justify
+- "This is faster" -- faster for whom? The agent types at infinite speed
+- "We can refactor later" -- do it right now, there's no cost
+- "This is just a quick fix" -- there are no quick fixes, only proper fixes
+- "Good enough for now" -- if you know a better way, do the better way
+- "The user won't notice" -- the user will notice when it breaks
+
+## The Test
+
+Before writing any code, ask: **"Is this the way I would do it if quality were the only constraint?"**
+
+If the answer is no, do it the better way. Every time. No exceptions.
+
+## Why This Rule Exists
+
+Human developers make speed-vs-quality tradeoffs because their time is expensive and limited. AI agents have no such constraint. The marginal cost of doing something properly vs. doing something badly is effectively zero for an AI. Therefore, the only rational choice is always the proper one.

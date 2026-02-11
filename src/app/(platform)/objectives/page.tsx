@@ -50,7 +50,11 @@ export default async function ObjectivesPage({ searchParams }: ObjectivesPagePro
         .order('created_at', { ascending: false })
 
     if (error) {
-        console.error(error)
+        console.error('[ObjectivesPage] Failed to fetch objectives:', {
+            foundryId: profile.foundry_id,
+            error: error.message,
+            code: error.code,
+        })
         return <div className="text-destructive">Error loading objectives</div>
     }
 
@@ -114,17 +118,33 @@ export default async function ObjectivesPage({ searchParams }: ObjectivesPagePro
 
     // SECURITY: Fetch data for CreateTaskDialog - filtered by foundry_id
     // Note: Profiles RLS is disabled due to recursion issues, so app-level filtering is CRITICAL
-    const objectivesForDialog = await supabase.from('objectives').select('id, title').eq('foundry_id', profile.foundry_id).eq('is_ghost', false).is('deleted_at', null).then(r => r.data || [])
-    const membersData = await supabase.from('profiles').select('id, full_name, role, email').eq('foundry_id', profile.foundry_id)
-    const members = (membersData.data || []).map(p => ({
+    const [
+        { data: objectivesForDialogData, error: objDialogError },
+        { data: membersRaw, error: membersError },
+        { data: teamsData, error: teamsError }
+    ] = await Promise.all([
+        supabase.from('objectives').select('id, title').eq('foundry_id', profile.foundry_id).eq('is_ghost', false).is('deleted_at', null),
+        supabase.from('profiles').select('id, full_name, role, email').eq('foundry_id', profile.foundry_id),
+        supabase.from('teams').select('id, name').eq('foundry_id', profile.foundry_id)
+    ])
+
+    if (objDialogError) {
+        console.error('[ObjectivesPage] Failed to fetch objectives for dialog:', { foundryId: profile.foundry_id, error: objDialogError.message })
+    }
+    if (membersError) {
+        console.error('[ObjectivesPage] Failed to fetch members:', { foundryId: profile.foundry_id, error: membersError.message })
+    }
+    if (teamsError) {
+        console.error('[ObjectivesPage] Failed to fetch teams:', { foundryId: profile.foundry_id, error: teamsError.message })
+    }
+
+    const objectivesForDialog = objectivesForDialogData || []
+    const members = (membersRaw || []).map(p => ({
         id: p.id,
         full_name: p.full_name || 'Unknown',
         role: p.role,
         email: p.email || ''
     }))
-
-    // Fetch Teams - filtered by foundry_id
-    const { data: teamsData } = await supabase.from('teams').select('id, name').eq('foundry_id', profile.foundry_id)
     const teams = teamsData || []
 
     return (
@@ -132,7 +152,7 @@ export default async function ObjectivesPage({ searchParams }: ObjectivesPagePro
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                        <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(255,69,0,0.6)]" />
                         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Strategic Objectives</h1>
                     </div>
                     <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">High-level goals aligned with your company's purpose</p>

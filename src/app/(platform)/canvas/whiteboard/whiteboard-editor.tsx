@@ -27,7 +27,7 @@ const Excalidraw = dynamic(
 
 function ExcalidrawLoading() {
   return (
-    <div className="flex items-center justify-center h-full bg-white">
+    <div className="flex items-center justify-center h-full bg-background">
       <div className="text-center space-y-3">
         <Loader2 className="w-8 h-8 animate-spin text-international-orange mx-auto" />
         <p className="text-sm text-muted-foreground">Loading whiteboard...</p>
@@ -252,7 +252,7 @@ export function WhiteboardEditor({ whiteboard, objectiveId }: WhiteboardEditorPr
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-100 flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-background border-b border-slate-100 flex-shrink-0">
         {/* Left: Back + title */}
         <div className="flex items-center gap-3">
           <Link
@@ -297,7 +297,7 @@ export function WhiteboardEditor({ whiteboard, objectiveId }: WhiteboardEditorPr
           <button
             onClick={handleConvertToTask}
             disabled={isConverting}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-international-orange bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-md transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-international-orange bg-international-orange-light hover:bg-international-orange-light/80 border border-international-orange/20 rounded-md transition-colors disabled:opacity-50"
             title="Convert selected text elements to tasks"
           >
             {isConverting ? (
@@ -310,7 +310,7 @@ export function WhiteboardEditor({ whiteboard, objectiveId }: WhiteboardEditorPr
           <button
             onClick={handleManualSave}
             disabled={isSaving}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-white border border-slate-200 hover:bg-muted rounded-md transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-background border hover:bg-muted rounded-md transition-colors disabled:opacity-50"
           >
             {isSaving ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />

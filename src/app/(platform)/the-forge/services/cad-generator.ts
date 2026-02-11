@@ -25,7 +25,7 @@ import OpenAI from "openai"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 
-import type { ModuleSpec, ModuleAnalysis, MassProperties, DfmAnalysis } from "./xray-schema"
+import type { ModuleSpec, ModuleAnalysis, MassProperties, DfmAnalysis, XRaySpec } from "./xray-schema"
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -605,4 +605,208 @@ function convertModalAnalysis(
   }
 
   return (result.massProperties || result.dfm) ? result : undefined
+}
+
+// ─── System-Level CAD Generation ─────────────────────────────────────
+
+/** Result of system-level CAD generation (subset of CadModelResult) */
+export interface SystemCadResult {
+  stlUrl: string | undefined
+  svgIsoUrl: string | undefined
+  cadQueryCode: string
+}
+
+/**
+ * System-level CadQuery prompt — creates the overall product form factor.
+ *
+ * @description Unlike module prompts which focus on individual subsystems,
+ * this prompt creates a single model representing the entire product as
+ * an assembled unit. The result is the "hero" 3D model shown on the
+ * concept page.
+ */
+const SYSTEM_CAD_PROMPT = `You are an expert CAD engineer. Write CadQuery Python code to create a 3D conceptual model of an ENTIRE product/system.
+
+## Rules
+1. Output ONLY valid Python code using CadQuery. No markdown fences.
+2. Import only \`cadquery as cq\` and \`math\`. No other imports.
+3. All dimensions in millimeters.
+4. The final model MUST be stored in a variable called \`result\`.
+5. Create a SINGLE assembled model showing the overall product form factor.
+6. Show the main structural body/frame and key external features.
+7. Do NOT model internal details — focus on the outer envelope and recognizable shape.
+8. Apply realistic overall proportions and dimensions.
+9. Include a PARAMETERS block with key dimensions.
+10. Target 80-200 lines of code.
+11. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or file I/O.
+12. Make it look like a real product — fillets, mounting features, panel lines.
+
+## CadQuery Patterns
+- \`cq.Workplane("XY").box(l, w, h)\` for bodies
+- \`.circle(r).extrude(h)\` for cylinders
+- \`.edges("|Z").fillet(r)\` for rounding
+- \`.cut(other)\` / \`.union(other)\` for boolean ops
+- \`.shell(-t)\` for hollow shells
+
+Output just the Python code.`
+
+/**
+ * Builds the user prompt for system-level CadQuery generation.
+ *
+ * @param spec - The full XRay spec with function and modules
+ * @returns Formatted prompt string
+ */
+function buildSystemCadPrompt(spec: XRaySpec): string {
+  const moduleSummaries = spec.modules
+    .map((m) => `- ${m.name}: ${m.purpose} (key parts: ${m.keyParts.slice(0, 3).join(", ")})`)
+    .join("\n")
+
+  return `Generate a 3D CadQuery model for the COMPLETE assembled product:
+
+**Product Function:** ${spec.function}
+
+**Modules (subsystems):**
+${moduleSummaries}
+
+**Key Materials:** ${spec.materials.slice(0, 5).join(", ")}
+
+Create a single conceptual 3D model showing the overall product. This should look like the finished assembled product from the outside — show the main body/frame/housing with key external features like intakes, outlets, mounting points, and panels. Think of this as what the product looks like on a table, not an exploded view.
+
+Store the final model in a variable called \`result\`.`
+}
+
+/**
+ * Generates AI CadQuery code for the system-level model.
+ *
+ * @param spec - The full XRay spec
+ * @returns CadQuery Python code
+ */
+async function generateSystemCadQueryCode(spec: XRaySpec): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error("[XRayCadGen] OPENAI_API_KEY is not configured")
+
+  const openai = new OpenAI({ apiKey })
+  const userPrompt = buildSystemCadPrompt(spec)
+
+  console.info("[XRayCadGen] Generating system-level CadQuery code")
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: SYSTEM_CAD_PROMPT },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.3,
+    max_tokens: 4000,
+  })
+
+  const rawCode = completion.choices[0]?.message?.content
+  if (!rawCode) throw new Error("[XRayCadGen] AI returned empty response for system CAD")
+
+  return rawCode
+    .replace(/^```(?:python)?\n?/gm, "")
+    .replace(/\n?```$/gm, "")
+    .trim()
+}
+
+/**
+ * Generates a system-level 3D CAD model representing the overall product.
+ *
+ * @description Pipeline: AI writes CadQuery for the full product -> Modal
+ * executes it -> STL + SVG uploaded to storage. This is the "hero" model
+ * displayed in the interactive 3D viewer on the concept page.
+ *
+ * @param scanId - The scan ID for storage namespacing
+ * @param spec - The full XRay spec (used for context in the prompt)
+ * @returns URLs for STL and isometric SVG, plus the source code
+ *
+ * @throws Error if any pipeline stage fails after retries
+ */
+export async function generateSystemCadModel(
+  scanId: string,
+  spec: XRaySpec,
+): Promise<SystemCadResult> {
+  // Stage 1: AI generates CadQuery code for the full product
+  let cadQueryCode = await generateSystemCadQueryCode(spec)
+
+  // Stage 2: Execute on Modal (default PLA density for conceptual model)
+  let modalResult = await executeCadQueryOnModal(cadQueryCode, "system", 1240)
+
+  // Retry once if Modal fails
+  if (modalResult.error) {
+    console.warn("[XRayCadGen] System CAD execution failed, retrying:", {
+      error: modalResult.error.slice(0, 200),
+    })
+    try {
+      cadQueryCode = await regenerateSystemCadCode(spec, cadQueryCode, modalResult.error)
+      modalResult = await executeCadQueryOnModal(cadQueryCode, "system", 1240)
+    } catch (retryError) {
+      console.error("[XRayCadGen] System CAD retry failed:", {
+        error: retryError instanceof Error ? retryError.message : "Unknown",
+      })
+    }
+  }
+
+  if (modalResult.error) {
+    throw new Error(`[XRayCadGen] System CAD execution failed: ${modalResult.error}`)
+  }
+
+  // Stage 3: Upload STL and isometric SVG
+  const [stlUrl, svgIsoUrl] = await Promise.all([
+    modalResult.stl
+      ? uploadCadFile(scanId, "system-cad/model.stl", modalResult.stl, "model/stl")
+      : Promise.resolve(undefined),
+    modalResult.svg_iso
+      ? uploadCadFile(scanId, "system-cad/iso.svg", modalResult.svg_iso, "image/svg+xml")
+      : Promise.resolve(undefined),
+  ])
+
+  console.info("[XRayCadGen] System CAD model generated:", {
+    scanId,
+    hasStl: !!stlUrl,
+    hasSvg: !!svgIsoUrl,
+  })
+
+  return { stlUrl, svgIsoUrl, cadQueryCode }
+}
+
+/**
+ * Feeds execution errors back to AI for a corrected system-level CadQuery script.
+ *
+ * @param spec - The full XRay spec for context
+ * @param failedCode - The code that produced the error
+ * @param error - The error message from Modal
+ * @returns Corrected CadQuery Python code
+ */
+async function regenerateSystemCadCode(
+  spec: XRaySpec,
+  failedCode: string,
+  error: string,
+): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error("[XRayCadGen] OPENAI_API_KEY is not configured")
+
+  const openai = new OpenAI({ apiKey })
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: SYSTEM_CAD_PROMPT },
+      { role: "user", content: buildSystemCadPrompt(spec) },
+      { role: "assistant", content: failedCode },
+      {
+        role: "user",
+        content: `The code above failed with this error:\n\n${error.slice(0, 1000)}\n\nPlease fix the code and output ONLY the corrected Python code.`,
+      },
+    ],
+    temperature: 0.2,
+    max_tokens: 4000,
+  })
+
+  const rawCode = completion.choices[0]?.message?.content
+  if (!rawCode) throw new Error("[XRayCadGen] AI returned empty response for system CAD fix")
+
+  return rawCode
+    .replace(/^```(?:python)?\n?/gm, "")
+    .replace(/\n?```$/gm, "")
+    .trim()
 }

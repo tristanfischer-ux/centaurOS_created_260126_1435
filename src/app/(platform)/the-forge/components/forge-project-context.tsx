@@ -25,6 +25,8 @@ import {
   refineModuleAction,
   deriveProcessClassAction,
   generateImagesAction,
+  generateModuleImagesAction,
+  generateSystemCadAction,
   generateCadModelsAction,
   analyzeModulesAction,
   runStructuralAnalysisAction,
@@ -76,6 +78,7 @@ export type ScanStatus = "idle" | "scanning" | "complete"
 /** Full project data loaded from DB */
 export interface ForgeProject {
   scanId: string
+  foundryId: string
   spec: XRaySpec
   name: string | null
   stage: ForgeStage
@@ -108,6 +111,7 @@ export interface ForgeProjectContextValue {
   handleGenerateImages: () => void
   handleGenerateCadModel: (moduleId: string) => Promise<void>
   isGeneratingImages: boolean
+  isGeneratingSystemCad: boolean
 
   // ── Engineering analysis ──
   handleRunAnalysis: () => Promise<void>
@@ -207,6 +211,7 @@ export function ForgeProjectProvider({
   const [spec, setSpecInternal] = useState<XRaySpec>(initialProject.spec)
   const [isScanning, setIsScanning] = useState(false)
   const [isGeneratingImages, setIsGeneratingImages] = useState(false)
+  const [isGeneratingSystemCad, setIsGeneratingSystemCad] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isRunningStructural, setIsRunningStructural] = useState(false)
   const [isRunningConvergence, setIsRunningConvergence] = useState(false)
@@ -355,28 +360,63 @@ export function ForgeProjectProvider({
     }
   }, [scanId])
 
-  // ── Generate images ──
+  // ── Generate images (orchestrated: system image first, then CAD + module images in parallel) ──
   const handleGenerateImages = useCallback((): void => {
     setIsGeneratingImages(true)
-    toast.info("Generating blueprint images...")
+    toast.info("Generating system blueprint...")
+
+    // Phase 1: System image first (fast, ~15s) — shows on concept page immediately
     generateImagesAction(scanId)
       .then((imgResult) => {
         if ("spec" in imgResult) {
           setSpecInternal(imgResult.spec)
           specRef.current = imgResult.spec
-          const successCount = imgResult.spec.modules.filter(m => m.imageStatus === "complete").length
-          if (successCount > 0) toast.success(`Generated ${successCount} blueprint images`)
+          toast.success("System blueprint ready")
 
           // Update thumbnail from system image
           if (imgResult.spec.systemImageUrl) {
             updateProjectMetadataAction(scanId, { thumbnailUrl: imgResult.spec.systemImageUrl })
           }
         } else {
-          toast.error(imgResult.error || "Image generation failed")
+          toast.error(imgResult.error || "System image generation failed")
         }
       })
-      .catch(() => toast.error("Image generation failed"))
-      .finally(() => setIsGeneratingImages(false))
+      .catch(() => toast.error("System image generation failed"))
+      .finally(() => {
+        setIsGeneratingImages(false)
+
+        // Phase 2: Fire-and-forget — system CAD + module images in parallel
+        // These run in the background while the user views the system diagram
+
+        // 2a: System-level 3D CAD model (slower, ~60-120s)
+        setIsGeneratingSystemCad(true)
+        generateSystemCadAction(scanId)
+          .then((cadResult) => {
+            if ("spec" in cadResult) {
+              setSpecInternal(cadResult.spec)
+              specRef.current = cadResult.spec
+              toast.success("3D product model ready — switch to 3D view")
+            }
+          })
+          .catch(() => {
+            console.error("[Forge] System CAD generation failed")
+          })
+          .finally(() => setIsGeneratingSystemCad(false))
+
+        // 2b: Module blueprint images (background, progressive via Realtime)
+        generateModuleImagesAction(scanId)
+          .then((modResult) => {
+            if ("spec" in modResult) {
+              setSpecInternal(modResult.spec)
+              specRef.current = modResult.spec
+              const count = modResult.spec.modules.filter(m => m.imageStatus === "complete").length
+              if (count > 0) toast.success(`${count} module blueprints ready`)
+            }
+          })
+          .catch(() => {
+            console.error("[Forge] Module image generation failed")
+          })
+      })
   }, [scanId])
 
   // ── Generate CAD model ──
@@ -689,8 +729,8 @@ export function ForgeProjectProvider({
 
   // ── Supplier matching ──
   const loadSuppliers = useCallback((forceRefresh = false): void => {
+    if (specRef.current.modules.length === 0) return
     const diagComplete = isGatingDiagComplete(specRef.current)
-    if (!diagComplete || specRef.current.modules.length === 0) return
     setIsSuppliersLoading(true)
     matchSuppliersAction(scanId, specRef.current.modules, diagComplete, forceRefresh)
       .then((result) => {
@@ -733,6 +773,7 @@ export function ForgeProjectProvider({
     handleGenerateImages,
     handleGenerateCadModel,
     isGeneratingImages,
+    isGeneratingSystemCad,
     handleRunAnalysis,
     handleRunStructural,
     handleRunConvergence,

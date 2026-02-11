@@ -96,9 +96,12 @@ export function UpdatesLayout({
       })
       if (result.success && result.data) {
         setItems(result.data)
+      } else if (!result.success) {
+        console.error('[UpdatesLayout] Activity feed returned error:', result.error)
+        toast.error(result.error || 'Failed to load updates')
       }
     } catch (error) {
-      console.error('[UpdatesLayout] Failed to fetch activity:', error)
+      console.error('[UpdatesLayout] Failed to fetch activity:', error instanceof Error ? error.message : 'Unknown error')
       toast.error('Failed to load updates')
     } finally {
       setIsLoading(false)
@@ -127,6 +130,8 @@ export function UpdatesLayout({
   }, [])
 
   // Handle mark all read
+  const [isMarkingRead, setIsMarkingRead] = useState(false)
+
   const handleMarkAllRead = useCallback(async () => {
     const unreadItems = items
       .filter(i => i.is_unread && (i.type === 'task_comment' || i.type === 'objective_comment'))
@@ -137,14 +142,21 @@ export function UpdatesLayout({
 
     if (unreadItems.length === 0) return
 
+    setIsMarkingRead(true)
     try {
-      await markMultipleActivityRead(unreadItems)
-      // Update local state
-      setItems(prev => prev.map(item => ({ ...item, is_unread: false })))
-      toast.success(`Marked ${unreadItems.length} items as read`)
+      const result = await markMultipleActivityRead(unreadItems)
+      if (result.success) {
+        setItems(prev => prev.map(item => ({ ...item, is_unread: false })))
+        toast.success(`Marked ${unreadItems.length} items as read`)
+      } else {
+        console.error('[UpdatesLayout] Mark all read returned error:', result.error)
+        toast.error(result.error || 'Failed to mark items as read')
+      }
     } catch (error) {
-      console.error('[UpdatesLayout] Failed to mark all read:', error)
+      console.error('[UpdatesLayout] Failed to mark all read:', error instanceof Error ? error.message : 'Unknown error')
       toast.error('Failed to mark items as read')
+    } finally {
+      setIsMarkingRead(false)
     }
   }, [items])
 
@@ -190,6 +202,7 @@ export function UpdatesLayout({
             tasksWithUpdates={tasksWithUpdates}
             objectivesWithUpdates={objectivesWithUpdates}
             onMarkAllRead={handleMarkAllRead}
+            isMarkingRead={isMarkingRead}
           />
         </div>
 
@@ -236,6 +249,7 @@ export function UpdatesLayout({
             tasksWithUpdates={tasksWithUpdates}
             objectivesWithUpdates={objectivesWithUpdates}
             onMarkAllRead={handleMarkAllRead}
+            isMarkingRead={isMarkingRead}
           />
         </div>
 
@@ -302,6 +316,7 @@ export function UpdatesLayout({
               tasksWithUpdates={tasksWithUpdates}
               objectivesWithUpdates={objectivesWithUpdates}
               onMarkAllRead={handleMarkAllRead}
+              isMarkingRead={isMarkingRead}
             />
           </div>
           <div className="flex-1 min-h-0">

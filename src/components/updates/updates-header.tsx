@@ -29,6 +29,8 @@ interface UpdatesHeaderProps {
   objectivesWithUpdates: number
   /** Callback to mark all items as read */
   onMarkAllRead?: () => void
+  /** Whether the mark-all-read operation is in progress */
+  isMarkingRead?: boolean
 }
 
 /**
@@ -38,7 +40,8 @@ export function UpdatesHeader({
   unreadCount,
   tasksWithUpdates,
   objectivesWithUpdates,
-  onMarkAllRead
+  onMarkAllRead,
+  isMarkingRead = false
 }: UpdatesHeaderProps) {
   return (
     <div className="space-y-4">
@@ -68,10 +71,11 @@ export function UpdatesHeader({
             variant="ghost"
             size="sm"
             onClick={onMarkAllRead}
+            disabled={isMarkingRead}
             className="gap-2 text-muted-foreground hover:text-foreground"
           >
             <CheckCheck className="h-4 w-4" />
-            Mark all read
+            {isMarkingRead ? 'Marking...' : 'Mark all read'}
           </Button>
         )}
       </div>

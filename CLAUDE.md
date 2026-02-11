@@ -19,6 +19,7 @@ This file contains meta-agent behavior directives that influence HOW work is app
 ## 3. Verification Before Done
 
 - **Never mark a task complete without proving it works**
+- **Test it yourself. Don't ask the user to test things you can test.** Write scripts, hit endpoints, use the browser — whatever it takes. Only involve the user if there's a genuine blocker (e.g., needs their physical device, requires their credentials interactively, or needs a judgment call on UX).
 - Diff behavior between main and your changes when relevant
 - Ask yourself: "Would a staff engineer approve this?"
 - Run tests, check logs, demonstrate correctness

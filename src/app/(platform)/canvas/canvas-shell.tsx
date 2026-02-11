@@ -242,7 +242,7 @@ export function CanvasShell({
       </div>
 
       {/* Tab bar with status badges */}
-      <div className="flex items-center gap-1 px-4 sm:px-6 lg:px-8 py-2 border-b border-slate-100 bg-background">
+      <div className="flex items-center gap-1 px-4 sm:px-6 lg:px-8 py-2 border-b border-slate-100 bg-background" role="tablist" aria-label="Strategy views">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id
           const Icon = tab.icon
@@ -250,11 +250,15 @@ export function CanvasShell({
           return (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`tabpanel-${tab.id}`}
+              id={`tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
                 isActive
-                  ? 'bg-orange-50 text-international-orange'
+                  ? 'bg-international-orange-light text-international-orange'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               )}
             >
@@ -281,7 +285,7 @@ export function CanvasShell({
       </div>
 
       {/* Tab content */}
-      <div className={activeTab === 'river' ? 'block' : 'hidden'}>
+      <div id="tabpanel-river" role="tabpanel" aria-labelledby="tab-river" className={activeTab === 'river' ? 'block' : 'hidden'}>
         {riverData.length === 0 ? (
           <EmptyState
             title="No strategic objectives yet"
@@ -299,19 +303,19 @@ export function CanvasShell({
           />
         )}
       </div>
-      <div className={activeTab === 'link-objectives' ? 'block' : 'hidden'}>
+      <div id="tabpanel-link-objectives" role="tabpanel" aria-labelledby="tab-link-objectives" className={activeTab === 'link-objectives' ? 'block' : 'hidden'}>
         <StrategyLinkView
           strategicObjectives={strategicObjectives}
           regularObjectives={regularObjectives}
         />
       </div>
-      <div className={activeTab === 'whiteboards' ? 'block' : 'hidden'}>
+      <div id="tabpanel-whiteboards" role="tabpanel" aria-labelledby="tab-whiteboards" className={activeTab === 'whiteboards' ? 'block' : 'hidden'}>
         {whiteboardList}
       </div>
-      <div className={activeTab === 'money-map' ? 'block' : 'hidden'}>
+      <div id="tabpanel-money-map" role="tabpanel" aria-labelledby="tab-money-map" className={activeTab === 'money-map' ? 'block' : 'hidden'}>
         <MoneyMapClient hideHeader={true} />
       </div>
-      <div className={activeTab === 'cost-of-delay' ? 'block' : 'hidden'}>
+      <div id="tabpanel-cost-of-delay" role="tabpanel" aria-labelledby="tab-cost-of-delay" className={activeTab === 'cost-of-delay' ? 'block' : 'hidden'}>
         <CostOfDelayView />
       </div>
 

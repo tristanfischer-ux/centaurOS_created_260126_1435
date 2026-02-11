@@ -623,6 +623,75 @@ export async function generateCadModelsAction(
   })
 }
 
+/**
+ * Generates a system-level 3D CAD model representing the overall product.
+ *
+ * @description Uses AI to write CadQuery code for the full product form
+ * factor (not individual modules), executes on Modal.com, and uploads
+ * the resulting STL for the interactive 3D viewer on the concept page.
+ *
+ * @param scanId - The scan ID to generate the system CAD for
+ * @returns Updated spec with systemCadUrl, or error
+ *
+ * @security Requires authenticated user with foundry context
+ */
+export async function generateSystemCadAction(scanId: string): Promise<
+  { spec: XRaySpec } | { error: string }
+> {
+  return withAuth(async ({ supabase }) => {
+    const { data: scan, error: loadError } = await supabase
+      .from("xray_scans")
+      .select("id, spec")
+      .eq("id", scanId)
+      .single()
+
+    if (loadError || !scan) {
+      return { error: "Scan not found" }
+    }
+
+    const spec = scan.spec as unknown as XRaySpec
+
+    try {
+      const { generateSystemCadModel } = await import(
+        "@/app/(platform)/the-forge/services/cad-generator"
+      )
+      const result = await generateSystemCadModel(scanId, spec)
+
+      const updatedSpec: XRaySpec = {
+        ...spec,
+        systemCadUrl: result.stlUrl,
+        systemCadStatus: "complete",
+        systemCadSvgUrl: result.svgIsoUrl,
+      }
+
+      const { error: updateError } = await supabase
+        .from("xray_scans")
+        .update({ spec: updatedSpec as unknown as Json })
+        .eq("id", scanId)
+
+      if (updateError) {
+        console.error("[XRay] Failed to persist system CAD:", updateError.message)
+      }
+
+      console.info("[XRay] System CAD model generated:", { scanId, hasStl: !!result.stlUrl })
+      return { spec: updatedSpec }
+    } catch (error) {
+      console.error("[XRay] System CAD generation failed:", {
+        error: error instanceof Error ? error.message : "Unknown",
+      })
+
+      // Mark as failed in spec
+      const failedSpec: XRaySpec = { ...spec, systemCadStatus: "failed" }
+      await supabase
+        .from("xray_scans")
+        .update({ spec: failedSpec as unknown as Json })
+        .eq("id", scanId)
+
+      return { error: "System CAD generation failed" }
+    }
+  })
+}
+
 // ─── CRUD Actions ────────────────────────────────────────────────────
 
 /**
@@ -664,6 +733,7 @@ export async function updateScanSpecAction(
 export async function loadScanAction(scanId: string): Promise<
   {
     scanId: string
+    foundryId: string
     spec: XRaySpec
     status: string
     scanStatus: string
@@ -678,7 +748,7 @@ export async function loadScanAction(scanId: string): Promise<
   return withAuth(async ({ supabase }) => {
     const { data: scan, error } = await supabase
       .from("xray_scans")
-      .select("id, spec, status, scan_status, name, stage, idea, thumbnail_url, created_at, updated_at")
+      .select("id, foundry_id, spec, status, scan_status, name, stage, idea, thumbnail_url, created_at, updated_at")
       .eq("id", scanId)
       .single()
 
@@ -688,6 +758,7 @@ export async function loadScanAction(scanId: string): Promise<
 
     return {
       scanId: scan.id,
+      foundryId: scan.foundry_id,
       spec: scan.spec as unknown as XRaySpec,
       status: scan.status,
       scanStatus: scan.scan_status,

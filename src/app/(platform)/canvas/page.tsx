@@ -46,9 +46,13 @@ export default async function CanvasPage() {
   const foundryId = profile.foundry_id
 
   // Fetch foundry with purpose_data via RPC (bypasses RLS issue on foundries table)
-  const { data: foundry } = await supabase.rpc('ensure_foundry_exists', {
+  const { data: foundry, error: foundryError } = await supabase.rpc('ensure_foundry_exists', {
     p_foundry_id: foundryId,
   })
+
+  if (foundryError) {
+    console.error('[Strategy] Failed to fetch foundry:', { foundryId, error: foundryError.message, code: foundryError.code })
+  }
 
   // Fetch strategic goals, whiteboards, and objectives in parallel
   const [goalsResult, whiteboardsResult, objectivesResult, strategicObjResult] = await Promise.all([
@@ -76,12 +80,20 @@ export default async function CanvasPage() {
   ])
 
   if (whiteboardsResult.error) {
-    console.error('[Strategy] Error loading whiteboards:', whiteboardsResult.error)
+    console.error('[Strategy] Error loading whiteboards:', { foundryId, error: whiteboardsResult.error.message })
+  }
+  if (objectivesResult.error) {
+    console.error('[Strategy] Error loading objectives:', { foundryId, error: objectivesResult.error.message })
+  }
+  if (strategicObjResult.error) {
+    console.error('[Strategy] Error loading strategic objectives:', { foundryId, error: strategicObjResult.error.message })
   }
 
-  // Extract goals from result
+  // Extract goals from result — goalsResult is a server action return, not a Supabase query
   const goals: StrategicGoal[] =
-    goalsResult && 'data' in goalsResult ? goalsResult.data : []
+    goalsResult && typeof goalsResult === 'object' && 'data' in goalsResult
+      ? (goalsResult as { data: StrategicGoal[] }).data
+      : []
 
   // Fetch goal bundles in parallel for the Strategy River visualization
   // Each bundle contains milestones, objectives, and tasks

@@ -53,6 +53,7 @@ export default async function ForgeProjectLayout({
 
   const project: ForgeProject = {
     scanId: result.scanId,
+    foundryId: result.foundryId,
     spec: result.spec,
     name: result.name,
     stage: result.stage as ForgeStage,

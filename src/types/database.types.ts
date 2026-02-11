@@ -3744,6 +3744,69 @@ export type Database = {
           },
         ]
       }
+      forge_contracts: {
+        Row: {
+          created_at: string
+          created_by: string
+          document_type: string
+          foundry_id: string
+          id: string
+          module_id: string | null
+          rendered_content: string
+          status: string
+          supplier_name: string | null
+          template_id: string | null
+          updated_at: string
+          variable_values: Json
+          xray_scan_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          document_type: string
+          foundry_id: string
+          id?: string
+          module_id?: string | null
+          rendered_content?: string
+          status?: string
+          supplier_name?: string | null
+          template_id?: string | null
+          updated_at?: string
+          variable_values?: Json
+          xray_scan_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          document_type?: string
+          foundry_id?: string
+          id?: string
+          module_id?: string | null
+          rendered_content?: string
+          status?: string
+          supplier_name?: string | null
+          template_id?: string | null
+          updated_at?: string
+          variable_values?: Json
+          xray_scan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forge_contracts_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "contract_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forge_contracts_xray_scan_id_fkey"
+            columns: ["xray_scan_id"]
+            isOneToOne: false
+            referencedRelation: "xray_scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       foundries: {
         Row: {
           created_at: string | null

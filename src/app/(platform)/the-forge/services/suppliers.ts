@@ -38,21 +38,17 @@ export interface SupplierMatch {
  * Finds suppliers that can build/supply components for a given module.
  *
  * @param module - The X-Ray module to find suppliers for
- * @param isGatingDiagComplete - Whether the gating diagnostic is complete
- * @returns Ranked list of supplier matches, empty if gating incomplete
+ * @param isGatingDiagComplete - Whether the gating diagnostic is complete (affects scoring accuracy)
+ * @returns Ranked list of supplier matches
  *
- * @description Enforces the gating principle: no supplier matches are
- * returned until the gating module's diagnostic is complete. This
- * prevents premature quoting that would be unreliable.
+ * @description Matches suppliers based on module requirements. When the
+ * gating diagnostic is complete, process-class-specific scoring improves
+ * match accuracy. Without the diagnostic, broad matches are returned.
  */
 export async function matchSuppliersForModule(
   module: ModuleSpec,
   isGatingDiagComplete: boolean,
 ): Promise<SupplierMatch[]> {
-  // GATING: Block supplier matching until diagnostic is complete
-  if (!isGatingDiagComplete) {
-    return []
-  }
 
   const supabase = await createClient()
 

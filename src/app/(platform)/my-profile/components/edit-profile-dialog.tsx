@@ -184,7 +184,7 @@ export function EditProfileDialog({
                 <div className={cn(
                   'flex items-center justify-center rounded-full h-8 w-8 transition-colors flex-shrink-0',
                   isActive && 'bg-international-orange text-background',
-                  isCompleted && !isActive && 'bg-orange-100 text-international-orange',
+                  isCompleted && !isActive && 'bg-international-orange-light text-international-orange',
                   !isActive && !isCompleted && 'bg-muted text-muted-foreground'
                 )}>
                   <Icon className="h-4 w-4" />

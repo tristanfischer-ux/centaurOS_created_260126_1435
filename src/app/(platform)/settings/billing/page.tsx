@@ -44,6 +44,9 @@ export default async function BillingPage() {
 
   const hasStripeCustomer = !!profile?.stripe_customer_id
 
+  // Test mode: Stripe products not configured yet
+  const isTestMode = !process.env.STRIPE_PRICE_STARTER_MONTHLY
+
   // Map subscription to the shape expected by BillingContent
   const subscriptionInfo = subscription
     ? {
@@ -61,6 +64,7 @@ export default async function BillingPage() {
       subscription={subscriptionInfo}
       aiUsage={aiUsage}
       hasStripeCustomer={hasStripeCustomer}
+      isTestMode={isTestMode}
     />
   )
 }

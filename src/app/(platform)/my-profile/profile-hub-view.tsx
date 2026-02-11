@@ -11,6 +11,7 @@ import { LinksTab } from './components/links-tab'
 import { MarketplaceEditWizard } from './components/marketplace-edit-wizard'
 import { EditProfileDialog } from './components/edit-profile-dialog'
 import { CompanySwitcher } from './components/company-switcher'
+import { toast } from 'sonner'
 import { TelegramLink } from '@/components/settings/telegram-link'
 import { ReportPreferences } from '@/components/settings/report-preferences'
 import { switchFoundry } from '@/actions/foundry-switching'
@@ -69,10 +70,16 @@ export function ProfileHubView({ data, foundries, telegramLink, botUsername }: P
 
     setSwitchingTo(foundryId)
     startTransition(async () => {
-      if (!foundry.isActive) {
-        await switchFoundry(foundryId)
+      try {
+        if (!foundry.isActive) {
+          await switchFoundry(foundryId)
+        }
+        router.push('/updates')
+      } catch (error) {
+        console.error('[ProfileHub] Failed to switch foundry:', { foundryId, error: error instanceof Error ? error.message : 'Unknown error' })
+        toast.error('Failed to switch company. Please try again.')
+        setSwitchingTo(null)
       }
-      router.push('/updates')
     })
   }
 

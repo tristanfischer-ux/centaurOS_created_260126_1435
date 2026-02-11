@@ -1,8 +1,8 @@
 /**
  * @file supply-chain.tsx — Compact supplier matching per module
  *
- * @description Inline supplier cards organized by module. Gated on
- * diagnostic completion — shows a lock CTA when incomplete.
+ * @description Inline supplier cards organized by module. Shows an info
+ * banner when the diagnostic is incomplete but never blocks access.
  */
 
 "use client"
@@ -13,10 +13,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { EmptyState } from "@/components/ui/empty-state"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
-  Lock,
-  Building2,
+  Info,
   Box,
   Clock,
   ShieldCheck,
@@ -59,7 +58,7 @@ interface SupplyChainProps {
  * SupplyChain — Module-by-module supplier matching.
  *
  * @description Compact supplier cards with select/assign behavior.
- * Gated on diagnostic completion.
+ * Shows an info banner when diagnostic is incomplete but never blocks access.
  */
 export function SupplyChain({
   spec,
@@ -69,25 +68,6 @@ export function SupplyChain({
   onRefreshSuppliers,
   onAssignSupplier,
 }: SupplyChainProps): React.ReactNode {
-  if (!diagComplete) {
-    return (
-      <Card className="rounded-xl shadow-sm">
-        <CardContent className="py-10">
-          <EmptyState
-            title="Supply chain locked"
-            description="Complete the gating diagnostic first. Supplier matching requires a derived process class for accurate results."
-            action={
-              <Button className="bg-international-orange hover:bg-international-orange-hover text-white">
-                <Lock className="h-4 w-4 mr-2" />
-                Complete diagnostic first
-              </Button>
-            }
-          />
-        </CardContent>
-      </Card>
-    )
-  }
-
   const processClass = spec.modules.find(m => m.isGatingModule)?.diagnostic?.derivedProcessClass
 
   return (
@@ -117,6 +97,17 @@ export function SupplyChain({
             Refresh
           </Button>
         </div>
+
+        {/* Diagnostic info banner */}
+        {!diagComplete && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Complete the gating diagnostic for more accurate supplier matching.
+              Results below are broad matches based on module requirements.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Loading */}
         {isSuppliersLoading && (

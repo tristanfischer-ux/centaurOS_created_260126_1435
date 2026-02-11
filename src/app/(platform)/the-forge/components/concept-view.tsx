@@ -34,6 +34,7 @@ export function ConceptView(): React.ReactNode {
     isScanning,
     scanStatus,
     isGeneratingImages,
+    isGeneratingSystemCad,
     handleRefineScan,
     handleGenerateImages,
     setSpec,
@@ -85,6 +86,7 @@ export function ConceptView(): React.ReactNode {
             systemImageUrl={spec.systemImageUrl}
             systemImageStatus={spec.systemImageStatus}
             isGeneratingImages={isGeneratingImages}
+            isGeneratingSystemCad={isGeneratingSystemCad}
             hasImages={spec.modules.some((m) => m.imageStatus === "complete")}
             onGenerateImages={handleGenerateImages}
             canGenerate={!!scanId}

@@ -24,6 +24,7 @@ import {
   Sparkles,
   AlertCircle,
   Loader2,
+  FlaskConical,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
@@ -41,6 +42,8 @@ interface BillingContentProps {
   } | null
   aiUsage: MonthlyUsage
   hasStripeCustomer: boolean
+  /** When true, upgrade buttons use test-activate instead of Stripe checkout */
+  isTestMode?: boolean
 }
 
 /**
@@ -56,6 +59,7 @@ export function BillingContent({
   subscription,
   aiUsage,
   hasStripeCustomer,
+  isTestMode = false,
 }: BillingContentProps) {
   const [isLoading, setIsLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -71,25 +75,44 @@ export function BillingContent({
   const isNearLimit = aiUsagePercent >= 80
 
   /**
-   * Creates a Stripe checkout session for upgrading to a paid tier.
+   * Upgrades the subscription. Uses test-activate in test mode,
+   * or Stripe checkout when real prices are configured.
    */
   async function handleUpgrade(tier: SubscriptionTier): Promise<void> {
     setIsLoading(tier)
     setError(null)
 
     try {
-      const response = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier, billingPeriod: 'monthly' }),
-      })
+      if (isTestMode) {
+        // Test mode: directly activate subscription without Stripe
+        const response = await fetch('/api/billing/test-activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tier }),
+        })
 
-      const data = await response.json()
+        const data = await response.json()
 
-      if (data.url) {
-        window.location.href = data.url
+        if (data.success) {
+          window.location.href = '/settings/billing?success=true'
+        } else {
+          setError(data.error || 'Failed to activate test subscription')
+        }
       } else {
-        setError(data.error || 'Failed to create checkout session')
+        // Production: redirect to Stripe Checkout
+        const response = await fetch('/api/billing/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tier, billingPeriod: 'monthly' }),
+        })
+
+        const data = await response.json()
+
+        if (data.url) {
+          window.location.href = data.url
+        } else {
+          setError(data.error || 'Failed to create checkout session')
+        }
       }
     } catch {
       setError('Something went wrong. Please try again.')
@@ -142,6 +165,17 @@ export function BillingContent({
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             Checkout was canceled. No changes were made to your subscription.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Test mode banner */}
+      {isTestMode && (
+        <Alert>
+          <FlaskConical className="h-4 w-4" />
+          <AlertDescription>
+            <span className="font-medium">Test Mode</span> — Stripe is not configured.
+            Upgrades are simulated locally. Connect Stripe to enable real payments.
           </AlertDescription>
         </Alert>
       )}
