@@ -288,7 +288,7 @@ export async function getAvailableSlots(providerSlug: string, startDate: string,
                     const slotEnd = new Date(slotDate)
                     slotEnd.setMinutes(slotEnd.getMinutes() + settings.call_duration_minutes)
 
-                    // Check if slot is already booked in CentaurOS
+                    // Check if slot is already booked in ForgeOS
                     const isBooked = (existingBookings || []).some(booking => {
                         const bookingStart = new Date(booking.scheduled_at)
                         const bookingEnd = new Date(bookingStart)

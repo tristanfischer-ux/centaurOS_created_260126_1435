@@ -7,7 +7,7 @@ graph TD
     User[User / Executive] -->|Web UI| Next[Next.js App]
     User -->|Voice| Whisper[OpenAI Whisper]
     
-    subgraph "CentaurOS Core"
+    subgraph "ForgeOS Core"
         Next -->|Read/Write| Supabase[Supabase Platform]
         
         subgraph "Database Layer"

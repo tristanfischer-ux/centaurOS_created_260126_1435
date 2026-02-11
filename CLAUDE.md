@@ -72,7 +72,7 @@ The master preferences document is the most important read -- it tells you how T
 ## 6. Session End / Memory Logging
 
 When completing significant work:
-1. Log entries to `~/.memory/daily/YYYY-MM-DD.md` with appropriate tags (#CentaurOS)
+1. Log entries to `~/.memory/daily/YYYY-MM-DD.md` with appropriate tags (#ForgeOS)
 2. **Include Preference Signals** in log entries when corrections or preferences were expressed
 3. **Run distillation:** Analyze today's log entries, extract preference signals, update `~/.memory/master-preferences.md`
 4. For incomplete work, update carry-forward with clear next steps

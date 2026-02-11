@@ -90,7 +90,7 @@ export async function updateSession(request: NextRequest) {
     })
 
     // Special handling for app domain root: authenticated users go to their portal
-    if ((hostname.includes('fractionalforge.app') || hostname.includes('centauros.io') || hostname.includes('forgeos.io')) && pathname === '/') {
+    if ((hostname.includes('fractionalforge.app') || hostname.includes('forgeos.io')) && pathname === '/') {
         if (user) {
             // Check user's account type and active foundry to determine redirect
             const { data: profile } = await supabase

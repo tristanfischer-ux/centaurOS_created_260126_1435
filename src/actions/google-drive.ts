@@ -2,7 +2,7 @@
  * @file google-drive.ts
  *
  * @description Server actions for browsing Google Drive and attaching
- * files to CentaurOS tasks and messages.
+ * files to ForgeOS tasks and messages.
  *
  * @security Requires authenticated user with Drive read-only scope
  * @audit File attachment events are logged

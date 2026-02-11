@@ -155,7 +155,7 @@ export function WhiteboardEditor({ whiteboard, objectiveId }: WhiteboardEditorPr
   }, [isDeleting, whiteboard.id])
 
   /**
-   * @description Convert selected text/sticky note elements to CentaurOS tasks.
+   * @description Convert selected text/sticky note elements to ForgeOS tasks.
    * Reads selected elements from the Excalidraw API, extracts text content,
    * and creates tasks via the server action.
    */

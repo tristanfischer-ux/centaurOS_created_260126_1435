@@ -271,7 +271,7 @@ For complex forms with 3+ fields or multi-step workflows, use the Wizard Pattern
 
 ## 5. CRITICAL: NEVER Use Sheet/Side Panels
 
-**FORBIDDEN: Sheet components that slide in from the side are NOT ALLOWED in CentaurOS.**
+**FORBIDDEN: Sheet components that slide in from the side are NOT ALLOWED in ForgeOS.**
 
 Users find side panels disruptive and jarring. ALWAYS use centered Dialog components instead.
 

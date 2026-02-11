@@ -1,6 +1,6 @@
 ---
 name: vercel-deploy
-description: Deploy CentaurOS to Vercel, verify deployment succeeded, and automatically fix any build errors. Use when deploying to production, pushing changes to Vercel, checking deployment status, fixing build failures, or when the user mentions deploy, production, Vercel, or live site.
+description: Deploy ForgeOS to Vercel, verify deployment succeeded, and automatically fix any build errors. Use when deploying to production, pushing changes to Vercel, checking deployment status, fixing build failures, or when the user mentions deploy, production, Vercel, or live site.
 ---
 
 # Vercel Deployment Skill
@@ -110,7 +110,7 @@ curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
 After deployment completes, verify it works:
 
 ```bash
-# Get the deployment URL (usually https://centauros.vercel.app or similar)
+# Get the deployment URL (usually https://forgeos.vercel.app or similar)
 # Test the health endpoint
 curl -s https://[deployment-url]/api/health | jq .
 
@@ -161,7 +161,7 @@ If the site deploys but has runtime errors:
 
 ## Environment Variables
 
-CentaurOS requires these environment variables on Vercel:
+ForgeOS requires these environment variables on Vercel:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://[project].supabase.co

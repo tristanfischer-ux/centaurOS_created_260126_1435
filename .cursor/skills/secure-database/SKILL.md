@@ -1,6 +1,6 @@
 ---
 name: secure-database
-description: Security checklist for Supabase database operations in CentaurOS. Use when creating database migrations, adding RLS policies, modifying tables, or writing database queries. Use when the user mentions RLS, policy, migration, database security, or multi-tenant. Prevents data leakage through missing or incorrect RLS policies.
+description: Security checklist for Supabase database operations in ForgeOS. Use when creating database migrations, adding RLS policies, modifying tables, or writing database queries. Use when the user mentions RLS, policy, migration, database security, or multi-tenant. Prevents data leakage through missing or incorrect RLS policies.
 ---
 
 # Secure Database Operations

@@ -1,6 +1,6 @@
 {
-    "name": "CentaurOS",
-    "short_name": "CentaurOS",
+    "name": "ForgeOS",
+    "short_name": "ForgeOS",
     "description": "Operating System for Fractional Foundries",
     "id": "/",
     "start_url": "/",

@@ -1,11 +1,11 @@
 ---
-description: CentaurOS design philosophy - bright, airy, and optimistic UI/UX
+description: ForgeOS design philosophy - bright, airy, and optimistic UI/UX
 alwaysApply: true
 ---
 
 # Design Philosophy: Bright, Airy, and Optimistic
 
-CentaurOS is a platform for collaboration between humans and AI agents. The design should reflect **optimism, clarity, and openness** - not dark, dreary, or heavy interfaces.
+ForgeOS is a platform for collaboration between humans and AI agents. The design should reflect **optimism, clarity, and openness** - not dark, dreary, or heavy interfaces.
 
 ## Core Principles
 
@@ -85,7 +85,7 @@ If the UI appears dark (dark dialogs, dark cards, dark backgrounds), check that:
 ```tsx
 <Card className="bg-background border p-8 space-y-6">
   <h2 className="text-2xl font-display text-foreground">
-    Welcome to CentaurOS
+    Welcome to ForgeOS
   </h2>
   <p className="text-muted-foreground text-lg leading-relaxed">
     Collaborate with AI agents to accomplish amazing things.

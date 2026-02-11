@@ -19,7 +19,7 @@ import { NextRequest, NextResponse } from 'next/server'
 /**
  * Google Calendar sends POST notifications when watched resources change.
  * Currently logs the notification for monitoring. Full bidirectional sync
- * can be implemented by querying the changed events and updating CentaurOS.
+ * can be implemented by querying the changed events and updating ForgeOS.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
     // SECURITY: Validate webhook token
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // For 'exists' state: calendar has changed events
-    // Future: Query changed events and update CentaurOS entities
+    // Future: Query changed events and update ForgeOS entities
     // For now, log and acknowledge
     if (resourceState === 'exists') {
         console.info('[GoogleCalendarWebhook] Calendar updated:', {

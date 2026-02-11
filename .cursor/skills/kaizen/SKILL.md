@@ -1,6 +1,6 @@
 ---
 name: kaizen
-description: Continuous improvement methodology applied to CentaurOS development. Use when implementing features, refactoring, designing systems, making architecture decisions, handling errors, or when the user mentions improve, simplify, clean up, iterative, incremental, quality, or error-proof. Guides quality through small improvements, error-proofing by design, following patterns, and building only what is needed.
+description: Continuous improvement methodology applied to ForgeOS development. Use when implementing features, refactoring, designing systems, making architecture decisions, handling errors, or when the user mentions improve, simplify, clean up, iterative, incremental, quality, or error-proof. Guides quality through small improvements, error-proofing by design, following patterns, and building only what is needed.
 ---
 
 # Kaizen: Continuous Improvement
@@ -125,7 +125,7 @@ const loadConfig = (): Config => {
 const config = loadConfig()
 ```
 
-**CentaurOS patterns to follow:**
+**ForgeOS patterns to follow:**
 - Use Zod schemas for input validation at API boundaries
 - Use TypeScript discriminated unions for task/objective status
 - Use `satisfies` for typed object literals (see `code-hygiene.mdc`)
@@ -141,7 +141,7 @@ Follow established patterns. Document what works. Make good practices easy.
 - Don't reinvent solved problems
 - New pattern only if significantly better
 
-**CentaurOS established patterns:**
+**ForgeOS established patterns:**
 - Server actions in `src/actions/` with `createClient()` + auth check + foundry check
 - Types in `src/types/` mirroring DB schema
 - Components in `src/components/` using shadcn/ui primitives

@@ -1,4 +1,4 @@
-# CentaurOS Executive Summary
+# ForgeOS Executive Summary
 
 **Strategic Business Review | January 2026**
 
@@ -6,11 +6,11 @@
 
 ## The Opportunity
 
-CentaurOS is building the operating system for the future of work - where AI agents and humans collaborate as equals on "centaur teams."
+ForgeOS is building the operating system for the future of work - where AI agents and humans collaborate as equals on hybrid teams.
 
 ### Why Now?
 
-| Macro Trend | CentaurOS Position |
+| Macro Trend | ForgeOS Position |
 |-------------|-------------------|
 | AI capabilities maturing rapidly | First-mover in "AI as teammate" |
 | Gig economy growing 17% annually | Marketplace + workflow combo |
@@ -172,7 +172,7 @@ PHASE 3: Dominate Category
 
 ### Proceed with Investment
 
-CentaurOS has built a differentiated product in a growing market with favorable timing. The technology is sound, but operational gaps must be addressed before scaling.
+ForgeOS has built a differentiated product in a growing market with favorable timing. The technology is sound, but operational gaps must be addressed before scaling.
 
 **Confidence Level:** 7/10
 

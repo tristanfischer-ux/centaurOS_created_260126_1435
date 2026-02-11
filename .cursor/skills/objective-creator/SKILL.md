@@ -1,11 +1,11 @@
 ---
 name: objective-creator
-description: Transform raw information (ideas, goals, projects) into structured CentaurOS objectives with detailed tasks, start/due dates, and add them to the authenticated user's account. Use when the user wants to create an objective, add a goal, plan a project, turn an idea into tasks, or mentions objective, goal, project plan, or task breakdown.
+description: Transform raw information (ideas, goals, projects) into structured ForgeOS objectives with detailed tasks, start/due dates, and add them to the authenticated user's account. Use when the user wants to create an objective, add a goal, plan a project, turn an idea into tasks, or mentions objective, goal, project plan, or task breakdown.
 ---
 
 # Objective Creator
 
-Transform any information into a structured CentaurOS objective with actionable tasks, and add it directly to the authenticated user's account.
+Transform any information into a structured ForgeOS objective with actionable tasks, and add it directly to the authenticated user's account.
 
 ## When to Use
 
@@ -81,7 +81,7 @@ Before creating, show the user:
 Shall I create this objective with these tasks?
 ```
 
-### Phase 5: Create in CentaurOS
+### Phase 5: Create in ForgeOS
 
 Once user confirms, use the `createObjectiveFromInput` server action:
 
@@ -174,7 +174,7 @@ When presenting the objective plan:
 
 ---
 
-Ready to create this objective in CentaurOS?
+Ready to create this objective in ForgeOS?
 ```
 
 ## Example Transformation
@@ -261,7 +261,7 @@ All objectives and tasks created through this skill are:
 
 When the user says "add this as an objective" or "turn this into tasks", create it directly under their account using the authenticated session context.
 
-## Quick Reference: CentaurOS Schema
+## Quick Reference: ForgeOS Schema
 
 **Objectives table:**
 - `id`, `title`, `description`, `status`, `progress`, `creator_id`, `foundry_id`, `created_at`, `updated_at`
@@ -280,7 +280,7 @@ When the user says "add this as an objective" or "turn this into tasks", create 
 
 ## When to Use This Skill
 
-- User shares an idea, goal, or project they want to track in CentaurOS
+- User shares an idea, goal, or project they want to track in ForgeOS
 - User asks to "add this as an objective" or "turn this into tasks"
 - User provides business requirements, initiatives, or plans needing structure
 - User mentions creating goals, OKRs, milestones, or project plans

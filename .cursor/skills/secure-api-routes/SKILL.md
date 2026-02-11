@@ -1,11 +1,11 @@
 ---
 name: secure-api-routes
-description: Security checklist for Next.js API routes in CentaurOS. Use when creating or modifying any API route in src/app/api/, when adding endpoints that accept user input, when implementing file uploads, or when the user mentions API, endpoint, route handler, POST, GET, PUT, DELETE. Prevents missing rate limiting, input validation bypass, and authentication issues.
+description: Security checklist for Next.js API routes in ForgeOS. Use when creating or modifying any API route in src/app/api/, when adding endpoints that accept user input, when implementing file uploads, or when the user mentions API, endpoint, route handler, POST, GET, PUT, DELETE. Prevents missing rate limiting, input validation bypass, and authentication issues.
 ---
 
 # Secure API Routes
 
-Every API route in CentaurOS MUST follow these security patterns.
+Every API route in ForgeOS MUST follow these security patterns.
 
 ## Required Security Template
 

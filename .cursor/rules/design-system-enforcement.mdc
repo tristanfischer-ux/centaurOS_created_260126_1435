@@ -1,6 +1,6 @@
 # Design System Enforcement
 
-This rule enforces strict adherence to the CentaurOS design system tokens and prevents the introduction of hardcoded values.
+This rule enforces strict adherence to the ForgeOS design system tokens and prevents the introduction of hardcoded values.
 
 ## 1. Color Tokens (Strict)
 
@@ -71,7 +71,7 @@ This rule enforces strict adherence to the CentaurOS design system tokens and pr
 
 ## 3. Navigation Active States
 
-**NEVER** use Cyan/Blue for active states. CentaurOS uses **International Orange**.
+**NEVER** use Cyan/Blue for active states. ForgeOS uses **International Orange**.
 
 ❌ **Forbidden:**
 ```tsx

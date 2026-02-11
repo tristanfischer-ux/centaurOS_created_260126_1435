@@ -1,6 +1,6 @@
 ---
 name: feature-implementation-guide
-description: Guide for implementing new features in CentaurOS following the established architecture patterns. Use when adding new platform features, API endpoints, database tables, UI components, or when the user asks about implementing features, creating new functionality, or following project conventions.
+description: Guide for implementing new features in ForgeOS following the established architecture patterns. Use when adding new platform features, API endpoints, database tables, UI components, or when the user asks about implementing features, creating new functionality, or following project conventions.
 role: |
   You are a senior architect who has maintained large codebases for years.
   You think about the developer who will read this code in 6 months.
@@ -10,7 +10,7 @@ role: |
 
 # Feature Implementation Guide
 
-This skill provides step-by-step guidance for implementing new features in CentaurOS while maintaining architectural consistency.
+This skill provides step-by-step guidance for implementing new features in ForgeOS while maintaining architectural consistency.
 
 ## Discovery (Before You Start)
 
@@ -25,7 +25,7 @@ Before implementing, ensure you have answers to these questions. If any are uncl
 
 ## Quick Reference
 
-CentaurOS follows a layered architecture:
+ForgeOS follows a layered architecture:
 - **UI Layer**: `src/app/` (Next.js App Router) and `src/components/`
 - **Business Logic**: `src/actions/` (Server Actions) and `src/lib/`
 - **Data Layer**: Supabase with PostgreSQL + RLS
@@ -390,7 +390,7 @@ export async function createCheckoutAction(priceId: string) {
 Always include `foundry_id` in tables and RLS policies to ensure data isolation between organizations.
 
 ```sql
--- Standard RLS pattern for CentaurOS
+-- Standard RLS pattern for ForgeOS
 create policy "Policy name"
   on public.table_name for {select|insert|update|delete}
   using (foundry_id = (select foundry_id from auth.users where id = auth.uid()));
@@ -435,7 +435,7 @@ For Telegram bot features, use the **telegram-integration** skill.
 
 ## Design System
 
-CentaurOS uses a custom design system based on shadcn/ui:
+ForgeOS uses a custom design system based on shadcn/ui:
 
 - **Components**: `src/components/ui/`
 - **Utilities**: `src/lib/utils.ts`
@@ -444,7 +444,7 @@ CentaurOS uses a custom design system based on shadcn/ui:
 
 ### Design Philosophy
 
-**IMPORTANT:** CentaurOS design is **bright, airy, and optimistic** - NOT dark or dreary.
+**IMPORTANT:** ForgeOS design is **bright, airy, and optimistic** - NOT dark or dreary.
 
 - Default to **light backgrounds** (foundry-50, foundry-100, white)
 - Use **vibrant brand colors** (international-orange, electric-blue)

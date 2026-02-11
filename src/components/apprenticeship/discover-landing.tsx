@@ -60,7 +60,7 @@ export function DiscoverLanding({
         </h1>
         <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
           UK Apprenticeships deliver skilled, loyal talent with government funding —
-          and CentaurOS manages the entire journey from enrolment to certification.
+          and ForgeOS manages the entire journey from enrolment to certification.
         </p>
         <div className="flex items-center justify-center gap-3 pt-2">
           <Button size="lg" onClick={onBrowseProgrammes}>
@@ -111,7 +111,7 @@ export function DiscoverLanding({
             <div className="h-12 w-12 rounded-xl bg-international-orange/10 flex items-center justify-center">
               <Sparkles className="h-6 w-6 text-international-orange" />
             </div>
-            <h3 className="text-lg font-semibold text-foreground">CentaurOS Manages Everything</h3>
+            <h3 className="text-lg font-semibold text-foreground">ForgeOS Manages Everything</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
               OTJT tracking, compliance reporting, progress reviews, legal documents,
               skills assessments — all built in. No external platforms needed.
@@ -208,7 +208,7 @@ export function DiscoverLanding({
             </h2>
             <p className="text-muted-foreground max-w-md mx-auto">
               Enroll your first apprentice in minutes. Choose a programme, assign a mentor,
-              and CentaurOS handles the rest.
+              and ForgeOS handles the rest.
             </p>
             <div className="flex items-center justify-center gap-3">
               <Button size="lg" onClick={() => setEnrollDialogOpen(true)}>

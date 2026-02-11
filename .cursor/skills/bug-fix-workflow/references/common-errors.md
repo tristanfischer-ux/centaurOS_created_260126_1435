@@ -1,4 +1,4 @@
-# Common Errors in CentaurOS
+# Common Errors in ForgeOS
 
 Quick reference for frequently encountered errors and their solutions.
 

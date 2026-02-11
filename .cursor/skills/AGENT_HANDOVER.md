@@ -8,7 +8,7 @@
 
 ## Context
 
-We audited all 22 CentaurOS skills and identified that 5 are "excellent" while 17 are "good". The goal is to elevate all 17 to excellent by adding standardized sections.
+We audited all 22 ForgeOS skills and identified that 5 are "excellent" while 17 are "good". The goal is to elevate all 17 to excellent by adding standardized sections.
 
 ---
 

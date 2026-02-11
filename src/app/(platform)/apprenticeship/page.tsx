@@ -24,7 +24,7 @@ import { redirect } from 'next/navigation'
 import type { Programme } from '@/components/apprenticeship/programme-detail-card'
 
 export const metadata = {
-  title: 'Apprenticeship | CentaurOS',
+  title: 'Apprenticeship | ForgeOS',
   description:
     'Your apprenticeship dashboard - track progress, log OTJT hours, and complete learning modules.',
 }

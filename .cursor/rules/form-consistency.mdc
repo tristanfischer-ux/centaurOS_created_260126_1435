@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Form Consistency Standards
 
-All forms in CentaurOS must follow these patterns for validation, error handling, accessibility, and styling.
+All forms in ForgeOS must follow these patterns for validation, error handling, accessibility, and styling.
 
 ## 1. Form Field Pattern
 

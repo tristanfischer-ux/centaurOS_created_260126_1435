@@ -17,7 +17,7 @@ export default function HelpPage() {
                         <HelpCircle className="h-5 w-5 text-international-orange" />
                         <CardTitle>Help & Support</CardTitle>
                     </div>
-                    <CardDescription>Tips and support to help you get the most out of CentaurOS.</CardDescription>
+                    <CardDescription>Tips and support to help you get the most out of ForgeOS.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {/* Quick Tips */}

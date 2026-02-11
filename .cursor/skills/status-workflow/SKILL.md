@@ -1,6 +1,6 @@
 ---
 name: status-workflow
-description: Patterns for implementing status workflows and state machines in CentaurOS. Use when implementing state machine, status, workflow, transitions, lifecycle, or when a feature needs status tracking with transitions.
+description: Patterns for implementing status workflows and state machines in ForgeOS. Use when implementing state machine, status, workflow, transitions, lifecycle, or when a feature needs status tracking with transitions.
 ---
 
 # Status Workflow Patterns

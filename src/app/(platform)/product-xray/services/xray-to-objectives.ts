@@ -1,7 +1,7 @@
 /**
  * @file xray-to-objectives.ts — Bridge from X-Ray modules to Objectives & Tasks
  *
- * @description Converts X-Ray module requirements into CentaurOS Objectives and Tasks:
+ * @description Converts X-Ray module requirements into ForgeOS Objectives and Tasks:
  * - Each module → one Objective (e.g., "Procure & commission Intake & Pumping")
  * - Module unknowns/expert questions → Tasks under that Objective
  * - Module tests → Validation tasks
@@ -30,7 +30,7 @@
  * - Team assignment: src/actions/team.ts (member skills for auto-assignment)
  */
 
-import type { XRaySpec, ModuleSpec } from "../demo/ForgeOS_CompanyScan_Demo"
+import type { XRaySpec, ModuleSpec } from "./xray-schema"
 
 export interface ObjectiveExportResult {
   objectiveId: string

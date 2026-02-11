@@ -1,5 +1,5 @@
 #!/bin/bash
-# CentaurOS Design Token Enforcement Script
+# ForgeOS Design Token Enforcement Script
 # Run before committing UI changes to catch design system violations
 #
 # Usage: ./scripts/check-design-tokens.sh [path]
@@ -14,7 +14,7 @@ EXCEPTION_FILES="user-avatar.tsx"
 VIOLATIONS=0
 WARNINGS=0
 
-echo "🎨 CentaurOS Design Token Check"
+echo "🎨 ForgeOS Design Token Check"
 echo "================================"
 echo "Checking: $TARGET"
 echo ""

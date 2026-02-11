@@ -1,39 +1,41 @@
-import { Suspense } from 'react'
-import { ProductXRayView } from './product-xray-view'
-import { Skeleton } from '@/components/ui/skeleton'
+/**
+ * @file page.tsx — Product X-Ray route entry
+ *
+ * @description Renders the unified Product X-Ray dossier page with
+ * Suspense boundary and loading skeleton. Consolidates v1 (interview,
+ * RFQ), v2 (narrative dossier), and v3 (3D CAD) into a single route.
+ */
 
-export const metadata = {
-  title: 'Product X-Ray | ForgeOS',
-  description:
-    'Deep product analysis connecting strategy, objectives, tasks, team, agents, inspiration, and marketplace.',
+import { Suspense } from "react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { XRayView } from "./xray-view"
+
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Product X-Ray | ForgeOS",
+  description: "AI-powered product decomposition — scan an idea into a buildable engineering dossier with 3D CAD models",
 }
 
-export default function ProductXRayPage() {
+function LoadingSkeleton(): React.ReactNode {
   return (
-    <Suspense fallback={<ProductXRaySkeleton />}>
-      <ProductXRayView />
-    </Suspense>
+    <div className="space-y-8">
+      <Skeleton className="h-10 w-64" />
+      <Skeleton className="h-40 w-full rounded-xl" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-xl" />
+        ))}
+      </div>
+      <Skeleton className="h-64 w-full rounded-xl" />
+    </div>
   )
 }
 
-/**
- * Loading skeleton for the Product X-Ray page.
- */
-function ProductXRaySkeleton() {
+export default function ProductXRayPage(): React.ReactNode {
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="space-y-3 pb-4 border-b border-muted">
-        <Skeleton className="h-8 w-56" />
-        <Skeleton className="h-5 w-[28rem]" />
-      </div>
-
-      {/* Section cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-48 rounded-xl" />
-        ))}
-      </div>
-    </div>
+    <Suspense fallback={<LoadingSkeleton />}>
+      <XRayView />
+    </Suspense>
   )
 }

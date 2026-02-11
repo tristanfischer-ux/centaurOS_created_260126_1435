@@ -1,7 +1,7 @@
 /**
  * @file google-calendar.ts
  *
- * @description Server actions for syncing CentaurOS entities to Google Calendar.
+ * @description Server actions for syncing ForgeOS entities to Google Calendar.
  * Provides push-sync for tasks, discovery calls, and objectives.
  *
  * @security Requires authenticated user with Google Calendar scopes granted
@@ -78,7 +78,7 @@ export async function syncTaskToCalendar(
         startTime: startDate || endDate!,
         endTime: endDate || undefined,
         allDay: true, // Tasks are all-day events by default
-        colorId: '6', // Tangerine — maps to the CentaurOS orange brand
+        colorId: '6', // Tangerine — maps to the ForgeOS orange brand
     }
 
     if (existing?.google_event_id) {
@@ -226,7 +226,7 @@ export async function syncDiscoveryCallToCalendar(
 }
 
 /**
- * Remove a calendar event when a CentaurOS entity is deleted.
+ * Remove a calendar event when a ForgeOS entity is deleted.
  *
  * @param entityType - The type of entity
  * @param entityId - The entity ID

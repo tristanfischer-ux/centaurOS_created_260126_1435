@@ -8,7 +8,7 @@
  *
  * @security
  * - Read-only access (drive.readonly scope)
- * - Files are referenced by link, not copied into CentaurOS storage
+ * - Files are referenced by link, not copied into ForgeOS storage
  *
  * @related
  * - src/lib/google/client.ts - Provides authenticated OAuth2 clients

@@ -1,4 +1,4 @@
-# CentaurOS UX/UI Audit - Phase 2 (Deep Analysis)
+# ForgeOS UX/UI Audit - Phase 2 (Deep Analysis)
 
 **Date:** January 31, 2026  
 **Status:** 🟡 NEEDS WORK  

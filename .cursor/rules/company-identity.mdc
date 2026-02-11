@@ -1,0 +1,59 @@
+# Company Identity Standards
+
+**CRITICAL:** The company has rebranded. All new code and documentation MUST use the correct names.
+
+## Identity
+
+| Entity | Correct Name | WRONG Names (never use) |
+|--------|-------------|------------------------|
+| **Company** | Fractional Forge | Centaur Dynamics, CentaurOS (as company) |
+| **App / Operating System** | ForgeOS | CentaurOS, Centaur OS |
+| **Platform users** | Forge teams | Centaur teams |
+
+## Usage Examples
+
+```tsx
+// ✅ CORRECT
+<title>Product X-Ray | ForgeOS</title>
+<p>Welcome to ForgeOS</p>
+<p>Fractional Forge builds ForgeOS, the operating system for fractional teams.</p>
+<meta name="description" content="ForgeOS - The Democratic Workflow Engine" />
+
+// ❌ WRONG - Old branding
+<title>Product X-Ray | CentaurOS</title>
+<p>Welcome to CentaurOS</p>
+<p>Centaur Dynamics builds CentaurOS...</p>
+```
+
+## Where to Apply
+
+- **Page titles:** `Something | ForgeOS`
+- **UI copy:** Reference "ForgeOS" for the app, "Fractional Forge" for the company
+- **Meta tags / manifest:** Use "ForgeOS"
+- **Documentation:** Use "ForgeOS" for the product, "Fractional Forge" for the company
+- **Comments/JSDoc:** Use "ForgeOS"
+- **Cursor rules/skills:** Use "ForgeOS"
+- **Marketing copy:** "Fractional Forge" (company), "ForgeOS" (product)
+
+## What NOT to Change
+
+- **Git repository URLs** (they are what they are)
+- **Already-applied database migration files** (historical records)
+- **Foundry IDs in database** (`centaur-guild`, `centaur-suppliers` - these are internal IDs, not user-facing)
+- **Font file names** (`centaur-font-*.woff2` - file renames require separate coordination)
+- **Image file names** (require actual file renames + deployment)
+- **Sentry project name** (requires Sentry dashboard change)
+- **Docker container names** (requires infra coordination)
+
+## Hashtags / Tags
+
+- Project tag: `#ForgeOS` (was `#CentaurOS`)
+- Memory logging: Use `#ForgeOS` in daily logs
+
+## Quick Check
+
+Before committing, grep for these patterns and fix any new occurrences:
+```bash
+rg -i "centauros" --type ts --type tsx -l
+rg "Centaur Dynamics" --type ts --type tsx -l
+```

@@ -1,11 +1,11 @@
 ---
 name: telegram-integration
-description: Patterns for integrating Telegram bots in CentaurOS. Use when implementing telegram, bot, notifications, chat integration, or when working with the Telegram Bot API.
+description: Patterns for integrating Telegram bots in ForgeOS. Use when implementing telegram, bot, notifications, chat integration, or when working with the Telegram Bot API.
 ---
 
 # Telegram Bot Integration
 
-This skill provides patterns for integrating Telegram bots in CentaurOS.
+This skill provides patterns for integrating Telegram bots in ForgeOS.
 
 ## Reference Files
 
@@ -373,7 +373,7 @@ CREATE TABLE public.telegram_verification_codes (
 ### Verification Flow
 
 ```typescript
-// Generate code in CentaurOS settings
+// Generate code in ForgeOS settings
 export async function generateTelegramCode(userId: string): Promise<string> {
   const code = crypto.randomBytes(4).toString('hex').toUpperCase()
   

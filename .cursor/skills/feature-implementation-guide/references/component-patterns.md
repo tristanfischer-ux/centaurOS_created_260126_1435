@@ -1,6 +1,6 @@
-# Component Patterns in CentaurOS
+# Component Patterns in ForgeOS
 
-Common component patterns and best practices used throughout the CentaurOS codebase.
+Common component patterns and best practices used throughout the ForgeOS codebase.
 
 ## Table of Contents
 
@@ -77,7 +77,7 @@ export function FeatureForm() {
 
 ### Pattern 1: Server Action Form
 
-The recommended pattern for forms in CentaurOS:
+The recommended pattern for forms in ForgeOS:
 
 ```typescript
 // src/components/features/create-feature-form.tsx

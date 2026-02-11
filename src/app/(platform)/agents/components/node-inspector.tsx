@@ -782,7 +782,7 @@ export function NodeInspector({
                                                         onClick={() => {
                                                             // Gamma accepts markdown content via URL
                                                             const content = data.output || ""
-                                                            const title = data.label || "CentaurOS Output"
+                                                            const title = data.label || "ForgeOS Output"
                                                             const gammaUrl = `https://gamma.app/generate?text=${encodeURIComponent(content.slice(0, 8000))}&title=${encodeURIComponent(title)}`
                                                             window.open(gammaUrl, "_blank", "noopener,noreferrer")
                                                         }}

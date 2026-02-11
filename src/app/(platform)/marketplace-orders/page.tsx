@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-    title: 'Marketplace Orders | CentaurOS',
+    title: 'Marketplace Orders | ForgeOS',
     description: 'View and manage your marketplace orders'
 }
 

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to CentaurOS (ForgeOS) are documented in this file.
+All notable changes to ForgeOS are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 

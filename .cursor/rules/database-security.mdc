@@ -1,6 +1,6 @@
 # Database Security: Foundry Isolation
 
-**CRITICAL:** CentaurOS is a multi-tenant SaaS platform. Data from different foundries (companies) MUST be isolated at ALL times.
+**CRITICAL:** ForgeOS is a multi-tenant SaaS platform. Data from different foundries (companies) MUST be isolated at ALL times.
 
 ## The Security Breach (Feb 2026)
 

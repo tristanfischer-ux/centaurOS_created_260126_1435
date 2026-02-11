@@ -1,6 +1,6 @@
 # Git Workflow: No Branches
 
-CentaurOS uses a **trunk-based development** workflow. Work directly on `main` with no feature branches.
+ForgeOS uses a **trunk-based development** workflow. Work directly on `main` with no feature branches.
 
 ## Core Principle
 

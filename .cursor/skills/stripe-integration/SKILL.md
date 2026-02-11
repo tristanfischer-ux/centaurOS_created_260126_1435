@@ -5,7 +5,7 @@ description: Patterns for Stripe integration including Connect accounts, payment
 
 # Stripe Integration Patterns
 
-This skill provides patterns for integrating Stripe payments in CentaurOS.
+This skill provides patterns for integrating Stripe payments in ForgeOS.
 
 ## Reference Files
 

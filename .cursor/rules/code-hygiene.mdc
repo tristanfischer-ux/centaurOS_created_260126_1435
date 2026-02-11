@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Code Hygiene Standards
 
-These standards ensure consistent, readable, and maintainable code across CentaurOS.
+These standards ensure consistent, readable, and maintainable code across ForgeOS.
 
 ## 1. TypeScript Standards
 

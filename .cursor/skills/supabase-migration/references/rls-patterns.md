@@ -1,10 +1,10 @@
-# RLS Policy Patterns for CentaurOS
+# RLS Policy Patterns for ForgeOS
 
-CentaurOS uses Row Level Security (RLS) extensively for multi-tenant data isolation. This reference covers all RLS patterns used in the project.
+ForgeOS uses Row Level Security (RLS) extensively for multi-tenant data isolation. This reference covers all RLS patterns used in the project.
 
 ## Core Concept: Foundry Isolation
 
-All user data in CentaurOS is scoped to a `foundry_id`. This is the primary security boundary.
+All user data in ForgeOS is scoped to a `foundry_id`. This is the primary security boundary.
 
 ```sql
 -- Get current user's foundry_id

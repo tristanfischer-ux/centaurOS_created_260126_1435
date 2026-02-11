@@ -46,8 +46,7 @@ export async function middleware(request: NextRequest) {
     // Legacy domain redirects: redirect old domains to fractionalforge.app
     if (
         hostname.includes('centauros.io') ||
-        hostname.includes('centaurdynamics.io') ||
-        hostname.includes('forgeos.io')
+        hostname.includes('centaurdynamics.io')
     ) {
         const newUrl = new URL(pathname + request.nextUrl.search, 'https://fractionalforge.app')
         return NextResponse.redirect(newUrl, 301)

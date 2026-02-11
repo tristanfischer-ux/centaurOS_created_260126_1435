@@ -1,4 +1,4 @@
-# CentaurOS Strategic Business Analysis
+# ForgeOS Strategic Business Analysis
 
 **Prepared by:** Strategic Consulting Team  
 **Date:** January 29, 2026  
@@ -10,7 +10,7 @@
 
 ### Overview
 
-CentaurOS is a B2B SaaS platform positioning itself as a "Democratic Workflow Engine" for "Fractional Foundries." The platform enables hybrid human-AI workforce management, treating AI agents as first-class team members alongside human experts.
+ForgeOS is a B2B SaaS platform positioning itself as a "Democratic Workflow Engine" for "Fractional Foundries." The platform enables hybrid human-AI workforce management, treating AI agents as first-class team members alongside human experts.
 
 ### Key Findings
 
@@ -32,7 +32,7 @@ CentaurOS is a B2B SaaS platform positioning itself as a "Democratic Workflow En
 
 ### Investment Thesis Summary
 
-CentaurOS has built a comprehensive product with genuine innovation in human-AI collaboration. The platform is technically sound but operationally immature. With standardized pricing, cost controls, and clearer positioning, this could be a category-defining company in the emerging "AI-augmented workforce" space.
+ForgeOS has built a comprehensive product with genuine innovation in human-AI collaboration. The platform is technically sound but operationally immature. With standardized pricing, cost controls, and clearer positioning, this could be a category-defining company in the emerging "AI-augmented workforce" space.
 
 **Estimated Valuation Range:** Seed/Pre-Series A stage  
 **Recommended Next Step:** $2-5M seed round to achieve product-market fit and build go-to-market engine
@@ -45,7 +45,7 @@ CentaurOS has built a comprehensive product with genuine innovation in human-AI 
 
 #### Current Positioning
 
-CentaurOS positions at the intersection of three large markets:
+ForgeOS positions at the intersection of three large markets:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -54,7 +54,7 @@ CentaurOS positions at the intersection of three large markets:
 │     Monday.com, Asana, ClickUp, Notion, Jira                    │
 ├─────────────────────────────────────────────────────────────────┤
 │                         ╔═══════════════╗                       │
-│    FREELANCE           ║   CentaurOS   ║    AI AGENT           │
+│    FREELANCE           ║   ForgeOS   ║    AI AGENT           │
 │    MARKETPLACES        ║   (Target)    ║    PLATFORMS          │
 │    ($7B+ market)       ╚═══════════════╝    ($2B+ emerging)    │
 │    Upwork, Fiverr,                          LangChain, AutoGPT,│
@@ -73,7 +73,7 @@ CentaurOS positions at the intersection of three large markets:
 
 #### Recommended Positioning Statement
 
-> "CentaurOS is the operating system for hybrid human-AI teams. We help growing companies build and manage 'centaur teams' where AI agents work alongside human experts, with built-in quality controls and a marketplace for on-demand talent."
+> "ForgeOS is the operating system for hybrid human-AI teams. We help growing companies build and manage 'centaur teams' where AI agents work alongside human experts, with built-in quality controls and a marketplace for on-demand talent."
 
 ### 1.2 Competitive Landscape
 
@@ -123,7 +123,7 @@ CentaurOS positions at the intersection of three large markets:
 | AI Automation Tools | $1.8B (2024) | 25% CAGR | Markets & Markets |
 | Gig Economy Platforms | $455B GMV (2024) | 17% CAGR | Mastercard |
 
-#### CentaurOS Addressable Market
+#### ForgeOS Addressable Market
 
 | Segment | Definition | Size Estimate |
 |---------|------------|---------------|
@@ -192,9 +192,9 @@ Org Blueprint           5%           src/lib/orders/service.ts
 | Upwork | 5-20% | Sliding scale based on relationship |
 | Fiverr | 20% | Flat rate |
 | Toptal | 0% to client | Margin built into talent pricing |
-| CentaurOS | 5-10% | Inconsistent |
+| ForgeOS | 5-10% | Inconsistent |
 
-**Finding:** CentaurOS take rate is competitive but could be higher given the value-add of AI integration.
+**Finding:** ForgeOS take rate is competitive but could be higher given the value-add of AI integration.
 
 ### 2.2 Unit Economics Model
 
@@ -714,7 +714,7 @@ This metric captures:
 
 ### Appendix D: Competitive Feature Matrix
 
-| Feature | CentaurOS | Monday.com | Upwork | Notion |
+| Feature | ForgeOS | Monday.com | Upwork | Notion |
 |---------|-----------|------------|--------|--------|
 | Task Management | Yes | Yes | No | Yes |
 | AI Agents | Yes | Limited | No | Yes |
@@ -730,7 +730,7 @@ This metric captures:
 
 ## Conclusion
 
-CentaurOS has built an impressive product at the intersection of workflow management, talent marketplaces, and AI automation. The technical foundation is solid, with ~95% feature completeness and a novel "human-AI collaboration" model.
+ForgeOS has built an impressive product at the intersection of workflow management, talent marketplaces, and AI automation. The technical foundation is solid, with ~95% feature completeness and a novel "human-AI collaboration" model.
 
 **Key Strengths:**
 1. Comprehensive product with genuine differentiation

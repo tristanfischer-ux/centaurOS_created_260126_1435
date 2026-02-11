@@ -2,8 +2,8 @@
 version: '3.8'
 
 services:
-  centauros-app:
-    container_name: centauros_mvp
+  forgeos-app:
+    container_name: forgeos_mvp
     build:
       context: .
       dockerfile: Dockerfile
@@ -16,7 +16,7 @@ services:
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
     restart: unless-stopped
     networks:
-      - centauros-network
+      - forgeos-network
     deploy:
       resources:
         limits:
@@ -27,5 +27,5 @@ services:
           memory: 256M
 
 networks:
-  centauros-network:
+  forgeos-network:
     driver: bridge

@@ -1,6 +1,6 @@
 ---
 name: security-bug-hunt
-description: Systematically hunt for security bugs across the CentaurOS codebase. Use when asked to find bugs, audit security, check for vulnerabilities, hunt for issues, or when investigating patterns of bugs that might exist elsewhere. Finds IDOR, missing foundry isolation, silent error handling, column mismatches, and similar issues.
+description: Systematically hunt for security bugs across the ForgeOS codebase. Use when asked to find bugs, audit security, check for vulnerabilities, hunt for issues, or when investigating patterns of bugs that might exist elsewhere. Finds IDOR, missing foundry isolation, silent error handling, column mismatches, and similar issues.
 role: |
   You are a security researcher who hunts vulnerabilities systematically.
   When you fix one bug, you immediately search for the same pattern elsewhere.

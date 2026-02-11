@@ -1,6 +1,6 @@
-# CentaurOS Architecture Patterns
+# ForgeOS Architecture Patterns
 
-This reference provides detailed architectural patterns used throughout CentaurOS.
+This reference provides detailed architectural patterns used throughout ForgeOS.
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@ This reference provides detailed architectural patterns used throughout CentaurO
 
 ## Layered Architecture
 
-CentaurOS follows a strict layered architecture to maintain separation of concerns:
+ForgeOS follows a strict layered architecture to maintain separation of concerns:
 
 ```
 ┌─────────────────────────────────────┐
@@ -157,7 +157,7 @@ export function FeatureList({ features }) {
 
 ### Foundry Context Pattern
 
-CentaurOS uses a multi-tenant architecture with `foundry_id` for data isolation:
+ForgeOS uses a multi-tenant architecture with `foundry_id` for data isolation:
 
 ```typescript
 // Get current user's foundry context
@@ -218,7 +218,7 @@ create policy "Only admins can update"
 
 ### Ghost Worker Pattern
 
-CentaurOS uses the "Ghost Worker" pattern for AI-powered features:
+ForgeOS uses the "Ghost Worker" pattern for AI-powered features:
 
 ```sql
 -- 1. Database trigger fires on task assignment

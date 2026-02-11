@@ -1,6 +1,6 @@
 ---
 name: test-driven-development
-description: Test-driven development discipline for CentaurOS. Use when implementing any new feature, fixing bugs, adding server actions, creating API routes, or when the user mentions TDD, test first, write tests, red green refactor, or test-driven. Enforces writing failing tests before implementation code.
+description: Test-driven development discipline for ForgeOS. Use when implementing any new feature, fixing bugs, adding server actions, creating API routes, or when the user mentions TDD, test first, write tests, red green refactor, or test-driven. Enforces writing failing tests before implementation code.
 ---
 
 # Test-Driven Development (TDD)
@@ -117,7 +117,7 @@ Keep tests green throughout. Don't add new behaviour during refactor.
 
 Next failing test for next behaviour.
 
-## CentaurOS Test Patterns
+## ForgeOS Test Patterns
 
 ### Server Action Tests
 

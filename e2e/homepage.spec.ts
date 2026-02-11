@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 
 /**
- * Comprehensive E2E tests for the CentaurOS marketing home page.
+ * Comprehensive E2E tests for the ForgeOS marketing home page.
  *
  * @description Tests page load, navigation, hero section, content sections,
  * cards, CTAs, footer, accessibility, and mobile responsiveness.

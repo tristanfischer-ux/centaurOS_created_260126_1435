@@ -87,7 +87,7 @@
 
 ### Dev Server Not Running:
 ```bash
-cd "/Users/tristanfischer/Library/Mobile Documents/com~apple~CloudDocs/Software development/CentaurOS created 260126 1435"
+cd "/Users/tristanfischer/Library/Mobile Documents/com~apple~CloudDocs/Software development/ForgeOS created 260126 1435"
 pkill -9 -f "next dev"
 rm -rf .next
 npm run dev

@@ -5,7 +5,7 @@ description: Create multi-step form wizards with step validation, progress indic
 
 # Multi-Step Form Implementation
 
-This skill provides patterns for building multi-step form wizards in CentaurOS.
+This skill provides patterns for building multi-step form wizards in ForgeOS.
 
 ## Reference Implementation
 

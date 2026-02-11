@@ -9,7 +9,7 @@
 
 ## 🎯 Architecture Overview
 
-CentaurOS now operates on a **single-domain architecture** under `fractionalforge.app`:
+ForgeOS now operates on a **single-domain architecture** under `fractionalforge.app`:
 
 ### 🏢 Company Domain: **fractionalforge.app**
 - **Purpose**: Public-facing marketing and information
@@ -20,7 +20,7 @@ CentaurOS now operates on a **single-domain architecture** under `fractionalforg
 - **Features**: No authentication required
 
 ### 🚀 App Domain: **fractionalforge.app**  
-- **Purpose**: Authenticated application (the actual CentaurOS platform)
+- **Purpose**: Authenticated application (the actual ForgeOS platform)
 - **Routes**:
   - `/login` - Login page
   - `/dashboard` - User dashboard (post-login)

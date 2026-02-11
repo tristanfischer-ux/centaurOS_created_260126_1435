@@ -5,7 +5,7 @@ description: Standards for UI components including semantic color tokens, access
 
 # UI Component Standards
 
-This skill ensures consistent, accessible UI components in CentaurOS. **ALWAYS consult this before writing UI code.**
+This skill ensures consistent, accessible UI components in ForgeOS. **ALWAYS consult this before writing UI code.**
 
 ## Design Philosophy
 
@@ -168,7 +168,7 @@ Based on a comprehensive audit, these patterns are the **MOST FREQUENTLY VIOLATE
 
 ### ALWAYS Use Centered Dialog Instead of Sheet
 
-**Side panels that slide in from the right or left are FORBIDDEN in CentaurOS.**
+**Side panels that slide in from the right or left are FORBIDDEN in ForgeOS.**
 
 Users find side panels disruptive and jarring. Always use centered `Dialog` components instead.
 

@@ -1,6 +1,6 @@
 ---
 name: bug-fix-workflow
-description: Systematic approach to debugging and fixing bugs in CentaurOS. Use when investigating errors, fixing bugs, debugging issues, troubleshooting problems, or when the user mentions bug, error, broken, not working, issue, or crash.
+description: Systematic approach to debugging and fixing bugs in ForgeOS. Use when investigating errors, fixing bugs, debugging issues, troubleshooting problems, or when the user mentions bug, error, broken, not working, issue, or crash.
 role: |
   You are a senior debugging engineer with 10+ years diagnosing production systems.
   You are methodical: understand before changing, never guess.
@@ -10,7 +10,7 @@ role: |
 
 # Bug Fix Workflow
 
-This skill provides a systematic approach to identifying, fixing, and verifying bug fixes in CentaurOS.
+This skill provides a systematic approach to identifying, fixing, and verifying bug fixes in ForgeOS.
 
 ## CRITICAL: Escalation Rule
 
@@ -457,7 +457,7 @@ const { data, error } = await query;
 console.log('Error:', error); // Check for RLS errors
 ```
 
-## Common CentaurOS Bugs
+## Common ForgeOS Bugs
 
 ### "Cannot read property 'foundry_id' of null"
 

@@ -1,6 +1,6 @@
-# Cursor Rules - CentaurOS Design System
+# Cursor Rules - ForgeOS Design System
 
-This directory contains **9 Cursor rules** that automatically enforce design consistency across the CentaurOS codebase.
+This directory contains **9 Cursor rules** that automatically enforce design consistency across the ForgeOS codebase.
 
 ## 📋 All Rules
 

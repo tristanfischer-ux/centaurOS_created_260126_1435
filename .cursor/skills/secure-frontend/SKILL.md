@@ -1,6 +1,6 @@
 ---
 name: secure-frontend
-description: Security checklist for React/Next.js frontend components in CentaurOS. Use when creating components that display user-provided URLs, render external links, display user content, or handle file downloads. Use when the user mentions XSS, href, link, URL, embed, iframe, or user content display. Prevents XSS via href/src injection and content injection attacks.
+description: Security checklist for React/Next.js frontend components in ForgeOS. Use when creating components that display user-provided URLs, render external links, display user content, or handle file downloads. Use when the user mentions XSS, href, link, URL, embed, iframe, or user content display. Prevents XSS via href/src injection and content injection attacks.
 ---
 
 # Secure Frontend Components

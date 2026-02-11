@@ -1,6 +1,6 @@
 # No Transparency Patterns
 
-CentaurOS enforces opaque backgrounds on interactive UI elements. Transparent/translucent backgrounds cause visual issues where content shows through elements that should be solid.
+ForgeOS enforces opaque backgrounds on interactive UI elements. Transparent/translucent backgrounds cause visual issues where content shows through elements that should be solid.
 
 ## FORBIDDEN Patterns
 

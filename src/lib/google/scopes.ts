@@ -31,7 +31,7 @@ export const BASE_SCOPES = [
     'profile',
 ] as const
 
-/** All scopes that CentaurOS may request across all phases */
+/** All scopes that ForgeOS may request across all phases */
 export const ALL_SCOPES = [
     ...BASE_SCOPES,
     ...CALENDAR_SCOPES,

@@ -1,11 +1,11 @@
 ---
 name: secure-server-actions
-description: Security checklist for Next.js Server Actions in CentaurOS. Use when creating or modifying any server action in src/actions/, when adding database queries, when implementing CRUD operations, or when the user mentions action, server action, mutation, or data modification. Prevents IDOR vulnerabilities, missing authentication, and foundry isolation issues.
+description: Security checklist for Next.js Server Actions in ForgeOS. Use when creating or modifying any server action in src/actions/, when adding database queries, when implementing CRUD operations, or when the user mentions action, server action, mutation, or data modification. Prevents IDOR vulnerabilities, missing authentication, and foundry isolation issues.
 ---
 
 # Secure Server Actions
 
-Every server action in CentaurOS MUST follow these security patterns to prevent IDOR, authentication bypass, and data leakage.
+Every server action in ForgeOS MUST follow these security patterns to prevent IDOR, authentication bypass, and data leakage.
 
 ## Recommended: Use `withAuth` / `withUser` Wrappers
 

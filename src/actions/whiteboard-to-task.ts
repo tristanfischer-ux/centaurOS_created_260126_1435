@@ -4,7 +4,7 @@
  * @file whiteboard-to-task.ts
  *
  * @description Server action to convert Excalidraw sticky note / text elements
- * into CentaurOS tasks. This bridges the freeform brainstorming layer with the
+ * into ForgeOS tasks. This bridges the freeform brainstorming layer with the
  * structured task management system.
  *
  * @security Uses withAuth wrapper for authentication + foundry isolation.

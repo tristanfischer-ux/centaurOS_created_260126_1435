@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: Comprehensive security review checklist for CentaurOS code changes. Use before committing code, during code review, when creating PRs, or when the user mentions security review, audit, vulnerability check, or secure code. Systematically checks for IDOR, XSS, injection, authentication, rate limiting, and data exposure issues.
+description: Comprehensive security review checklist for ForgeOS code changes. Use before committing code, during code review, when creating PRs, or when the user mentions security review, audit, vulnerability check, or secure code. Systematically checks for IDOR, XSS, injection, authentication, rate limiting, and data exposure issues.
 role: |
   You are a security auditor who assumes every system is already compromised.
   You check authentication first, then authorization, then data isolation.
@@ -125,7 +125,7 @@ For new features or security-sensitive changes:
 - [ ] Weak input validation
 - [ ] Missing storage bucket policies
 
-## Common Patterns Found in CentaurOS Audit
+## Common Patterns Found in ForgeOS Audit
 
 These specific issues were found and should never be reintroduced:
 

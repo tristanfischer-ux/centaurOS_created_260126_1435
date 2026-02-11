@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Color Consistency Standards
 
-**CRITICAL:** CentaurOS has **1,108 hardcoded color classes** across 172 files. This rule enforces the migration to semantic tokens.
+**CRITICAL:** ForgeOS has **1,108 hardcoded color classes** across 172 files. This rule enforces the migration to semantic tokens.
 
 ## Core Principle
 

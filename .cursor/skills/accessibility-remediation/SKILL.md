@@ -1,6 +1,6 @@
 ---
 name: accessibility-remediation
-description: Systematic checklist for fixing accessibility issues in CentaurOS. Use when fixing a11y, accessibility, WCAG compliance, screen reader support, keyboard navigation, or when audit identifies accessibility gaps.
+description: Systematic checklist for fixing accessibility issues in ForgeOS. Use when fixing a11y, accessibility, WCAG compliance, screen reader support, keyboard navigation, or when audit identifies accessibility gaps.
 ---
 
 # Accessibility Remediation

@@ -1,6 +1,6 @@
 # Avatar Standard: Use UserAvatar Component
 
-All user avatars in CentaurOS **must** use the standardized `UserAvatar` component to ensure consistent role-based color coding across the application.
+All user avatars in ForgeOS **must** use the standardized `UserAvatar` component to ensure consistent role-based color coding across the application.
 
 ## Required Import
 

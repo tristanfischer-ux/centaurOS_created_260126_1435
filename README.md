@@ -1,6 +1,6 @@
-# CentaurOS
+# ForgeOS
 
-CentaurOS is a "Democratic Workflow Engine" designed for **Fractional Foundries**. It treats AI Agents as first-class citizens alongside human experts, enabling a hybrid workforce.
+ForgeOS is a "Democratic Workflow Engine" designed for **Fractional Foundries** — built by **Fractional Forge**. It treats AI Agents as first-class citizens alongside human experts, enabling a hybrid workforce.
 
 ## Features
 - **Task Engine**: Real-time task tracking with "Democratic" state machine (Accept/Reject/Forward/Amend).

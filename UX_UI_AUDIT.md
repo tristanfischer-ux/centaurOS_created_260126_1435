@@ -1,4 +1,4 @@
-# CentaurOS UX/UI Audit Report
+# ForgeOS UX/UI Audit Report
 
 **Date:** January 31, 2026  
 **Status:** 🟢 REMEDIATED  
@@ -449,7 +449,7 @@ When creating components with success/warning/error/info states
 
 ## Conclusion
 
-CentaurOS has strong foundations with good component library adoption and a defined design system. The primary issues are:
+ForgeOS has strong foundations with good component library adoption and a defined design system. The primary issues are:
 
 1. **Hardcoded colors** breaking consistency and dark mode
 2. **Accessibility gaps** in forms

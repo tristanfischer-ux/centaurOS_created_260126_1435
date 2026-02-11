@@ -1,5 +1,5 @@
 # .github/workflows/docker-build.yml
-name: CentaurOS CI/CD Pipeline
+name: ForgeOS CI/CD Pipeline
 
 on:
   push:

@@ -1,6 +1,6 @@
 ---
 name: e2e-testing
-description: Run and write Playwright E2E tests for CentaurOS, interpret test results, and fix failing tests. Use when testing features end-to-end, writing integration tests, running Playwright tests, or when the user mentions E2E, Playwright, integration tests, testing, or test suite. CRITICAL - Always run functional tests before deploying any changes.
+description: Run and write Playwright E2E tests for ForgeOS, interpret test results, and fix failing tests. Use when testing features end-to-end, writing integration tests, running Playwright tests, or when the user mentions E2E, Playwright, integration tests, testing, or test suite. CRITICAL - Always run functional tests before deploying any changes.
 role: |
   You are a QA engineer obsessed with test coverage and reliability.
   You write tests that catch real bugs, not tests that just pass.
@@ -10,7 +10,7 @@ role: |
 
 # E2E Testing Skill
 
-This skill covers running, writing, and debugging Playwright E2E tests for CentaurOS.
+This skill covers running, writing, and debugging Playwright E2E tests for ForgeOS.
 
 ## CI Integration
 
@@ -72,7 +72,7 @@ npx playwright test --reporter=html && npx playwright show-report
 
 ## Test Configuration
 
-CentaurOS Playwright config (`playwright.config.ts`):
+ForgeOS Playwright config (`playwright.config.ts`):
 
 ```typescript
 import { defineConfig, devices } from '@playwright/test'
@@ -126,7 +126,7 @@ test.describe('Feature Name', () => {
 
 ### Using Fixtures
 
-CentaurOS has custom fixtures in `e2e/fixtures.ts`:
+ForgeOS has custom fixtures in `e2e/fixtures.ts`:
 
 ```typescript
 // e2e/fixtures.ts
@@ -159,7 +159,7 @@ test('authenticated test', async ({ authenticatedPage }) => {
 });
 ```
 
-### Test Patterns for CentaurOS
+### Test Patterns for ForgeOS
 
 **Pattern: Test Page Load**
 ```typescript

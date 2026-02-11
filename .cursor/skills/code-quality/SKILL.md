@@ -5,7 +5,7 @@ description: Ensure code quality through linting, type checking, testing, and co
 
 # Code Quality Skill
 
-This skill ensures code quality in CentaurOS through automated checks and best practices.
+This skill ensures code quality in ForgeOS through automated checks and best practices.
 
 ## Quality Check Workflow
 

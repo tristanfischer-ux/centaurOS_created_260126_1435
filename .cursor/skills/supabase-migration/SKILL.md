@@ -66,7 +66,7 @@ date +%Y%m%d%H%M%S
 
 ## Step 2: Write Migration SQL
 
-Follow these patterns for CentaurOS migrations:
+Follow these patterns for ForgeOS migrations:
 
 ### Create Table Pattern
 
@@ -405,7 +405,7 @@ DROP TRIGGER IF EXISTS trigger_name ON public.table_name;
 CREATE TRIGGER trigger_name ...
 ```
 
-## RLS Policy Patterns for CentaurOS
+## RLS Policy Patterns for ForgeOS
 
 ### User-owned data
 ```sql

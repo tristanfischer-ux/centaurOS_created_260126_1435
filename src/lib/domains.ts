@@ -59,14 +59,14 @@ export function getAppUrl(path: string = '/updates'): string {
 /**
  * Check if current hostname is the main app domain
  *
- * @description Checks for fractionalforge.app as well as legacy domains
- * (centauros.io, forgeos.io, centaurdynamics.io) during migration period.
+ * @description Checks for fractionalforge.app and forgeos.io as active domains,
+ * plus legacy domains (centauros.io, centaurdynamics.io) during migration period.
  */
 export function isAppDomain(hostname: string): boolean {
   return (
     hostname.includes('fractionalforge.app') ||
-    hostname.includes('centauros.io') ||
     hostname.includes('forgeos.io') ||
+    hostname.includes('centauros.io') ||
     hostname.includes('centaurdynamics.io')
   )
 }
