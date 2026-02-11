@@ -8,7 +8,7 @@
 
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, lazy, Suspense } from "react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -53,6 +53,11 @@ import {
   Pencil,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+// Lazy-load 3D viewer — avoids loading three.js until a user opens the 3D tab
+const StlViewer = lazy(() =>
+  import("./stl-viewer").then((mod) => ({ default: mod.StlViewer })),
+)
 
 import { ForgeSectionHeader, ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import type { XRaySpec, ModuleSpec, ModuleAnalysis, MassProperties, DfmAnalysis, DfmIssue, StructuralAnalysis, StressHotspot, EmiShielding, Fatigue, Impact } from "../services/xray-schema"
@@ -594,21 +599,25 @@ function ExpandedModuleDetail({
 
 // ─── CAD Model Section ───────────────────────────────────────────────
 
+/** Active display mode for the CAD section: interactive 3D or one of the SVG projections */
+type CadViewMode = "3d" | "svgIsoUrl" | "svgTopUrl" | "svgFrontUrl" | "svgRightUrl"
+
 const SVG_VIEWS = [
-  { key: "svgIsoUrl", label: "Isometric", short: "ISO" },
-  { key: "svgTopUrl", label: "Top", short: "Top" },
-  { key: "svgFrontUrl", label: "Front", short: "Front" },
-  { key: "svgRightUrl", label: "Right", short: "Right" },
-] as const
+  { key: "svgIsoUrl" as const, label: "Isometric", short: "ISO" },
+  { key: "svgTopUrl" as const, label: "Top", short: "Top" },
+  { key: "svgFrontUrl" as const, label: "Front", short: "Front" },
+  { key: "svgRightUrl" as const, label: "Right", short: "Right" },
+]
 
 type SvgViewKey = typeof SVG_VIEWS[number]["key"]
 
 /**
- * CadModelSection — Displays 3D CAD model SVG views with download buttons.
+ * CadModelSection — Interactive 3D viewer + SVG projection views + STEP/STL downloads.
  *
- * @description Shows an SVG view carousel for the generated 3D model,
- * download links for STEP/STL files, and a generate trigger when no
- * model exists yet.
+ * @description When the module has an STL file, the default view is an interactive
+ * 3D model that can be rotated, zoomed, and panned. Users can switch to flat SVG
+ * projections (ISO, Top, Front, Right) via tabs. Download links for STEP and STL
+ * are always visible in the header.
  */
 function CadModelSection({
   module: m,
@@ -618,9 +627,13 @@ function CadModelSection({
   /** Fire-and-forget callback — starts background generation */
   onGenerate?: (moduleId: string) => void
 }): React.ReactNode {
-  const [activeView, setActiveView] = useState<SvgViewKey>("svgIsoUrl")
-  const [svgLightboxOpen, setSvgLightboxOpen] = useState(false)
   const cadModel = m.cadModel
+  const has3d = !!(cadModel?.stlUrl && cadModel.status === "complete")
+
+  // Default to 3D if STL is available, otherwise fall back to isometric SVG
+  const [activeView, setActiveView] = useState<CadViewMode>(has3d ? "3d" : "svgIsoUrl")
+  const [svgLightboxOpen, setSvgLightboxOpen] = useState(false)
+  const [stlLoadFailed, setStlLoadFailed] = useState(false)
   const isGenerating = cadModel?.status === "generating"
 
   /** Trigger CAD generation (fire-and-forget — safe to navigate away) */
@@ -714,9 +727,11 @@ function CadModelSection({
     )
   }
 
-  // Complete state — show SVG views + downloads
-  const activeSvgUrl = cadModel[activeView]
-  const availableViews = SVG_VIEWS.filter((v) => cadModel[v.key])
+  // Complete state — build the list of available view tabs
+  const availableSvgViews = SVG_VIEWS.filter((v) => cadModel[v.key])
+  const hasStl = !!(cadModel.stlUrl && !stlLoadFailed)
+  const activeSvgKey = activeView !== "3d" ? activeView as SvgViewKey : null
+  const activeSvgUrl = activeSvgKey ? cadModel[activeSvgKey] : null
 
   return (
     <div className="rounded-lg border p-4 space-y-3">
@@ -754,10 +769,26 @@ function CadModelSection({
         </div>
       </div>
 
-      {/* View selector tabs */}
-      {availableViews.length > 1 && (
+      {/* View selector tabs — 3D + SVG projections */}
+      {(hasStl || availableSvgViews.length > 0) && (
         <div className="flex items-center gap-1 bg-muted/30 rounded-lg p-1">
-          {availableViews.map((view) => (
+          {/* 3D tab — only shown when STL is available */}
+          {hasStl && (
+            <button
+              onClick={() => setActiveView("3d")}
+              className={cn(
+                "flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                activeView === "3d"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Box className="h-3 w-3" />
+              3D
+            </button>
+          )}
+          {/* SVG projection tabs */}
+          {availableSvgViews.map((view) => (
             <button
               key={view.key}
               onClick={() => setActiveView(view.key)}
@@ -774,8 +805,30 @@ function CadModelSection({
         </div>
       )}
 
-      {/* SVG Display */}
-      {activeSvgUrl && (
+      {/* Interactive 3D Viewer */}
+      {activeView === "3d" && hasStl && (
+        <div className="space-y-2">
+          <Suspense fallback={<Skeleton className="h-[350px] w-full rounded-xl" />}>
+            <StlViewer
+              stlUrl={cadModel.stlUrl!}
+              height={350}
+              className="rounded-xl"
+              onLoadError={() => {
+                // Fall back to SVG view if 3D fails to load
+                setStlLoadFailed(true)
+                const fallback = availableSvgViews[0]?.key ?? "svgIsoUrl"
+                setActiveView(fallback)
+              }}
+            />
+          </Suspense>
+          <p className="text-xs text-muted-foreground text-center font-medium">
+            {m.name} — Interactive 3D Model (drag to rotate, scroll to zoom)
+          </p>
+        </div>
+      )}
+
+      {/* SVG Display (shown when a projection tab is active) */}
+      {activeView !== "3d" && activeSvgUrl && (
         <>
           <button
             onClick={() => setSvgLightboxOpen(true)}
@@ -784,12 +837,12 @@ function CadModelSection({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={activeSvgUrl}
-              alt={`${m.name} — ${SVG_VIEWS.find((v) => v.key === activeView)?.label ?? "Engineering"} view`}
+              alt={`${m.name} — ${SVG_VIEWS.find((v) => v.key === activeSvgKey)?.label ?? "Engineering"} view`}
               className="w-full h-auto object-contain max-h-[350px]"
             />
           </button>
           <p className="text-xs text-muted-foreground text-center font-medium">
-            {m.name} — {SVG_VIEWS.find((v) => v.key === activeView)?.label ?? "Engineering"} View (click to enlarge)
+            {m.name} — {SVG_VIEWS.find((v) => v.key === activeSvgKey)?.label ?? "Engineering"} View (click to enlarge)
           </p>
 
           {/* SVG Lightbox */}
@@ -809,21 +862,21 @@ function CadModelSection({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={activeSvgUrl}
-                    alt={`${m.name} — ${SVG_VIEWS.find((v) => v.key === activeView)?.label ?? "Engineering"} view`}
+                    alt={`${m.name} — ${SVG_VIEWS.find((v) => v.key === activeSvgKey)?.label ?? "Engineering"} view`}
                     className="w-full h-auto"
                   />
                 </div>
               </div>
               <DialogTitle className="sr-only">
-                {m.name} — {SVG_VIEWS.find((v) => v.key === activeView)?.label ?? "Engineering"} View
+                {m.name} — {SVG_VIEWS.find((v) => v.key === activeSvgKey)?.label ?? "Engineering"} View
               </DialogTitle>
             </DialogContent>
           </Dialog>
         </>
       )}
 
-      {/* No SVGs available but model exists */}
-      {!activeSvgUrl && (cadModel.stepUrl || cadModel.stlUrl) && (
+      {/* No views available at all but model files exist */}
+      {activeView !== "3d" && !activeSvgUrl && !hasStl && (cadModel.stepUrl || cadModel.stlUrl) && (
         <div className="rounded-lg bg-muted/20 border p-4 text-center">
           <p className="text-xs text-muted-foreground">
             SVG views unavailable. Download the STEP or STL file above to view in a CAD application.
