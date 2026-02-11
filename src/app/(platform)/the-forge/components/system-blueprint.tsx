@@ -258,7 +258,7 @@ export function SystemBlueprint({
                 <p className="text-xs text-muted-foreground">
                   {heroView === "3d"
                     ? "Interactive 3D product model — drag to rotate, scroll to zoom"
-                    : "AI-generated system-level process flow diagram"}
+                    : "System-level process flow diagram"}
                 </p>
               </div>
             </div>
@@ -329,11 +329,32 @@ export function SystemBlueprint({
                   <div className="text-center">
                     <p className="text-sm font-medium text-foreground">Building 3D model...</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      AI is generating CadQuery code and rendering the product
+                      Generating CadQuery code and rendering the product
                     </p>
                   </div>
                 </div>
               </div>
+            </div>
+          ) : heroView === "3d" && spec.systemCadStatus === "failed" ? (
+            /* 3D generation failed — show clear feedback with fallback */
+            <div className="rounded-xl border border-dashed border-muted-foreground/20 flex flex-col items-center justify-center gap-3 py-16">
+              <AlertTriangle className="h-8 w-8 text-muted-foreground" />
+              <div className="text-center space-y-1">
+                <p className="text-sm font-medium text-foreground">3D model generation failed</p>
+                <p className="text-xs text-muted-foreground">
+                  The product geometry was too complex to render. The system diagram is still available.
+                </p>
+              </div>
+              {hasSystemImage && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setHeroView("diagram")}
+                >
+                  <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+                  View Diagram
+                </Button>
+              )}
             </div>
           ) : hasSystemImage ? (
             /* System diagram view */

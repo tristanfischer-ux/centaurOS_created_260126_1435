@@ -35,7 +35,7 @@ export function ContractingView(): React.ReactNode {
     return (
       <EmptyState
         title="No modules defined yet"
-        description="Scan a product idea on the Concept page first. RFQ generation will be available once modules and suppliers are identified."
+        description="Create a product concept on the Concept page first. RFQ generation will be available once modules and suppliers are identified."
       />
     )
   }

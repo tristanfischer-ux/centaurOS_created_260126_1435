@@ -74,7 +74,7 @@ export function DossierView(): React.ReactNode {
     return (
       <EmptyState
         title="No modules yet"
-        description="Scan a product idea on the Concept page first. Modules will appear here once the scan is complete."
+        description="Create a product concept on the Concept page first. Modules will appear here once the concept is ready."
       />
     )
   }

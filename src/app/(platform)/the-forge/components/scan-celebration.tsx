@@ -1,10 +1,10 @@
 /**
- * @file scan-celebration.tsx — Animated celebration banner on scan completion
+ * @file scan-celebration.tsx — Animated celebration banner on concept creation
  *
- * @description Shows a brief animated hero banner when a scan completes,
+ * @description Shows a brief animated hero banner when a concept is created,
  * displaying the module count with a particle-burst effect and a pulsing
  * CTA. Auto-dismisses after 8 seconds or on user interaction. Turns the
- * moment of scan completion into a moment of excitement.
+ * moment of concept creation into a moment of excitement.
  *
  * @related
  * - concept-view.tsx (parent — renders this when justScanned is true)
@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils"
 // ─── Props ────────────────────────────────────────────────────────────
 
 interface ScanCelebrationProps {
-  /** Number of modules identified in the scan */
+  /** Number of modules identified in the concept */
   moduleCount: number
   /** Called when the banner is dismissed (auto or manual) */
   onDismiss: () => void
@@ -69,7 +69,7 @@ function ParticleBurst(): React.ReactNode {
 // ─── Component ────────────────────────────────────────────────────────
 
 /**
- * ScanCelebration — Animated banner shown when a scan completes.
+ * ScanCelebration — Animated banner shown when a concept is created.
  *
  * @description Fades in with a scale animation, shows module count
  * and a particle burst around the icon, then auto-dismisses after

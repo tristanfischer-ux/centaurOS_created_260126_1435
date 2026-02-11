@@ -1,12 +1,12 @@
 /**
- * @file scan-hero.tsx — Idea input + scan CTA with educational progress
+ * @file scan-hero.tsx — Idea input + create CTA with educational progress
  *
  * @description Compact card for entering a product idea and triggering
- * the scan. Shows the derived function statement as a blockquote.
- * After a scan exists, offers "Fresh Re-scan" and "Refine with changes"
+ * concept creation. Shows the derived function statement as a blockquote.
+ * After a concept exists, offers "Start over" and "Refine with changes"
  * options so users can iterate on their idea.
  *
- * While scanning is in progress, displays an animated educational explainer
+ * While creation is in progress, displays an animated educational explainer
  * that cycles through messages describing each stage of the reverse-engineering
  * process. This turns the wait into a learning moment about systems engineering.
  */
@@ -240,11 +240,11 @@ interface ScanHeroProps {
   idea: string
   /** AI-derived function statement (shown after scan) */
   functionStatement: string
-  /** Whether a scan is in progress */
+  /** Whether concept creation is in progress */
   isScanning: boolean
   /** Whether a completed spec already exists (modules.length > 0) */
   hasExistingSpec: boolean
-  /** Called when user clicks scan (fresh, from-scratch scan) */
+  /** Called when user clicks create (fresh, from-scratch creation) */
   onScan: (idea: string) => void
   /** Called when user wants to refine the existing spec with an updated idea */
   onRefine: (idea: string) => void
@@ -257,12 +257,12 @@ interface ScanHeroProps {
 /**
  * ScanHero — The first section of the X-Ray dossier.
  *
- * @description Clean idea input with scan button. Before any scan exists,
- * shows a single "Scan & reverse engineer" CTA. After a scan exists,
- * shows two options: "Fresh Re-scan" (with confirmation) and "Refine
+ * @description Clean idea input with create button. Before any concept exists,
+ * shows a single "Create concept" CTA. After a concept exists,
+ * shows two options: "Start over" (with confirmation) and "Refine
  * with changes" (sends existing spec + updated idea to AI).
  *
- * While scanning, an educational explainer cycles through messages
+ * While creating, an educational explainer cycles through messages
  * explaining each phase of the reverse-engineering process.
  */
 export function ScanHero({
@@ -340,7 +340,7 @@ export function ScanHero({
                   ) : (
                     <RefreshCw className="h-4 w-4" />
                   )}
-                  {isScanning && !lastActionWasRefine ? "Scanning..." : "Fresh re-scan"}
+                  {isScanning && !lastActionWasRefine ? "Creating..." : "Start over"}
                 </span>
                 <span className="text-xs leading-snug text-muted-foreground">
                   Start over from scratch. Replaces all existing modules and data.
@@ -377,12 +377,12 @@ export function ScanHero({
               {isScanning ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Scanning your idea...
+                  Creating your concept...
                 </>
               ) : (
                 <>
                   <Zap className="h-4 w-4 mr-2" />
-                  Scan &amp; reverse engineer
+                  Create concept
                 </>
               )}
             </Button>
@@ -403,11 +403,11 @@ export function ScanHero({
         </CardContent>
       </Card>
 
-      {/* Confirmation dialog for fresh re-scan (destructive: replaces all data) */}
+      {/* Confirmation dialog for starting over (destructive: replaces all data) */}
       <AlertDialog open={showRescanConfirm} onOpenChange={setShowRescanConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Start a fresh re-scan?</AlertDialogTitle>
+            <AlertDialogTitle>Start over from scratch?</AlertDialogTitle>
             <AlertDialogDescription>
               This will replace all existing modules, diagnostic answers, images, and
               analysis with a completely new result. This cannot be undone.

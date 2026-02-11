@@ -59,7 +59,7 @@ export function SupplyChainView(): React.ReactNode {
     return (
       <EmptyState
         title="No modules defined yet"
-        description="Scan a product idea on the Concept page first. Supplier matches will appear here based on the modules identified."
+        description="Create a product concept on the Concept page first. Supplier matches will appear here based on the modules identified."
       />
     )
   }

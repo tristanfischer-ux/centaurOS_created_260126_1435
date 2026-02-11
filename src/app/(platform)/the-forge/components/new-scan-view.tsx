@@ -1,9 +1,9 @@
 /**
- * @file new-scan-view.tsx — Client component for the new scan flow
+ * @file new-scan-view.tsx — Client component for the create concept flow
  *
- * @description Renders the ScanHero input and scanning animation.
- * On scan completion, redirects to the project's concept page.
- * Reuses the existing ScanHero component in "new scan" mode.
+ * @description Renders the ScanHero input and progress animation.
+ * On concept creation, redirects to the project's concept page.
+ * Reuses the existing ScanHero component in "new" mode.
  *
  * @related
  * - Page: src/app/(platform)/the-forge/new/page.tsx
@@ -22,9 +22,9 @@ import { scanIdeaAction, generateImagesAction, updateProjectMetadataAction } fro
 import { ScanHero } from "./scan-hero"
 
 /**
- * NewScanView — Client-side new scan flow.
+ * NewScanView — Client-side create concept flow.
  *
- * @description Wraps ScanHero with scan logic. On successful scan,
+ * @description Wraps ScanHero with creation logic. On successful concept creation,
  * triggers image generation in background and redirects to concept page.
  */
 export function NewScanView(): React.ReactNode {
@@ -41,7 +41,7 @@ export function NewScanView(): React.ReactNode {
         toast.error(result.error)
         return
       }
-      toast.success(`Scan complete: ${result.spec.modules.length} modules identified`)
+      toast.success(`Concept created: ${result.spec.modules.length} modules identified`)
 
       // Trigger image generation in background (don't await)
       generateImagesAction(result.scanId)
@@ -57,7 +57,7 @@ export function NewScanView(): React.ReactNode {
       // Redirect to concept page
       router.push(`/the-forge/${result.scanId}/concept`)
     } catch (error) {
-      toast.error("Scan failed. Please try again.")
+      toast.error("Concept creation failed. Please try again.")
       console.error("[Forge] Scan error:", error instanceof Error ? error.message : "Unknown")
     } finally {
       setIsScanning(false)

@@ -274,7 +274,7 @@ export function ForgeProjectProvider({
               setSpecInternal(updatedSpec)
               specRef.current = updatedSpec
               setIsScanning(false)
-              toast.success(`Scan complete: ${updatedSpec.modules.length} modules identified`)
+              toast.success(`Concept ready: ${updatedSpec.modules.length} modules identified`)
             }
           }
         },
@@ -320,7 +320,7 @@ export function ForgeProjectProvider({
     const trimmed = (updatedIdea || "").trim() || "New machine concept"
     setIsScanning(true)
     setScanStatus("scanning")
-    toast.info("Scanning in progress — you can navigate away and come back.", { duration: 5000 })
+    toast.info("Creating concept — you can navigate away and come back.", { duration: 5000 })
 
     // Fire the scan — Realtime subscription will also update the UI,
     // but we still handle the direct response for the common case
@@ -409,10 +409,14 @@ export function ForgeProjectProvider({
               setSpecInternal(cadResult.spec)
               specRef.current = cadResult.spec
               toast.success("3D product model ready — switch to 3D view")
+            } else {
+              console.error("[Forge] System CAD generation failed:", cadResult.error)
+              toast.error("3D model generation failed. You can still use the system diagram.")
             }
           })
-          .catch(() => {
-            console.error("[Forge] System CAD generation failed")
+          .catch((err) => {
+            console.error("[Forge] System CAD generation failed:", err instanceof Error ? err.message : "Unknown")
+            toast.error("3D model generation failed. You can still use the system diagram.")
           })
           .finally(() => setIsGeneratingSystemCad(false))
 

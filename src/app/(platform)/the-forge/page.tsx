@@ -3,11 +3,11 @@
  *
  * @description Shows all forge projects for the current foundry with
  * cards showing project name, stage, module count, and thumbnail.
- * Provides a "New Scan" CTA to start a new project.
+ * Provides a "Create Concept" CTA to start a new project.
  *
  * @related
  * - Server actions: src/actions/xray.ts (listScansAction)
- * - New scan page: src/app/(platform)/the-forge/new/page.tsx
+ * - New concept page: src/app/(platform)/the-forge/new/page.tsx
  */
 
 import React, { Suspense } from "react"
@@ -20,7 +20,7 @@ import type { Metadata } from "next"
 
 export const metadata: Metadata = {
   title: "The Forge | ForgeOS",
-  description: "Scan product ideas into buildable engineering dossiers",
+  description: "Turn product ideas into buildable engineering dossiers",
 }
 
 function LoadingSkeleton(): React.ReactNode {
