@@ -163,6 +163,8 @@ interface SystemBlueprintProps {
   justScanned?: boolean
   /** Whether the system CAD model is currently generating */
   isGeneratingSystemCad?: boolean
+  /** Called to regenerate the system 3D model (after load failure) */
+  onRegenerateSystemCad?: () => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────
@@ -186,6 +188,7 @@ export function SystemBlueprint({
   canGenerate,
   justScanned = false,
   isGeneratingSystemCad = false,
+  onRegenerateSystemCad,
 }: SystemBlueprintProps): React.ReactNode {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [heroView, setHeroView] = useState<HeroView>("diagram")
@@ -346,26 +349,46 @@ export function SystemBlueprint({
                 </div>
               </div>
             </div>
-          ) : heroView === "3d" && spec.systemCadStatus === "failed" ? (
-            /* 3D generation failed — show clear feedback with fallback */
+          ) : heroView === "3d" && (spec.systemCadStatus === "failed" || stlLoadFailed) ? (
+            /* 3D generation failed or STL failed to load — offer retry + diagram fallback */
             <div className="rounded-xl border border-dashed border-muted-foreground/20 flex flex-col items-center justify-center gap-3 py-16">
               <AlertTriangle className="h-8 w-8 text-muted-foreground" />
               <div className="text-center space-y-1">
-                <p className="text-sm font-medium text-foreground">3D model generation failed</p>
+                <p className="text-sm font-medium text-foreground">
+                  {stlLoadFailed ? "3D model failed to load" : "3D model generation failed"}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  The product geometry was too complex to render. The system diagram is still available.
+                  {stlLoadFailed
+                    ? "The model file could not be rendered. Try regenerating it."
+                    : "The product geometry was too complex to render."}
                 </p>
               </div>
-              {hasSystemImage && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setHeroView("diagram")}
-                >
-                  <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
-                  View Diagram
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {onRegenerateSystemCad && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => {
+                      setStlLoadFailed(false)
+                      onRegenerateSystemCad()
+                    }}
+                    className="bg-international-orange hover:bg-international-orange-hover text-white"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Regenerate 3D Model
+                  </Button>
+                )}
+                {hasSystemImage && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setHeroView("diagram")}
+                  >
+                    <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+                    View Diagram
+                  </Button>
+                )}
+              </div>
             </div>
           ) : hasSystemImage ? (
             /* System diagram view */

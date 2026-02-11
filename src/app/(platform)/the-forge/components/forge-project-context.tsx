@@ -110,6 +110,7 @@ export interface ForgeProjectContextValue {
   // ── Image/CAD generation ──
   handleGenerateImages: () => void
   handleGenerateCadModel: (moduleId: string) => Promise<void>
+  handleRegenerateSystemCad: () => void
   isGeneratingImages: boolean
   isGeneratingSystemCad: boolean
 
@@ -454,6 +455,29 @@ export function ForgeProjectProvider({
     }
   }, [scanId])
 
+  // ── Regenerate system 3D model ──
+  const handleRegenerateSystemCad = useCallback((): void => {
+    if (!scanId || isGeneratingSystemCad) return
+    setIsGeneratingSystemCad(true)
+    toast.info("Regenerating 3D product model — this may take up to 2 minutes...")
+    generateSystemCadAction(scanId)
+      .then((cadResult) => {
+        if ("spec" in cadResult) {
+          setSpecInternal(cadResult.spec)
+          specRef.current = cadResult.spec
+          toast.success("3D product model ready")
+        } else {
+          console.error("[Forge] System CAD regeneration failed:", cadResult.error)
+          toast.error("3D model regeneration failed. Try again later.")
+        }
+      })
+      .catch((err) => {
+        console.error("[Forge] System CAD regeneration error:", err instanceof Error ? err.message : "Unknown")
+        toast.error("3D model regeneration failed.")
+      })
+      .finally(() => setIsGeneratingSystemCad(false))
+  }, [scanId, isGeneratingSystemCad])
+
   // ── Engineering analysis ──
   const handleRunAnalysis = useCallback(async (): Promise<void> => {
     setIsAnalyzing(true)
@@ -789,6 +813,7 @@ export function ForgeProjectProvider({
     handleDeriveProcessClass,
     handleGenerateImages,
     handleGenerateCadModel,
+    handleRegenerateSystemCad,
     isGeneratingImages,
     isGeneratingSystemCad,
     handleRunAnalysis,

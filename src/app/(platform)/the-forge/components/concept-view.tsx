@@ -37,6 +37,7 @@ export function ConceptView(): React.ReactNode {
     isGeneratingSystemCad,
     handleRefineScan,
     handleGenerateImages,
+    handleRegenerateSystemCad,
     setSpec,
   } = useForgeProject()
 
@@ -89,6 +90,7 @@ export function ConceptView(): React.ReactNode {
             isGeneratingSystemCad={isGeneratingSystemCad}
             hasImages={spec.modules.some((m) => m.imageStatus === "complete")}
             onGenerateImages={handleGenerateImages}
+            onRegenerateSystemCad={handleRegenerateSystemCad}
             canGenerate={!!scanId}
             justScanned={justScanned}
           />
