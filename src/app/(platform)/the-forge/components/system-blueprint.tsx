@@ -324,9 +324,7 @@ export function SystemBlueprint({
                   onLoadError={() => {
                     // Auto-fallback to diagram view when 3D fails to load
                     setStlLoadFailed(true)
-                    if (hasSystemImage) {
-                      setHeroView("diagram")
-                    }
+                    setHeroView("diagram")
                   }}
                 />
               </Suspense>
