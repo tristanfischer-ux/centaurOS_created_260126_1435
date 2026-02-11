@@ -141,13 +141,16 @@ export function EnrollmentCreateDialog({
     setError(null)
     
     startTransition(async () => {
+      const mentorId = seniorMentor && seniorMentor !== '__none__' ? seniorMentor : undefined
+      const buddyId = workplaceBuddy && workplaceBuddy !== '__none__' ? workplaceBuddy : undefined
+      
       const result = await createEnrollment({
         apprenticeId: selectedApprentice,
         programmeId: selectedProgramme,
         foundryId,
         startDate,
-        seniorMentorId: seniorMentor || undefined,
-        workplaceBuddyId: workplaceBuddy || undefined,
+        seniorMentorId: mentorId,
+        workplaceBuddyId: buddyId,
         weeklyHours: parseInt(weeklyHours),
         wageBand: wageBand as 'apprentice_minimum' | 'national_minimum' | 'living_wage' | 'above_living_wage'
       })
@@ -163,7 +166,9 @@ export function EnrollmentCreateDialog({
 
   const selectedProgrammeData = programmes.find(p => p.id === selectedProgramme)
   const selectedApprenticeData = eligibleApprentices.find(a => a.id === selectedApprentice)
-  const selectedMentorData = potentialMentors.find(m => m.id === seniorMentor)
+  const selectedMentorData = seniorMentor && seniorMentor !== '__none__'
+    ? potentialMentors.find(m => m.id === seniorMentor)
+    : undefined
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -362,7 +367,7 @@ export function EnrollmentCreateDialog({
                       <SelectValue placeholder="Select mentor..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="__none__">None</SelectItem>
                       {potentialMentors.map((mentor) => (
                         <SelectItem key={mentor.id} value={mentor.id}>
                           {mentor.full_name} ({mentor.role})
@@ -379,7 +384,7 @@ export function EnrollmentCreateDialog({
                       <SelectValue placeholder="Select buddy..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="__none__">None</SelectItem>
                       {potentialMentors.map((mentor) => (
                         <SelectItem key={mentor.id} value={mentor.id}>
                           {mentor.full_name}
