@@ -33,6 +33,7 @@ import {
   CheckCircle2,
   Cog,
   ImageIcon,
+  Layers,
   Loader2,
   RotateCcw,
   ShieldAlert,
@@ -113,7 +114,7 @@ function isGatingDiagComplete(spec: XRaySpec): boolean {
 
 // ─── Hero View Types ──────────────────────────────────────────────────
 
-type HeroView = "3d" | "diagram"
+type HeroView = "3d" | "diagram" | "exploded"
 
 // ─── Animation Variants ──────────────────────────────────────────────
 
@@ -283,6 +284,20 @@ export function SystemBlueprint({
                     <Box className="h-3.5 w-3.5" />
                     3D Model
                   </button>
+                  {spec.systemCadExplodedSvgUrl && (
+                    <button
+                      onClick={() => setHeroView("exploded")}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                        heroView === "exploded"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      <Layers className="h-3.5 w-3.5" />
+                      Exploded
+                    </button>
+                  )}
                   <button
                     onClick={() => setHeroView("diagram")}
                     className={cn(
@@ -388,6 +403,21 @@ export function SystemBlueprint({
                   </Button>
                 )}
               </div>
+            </div>
+          ) : heroView === "exploded" && spec.systemCadExplodedSvgUrl ? (
+            /* Exploded isometric view — shows all subsystems separated */
+            <div className="space-y-2">
+              <div className="w-full rounded-xl overflow-hidden border bg-background p-6">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={spec.systemCadExplodedSvgUrl}
+                  alt="Exploded isometric view showing all subsystems separated"
+                  className="w-full h-auto object-contain max-h-[600px]"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground text-center font-medium">
+                Exploded Isometric View — All subsystems separated along assembly axes
+              </p>
             </div>
           ) : hasSystemImage ? (
             /* System diagram view */

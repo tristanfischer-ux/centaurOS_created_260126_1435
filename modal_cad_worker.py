@@ -142,6 +142,24 @@ for _name, _dir in _views.items():
         }},
     )
 
+# === Exploded View Export (if result_exploded exists) ===
+try:
+    _exploded_candidates = [v for k, v in locals().items()
+                            if k == "result_exploded" and isinstance(v, cq.Workplane)]
+    if _exploded_candidates:
+        _exploded_model = _exploded_candidates[0]
+        cq.exporters.export(
+            _exploded_model,
+            _os.path.join(_output_dir, "exploded_iso.svg"),
+            opt={{
+                "projectionDir": (1, 1, -1),
+                "showHidden": False,
+                "strokeWidth": 0.25,
+            }},
+        )
+except Exception:
+    pass  # Exploded view is best-effort — never block main exports
+
 # === Mass Properties Computation ===
 _analysis = {{"mass_properties": None, "dfm": None}}
 
@@ -333,6 +351,7 @@ def _empty_result() -> dict:
         "svg_top": None,
         "svg_front": None,
         "svg_right": None,
+        "svg_exploded": None,
         "analysis": None,
     }
 
@@ -399,6 +418,7 @@ def generate_cad(
             "svg_top": "top.svg",
             "svg_front": "front.svg",
             "svg_right": "right.svg",
+            "svg_exploded": "exploded_iso.svg",
         }
 
         has_any_file = False

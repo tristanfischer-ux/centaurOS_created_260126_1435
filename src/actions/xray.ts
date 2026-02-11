@@ -669,6 +669,7 @@ export async function generateSystemCadAction(scanId: string): Promise<
         systemCadUrl: result.stlUrl,
         systemCadStatus: "complete",
         systemCadSvgUrl: result.svgIsoUrl,
+        systemCadExplodedSvgUrl: result.svgExplodedUrl,
       }
 
       const { error: updateError } = await supabase
@@ -2183,6 +2184,7 @@ export async function copyScanAction(
       systemCadUrl: undefined,
       systemCadStatus: undefined,
       systemCadSvgUrl: undefined,
+      systemCadExplodedSvgUrl: undefined,
       systemAnalysis: undefined,
       modules: sourceSpec.modules.map((m) => ({
         ...m,

@@ -123,6 +123,7 @@ interface ModalCadResponse {
   svg_top: string | null
   svg_front: string | null
   svg_right: string | null
+  svg_exploded: string | null
   analysis: ModalAnalysisPayload | null
 }
 
@@ -778,6 +779,7 @@ function convertModalAnalysis(
 export interface SystemCadResult {
   stlUrl: string | undefined
   svgIsoUrl: string | undefined
+  svgExplodedUrl: string | undefined
   cadQueryCode: string
 }
 
@@ -1067,6 +1069,52 @@ This example demonstrates: shelled body, internal ribs, screw bosses with pilot 
 7. Verify shapes physically overlap before \`.cut()\` or \`.union()\`.
 8. For aerodynamic/organic bodies, consider \`loft()\` between cross-section profiles rather than box-with-fillets.
 
+## REQUIRED: Exploded View (result_exploded)
+
+After creating \`result\` (the assembled model), you MUST also create \`result_exploded\` — an exploded isometric view where each major subsystem is translated outward from the center so all parts are visible separately.
+
+### How to Build the Exploded View
+
+1. Keep each major subsystem as a SEPARATE variable before unioning into \`result\`.
+2. After creating \`result\`, create \`result_exploded\` by translating each subsystem outward along its natural assembly direction.
+3. Use an \`explosion_factor\` parameter (default 1.5) to control spacing.
+
+### Pattern:
+\`\`\`python
+# After all subsystems are built as separate variables...
+
+# Assembled view (all parts in correct positions)
+result = body_shell
+for part in [motor_assembly, gimbal, battery, landing_gear, antenna]:
+    result = result.union(part)
+
+# Exploded view (each part translated outward from center)
+explosion_factor = 1.5  # Multiplier — increase for more separation
+
+_parts_exploded = [
+    (body_shell, (0, 0, 0)),           # Center body stays at origin
+    (motor_assembly, (60, 60, 30)),     # Pull outward along assembly axis
+    (gimbal, (0, 0, -70)),             # Pull down (it mounts underneath)
+    (battery, (-20, 0, -80)),          # Pull down and back
+    (landing_gear, (0, 0, -50)),       # Pull down
+    (antenna, (0, 0, 50)),             # Pull up
+]
+
+result_exploded = _parts_exploded[0][0]
+for _part, (_dx, _dy, _dz) in _parts_exploded[1:]:
+    result_exploded = result_exploded.union(
+        _part.translate((_dx * explosion_factor, _dy * explosion_factor, _dz * explosion_factor))
+    )
+\`\`\`
+
+### Rules for the Exploded View:
+- Use 5-10 major subsystems (not every tiny feature — group related parts)
+- Translate along the natural assembly/disassembly direction
+- The center body stays at origin (0,0,0)
+- Parts above go UP, parts below go DOWN, parts to sides go OUTWARD
+- Explosion offsets should be proportional to the model's bounding box (roughly 30-50% of each axis dimension)
+- Wrap the entire exploded view section in try/except so it NEVER prevents the assembled \`result\` from being created
+
 Output just the Python code.`
 
 /**
@@ -1276,13 +1324,16 @@ export async function generateSystemCadModel(
     }
   }
 
-  // Stage 4: Upload STL and isometric SVG
-  const [stlUrl, svgIsoUrl] = await Promise.all([
+  // Stage 4: Upload STL, isometric SVG, and exploded view SVG
+  const [stlUrl, svgIsoUrl, svgExplodedUrl] = await Promise.all([
     modalResult.stl
       ? uploadCadFile(scanId, "system-cad/model.stl", modalResult.stl, "model/stl")
       : Promise.resolve(undefined),
     modalResult.svg_iso
       ? uploadCadFile(scanId, "system-cad/iso.svg", modalResult.svg_iso, "image/svg+xml")
+      : Promise.resolve(undefined),
+    modalResult.svg_exploded
+      ? uploadCadFile(scanId, "system-cad/exploded_iso.svg", modalResult.svg_exploded, "image/svg+xml")
       : Promise.resolve(undefined),
   ])
 
@@ -1290,9 +1341,10 @@ export async function generateSystemCadModel(
     scanId,
     hasStl: !!stlUrl,
     hasSvg: !!svgIsoUrl,
+    hasExploded: !!svgExplodedUrl,
   })
 
-  return { stlUrl, svgIsoUrl, cadQueryCode }
+  return { stlUrl, svgIsoUrl, svgExplodedUrl, cadQueryCode }
 }
 
 /**
