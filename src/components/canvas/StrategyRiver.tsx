@@ -71,6 +71,10 @@ interface StrategyRiverProps {
   expandedObjectiveIds?: Set<string>
   /** Called when expansion should change (when controlled externally) */
   onExpandToggle?: (objectiveId: string) => void
+  /** Called to expand every milestone across all strategic objectives */
+  onExpandAll?: () => void
+  /** Called to collapse every milestone across all strategic objectives */
+  onCollapseAll?: () => void
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -123,7 +127,7 @@ function riverSegPath(x1: number, y: number, w1: number, x2: number, w2: number)
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onTaskClick, onMilestoneClick, onGoalClick, onAddToRiver, expandedObjectiveIds, onExpandToggle }) => {
+const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onTaskClick, onMilestoneClick, onGoalClick, onAddToRiver, expandedObjectiveIds, onExpandToggle, onExpandAll, onCollapseAll }) => {
   const NOW = today ?? new Date()
 
   // Per-milestone expansion — controlled externally or managed internally
@@ -263,6 +267,10 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
   const ipTasks = strategicObjectives.reduce((s, so) =>
     s + so.objectives.reduce((a, o) => a + o.tasks.filter((t) => t.status === 'in_progress').length, 0), 0)
 
+  // Are all milestones currently expanded?
+  const allMilestoneIds = strategicObjectives.flatMap((so) => so.objectives.map((o) => o.id))
+  const allExpanded = allMilestoneIds.length > 0 && allMilestoneIds.every((id) => expandedMilestones.has(id))
+
   const vbW = SVG_W / zoom
 
   // ── Drag-to-pan ──
@@ -318,25 +326,48 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
       onMouseUp={onMU}
       onMouseLeave={onMU}
     >
-      {/* Floating zoom controls (top-right corner of the river) */}
+      {/* Floating controls (top-right corner of the river) */}
       <div style={{
         position: 'absolute', top: 10, right: 28, zIndex: 10,
-        display: 'flex', alignItems: 'center', gap: 3,
-        background: 'white', borderRadius: 8, padding: '3px 5px',
-        boxShadow: '0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04)',
+        display: 'flex', alignItems: 'center', gap: 6,
       }}>
-        <ZoomBtn onClick={() => setPan((p) => Math.max(p - 80, -200))}>◀</ZoomBtn>
-        <ZoomBtn onClick={() => setZoom((z) => { const n = Math.max(z - 0.25, 0.5); if (n <= 1) setPan(0); return n })}>−</ZoomBtn>
-        <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B', minWidth: 32, textAlign: 'center' as const }}>
-          {Math.round(zoom * 100)}%
-        </span>
-        <ZoomBtn onClick={() => setZoom((z) => Math.min(z + 0.25, 4))}>+</ZoomBtn>
-        <ZoomBtn onClick={() => setPan((p) => Math.min(p + 80, 800))}>▶</ZoomBtn>
-        {zoom !== 1 && (
-          <ZoomBtn onClick={() => { setZoom(1); setPan(0) }} style={{ fontSize: 8, width: 'auto', padding: '0 6px' }}>
-            Reset
-          </ZoomBtn>
+        {/* Expand / Collapse All toggle */}
+        {(onExpandAll || onCollapseAll) && (
+          <button
+            onClick={allExpanded ? onCollapseAll : onExpandAll}
+            title={allExpanded ? 'Collapse all milestones' : 'Expand all milestones'}
+            style={{
+              height: 26, borderRadius: 7, border: '1px solid #E2E8F0',
+              background: 'white', cursor: 'pointer', fontSize: 10, fontWeight: 700,
+              color: '#64748B', display: 'flex', alignItems: 'center', gap: 4,
+              fontFamily: FONT, padding: '0 10px',
+              boxShadow: '0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04)',
+            }}
+          >
+            <span style={{ fontSize: 12 }}>{allExpanded ? '▾' : '▸'}</span>
+            {allExpanded ? 'Collapse All' : 'Expand All'}
+          </button>
         )}
+
+        {/* Zoom controls */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 3,
+          background: 'white', borderRadius: 8, padding: '3px 5px',
+          boxShadow: '0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04)',
+        }}>
+          <ZoomBtn onClick={() => setPan((p) => Math.max(p - 80, -200))}>◀</ZoomBtn>
+          <ZoomBtn onClick={() => setZoom((z) => { const n = Math.max(z - 0.25, 0.5); if (n <= 1) setPan(0); return n })}>−</ZoomBtn>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B', minWidth: 32, textAlign: 'center' as const }}>
+            {Math.round(zoom * 100)}%
+          </span>
+          <ZoomBtn onClick={() => setZoom((z) => Math.min(z + 0.25, 4))}>+</ZoomBtn>
+          <ZoomBtn onClick={() => setPan((p) => Math.min(p + 80, 800))}>▶</ZoomBtn>
+          {zoom !== 1 && (
+            <ZoomBtn onClick={() => { setZoom(1); setPan(0) }} style={{ fontSize: 8, width: 'auto', padding: '0 6px' }}>
+              Reset
+            </ZoomBtn>
+          )}
+        </div>
       </div>
 
       {/* SVG Canvas */}
@@ -480,8 +511,8 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                   </text>
                 </g>
 
-                {/* SO title (left column) */}
-                <g onClick={() => onGoalClick?.(so.id)} style={{ cursor: 'pointer' }}>
+                {/* SO title (left column) — click toggles expand/collapse of all milestones in this SO */}
+                <g onClick={() => toggleExpand(so.id)} style={{ cursor: 'pointer' }}>
                   <text x={14} y={ry - 5} fill="#0F172A" fontSize="12" fontFamily={FONT} fontWeight="800">{so.title}</text>
                   <text x={14} y={ry + 9} fill={so.color} fontSize="10" fontFamily={FONT} fontWeight="700">
                     {pct}% · {new Date(so.targetDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
