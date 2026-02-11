@@ -16,11 +16,11 @@ export interface SavedPaymentMethod {
   cardLastFour: string | null
   cardExpMonth: number | null
   cardExpYear: number | null
-  isDefault: boolean
+  isDefault: boolean | null
   billingName: string | null
   billingEmail: string | null
-  createdAt: string
-  updatedAt: string
+  createdAt: string | null
+  updatedAt: string | null
 }
 
 export interface CreatePaymentMethodParams {
@@ -96,11 +96,11 @@ export const DEFAULT_FEE_CONFIG: Record<UserRole, Record<FeeOrderType, number>> 
 export interface AccountBalance {
   id: string
   userId: string
-  balanceAmount: number // in smallest currency unit (pence)
-  currency: string
+  balanceAmount: number | null // in smallest currency unit (pence)
+  currency: string | null
   lastToppedUpAt: string | null
-  createdAt: string
-  updatedAt: string
+  createdAt: string | null
+  updatedAt: string | null
 }
 
 export type BalanceTransactionType = 'top_up' | 'spend' | 'refund' | 'adjustment' | 'withdrawal'
@@ -108,7 +108,7 @@ export type BalanceTransactionType = 'top_up' | 'spend' | 'refund' | 'adjustment
 export interface BalanceTransaction {
   id: string
   userId: string
-  transactionType: BalanceTransactionType
+  transactionType: string
   amount: number // positive for credits, negative for debits
   balanceBefore: number
   balanceAfter: number
@@ -116,7 +116,7 @@ export interface BalanceTransaction {
   referenceId: string | null
   stripePaymentIntentId: string | null
   description: string | null
-  createdAt: string
+  createdAt: string | null
 }
 
 export interface TopUpParams {
@@ -145,13 +145,13 @@ export interface FailedPayment {
   failureCode: string | null
   failureMessage: string | null
   amount: number
-  currency: string
-  retryCount: number
-  maxRetries: number
+  currency: string | null
+  retryCount: number | null
+  maxRetries: number | null
   nextRetryAt: string | null
   lastRetryAt: string | null
-  status: FailedPaymentStatus
-  createdAt: string
+  status: string | null
+  createdAt: string | null
   resolvedAt: string | null
 }
 
@@ -173,8 +173,8 @@ export interface ExchangeRate {
   baseCurrency: string
   targetCurrency: string
   rate: number
-  fetchedAt: string
-  expiresAt: string
+  fetchedAt: string | null
+  expiresAt: string | null
 }
 
 export interface ConvertedAmount {
@@ -207,12 +207,12 @@ export type PayoutSchedule = 'automatic' | 'manual' | 'weekly' | 'monthly'
 export interface PayoutPreferences {
   id: string
   providerId: string
-  payoutSchedule: PayoutSchedule
-  minimumPayoutAmount: number
+  payoutSchedule: string | null
+  minimumPayoutAmount: number | null
   preferredPayoutDay: number | null
-  instantPayoutEnabled: boolean
-  createdAt: string
-  updatedAt: string
+  instantPayoutEnabled: boolean | null
+  createdAt: string | null
+  updatedAt: string | null
 }
 
 export type PayoutRequestStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
@@ -221,11 +221,11 @@ export interface PayoutRequest {
   id: string
   providerId: string
   amount: number
-  currency: string
+  currency: string | null
   status: PayoutRequestStatus
   stripePayoutId: string | null
   failureReason: string | null
-  requestedAt: string
+  requestedAt: string | null
   processedAt: string | null
   completedAt: string | null
 }

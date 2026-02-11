@@ -726,7 +726,7 @@ export async function retryFailedPayment(
     // Create new payment intent
     const paymentIntent = await stripe.paymentIntents.create({
       amount: failedPayment.amount,
-      currency: failedPayment.currency.toLowerCase(),
+      currency: (failedPayment.currency ?? 'GBP').toLowerCase(),
       customer: customerId,
       payment_method: paymentMethodId,
       confirm: true,
@@ -873,7 +873,7 @@ export async function updatePayoutPreferences(
     }
     
     // Validate minimum payout amount
-    if (preferences.minimumPayoutAmount !== undefined && preferences.minimumPayoutAmount < 100) {
+    if (preferences.minimumPayoutAmount != null && preferences.minimumPayoutAmount < 100) {
       return { success: false, error: 'Minimum payout amount must be at least £1' }
     }
     

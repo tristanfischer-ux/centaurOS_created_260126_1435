@@ -13,7 +13,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 
+import type { Json } from '@/types/database.types'
 import type {
   RevenueStream,
   RevenueStreamInput,
@@ -38,24 +40,19 @@ interface ActionResult<T = null> {
 }
 
 /**
- * Get the current user's active foundry_id.
+ * Convert a JSON-serializable value to the Supabase `Json` type.
  *
- * @description Reads the user's profile to determine their active foundry.
- * @returns foundry_id string or null
+ * @description TypeScript interfaces lack implicit index signatures, so
+ * complex nested types (e.g. MoneyMapSnapshotData) cannot be directly
+ * assigned to `Json`. A JSON round-trip produces a plain object tree
+ * that satisfies the `Json` union. The `Json` return type is correct
+ * because any value that survives JSON serialization is valid JSON.
+ *
+ * @param value - Any JSON-serializable value
+ * @returns The value as a `Json`-typed plain object
  */
-async function getFoundryId(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string | null> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: member } = await supabase
-    .from('foundry_members')
-    .select('foundry_id')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .limit(1)
-    .single()
-
-  return member?.foundry_id ?? null
+function toJson(value: MoneyMapSnapshotData): Json {
+  return JSON.parse(JSON.stringify(value))
 }
 
 // ============================================================
@@ -71,7 +68,7 @@ async function getFoundryId(supabase: Awaited<ReturnType<typeof createClient>>):
 export async function getRevenueStreams(): Promise<ActionResult<RevenueStream[]>> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     const { data, error } = await supabase
@@ -104,7 +101,7 @@ export async function getRevenueStreams(): Promise<ActionResult<RevenueStream[]>
 export async function createRevenueStream(input: RevenueStreamInput): Promise<ActionResult<RevenueStream>> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     // VALIDATION: Name is required
@@ -155,7 +152,7 @@ export async function updateRevenueStream(
 ): Promise<ActionResult<RevenueStream>> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     const updateData: Record<string, unknown> = {}
@@ -196,7 +193,7 @@ export async function updateRevenueStream(
 export async function deleteRevenueStream(id: string): Promise<ActionResult> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     const { error } = await supabase
@@ -231,7 +228,7 @@ export async function deleteRevenueStream(id: string): Promise<ActionResult> {
 export async function getCostItems(): Promise<ActionResult<CostItem[]>> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     const { data, error } = await supabase
@@ -264,7 +261,7 @@ export async function getCostItems(): Promise<ActionResult<CostItem[]>> {
 export async function createCostItem(input: CostItemInput): Promise<ActionResult<CostItem>> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     if (!input.name?.trim()) {
@@ -314,7 +311,7 @@ export async function updateCostItem(
 ): Promise<ActionResult<CostItem>> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     const updateData: Record<string, unknown> = {}
@@ -356,7 +353,7 @@ export async function updateCostItem(
 export async function deleteCostItem(id: string): Promise<ActionResult> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     const { error } = await supabase
@@ -391,7 +388,7 @@ export async function deleteCostItem(id: string): Promise<ActionResult> {
 export async function getCostLinks(): Promise<ActionResult<CostLink[]>> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     // RLS handles foundry isolation through the cost_item join
@@ -424,7 +421,7 @@ export async function upsertCostLinks(
 ): Promise<ActionResult> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     // VALIDATION: Total allocation should not exceed 100%
@@ -481,7 +478,7 @@ export async function upsertCostLinks(
 export async function getMoneyMapData(): Promise<ActionResult<MoneyMapData>> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     // Fetch all data in parallel
@@ -547,7 +544,7 @@ export async function getMoneyMapData(): Promise<ActionResult<MoneyMapData>> {
 export async function getSnapshots(): Promise<ActionResult<MoneyMapSnapshot[]>> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     const { data, error } = await supabase
@@ -561,7 +558,7 @@ export async function getSnapshots(): Promise<ActionResult<MoneyMapSnapshot[]>> 
       return { data: null, error: error.message }
     }
 
-    return { data: data as MoneyMapSnapshot[], error: null }
+    return { data: data ?? [], error: null }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('[MoneyMap] Unexpected error fetching snapshots:', message)
@@ -583,7 +580,7 @@ export async function createSnapshot(
 ): Promise<ActionResult<MoneyMapSnapshot>> {
   try {
     const supabase = await createClient()
-    const foundryId = await getFoundryId(supabase)
+    const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
     if (!name?.trim()) return { data: null, error: 'Name is required' }
@@ -610,7 +607,7 @@ export async function createSnapshot(
         foundry_id: foundryId,
         name: name.trim(),
         period_label: periodLabel.trim(),
-        snapshot_data: snapshotData,
+        snapshot_data: toJson(snapshotData),
         total_revenue: mapResult.data.summary.total_revenue,
         total_costs: mapResult.data.summary.total_costs,
         net_margin_pct: mapResult.data.summary.net_margin_pct,
@@ -624,7 +621,7 @@ export async function createSnapshot(
     }
 
     revalidatePath('/money-map')
-    return { data: data as MoneyMapSnapshot, error: null }
+    return { data, error: null }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('[MoneyMap] Unexpected error creating snapshot:', message)

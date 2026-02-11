@@ -680,18 +680,25 @@ export async function generateSystemCadAction(scanId: string): Promise<
       console.info("[XRay] System CAD model generated:", { scanId, hasStl: !!result.stlUrl })
       return { spec: updatedSpec }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown"
+      const failedCode = error instanceof CadGenerationError ? error.cadQueryCode : undefined
       console.error("[XRay] System CAD generation failed:", {
-        error: error instanceof Error ? error.message : "Unknown",
+        error: errorMsg,
+        ...(failedCode ? { cadQueryCodeLength: failedCode.length } : {}),
       })
 
-      // Mark as failed in spec
-      const failedSpec: XRaySpec = { ...spec, systemCadStatus: "failed" }
+      // Mark as failed in spec, persist failed code for debugging
+      const failedSpec: XRaySpec = {
+        ...spec,
+        systemCadStatus: "failed",
+        ...(failedCode ? { systemCadQueryCode: failedCode } : {}),
+      }
       await supabase
         .from("xray_scans")
         .update({ spec: failedSpec as unknown as Json })
         .eq("id", scanId)
 
-      return { error: "System CAD generation failed" }
+      return { error: `System CAD generation failed: ${errorMsg.slice(0, 200)}` }
     }
   })
 }

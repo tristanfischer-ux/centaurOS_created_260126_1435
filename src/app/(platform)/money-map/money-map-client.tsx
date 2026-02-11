@@ -49,6 +49,7 @@ import type {
   CostItemInput,
   RevenueStream,
 } from '@/types/money-map'
+import { parseSnapshotData } from '@/types/money-map'
 
 interface MoneyMapClientProps {
   /** When true, hides the page header (used when embedded in Financial Tools tab) */
@@ -307,7 +308,7 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
       {/* Summary Cards */}
       <MoneyMapSummaryCards
         summary={displayData.summary}
-        previousSummary={!isDemo ? (selectedSnapshot?.snapshot_data?.summary ?? null) : null}
+        previousSummary={!isDemo ? (selectedSnapshot ? parseSnapshotData(selectedSnapshot.snapshot_data)?.summary ?? null : null) : null}
       />
 
       {/* Main Content: Input Panel + Sankey */}

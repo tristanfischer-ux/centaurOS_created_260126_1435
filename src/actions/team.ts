@@ -704,8 +704,35 @@ export async function assignToTask(taskId: string, profileIds: string[]) {
     return { success: true, teamId }
 }
 
+/**
+ * Retrieves the assignees and team for a given task.
+ *
+ * @param taskId - The task to fetch assignees for
+ * @returns Assignee profiles and optional team, or error
+ *
+ * @security Requires authenticated user in the same foundry as the task
+ */
 export async function getTaskAssignees(taskId: string) {
+    // AUTH: Verify user is authenticated
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { assignees: [], team: null, error: 'Unauthorized' }
+
+    // AUTH: Verify foundry context for multi-tenant isolation
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { assignees: [], team: null, error: 'User not in a foundry' }
+
+    // SECURITY: Verify the task belongs to the user's foundry before returning assignees
+    const { data: task, error: taskError } = await supabase
+        .from('tasks')
+        .select('id')
+        .eq('id', taskId)
+        .eq('foundry_id', foundry_id)
+        .single()
+
+    if (taskError || !task) {
+        return { assignees: [], team: null, error: 'Task not found in your foundry' }
+    }
 
     const { data, error } = await supabase
         .from('task_assignees')

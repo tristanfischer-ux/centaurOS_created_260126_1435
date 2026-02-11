@@ -386,7 +386,7 @@ def generate_cad(
         except Exception:
             exec_error = (
                 f"CadQuery execution failed for module '{module_id}': "
-                f"{traceback.format_exc()[-500:]}"
+                f"{traceback.format_exc()[-1500:]}"
             )
 
         # Read output files — attempt even after exec error to recover

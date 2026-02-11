@@ -5,6 +5,8 @@
  * cost items, cost allocation links, snapshots, and computed summaries.
  */
 
+import type { Json } from '@/types/database.types'
+
 // ============================================================
 // Enums / Literal Unions
 // ============================================================
@@ -65,16 +67,54 @@ export interface CostLink {
   updated_at: string
 }
 
+/**
+ * Matches the money_map_snapshots DB row. `snapshot_data` is stored as JSONB
+ * and typed as `Json` to match the Supabase-generated schema. Use
+ * {@link parseSnapshotData} to safely narrow it to `MoneyMapSnapshotData`.
+ */
 export interface MoneyMapSnapshot {
   id: string
   foundry_id: string
   name: string
   period_label: string
-  snapshot_data: MoneyMapSnapshotData
+  snapshot_data: Json
   total_revenue: number
   total_costs: number
   net_margin_pct: number
   created_at: string
+}
+
+/**
+ * Type guard that narrows a `Json` value to `MoneyMapSnapshotData`.
+ *
+ * @description Validates that the JSON payload has the expected top-level
+ * keys before narrowing. This avoids unsafe `as` casts when reading
+ * snapshot_data from the database.
+ *
+ * @param value - Raw JSON from the snapshot_data column
+ * @returns True if value has the expected MoneyMapSnapshotData shape
+ */
+export function isMoneyMapSnapshotData(
+  value: Json,
+): value is Json & MoneyMapSnapshotData {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    'revenue_streams' in value &&
+    'cost_items' in value &&
+    'cost_links' in value &&
+    'summary' in value
+  )
+}
+
+/**
+ * Safely parse snapshot_data from its DB representation (`Json`) to
+ * the typed `MoneyMapSnapshotData` form. Returns `null` if the stored
+ * value doesn't match the expected shape.
+ */
+export function parseSnapshotData(value: Json): MoneyMapSnapshotData | null {
+  return isMoneyMapSnapshotData(value) ? value : null
 }
 
 // ============================================================

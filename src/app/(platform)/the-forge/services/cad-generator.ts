@@ -32,7 +32,7 @@ import type { ModuleSpec, ModuleAnalysis, MassProperties, DfmAnalysis, XRaySpec 
 const STORAGE_BUCKET = "xray-images"
 const MODAL_TIMEOUT_MS = 90_000
 /** Number of retry attempts when CadQuery execution fails on Modal */
-const MAX_RETRY_ATTEMPTS = 1
+const MAX_RETRY_ATTEMPTS = 2
 
 // ─── Common Material Densities (kg/m³) ───────────────────────────────
 
@@ -79,6 +79,23 @@ function inferMaterialDensity(module: ModuleSpec): { density: number; name: stri
 }
 
 // ─── Types ───────────────────────────────────────────────────────────
+
+/**
+ * Custom error class that preserves the last-attempted CadQuery code.
+ *
+ * @description When CAD generation fails after all retries, this error
+ * carries the code that was last sent to Modal so it can be persisted
+ * for debugging purposes.
+ */
+export class CadGenerationError extends Error {
+  public readonly cadQueryCode: string
+
+  constructor(message: string, cadQueryCode: string) {
+    super(message)
+    this.name = "CadGenerationError"
+    this.cadQueryCode = cadQueryCode
+  }
+}
 
 /** Result of a successful CAD model generation (now includes analysis) */
 export interface CadModelResult {
@@ -192,7 +209,27 @@ Rules for the PARAMETERS block:
 - \`.cut(other)\` for boolean subtraction
 - \`.union(other)\` for boolean addition
 - \`.transformed(offset=(x,y,z))\` for positioning features
-- \`.shell(-thickness)\` for hollow bodies (negative = inward)
+
+## CRITICAL: Common Pitfalls — AVOID These
+1. **NEVER use \`.shell()\`** unless the geometry is a simple box or cylinder. It crashes on complex or boolean-combined shapes. Build hollow bodies manually with \`.cut()\` instead.
+2. **Keep \`.fillet()\` radius small** — under 30% of the smallest adjacent edge length. Prefer \`.chamfer()\` for reliability. If fillet radius might be too large, wrap it in try/except:
+   \`\`\`python
+   try:
+       result = result.edges("|Z").fillet(FILLET_RADIUS)
+   except:
+       result = result.edges("|Z").chamfer(FILLET_RADIUS * 0.5)
+   \`\`\`
+3. **Avoid deeply nested boolean operations.** Build geometry incrementally, assigning to intermediate variables:
+   \`\`\`python
+   base = cq.Workplane("XY").box(100, 80, 40)
+   cutout = cq.Workplane("XY").circle(20).extrude(40)
+   result = base.cut(cutout)
+   \`\`\`
+4. **Verify shapes overlap** before \`.cut()\` or \`.union()\` — misaligned shapes cause silent failures.
+5. **Use tuples, not lists** for \`.transformed(offset=(x,y,z))\`.
+6. **Workplane selectors** like \`">Z"\` or \`"|Z"\` must match existing geometry — don't reference faces that don't exist yet.
+
+**Golden rule: If in doubt, prefer simpler geometry. A recognizable basic shape is far better than a complex model that crashes.**
 
 ## Output Format
 Just the Python code. The variable \`result\` must be the final assembled CadQuery Workplane object.`
@@ -321,6 +358,88 @@ Store the final model in a variable called \`result\`.`
     .trim()
 
   return code
+}
+
+/**
+ * Generates a simplified CadQuery model as a last-resort fallback.
+ *
+ * @description When both the initial generation and standard retry fail,
+ * this function asks the AI to produce the simplest possible representation
+ * (basic box/cylinder with mounting holes, no .shell() or .fillet()).
+ * This ensures the user always gets _something_ rather than a persistent error.
+ *
+ * @param module - The module spec for context
+ * @returns Simplified CadQuery Python code that is unlikely to crash
+ *
+ * @throws Error if AI call fails
+ */
+async function generateSimplifiedFallbackCode(
+  module: ModuleSpec,
+): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error("[XRayCadGen] OPENAI_API_KEY is not configured")
+  }
+
+  const openai = new OpenAI({ apiKey })
+
+  const fallbackPrompt = `Generate the SIMPLEST possible CadQuery model for: "${module.name}" (${module.purpose}).
+
+STRICT CONSTRAINTS:
+- Maximum 30 lines of code
+- Do NOT use .shell() — it crashes on non-trivial shapes
+- Do NOT use .fillet() or .chamfer()
+- Do NOT use nested boolean operations
+- Use ONLY: .box(), .circle(), .extrude(), .hole(), .cut() with simple shapes
+- Create a basic recognizable shape: a box or cylinder with a few holes/cutouts
+- Store the final model in a variable called \`result\`
+
+Example of acceptable complexity:
+\`\`\`python
+import cadquery as cq
+import math
+
+BODY_LENGTH = 120.0
+BODY_WIDTH = 80.0
+BODY_HEIGHT = 40.0
+HOLE_DIAMETER = 6.0
+
+result = (
+    cq.Workplane("XY")
+    .box(BODY_LENGTH, BODY_WIDTH, BODY_HEIGHT)
+    .faces(">Z").workplane()
+    .rect(BODY_LENGTH - 20, BODY_WIDTH - 20, forConstruction=True)
+    .vertices()
+    .hole(HOLE_DIAMETER)
+)
+\`\`\`
+
+Output ONLY the Python code. No markdown fences, no explanation.`
+
+  console.info("[XRayCadGen] Generating simplified fallback for module:", {
+    moduleId: module.id,
+    moduleName: module.name,
+  })
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: "You write simple, crash-proof CadQuery Python code. Keep it minimal." },
+      { role: "user", content: fallbackPrompt },
+    ],
+    temperature: 0.1,
+    max_tokens: 1500,
+  })
+
+  const rawCode = completion.choices[0]?.message?.content
+  if (!rawCode) {
+    throw new Error("[XRayCadGen] AI returned empty response for simplified fallback")
+  }
+
+  return rawCode
+    .replace(/^```(?:python)?\n?/gm, "")
+    .replace(/\n?```$/gm, "")
+    .trim()
 }
 
 /**
@@ -472,22 +591,34 @@ export async function generateModuleCadModel(
   // Stage 2: Modal executes the code (with auto-retry on failure)
   let modalResult = await executeCadQueryOnModal(cadQueryCode, module.id, materialDensity)
 
-  // Retry loop: if Modal returns an execution error, feed it back to AI for a fix
+  // Retry loop: if Modal returns an execution error, feed it back to AI for a fix.
+  // On the final attempt, switch to a simplified fallback prompt for maximum reliability.
   if (modalResult.error) {
     let lastError: string = modalResult.error
     for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
-      console.warn("[XRayCadGen] Execution failed, retrying with error feedback:", {
+      const isFinalAttempt = attempt === MAX_RETRY_ATTEMPTS
+
+      console.warn("[XRayCadGen] Execution failed, retrying:", {
         moduleId: module.id,
         attempt,
+        isFinalAttempt,
         error: lastError.slice(0, 200),
       })
 
       try {
-        cadQueryCode = await regenerateCadQueryCode(module, cadQueryCode, lastError)
+        // Final attempt: use simplified fallback for maximum reliability
+        cadQueryCode = isFinalAttempt
+          ? await generateSimplifiedFallbackCode(module)
+          : await regenerateCadQueryCode(module, cadQueryCode, lastError)
+
         modalResult = await executeCadQueryOnModal(cadQueryCode, module.id, materialDensity)
 
         if (!modalResult.error) {
-          console.info("[XRayCadGen] Retry succeeded on attempt:", { moduleId: module.id, attempt })
+          console.info("[XRayCadGen] Retry succeeded on attempt:", {
+            moduleId: module.id,
+            attempt,
+            usedFallback: isFinalAttempt,
+          })
           break
         }
         lastError = modalResult.error
@@ -503,7 +634,10 @@ export async function generateModuleCadModel(
   }
 
   if (modalResult.error) {
-    throw new Error(`[XRayCadGen] Modal execution failed: ${modalResult.error}`)
+    throw new CadGenerationError(
+      `[XRayCadGen] Modal execution failed: ${modalResult.error}`,
+      cadQueryCode,
+    )
   }
 
   // Stage 3: Upload files to Supabase Storage
@@ -636,16 +770,37 @@ const SYSTEM_CAD_PROMPT = `You are an expert CAD engineer. Write CadQuery Python
 7. Do NOT model internal details — focus on the outer envelope and recognizable shape.
 8. Apply realistic overall proportions and dimensions.
 9. Include a PARAMETERS block with key dimensions.
-10. Target 80-200 lines of code.
+10. Target 60-150 lines of code.
 11. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or file I/O.
-12. Make it look like a real product — fillets, mounting features, panel lines.
+12. Prefer simple, robust geometry over fine detail.
 
 ## CadQuery Patterns
 - \`cq.Workplane("XY").box(l, w, h)\` for bodies
 - \`.circle(r).extrude(h)\` for cylinders
-- \`.edges("|Z").fillet(r)\` for rounding
+- \`.edges("|Z").chamfer(c)\` for edge treatment (prefer chamfer over fillet)
 - \`.cut(other)\` / \`.union(other)\` for boolean ops
-- \`.shell(-t)\` for hollow shells
+- \`.transformed(offset=(x,y,z))\` for positioning features
+
+## CRITICAL: Common Pitfalls — AVOID These
+1. **NEVER use \`.shell()\`** unless the geometry is a simple box or cylinder. It crashes on complex or boolean-combined shapes. Build hollow bodies manually with \`.cut()\` instead.
+2. **Keep \`.fillet()\` radius small** — under 30% of the smallest adjacent edge length. Prefer \`.chamfer()\` for reliability. If fillet radius might be too large, wrap it in try/except:
+   \`\`\`python
+   try:
+       result = result.edges("|Z").fillet(FILLET_RADIUS)
+   except:
+       result = result.edges("|Z").chamfer(FILLET_RADIUS * 0.5)
+   \`\`\`
+3. **Avoid deeply nested boolean operations.** Build geometry incrementally, assigning to intermediate variables:
+   \`\`\`python
+   base = cq.Workplane("XY").box(100, 80, 40)
+   cutout = cq.Workplane("XY").circle(20).extrude(40)
+   result = base.cut(cutout)
+   \`\`\`
+4. **Verify shapes overlap** before \`.cut()\` or \`.union()\` — misaligned shapes cause silent failures.
+5. **Use tuples, not lists** for \`.transformed(offset=(x,y,z))\`.
+6. **Workplane selectors** like \`">Z"\` or \`"|Z"\` must match existing geometry — don't reference faces that don't exist yet.
+
+**Golden rule: If in doubt, prefer simpler geometry. A recognizable basic shape is far better than a complex model that crashes.**
 
 Output just the Python code.`
 
@@ -709,6 +864,83 @@ async function generateSystemCadQueryCode(spec: XRaySpec): Promise<string> {
 }
 
 /**
+ * Generates a very simple CadQuery model as a last-resort fallback for the system model.
+ *
+ * @description Used on the final retry attempt when complex generation has failed.
+ * Produces a basic box/cylinder representation of the overall product.
+ *
+ * @param spec - The full XRay spec for context
+ * @returns Minimal CadQuery Python code
+ */
+async function generateSimplifiedSystemFallbackCode(spec: XRaySpec): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error("[XRayCadGen] OPENAI_API_KEY is not configured")
+
+  const openai = new OpenAI({ apiKey })
+
+  const moduleSummary = spec.modules
+    .map((m) => `- ${m.name}`)
+    .join("\n")
+
+  const fallbackPrompt = `Generate the SIMPLEST possible CadQuery model for this product: "${spec.function}".
+
+Modules: ${moduleSummary}
+
+STRICT CONSTRAINTS:
+- Maximum 30 lines of code
+- Do NOT use .shell() — it crashes on non-trivial shapes
+- Do NOT use .fillet() or .chamfer()
+- Do NOT use nested boolean operations
+- Use ONLY: .box(), .circle(), .extrude(), .hole(), .cut() with simple shapes
+- Create a basic recognizable shape: a box or cylinder with a few holes/cutouts
+- Store the final model in a variable called \`result\`
+
+Example of acceptable complexity:
+\`\`\`python
+import cadquery as cq
+import math
+
+BODY_LENGTH = 500.0
+BODY_WIDTH = 300.0
+BODY_HEIGHT = 150.0
+HOLE_DIAMETER = 10.0
+
+result = (
+    cq.Workplane("XY")
+    .box(BODY_LENGTH, BODY_WIDTH, BODY_HEIGHT)
+    .faces(">Z").workplane()
+    .rect(BODY_LENGTH - 40, BODY_WIDTH - 40, forConstruction=True)
+    .vertices()
+    .hole(HOLE_DIAMETER)
+)
+\`\`\`
+
+Output ONLY the Python code. No markdown fences, no explanation.`
+
+  console.info("[XRayCadGen] Generating simplified system fallback for:", {
+    function: spec.function,
+  })
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: "You are a CadQuery expert. Generate only valid Python code." },
+      { role: "user", content: fallbackPrompt },
+    ],
+    temperature: 0.2,
+    max_tokens: 1000,
+  })
+
+  const rawCode = completion.choices[0]?.message?.content
+  if (!rawCode) throw new Error("[XRayCadGen] AI returned empty response for system fallback")
+
+  return rawCode
+    .replace(/^```(?:python)?\n?/gm, "")
+    .replace(/\n?```$/gm, "")
+    .trim()
+}
+
+/**
  * Generates a system-level 3D CAD model representing the overall product.
  *
  * @description Pipeline: AI writes CadQuery for the full product -> Modal
@@ -719,7 +951,7 @@ async function generateSystemCadQueryCode(spec: XRaySpec): Promise<string> {
  * @param spec - The full XRay spec (used for context in the prompt)
  * @returns URLs for STL and isometric SVG, plus the source code
  *
- * @throws Error if any pipeline stage fails after retries
+ * @throws CadGenerationError if all retry attempts fail
  */
 export async function generateSystemCadModel(
   scanId: string,
@@ -728,26 +960,37 @@ export async function generateSystemCadModel(
   // Stage 1: AI generates CadQuery code for the full product
   let cadQueryCode = await generateSystemCadQueryCode(spec)
 
-  // Stage 2: Execute on Modal (default PLA density for conceptual model)
+  // Stage 2: Execute on Modal with retry loop (matches module-level pattern)
   let modalResult = await executeCadQueryOnModal(cadQueryCode, "system", 1240)
 
-  // Retry once if Modal fails
-  if (modalResult.error) {
-    console.warn("[XRayCadGen] System CAD execution failed, retrying:", {
-      error: modalResult.error.slice(0, 200),
+  for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS && modalResult.error; attempt++) {
+    console.warn("[XRayCadGen] System CAD attempt failed, retrying:", {
+      attempt,
+      maxRetries: MAX_RETRY_ATTEMPTS,
+      error: modalResult.error.slice(0, 300),
     })
+
     try {
-      cadQueryCode = await regenerateSystemCadCode(spec, cadQueryCode, modalResult.error)
+      // On final retry, use a simplified fallback prompt
+      if (attempt === MAX_RETRY_ATTEMPTS) {
+        cadQueryCode = await generateSimplifiedSystemFallbackCode(spec)
+      } else {
+        cadQueryCode = await regenerateSystemCadCode(spec, cadQueryCode, modalResult.error)
+      }
       modalResult = await executeCadQueryOnModal(cadQueryCode, "system", 1240)
     } catch (retryError) {
-      console.error("[XRayCadGen] System CAD retry failed:", {
+      console.error("[XRayCadGen] System CAD retry generation failed:", {
+        attempt,
         error: retryError instanceof Error ? retryError.message : "Unknown",
       })
     }
   }
 
   if (modalResult.error) {
-    throw new Error(`[XRayCadGen] System CAD execution failed: ${modalResult.error}`)
+    throw new CadGenerationError(
+      `[XRayCadGen] System CAD execution failed after ${MAX_RETRY_ATTEMPTS + 1} attempts: ${modalResult.error}`,
+      cadQueryCode,
+    )
   }
 
   // Stage 3: Upload STL and isometric SVG

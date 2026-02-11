@@ -859,11 +859,21 @@ export async function approveTask(taskId: string) {
     return { success: true }
 }
 
-// Get all tasks pending executive approval
+/**
+ * Retrieves all tasks pending executive approval within the user's foundry.
+ *
+ * @returns List of pending approval tasks, or error
+ *
+ * @security Requires Executive or Founder role. Filters by foundry_id for defense-in-depth.
+ */
 export async function getPendingApprovals() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized', data: [] }
+
+    // AUTH: Get foundry context for multi-tenant isolation
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry', data: [] }
 
     // Check if user is Executive or Founder
     const { data: profile } = await supabase.from('profiles').select('role, foundry_id').eq('id', user.id).single()
@@ -871,6 +881,7 @@ export async function getPendingApprovals() {
         return { error: 'Only Executives and Founders can view pending approvals', data: [] }
     }
 
+    // SECURITY: Filter by foundry_id for defense-in-depth (not just relying on RLS)
     const { data: tasks, error } = await supabase
         .from('tasks')
         .select(`
@@ -885,6 +896,7 @@ export async function getPendingApprovals() {
             objective:objectives!objective_id(id, title),
             creator:profiles!created_by(id, full_name)
         `)
+        .eq('foundry_id', foundry_id)
         .eq('is_ghost', false)
         .is('deleted_at', null)
         .in('status', ['Pending_Executive_Approval', 'Amended_Pending_Approval'])
@@ -1178,16 +1190,29 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
     }
 }
 
+/**
+ * Triggers the AI worker to process a task assigned to an AI agent.
+ *
+ * @param taskId - The task to trigger AI processing for
+ * @returns Success status or error
+ *
+ * @security Requires authenticated user. Verifies task belongs to user's foundry.
+ */
 export async function triggerAIWorker(taskId: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
-    // Fetch task to get assignee
+    // AUTH: Verify foundry context for multi-tenant isolation
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // SECURITY: Fetch task with foundry_id filter for defense-in-depth
     const { data: task } = await supabase
         .from('tasks')
         .select('assignee_id')
         .eq('id', taskId)
+        .eq('foundry_id', foundry_id)
         .single()
 
     if (!task) return { error: 'Task not found' }

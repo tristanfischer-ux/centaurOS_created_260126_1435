@@ -47,13 +47,16 @@ function getAdminClient() {
  * }
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-    // SECURITY: Validate webhook secret
-    if (INBOUND_WEBHOOK_SECRET) {
-        const authHeader = req.headers.get('authorization')
-        if (authHeader !== `Bearer ${INBOUND_WEBHOOK_SECRET}`) {
-            console.warn('[EmailInbound] Invalid webhook secret')
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
+    // SECURITY: Validate webhook secret — reject if not configured or mismatch
+    if (!INBOUND_WEBHOOK_SECRET) {
+        console.error('[EmailInbound] EMAIL_INBOUND_WEBHOOK_SECRET not configured — rejecting all requests')
+        return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+    }
+
+    const authHeader = req.headers.get('authorization')
+    if (authHeader !== `Bearer ${INBOUND_WEBHOOK_SECRET}`) {
+        console.warn('[EmailInbound] Invalid webhook secret')
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const admin = getAdminClient()

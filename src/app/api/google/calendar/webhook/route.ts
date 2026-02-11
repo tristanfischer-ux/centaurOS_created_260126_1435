@@ -22,11 +22,16 @@ import { NextRequest, NextResponse } from 'next/server'
  * can be implemented by querying the changed events and updating ForgeOS.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-    // SECURITY: Validate webhook token
+    // SECURITY: Validate webhook token — reject if secret not configured or mismatch
     const channelToken = req.headers.get('x-goog-channel-token')
     const webhookSecret = process.env.GOOGLE_CALENDAR_WEBHOOK_SECRET
 
-    if (webhookSecret && channelToken !== webhookSecret) {
+    if (!webhookSecret) {
+        console.error('[GoogleCalendarWebhook] GOOGLE_CALENDAR_WEBHOOK_SECRET not configured — rejecting all requests')
+        return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+    }
+
+    if (channelToken !== webhookSecret) {
         console.warn('[GoogleCalendarWebhook] Invalid channel token')
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

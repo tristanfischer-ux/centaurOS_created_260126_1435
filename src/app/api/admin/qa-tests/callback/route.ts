@@ -4,10 +4,26 @@ import type { QATestWebhookPayload, QATestResults } from '@/types/qa.types'
 
 /**
  * POST /api/admin/qa-tests/callback
- * Webhook endpoint for GitHub Actions to report test results
+ * Webhook endpoint for GitHub Actions to report test results.
+ *
+ * @security Requires QA_CALLBACK_SECRET in Authorization header to prevent
+ *   unauthorized test result fabrication.
  */
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Verify webhook secret before processing any data
+    const callbackSecret = process.env.QA_CALLBACK_SECRET
+    if (!callbackSecret) {
+      console.error('[QACallback] QA_CALLBACK_SECRET not configured — rejecting all requests')
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+    }
+
+    const authHeader = request.headers.get('authorization')
+    if (authHeader !== `Bearer ${callbackSecret}`) {
+      console.warn('[QACallback] Invalid or missing authorization header')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     // Get test run ID from query params
     const testRunId = request.nextUrl.searchParams.get('test_run_id')
     
@@ -59,14 +75,19 @@ export async function POST(request: NextRequest) {
       .eq('id', testRunId)
     
     if (updateError) {
-      console.error('Error updating test run:', updateError)
+      console.error('[QACallback] Failed to update test run:', {
+        testRunId,
+        error: updateError.message,
+      })
       return NextResponse.json({ error: 'Failed to update test run' }, { status: 500 })
     }
     
     return NextResponse.json({ success: true, message: 'Test results recorded' })
     
   } catch (error) {
-    console.error('QA callback error:', error)
+    console.error('[QACallback] Unexpected error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

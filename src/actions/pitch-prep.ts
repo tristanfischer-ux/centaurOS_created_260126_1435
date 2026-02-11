@@ -63,7 +63,16 @@ export async function createPitchPrepRequest(params: CreatePitchPrepParams): Pro
       headquarters: params.headquarters?.trim() || null,
       founder_count: params.founder_count || null,
       team_size: params.team_size || null,
-      key_team_members: params.key_team_members || null,
+      // Map to plain records so TypeScript can verify assignability to Json
+      // (named interfaces can't be checked against recursive index signatures)
+      key_team_members: params.key_team_members
+        ? params.key_team_members.map((m): Record<string, string | undefined> => ({
+            name: m.name,
+            role: m.role,
+            linkedIn: m.linkedIn,
+            background: m.background,
+          }))
+        : null,
       product_description: params.product_description.trim(),
       problem_solved: params.problem_solved?.trim() || null,
       target_market: params.target_market?.trim() || null,
@@ -140,27 +149,32 @@ export async function getPitchPrepRequest(id: string): Promise<{
   const foundryId = await getFoundryIdCached()
   if (!foundryId) return { data: null, error: "User not in a foundry" }
 
-  const { data, error } = await supabase
+  // Fetch request and profile separately — no FK relationship exists
+  // between pitch_prep_requests.user_id and public.profiles in the schema
+  const { data: request, error: requestError } = await supabase
     .from("pitch_prep_requests")
-    .select(`
-      *,
-      user:profiles!pitch_prep_requests_user_id_fkey (
-        id,
-        full_name,
-        email,
-        avatar_url
-      )
-    `)
+    .select("*")
     .eq("id", id)
     .eq("foundry_id", foundryId)
     .single()
 
-  if (error) {
-    console.error("Failed to fetch pitch prep request:", error)
-    return { data: null, error: error.message }
+  if (requestError || !request) {
+    console.error("Failed to fetch pitch prep request:", requestError)
+    return { data: null, error: requestError?.message || "Request not found" }
   }
 
-  return { data: data as PitchPrepRequestWithUser, error: null }
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, full_name, email, avatar_url")
+    .eq("id", request.user_id)
+    .single()
+
+  const result: PitchPrepRequestWithUser = {
+    ...(request as PitchPrepRequest),
+    user: profile,
+  }
+
+  return { data: result, error: null }
 }
 
 /**

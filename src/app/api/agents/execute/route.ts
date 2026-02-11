@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { rateLimit } from "@/lib/security/rate-limit"
 import { getTextProvider, getImageProvider, getAudioProvider, getVideoProvider } from "@/lib/ai-providers/registry"
 import { decryptApiKey } from "@/lib/ai-providers/key-vault"
 import type { AIProviderId, OutputModality } from "@/lib/ai-providers/types"
@@ -69,6 +70,15 @@ export async function POST(request: Request) {
 
     if (!user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // SECURITY: Rate limit to prevent API cost abuse (AI calls are expensive)
+    const rateLimitResult = await rateLimit('api', `agent-execute:${user.id}`, { limit: 30, window: 3600 })
+    if (!rateLimitResult.success) {
+        return NextResponse.json(
+            { error: "Rate limit exceeded. Please wait before running more AI agents." },
+            { status: 429 }
+        )
     }
 
     // 2. Parse body
