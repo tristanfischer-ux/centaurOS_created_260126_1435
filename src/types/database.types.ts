@@ -10930,10 +10930,13 @@ export type Database = {
           foundry_id: string
           id: string
           idea: string
+          name: string | null
           people_matches: Json | null
           spec: Json
+          stage: string
           status: string
           supplier_matches: Json | null
+          thumbnail_url: string | null
           updated_at: string
         }
         Insert: {
@@ -10943,10 +10946,13 @@ export type Database = {
           foundry_id: string
           id?: string
           idea: string
+          name?: string | null
           people_matches?: Json | null
           spec?: Json
+          stage?: string
           status?: string
           supplier_matches?: Json | null
+          thumbnail_url?: string | null
           updated_at?: string
         }
         Update: {
@@ -10956,10 +10962,13 @@ export type Database = {
           foundry_id?: string
           id?: string
           idea?: string
+          name?: string | null
           people_matches?: Json | null
           spec?: Json
+          stage?: string
           status?: string
           supplier_matches?: Json | null
+          thumbnail_url?: string | null
           updated_at?: string
         }
         Relationships: []

@@ -71,15 +71,18 @@ export async function scanIdeaAction(idea: string): Promise<
     // AI scan
     const spec = await scanIdeaService(idea.trim())
 
-    // Persist to database
+    // Persist to database with project name derived from idea
+    const projectName = idea.trim().slice(0, 60)
     const { data: scan, error: insertError } = await supabase
       .from("xray_scans")
       .insert({
         foundry_id: foundryId,
         created_by: user.id,
         idea: idea.trim(),
+        name: projectName,
         spec: spec as unknown as Json,
         status: "scanned",
+        stage: "concept",
       })
       .select("id")
       .single()
@@ -566,20 +569,30 @@ export async function updateScanSpecAction(
 }
 
 /**
- * Loads a scan by ID.
+ * Loads a forge project (scan) by ID with full metadata.
  *
- * @param scanId - The scan ID
- * @returns The scan data or error
+ * @param scanId - The scan/project ID
+ * @returns The project data including spec, stage, name, or error
  *
  * @security RLS ensures foundry isolation
  */
 export async function loadScanAction(scanId: string): Promise<
-  { scanId: string; spec: XRaySpec; status: string } | { error: string }
+  {
+    scanId: string
+    spec: XRaySpec
+    status: string
+    name: string | null
+    stage: string
+    idea: string
+    thumbnailUrl: string | null
+    createdAt: string
+    updatedAt: string
+  } | { error: string }
 > {
   return withAuth(async ({ supabase }) => {
     const { data: scan, error } = await supabase
       .from("xray_scans")
-      .select("id, spec, status")
+      .select("id, spec, status, name, stage, idea, thumbnail_url, created_at, updated_at")
       .eq("id", scanId)
       .single()
 
@@ -591,25 +604,43 @@ export async function loadScanAction(scanId: string): Promise<
       scanId: scan.id,
       spec: scan.spec as unknown as XRaySpec,
       status: scan.status,
+      name: scan.name,
+      stage: scan.stage,
+      idea: scan.idea,
+      thumbnailUrl: scan.thumbnail_url,
+      createdAt: scan.created_at,
+      updatedAt: scan.updated_at,
     }
   })
 }
 
 /**
- * Lists all scans for the current foundry.
+ * Lists all forge projects for the current foundry.
  *
- * @returns Array of scan summaries
+ * @returns Array of project summaries with metadata
  *
  * @security RLS ensures foundry isolation
  */
 export async function listScansAction(): Promise<
-  { scans: Array<{ id: string; idea: string; status: string; createdAt: string }> } | { error: string }
+  {
+    scans: Array<{
+      id: string
+      idea: string
+      name: string | null
+      status: string
+      stage: string
+      thumbnailUrl: string | null
+      moduleCount: number
+      createdAt: string
+      updatedAt: string
+    }>
+  } | { error: string }
 > {
   return withAuth(async ({ supabase }) => {
     const { data: scans, error } = await supabase
       .from("xray_scans")
-      .select("id, idea, status, created_at")
-      .order("created_at", { ascending: false })
+      .select("id, idea, name, status, stage, thumbnail_url, spec, created_at, updated_at")
+      .order("updated_at", { ascending: false })
       .limit(50)
 
     if (error) {
@@ -617,13 +648,68 @@ export async function listScansAction(): Promise<
     }
 
     return {
-      scans: (scans || []).map((s) => ({
-        id: s.id,
-        idea: s.idea,
-        status: s.status,
-        createdAt: s.created_at,
-      })),
+      scans: (scans || []).map((s) => {
+        const spec = s.spec as unknown as XRaySpec | null
+        return {
+          id: s.id,
+          idea: s.idea,
+          name: s.name,
+          status: s.status,
+          stage: s.stage,
+          thumbnailUrl: s.thumbnail_url,
+          moduleCount: spec?.modules?.length ?? 0,
+          createdAt: s.created_at,
+          updatedAt: s.updated_at,
+        }
+      }),
     }
+  })
+}
+
+/**
+ * Updates project metadata (name, stage) for a forge project.
+ *
+ * @param scanId - The project ID
+ * @param updates - Partial update with name and/or stage
+ * @returns Success or error
+ *
+ * @security Requires authenticated user, RLS ensures foundry isolation
+ */
+export async function updateProjectMetadataAction(
+  scanId: string,
+  updates: { name?: string; stage?: string; thumbnailUrl?: string },
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    // VALIDATION: Stage must be valid if provided
+    const validStages = ["concept", "dossier", "people", "supply_chain", "contracting"]
+    if (updates.stage && !validStages.includes(updates.stage)) {
+      return { error: `Invalid stage: ${updates.stage}` }
+    }
+
+    // VALIDATION: Name length
+    if (updates.name !== undefined && updates.name.length > 200) {
+      return { error: "Project name must be 200 characters or less" }
+    }
+
+    const updatePayload: Record<string, unknown> = {}
+    if (updates.name !== undefined) updatePayload.name = updates.name
+    if (updates.stage !== undefined) updatePayload.stage = updates.stage
+    if (updates.thumbnailUrl !== undefined) updatePayload.thumbnail_url = updates.thumbnailUrl
+
+    if (Object.keys(updatePayload).length === 0) {
+      return { success: true as const }
+    }
+
+    const { error } = await supabase
+      .from("xray_scans")
+      .update(updatePayload)
+      .eq("id", scanId)
+
+    if (error) {
+      return { error: `Failed to update project: ${error.message}` }
+    }
+
+    return { success: true as const }
   })
 }
 
