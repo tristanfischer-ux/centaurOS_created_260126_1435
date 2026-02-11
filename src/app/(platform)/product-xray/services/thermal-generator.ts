@@ -90,10 +90,10 @@ async function inferThermalConfig(module: ModuleSpec): Promise<ThermalConfig> {
 
   const moduleContext = [
     `Module name: ${module.name}`,
-    `Function: ${module.function}`,
-    module.specs ? `Specs: ${JSON.stringify(module.specs)}` : "",
-    module.technicalDescription
-      ? `Technical description: ${module.technicalDescription}`
+    `Purpose: ${module.purpose}`,
+    module.keyParts?.length ? `Key parts: ${JSON.stringify(module.keyParts)}` : "",
+    module.detail?.whatItIs
+      ? `Technical description: ${module.detail.whatItIs}`
       : "",
   ]
     .filter(Boolean)

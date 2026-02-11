@@ -15,7 +15,7 @@ import { XRayV2View } from "../product-xray-v2/xray-v2-view"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Product X-Ray v3 (3D CAD) | CentaurOS",
+  title: "Product X-Ray v3 (3D CAD) | ForgeOS",
   description: "AI-powered product decomposition with 3D CAD model generation",
 }
 

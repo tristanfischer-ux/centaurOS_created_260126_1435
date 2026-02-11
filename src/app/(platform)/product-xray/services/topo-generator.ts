@@ -54,7 +54,7 @@ interface TopoWorkerResult {
 
 /** Map module descriptions to material keys for the topo worker */
 function inferMaterialKey(module: ModuleSpec): string {
-  const desc = `${module.name} ${module.function} ${module.technicalDescription ?? ""}`.toLowerCase()
+  const desc = `${module.name} ${module.purpose} ${module.detail?.whatItIs ?? ""}`.toLowerCase()
 
   if (desc.includes("aluminum") || desc.includes("aluminium") || desc.includes("alloy")) {
     return "aluminum_6061"

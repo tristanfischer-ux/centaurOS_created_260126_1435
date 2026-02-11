@@ -19,62 +19,50 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 
-import type { ModuleSpec } from "./xray-schema"
+import type { ModuleSpec, EmiShielding, Fatigue, Impact } from "./xray-schema"
 
 // ─── Constants ───────────────────────────────────────────────────────
 
 const STORAGE_BUCKET = "xray-images"
 const PREMIUM_TIMEOUT_MS = 180_000 // 3 minutes
 
-// ─── Types ───────────────────────────────────────────────────────────
+// ─── Typed Worker Response ───────────────────────────────────────────
 
-/** EMI shielding analysis result */
-export interface EmiShieldingResult {
-  status: "complete" | "failed"
-  isConductive: boolean
-  seAt1GHz_dB?: number
-  overallRating?: string
+/** Raw response shape from the Modal premium worker */
+interface PremiumWorkerResponse {
+  error?: string
+  // EMI fields
+  is_conductive?: boolean
+  se_at_1GHz_dB?: number
+  overall_rating?: string
   recommendation?: string
-  wallThickness_mm?: number
-  shieldingData?: Array<{
+  wall_thickness_mm?: number
+  shielding_data?: Array<{
     frequency_Hz: number
-    frequencyLabel: string
-    seTotal_dB: number
+    frequency_label: string
+    se_total_dB: number
   }>
-  visualizationUrl?: string
-  computedAt: string
-}
-
-/** Fatigue life estimation result */
-export interface FatigueResult {
-  status: "complete" | "failed"
-  cyclesToFailure?: number
-  cyclesToFailureLabel?: string
-  lifeCategory?: string
+  visualization_b64?: string
+  // Fatigue fields
+  cycles_to_failure?: number
+  cycles_to_failure_label?: string
+  life_category?: string
   description?: string
-  safetyFactor?: number
-  enduranceLimit_MPa?: number
-  stressAmplitude_MPa?: number
-  meanStress_MPa?: number
-  computedAt: string
-}
-
-/** Impact resistance result */
-export interface ImpactResult {
-  status: "complete" | "failed"
-  impactVelocity_m_s?: number
-  kineticEnergy_J?: number
-  energyAbsorptionCapacity_J?: number
-  safetyFactor?: number
+  safety_factor?: number
+  endurance_limit_MPa?: number
+  stress_amplitude_MPa?: number
+  mean_stress_MPa?: number
+  // Impact fields
+  impact_velocity_m_s?: number
+  kinetic_energy_J?: number
+  energy_absorption_capacity_J?: number
   rating?: string
-  description?: string
-  computedAt: string
 }
 
 // ─── Material Inference ──────────────────────────────────────────────
 
 function inferMaterialKey(module: ModuleSpec): string {
-  const desc = `${module.name} ${module.function} ${module.technicalDescription ?? ""}`.toLowerCase()
+  const desc = `${module.name} ${module.purpose} ${module.detail?.whatItIs ?? ""}`.toLowerCase()
   if (desc.includes("aluminum") || desc.includes("aluminium")) return "aluminum_6061"
   if (desc.includes("steel")) return "steel_mild"
   if (desc.includes("titanium")) return "titanium"
@@ -98,7 +86,7 @@ function inferMaterialKey(module: ModuleSpec): string {
 export async function runEmiAnalysis(
   scanId: string,
   module: ModuleSpec,
-): Promise<EmiShieldingResult> {
+): Promise<EmiShielding> {
   const endpoint = process.env.MODAL_PREMIUM_ENDPOINT_URL
   if (!endpoint) {
     throw new Error("[XRayPremium] MODAL_PREMIUM_ENDPOINT_URL is not configured")
@@ -121,7 +109,7 @@ export async function runEmiAnalysis(
   })
 
   if (result.error) {
-    return { status: "failed", isConductive: false, computedAt: new Date().toISOString() }
+    return { status: "failed", computedAt: new Date().toISOString() }
   }
 
   // Upload visualization if available
@@ -146,11 +134,6 @@ export async function runEmiAnalysis(
     overallRating: result.overall_rating,
     recommendation: result.recommendation,
     wallThickness_mm: result.wall_thickness_mm,
-    shieldingData: (result.shielding_data ?? []).map((d: Record<string, unknown>) => ({
-      frequency_Hz: d.frequency_Hz as number,
-      frequencyLabel: d.frequency_label as string,
-      seTotal_dB: d.se_total_dB as number,
-    })),
     visualizationUrl,
     computedAt: new Date().toISOString(),
   }
@@ -166,7 +149,7 @@ export async function runEmiAnalysis(
  */
 export async function runFatigueAnalysis(
   module: ModuleSpec,
-): Promise<FatigueResult> {
+): Promise<Fatigue> {
   const endpoint = process.env.MODAL_PREMIUM_ENDPOINT_URL
   if (!endpoint) {
     throw new Error("[XRayPremium] MODAL_PREMIUM_ENDPOINT_URL is not configured")
@@ -216,7 +199,7 @@ export async function runFatigueAnalysis(
  */
 export async function runImpactAnalysis(
   module: ModuleSpec,
-): Promise<ImpactResult> {
+): Promise<Impact> {
   const endpoint = process.env.MODAL_PREMIUM_ENDPOINT_URL
   if (!endpoint) {
     throw new Error("[XRayPremium] MODAL_PREMIUM_ENDPOINT_URL is not configured")
@@ -261,9 +244,9 @@ function estimateWallThickness(module: ModuleSpec): number {
   if (!bb) return 2.0
 
   // Rough estimate: wall thickness ~ volume / surface area
-  const dx = bb.xLength
-  const dy = bb.yLength
-  const dz = bb.zLength
+  const dx = bb.xLen
+  const dy = bb.yLen
+  const dz = bb.zLen
   const surfaceArea = 2 * (dx * dy + dy * dz + dx * dz)
   const volume = module.cadModel?.analysis?.massProperties?.volume_mm3 ?? (dx * dy * dz * 0.3)
 
@@ -275,7 +258,7 @@ function estimateWallThickness(module: ModuleSpec): number {
 async function callPremiumWorker(
   endpoint: string,
   body: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
+): Promise<PremiumWorkerResponse> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), PREMIUM_TIMEOUT_MS)
 
@@ -294,7 +277,7 @@ async function callPremiumWorker(
       return { error: `API error (${response.status}): ${errText.slice(0, 300)}` }
     }
 
-    return (await response.json()) as Record<string, unknown>
+    return (await response.json()) as PremiumWorkerResponse
   } catch (error) {
     clearTimeout(timeoutId)
     if (error instanceof DOMException && error.name === "AbortError") {

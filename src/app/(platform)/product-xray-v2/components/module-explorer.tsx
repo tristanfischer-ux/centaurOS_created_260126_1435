@@ -885,23 +885,25 @@ function MassPropertiesCard({ mp }: { mp: MassProperties }): React.ReactNode {
 }
 
 /**
- * MetricCell — A single metric display with label, value, and icon.
+ * MetricCell — A single metric display with label, value, and optional icon.
  */
 function MetricCell({
   label,
   value,
   icon,
+  className,
 }: {
   label: string
   value: string
-  icon: React.ReactNode
+  icon?: React.ReactNode
+  className?: string
 }): React.ReactNode {
   return (
     <div className="flex items-start gap-2 rounded-lg bg-background border px-3 py-2">
-      <div className="text-muted-foreground mt-0.5 shrink-0">{icon}</div>
+      {icon && <div className="text-muted-foreground mt-0.5 shrink-0">{icon}</div>}
       <div className="min-w-0">
         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
-        <p className="text-sm font-medium text-foreground truncate">{value}</p>
+        <p className={cn("text-sm font-medium text-foreground truncate", className)}>{value}</p>
       </div>
     </div>
   )
