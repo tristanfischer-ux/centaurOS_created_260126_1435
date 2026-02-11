@@ -4,6 +4,12 @@ import { getTextProvider, getImageProvider, getAudioProvider, getVideoProvider }
 import { decryptApiKey } from "@/lib/ai-providers/key-vault"
 import type { AIProviderId, OutputModality } from "@/lib/ai-providers/types"
 import { PROVIDER_REGISTRY } from "@/lib/ai-providers/types"
+import {
+    getMemoryContext,
+    formatMemoryForPrompt,
+    addMemoryMessage,
+    processMemory,
+} from "@/lib/agent-memory"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -71,6 +77,7 @@ export async function POST(request: Request) {
     let providerId: AIProviderId
     let modelId: string
     let modality: OutputModality
+    let threadId: string | undefined
 
     try {
         const body = await request.json()
@@ -79,6 +86,7 @@ export async function POST(request: Request) {
         providerId = body.providerId ?? "anthropic"
         modelId = body.modelId ?? "claude-opus-4-6"
         modality = body.modality ?? "text"
+        threadId = body.threadId ?? undefined
 
         if (!prompt || typeof prompt !== "string") {
             return NextResponse.json({ error: "prompt is required" }, { status: 400 })
@@ -186,19 +194,55 @@ export async function POST(request: Request) {
     let finalPrompt = prompt.replace(/\{\{input\}\}/g, input)
     finalPrompt = finalPrompt.replace(/\{\{company_context\}\}/g, companyContext)
 
-    // 6. Build system prompt with company context
-    const systemPromptWithContext = companyContext
-        ? `${SYSTEM_PROMPT}\n\n## Company Context\n${companyContext}`
-        : SYSTEM_PROMPT
+    // 6. Build system prompt with company context + agent memory
+    let memoryBlock = ""
+    const foundryId = await resolveFoundryId(supabase, user.id)
+
+    if (threadId && foundryId) {
+        try {
+            const memoryContext = await getMemoryContext(threadId, foundryId, true)
+            memoryBlock = formatMemoryForPrompt(memoryContext)
+
+            // Record the user's prompt as a message in the memory thread
+            await addMemoryMessage(threadId, foundryId, "user", finalPrompt)
+        } catch (err) {
+            // Non-critical — proceed without memory context
+            console.warn("[agents/execute] Could not load agent memory:", err)
+        }
+    }
+
+    let systemPromptWithContext = SYSTEM_PROMPT
+    if (companyContext) {
+        systemPromptWithContext += `\n\n## Company Context\n${companyContext}`
+    }
+    if (memoryBlock) {
+        systemPromptWithContext += `\n\n## Agent Memory\n${memoryBlock}`
+    }
 
     // 7. Route to the right provider based on modality
+    // Memory callback: record assistant response and process memory after streaming
+    const memoryCallback = threadId && foundryId
+        ? async (fullOutput: string) => {
+            try {
+                await addMemoryMessage(threadId!, foundryId, "assistant", fullOutput)
+                // Process memory asynchronously (observe/reflect if thresholds hit)
+                // Fire-and-forget — don't block the response
+                processMemory(threadId!, foundryId).catch((err) => {
+                    console.warn("[agents/execute] Memory processing failed:", err)
+                })
+            } catch (err) {
+                console.warn("[agents/execute] Failed to record assistant message:", err)
+            }
+        }
+        : undefined
+
     try {
         if (modality === "text") {
-            return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, systemPromptWithContext)
+            return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, systemPromptWithContext, memoryCallback)
         }
         if (modality === "slides") {
             // Slides use text generation with a structured output prompt
-            return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, SLIDES_SYSTEM_PROMPT)
+            return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback)
         }
         if (modality === "image") {
             return await handleImageGeneration(apiKey, providerId, modelId, finalPrompt)
@@ -225,7 +269,8 @@ async function handleTextStreaming(
     providerId: AIProviderId,
     modelId: string,
     finalPrompt: string,
-    customSystemPrompt?: string
+    customSystemPrompt?: string,
+    onComplete?: (fullOutput: string) => Promise<void>
 ): Promise<Response> {
     const streamFn = getTextProvider(providerId)
     if (!streamFn) {
@@ -236,6 +281,8 @@ async function handleTextStreaming(
     }
 
     const encoder = new TextEncoder()
+    let fullOutput = ""
+
     const readable = new ReadableStream({
         async start(controller) {
             try {
@@ -246,11 +293,16 @@ async function handleTextStreaming(
                     userPrompt: finalPrompt,
                     maxTokens: 16384,
                     onChunk(text) {
+                        fullOutput += text
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
                     },
                     onDone() {
                         controller.enqueue(encoder.encode("data: [DONE]\n\n"))
                         controller.close()
+                        // Record the full output to agent memory (fire-and-forget)
+                        if (onComplete && fullOutput) {
+                            onComplete(fullOutput).catch(() => {})
+                        }
                     },
                     onError(error) {
                         controller.enqueue(
@@ -336,4 +388,26 @@ async function handleVideoGeneration(
 
     const result = await genFn({ apiKey, modelId, prompt: finalPrompt })
     return NextResponse.json({ modality: "video", videoUrl: result.videoUrl })
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Resolves the active foundry ID for a user.
+ *
+ * @param supabase - Authenticated Supabase client
+ * @param userId - The authenticated user's ID
+ * @returns The foundry ID, or null if not found
+ */
+async function resolveFoundryId(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    userId: string
+): Promise<string | null> {
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("foundry_id, active_foundry_id")
+        .eq("id", userId)
+        .single()
+
+    return profile?.active_foundry_id || profile?.foundry_id || null
 }

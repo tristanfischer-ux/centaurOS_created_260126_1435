@@ -680,6 +680,157 @@ export type Database = {
           },
         ]
       }
+      agent_memory_messages: {
+        Row: {
+          content: string
+          created_at: string
+          foundry_id: string
+          id: string
+          is_observed: boolean
+          role: string
+          thread_id: string
+          token_count: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          foundry_id: string
+          id?: string
+          is_observed?: boolean
+          role?: string
+          thread_id: string
+          token_count?: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          is_observed?: boolean
+          role?: string
+          thread_id?: string
+          token_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_memory_messages_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_memory_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "agent_memory_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_memory_observations: {
+        Row: {
+          created_at: string
+          foundry_id: string
+          id: string
+          observations_text: string
+          thread_id: string
+          token_count: number
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          foundry_id: string
+          id?: string
+          observations_text?: string
+          thread_id: string
+          token_count?: number
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          observations_text?: string
+          thread_id?: string
+          token_count?: number
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_memory_observations_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_memory_observations_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "agent_memory_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_memory_threads: {
+        Row: {
+          context_id: string | null
+          context_type: string
+          created_at: string
+          created_by: string | null
+          foundry_id: string
+          id: string
+          metadata: Json
+          updated_at: string
+        }
+        Insert: {
+          context_id?: string | null
+          context_type?: string
+          created_at?: string
+          created_by?: string | null
+          foundry_id: string
+          id?: string
+          metadata?: Json
+          updated_at?: string
+        }
+        Update: {
+          context_id?: string | null
+          context_type?: string
+          created_at?: string
+          created_by?: string | null
+          foundry_id?: string
+          id?: string
+          metadata?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_memory_threads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_memory_threads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_memory_threads_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_workflow_runs: {
         Row: {
           completed_at: string | null
@@ -3493,6 +3644,7 @@ export type Database = {
           created_at: string | null
           id: string
           industry: string | null
+          logo_url: string | null
           name: string
           owner_id: string | null
           purpose_data: Json | null
@@ -3503,6 +3655,7 @@ export type Database = {
           created_at?: string | null
           id: string
           industry?: string | null
+          logo_url?: string | null
           name: string
           owner_id?: string | null
           purpose_data?: Json | null
@@ -3513,6 +3666,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           industry?: string | null
+          logo_url?: string | null
           name?: string
           owner_id?: string | null
           purpose_data?: Json | null
@@ -11518,6 +11672,7 @@ export type Database = {
           is_active: boolean
           is_primary: boolean
           joined_at: string
+          logo_url: string
           member_count: number
           role: Database["public"]["Enums"]["member_role"]
         }[]

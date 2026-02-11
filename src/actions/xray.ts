@@ -37,12 +37,14 @@ import { runThermalAnalysis } from "@/app/(platform)/the-forge/services/thermal-
 import { runEmiAnalysis, runFatigueAnalysis, runImpactAnalysis } from "@/app/(platform)/the-forge/services/premium-analysis-generator"
 import { runConvergenceStep } from "@/app/(platform)/the-forge/services/convergence-controller"
 import { enrichModules } from "@/app/(platform)/the-forge/services/inspiration-bridge"
+import { generateReviewTasks } from "@/app/(platform)/the-forge/services/xray-to-objectives"
 
 import type { XRaySpec, ModuleSpec, SystemAnalysis, ModuleAnalysis } from "@/app/(platform)/the-forge/services/xray-schema"
 import type { PersonMatch } from "@/app/(platform)/the-forge/services/people"
 import type { SupplierMatch } from "@/app/(platform)/the-forge/services/suppliers"
 import type { ModuleEnrichment } from "@/app/(platform)/the-forge/services/inspiration-bridge"
 import type { ConvergenceEvaluation, ProposedChange } from "@/app/(platform)/the-forge/services/convergence-controller"
+import type { EngineeringReviewResult } from "@/app/(platform)/the-forge/services/xray-to-objectives"
 import type { Json } from "@/types/database.types"
 
 // ─── Scan Actions ────────────────────────────────────────────────────
@@ -1624,6 +1626,155 @@ export async function runConvergenceStepAction(
       proposedChanges: evaluation.proposedChanges,
       shouldContinue,
       spec: updatedSpec,
+    }
+  })
+}
+
+// ─── Engineering Review Bridge ───────────────────────────────────────
+
+/**
+ * Creates an Objective with review Tasks from X-Ray analysis results.
+ *
+ * @description After the full analysis pipeline completes, this action
+ * creates a structured review objective with tasks for each analysis
+ * area that needs human validation. Tasks are auto-generated based on
+ * analysis results — failed FEA gets safety review, DFM issues get
+ * manufacturing review, etc.
+ *
+ * @param scanId - The scan ID to load analysis results from
+ * @param evaluation - Optional convergence evaluation for proposed changes
+ * @returns The created objective ID and task IDs
+ *
+ * @security Requires authenticated user with foundry context
+ * @audit Logs engineering_review_created event
+ */
+export async function createEngineeringReviewAction(
+  scanId: string,
+  evaluation?: ConvergenceEvaluation,
+): Promise<EngineeringReviewResult | { error: string }> {
+  return withAuth(async ({ supabase, userId, foundryId }) => {
+    // Load the scan spec
+    const { data: scan, error: loadError } = await supabase
+      .from("xray_scans")
+      .select("id, spec, name")
+      .eq("id", scanId)
+      .single()
+
+    if (loadError || !scan) {
+      return { error: "Scan not found" }
+    }
+
+    const spec = scan.spec as unknown as XRaySpec
+    const projectName = (scan as Record<string, unknown>).name as string | null
+    const displayName = projectName || spec.productName || "Forge Project"
+
+    // Generate review task definitions from analysis results
+    const taskDefs = generateReviewTasks(spec, evaluation)
+
+    if (taskDefs.length === 0) {
+      return { error: "No review tasks needed — all analyses passed" }
+    }
+
+    // 1. Create the parent objective
+    const { data: objective, error: objError } = await supabase
+      .from("objectives")
+      .insert({
+        title: `Engineering Review: ${displayName}`,
+        description: `Review and validate engineering analysis results for "${displayName}". ` +
+          `${taskDefs.length} items need human review before design can be approved.`,
+        creator_id: userId,
+        foundry_id: foundryId,
+      })
+      .select("id")
+      .single()
+
+    if (objError || !objective) {
+      console.error("[XRay] Failed to create review objective:", objError?.message)
+      return { error: objError?.message ?? "Failed to create objective" }
+    }
+
+    // AUDIT: Log objective creation
+    console.info("[XRay] Engineering review objective created:", {
+      objectiveId: objective.id,
+      scanId,
+      taskCount: taskDefs.length,
+    })
+
+    // 2. Create tasks under the objective
+    const taskInserts = taskDefs.map((def) => ({
+      title: def.title,
+      description: def.description,
+      objective_id: objective.id,
+      creator_id: userId,
+      foundry_id: foundryId,
+      status: "Pending" as const,
+      risk_level: def.riskLevel,
+      start_date: new Date().toISOString(),
+      end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // +14 days
+    }))
+
+    const { data: tasks, error: taskError } = await supabase
+      .from("tasks")
+      .insert(taskInserts)
+      .select("id")
+
+    if (taskError) {
+      console.error("[XRay] Failed to create review tasks:", taskError.message)
+      return { error: `Tasks creation failed: ${taskError.message}` }
+    }
+
+    const taskIds = (tasks ?? []).map((t) => t.id)
+
+    // 3. Create review gates for tasks that need them
+    const reviewGateIds: string[] = []
+    const gateInserts: Array<{
+      foundry_id: string
+      task_id: string
+      gate_type: string
+      title: string
+      description: string
+      required_skills: string[]
+      created_by: string
+    }> = []
+
+    for (let i = 0; i < taskDefs.length; i++) {
+      const def = taskDefs[i]
+      const taskId = taskIds[i]
+      if (!def.gateType || !taskId) continue
+
+      gateInserts.push({
+        foundry_id: foundryId,
+        task_id: taskId,
+        gate_type: def.gateType,
+        title: `Gate: ${def.title}`,
+        description: `Review gate for: ${def.title}`,
+        required_skills: def.requiredSkills ?? [],
+        created_by: userId,
+      })
+    }
+
+    if (gateInserts.length > 0) {
+      const { data: gates, error: gateError } = await supabase
+        .from("review_gates")
+        .insert(gateInserts)
+        .select("id")
+
+      if (gateError) {
+        console.warn("[XRay] Failed to create some review gates:", gateError.message)
+      } else {
+        reviewGateIds.push(...(gates ?? []).map((g) => g.id))
+      }
+    }
+
+    // Count analysis vs change tasks
+    const changeTaskCount = taskDefs.filter((d) => d.title.startsWith("Implement:")).length
+
+    return {
+      objectiveId: objective.id,
+      taskIds,
+      reviewGateIds,
+      analysisTaskCount: taskDefs.length - changeTaskCount,
+      changeTaskCount,
     }
   })
 }

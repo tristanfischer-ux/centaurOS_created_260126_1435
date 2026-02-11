@@ -31,12 +31,15 @@ import {
   CheckCircle2,
   AlertTriangle,
   Zap,
+  ClipboardList,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import type { XRaySpec, SystemAnalysis, ModuleSpec } from "../services/xray-schema"
 
 // ─── Props ───────────────────────────────────────────────────────────
+
+import type { PipelineProgress, PipelineStageStatus } from "./forge-project-context"
 
 interface EngineeringSummaryProps {
   spec: XRaySpec
@@ -48,6 +51,12 @@ interface EngineeringSummaryProps {
   isRunningConvergence?: boolean
   onRunPremium?: () => void
   isRunningPremium?: boolean
+  /** Full pipeline handler */
+  onRunFullPipeline?: () => void
+  /** Pipeline progress state */
+  pipelineProgress?: PipelineProgress
+  /** Create review objective from analysis results */
+  onCreateReviewObjective?: () => Promise<string | null>
 }
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -75,6 +84,9 @@ export function EngineeringSummary({
   isRunningConvergence = false,
   onRunPremium,
   isRunningPremium = false,
+  onRunFullPipeline,
+  pipelineProgress,
+  onCreateReviewObjective,
 }: EngineeringSummaryProps): React.ReactNode {
   const sa = spec.systemAnalysis
   const modulesWithAnalysis = spec.modules.filter(
@@ -110,6 +122,28 @@ export function EngineeringSummary({
             <Badge variant="secondary" className="text-xs">
               {modulesWithAnalysis.length} analyzed
             </Badge>
+          )}
+          {onRunFullPipeline && modulesWithCad.length > 0 && (
+            <Button
+              size="sm"
+              onClick={onRunFullPipeline}
+              disabled={
+                pipelineProgress?.isRunning ||
+                isAnalyzing || isRunningStructural || isRunningConvergence || isRunningPremium
+              }
+            >
+              {pipelineProgress?.isRunning ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Pipeline Running...
+                </>
+              ) : (
+                <>
+                  <FlaskConical className="h-4 w-4 mr-2" />
+                  Run Full Analysis
+                </>
+              )}
+            </Button>
           )}
           {onRunAnalysis && modulesWithCad.length > 0 && (
             <Button
@@ -193,6 +227,16 @@ export function EngineeringSummary({
           )}
         </div>
       </div>
+
+      {/* Full Pipeline Progress Stepper */}
+      {pipelineProgress && pipelineProgress.isRunning && (
+        <PipelineProgressCard stages={pipelineProgress.stages} />
+      )}
+
+      {/* Pipeline complete summary — show when pipeline finished but has results */}
+      {pipelineProgress && !pipelineProgress.isRunning && pipelineProgress.stages.some((s) => s.status === "complete") && (
+        <PipelineCompleteCard stages={pipelineProgress.stages} onCreateReviewObjective={onCreateReviewObjective} />
+      )}
 
       {hasAnalysis && sa && (
         <>
@@ -434,6 +478,171 @@ function ModuleAnalysisRow({ module: m }: { module: ModuleSpec }): React.ReactNo
         })()}
       </td>
     </tr>
+  )
+}
+
+// ─── Pipeline Progress Cards ─────────────────────────────────────────
+
+const STAGE_ICONS: Record<string, React.ElementType> = {
+  mass_dfm: Scale,
+  structural: ShieldAlert,
+  thermal: FlaskConical,
+  topology: BarChart3,
+  convergence: RotateCcw,
+}
+
+/**
+ * PipelineProgressCard — Shows real-time progress of the full pipeline.
+ * Renders a horizontal stepper with stage status indicators.
+ */
+function PipelineProgressCard({ stages }: { stages: PipelineStageStatus[] }): React.ReactNode {
+  return (
+    <Card>
+      <CardContent className="pt-4 pb-4 px-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
+          <p className="text-sm font-semibold text-foreground">Full Engineering Analysis Running</p>
+        </div>
+        <div className="flex items-center gap-1">
+          {stages.map((stage, idx) => {
+            const Icon = STAGE_ICONS[stage.id] ?? FlaskConical
+            return (
+              <React.Fragment key={stage.id}>
+                {idx > 0 && (
+                  <div
+                    className={cn(
+                      "h-0.5 flex-1 min-w-4",
+                      stage.status === "complete" ? "bg-international-orange"
+                        : stage.status === "error" ? "bg-destructive"
+                          : "bg-muted",
+                    )}
+                  />
+                )}
+                <div
+                  className={cn(
+                    "flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium whitespace-nowrap",
+                    stage.status === "running" && "bg-orange-50 text-international-orange",
+                    stage.status === "complete" && "bg-orange-50/50 text-international-orange",
+                    stage.status === "error" && "bg-status-error-light text-destructive",
+                    stage.status === "pending" && "text-muted-foreground",
+                  )}
+                >
+                  {stage.status === "running" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : stage.status === "complete" ? (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  ) : stage.status === "error" ? (
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                  ) : (
+                    <Icon className="h-3.5 w-3.5" />
+                  )}
+                  <span className="hidden sm:inline">{stage.label}</span>
+                </div>
+              </React.Fragment>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * PipelineCompleteCard — Summary shown after pipeline finishes.
+ * Shows which stages passed/failed with a compact overview and
+ * an option to create review tasks in the task system.
+ */
+function PipelineCompleteCard({
+  stages,
+  onCreateReviewObjective,
+}: {
+  stages: PipelineStageStatus[]
+  onCreateReviewObjective?: () => Promise<string | null>
+}): React.ReactNode {
+  const [isCreating, setIsCreating] = React.useState(false)
+  const [created, setCreated] = React.useState(false)
+  const completed = stages.filter((s) => s.status === "complete").length
+  const failed = stages.filter((s) => s.status === "error").length
+  const total = stages.length
+
+  const handleCreateReview = async (): Promise<void> => {
+    if (!onCreateReviewObjective) return
+    setIsCreating(true)
+    try {
+      const objId = await onCreateReviewObjective()
+      if (objId) setCreated(true)
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="pt-4 pb-4 px-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {failed === 0 ? (
+              <CheckCircle2 className="h-5 w-5 text-status-success" />
+            ) : (
+              <AlertTriangle className="h-5 w-5 text-status-warning" />
+            )}
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Pipeline Complete — {completed}/{total} stages passed
+              </p>
+              {failed > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {failed} stage{failed > 1 ? "s" : ""} had errors
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              {stages.map((stage) => (
+                <div
+                  key={stage.id}
+                  className={cn(
+                    "h-2 w-8 rounded-full",
+                    stage.status === "complete" && "bg-international-orange",
+                    stage.status === "error" && "bg-destructive",
+                    stage.status === "pending" && "bg-muted",
+                    stage.status === "skipped" && "bg-muted",
+                  )}
+                  title={`${stage.label}: ${stage.status}${stage.error ? ` — ${stage.error}` : ""}`}
+                />
+              ))}
+            </div>
+            {onCreateReviewObjective && !created && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleCreateReview}
+                disabled={isCreating}
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <ClipboardList className="h-3.5 w-3.5 mr-1.5" />
+                    Create Review Tasks
+                  </>
+                )}
+              </Button>
+            )}
+            {created && (
+              <Badge variant="success" className="text-xs">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Review Created
+              </Badge>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

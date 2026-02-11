@@ -1,13 +1,16 @@
 /**
- * @file forge-sub-nav.tsx — Stage navigation bar for Forge projects
+ * @file forge-sub-nav.tsx — Pipeline stage navigation for Forge projects
  *
- * @description Horizontal sub-navigation showing the 5 pipeline stages.
- * Active stage uses international-orange. Stages with data show a
- * small progress dot. All stages are freely navigable (no gating).
+ * @description Horizontal pipeline stepper showing the 5 sequential stages
+ * as connected circles with labels. Connector lines and icon states
+ * communicate progression: completed stages show a check, the active
+ * stage glows orange, and pending stages are muted. All stages remain
+ * freely navigable (no gating).
  *
  * @related
  * - Layout: src/app/(platform)/the-forge/[id]/layout.tsx
  * - Context: src/app/(platform)/the-forge/components/forge-project-context.tsx
+ * - Similar pattern: src/components/sidebar/JourneyIndicator.tsx
  */
 
 "use client"
@@ -16,7 +19,14 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-import { Lightbulb, Wrench, Users, Truck, FileText } from "lucide-react"
+import {
+  Lightbulb,
+  Wrench,
+  Users,
+  Truck,
+  FileText,
+  CheckCircle2,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import type { XRaySpec } from "../services/xray-schema"
@@ -93,11 +103,12 @@ interface ForgeSubNavProps {
 }
 
 /**
- * ForgeSubNav — Horizontal stage navigation bar for forge projects.
+ * ForgeSubNav — Pipeline stepper navigation for forge projects.
  *
- * @description Shows 5 pipeline stages as clickable links. Active stage
- * has international-orange styling. Stages with data show a small dot.
- * All stages are freely navigable.
+ * @description Shows 5 sequential pipeline stages as circle icons connected
+ * by horizontal lines. Completed stages show a check icon with orange tint,
+ * the active stage glows orange, and pending stages are muted. Labels appear
+ * below circles on medium+ screens. All stages are freely navigable links.
  *
  * @example
  * <ForgeSubNav projectId={scanId} spec={spec} />
@@ -109,43 +120,80 @@ export function ForgeSubNav({ projectId, spec, className }: ForgeSubNavProps): R
   return (
     <nav
       className={cn(
-        "flex items-center gap-1 border-b border-muted overflow-x-auto",
+        "flex items-center justify-center py-4 px-2 sm:px-4",
         className,
       )}
       aria-label="Forge project stages"
     >
-      {STAGES.map((stage) => {
-        const href = `/the-forge/${projectId}/${stage.segment}`
-        const isActive = pathname.includes(`/${stage.segment}`)
-        const hasData = stagesWithData.has(stage.id)
-        const Icon = stage.icon
+      <div className="flex items-start w-full max-w-2xl">
+        {STAGES.map((stage, index) => {
+          const href = `/the-forge/${projectId}/${stage.segment}`
+          const isActive = pathname.includes(`/${stage.segment}`)
+          const hasData = stagesWithData.has(stage.id)
+          const isCompleted = hasData && !isActive
+          const Icon = stage.icon
 
-        return (
-          <Link
-            key={stage.id}
-            href={href}
-            className={cn(
-              "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap relative",
-              isActive
-                ? "text-international-orange"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            <span>{stage.label}</span>
+          // Connector is orange if the stage before it is completed (has data)
+          const prevStage = index > 0 ? STAGES[index - 1] : null
+          const prevHasData = prevStage ? stagesWithData.has(prevStage.id) : false
 
-            {/* Progress dot */}
-            {hasData && !isActive && (
-              <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
-            )}
+          return (
+            <React.Fragment key={stage.id}>
+              {/* Connector line between stages */}
+              {index > 0 && (
+                <div
+                  className={cn(
+                    "h-0.5 flex-1 mt-[15px] sm:mt-[17px]",
+                    prevHasData
+                      ? "bg-international-orange"
+                      : "bg-muted",
+                  )}
+                  aria-hidden
+                />
+              )}
 
-            {/* Active bottom border accent */}
-            {isActive && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-international-orange rounded-full" />
-            )}
-          </Link>
-        )
-      })}
+              {/* Stage node: circle + label, wrapped in a link */}
+              <Link
+                href={href}
+                className="flex flex-col items-center gap-1.5 transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-international-orange focus:ring-offset-2 rounded-sm"
+                aria-label={`${stage.label}${isActive ? " (current stage)" : ""}${isCompleted ? " (completed)" : ""}`}
+                aria-current={isActive ? "step" : undefined}
+              >
+                {/* Circle icon */}
+                <div
+                  className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors sm:h-9 sm:w-9",
+                    isActive &&
+                      "bg-international-orange text-white shadow-[0_0_12px_rgba(255,69,0,0.4)]",
+                    isCompleted &&
+                      "bg-orange-100 text-international-orange",
+                    !isActive && !isCompleted &&
+                      "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {isCompleted ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    <Icon className="h-4 w-4" />
+                  )}
+                </div>
+
+                {/* Label — hidden on mobile for compact layout */}
+                <span
+                  className={cn(
+                    "hidden text-xs font-medium transition-colors sm:block whitespace-nowrap",
+                    isActive && "text-international-orange font-semibold",
+                    isCompleted && "text-international-orange",
+                    !isActive && !isCompleted && "text-muted-foreground",
+                  )}
+                >
+                  {stage.label}
+                </span>
+              </Link>
+            </React.Fragment>
+          )
+        })}
+      </div>
     </nav>
   )
 }

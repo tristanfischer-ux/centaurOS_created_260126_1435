@@ -26,8 +26,11 @@ import {
   generateCadModelsAction,
   analyzeModulesAction,
   runStructuralAnalysisAction,
+  runThermalAnalysisAction,
+  runTopologyOptimizationAction,
   runConvergenceStepAction,
   runPremiumAnalysisAction,
+  createEngineeringReviewAction,
   matchPeopleAction,
   matchSuppliersAction,
   updateProjectMetadataAction,
@@ -36,11 +39,33 @@ import {
 import type { XRaySpec, ModuleSpec } from "../services/xray-schema"
 import type { PersonMatch } from "../services/people"
 import type { SupplierMatch } from "../services/suppliers"
+import type { ConvergenceEvaluation, ProposedChange } from "../services/convergence-controller"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
 /** Pipeline stages for the Forge */
 export type ForgeStage = "concept" | "dossier" | "people" | "supply_chain" | "contracting"
+
+/** Stages of the full engineering analysis pipeline */
+export type PipelineStageId = "mass_dfm" | "structural" | "thermal" | "topology" | "convergence"
+
+/** Status of a single pipeline stage */
+export interface PipelineStageStatus {
+  id: PipelineStageId
+  label: string
+  status: "pending" | "running" | "complete" | "error" | "skipped"
+  error?: string
+}
+
+/** Overall pipeline progress */
+export interface PipelineProgress {
+  isRunning: boolean
+  stages: PipelineStageStatus[]
+  /** Convergence evaluation returned after pipeline completes */
+  convergenceResult?: ConvergenceEvaluation
+  /** Proposed design changes from the convergence step */
+  proposedChanges?: ProposedChange[]
+}
 
 /** Full project data loaded from DB */
 export interface ForgeProject {
@@ -86,6 +111,14 @@ export interface ForgeProjectContextValue {
   isRunningStructural: boolean
   isRunningConvergence: boolean
   isRunningPremium: boolean
+
+  // ── Full pipeline ──
+  handleRunFullPipeline: () => Promise<void>
+  pipelineProgress: PipelineProgress
+  dismissPipelineChanges: () => void
+
+  // ── Engineering review bridge ──
+  handleCreateReviewObjective: () => Promise<string | null>
 
   // ── People matching ──
   people: PersonMatch[]
@@ -356,6 +389,181 @@ export function ForgeProjectProvider({
     }
   }, [scanId])
 
+  // ── Full Engineering Pipeline ──
+  const INITIAL_PIPELINE_STAGES: PipelineStageStatus[] = [
+    { id: "mass_dfm", label: "Mass & DFM", status: "pending" },
+    { id: "structural", label: "Structural FEA", status: "pending" },
+    { id: "thermal", label: "Thermal Analysis", status: "pending" },
+    { id: "topology", label: "Topology Optimization", status: "pending" },
+    { id: "convergence", label: "Convergence Check", status: "pending" },
+  ]
+
+  const [pipelineProgress, setPipelineProgress] = useState<PipelineProgress>({
+    isRunning: false,
+    stages: INITIAL_PIPELINE_STAGES,
+  })
+
+  /**
+   * Runs the full engineering analysis pipeline sequentially.
+   *
+   * @description Chains: mass/DFM → structural FEA → thermal → topology
+   * optimization → convergence evaluation. Updates spec after each stage.
+   * Each stage continues even if a prior stage fails (best-effort).
+   * At the end, convergence evaluation proposes design changes if needed.
+   */
+  const handleRunFullPipeline = useCallback(async (): Promise<void> => {
+    const stages = INITIAL_PIPELINE_STAGES.map((s) => ({ ...s }))
+    setPipelineProgress({ isRunning: true, stages })
+
+    const updateStage = (id: PipelineStageId, update: Partial<PipelineStageStatus>): void => {
+      const idx = stages.findIndex((s) => s.id === id)
+      if (idx >= 0) stages[idx] = { ...stages[idx], ...update }
+      setPipelineProgress({ isRunning: true, stages: [...stages] })
+    }
+
+    const latestSpec = (): XRaySpec => specRef.current
+
+    try {
+      // Stage 1: Mass properties + DFM
+      updateStage("mass_dfm", { status: "running" })
+      toast.info("Pipeline: Running mass properties & DFM...")
+      try {
+        const r = await analyzeModulesAction(scanId)
+        if ("error" in r) {
+          updateStage("mass_dfm", { status: "error", error: r.error })
+        } else {
+          setSpecInternal(r.spec)
+          specRef.current = r.spec
+          updateStage("mass_dfm", { status: "complete" })
+        }
+      } catch (err) {
+        updateStage("mass_dfm", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
+      }
+
+      // Stage 2: Structural FEA
+      updateStage("structural", { status: "running" })
+      toast.info("Pipeline: Running structural FEA...")
+      try {
+        const r = await runStructuralAnalysisAction(scanId)
+        if ("error" in r) {
+          updateStage("structural", { status: "error", error: r.error })
+        } else {
+          setSpecInternal(r.spec)
+          specRef.current = r.spec
+          updateStage("structural", { status: "complete" })
+        }
+      } catch (err) {
+        updateStage("structural", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
+      }
+
+      // Stage 3: Thermal analysis
+      updateStage("thermal", { status: "running" })
+      toast.info("Pipeline: Running thermal analysis...")
+      try {
+        const r = await runThermalAnalysisAction(scanId)
+        if ("error" in r) {
+          updateStage("thermal", { status: "error", error: r.error })
+        } else {
+          setSpecInternal(r.spec)
+          specRef.current = r.spec
+          updateStage("thermal", { status: "complete" })
+        }
+      } catch (err) {
+        updateStage("thermal", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
+      }
+
+      // Stage 4: Topology optimization
+      updateStage("topology", { status: "running" })
+      toast.info("Pipeline: Running topology optimization...")
+      try {
+        const r = await runTopologyOptimizationAction(scanId)
+        if ("error" in r) {
+          updateStage("topology", { status: "error", error: r.error })
+        } else {
+          setSpecInternal(r.spec)
+          specRef.current = r.spec
+          updateStage("topology", { status: "complete" })
+        }
+      } catch (err) {
+        updateStage("topology", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
+      }
+
+      // Stage 5: Convergence evaluation
+      updateStage("convergence", { status: "running" })
+      toast.info("Pipeline: Evaluating convergence criteria...")
+      try {
+        const r = await runConvergenceStepAction(scanId)
+        if ("error" in r) {
+          updateStage("convergence", { status: "error", error: r.error })
+        } else {
+          setSpecInternal(r.spec)
+          specRef.current = r.spec
+          updateStage("convergence", { status: "complete" })
+
+          // Store convergence results so the UI can show the review dialog
+          setPipelineProgress((prev) => ({
+            ...prev,
+            convergenceResult: r.evaluation,
+            proposedChanges: r.evaluation.proposedChanges,
+          }))
+
+          if (r.evaluation.isConverged) {
+            toast.success("Full analysis pipeline complete — all criteria met!")
+          } else {
+            toast.info(
+              `Pipeline complete — ${r.evaluation.proposedChanges.length} design changes proposed`,
+            )
+          }
+        }
+      } catch (err) {
+        updateStage("convergence", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
+      }
+    } finally {
+      setPipelineProgress((prev) => ({
+        ...prev,
+        isRunning: false,
+        stages: [...stages],
+      }))
+    }
+  }, [scanId])
+
+  /** Dismiss proposed changes (user chose to skip the review dialog) */
+  const dismissPipelineChanges = useCallback((): void => {
+    setPipelineProgress((prev) => ({
+      ...prev,
+      convergenceResult: undefined,
+      proposedChanges: undefined,
+    }))
+  }, [])
+
+  /**
+   * Creates an engineering review Objective with Tasks from the current
+   * analysis results. This bridges the AI pipeline into the human task system.
+   *
+   * @returns The created objective ID, or null if creation failed
+   */
+  const handleCreateReviewObjective = useCallback(async (): Promise<string | null> => {
+    try {
+      const result = await createEngineeringReviewAction(
+        scanId,
+        pipelineProgress.convergenceResult,
+      )
+      if ("error" in result) {
+        toast.error(result.error)
+        return null
+      }
+      toast.success(
+        `Review objective created with ${result.analysisTaskCount} analysis task${result.analysisTaskCount !== 1 ? "s" : ""}` +
+        (result.changeTaskCount > 0 ? ` and ${result.changeTaskCount} change task${result.changeTaskCount !== 1 ? "s" : ""}` : ""),
+      )
+      return result.objectiveId
+    } catch (error) {
+      toast.error("Failed to create review objective")
+      console.error("[Forge] Review objective error:", error instanceof Error ? error.message : "Unknown")
+      return null
+    }
+  }, [scanId, pipelineProgress.convergenceResult])
+
   // ── People matching ──
   const loadPeople = useCallback((forceRefresh = false): void => {
     if (specRef.current.modules.length === 0) return
@@ -423,6 +631,10 @@ export function ForgeProjectProvider({
     isRunningStructural,
     isRunningConvergence,
     isRunningPremium,
+    handleRunFullPipeline,
+    pipelineProgress,
+    dismissPipelineChanges,
+    handleCreateReviewObjective,
     people,
     isPeopleLoading,
     loadPeople,

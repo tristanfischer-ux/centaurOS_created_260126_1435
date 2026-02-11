@@ -149,6 +149,39 @@ const CAD_SYSTEM_PROMPT = `You are an expert CAD engineer who writes CadQuery Py
 10. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or any file I/O. The export is handled externally.
 11. Do NOT include any print statements or comments that reference file paths.
 
+## CRITICAL: Parametric Design Parameters
+
+Your code MUST start with a clearly marked PARAMETERS block immediately after the imports.
+This block defines all key dimensions as named variables that can be modified by the
+optimization loop. Use this exact format:
+
+\`\`\`python
+import cadquery as cq
+import math
+
+# ── PARAMETERS ──────────────────────────────────────────────────────
+# All key dimensions that control the model geometry.
+# These values can be adjusted by the convergence loop.
+
+BODY_LENGTH = 120.0        # mm — overall length of the housing
+BODY_WIDTH = 80.0          # mm — overall width
+BODY_HEIGHT = 45.0         # mm — overall height
+WALL_THICKNESS = 3.0       # mm — shell wall thickness
+FILLET_RADIUS = 4.0        # mm — edge fillet radius
+BOLT_HOLE_DIAMETER = 5.0   # mm — mounting bolt diameter
+BOLT_HOLE_SPACING = 60.0   # mm — distance between bolt holes
+# ── END PARAMETERS ──────────────────────────────────────────────────
+\`\`\`
+
+Rules for the PARAMETERS block:
+- Place it immediately after \`import\` statements
+- Start with \`# ── PARAMETERS\` and end with \`# ── END PARAMETERS\`
+- Use SCREAMING_SNAKE_CASE for variable names
+- Include units in the comment (mm, deg, etc.)
+- Include a brief description in the comment
+- Every dimension used in the model that could reasonably be adjusted must be a parameter
+- The rest of the code must reference these parameter variables (never hardcode dimensions below the block)
+
 ## CadQuery Patterns to Use
 - \`cq.Workplane("XY").box(l, w, h)\` for rectangular bodies
 - \`.circle(r).extrude(h)\` for cylindrical features

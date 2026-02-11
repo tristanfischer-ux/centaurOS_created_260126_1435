@@ -121,18 +121,22 @@ interface FoundryInfo {
     isPrimary: boolean
     isActive: boolean
     memberCount: number
+    /** URL to the foundry's logo image, if uploaded */
+    logoUrl?: string | null
 }
 
 interface SidebarProps {
     foundryName?: string
     foundryId?: string
+    /** URL to the active foundry's logo image */
+    foundryLogoUrl?: string | null
     userName?: string
     userRole?: string
     isCompanyAdmin?: boolean
     userFoundries?: FoundryInfo[]
 }
 
-export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyAdmin, userFoundries }: SidebarProps) {
+export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, userRole, isCompanyAdmin, userFoundries }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { setZoom } = useZoomContext()
@@ -207,7 +211,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
             <div className="px-5 pt-8 pb-4">
                 <div className="flex items-center justify-between">
                     <Link href="/updates" className="group flex items-center gap-2">
-                        <span className="font-display text-xl font-bold tracking-[0.05em] text-foreground group-hover:text-international-orange transition-colors">
+                        <span className="font-display text-2xl font-bold tracking-[0.05em] text-foreground group-hover:text-international-orange transition-colors">
                             ForgeOS
                         </span>
                         <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse shadow-[0_0_8px_rgba(255,69,0,0.6)]"></span>
@@ -235,6 +239,16 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
 
             {/* Scrollable navigation */}
             <nav className="flex-1 overflow-y-auto px-3 py-1 space-y-1">
+                {/* Company identity — foundry name + logo */}
+                <FoundrySwitcher
+                    foundries={userFoundries || []}
+                    currentFoundryId={foundryId}
+                    currentFoundryName={foundryName}
+                    currentFoundryLogoUrl={foundryLogoUrl}
+                    userName={userName}
+                    userRole={userRole}
+                />
+
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 1: "Me" — Personal pages                  */}
                 {/* ══════════════════════════════════════════════════ */}
@@ -258,15 +272,6 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                 {/* Section 3: "Workshop" — Where the work happens     */}
                 {/* ══════════════════════════════════════════════════ */}
                 <div className="my-2 border-t border-slate-100" />
-
-                {/* Foundry switcher — contextual to the Workshop section */}
-                <FoundrySwitcher
-                    foundries={userFoundries || []}
-                    currentFoundryId={foundryId}
-                    currentFoundryName={foundryName}
-                    userName={userName}
-                    userRole={userRole}
-                />
 
                 <SectionHeader label="Workshop" introRoute="/workshop" hasNew={badges.workshop} />
                 {workshopNavigation.map(renderNavItem)}

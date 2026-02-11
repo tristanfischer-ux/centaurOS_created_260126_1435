@@ -14,9 +14,11 @@
 
 import React, { useState } from "react"
 
-import { Boxes, FlaskConical, Clock, AlertTriangle, Stethoscope } from "lucide-react"
+import { Boxes, FlaskConical, Clock, AlertTriangle, Stethoscope, FileCheck2 } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { EmptyState } from "@/components/ui/empty-state"
+
+import { toast } from "sonner"
 
 import { useForgeProject } from "./forge-project-context"
 import { ModuleExplorer } from "./module-explorer"
@@ -26,8 +28,11 @@ import { RiskRegister } from "./risk-register"
 import { DiagnosticCenter } from "./diagnostic-center"
 import { InterviewPanel } from "./interview-panel"
 import { EditModuleDialog } from "./edit-module-dialog"
+import { DesignChangesDialog } from "./design-changes-dialog"
+import { EngineeringReviewPackage } from "./engineering-review-package"
 
 import type { ModuleSpec } from "../services/xray-schema"
+import type { ChangeReview } from "./design-changes-dialog"
 
 /**
  * DossierView — Stage 2 client component with tabbed navigation.
@@ -48,6 +53,10 @@ export function DossierView(): React.ReactNode {
     handleRunStructural,
     handleRunConvergence,
     handleRunPremium,
+    handleRunFullPipeline,
+    pipelineProgress,
+    dismissPipelineChanges,
+    handleCreateReviewObjective,
     isAnalyzing,
     isRunningStructural,
     isRunningConvergence,
@@ -93,6 +102,10 @@ export function DossierView(): React.ReactNode {
             <Stethoscope className="h-4 w-4" />
             Diagnostics
           </TabsTrigger>
+          <TabsTrigger value="review" className="gap-2">
+            <FileCheck2 className="h-4 w-4" />
+            Review Package
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="modules">
@@ -118,6 +131,9 @@ export function DossierView(): React.ReactNode {
             isRunningConvergence={isRunningConvergence}
             onRunPremium={handleRunPremium}
             isRunningPremium={isRunningPremium}
+            onRunFullPipeline={handleRunFullPipeline}
+            pipelineProgress={pipelineProgress}
+            onCreateReviewObjective={handleCreateReviewObjective}
           />
         </TabsContent>
 
@@ -136,6 +152,10 @@ export function DossierView(): React.ReactNode {
             onModuleUpdate={handleModuleUpdate}
             onDeriveProcessClass={handleDeriveProcessClass}
           />
+        </TabsContent>
+
+        <TabsContent value="review">
+          <EngineeringReviewPackage spec={spec} />
         </TabsContent>
       </Tabs>
 
@@ -159,6 +179,20 @@ export function DossierView(): React.ReactNode {
           onClose={() => setEditingModule(null)}
           onSave={handleModuleUpdate}
           onRefineWithAI={handleRefineModule}
+        />
+      )}
+
+      {/* Design Changes Review Dialog — appears after full pipeline completes */}
+      {pipelineProgress.convergenceResult && pipelineProgress.proposedChanges && (
+        <DesignChangesDialog
+          open
+          onClose={dismissPipelineChanges}
+          evaluation={pipelineProgress.convergenceResult}
+          onApplyChanges={(approved: ChangeReview[]) => {
+            // TODO: T8 — wire approved changes back into convergence controller
+            toast.success(`${approved.length} change${approved.length !== 1 ? "s" : ""} acknowledged`)
+            dismissPipelineChanges()
+          }}
         />
       )}
     </>

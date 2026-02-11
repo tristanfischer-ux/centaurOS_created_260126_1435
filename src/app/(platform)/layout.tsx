@@ -51,13 +51,14 @@ export default async function PlatformLayout({
 
     let foundryName = "Forge Foundry";
     let foundryId = "Unknown";
+    let foundryLogoUrl: string | null = null;
     let hasAdminAccess = false;
 
     if (profile?.foundry_id) {
         foundryId = profile.foundry_id;
         const { data: foundry, error: foundryError } = await supabase
             .from("foundries")
-            .select("name")
+            .select("name, logo_url")
             .eq("id", profile.foundry_id)
             .maybeSingle();
 
@@ -67,6 +68,7 @@ export default async function PlatformLayout({
 
         if (foundry) {
             foundryName = foundry.name;
+            foundryLogoUrl = foundry.logo_url || null;
         }
 
         // Check for admin permissions (non-Founders only)
@@ -97,7 +99,7 @@ export default async function PlatformLayout({
                         <CommandPalette />
                         <KeyboardShortcutsDialog />
                         <MobileZoomControl />
-                        <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} />
+                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} />
                         <ZoomableContent className="flex-1 overflow-y-auto bg-background">
                             <main className="p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
                                 <ErrorBoundary>

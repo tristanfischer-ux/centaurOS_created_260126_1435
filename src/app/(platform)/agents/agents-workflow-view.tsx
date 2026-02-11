@@ -43,6 +43,7 @@ import {
     completeWorkflowRun,
     createArtifact,
 } from "@/actions/agent-artifacts"
+import { createWorkflowMemoryThread } from "@/actions/agent-memory"
 import { generateWorkflowMarkdown } from "./lib/export-markdown"
 import type { PromptCategory, Workflow, WorkflowTemplate, CustomPrompt, AttachedFile, ExecutionStatus } from "./lib/agent-types"
 
@@ -251,6 +252,9 @@ function AgentsFlowInner({
     const abortControllerRef = useRef<AbortController | null>(null)
     const pendingContinueRef = useRef<string | null>(null)
     const [isSaving, setIsSaving] = useState(false)
+
+    // Agent memory — thread ID for the current chain execution
+    const activeThreadIdRef = useRef<string | null>(null)
 
     // Load initial workflow nodes/edges from first saved workflow
     useEffect(() => {
@@ -631,6 +635,7 @@ function AgentsFlowInner({
         setEdges([])
         setSelectedNodeId(null)
         setInspectorOpen(false)
+        activeThreadIdRef.current = null
     }, [setNodes, setEdges])
 
     // ── Load a saved workflow from database ─────────────────────────
@@ -648,6 +653,7 @@ function AgentsFlowInner({
             setEdges(styledEdges)
             setSelectedNodeId(null)
             setInspectorOpen(false)
+            activeThreadIdRef.current = null
 
             requestAnimationFrame(() => {
                 fitView({ padding: 0.2, duration: 300 })
@@ -807,7 +813,14 @@ function AgentsFlowInner({
                 const response = await fetch("/api/agents/execute", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ prompt, input, providerId, modelId, modality }),
+                    body: JSON.stringify({
+                        prompt,
+                        input,
+                        providerId,
+                        modelId,
+                        modality,
+                        threadId: activeThreadIdRef.current ?? undefined,
+                    }),
                     signal,
                 })
 
@@ -1013,6 +1026,7 @@ function AgentsFlowInner({
                 toast.success("Chain complete — all steps approved")
                 setIsChainRunning(false)
                 setChainProgress(undefined)
+                activeThreadIdRef.current = null
 
                 // Auto-create artifact from the completed chain
                 // Use latest node state after the approval update
@@ -1062,6 +1076,21 @@ function AgentsFlowInner({
             return
         }
 
+        // Create a memory thread for this chain run (fire-and-forget if it fails)
+        if (!activeThreadIdRef.current) {
+            try {
+                const { threadId: newThreadId } = await createWorkflowMemoryThread(
+                    'workflow_run',
+                    dbWorkflowId,
+                    { workflowName, nodeCount: orderedIds.length }
+                )
+                activeThreadIdRef.current = newThreadId
+            } catch {
+                // Non-critical — proceed without memory
+                console.warn("[AgentsFlow] Failed to create memory thread")
+            }
+        }
+
         const nodeId = orderedIds[startIdx]
         const targetNode = nodes.find((n) => n.id === nodeId)
         setChainProgress({ current: startIdx + 1, total: orderedIds.length })
@@ -1096,6 +1125,7 @@ function AgentsFlowInner({
         abortControllerRef.current?.abort()
         setIsChainRunning(false)
         setChainProgress(undefined)
+        activeThreadIdRef.current = null
         toast.info("Chain execution stopped")
     }, [])
 

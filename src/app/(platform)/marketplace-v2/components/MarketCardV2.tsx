@@ -289,7 +289,12 @@ export const MarketCardV2 = memo(function MarketCardV2({
                 <div className="flex items-center justify-between pt-3 border-t border-muted">
                     <div>
                         {price ? (
-                            <span className="text-lg font-bold text-foreground">{price}</span>
+                            <span>
+                                <span className="text-lg font-bold text-foreground">£{price}</span>
+                                {listing.category === 'People' && (
+                                    <span className="text-xs text-muted-foreground ml-0.5">/ day</span>
+                                )}
+                            </span>
                         ) : (
                             <span className="text-sm text-muted-foreground">Request pricing</span>
                         )}

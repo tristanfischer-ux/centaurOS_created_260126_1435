@@ -213,7 +213,7 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                                 <div>
                                     {price ? (
                                         <>
-                                            <span className="text-2xl font-bold text-foreground">{price}</span>
+                                            <span className="text-2xl font-bold text-foreground">£{price}</span>
                                             {listing.category === 'People' && (
                                                 <span className="text-sm text-muted-foreground ml-1">/ day</span>
                                             )}

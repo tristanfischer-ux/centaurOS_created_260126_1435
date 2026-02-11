@@ -277,7 +277,7 @@ export function MarketplaceSavedView({
                                         >
                                             {listing.subcategory}
                                         </Badge>
-                                        {price && <span className="font-semibold text-foreground">{price}</span>}
+                                        {price && <span className="font-semibold text-foreground">£{price}</span>}
                                         {rating && (
                                             <span className="flex items-center gap-0.5">
                                                 <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
@@ -304,7 +304,7 @@ export function MarketplaceSavedView({
                             {/* Price - desktop only */}
                             <div className="hidden md:block">
                                 {price ? (
-                                    <span className="text-sm font-semibold text-foreground">{price}</span>
+                                    <span className="text-sm font-semibold text-foreground">£{price}</span>
                                 ) : (
                                     <span className="text-xs text-muted-foreground">On request</span>
                                 )}

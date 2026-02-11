@@ -222,7 +222,7 @@ function ListRow({
             <div className="flex items-center gap-2 shrink-0">
                 <div className="text-right">
                     {price ? (
-                        <span className="text-sm font-bold text-foreground">{price}</span>
+                        <span className="text-sm font-bold text-foreground">£{price}</span>
                     ) : (
                         <span className="text-xs text-muted-foreground">Request pricing</span>
                     )}

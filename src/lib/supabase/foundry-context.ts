@@ -87,7 +87,12 @@ export function clearFoundryCache(userId?: string) {
 }
 
 /**
- * Get all foundries for the current user
+ * Get all foundries for the current user.
+ *
+ * @description Calls the get_user_foundries RPC which returns each foundry
+ * the user belongs to, including name, role, member count, and logo URL.
+ *
+ * @returns Array of foundry info objects sorted by primary first, then join date
  */
 export async function getUserFoundries(): Promise<Array<{
   foundryId: string
@@ -97,6 +102,7 @@ export async function getUserFoundries(): Promise<Array<{
   isActive: boolean
   memberCount: number
   joinedAt: string
+  logoUrl: string | null
 }>> {
   const supabase = await createClient()
   
@@ -108,7 +114,7 @@ export async function getUserFoundries(): Promise<Array<{
     .rpc('get_user_foundries', { p_user_id: user.id })
 
   if (error || !data) {
-    console.error('Failed to get user foundries:', error)
+    console.error('[FoundryContext] Failed to get user foundries:', error)
     return []
   }
 
@@ -120,6 +126,7 @@ export async function getUserFoundries(): Promise<Array<{
     is_active: boolean
     member_count: number
     joined_at: string
+    logo_url: string | null
   }) => ({
     foundryId: f.foundry_id,
     foundryName: f.foundry_name,
@@ -128,5 +135,6 @@ export async function getUserFoundries(): Promise<Array<{
     isActive: f.is_active,
     memberCount: Number(f.member_count),
     joinedAt: f.joined_at,
+    logoUrl: f.logo_url || null,
   }))
 }
