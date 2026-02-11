@@ -17,7 +17,7 @@
 
 import React, { useState, useRef, useEffect } from "react"
 
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, type Variants } from "framer-motion"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -26,10 +26,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertTriangle,
+  ArrowRight,
   Box,
   CheckCircle2,
+  Cog,
   ImageIcon,
   Loader2,
+  ShieldAlert,
   Sparkles,
   X,
 } from "lucide-react"
@@ -102,7 +105,7 @@ function isGatingDiagComplete(spec: XRaySpec): boolean {
 // ─── Animation Variants ──────────────────────────────────────────────
 
 /** Parent container variant — orchestrates stagger timing */
-const gridContainerVariants = {
+const gridContainerVariants: Variants = {
   hidden: {},
   visible: {
     transition: {
@@ -113,7 +116,7 @@ const gridContainerVariants = {
 }
 
 /** Individual module card variant — fade + scale + slide up */
-const moduleCardVariants = {
+const moduleCardVariants: Variants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
   visible: {
     opacity: 1,
@@ -277,10 +280,15 @@ export function SystemBlueprint({
             </div>
           ) : null}
 
-          {/* Module Status Grid */}
+          {/* Module Status Grid — stagger animation on first reveal */}
           {n > 0 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <motion.div
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                variants={shouldAnimate ? gridContainerVariants : undefined}
+                initial={shouldAnimate ? "hidden" : undefined}
+                animate={shouldAnimate ? "visible" : undefined}
+              >
                 {modules.map((m) => {
                   const status = getNodeStatus(m, diagComplete)
                   const progress = readinessFor(m)
@@ -288,9 +296,10 @@ export function SystemBlueprint({
                   const dotColor = statusDotColor(status)
 
                   return (
-                    <button
+                    <motion.button
                       key={m.id}
                       type="button"
+                      variants={shouldAnimate ? moduleCardVariants : undefined}
                       onClick={() =>
                         document.getElementById(`module-v2-${m.id}`)?.scrollIntoView({
                           behavior: "smooth",
@@ -334,6 +343,18 @@ export function SystemBlueprint({
                         {m.purpose}
                       </p>
 
+                      {/* Module stats — key parts + failure modes */}
+                      <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <Cog className="h-2.5 w-2.5" />
+                          {m.keyParts.length} parts
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <ShieldAlert className="h-2.5 w-2.5" />
+                          {m.detail.commonFailureModes.length} risks
+                        </span>
+                      </div>
+
                       {/* Progress bar + lead time */}
                       <div className="flex items-center gap-2 mt-auto">
                         <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -349,10 +370,10 @@ export function SystemBlueprint({
                           {m.requirements.leadWeeks}w
                         </Badge>
                       </div>
-                    </button>
+                    </motion.button>
                   )
                 })}
-              </div>
+              </motion.div>
 
               {/* Status legend */}
               <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">

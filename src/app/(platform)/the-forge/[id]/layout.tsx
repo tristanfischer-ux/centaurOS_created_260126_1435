@@ -58,6 +58,7 @@ export default async function ForgeProjectLayout({
     stage: result.stage as ForgeStage,
     idea: result.idea,
     status: result.status,
+    scanStatus: (result.scanStatus as "idle" | "scanning" | "complete") || "idle",
     thumbnailUrl: result.thumbnailUrl,
     createdAt: result.createdAt,
     updatedAt: result.updatedAt,

@@ -13,9 +13,11 @@
 
 "use client"
 
-import React, { createContext, useContext, useState, useCallback, useRef } from "react"
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react"
 
 import { toast } from "sonner"
+
+import { createClient } from "@/lib/supabase/client"
 
 import {
   updateScanSpecAction,
@@ -68,6 +70,9 @@ export interface PipelineProgress {
   proposedChanges?: ProposedChange[]
 }
 
+/** Scan processing lifecycle status */
+export type ScanStatus = "idle" | "scanning" | "complete"
+
 /** Full project data loaded from DB */
 export interface ForgeProject {
   scanId: string
@@ -76,6 +81,7 @@ export interface ForgeProject {
   stage: ForgeStage
   idea: string
   status: string
+  scanStatus: ScanStatus
   thumbnailUrl: string | null
   createdAt: string
   updatedAt: string
@@ -140,6 +146,8 @@ export interface ForgeProjectContextValue {
 
   // ── Scanning state ──
   isScanning: boolean
+  /** Background scan status from DB (idle | scanning | complete) */
+  scanStatus: ScanStatus
 }
 
 // ─── Context ─────────────────────────────────────────────────────────
@@ -211,6 +219,54 @@ export function ForgeProjectProvider({
 
   const specRef = useRef<XRaySpec>(initialProject.spec)
   const scanId = project.scanId
+  const [scanStatus, setScanStatus] = useState<ScanStatus>(initialProject.scanStatus || "idle")
+
+  // ── Supabase Realtime subscription ──
+  // Listens for scan_status changes on this scan row so the UI
+  // auto-updates when a background scan completes (user can navigate away).
+  useEffect(() => {
+    const supabase = createClient()
+
+    const channel = supabase
+      .channel(`xray-scan-${scanId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "xray_scans",
+          filter: `id=eq.${scanId}`,
+        },
+        (payload) => {
+          const newRow = payload.new as {
+            scan_status?: string
+            spec?: XRaySpec
+          }
+
+          // Update scan status
+          if (newRow.scan_status) {
+            setScanStatus(newRow.scan_status as ScanStatus)
+          }
+
+          // When scan completes in background, update the spec from the DB row
+          if (newRow.scan_status === "complete" && newRow.spec) {
+            const updatedSpec = newRow.spec as XRaySpec
+            // Only update if the new spec has modules (completed scan)
+            if (updatedSpec.modules && updatedSpec.modules.length > 0) {
+              setSpecInternal(updatedSpec)
+              specRef.current = updatedSpec
+              setIsScanning(false)
+              toast.success(`Scan complete: ${updatedSpec.modules.length} modules identified`)
+            }
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [scanId])
 
   // ── Persist spec to DB ──
   const persistSpec = useCallback(async (nextSpec: XRaySpec): Promise<void> => {
@@ -239,22 +295,40 @@ export function ForgeProjectProvider({
     setSpec(next)
   }, [setSpec])
 
-  // ── Refine scan ──
+  // ── Refine scan (background-safe) ──
+  // The scan runs as a server action. Realtime subscription picks up the
+  // completed result, so the user can navigate away during the scan.
   const handleRefineScan = useCallback(async (updatedIdea: string): Promise<void> => {
     const trimmed = (updatedIdea || "").trim() || "New machine concept"
     setIsScanning(true)
-    try {
-      const result = await refineScanAction(scanId, trimmed, specRef.current)
-      if ("error" in result) { toast.error(result.error); return }
-      setSpecInternal(result.spec)
-      specRef.current = result.spec
-      toast.success(`Refined: ${result.spec.modules.length} modules updated`)
-    } catch (error) {
-      toast.error("Refine failed. Please try again.")
-      console.error("[Forge] Refine error:", error instanceof Error ? error.message : "Unknown")
-    } finally {
-      setIsScanning(false)
-    }
+    setScanStatus("scanning")
+    toast.info("Scanning in progress — you can navigate away and come back.", { duration: 5000 })
+
+    // Fire the scan — Realtime subscription will also update the UI,
+    // but we still handle the direct response for the common case
+    // where the user stays on the page.
+    refineScanAction(scanId, trimmed, specRef.current)
+      .then((result) => {
+        if ("error" in result) {
+          toast.error(result.error)
+          setIsScanning(false)
+          setScanStatus("idle")
+          return
+        }
+        // Direct response — update spec immediately (Realtime may also fire,
+        // but duplicate updates are harmless since React dedupes)
+        setSpecInternal(result.spec)
+        specRef.current = result.spec
+        setIsScanning(false)
+        setScanStatus("complete")
+        toast.success(`Refined: ${result.spec.modules.length} modules updated`)
+      })
+      .catch((error) => {
+        toast.error("Refine failed. Please try again.")
+        console.error("[Forge] Refine error:", error instanceof Error ? error.message : "Unknown")
+        setIsScanning(false)
+        setScanStatus("idle")
+      })
   }, [scanId])
 
   // ── Refine module ──
@@ -681,6 +755,7 @@ export function ForgeProjectProvider({
     updateProjectName,
     updateProjectStage,
     isScanning,
+    scanStatus,
   }
 
   return (

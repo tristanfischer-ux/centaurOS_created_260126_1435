@@ -70,10 +70,8 @@ export async function scanIdeaAction(idea: string): Promise<
       return { error: "Idea text is too long (max 5000 characters)" }
     }
 
-    // AI scan
-    const spec = await scanIdeaService(idea.trim())
-
-    // Persist to database with project name derived from idea
+    // Create placeholder row first with scan_status = 'scanning'
+    // so Realtime subscribers see the scan-in-progress state
     const projectName = idea.trim().slice(0, 60)
     const { data: scan, error: insertError } = await supabase
       .from("xray_scans")
@@ -82,20 +80,43 @@ export async function scanIdeaAction(idea: string): Promise<
         created_by: user.id,
         idea: idea.trim(),
         name: projectName,
-        spec: spec as unknown as Json,
-        status: "scanned",
+        spec: { idea: idea.trim(), function: "", assumptions: [], materials: [], processes: [], validation: [], modules: [] } as unknown as Json,
+        status: "draft",
         stage: "concept",
+        scan_status: "scanning",
       })
       .select("id")
       .single()
 
     if (insertError) {
-      console.error("[XRay] Failed to persist scan:", {
+      console.error("[XRay] Failed to create scan placeholder:", {
         error: insertError.message,
         foundryId,
         userId: user.id,
       })
       return { error: `Failed to save scan: ${insertError.message}` }
+    }
+
+    // AI scan
+    const spec = await scanIdeaService(idea.trim())
+
+    // Update the row with the completed spec and mark as complete
+    const { error: updateError } = await supabase
+      .from("xray_scans")
+      .update({
+        spec: spec as unknown as Json,
+        status: "scanned",
+        scan_status: "complete",
+      })
+      .eq("id", scan.id)
+
+    if (updateError) {
+      console.error("[XRay] Failed to persist scan result:", {
+        error: updateError.message,
+        scanId: scan.id,
+        foundryId,
+      })
+      return { error: `Failed to save scan: ${updateError.message}` }
     }
 
     // AUDIT: Log scan creation
@@ -139,16 +160,23 @@ export async function refineScanAction(
       return { error: "Idea text is too long (max 5000 characters)" }
     }
 
+    // Mark scan as in-progress so Realtime subscribers see the state change
+    await supabase
+      .from("xray_scans")
+      .update({ scan_status: "scanning" })
+      .eq("id", scanId)
+
     // AI refine scan
     const refinedSpec = await refineScanAI(updatedIdea.trim(), currentSpec)
 
-    // Persist refined spec to same scan row
+    // Persist refined spec and mark scan as complete
     const { error: updateError } = await supabase
       .from("xray_scans")
       .update({
         idea: updatedIdea.trim(),
         spec: refinedSpec as unknown as Json,
         status: "refined",
+        scan_status: "complete",
         updated_at: new Date().toISOString(),
       })
       .eq("id", scanId)
@@ -583,6 +611,7 @@ export async function loadScanAction(scanId: string): Promise<
     scanId: string
     spec: XRaySpec
     status: string
+    scanStatus: string
     name: string | null
     stage: string
     idea: string
@@ -594,7 +623,7 @@ export async function loadScanAction(scanId: string): Promise<
   return withAuth(async ({ supabase }) => {
     const { data: scan, error } = await supabase
       .from("xray_scans")
-      .select("id, spec, status, name, stage, idea, thumbnail_url, created_at, updated_at")
+      .select("id, spec, status, scan_status, name, stage, idea, thumbnail_url, created_at, updated_at")
       .eq("id", scanId)
       .single()
 
@@ -606,6 +635,7 @@ export async function loadScanAction(scanId: string): Promise<
       scanId: scan.id,
       spec: scan.spec as unknown as XRaySpec,
       status: scan.status,
+      scanStatus: scan.scan_status,
       name: scan.name,
       stage: scan.stage,
       idea: scan.idea,

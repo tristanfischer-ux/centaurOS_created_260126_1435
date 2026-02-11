@@ -11,28 +11,28 @@
 
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useRef, useEffect } from "react"
 
 import { useForgeProject } from "./forge-project-context"
 import { ScanHero } from "./scan-hero"
 import { SystemBlueprint } from "./system-blueprint"
 import { ExecutiveDashboard } from "./executive-dashboard"
-import { InterviewPanel } from "./interview-panel"
-import { EditModuleDialog } from "./edit-module-dialog"
-
-import type { ModuleSpec } from "../services/xray-schema"
+import { QuickInsights } from "./quick-insights"
+import { ScanCelebration } from "./scan-celebration"
 
 /**
  * ConceptView — Stage 1 client component.
  *
- * @description Renders concept definition tools. ScanHero is in
- * "edit/refine" mode since the initial scan was done on /the-forge/new.
+ * @description Renders concept definition tools: ScanHero (in edit/refine mode),
+ * celebration banner on scan completion, SystemBlueprint with staggered module
+ * reveal, QuickInsights highlights, and ExecutiveDashboard metrics.
  */
 export function ConceptView(): React.ReactNode {
   const {
     spec,
     scanId,
     isScanning,
+    scanStatus,
     isGeneratingImages,
     handleRefineScan,
     handleGenerateImages,
@@ -40,6 +40,21 @@ export function ConceptView(): React.ReactNode {
   } = useForgeProject()
 
   const hasModules = spec.modules.length > 0
+  // Treat both client-side isScanning and DB scan_status as "scanning"
+  // (covers the case where user navigated away and came back)
+  const effectivelyScanning = isScanning || scanStatus === "scanning"
+
+  // Track scan completion to trigger celebration + stagger animation
+  const wasScanningRef = useRef(false)
+  const [justScanned, setJustScanned] = useState(false)
+
+  useEffect(() => {
+    // Detect transition from scanning → not scanning (scan just finished)
+    if (wasScanningRef.current && !effectivelyScanning && hasModules) {
+      setJustScanned(true)
+    }
+    wasScanningRef.current = effectivelyScanning
+  }, [effectivelyScanning, hasModules])
 
   return (
     <div className="space-y-8">
@@ -47,16 +62,24 @@ export function ConceptView(): React.ReactNode {
       <ScanHero
         idea={spec.idea}
         functionStatement={spec.function}
-        isScanning={isScanning}
+        isScanning={effectivelyScanning}
         hasExistingSpec={hasModules}
         onScan={handleRefineScan}
         onRefine={handleRefineScan}
         onIdeaChange={(idea) => setSpec({ ...spec, idea })}
       />
 
+      {/* Celebration banner — auto-dismisses after 8 seconds */}
+      {justScanned && (
+        <ScanCelebration
+          moduleCount={spec.modules.length}
+          onDismiss={() => setJustScanned(false)}
+        />
+      )}
+
       {hasModules && (
         <>
-          {/* System Blueprint with module status grid */}
+          {/* System Blueprint with staggered module reveal */}
           <SystemBlueprint
             spec={spec}
             systemImageUrl={spec.systemImageUrl}
@@ -65,7 +88,11 @@ export function ConceptView(): React.ReactNode {
             hasImages={spec.modules.some((m) => m.imageStatus === "complete")}
             onGenerateImages={handleGenerateImages}
             canGenerate={!!scanId}
+            justScanned={justScanned}
           />
+
+          {/* Key findings at a glance */}
+          <QuickInsights spec={spec} justScanned={justScanned} />
 
           {/* Executive summary dashboard */}
           <ExecutiveDashboard spec={spec} />
