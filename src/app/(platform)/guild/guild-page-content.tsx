@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,15 +12,17 @@ import {
     Clock,
     Loader2,
     Users,
-    Plus
+    Plus,
 } from "lucide-react"
 import { ApprenticePoolBrowser } from "@/components/guild/ApprenticePoolBrowser"
 import { ProjectAssignmentsList } from "@/components/guild/ProjectAssignmentsList"
-import { GuildTabs } from "./guild-tabs"
+import { GuildNetwork } from "./guild-network"
 import { CreateEventDialog } from "@/components/guild/create-event-dialog"
-import { UpcomingEvents } from "@/components/guild/upcoming-events"
+import { FeaturedEventHero } from "@/components/guild/featured-event-hero"
+import { GuildStatsBar } from "@/components/guild/guild-stats-bar"
+import { EventsSection } from "@/components/guild/events-section"
 import { getMyAssignments } from "@/actions/project-assignments"
-import { getGuildEvents, getEventRSVPStatuses, type GuildEvent } from "@/actions/guild-events"
+import { getGuildEvents, getEventRSVPStatuses, getGuildEventsSummary, type GuildEvent } from "@/actions/guild-events"
 import { formatDistanceToNow } from "date-fns"
 
 // ==========================================
@@ -56,21 +58,32 @@ interface MyAssignment {
     assignedByName: string
 }
 
+interface EventSummary {
+    upcomingCount: number
+    totalThisMonth: number
+}
+
 // ==========================================
 // COMPONENT
 // ==========================================
 
 /**
- * Main Guild page content with role-based views.
+ * Main Guild page content with events-first layout.
  *
- * @description Managers see: Apprentice Pool, Assignments, Community tabs.
- * Apprentices see: My Assignments, Community tabs.
- * Community tab includes events with RSVP and member network.
+ * @description Redesigned to put events front and center:
+ * 1. Featured Event Hero (next upcoming event, full-width)
+ * 2. Stats Bar (community health at a glance)
+ * 3. Events Grid (remaining events in 2-column layout)
+ * 4. Management Tabs (Pool, Assignments, Network pushed below)
+ *
+ * Both Manager and Apprentice views share the same events-first layout,
+ * with role-specific tabs below.
  */
 export function GuildPageContent({ isManager, isApprentice, isExecutive, currentUserId, members }: GuildPageContentProps) {
     const [myAssignments, setMyAssignments] = useState<MyAssignment[]>([])
     const [events, setEvents] = useState<GuildEvent[]>([])
     const [rsvpStatuses, setRsvpStatuses] = useState<Record<string, { attending: boolean; count: number }>>({})
+    const [summary, setSummary] = useState<EventSummary>({ upcomingCount: 0, totalThisMonth: 0 })
     const [loading, setLoading] = useState(true)
     const [createEventOpen, setCreateEventOpen] = useState(false)
 
@@ -98,6 +111,15 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                 }
             }
 
+            // Load summary stats
+            const summaryResult = await getGuildEventsSummary()
+            if (summaryResult.data) {
+                setSummary({
+                    upcomingCount: summaryResult.data.upcomingCount,
+                    totalThisMonth: summaryResult.data.totalThisMonth,
+                })
+            }
+
             // Load assignments for apprentices
             if (isApprentice) {
                 const result = await getMyAssignments()
@@ -122,10 +144,51 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
         loadData()
     }
 
-    // Manager view - can browse pool and manage assignments
+    // Sync RSVP changes across Hero and EventsSection
+    const handleRSVPChange = useCallback((eventId: string, status: { attending: boolean; count: number }) => {
+        setRsvpStatuses(prev => ({ ...prev, [eventId]: status }))
+    }, [])
+
+    // Split events: first goes to Hero, rest to EventsSection
+    const featuredEvent = events.length > 0 ? events[0] : null
+    const remainingEvents = events.length > 1 ? events.slice(1) : []
+
+    // Calculate total attending across all events
+    const totalAttending = Object.values(rsvpStatuses).reduce((sum, s) => sum + s.count, 0)
+
+    // Shared events-first layout used by both Manager and Apprentice views
+    const eventsLayout = (
+        <>
+            {/* 1. Featured Event Hero */}
+            <FeaturedEventHero
+                event={featuredEvent}
+                rsvpStatus={featuredEvent ? rsvpStatuses[featuredEvent.id] : undefined}
+                onRSVPChange={handleRSVPChange}
+            />
+
+            {/* 2. Stats Bar */}
+            <GuildStatsBar
+                upcomingEvents={summary.upcomingCount}
+                totalMembers={members.length}
+                totalAttending={totalAttending}
+                eventsThisMonth={summary.totalThisMonth}
+            />
+
+            {/* 3. Events Grid */}
+            {remainingEvents.length > 0 && (
+                <EventsSection
+                    events={remainingEvents}
+                    rsvpStatuses={rsvpStatuses}
+                    onRSVPChange={handleRSVPChange}
+                />
+            )}
+        </>
+    )
+
+    // Manager view - events-first, then management tabs
     if (isManager) {
         return (
-            <div className="space-y-6">
+            <div className="space-y-8">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
                     <div className="min-w-0 flex-1">
@@ -134,7 +197,7 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                             <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Guild</h1>
                         </div>
                         <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
-                            Manage apprentices, assignments, events, and the Guild community
+                            Your community hub for events, learning, and growth
                         </p>
                     </div>
                     {isExecutive && (
@@ -145,9 +208,19 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                     )}
                 </div>
 
-                {/* Upcoming Events highlight widget */}
-                <UpcomingEvents />
+                {/* Events-first layout */}
+                {loading ? (
+                    <Card className="border">
+                        <CardContent className="p-8 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
+                            <p className="text-muted-foreground">Loading Guild...</p>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    eventsLayout
+                )}
 
+                {/* Management Tabs */}
                 <Tabs defaultValue="pool" className="space-y-6">
                     <TabsList className="bg-muted">
                         <TabsTrigger value="pool" className="flex items-center gap-2">
@@ -158,9 +231,9 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                             <Briefcase className="h-4 w-4" />
                             Assignments
                         </TabsTrigger>
-                        <TabsTrigger value="community" className="flex items-center gap-2">
+                        <TabsTrigger value="network" className="flex items-center gap-2">
                             <Users className="h-4 w-4" />
-                            Community
+                            Network
                         </TabsTrigger>
                     </TabsList>
 
@@ -172,13 +245,8 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                         <ProjectAssignmentsList />
                     </TabsContent>
 
-                    <TabsContent value="community">
-                        <GuildTabs
-                            events={events}
-                            members={members}
-                            isExecutive={isExecutive}
-                            rsvpStatuses={rsvpStatuses}
-                        />
+                    <TabsContent value="network">
+                        <GuildNetwork members={members} />
                     </TabsContent>
                 </Tabs>
 
@@ -191,13 +259,13 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
         )
     }
 
-    // Apprentice view - can see their own assignments and community
+    // Apprentice view - events-first, then assignments + network
     if (isApprentice) {
         const activeAssignments = myAssignments.filter(a => a.status === 'active')
         const pastAssignments = myAssignments.filter(a => a.status !== 'active')
 
         return (
-            <div className="space-y-6">
+            <div className="space-y-8">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
                     <div className="min-w-0 flex-1">
@@ -206,23 +274,33 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                             <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Guild</h1>
                         </div>
                         <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
-                            Your assignments and the Guild community
+                            Your community hub for events, learning, and growth
                         </p>
                     </div>
                 </div>
 
-                {/* Upcoming Events highlight widget */}
-                <UpcomingEvents />
+                {/* Events-first layout */}
+                {loading ? (
+                    <Card className="border">
+                        <CardContent className="p-8 text-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
+                            <p className="text-muted-foreground">Loading Guild...</p>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    eventsLayout
+                )}
 
+                {/* Apprentice Tabs: Assignments + Network */}
                 <Tabs defaultValue="assignments" className="space-y-6">
                     <TabsList className="bg-muted">
                         <TabsTrigger value="assignments" className="flex items-center gap-2">
                             <Briefcase className="h-4 w-4" />
                             My Assignments
                         </TabsTrigger>
-                        <TabsTrigger value="community" className="flex items-center gap-2">
+                        <TabsTrigger value="network" className="flex items-center gap-2">
                             <Users className="h-4 w-4" />
-                            Community
+                            Network
                         </TabsTrigger>
                     </TabsList>
 
@@ -331,13 +409,8 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                         )}
                     </TabsContent>
 
-                    <TabsContent value="community">
-                        <GuildTabs
-                            events={events}
-                            members={members}
-                            isExecutive={isExecutive}
-                            rsvpStatuses={rsvpStatuses}
-                        />
+                    <TabsContent value="network">
+                        <GuildNetwork members={members} />
                     </TabsContent>
                 </Tabs>
             </div>
