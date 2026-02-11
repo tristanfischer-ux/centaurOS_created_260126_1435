@@ -18,6 +18,7 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 
 import type { ModuleSpec, XRaySpec } from "./xray-schema"
+import type { StructuralBrief, SystemStructuralBrief } from "./structural-brief"
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -47,11 +48,20 @@ interface GeminiImageResponse {
 
 /**
  * Builds a descriptive prompt for generating a module blueprint image.
+ * Uses the structural brief from Opus when available for consistency
+ * with the 3D CAD model.
  *
  * @param module - The module to generate an image for
+ * @param brief - Optional structural brief from Opus orchestrator
  * @returns A narrative prompt optimized for Gemini image generation
  */
-function buildModulePrompt(module: ModuleSpec): string {
+function buildModulePrompt(module: ModuleSpec, brief?: StructuralBrief): string {
+  // If we have an Opus structural brief, use its image prompt for consistency
+  if (brief?.imagePrompt) {
+    return brief.imagePrompt
+  }
+
+  // Fallback: build prompt directly from module spec
   return `Create a clean, professional technical engineering illustration showing a ${module.detail.whatItIs}.
 
 The diagram should clearly depict these key components, each labeled with callout lines: ${module.keyParts.join(", ")}.
@@ -63,11 +73,17 @@ Style: Modern industrial engineering diagram on a white background with thin, pr
 
 /**
  * Builds a descriptive prompt for generating the system-level diagram.
+ * Uses the system structural brief from Opus when available.
  *
  * @param spec - The full X-Ray spec with all modules
+ * @param brief - Optional system structural brief from Opus orchestrator
  * @returns A narrative prompt for the system P&ID diagram
  */
-function buildSystemPrompt(spec: XRaySpec): string {
+function buildSystemPrompt(spec: XRaySpec, brief?: SystemStructuralBrief): string {
+  // If we have an Opus structural brief, use its image prompt for consistency
+  if (brief?.imagePrompt) {
+    return brief.imagePrompt
+  }
   const moduleFlow = spec.modules
     .map((m) => `${m.name}: ${m.purpose}`)
     .join("\n")
@@ -212,6 +228,7 @@ async function uploadToStorage(
  *
  * @param scanId - The scan ID for storage namespacing
  * @param module - The module to generate an image for
+ * @param brief - Optional structural brief from Opus orchestrator for consistency with 3D model
  * @returns The public URL of the generated image
  *
  * @throws Error if image generation or upload fails
@@ -219,8 +236,9 @@ async function uploadToStorage(
 export async function generateModuleImage(
   scanId: string,
   module: ModuleSpec,
+  brief?: StructuralBrief,
 ): Promise<string> {
-  const prompt = buildModulePrompt(module)
+  const prompt = buildModulePrompt(module, brief)
 
   const imageData = await callGeminiImage(MODULE_MODEL, prompt, {
     aspectRatio: "3:2",
@@ -241,7 +259,7 @@ export async function generateModuleImage(
  *
  * @param scanId - The scan ID for storage namespacing
  * @param spec - The full X-Ray spec
- * @param moduleImageUrls - Map of moduleId -> image URL (for downloading as references)
+ * @param brief - Optional system structural brief from Opus orchestrator
  * @returns The public URL of the generated system diagram
  *
  * @throws Error if image generation or upload fails
@@ -249,8 +267,9 @@ export async function generateModuleImage(
 export async function generateSystemImage(
   scanId: string,
   spec: XRaySpec,
+  brief?: SystemStructuralBrief,
 ): Promise<string> {
-  const prompt = buildSystemPrompt(spec)
+  const prompt = buildSystemPrompt(spec, brief)
 
   // For now, generate without reference images (simpler, still effective)
   // Future: download module images and pass as references to Pro model

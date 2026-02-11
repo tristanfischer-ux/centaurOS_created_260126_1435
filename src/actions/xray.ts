@@ -30,6 +30,7 @@ import { matchPeopleForModules } from "@/app/(platform)/the-forge/services/peopl
 import { matchSuppliersForModule } from "@/app/(platform)/the-forge/services/suppliers"
 import { generateModuleImage, generateSystemImage } from "@/app/(platform)/the-forge/services/image-generator"
 import { generateModuleCadModel, CadGenerationError } from "@/app/(platform)/the-forge/services/cad-generator"
+import { generateModuleStructuralBrief } from "@/app/(platform)/the-forge/services/structural-brief"
 import { runStructuralAnalysis } from "@/app/(platform)/the-forge/services/fea-generator"
 import { runCfdAnalysis } from "@/app/(platform)/the-forge/services/cfd-generator"
 import { runTopologyOptimization } from "@/app/(platform)/the-forge/services/topo-generator"
@@ -541,7 +542,9 @@ export async function generateCadModelsAction(
         batchIndices.map(async (moduleIndex) => {
           const xrayModule = updatedModules[moduleIndex]
           try {
-            const cadResult = await generateModuleCadModel(scanId, xrayModule)
+            // Generate structural brief first (Opus orchestrator)
+            const brief = await generateModuleStructuralBrief(xrayModule)
+            const cadResult = await generateModuleCadModel(scanId, xrayModule, brief)
             return {
               moduleIndex,
               cadModel: {
