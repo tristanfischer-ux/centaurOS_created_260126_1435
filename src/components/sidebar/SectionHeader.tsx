@@ -18,6 +18,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface SectionHeaderProps {
@@ -40,7 +41,7 @@ export function SectionHeader({ label, introRoute, hasNew = false, className }: 
             <Link
                 href={introRoute}
                 className={cn(
-                    "inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest transition-colors",
+                    "group inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest transition-colors",
                     isActive
                         ? "text-international-orange"
                         : "text-muted-foreground hover:text-foreground"
@@ -53,6 +54,7 @@ export function SectionHeader({ label, introRoute, hasNew = false, className }: 
                         aria-label={`${label} has new features`}
                     />
                 )}
+                <ChevronRight className="h-3 w-3 opacity-40 group-hover:opacity-100 transition-opacity" />
             </Link>
         </div>
     )

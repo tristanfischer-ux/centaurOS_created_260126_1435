@@ -57,6 +57,7 @@ export function DossierView(): React.ReactNode {
     pipelineProgress,
     dismissPipelineChanges,
     handleCreateReviewObjective,
+    handleApplyDesignChanges,
     isAnalyzing,
     isRunningStructural,
     isRunningConvergence,
@@ -188,9 +189,26 @@ export function DossierView(): React.ReactNode {
           open
           onClose={dismissPipelineChanges}
           evaluation={pipelineProgress.convergenceResult}
-          onApplyChanges={(approved: ChangeReview[]) => {
-            // TODO: T8 — wire approved changes back into convergence controller
-            toast.success(`${approved.length} change${approved.length !== 1 ? "s" : ""} acknowledged`)
+          onApplyChanges={async (approved: ChangeReview[]) => {
+            // Convert approved changes to parameter modifications
+            const paramChanges = approved
+              .filter((r) => r.decision === "approve" || r.decision === "modify")
+              .map((r) => ({
+                moduleId: r.change.moduleId,
+                parameter: r.change.parameter,
+                newValue: r.decision === "modify" && r.userValue
+                  ? r.userValue
+                  : r.change.suggestedValue,
+              }))
+              .filter((c) => c.parameter && c.newValue)
+
+            if (paramChanges.length > 0) {
+              const success = await handleApplyDesignChanges(paramChanges)
+              if (!success) return // toast already shown by handler
+            } else {
+              toast.success(`${approved.length} change${approved.length !== 1 ? "s" : ""} acknowledged`)
+            }
+
             dismissPipelineChanges()
           }}
         />

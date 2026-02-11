@@ -569,22 +569,67 @@ def parse_force_coefficients(case_dir: str) -> dict:
 
     Returns drag coefficient (Cd), lift coefficient (Cl),
     and side force coefficient (Cs).
+
+    OpenFOAM versions use different file naming conventions:
+    - v2406+: coefficient.dat
+    - v2312 and earlier: forceCoeffs.dat
+    - Some versions: coefficient_0.dat
     """
     coeff_dir = os.path.join(case_dir, "postProcessing", "forceCoeffs")
     if not os.path.isdir(coeff_dir):
-        return {"cd": None, "cl": None, "cs": None, "error": "No forceCoeffs output"}
+        # List postProcessing contents for debugging
+        pp_dir = os.path.join(case_dir, "postProcessing")
+        pp_contents = os.listdir(pp_dir) if os.path.isdir(pp_dir) else []
+        return {
+            "cd": None, "cl": None, "cs": None,
+            "error": f"No forceCoeffs output. postProcessing contains: {pp_contents}"
+        }
 
     # Find the latest time directory
-    times = sorted([d for d in os.listdir(coeff_dir) if d.replace(".", "").isdigit()], key=float)
-    if not times:
-        return {"cd": None, "cl": None, "cs": None, "error": "No time directories"}
+    time_dirs = []
+    for d in os.listdir(coeff_dir):
+        try:
+            float(d)
+            time_dirs.append(d)
+        except ValueError:
+            continue
+    time_dirs.sort(key=float)
 
-    coeff_file = os.path.join(coeff_dir, times[-1], "coefficient.dat")
-    if not os.path.isfile(coeff_file):
-        # Try older naming convention
-        coeff_file = os.path.join(coeff_dir, times[-1], "forceCoeffs.dat")
-        if not os.path.isfile(coeff_file):
-            return {"cd": None, "cl": None, "cs": None, "error": "Coefficient file not found"}
+    if not time_dirs:
+        dir_contents = os.listdir(coeff_dir)
+        return {
+            "cd": None, "cl": None, "cs": None,
+            "error": f"No time directories in forceCoeffs. Contents: {dir_contents}"
+        }
+
+    latest_dir = os.path.join(coeff_dir, time_dirs[-1])
+
+    # Try multiple file naming conventions
+    candidate_names = [
+        "coefficient.dat",
+        "forceCoeffs.dat",
+        "coefficient_0.dat",
+        "forceCoeffs_0.dat",
+    ]
+    coeff_file = None
+    for name in candidate_names:
+        path = os.path.join(latest_dir, name)
+        if os.path.isfile(path):
+            coeff_file = path
+            break
+
+    # If none of the candidates matched, try any .dat file
+    if coeff_file is None:
+        dat_files = [f for f in os.listdir(latest_dir) if f.endswith(".dat")]
+        if dat_files:
+            coeff_file = os.path.join(latest_dir, dat_files[0])
+
+    if coeff_file is None:
+        dir_contents = os.listdir(latest_dir)
+        return {
+            "cd": None, "cl": None, "cs": None,
+            "error": f"No coefficient file found in {time_dirs[-1]}. Contents: {dir_contents}"
+        }
 
     # Read last non-comment line
     last_line = None
@@ -606,7 +651,10 @@ def parse_force_coefficients(case_dir: str) -> dict:
             "cl": float(parts[3]),
         }
     except (IndexError, ValueError) as e:
-        return {"cd": None, "cl": None, "cs": None, "error": f"Parse error: {e}"}
+        return {
+            "cd": None, "cl": None, "cs": None,
+            "error": f"Parse error: {e}. Line: {last_line[:200]}. Parts count: {len(parts)}"
+        }
 
 
 def check_convergence(case_dir: str) -> dict:
@@ -803,16 +851,22 @@ def run_cfd(
         convergence = check_convergence(case_dir)
 
         # Step 7: Compute drag/lift forces
+        # Use `is not None` instead of truthiness to correctly handle 0.0 values
         q_inf = 0.5 * flow["density_kg_m3"] * flow["velocity_m_s"] ** 2
         a_ref = flow["reference_area_m2"]
-        drag_N = (coeffs.get("cd") or 0) * q_inf * a_ref if coeffs.get("cd") else None
-        lift_N = (coeffs.get("cl") or 0) * q_inf * a_ref if coeffs.get("cl") else None
+        cd = coeffs.get("cd")
+        cl = coeffs.get("cl")
+        drag_N = cd * q_inf * a_ref if cd is not None else None
+        lift_N = cl * q_inf * a_ref if cl is not None else None
 
         # Reynolds number
         Re = flow["velocity_m_s"] * char_len / flow["kinematic_viscosity_m2_s"]
 
         # Step 8: Generate residual plot
         residual_plot = generate_residual_plot(case_dir)
+
+        # Include coefficient parsing warnings if present
+        coeff_warning = coeffs.get("error")
 
         return {
             "error": None,
@@ -828,6 +882,7 @@ def run_cfd(
             "convergence": convergence,
             "residual_plot_b64": residual_plot,
             "mesh_cell_count": None,  # Could parse from log
+            "coefficient_warning": coeff_warning,
         }
 
 

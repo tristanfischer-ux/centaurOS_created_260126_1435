@@ -15,8 +15,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/ui/empty-state"
-import { Users, Loader2, RefreshCw, CheckCircle2 } from "lucide-react"
+import { Users, Loader2, RefreshCw, CheckCircle2, ExternalLink } from "lucide-react"
 import { toast } from "sonner"
+import Link from "next/link"
 import { MarketCardV2 } from "@/app/(platform)/marketplace-v2/components/MarketCardV2"
 
 import type { XRaySpec } from "../services/xray-schema"
@@ -143,7 +144,13 @@ export function TeamMap({
                       {matchCount} matched
                     </Badge>
                   ) : (
-                    <Badge variant="secondary" className="text-[9px]">No matches</Badge>
+                    <Link
+                      href={`/recruits?q=${encodeURIComponent(discipline)}`}
+                      className="inline-flex items-center gap-1 text-[9px] font-medium text-international-orange hover:underline"
+                    >
+                      Find on Recruits
+                      <ExternalLink className="h-2 w-2" />
+                    </Link>
                   )}
                 </div>
               </div>
@@ -188,14 +195,34 @@ export function TeamMap({
         {!isPeopleLoading && people.length === 0 && (
           <EmptyState
             title="No matching experts found"
-            description="Try scanning a different idea or check that marketplace listings exist."
+            description="Try browsing the Recruits marketplace to find experts with the skills your project needs."
             action={
-              <Button variant="outline" onClick={onRefreshPeople}>
-                <Users className="h-4 w-4 mr-2" />
-                Retry matching
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={onRefreshPeople}>
+                  <Users className="h-4 w-4 mr-2" />
+                  Retry matching
+                </Button>
+                <Button asChild>
+                  <Link href="/recruits">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Browse Recruits
+                  </Link>
+                </Button>
+              </div>
             }
           />
+        )}
+
+        {/* Browse more experts link */}
+        {!isPeopleLoading && people.length > 0 && (
+          <div className="flex items-center justify-center pt-2">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/recruits" className="gap-1.5">
+                <ExternalLink className="h-3.5 w-3.5" />
+                Browse more experts on Recruits
+              </Link>
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>

@@ -1630,6 +1630,126 @@ export async function runConvergenceStepAction(
   })
 }
 
+// ─── Design Change Feedback Loop ─────────────────────────────────────
+
+/**
+ * Applies approved design changes back into the CAD model parameters.
+ *
+ * @description Takes a list of approved parameter modifications from the
+ * Design Changes Review Dialog, applies them to the CadQuery code stored
+ * in each module's cadModel.cadQueryCode, and persists the updated spec.
+ * The caller can then trigger a re-analysis to validate the changes.
+ *
+ * @param scanId - The scan ID
+ * @param changes - Array of approved changes with parameter names and new values
+ * @returns Updated spec after applying parameter changes
+ *
+ * @security Requires authenticated user with foundry context
+ * @audit Logs parameter_changes_applied event
+ */
+export async function applyDesignChangesAction(
+  scanId: string,
+  changes: Array<{
+    moduleId: string
+    parameter: string
+    newValue: string
+  }>,
+): Promise<{ spec: XRaySpec; appliedCount: number } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    const { data: scan, error: loadError } = await supabase
+      .from("xray_scans")
+      .select("id, spec")
+      .eq("id", scanId)
+      .single()
+
+    if (loadError || !scan) {
+      return { error: "Scan not found" }
+    }
+
+    const spec = scan.spec as unknown as XRaySpec
+    let appliedCount = 0
+
+    // Group changes by module
+    const changesByModule = new Map<string, Array<{ parameter: string; newValue: string }>>()
+    for (const change of changes) {
+      const existing = changesByModule.get(change.moduleId) || []
+      existing.push({ parameter: change.parameter, newValue: change.newValue })
+      changesByModule.set(change.moduleId, existing)
+    }
+
+    // Apply changes to each module's CadQuery code
+    const updatedModules = spec.modules.map((mod) => {
+      const moduleChanges = changesByModule.get(mod.id)
+      if (!moduleChanges || !mod.cadModel?.cadQueryCode) return mod
+
+      // Import parameter utilities dynamically
+      const code = mod.cadModel.cadQueryCode
+      const modifications: Array<{ name: string; newValue: number }> = []
+
+      for (const change of moduleChanges) {
+        // Extract numeric value from the new value string
+        const numMatch = change.newValue.match(/([0-9]+(?:\.[0-9]+)?)/)
+        if (numMatch) {
+          modifications.push({
+            name: change.parameter,
+            newValue: parseFloat(numMatch[1]),
+          })
+        }
+      }
+
+      if (modifications.length === 0) return mod
+
+      // Apply modifications to the code using inline regex replacement
+      // (we can't import the cad-parameters module in a server action
+      //  that runs server-side, so we do a simpler regex-based replacement)
+      let updatedCode = code
+      for (const modification of modifications) {
+        const paramRegex = new RegExp(
+          `^(${modification.name}\\s*=\\s*)[0-9]+(?:\\.[0-9]+)?(\\s*#.*)$`,
+          "m",
+        )
+        const formattedValue = Number.isInteger(modification.newValue)
+          ? `${modification.newValue}.0`
+          : modification.newValue.toString()
+        updatedCode = updatedCode.replace(paramRegex, `$1${formattedValue}$2`)
+        appliedCount++
+      }
+
+      return {
+        ...mod,
+        cadModel: {
+          ...mod.cadModel,
+          cadQueryCode: updatedCode,
+          // Mark that the code has been modified — needs re-generation
+          status: "complete" as const, // Keep complete since code is valid
+        },
+      }
+    })
+
+    const updatedSpec: XRaySpec = { ...spec, modules: updatedModules }
+
+    // Persist
+    const { error: updateError } = await supabase
+      .from("xray_scans")
+      .update({ spec: updatedSpec as unknown as Json })
+      .eq("id", scanId)
+
+    if (updateError) {
+      console.error("[XRay] Failed to persist design changes:", updateError.message)
+      return { error: `Failed to save changes: ${updateError.message}` }
+    }
+
+    // AUDIT: Log the parameter changes
+    console.info("[XRay] Design changes applied:", {
+      scanId,
+      appliedCount,
+      moduleCount: changesByModule.size,
+    })
+
+    return { spec: updatedSpec, appliedCount }
+  })
+}
+
 // ─── Engineering Review Bridge ───────────────────────────────────────
 
 /**

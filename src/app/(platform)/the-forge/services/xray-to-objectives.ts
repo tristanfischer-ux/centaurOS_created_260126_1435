@@ -273,12 +273,17 @@ export async function exportModuleToObjective(
   // Expert questions → expert review tasks
   if (module.detail?.expertQuestionsNeeded) {
     for (const question of module.detail.expertQuestionsNeeded) {
+      const skills = module.detail.requiredExpertise ?? []
+      const recruitsLink = skills.length > 0
+        ? `\n\n---\n**Need an expert?** Browse the [Recruits page](/recruits?q=${encodeURIComponent(skills[0])}) to find specialists.`
+        : ""
+
       taskDefs.push({
         title: `Expert: ${question}`,
-        description: `Expert input needed for module "${module.name}".\n\nThis question requires specialist knowledge to answer correctly.`,
+        description: `Expert input needed for module "${module.name}".\n\nThis question requires specialist knowledge to answer correctly.${recruitsLink}`,
         riskLevel: "Medium",
         gateType: "expert_review",
-        requiredSkills: module.detail.requiredExpertise ?? [],
+        requiredSkills: skills,
       })
     }
   }

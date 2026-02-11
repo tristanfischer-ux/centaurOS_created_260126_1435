@@ -31,6 +31,7 @@ import {
   runConvergenceStepAction,
   runPremiumAnalysisAction,
   createEngineeringReviewAction,
+  applyDesignChangesAction,
   matchPeopleAction,
   matchSuppliersAction,
   updateProjectMetadataAction,
@@ -119,6 +120,9 @@ export interface ForgeProjectContextValue {
 
   // ── Engineering review bridge ──
   handleCreateReviewObjective: () => Promise<string | null>
+
+  // ── Design change feedback ──
+  handleApplyDesignChanges: (changes: Array<{ moduleId: string; parameter: string; newValue: string }>) => Promise<boolean>
 
   // ── People matching ──
   people: PersonMatch[]
@@ -564,6 +568,38 @@ export function ForgeProjectProvider({
     }
   }, [scanId, pipelineProgress.convergenceResult])
 
+  /**
+   * Applies approved design changes to CAD parameters and persists.
+   *
+   * @description Takes the approved changes from the Design Changes Review
+   * Dialog, applies them to the CadQuery code, and saves. After this,
+   * the user can trigger a re-analysis to validate the modified design.
+   *
+   * @returns true if changes were applied successfully
+   */
+  const handleApplyDesignChanges = useCallback(async (
+    changes: Array<{ moduleId: string; parameter: string; newValue: string }>,
+  ): Promise<boolean> => {
+    try {
+      const result = await applyDesignChangesAction(scanId, changes)
+      if ("error" in result) {
+        toast.error(result.error)
+        return false
+      }
+      setSpecInternal(result.spec)
+      specRef.current = result.spec
+      toast.success(
+        `${result.appliedCount} parameter${result.appliedCount !== 1 ? "s" : ""} updated. ` +
+        `Run the full pipeline again to re-analyze with the new values.`,
+      )
+      return true
+    } catch (error) {
+      toast.error("Failed to apply design changes")
+      console.error("[Forge] Design change error:", error instanceof Error ? error.message : "Unknown")
+      return false
+    }
+  }, [scanId])
+
   // ── People matching ──
   const loadPeople = useCallback((forceRefresh = false): void => {
     if (specRef.current.modules.length === 0) return
@@ -635,6 +671,7 @@ export function ForgeProjectProvider({
     pipelineProgress,
     dismissPipelineChanges,
     handleCreateReviewObjective,
+    handleApplyDesignChanges,
     people,
     isPeopleLoading,
     loadPeople,
