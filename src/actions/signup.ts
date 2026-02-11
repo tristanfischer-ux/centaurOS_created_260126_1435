@@ -227,6 +227,19 @@ export async function signup(formData: FormData) {
     joined_at: new Date().toISOString(),
   });
 
+  // 3c. Seed demo forge concept for new founders so they can see what The Forge produces
+  if (role === "founder" && foundryId && authData.user) {
+    try {
+      await supabase.rpc("seed_demo_forge_concept", {
+        p_foundry_id: foundryId,
+        p_user_id: authData.user.id,
+      })
+    } catch (demoError) {
+      // Non-critical — don't fail signup if demo seeding fails
+      console.warn("[Signup] Failed to seed demo forge concept:", demoError)
+    }
+  }
+
   // 3a. For suppliers, store their business info in onboarding_data for later use
   if (role === 'supplier' && businessName) {
     await supabase.from("profiles").update({

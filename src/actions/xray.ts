@@ -29,7 +29,7 @@ import { scanIdea as scanIdeaService, deriveProcessClassAI, refineScanAI, refine
 import { matchPeopleForModules } from "@/app/(platform)/the-forge/services/people"
 import { matchSuppliersForModule } from "@/app/(platform)/the-forge/services/suppliers"
 import { generateModuleImage, generateSystemImage } from "@/app/(platform)/the-forge/services/image-generator"
-import { generateModuleCadModel } from "@/app/(platform)/the-forge/services/cad-generator"
+import { generateModuleCadModel, CadGenerationError } from "@/app/(platform)/the-forge/services/cad-generator"
 import { runStructuralAnalysis } from "@/app/(platform)/the-forge/services/fea-generator"
 import { runCfdAnalysis } from "@/app/(platform)/the-forge/services/cfd-generator"
 import { runTopologyOptimization } from "@/app/(platform)/the-forge/services/topo-generator"
@@ -559,8 +559,11 @@ export async function generateCadModelsAction(
             }
           } catch (error) {
             const errorMsg = error instanceof Error ? error.message : "Unknown error"
+            // Persist the failed CadQuery code for debugging if available
+            const failedCode = error instanceof CadGenerationError ? error.cadQueryCode : undefined
             console.error(`[XRay] Failed to generate CAD model for module ${xrayModule.id}:`, {
               error: errorMsg,
+              hasFailedCode: !!failedCode,
             })
             return {
               moduleIndex,
@@ -568,6 +571,7 @@ export async function generateCadModelsAction(
                 status: "failed" as const,
                 generatedAt: new Date().toISOString(),
                 errorMessage: errorMsg,
+                ...(failedCode ? { cadQueryCode: failedCode } : {}),
               },
             }
           }
@@ -2052,6 +2056,216 @@ export async function createEngineeringReviewAction(
       analysisTaskCount: taskDefs.length - changeTaskCount,
       changeTaskCount,
     }
+  })
+}
+
+// ─── Delete & Copy Actions ───────────────────────────────────────────
+
+/**
+ * Deletes a forge project (scan) and all associated data.
+ *
+ * @description Permanently removes a scan from the database.
+ * Associated forge_contracts are cascade-deleted. Storage objects
+ * (images, CAD files) are NOT cleaned up here — they will be
+ * garbage-collected by a future storage cleanup job.
+ *
+ * @param scanId - The scan/project ID to delete
+ * @returns Success or error
+ *
+ * @security Requires authenticated user; RLS enforces foundry isolation
+ * @audit Logs scan deletion with scanId, foundryId, userId
+ */
+export async function deleteScanAction(
+  scanId: string,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // VALIDATION: Ensure scanId is provided
+    if (!scanId?.trim()) {
+      return { error: "Missing scan ID" }
+    }
+
+    // AUTH: Verify the scan belongs to the user's foundry before deleting
+    const { data: scan, error: loadError } = await supabase
+      .from("xray_scans")
+      .select("id, foundry_id")
+      .eq("id", scanId)
+      .single()
+
+    if (loadError || !scan) {
+      return { error: "Project not found" }
+    }
+
+    if (scan.foundry_id !== foundryId) {
+      return { error: "You don't have permission to delete this project" }
+    }
+
+    // Delete the scan (forge_contracts cascade automatically)
+    const { error: deleteError } = await supabase
+      .from("xray_scans")
+      .delete()
+      .eq("id", scanId)
+
+    if (deleteError) {
+      console.error("[XRay] Failed to delete scan:", {
+        error: deleteError.message,
+        scanId,
+        foundryId,
+      })
+      return { error: `Failed to delete project: ${deleteError.message}` }
+    }
+
+    // AUDIT: Log scan deletion
+    console.info("[XRay] Scan deleted:", {
+      scanId,
+      foundryId,
+      userId: user.id,
+    })
+
+    return { success: true as const }
+  })
+}
+
+/**
+ * Duplicates a forge project (scan) with a fresh ID and reset state.
+ *
+ * @description Creates a copy of the scan with the same idea and spec,
+ * but strips generated assets (images, CAD models, analysis results,
+ * people/supplier matches) since those are tied to the original scan.
+ * The copy starts fresh at the concept stage.
+ *
+ * @param scanId - The scan/project ID to copy
+ * @returns The new scan ID, or error
+ *
+ * @security Requires authenticated user; RLS enforces foundry isolation
+ * @audit Logs scan duplication with original and new scanId
+ */
+export async function copyScanAction(
+  scanId: string,
+): Promise<{ newScanId: string } | { error: string }> {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // VALIDATION: Ensure scanId is provided
+    if (!scanId?.trim()) {
+      return { error: "Missing scan ID" }
+    }
+
+    // Load the source scan
+    const { data: source, error: loadError } = await supabase
+      .from("xray_scans")
+      .select("id, idea, name, spec, foundry_id")
+      .eq("id", scanId)
+      .single()
+
+    if (loadError || !source) {
+      return { error: "Project not found" }
+    }
+
+    // AUTH: Verify the scan belongs to the user's foundry
+    if (source.foundry_id !== foundryId) {
+      return { error: "You don't have permission to copy this project" }
+    }
+
+    // Strip generated assets from the spec so the copy starts clean
+    const sourceSpec = source.spec as unknown as XRaySpec
+    const cleanSpec: XRaySpec = {
+      ...sourceSpec,
+      systemImageUrl: undefined,
+      systemImageStatus: undefined,
+      systemCadUrl: undefined,
+      systemCadStatus: undefined,
+      systemCadSvgUrl: undefined,
+      systemAnalysis: undefined,
+      modules: sourceSpec.modules.map((m) => ({
+        ...m,
+        imageUrl: undefined,
+        imageStatus: undefined,
+        cadModel: undefined,
+      })),
+    }
+
+    // Create the copy with a new name
+    const copyName = source.name
+      ? `Copy of ${source.name}`.slice(0, 200)
+      : `Copy of ${source.idea.slice(0, 50)}`
+
+    const { data: newScan, error: insertError } = await supabase
+      .from("xray_scans")
+      .insert({
+        foundry_id: foundryId,
+        created_by: user.id,
+        idea: source.idea,
+        name: copyName,
+        spec: cleanSpec as unknown as Json,
+        status: "scanned",
+        stage: "concept",
+        scan_status: "complete",
+      })
+      .select("id")
+      .single()
+
+    if (insertError || !newScan) {
+      console.error("[XRay] Failed to copy scan:", {
+        error: insertError?.message,
+        sourceScanId: scanId,
+        foundryId,
+      })
+      return { error: `Failed to copy project: ${insertError?.message ?? "Unknown error"}` }
+    }
+
+    // AUDIT: Log scan duplication
+    console.info("[XRay] Scan copied:", {
+      sourceScanId: scanId,
+      newScanId: newScan.id,
+      foundryId,
+      userId: user.id,
+    })
+
+    return { newScanId: newScan.id }
+  })
+}
+
+// ─── Demo Concept Seeding ────────────────────────────────────────────
+
+/**
+ * Seeds a demo forge concept for a new foundry so users can see
+ * what The Forge produces before scanning their own ideas.
+ *
+ * @description Calls the Supabase RPC function that inserts a
+ * pre-built "Solar Weather Station" demo project with 5 modules.
+ * Safe to call multiple times — but should only be called once
+ * during signup.
+ *
+ * @param foundryId - The newly created foundry ID
+ * @param userId - The user ID who created the foundry
+ * @returns The demo scan ID, or error
+ *
+ * @security Uses service-level RPC with SECURITY DEFINER
+ */
+export async function seedDemoConceptAction(
+  foundryId: string,
+  userId: string,
+): Promise<{ demoScanId: string } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    const { data, error } = await supabase.rpc("seed_demo_forge_concept", {
+      p_foundry_id: foundryId,
+      p_user_id: userId,
+    })
+
+    if (error) {
+      console.error("[XRay] Failed to seed demo concept:", {
+        error: error.message,
+        foundryId,
+        userId,
+      })
+      return { error: `Failed to seed demo: ${error.message}` }
+    }
+
+    console.info("[XRay] Demo concept seeded:", {
+      demoScanId: data,
+      foundryId,
+      userId,
+    })
+
+    return { demoScanId: data as string }
   })
 }
 

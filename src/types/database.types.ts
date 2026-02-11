@@ -11953,6 +11953,10 @@ export type Database = {
         Args: { p_failed_payment_id: string }
         Returns: string
       }
+      seed_demo_forge_concept: {
+        Args: { p_foundry_id: string; p_user_id: string }
+        Returns: string
+      }
       submit_standup: {
         Args: {
           p_blocker_severity?: string
