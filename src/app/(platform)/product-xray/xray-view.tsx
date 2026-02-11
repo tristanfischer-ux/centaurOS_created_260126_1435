@@ -1,12 +1,12 @@
 /**
- * @file xray-v2-view.tsx — Main X-Ray v2 "Product Dossier" view
+ * @file xray-view.tsx — Main Product X-Ray "Product Dossier" view
  *
  * @description Single-page scrollable product dossier that tells the story
  * of a product decomposition: idea → blueprint → architecture → modules →
  * timeline → risks → team → supply chain → diagnostic.
  *
- * Reuses the same server actions and services as X-Ray v1 but presents
- * information in a narrative-driven layout with prominent blueprint images.
+ * Consolidates the best of v1 (interview system, RFQ) and v2 (narrative
+ * layout, 3D CAD, engineering analysis) into a single unified page.
  *
  * @related
  * - Server actions: src/actions/xray.ts
@@ -23,6 +23,8 @@ import { toast } from "sonner"
 
 import {
   scanIdeaAction,
+  refineScanAction,
+  refineModuleAction,
   deriveProcessClassAction,
   updateScanSpecAction,
   matchPeopleAction,
@@ -46,14 +48,17 @@ import { TeamMap } from "./components/team-map"
 import { SupplyChain } from "./components/supply-chain"
 import { DiagnosticCenter } from "./components/diagnostic-center"
 import { EngineeringSummary } from "./components/engineering-summary"
+import { InterviewPanel } from "./components/interview-panel"
+import { RfqSection } from "./components/rfq-section"
 
-import type { XRaySpec, ModuleSpec } from "../product-xray/services/xray-schema"
-import type { PersonMatch } from "../product-xray/services/people"
-import type { SupplierMatch } from "../product-xray/services/suppliers"
+import type { XRaySpec, ModuleSpec } from "./services/xray-schema"
+import type { PersonMatch } from "./services/people"
+import type { SupplierMatch } from "./services/suppliers"
 
 // ─── localStorage persistence ─────────────────────────────────────────
 
-const STORAGE_KEY = "xray-v2-workbench-state"
+const STORAGE_KEY = "xray-workbench-state"
+const LEGACY_STORAGE_KEY = "xray-v2-workbench-state"
 
 interface PersistedState {
   spec: XRaySpec
@@ -64,13 +69,21 @@ interface PersistedState {
 function readPersistedState(): PersistedState | null {
   if (typeof window === "undefined") return null
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    let raw = localStorage.getItem(STORAGE_KEY)
+    // Fallback: migrate from legacy v2 key if new key is empty
+    if (!raw) {
+      raw = localStorage.getItem(LEGACY_STORAGE_KEY)
+      if (raw) {
+        localStorage.setItem(STORAGE_KEY, raw)
+        localStorage.removeItem(LEGACY_STORAGE_KEY)
+      }
+    }
     if (!raw) return null
     const parsed = JSON.parse(raw) as PersistedState
     if (parsed && typeof parsed.spec === "object") return parsed
     return null
   } catch {
-    console.warn("[XRayV2] Failed to parse persisted state, starting fresh.")
+    console.warn("[XRay] Failed to parse persisted state, starting fresh.")
     return null
   }
 }
@@ -80,7 +93,7 @@ function writePersistedState(state: PersistedState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   } catch (error) {
-    console.warn("[XRayV2] Failed to persist state:", error instanceof Error ? error.message : "Unknown")
+    console.warn("[XRay] Failed to persist state:", error instanceof Error ? error.message : "Unknown")
   }
 }
 
@@ -106,18 +119,21 @@ function isGatingDiagComplete(spec: XRaySpec): boolean {
 // ─── Main view ────────────────────────────────────────────────────────
 
 /**
- * XRayV2View — The Product Dossier.
+ * XRayView — The Product Dossier.
  *
  * @description Orchestrates the full X-Ray v2 page: scan workflow,
  * state management, image generation, people/supplier matching,
  * and renders all dossier sections in narrative order.
  */
-export function XRayV2View(): React.ReactNode {
+export function XRayView(): React.ReactNode {
   const [spec, setSpecInternal] = useState<XRaySpec>(() => newEmptySpec(""))
   const [scanId, setScanId] = useState<string | null>(null)
   const [isScanning, setIsScanning] = useState(false)
   const [isGeneratingImages, setIsGeneratingImages] = useState(false)
   const [isHydrated, setIsHydrated] = useState(false)
+
+  // Interview state (ported from v1)
+  const [interviewModule, setInterviewModule] = useState<ModuleSpec | null>(null)
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -163,7 +179,7 @@ export function XRayV2View(): React.ReactNode {
     try {
       await updateScanSpecAction(scanId, nextSpec)
     } catch (error) {
-      console.warn("[XRayV2] Failed to persist spec:", error instanceof Error ? error.message : "Unknown")
+      console.warn("[XRay] Failed to persist spec:", error instanceof Error ? error.message : "Unknown")
     }
   }, [scanId])
 
@@ -194,16 +210,74 @@ export function XRayV2View(): React.ReactNode {
         })
         .catch((err) => {
           toast.error("Image generation failed")
-          console.error("[XRayV2] Image error:", err)
+          console.error("[XRay] Image error:", err)
         })
         .finally(() => setIsGeneratingImages(false))
     } catch (error) {
       toast.error("Scan failed. Check that OPENAI_API_KEY is configured.")
-      console.error("[XRayV2] Scan error:", error instanceof Error ? error.message : "Unknown")
+      console.error("[XRay] Scan error:", error instanceof Error ? error.message : "Unknown")
     } finally {
       setIsScanning(false)
     }
   }, [setSpec])
+
+  // ── Refine scan (update existing spec with edited idea via AI) ─────
+  const handleRefineScan = useCallback(async (updatedIdea: string): Promise<void> => {
+    if (!scanId) {
+      // No existing scan — fall back to fresh scan
+      return handleScan(updatedIdea)
+    }
+
+    const trimmed = (updatedIdea || "").trim() || "New machine concept"
+    setIsScanning(true)
+    try {
+      const result = await refineScanAction(scanId, trimmed, spec)
+      if ("error" in result) { toast.error(result.error); return }
+      setScanId(result.scanId)
+      setSpec(result.spec)
+      toast.success(`Refined: ${result.spec.modules.length} modules updated`)
+
+      // Trigger image generation for modules that need new images
+      const needsImages = result.spec.modules.some((m) => m.imageStatus === "pending")
+      if (needsImages) {
+        setIsGeneratingImages(true)
+        toast.info("Generating AI blueprint images for updated modules...")
+        generateImagesAction(result.scanId)
+          .then((imgResult) => {
+            if ("spec" in imgResult) {
+              setSpec(imgResult.spec)
+              const successCount = imgResult.spec.modules.filter(m => m.imageStatus === "complete").length
+              if (successCount > 0) toast.success(`Generated ${successCount} blueprint images`)
+            }
+          })
+          .catch((err) => {
+            toast.error("Image generation failed")
+            console.error("[XRay] Image error:", err)
+          })
+          .finally(() => setIsGeneratingImages(false))
+      }
+    } catch (error) {
+      toast.error("Refine failed. Please try again.")
+      console.error("[XRay] Refine error:", error instanceof Error ? error.message : "Unknown")
+    } finally {
+      setIsScanning(false)
+    }
+  }, [scanId, spec, setSpec, handleScan])
+
+  // ── Refine module (AI-assisted improvement of a single module) ─────
+  const handleRefineModule = useCallback(async (editedModule: ModuleSpec): Promise<ModuleSpec> => {
+    if (!scanId) {
+      throw new Error("No scan ID available for module refinement")
+    }
+
+    const result = await refineModuleAction(scanId, editedModule, spec)
+    if ("error" in result) {
+      toast.error(result.error)
+      throw new Error(result.error)
+    }
+
+    return result.module
+  }, [scanId, spec])
 
   // ── Generate images manually ────────────────────────────────────────
   const handleGenerateImages = useCallback((): void => {
@@ -223,7 +297,7 @@ export function XRayV2View(): React.ReactNode {
       })
       .catch((err) => {
         toast.error("Image generation failed")
-        console.error("[XRayV2] Image error:", err)
+        console.error("[XRay] Image error:", err)
       })
       .finally(() => setIsGeneratingImages(false))
   }, [scanId, setSpec])
@@ -238,7 +312,7 @@ export function XRayV2View(): React.ReactNode {
       toast.success("Process class derived")
     } catch (error) {
       toast.error("Failed to derive process class")
-      console.error("[XRayV2] Diagnostic error:", error instanceof Error ? error.message : "Unknown")
+      console.error("[XRay] Diagnostic error:", error instanceof Error ? error.message : "Unknown")
     }
   }, [scanId, setSpec])
 
@@ -265,7 +339,7 @@ export function XRayV2View(): React.ReactNode {
       }
     } catch (error) {
       toast.error("CAD model generation failed")
-      console.error("[XRayV2] CAD generation error:", error instanceof Error ? error.message : "Unknown")
+      console.error("[XRay] CAD generation error:", error instanceof Error ? error.message : "Unknown")
     }
   }, [scanId, setSpec])
 
@@ -282,7 +356,7 @@ export function XRayV2View(): React.ReactNode {
       toast.success(`Engineering analysis complete for ${analyzed} modules`)
     } catch (error) {
       toast.error("Engineering analysis failed")
-      console.error("[XRayV2] Analysis error:", error instanceof Error ? error.message : "Unknown")
+      console.error("[XRay] Analysis error:", error instanceof Error ? error.message : "Unknown")
     } finally {
       setIsAnalyzing(false)
     }
@@ -306,7 +380,7 @@ export function XRayV2View(): React.ReactNode {
       toast.success(`Structural FEA complete: ${passed}/${total} modules pass`)
     } catch (error) {
       toast.error("Structural FEA failed")
-      console.error("[XRayV2] FEA error:", error instanceof Error ? error.message : "Unknown")
+      console.error("[XRay] FEA error:", error instanceof Error ? error.message : "Unknown")
     } finally {
       setIsRunningStructural(false)
     }
@@ -332,7 +406,7 @@ export function XRayV2View(): React.ReactNode {
       }
     } catch (error) {
       toast.error("Convergence evaluation failed")
-      console.error("[XRayV2] Convergence error:", error instanceof Error ? error.message : "Unknown")
+      console.error("[XRay] Convergence error:", error instanceof Error ? error.message : "Unknown")
     } finally {
       setIsRunningConvergence(false)
     }
@@ -350,7 +424,7 @@ export function XRayV2View(): React.ReactNode {
       toast.success("Premium analyses complete!")
     } catch (error) {
       toast.error("Premium analysis failed")
-      console.error("[XRayV2] Premium analysis error:", error instanceof Error ? error.message : "Unknown")
+      console.error("[XRay] Premium analysis error:", error instanceof Error ? error.message : "Unknown")
     } finally {
       setIsRunningPremium(false)
     }
@@ -363,9 +437,9 @@ export function XRayV2View(): React.ReactNode {
     matchPeopleAction(scanId, spec.modules, forceRefresh)
       .then((result) => {
         if ("people" in result) setPeople(result.people)
-        else console.error("[XRayV2] People error:", result.error)
+        else console.error("[XRay] People error:", result.error)
       })
-      .catch((err) => console.error("[XRayV2] People error:", err))
+      .catch((err) => console.error("[XRay] People error:", err))
       .finally(() => setIsPeopleLoading(false))
   }, [scanId, spec.modules])
 
@@ -377,9 +451,9 @@ export function XRayV2View(): React.ReactNode {
     matchSuppliersAction(scanId, spec.modules, diagComplete, forceRefresh)
       .then((result) => {
         if ("suppliersByModule" in result) setSuppliersByModule(result.suppliersByModule)
-        else console.error("[XRayV2] Supplier error:", result.error)
+        else console.error("[XRay] Supplier error:", result.error)
       })
-      .catch((err) => console.error("[XRayV2] Supplier error:", err))
+      .catch((err) => console.error("[XRay] Supplier error:", err))
       .finally(() => setIsSuppliersLoading(false))
   }, [scanId, spec])
 
@@ -421,7 +495,9 @@ export function XRayV2View(): React.ReactNode {
         idea={spec.idea}
         functionStatement={spec.function}
         isScanning={isScanning}
+        hasExistingSpec={spec.modules.length > 0}
         onScan={handleScan}
+        onRefine={handleRefineScan}
         onIdeaChange={(idea) => setSpec({ ...spec, idea })}
       />
 
@@ -452,6 +528,7 @@ export function XRayV2View(): React.ReactNode {
             scanId={scanId}
             onDeriveProcessClass={handleDeriveProcessClass}
             onGenerateCadModel={handleGenerateCadModel}
+            onOpenInterview={setInterviewModule}
           />
 
           {/* Section 5b: Engineering Analysis Summary */}
@@ -498,6 +575,19 @@ export function XRayV2View(): React.ReactNode {
             onModuleUpdate={handleModuleUpdate}
             onDeriveProcessClass={handleDeriveProcessClass}
           />
+
+          {/* Section 11: RFQ (Request for Quotation) */}
+          <RfqSection spec={spec} />
+
+          {/* Interview Panel Dialog (opens on top of dossier) */}
+          {interviewModule && (
+            <InterviewPanel
+              module={interviewModule}
+              open={!!interviewModule}
+              onClose={() => setInterviewModule(null)}
+              onSave={handleModuleUpdate}
+            />
+          )}
         </>
       )}
     </div>

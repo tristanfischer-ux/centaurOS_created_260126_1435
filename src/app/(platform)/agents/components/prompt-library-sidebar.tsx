@@ -173,7 +173,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                                 )}
                                 style={
                                     activeCategory === cat
-                                        ? { ringColor: CATEGORY_ACCENT_COLORS[cat] }
+                                        ? { '--tw-ring-color': CATEGORY_ACCENT_COLORS[cat] } as React.CSSProperties
                                         : undefined
                                 }
                             >

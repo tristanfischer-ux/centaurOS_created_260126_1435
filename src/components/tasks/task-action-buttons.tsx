@@ -97,7 +97,7 @@ interface TaskActionButtonsProps {
   forwardAttachments: TaskAttachment[]
   forwardAttachmentsLoading: boolean
   forwardUploading: boolean
-  forwardFileInputRef: React.RefObject<HTMLInputElement>
+  forwardFileInputRef: React.RefObject<HTMLInputElement | null>
   handleForwardFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
   handleRemoveAttachment: (fileId: string) => void
 }

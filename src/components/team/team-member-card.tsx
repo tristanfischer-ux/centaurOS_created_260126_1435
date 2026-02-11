@@ -11,7 +11,7 @@ import {
     AlertTriangle, User, MessageSquare, Users
 } from "lucide-react"
 import { formatDistanceToNow, isPast, parseISO } from "date-fns"
-import { PresenceIndicator } from "@/components/PresenceIndicator"
+import { PresenceIndicator, type DisplayPresenceStatus, type PresenceData } from "@/components/PresenceIndicator"
 
 export type CardSize = 'small' | 'medium' | 'full'
 
@@ -57,8 +57,8 @@ interface TeamMemberCardProps {
     onMessage?: (id: string) => void
     onAddToTeam?: (id: string) => void
     onTaskClick?: (taskId: string) => void
-    presenceStatus?: 'online' | 'away' | 'busy' | 'offline'
-    presence?: { status: string; last_seen?: string } | null
+    presenceStatus?: DisplayPresenceStatus
+    presence?: PresenceData | null
 }
 
 /**

@@ -25,7 +25,7 @@
 "use server"
 
 import { withAuth } from "@/lib/server-action-utils"
-import { scanIdea as scanIdeaService, deriveProcessClassAI } from "@/app/(platform)/product-xray/services/scan"
+import { scanIdea as scanIdeaService, deriveProcessClassAI, refineScanAI, refineModuleAI } from "@/app/(platform)/product-xray/services/scan"
 import { matchPeopleForModules } from "@/app/(platform)/product-xray/services/people"
 import { matchSuppliersForModule } from "@/app/(platform)/product-xray/services/suppliers"
 import { generateModuleImage, generateSystemImage } from "@/app/(platform)/product-xray/services/image-generator"
@@ -102,6 +102,103 @@ export async function scanIdeaAction(idea: string): Promise<
     })
 
     return { scanId: scan.id, spec }
+  })
+}
+
+/**
+ * Refines an existing scan by sending the current spec + updated idea to AI.
+ *
+ * @description The AI reviews the existing decomposition and produces an
+ * improved version that incorporates the updated idea while preserving
+ * modules with stable IDs (so images, CAD, interviews are kept).
+ *
+ * @param scanId - The existing scan ID to update
+ * @param updatedIdea - The user's revised product idea text
+ * @param currentSpec - The existing XRaySpec to refine
+ * @returns Updated spec with refined modules
+ *
+ * @security Requires authenticated user with foundry context
+ * @audit Logs scan refinement with scanId, foundryId
+ */
+export async function refineScanAction(
+  scanId: string,
+  updatedIdea: string,
+  currentSpec: XRaySpec,
+): Promise<{ scanId: string; spec: XRaySpec } | { error: string }> {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // VALIDATION: Ensure idea is non-empty
+    if (!updatedIdea?.trim()) {
+      return { error: "Please enter a product idea to refine" }
+    }
+    if (updatedIdea.length > 5000) {
+      return { error: "Idea text is too long (max 5000 characters)" }
+    }
+
+    // AI refine scan
+    const refinedSpec = await refineScanAI(updatedIdea.trim(), currentSpec)
+
+    // Persist refined spec to same scan row
+    const { error: updateError } = await supabase
+      .from("xray_scans")
+      .update({
+        idea: updatedIdea.trim(),
+        spec: refinedSpec as unknown as Json,
+        status: "refined",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", scanId)
+
+    if (updateError) {
+      console.error("[XRay] Failed to persist refined scan:", {
+        error: updateError.message,
+        scanId,
+        foundryId,
+      })
+      return { error: `Failed to save refined scan: ${updateError.message}` }
+    }
+
+    // AUDIT: Log scan refinement
+    console.info("[XRay] Scan refined:", {
+      scanId,
+      foundryId,
+      userId: user.id,
+      moduleCount: refinedSpec.modules.length,
+    })
+
+    return { scanId, spec: refinedSpec }
+  })
+}
+
+/**
+ * Refines a single module using AI, preserving user edits and improving quality.
+ *
+ * @description Sends the user-edited module + system context to AI for
+ * improvement. Does NOT auto-persist — returns the refined module for
+ * user review in the edit dialog.
+ *
+ * @param scanId - The scan ID (for context)
+ * @param editedModule - The module with user's manual edits
+ * @param fullSpec - The full XRaySpec for system context
+ * @returns The AI-refined module
+ *
+ * @security Requires authenticated user with foundry context
+ */
+export async function refineModuleAction(
+  scanId: string,
+  editedModule: ModuleSpec,
+  fullSpec: XRaySpec,
+): Promise<{ module: ModuleSpec } | { error: string }> {
+  return withAuth(async () => {
+    try {
+      const refined = await refineModuleAI(editedModule, fullSpec)
+      return { module: refined }
+    } catch (error) {
+      console.error("[XRay] Failed to refine module:", {
+        moduleId: editedModule.id,
+        error: error instanceof Error ? error.message : "Unknown",
+      })
+      return { error: "Failed to refine module with AI. Please try again." }
+    }
   })
 }
 

@@ -22,7 +22,7 @@ interface Member {
 interface Comment {
     id: string
     content: string
-    is_system_log: boolean
+    is_system_log: boolean | null
     created_at: string
     user_id: string
     user?: { full_name: string; role: string }
@@ -55,8 +55,8 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                 console.error('[InlineThread] Failed to fetch comments:', commentsRes.error)
             } else if (commentsRes.data) {
                 // Filter to only show human notes (not system logs)
-                const humanNotes = commentsRes.data.filter((c: Comment) => !c.is_system_log)
-                setComments(humanNotes.slice(0, 10) as Comment[])
+                const humanNotes = (commentsRes.data as Comment[]).filter(c => !c.is_system_log)
+                setComments(humanNotes.slice(0, 10))
             }
 
             // Fetch attachments
@@ -88,8 +88,8 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                 // Refresh comments using server action for consistent auth
                 const commentsRes = await getTaskComments(taskId)
                 if (commentsRes.data) {
-                    const humanNotes = commentsRes.data.filter((c: Comment) => !c.is_system_log)
-                    setComments(humanNotes.slice(0, 10) as Comment[])
+                    const humanNotes = (commentsRes.data as Comment[]).filter(c => !c.is_system_log)
+                    setComments(humanNotes.slice(0, 10))
                 }
             }
         } finally {
@@ -111,8 +111,8 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
             // Refresh comments using server action for consistent auth
             const commentsRes = await getTaskComments(taskId)
             if (commentsRes.data) {
-                const humanNotes = commentsRes.data.filter((c: Comment) => !c.is_system_log)
-                setComments(humanNotes.slice(0, 10) as Comment[])
+                const humanNotes = (commentsRes.data as Comment[]).filter(c => !c.is_system_log)
+                setComments(humanNotes.slice(0, 10))
             }
             
             const attachmentsRes = await getTaskAttachments(taskId)

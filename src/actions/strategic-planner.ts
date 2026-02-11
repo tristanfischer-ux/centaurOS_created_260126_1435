@@ -27,6 +27,7 @@ import type {
   StrategicRisk,
   AISuggestion,
 } from '@/types/strategic-planner'
+import type { Json } from '@/types/database.types'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'dummy-key-for-build',
@@ -443,9 +444,9 @@ export async function applyStrategicPlan(
         description: goalDescription,
         is_strategic_goal: true,
         milestone_date: deadline,
-        resource_suggestions: plan.resourceGaps || [],
-        strategic_risks: plan.risks || [],
-        ai_suggestions: plan.suggestions || [],
+        resource_suggestions: (plan.resourceGaps || []) as unknown as Json,
+        strategic_risks: (plan.risks || []) as unknown as Json,
+        ai_suggestions: (plan.suggestions || []) as unknown as Json,
         creator_id: user.id,
         foundry_id: foundryId,
         status: 'In Progress',
@@ -608,10 +609,10 @@ export async function getStrategicPlanOverview(
       progress: goalData.progress || 0,
       milestone_date: goalData.milestone_date || null,
       is_strategic_goal: goalData.is_strategic_goal || false,
-      resource_suggestions: (goalData.resource_suggestions as ResourceSuggestion[]) || [],
-      strategic_risks: (goalData.strategic_risks as StrategicRisk[]) || [],
-      ai_suggestions: (goalData.ai_suggestions as AISuggestion[]) || [],
-      created_at: goalData.created_at,
+      resource_suggestions: (goalData.resource_suggestions as unknown as ResourceSuggestion[]) || [],
+      strategic_risks: (goalData.strategic_risks as unknown as StrategicRisk[]) || [],
+      ai_suggestions: (goalData.ai_suggestions as unknown as AISuggestion[]) || [],
+      created_at: goalData.created_at ?? '',
     }
 
     // 2. Fetch child objectives (phases)
@@ -777,9 +778,11 @@ export async function updateStrategicGoalMeta(
   }
 ): Promise<{ success?: boolean; error?: string }> {
   return withAuth(async ({ supabase, foundryId }) => {
+    // Cast through unknown since custom types (AISuggestion[], etc.) aren't directly assignable to Json
+    const dbUpdates = updates as unknown as Record<string, Json>
     const { error } = await supabase
       .from('objectives')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', objectiveId)
       .eq('foundry_id', foundryId)
 

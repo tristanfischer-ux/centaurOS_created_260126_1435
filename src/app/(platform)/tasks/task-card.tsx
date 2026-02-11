@@ -303,7 +303,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                         )}
                         <h3 className="font-display font-semibold text-lg text-foreground leading-tight group-hover/card:text-electric-blue transition-colors duration-200 tracking-tight flex items-center gap-2">
                             {task.is_private && (
-                                <Lock className="h-4 w-4 text-status-warning shrink-0" title="Private task" />
+                                <span title="Private task"><Lock className="h-4 w-4 text-status-warning shrink-0" /></span>
                             )}
                             {task.title}
                         </h3>
@@ -375,7 +375,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                     name={currentAssignees[0].full_name}
                                                     role={currentAssignees[0].role}
                                                     size="md"
-                                                    className={`border-2 ${getRoleColors(currentAssignees[0].role).border}`}
+                                                    className={getRoleColors(currentAssignees[0].role).bg}
                                                 />
                                             ) : currentAssignees.length > 1 ? (
                                                 // Multiple assignees - use stack with overlap
@@ -720,8 +720,8 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                     <TaskActionButtons
                         task={{
                             id: task.id,
-                            status: task.status,
-                            client_visible: task.client_visible,
+                            status: task.status ?? '',
+                            client_visible: task.client_visible ?? false,
                             last_nudge_at: task.last_nudge_at,
                         }}
                         isAssignee={isAssignee}

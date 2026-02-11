@@ -154,9 +154,7 @@ export function useActivityTracker() {
 
     const handleBeforeUnload = () => {
       recordTimeSpent()
-      // Use sendBeacon for reliable delivery on page close
-      if (eventBuffer.length > 0 && navigator.sendBeacon) {
-        // Fall back to regular flush since sendBeacon needs a URL
+      if (eventBuffer.length > 0) {
         flushEvents()
       }
     }

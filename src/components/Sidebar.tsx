@@ -16,7 +16,6 @@ import {
     Sparkles,
     Waypoints,
     ScanSearch,
-    Boxes,
     MessageSquarePlus,
     Plus,
     GraduationCap,
@@ -68,9 +67,7 @@ const companyNavigation = [
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Agents", href: "/agents", icon: Bot, tooltip: "Prompt workflows — build, chain, and copy prompts" },
-    { name: "Product X-Ray", href: "/product-xray", icon: ScanSearch, tooltip: "Deep product analysis across strategy, team, and marketplace" },
-    { name: "X-Ray v2", href: "/product-xray-v2", icon: Sparkles, tooltip: "Redesigned product dossier — single-page engineering report" },
-    { name: "X-Ray 3D", href: "/product-xray-v3", icon: Boxes, tooltip: "Product dossier with AI-generated 3D CAD models (STEP, STL, SVG)" },
+    { name: "Product X-Ray", href: "/product-xray", icon: ScanSearch, tooltip: "AI-powered product dossier — scan an idea into a buildable engineering spec with 3D CAD models" },
     { name: "Marketplace Orders", href: "/marketplace-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
     { name: "Settings", href: "/settings", icon: Settings, tooltip: "Company configuration, integrations, and preferences" },
 ]

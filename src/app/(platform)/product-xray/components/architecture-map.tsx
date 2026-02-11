@@ -28,7 +28,7 @@ import { Box, CircleDot } from "lucide-react"
 
 import { ArchitectureNode } from "./architecture-node"
 import type { ArchitectureNodeData } from "./architecture-node"
-import type { XRaySpec, ModuleSpec } from "../../product-xray/services/xray-schema"
+import type { XRaySpec, ModuleSpec } from "../services/xray-schema"
 import type { Node, Edge } from "@xyflow/react"
 
 // ─── Constants ───────────────────────────────────────────────────────

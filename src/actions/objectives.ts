@@ -341,7 +341,7 @@ export async function updateObjective(
 
     // Perform the update
     try {
-        const { error: updateError } = await withRetry(async () => {
+        await withRetry(async () => {
             const res = await supabase
                 .from('objectives')
                 .update(updateData)
@@ -349,15 +349,7 @@ export async function updateObjective(
             if (res.error) throw res.error
             return res
         })
-
-        if (updateError) {
-            console.error('[ObjectiveService] Failed to update objective:', {
-                objectiveId,
-                error: updateError.message
-            })
-            return { error: updateError.message }
-        }
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('[ObjectiveService] Unexpected error updating objective:', {
             objectiveId,
             error: error instanceof Error ? error.message : 'Unknown error'
@@ -395,7 +387,7 @@ export async function updateObjective(
  * @security Requires authenticated user who is the creator or has Executive/Founder role
  * @audit Foundry isolation enforced — cannot delete across foundries
  */
-export async function deleteObjective(id: string, childAction: 'keep' | 'cascade' = 'keep') {
+export async function deleteObjective(id: string, childAction: 'keep' | 'cascade' = 'keep'): Promise<{ error?: string; success?: boolean }> {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -810,7 +802,7 @@ export async function getObjectiveShares(objectiveId: string): Promise<{
  * @security Scoped to user's foundry via foundry_id check
  */
 export async function getStrategicObjectives(): Promise<{
-    data: { id: string; title: string; created_at: string }[]
+    data: { id: string; title: string; created_at: string | null }[]
     error?: string
 }> {
     const supabase = await createClient()
@@ -853,7 +845,7 @@ export async function getStrategicObjectives(): Promise<{
  * @audit Logs strategic_objective_created event
  */
 export async function createStrategicObjective(title: string): Promise<{
-    data?: { id: string; title: string; created_at: string }
+    data?: { id: string; title: string; created_at: string | null }
     error?: string
 }> {
     const supabase = await createClient()

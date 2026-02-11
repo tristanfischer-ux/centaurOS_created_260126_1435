@@ -19,6 +19,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import type { Json } from '@/types/database.types'
 
 
 // ============================================================================
@@ -214,8 +215,8 @@ export async function saveAgentWorkflow(input: SaveWorkflowInput): Promise<{
       .update({
         name: input.name.trim(),
         description: input.description ?? '',
-        nodes: input.nodes,
-        edges: input.edges,
+        nodes: input.nodes as unknown as Json,
+        edges: input.edges as unknown as Json,
         updated_at: now,
       })
       .eq('id', input.id)
@@ -242,8 +243,8 @@ export async function saveAgentWorkflow(input: SaveWorkflowInput): Promise<{
       created_by: user.id,
       name: input.name.trim(),
       description: input.description ?? '',
-      nodes: input.nodes,
-      edges: input.edges,
+      nodes: input.nodes as unknown as Json,
+      edges: input.edges as unknown as Json,
       created_at: now,
       updated_at: now,
     })
@@ -339,8 +340,8 @@ export async function migrateLocalWorkflows(workflows: MigrateWorkflowInput[]): 
     created_by: user.id,
     name: wf.name?.trim() || 'Untitled Workflow',
     description: wf.description ?? '',
-    nodes: wf.nodes ?? [],
-    edges: wf.edges ?? [],
+    nodes: (wf.nodes ?? []) as unknown as Json,
+    edges: (wf.edges ?? []) as unknown as Json,
     is_template: false,
     created_at: now,
     updated_at: now,

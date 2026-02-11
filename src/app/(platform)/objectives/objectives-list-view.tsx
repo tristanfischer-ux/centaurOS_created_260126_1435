@@ -64,14 +64,14 @@ interface Objective {
     tasks: Task[]
     is_private?: boolean
     creator_id?: string
-    is_strategic_goal?: boolean
+    is_strategic_goal?: boolean | null
     parent_objective_id?: string | null
 }
 
 interface ObjectivesListViewProps {
     objectives: Objective[]
     objectivesForDialog: { id: string; title: string }[]
-    members: { id: string; full_name: string; role: string }[]
+    members: { id: string; full_name: string; role: string; email: string }[]
     teams?: { id: string; name: string }[]
     currentUserId: string
 }
@@ -474,7 +474,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                             className="font-semibold text-foreground hover:text-international-orange transition-colors text-left"
                                         >
                                             {objective.is_private && (
-                                                <Lock className="h-4 w-4 text-status-warning shrink-0" title="Private objective" />
+                                                <Lock className="h-4 w-4 text-status-warning shrink-0" aria-label="Private objective" />
                                             )}
                                             {objective.title}
                                         </button>

@@ -43,7 +43,7 @@
  * - UsePackDialog: src/components/inspiration/ (converts packs to objectives)
  */
 
-import type { XRaySpec, ModuleSpec } from "../demo/ForgeOS_CompanyScan_Demo"
+import type { XRaySpec, ModuleSpec } from "./xray-schema"
 
 export interface TechniqueMatch {
   techniqueName: string

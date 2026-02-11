@@ -3,7 +3,8 @@
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { 
-  type PresenceStatus, 
+  type PresenceStatus,
+  type DisplayPresenceStatus,
   type UserPresence,
   getPresenceColor, 
   getPresenceLabel, 
@@ -11,15 +12,22 @@ import {
 } from '@/hooks/usePresence'
 import { Clock, Target, MapPin } from 'lucide-react'
 
+/** Minimal presence data needed for the indicator tooltip */
+export interface PresenceData {
+  timezone?: string | null
+  status_message?: string | null
+  last_seen?: string
+}
+
 // Re-export for convenience
 export { getPresenceColor, getPresenceLabel, formatLastSeen }
-export type { PresenceStatus, UserPresence }
+export type { PresenceStatus, DisplayPresenceStatus, UserPresence }
 
 interface PresenceIndicatorProps {
-  status: PresenceStatus
+  status: DisplayPresenceStatus
   size?: 'sm' | 'md' | 'lg'
   showTooltip?: boolean
-  presence?: UserPresence | null
+  presence?: PresenceData | null
   taskTitle?: string
   className?: string
 }
@@ -135,7 +143,7 @@ export function PresenceIndicator({
 interface AvatarWithPresenceProps {
   children: React.ReactNode
   status?: PresenceStatus
-  presence?: UserPresence | null
+  presence?: PresenceData | null
   taskTitle?: string
   size?: 'sm' | 'md' | 'lg'
   className?: string

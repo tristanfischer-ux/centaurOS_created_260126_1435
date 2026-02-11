@@ -132,7 +132,7 @@ function FunctionCard({
                     </div>
                     <ActOnThisButton
                         context={{
-                            source: 'blueprint',
+                            source: 'blueprints',
                             entityTitle: businessFunction.name,
                             entityDescription: businessFunction.description || `Fill the ${businessFunction.category} gap: ${businessFunction.name}`,
                         }}
@@ -585,7 +585,7 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
                                 {fn.coverage_status === 'gap' && (
                                     <ActOnThisButton
                                         context={{
-                                            source: 'blueprint',
+                                            source: 'blueprints',
                                             entityTitle: fn.name,
                                             entityDescription: fn.description || `Fill the ${fn.category} gap: ${fn.name}`,
                                         }}

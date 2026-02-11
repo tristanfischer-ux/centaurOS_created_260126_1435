@@ -11,6 +11,7 @@
 import React, { useMemo } from "react"
 
 import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import {
   Box,
   Clock,
@@ -18,10 +19,11 @@ import {
   CheckCircle2,
   DollarSign,
   ShieldCheck,
+  Target,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-import type { XRaySpec, ModuleSpec } from "../../product-xray/services/xray-schema"
+import type { XRaySpec, ModuleSpec } from "../services/xray-schema"
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -191,6 +193,23 @@ export function ExecutiveDashboard({ spec }: ExecutiveDashboardProps): React.Rea
             </Card>
           )
         })}
+      </div>
+
+      {/* Bridge action: Create objectives from X-Ray modules */}
+      <div className="flex items-center gap-3 pt-1">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled
+          className="rounded-full opacity-60"
+          title="Coming soon — create Objectives & Tasks from each module"
+        >
+          <Target className="h-3.5 w-3.5 mr-1.5" />
+          Create Objectives from X-Ray
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          Coming soon — auto-generate Objectives & Tasks from module specs
+        </span>
       </div>
     </div>
   )

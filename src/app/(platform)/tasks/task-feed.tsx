@@ -17,7 +17,7 @@ type Comment = Database["public"]["Tables"]["task_comments"]["Row"]
  * Removes the "_[Synced from conversation - Message ID: xyz]_" suffix.
  */
 function stripSyncMarker(content: string): string {
-    return content.replace(/\n\n_\[Synced from conversation.*?\]_$/s, '')
+    return content.replace(/\n\n_\[Synced from conversation[\s\S]*?\]_$/, '')
 }
 
 /**

@@ -554,7 +554,7 @@ function AgentsFlowInner({
                 id: n.id,
                 type: (n.type ?? "prompt") as "prompt" | "trigger" | "output",
                 position: n.position,
-                data: n.data as Workflow["nodes"][number]["data"],
+                data: n.data as unknown as Workflow["nodes"][number]["data"],
             }))
             const serializedEdges = edges.map((e) => ({
                 id: e.id,
@@ -608,7 +608,7 @@ function AgentsFlowInner({
 
             // Auto-layout template nodes so they always look clean
             const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
-                template.nodes as Node[],
+                template.nodes as unknown as Node[],
                 styledEdges,
                 "TB"
             )

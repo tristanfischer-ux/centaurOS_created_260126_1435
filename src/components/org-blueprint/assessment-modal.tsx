@@ -20,6 +20,7 @@ import {
     CoverageStatus,
     AssessmentAnswer,
     FunctionCategory,
+    BusinessFunctionCategory,
     ALL_CATEGORIES,
     CATEGORY_COLORS,
     STATUS_COLORS,
@@ -245,7 +246,7 @@ export function AssessmentModal({ functions, onComplete, children }: AssessmentM
                 <div className="flex items-center gap-3 py-3 border-b flex-shrink-0">
                     <div
                         className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: CATEGORY_COLORS[currentCategory] }}
+                        style={{ backgroundColor: CATEGORY_COLORS[currentCategory as BusinessFunctionCategory] }}
                     />
                     <h3 className="text-lg font-semibold">{currentCategory}</h3>
                     <Badge variant="secondary" className="ml-auto">

@@ -310,21 +310,8 @@ export function ObjectivesBoard({
             title: objectiveToEdit.title,
             description: objectiveToEdit.description,
             extended_description: objectiveToEdit.extended_description,
-            created_at: objectiveToEdit.created_at,
-            tasks: objectiveToEdit.tasks.map(t => ({
-              id: t.id,
-              title: t.title,
-              description: t.description,
-              task_number: t.task_number,
-              status: t.status,
-              assignee_id: t.assignee_id,
-              end_date: t.end_date,
-              foundry_id: t.foundry_id,
-              assignee: t.assignee,
-            })),
             is_private: objectiveToEdit.is_private,
             creator_id: objectiveToEdit.creator_id,
-            is_strategic_goal: objectiveToEdit.is_strategic_goal,
           }}
           members={members}
           teams={teams}

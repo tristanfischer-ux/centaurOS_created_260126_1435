@@ -28,10 +28,10 @@ interface StrategicGoal {
   id: string
   title: string
   description: string | null
-  status: string
-  progress: number
+  status: string | null
+  progress: number | null
   milestone_date: string | null
-  created_at: string
+  created_at: string | null
 }
 
 interface StrategicPlannerLandingProps {

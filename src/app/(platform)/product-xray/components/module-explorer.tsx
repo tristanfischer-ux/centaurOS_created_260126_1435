@@ -53,7 +53,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-import type { XRaySpec, ModuleSpec, ModuleAnalysis, MassProperties, DfmAnalysis, DfmIssue, StructuralAnalysis, StressHotspot, EmiShielding, Fatigue, Impact } from "../../product-xray/services/xray-schema"
+import type { XRaySpec, ModuleSpec, ModuleAnalysis, MassProperties, DfmAnalysis, DfmIssue, StructuralAnalysis, StressHotspot, EmiShielding, Fatigue, Impact } from "../services/xray-schema"
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -85,6 +85,8 @@ interface ModuleExplorerProps {
   onDeriveProcessClass: (moduleId: string, answers: Record<string, string>) => Promise<void>
   /** Callback to trigger 3D CAD model generation for a specific module */
   onGenerateCadModel?: (moduleId: string) => Promise<void>
+  /** Callback to open the expert interview panel for a module */
+  onOpenInterview?: (m: ModuleSpec) => void
 }
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -101,6 +103,7 @@ export function ModuleExplorer({
   scanId,
   onDeriveProcessClass,
   onGenerateCadModel,
+  onOpenInterview,
 }: ModuleExplorerProps): React.ReactNode {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -137,6 +140,7 @@ export function ModuleExplorer({
             scanId={scanId}
             onDeriveProcessClass={onDeriveProcessClass}
             onGenerateCadModel={onGenerateCadModel}
+            onOpenInterview={onOpenInterview}
           />
         ))}
       </div>
@@ -154,6 +158,7 @@ function ModuleRow({
   scanId,
   onDeriveProcessClass,
   onGenerateCadModel,
+  onOpenInterview,
 }: {
   module: ModuleSpec
   isExpanded: boolean
@@ -162,6 +167,7 @@ function ModuleRow({
   scanId: string | null
   onDeriveProcessClass: (moduleId: string, answers: Record<string, string>) => Promise<void>
   onGenerateCadModel?: (moduleId: string) => Promise<void>
+  onOpenInterview?: (m: ModuleSpec) => void
 }): React.ReactNode {
   const r = readinessFor(m)
   const accentColor = chipColor(m.id)
@@ -252,6 +258,7 @@ function ModuleRow({
           scanId={scanId}
           onDeriveProcessClass={onDeriveProcessClass}
           onGenerateCadModel={onGenerateCadModel}
+          onOpenInterview={onOpenInterview}
         />
       )}
     </Card>
@@ -267,6 +274,7 @@ function ExpandedModuleDetail({
   scanId,
   onDeriveProcessClass,
   onGenerateCadModel,
+  onOpenInterview,
 }: {
   m: ModuleSpec
   accentColor: string
@@ -274,6 +282,7 @@ function ExpandedModuleDetail({
   scanId: string | null
   onDeriveProcessClass: (moduleId: string, answers: Record<string, string>) => Promise<void>
   onGenerateCadModel?: (moduleId: string) => Promise<void>
+  onOpenInterview?: (m: ModuleSpec) => void
 }): React.ReactNode {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [cadGenerating, setCadGenerating] = useState(false)
@@ -482,11 +491,24 @@ function ExpandedModuleDetail({
 
       {/* 7. Expert Questions by Discipline */}
       <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Users className="h-3.5 w-3.5 text-chart-1" />
-          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
-            Expert questions by discipline
-          </h4>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="h-3.5 w-3.5 text-chart-1" />
+            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+              Expert questions by discipline
+            </h4>
+          </div>
+          {onOpenInterview && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={() => onOpenInterview(m)}
+            >
+              <Users className="h-3.5 w-3.5 mr-1.5" />
+              {m.interview?.completedAt ? "Edit Interview" : "Start Interview"}
+            </Button>
+          )}
         </div>
         {Array.from(disciplineGroups.entries()).map(([discipline, questions]) => (
           <div key={discipline} className="space-y-1.5">

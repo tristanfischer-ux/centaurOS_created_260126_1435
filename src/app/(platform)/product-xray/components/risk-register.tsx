@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, HelpCircle, ShieldAlert, Box } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-import type { XRaySpec } from "../../product-xray/services/xray-schema"
+import type { XRaySpec } from "../services/xray-schema"
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 

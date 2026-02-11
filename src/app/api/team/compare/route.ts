@@ -110,7 +110,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const validation = CompareRequestSchema.safeParse(body);
         
         if (!validation.success) {
-            console.error('[TeamCompareAPI] Validation failed:', validation.error.errors);
+            console.error('[TeamCompareAPI] Validation failed:', validation.error.issues);
             return NextResponse.json(
                 { error: "Invalid request data" },
                 { status: 400 }

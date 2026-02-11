@@ -26,8 +26,8 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-import type { XRaySpec } from "../../product-xray/services/xray-schema"
-import type { SupplierMatch } from "../../product-xray/services/suppliers"
+import type { XRaySpec } from "../services/xray-schema"
+import type { SupplierMatch } from "../services/suppliers"
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 

@@ -19,8 +19,8 @@ import { Users, Loader2, RefreshCw, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 import { MarketCardV2 } from "@/app/(platform)/marketplace-v2/components/MarketCardV2"
 
-import type { XRaySpec } from "../../product-xray/services/xray-schema"
-import type { PersonMatch } from "../../product-xray/services/people"
+import type { XRaySpec } from "../services/xray-schema"
+import type { PersonMatch } from "../services/people"
 import type { MarketplaceListing } from "@/actions/marketplace"
 
 // ─── Props ───────────────────────────────────────────────────────────

@@ -156,7 +156,7 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
     // Privacy & Sharing
     const [isPrivate, setIsPrivate] = useState(false)
     const [sharedWith, setSharedWith] = useState<ShareTarget[]>([])
-    const [dialogMembers, setDialogMembers] = useState<{ id: string; full_name: string; role: string }[]>([])
+    const [dialogMembers, setDialogMembers] = useState<{ id: string; full_name: string | null; role: string }[]>([])
     const [dialogTeams, setDialogTeams] = useState<{ id: string; name: string }[]>([])
     const [currentUserId, setCurrentUserId] = useState('')
 

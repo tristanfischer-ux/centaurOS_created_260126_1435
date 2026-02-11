@@ -278,7 +278,7 @@ export function OrgBlueprintGapCard({
         </Link>
         <ActOnThisButton
           context={{
-            source: 'blueprint',
+            source: 'blueprints',
             entityTitle: functionName,
             entityDescription: description || `Address the ${category} gap: ${functionName}`,
           }}

@@ -64,7 +64,7 @@ interface Profile {
     bio: string | null
     phone_number: string | null
     linkedin_url: string | null
-    created_at: string
+    created_at: string | null
     foundry_id: string
 }
 
@@ -74,24 +74,24 @@ interface Task {
     description: string | null
     status: string | null
     risk_level: string | null
-    created_at: string
+    created_at: string | null
 }
 
 interface UnassignedTask {
     id: string
     title: string
-    created_at: string
+    created_at: string | null
 }
 
 interface Team {
     id: string
     name: string
-    created_at: string
+    created_at: string | null
 }
 
 interface TeamMembership {
     team_id: string
-    created_at: string
+    created_at: string | null
     teams: Team
 }
 
@@ -789,10 +789,12 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                                                 </a>
                                             </div>
                                         )}
-                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                            <Calendar className="h-4 w-4" />
-                                            <span>Joined {format(new Date(profile.created_at), 'MMM d, yyyy')}</span>
-                                        </div>
+                                        {profile.created_at && (
+                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                                <Calendar className="h-4 w-4" />
+                                                <span>Joined {format(new Date(profile.created_at), 'MMM d, yyyy')}</span>
+                                            </div>
+                                        )}
                                         {!profile.phone_number && !profile.linkedin_url && (
                                             <p className="text-muted-foreground italic">No contact details added</p>
                                         )}
@@ -892,9 +894,11 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                                                         <div className="font-medium text-foreground">
                                                             {membership.teams.name}
                                                         </div>
-                                                        <div className="text-sm text-muted-foreground">
-                                                            Joined {formatDistanceToNow(new Date(membership.created_at), { addSuffix: true })}
-                                                        </div>
+                                                        {membership.created_at && (
+                                                            <div className="text-sm text-muted-foreground">
+                                                                Joined {formatDistanceToNow(new Date(membership.created_at), { addSuffix: true })}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 {canManageAssignments && (

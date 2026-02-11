@@ -52,7 +52,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
             creator:profiles!creator_id(id, full_name, role),
             objective:objectives!objective_id(id, title),
             task_files(id, file_name, file_size, created_at),
-            task_assignees(profile:profiles(id, full_name, role))
+            task_assignees(profile:profiles(id, full_name, role, email))
         `)
         .eq('foundry_id', foundry_id)
         .eq('is_ghost', false)

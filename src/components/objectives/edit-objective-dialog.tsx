@@ -28,7 +28,7 @@ interface EditObjectiveDialogProps {
     /** The objective to edit */
     objective: Objective
     /** Available members for sharing */
-    members?: { id: string; full_name: string; role: string }[]
+    members?: { id: string; full_name: string; role: string | null }[]
     /** Available teams for sharing */
     teams?: { id: string; name: string }[]
     /** Current user ID */

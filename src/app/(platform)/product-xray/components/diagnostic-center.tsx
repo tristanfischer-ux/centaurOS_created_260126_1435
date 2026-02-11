@@ -27,7 +27,7 @@ import {
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
-import type { XRaySpec, ModuleSpec } from "../../product-xray/services/xray-schema"
+import type { XRaySpec, ModuleSpec } from "../services/xray-schema"
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 

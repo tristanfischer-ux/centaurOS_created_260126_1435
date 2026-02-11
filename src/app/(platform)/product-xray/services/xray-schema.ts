@@ -10,7 +10,7 @@
  * questions during the scan, and derives the process class from answers.
  *
  * @related
- * - Demo types: ../demo/ForgeOS_CompanyScan_Demo.tsx (original TypeScript types)
+ * - Mock scan: ./scan.ts (mockScanIdea function for development)
  * - Scan service: ./scan.ts (uses these schemas for AI calls)
  * - Server actions: src/actions/xray.ts (validates AI responses)
  */

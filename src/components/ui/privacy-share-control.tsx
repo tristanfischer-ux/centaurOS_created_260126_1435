@@ -25,7 +25,7 @@ interface PrivacyShareControlProps {
     /** Callback when shares change */
     onSharedWithChange: (targets: ShareTarget[]) => void
     /** Available members to share with */
-    members: { id: string; full_name: string; role: string }[]
+    members: { id: string; full_name: string | null; role: string | null }[]
     /** Available teams to share with */
     teams?: { id: string; name: string }[]
     /** Current user (excluded from share picker) */

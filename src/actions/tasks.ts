@@ -657,8 +657,8 @@ export async function addTaskComment(taskId: string, content: string) {
         if (mentions.length > 0) {
             // Get all foundry members to match mentions
             const { data: members } = await supabase
-                .from('foundry_members')
-                .select('user_id, profiles!inner(id, full_name)')
+                .from('profiles')
+                .select('id, full_name')
                 .eq('foundry_id', foundry_id)
             
             if (members) {
@@ -666,10 +666,10 @@ export async function addTaskComment(taskId: string, content: string) {
                 const mentionedUserIds = new Set<string>()
                 for (const mention of mentions) {
                     const matchedMember = members.find(m => 
-                        m.profiles?.full_name?.toLowerCase().startsWith(mention.toLowerCase())
+                        m.full_name?.toLowerCase().startsWith(mention.toLowerCase())
                     )
-                    if (matchedMember && matchedMember.user_id !== user.id) {
-                        mentionedUserIds.add(matchedMember.user_id)
+                    if (matchedMember && matchedMember.id !== user.id) {
+                        mentionedUserIds.add(matchedMember.id)
                     }
                 }
 
@@ -683,6 +683,7 @@ export async function addTaskComment(taskId: string, content: string) {
 
                     const notifications = Array.from(mentionedUserIds).map(userId => ({
                         user_id: userId,
+                        foundry_id: foundry_id,
                         type: 'mention' as const,
                         title: 'Mentioned in task comment',
                         message: `${user.email?.split('@')[0] || 'Someone'} mentioned you in task #${task?.task_number || ''}: ${task?.title || 'Untitled'}`,
@@ -1483,12 +1484,12 @@ export async function updateTaskStatusAndRisk(
     // Log the status change
     try {
         if (updates.status) {
-            await logTaskHistory(taskId, 'STATUS_CHANGED', user.id, {
+            await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
                 new_status: updates.status
             })
         }
         if (updates.risk_level) {
-            await logTaskHistory(taskId, 'RISK_LEVEL_CHANGED', user.id, {
+            await logTaskHistory(taskId, 'UPDATED', user.id, {
                 new_risk_level: updates.risk_level
             })
         }

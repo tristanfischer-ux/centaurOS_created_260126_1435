@@ -86,7 +86,7 @@ interface Member {
 interface Assignee {
     id: string
     full_name: string | null
-    role: string
+    role: string | null
     email: string
     avatar_url?: string | null
 }

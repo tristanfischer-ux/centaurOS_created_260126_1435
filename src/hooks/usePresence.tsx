@@ -4,7 +4,10 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
+/** DB-compatible presence statuses */
 export type PresenceStatus = 'online' | 'away' | 'focus' | 'offline'
+/** Extended statuses for UI display (includes non-DB values) */
+export type DisplayPresenceStatus = PresenceStatus | 'busy'
 
 export interface UserPresence {
   id: string
@@ -56,9 +59,9 @@ export function usePresence(options: UsePresenceOptions = {}) {
       const { data, error } = await supabase
         .rpc('upsert_presence', {
           p_status: status,
-          p_current_task_id: currentTaskId || null,
+          p_current_task_id: currentTaskId ?? undefined,
           p_timezone: timezone,
-          p_status_message: statusMessage || null
+          p_status_message: statusMessage ?? undefined
         })
       
       if (error) {
@@ -340,12 +343,14 @@ export function usePresence(options: UsePresenceOptions = {}) {
 }
 
 // Helper to get status color
-export function getPresenceColor(status: PresenceStatus): string {
+export function getPresenceColor(status: DisplayPresenceStatus): string {
   switch (status) {
     case 'online':
       return 'bg-status-success'
     case 'away':
       return 'bg-status-warning'
+    case 'busy':
+      return 'bg-status-error'
     case 'focus':
       return 'bg-chart-5'
     case 'offline':
@@ -355,12 +360,14 @@ export function getPresenceColor(status: PresenceStatus): string {
 }
 
 // Helper to get status label
-export function getPresenceLabel(status: PresenceStatus): string {
+export function getPresenceLabel(status: DisplayPresenceStatus): string {
   switch (status) {
     case 'online':
       return 'Online'
     case 'away':
       return 'Away'
+    case 'busy':
+      return 'Busy'
     case 'focus':
       return 'Focus Mode'
     case 'offline':

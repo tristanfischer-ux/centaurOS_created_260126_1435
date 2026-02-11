@@ -34,7 +34,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-import type { XRaySpec, SystemAnalysis, ModuleSpec } from "../../product-xray/services/xray-schema"
+import type { XRaySpec, SystemAnalysis, ModuleSpec } from "../services/xray-schema"
 
 // ─── Props ───────────────────────────────────────────────────────────
 
