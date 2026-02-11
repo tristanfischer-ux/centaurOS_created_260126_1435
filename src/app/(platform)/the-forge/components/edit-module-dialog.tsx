@@ -377,12 +377,12 @@ export function EditModuleDialog({
                     id="module-whatitis"
                     value={draft.detail.whatItIs}
                     onChange={(e) => updateDetail("whatItIs", e.target.value)}
-                    placeholder="2-3 sentence technical description"
-                    rows={3}
-                    className="resize-none"
+                    placeholder={"Paragraph 1: What it physically is and how it works (operating principle, mechanism)...\n\nParagraph 2: Materials, specs, and standards (ASTM, ISO, DIN) with rationale...\n\nParagraph 3: Integration with adjacent modules, critical parameters, and design constraints..."}
+                    rows={10}
+                    className="resize-y"
                   />
                   <p className="text-xs text-muted-foreground">
-                    {draft.detail.whatItIs.length} / 500 characters
+                    {draft.detail.whatItIs.length} / 2000 characters
                   </p>
                 </div>
                 <div className="space-y-2">

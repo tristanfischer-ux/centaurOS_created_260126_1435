@@ -407,8 +407,8 @@ function ExpandedModuleDetail({
           <Lightbulb className="h-3.5 w-3.5 shrink-0" style={{ color: accentColor }} />
           <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider inline-flex items-center gap-1.5">What it is <ForgeInfoTip text="A plain-English description of what this module does and why it matters to your overall product." /></h4>
         </div>
-        <p className="text-sm text-muted-foreground leading-relaxed">{m.detail.whatItIs}</p>
-        <p className="text-sm text-muted-foreground leading-relaxed italic">{m.detail.whyItMatters}</p>
+        <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{m.detail.whatItIs}</div>
+        <p className="text-sm text-muted-foreground leading-relaxed italic mt-2">{m.detail.whyItMatters}</p>
       </div>
 
       {/* 3. Process Flow (IO) */}

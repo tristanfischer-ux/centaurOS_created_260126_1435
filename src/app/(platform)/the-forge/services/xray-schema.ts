@@ -346,7 +346,7 @@ export const ModuleSpecSchema = z.object({
     notes: z.string().describe("Key procurement/design notes"),
   }),
   detail: z.object({
-    whatItIs: z.string().describe("2-3 sentence technical description including operating principles and material considerations"),
+    whatItIs: z.string().describe("2-3 paragraph technical description. Paragraph 1: What the module physically is and its operating principle (mechanism, physics, key process). Paragraph 2: Material choices with standards (ASTM, ISO, DIN), key specifications, and engineering rationale. Paragraph 3: Integration context — how it interfaces with adjacent modules, critical performance parameters, and design constraints affecting procurement or fabrication."),
     whyItMatters: z.string().describe("Why this module is critical to the system"),
     operatingPrinciples: z.string().optional()
       .describe("Deep explanation of the physics, chemistry, thermodynamics, or mechanics that govern this module"),
@@ -480,7 +480,7 @@ export const AIScanOutputSchema = z.object({
       notes: z.string().describe("Key procurement/design notes"),
     }),
     detail: z.object({
-      whatItIs: z.string().describe("2-3 sentence technical description including operating principles and material considerations"),
+      whatItIs: z.string().describe("2-3 paragraph technical description. Paragraph 1: What the module physically is and its operating principle (mechanism, physics, key process). Paragraph 2: Material choices with standards (ASTM, ISO, DIN), key specifications, and engineering rationale. Paragraph 3: Integration context — how it interfaces with adjacent modules, critical performance parameters, and design constraints affecting procurement or fabrication."),
       whyItMatters: z.string().describe("Why this module is critical to the system"),
       commonFailureModes: z.array(z.string()).min(2)
         .describe("Typical failure modes"),
