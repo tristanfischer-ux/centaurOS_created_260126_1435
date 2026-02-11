@@ -1,0 +1,466 @@
+/**
+ * @file cad-generator.ts — AI-powered 3D CAD model generation for X-Ray modules
+ *
+ * @description Two-stage pipeline:
+ * 1. AI generates CadQuery Python code from module spec (OpenAI)
+ * 2. Code executes on Modal.com to produce STEP, STL, and SVG files
+ *
+ * Follows the same pattern as image-generator.ts but produces
+ * parametric 3D CAD models instead of 2D raster blueprints.
+ *
+ * @security
+ * - OPENAI_API_KEY for code generation
+ * - MODAL_CAD_ENDPOINT_URL for CadQuery execution
+ * - Modal containers are sandboxed (no ForgeOS infra access)
+ * - Generated code is validated for blocked patterns before execution
+ *
+ * @related
+ * - Image generator: ./image-generator.ts (parallel 2D pipeline)
+ * - Schema: ./xray-schema.ts (cadModel field on ModuleSpec)
+ * - Modal worker: /modal_cad_worker.py (Python execution environment)
+ * - Server actions: src/actions/xray.ts (orchestrates generation)
+ */
+
+import OpenAI from "openai"
+
+import { createAdminClient } from "@/lib/supabase/admin"
+
+import type { ModuleSpec, ModuleAnalysis, MassProperties, DfmAnalysis } from "./xray-schema"
+
+// ─── Constants ───────────────────────────────────────────────────────
+
+const STORAGE_BUCKET = "xray-images"
+const MODAL_TIMEOUT_MS = 90_000
+
+// ─── Common Material Densities (kg/m³) ───────────────────────────────
+
+/**
+ * Material density lookup for analysis computations.
+ * Matched against module material descriptions via keyword matching.
+ */
+const MATERIAL_DENSITIES: Record<string, number> = {
+  pla: 1240,
+  petg: 1270,
+  abs: 1040,
+  nylon: 1140,
+  tpu: 1210,
+  pc: 1200,
+  asa: 1070,
+  resin: 1100,
+  aluminum: 2700,
+  steel: 7850,
+  titanium: 4500,
+  carbon_fiber: 1600,
+  default: 1240,
+}
+
+/**
+ * Infers material density from module spec by keyword matching.
+ *
+ * @param module - The module spec to extract material info from
+ * @returns Density in kg/m³, defaults to PLA (1240)
+ */
+function inferMaterialDensity(module: ModuleSpec): { density: number; name: string } {
+  const text = [
+    module.detail.materialJustification ?? "",
+    module.detail.whatItIs,
+    ...module.keyParts,
+  ].join(" ").toLowerCase()
+
+  for (const [material, density] of Object.entries(MATERIAL_DENSITIES)) {
+    if (material === "default") continue
+    if (text.includes(material.replace("_", " ")) || text.includes(material)) {
+      return { density, name: material }
+    }
+  }
+  return { density: MATERIAL_DENSITIES.default, name: "PLA (default)" }
+}
+
+// ─── Types ───────────────────────────────────────────────────────────
+
+/** Result of a successful CAD model generation (now includes analysis) */
+export interface CadModelResult {
+  stepUrl: string | undefined
+  stlUrl: string | undefined
+  svgIsoUrl: string | undefined
+  svgTopUrl: string | undefined
+  svgFrontUrl: string | undefined
+  svgRightUrl: string | undefined
+  cadQueryCode: string
+  analysis: ModuleAnalysis | undefined
+}
+
+/** Response from Modal's generate_cad endpoint */
+interface ModalCadResponse {
+  error: string | null
+  step: string | null
+  stl: string | null
+  svg_iso: string | null
+  svg_top: string | null
+  svg_front: string | null
+  svg_right: string | null
+  analysis: ModalAnalysisPayload | null
+}
+
+/** Analysis payload from Modal worker */
+interface ModalAnalysisPayload {
+  mass_properties: {
+    mass_kg: number
+    volume_mm3: number
+    surface_area_mm2?: number
+    center_of_gravity: [number, number, number]
+    moment_of_inertia: {
+      Ixx: number; Iyy: number; Izz: number
+      Ixy: number; Ixz: number; Iyz: number
+    }
+    bounding_box: {
+      xLen: number; yLen: number; zLen: number
+      xMin: number; yMin: number; zMin: number
+      xMax: number; yMax: number; zMax: number
+    }
+    material_density_kg_m3: number
+    error?: string
+  } | null
+  dfm: {
+    printable: boolean
+    issues: Array<{ severity: string; category: string; message: string }>
+    estimated_print_time_min?: number
+    estimated_material_g?: number
+    support_volume_pct?: number
+    compatible_printers?: string[]
+    error?: string
+  } | null
+}
+
+// ─── System Prompt ───────────────────────────────────────────────────
+
+const CAD_SYSTEM_PROMPT = `You are an expert CAD engineer who writes CadQuery Python code to create 3D parametric models of mechanical/industrial components.
+
+## Rules
+1. Output ONLY valid Python code using CadQuery. No markdown fences, no explanation text.
+2. Import only \`cadquery as cq\` and \`math\`. No other imports.
+3. All dimensions in millimeters.
+4. The final model MUST be stored in a variable called \`result\` (a cq.Workplane object).
+5. Use realistic proportions and dimensions. A motor mount is ~25-40mm diameter, a pump housing is ~100-200mm, etc.
+6. Apply appropriate fillets (2-8mm) on edges for a realistic manufactured look.
+7. Include bolt holes, mounting features, and internal cavities where appropriate.
+8. Keep the model conceptual but recognizable — show the key features without excessive detail.
+9. Target 50-150 lines of code. More complex modules can go to 200 lines max.
+10. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or any file I/O. The export is handled externally.
+11. Do NOT include any print statements or comments that reference file paths.
+
+## CadQuery Patterns to Use
+- \`cq.Workplane("XY").box(l, w, h)\` for rectangular bodies
+- \`.circle(r).extrude(h)\` for cylindrical features
+- \`.edges("|Z").fillet(r)\` for edge rounding
+- \`.faces(">Z").workplane().hole(d)\` for through holes
+- \`.cut(other)\` for boolean subtraction
+- \`.union(other)\` for boolean addition
+- \`.transformed(offset=(x,y,z))\` for positioning features
+- \`.shell(-thickness)\` for hollow bodies (negative = inward)
+
+## Output Format
+Just the Python code. The variable \`result\` must be the final assembled CadQuery Workplane object.`
+
+// ─── AI Code Generation ──────────────────────────────────────────────
+
+/**
+ * Generates CadQuery Python code for a module using AI.
+ *
+ * @param module - The module spec to generate CAD code for
+ * @returns The CadQuery Python code as a string
+ *
+ * @throws Error if AI call fails
+ */
+async function generateCadQueryCode(module: ModuleSpec): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error("[XRayCadGen] OPENAI_API_KEY is not configured")
+  }
+
+  const openai = new OpenAI({ apiKey })
+
+  const userPrompt = buildModulePrompt(module)
+
+  console.info("[XRayCadGen] Generating CadQuery code for module:", {
+    moduleId: module.id,
+    moduleName: module.name,
+  })
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: CAD_SYSTEM_PROMPT },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.3,
+    max_tokens: 4000,
+  })
+
+  const rawCode = completion.choices[0]?.message?.content
+  if (!rawCode) {
+    throw new Error("[XRayCadGen] AI returned empty response")
+  }
+
+  // Strip markdown fences if the AI included them despite instructions
+  const code = rawCode
+    .replace(/^```(?:python)?\n?/gm, "")
+    .replace(/\n?```$/gm, "")
+    .trim()
+
+  return code
+}
+
+/**
+ * Builds the user prompt for CadQuery code generation from a module spec.
+ *
+ * @param module - The module spec
+ * @returns Formatted prompt string
+ */
+function buildModulePrompt(module: ModuleSpec): string {
+  return `Generate a 3D CadQuery model for this engineering module:
+
+**Module:** ${module.name}
+**Purpose:** ${module.purpose}
+**What it is:** ${module.detail.whatItIs}
+
+**Key Physical Components:**
+${module.keyParts.map((p) => `- ${p}`).join("\n")}
+
+**Inputs:** ${module.io.in.join(", ")}
+**Outputs:** ${module.io.out.join(", ")}
+
+${module.detail.operatingPrinciples ? `**Operating Principles:** ${module.detail.operatingPrinciples}` : ""}
+${module.detail.materialJustification ? `**Materials:** ${module.detail.materialJustification}` : ""}
+${module.detail.tolerancesAndSpecs ? `**Tolerances:** ${module.detail.tolerancesAndSpecs}` : ""}
+
+Create a conceptual 3D model that shows the main body/housing with the key components represented as geometric features (cylindrical bores for pipes, rectangular slots for circuit boards, mounting bosses for bolts, etc.). The model should be immediately recognizable as a ${module.name} to an engineer.
+
+Store the final model in a variable called \`result\`.`
+}
+
+// ─── Modal Execution ─────────────────────────────────────────────────
+
+/**
+ * Sends CadQuery code to Modal for execution, file export, and analysis.
+ *
+ * @param code - The CadQuery Python code to execute
+ * @param moduleId - Module identifier for logging
+ * @param materialDensity - Material density in kg/m³ for mass calculations
+ * @returns The Modal response with base64-encoded files and analysis results
+ *
+ * @throws Error if Modal endpoint is not configured or request fails
+ */
+async function executeCadQueryOnModal(
+  code: string,
+  moduleId: string,
+  materialDensity: number = 1240,
+): Promise<ModalCadResponse> {
+  const endpointUrl = process.env.MODAL_CAD_ENDPOINT_URL
+  if (!endpointUrl) {
+    throw new Error("[XRayCadGen] MODAL_CAD_ENDPOINT_URL is not configured")
+  }
+
+  console.info("[XRayCadGen] Sending code to Modal for execution:", {
+    moduleId,
+    codeLength: code.length,
+  })
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), MODAL_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(endpointUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, module_id: moduleId, material_density: materialDensity }),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(
+        `[XRayCadGen] Modal API error (${response.status}): ${errText.slice(0, 300)}`,
+      )
+    }
+
+    return (await response.json()) as ModalCadResponse
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(`[XRayCadGen] Modal execution timed out after ${MODAL_TIMEOUT_MS / 1000}s`)
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// ─── Storage Upload ──────────────────────────────────────────────────
+
+/**
+ * Uploads a base64-encoded file to Supabase Storage and returns the public URL.
+ *
+ * @param scanId - The scan ID for path namespacing
+ * @param filename - The filename (e.g., "module-intake/model.step")
+ * @param base64Data - The base64-encoded file data
+ * @param mimeType - The MIME type of the file
+ * @returns The public URL of the uploaded file
+ */
+async function uploadCadFile(
+  scanId: string,
+  filename: string,
+  base64Data: string,
+  mimeType: string,
+): Promise<string> {
+  const supabase = createAdminClient()
+  const buffer = Buffer.from(base64Data, "base64")
+  const path = `${scanId}/cad/${filename}`
+
+  const { error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(path, buffer, {
+      contentType: mimeType,
+      upsert: true,
+    })
+
+  if (error) {
+    throw new Error(`[XRayCadGen] Storage upload failed for ${filename}: ${error.message}`)
+  }
+
+  const { data: urlData } = supabase.storage
+    .from(STORAGE_BUCKET)
+    .getPublicUrl(path)
+
+  return urlData.publicUrl
+}
+
+// ─── Public API ──────────────────────────────────────────────────────
+
+/**
+ * Generates a 3D CAD model for a single module.
+ *
+ * Pipeline: AI generates CadQuery code -> Modal executes it -> files uploaded to storage.
+ *
+ * @param scanId - The scan ID for storage namespacing
+ * @param module - The module to generate a CAD model for
+ * @returns URLs for all generated files (STEP, STL, SVGs) and the source code
+ *
+ * @throws Error if any stage of the pipeline fails
+ */
+export async function generateModuleCadModel(
+  scanId: string,
+  module: ModuleSpec,
+): Promise<CadModelResult> {
+  // Stage 0: Infer material density from module spec
+  const { density: materialDensity, name: materialName } = inferMaterialDensity(module)
+
+  // Stage 1: AI generates CadQuery code
+  const cadQueryCode = await generateCadQueryCode(module)
+
+  // Stage 2: Modal executes the code (now also computes analysis)
+  const modalResult = await executeCadQueryOnModal(cadQueryCode, module.id, materialDensity)
+
+  if (modalResult.error) {
+    throw new Error(`[XRayCadGen] Modal execution failed: ${modalResult.error}`)
+  }
+
+  // Stage 3: Upload files to Supabase Storage
+  const prefix = `module-${module.id}`
+
+  const [stepUrl, stlUrl, svgIsoUrl, svgTopUrl, svgFrontUrl, svgRightUrl] = await Promise.all([
+    modalResult.step
+      ? uploadCadFile(scanId, `${prefix}/model.step`, modalResult.step, "application/step")
+      : Promise.resolve(undefined),
+    modalResult.stl
+      ? uploadCadFile(scanId, `${prefix}/model.stl`, modalResult.stl, "model/stl")
+      : Promise.resolve(undefined),
+    modalResult.svg_iso
+      ? uploadCadFile(scanId, `${prefix}/iso.svg`, modalResult.svg_iso, "image/svg+xml")
+      : Promise.resolve(undefined),
+    modalResult.svg_top
+      ? uploadCadFile(scanId, `${prefix}/top.svg`, modalResult.svg_top, "image/svg+xml")
+      : Promise.resolve(undefined),
+    modalResult.svg_front
+      ? uploadCadFile(scanId, `${prefix}/front.svg`, modalResult.svg_front, "image/svg+xml")
+      : Promise.resolve(undefined),
+    modalResult.svg_right
+      ? uploadCadFile(scanId, `${prefix}/right.svg`, modalResult.svg_right, "image/svg+xml")
+      : Promise.resolve(undefined),
+  ])
+
+  // Stage 4: Convert analysis results from Modal format to schema format
+  const analysis = convertModalAnalysis(modalResult.analysis, materialName)
+
+  console.info("[XRayCadGen] CAD model generated and uploaded:", {
+    moduleId: module.id,
+    hasStep: !!stepUrl,
+    hasStl: !!stlUrl,
+    hasSvgs: !!svgIsoUrl,
+    hasAnalysis: !!analysis,
+    mass_g: analysis?.massProperties ? analysis.massProperties.mass_kg * 1000 : undefined,
+  })
+
+  return {
+    stepUrl,
+    stlUrl,
+    svgIsoUrl,
+    svgTopUrl,
+    svgFrontUrl,
+    svgRightUrl,
+    cadQueryCode,
+    analysis,
+  }
+}
+
+/**
+ * Converts the raw Modal analysis payload into the typed ModuleAnalysis schema.
+ *
+ * @param payload - Raw analysis from Modal worker
+ * @param materialName - Name of the material used
+ * @returns Typed ModuleAnalysis or undefined if no data
+ */
+function convertModalAnalysis(
+  payload: ModalAnalysisPayload | null,
+  materialName: string,
+): ModuleAnalysis | undefined {
+  if (!payload) return undefined
+
+  const now = new Date().toISOString()
+  const result: ModuleAnalysis = {}
+
+  // Convert mass properties
+  const mp = payload.mass_properties
+  if (mp && !mp.error) {
+    result.massProperties = {
+      mass_kg: mp.mass_kg,
+      volume_mm3: mp.volume_mm3,
+      surface_area_mm2: mp.surface_area_mm2,
+      centerOfGravity: mp.center_of_gravity,
+      momentOfInertia: mp.moment_of_inertia,
+      boundingBox: mp.bounding_box,
+      materialDensity_kg_m3: mp.material_density_kg_m3,
+      materialName,
+      computedAt: now,
+    }
+  }
+
+  // Convert DFM results
+  const dfm = payload.dfm
+  if (dfm && !dfm.error) {
+    result.dfm = {
+      printable: dfm.printable,
+      issues: dfm.issues.map((i) => ({
+        severity: i.severity as "critical" | "warning" | "info",
+        category: i.category,
+        message: i.message,
+      })),
+      estimatedPrintTime_min: dfm.estimated_print_time_min,
+      estimatedMaterial_g: dfm.estimated_material_g,
+      supportVolume_pct: dfm.support_volume_pct,
+      compatiblePrinters: dfm.compatible_printers,
+      computedAt: now,
+    }
+  }
+
+  return (result.massProperties || result.dfm) ? result : undefined
+}

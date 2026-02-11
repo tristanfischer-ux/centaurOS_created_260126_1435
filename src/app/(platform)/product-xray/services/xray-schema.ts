@@ -17,6 +17,260 @@
 
 import { z } from "zod"
 
+// ─── Engineering Analysis Schemas ────────────────────────────────────
+
+/** DFM issue severity levels */
+export const DfmIssueSeveritySchema = z.enum(["critical", "warning", "info"])
+export type DfmIssueSeverity = z.infer<typeof DfmIssueSeveritySchema>
+
+/** A single DFM (Design for Manufacturability) issue */
+export const DfmIssueSchema = z.object({
+  severity: DfmIssueSeveritySchema,
+  category: z.string().describe("Issue category (build_volume, feature_size, material_usage, etc.)"),
+  message: z.string().describe("Human-readable description of the issue"),
+})
+export type DfmIssue = z.infer<typeof DfmIssueSchema>
+
+/** Bounding box dimensions */
+export const BoundingBoxSchema = z.object({
+  xLen: z.number(), yLen: z.number(), zLen: z.number(),
+  xMin: z.number(), yMin: z.number(), zMin: z.number(),
+  xMax: z.number(), yMax: z.number(), zMax: z.number(),
+})
+export type BoundingBox = z.infer<typeof BoundingBoxSchema>
+
+/** Moment of inertia tensor */
+export const MomentOfInertiaSchema = z.object({
+  Ixx: z.number(), Iyy: z.number(), Izz: z.number(),
+  Ixy: z.number(), Ixz: z.number(), Iyz: z.number(),
+})
+export type MomentOfInertia = z.infer<typeof MomentOfInertiaSchema>
+
+/** Mass properties computed from CAD geometry */
+export const MassPropertiesSchema = z.object({
+  mass_kg: z.number().describe("Mass in kilograms"),
+  volume_mm3: z.number().describe("Volume in cubic millimeters"),
+  surface_area_mm2: z.number().optional().describe("Surface area in square millimeters"),
+  centerOfGravity: z.tuple([z.number(), z.number(), z.number()])
+    .describe("Center of gravity [x, y, z] in mm"),
+  momentOfInertia: MomentOfInertiaSchema.describe("Moment of inertia tensor (kg*mm²)"),
+  boundingBox: BoundingBoxSchema.describe("Axis-aligned bounding box dimensions"),
+  materialDensity_kg_m3: z.number().describe("Material density used for calculation"),
+  materialName: z.string().optional().describe("Name of the material used"),
+  computedAt: z.string().optional().describe("ISO timestamp of computation"),
+})
+export type MassProperties = z.infer<typeof MassPropertiesSchema>
+
+/** DFM analysis results */
+export const DfmAnalysisSchema = z.object({
+  printable: z.boolean().describe("Whether the part can be 3D printed as-is"),
+  issues: z.array(DfmIssueSchema).describe("List of manufacturability issues"),
+  recommendedOrientation: z.tuple([z.number(), z.number(), z.number()]).optional()
+    .describe("Recommended print orientation as Euler angles"),
+  estimatedPrintTime_min: z.number().optional().describe("Estimated FDM print time in minutes"),
+  estimatedMaterial_g: z.number().optional().describe("Estimated material usage in grams"),
+  supportVolume_pct: z.number().optional().describe("Estimated support volume as percentage"),
+  compatiblePrinters: z.array(z.string()).optional().describe("List of compatible printer models"),
+  computedAt: z.string().optional().describe("ISO timestamp of computation"),
+})
+export type DfmAnalysis = z.infer<typeof DfmAnalysisSchema>
+
+/** Stress hotspot location from FEA */
+export const StressHotspotSchema = z.object({
+  location: z.tuple([z.number(), z.number(), z.number()]).describe("Position [x,y,z] in mm"),
+  vonMisesStress_MPa: z.number().describe("Von Mises stress at this location"),
+  description: z.string().optional().describe("Human-readable description of the hotspot"),
+})
+export type StressHotspot = z.infer<typeof StressHotspotSchema>
+
+/** Structural FEA results */
+export const StructuralAnalysisSchema = z.object({
+  status: z.enum(["pending", "running", "complete", "failed"]),
+  maxVonMisesStress_MPa: z.number().optional().describe("Peak Von Mises stress"),
+  yieldStrength_MPa: z.number().optional().describe("Material yield strength"),
+  safetyFactor: z.number().optional().describe("Minimum safety factor (yield / max stress)"),
+  maxDeformation_mm: z.number().optional().describe("Maximum deformation under load"),
+  criticalLocations: z.array(StressHotspotSchema).optional().describe("Stress concentration points"),
+  meshElementCount: z.number().optional().describe("Number of mesh elements used"),
+  loadCaseDescription: z.string().optional().describe("Description of applied loads"),
+  resultsUrl: z.string().optional().describe("URL to full results file"),
+  contourImageUrl: z.string().optional().describe("URL to stress contour visualization"),
+  computedAt: z.string().optional().describe("ISO timestamp of computation"),
+})
+export type StructuralAnalysis = z.infer<typeof StructuralAnalysisSchema>
+
+/** Modal / vibration analysis results */
+export const ModalAnalysisSchema = z.object({
+  naturalFrequencies_Hz: z.array(z.number()).describe("Natural frequencies in Hz"),
+  resonanceRisks: z.array(z.object({
+    frequency_Hz: z.number(),
+    operatingFrequency_Hz: z.number(),
+    separation_pct: z.number(),
+    riskLevel: z.enum(["high", "medium", "low"]),
+    description: z.string(),
+  })).optional().describe("Resonance risk assessments"),
+  computedAt: z.string().optional(),
+})
+export type ModalAnalysis = z.infer<typeof ModalAnalysisSchema>
+
+/** Thermal analysis results */
+export const ThermalAnalysisSchema = z.object({
+  status: z.enum(["pending", "running", "complete", "failed"]),
+  maxTemp_C: z.number().optional().describe("Maximum temperature in Celsius"),
+  minTemp_C: z.number().optional().describe("Minimum temperature in Celsius"),
+  avgTemp_C: z.number().optional().describe("Average temperature in Celsius"),
+  materialLimit_C: z.number().optional().describe("Material thermal limit in Celsius"),
+  thermalMargin_pct: z.number().optional().describe("Margin below material limit (%)"),
+  withinLimits: z.boolean().optional().describe("Whether all temps are within material limits"),
+  ambientTemp_C: z.number().optional().describe("Ambient temperature used for analysis"),
+  hotspots: z.array(z.object({
+    location: z.tuple([z.number(), z.number(), z.number()]),
+    temp_C: z.number(),
+    description: z.string().optional(),
+  })).optional(),
+  visualizationUrl: z.string().optional().describe("URL to thermal visualization image"),
+  contourImageUrl: z.string().optional(),
+  computedAt: z.string().optional(),
+})
+export type ThermalAnalysis = z.infer<typeof ThermalAnalysisSchema>
+
+/** CFD aerodynamic analysis results */
+export const CfdAnalysisSchema = z.object({
+  status: z.enum(["pending", "running", "complete", "failed"]),
+  dragCoefficient: z.number().optional().describe("Drag coefficient (Cd)"),
+  liftCoefficient: z.number().optional().describe("Lift coefficient (Cl)"),
+  dragForce_N: z.number().optional().describe("Drag force in Newtons"),
+  liftForce_N: z.number().optional().describe("Lift force in Newtons"),
+  reynoldsNumber: z.number().optional().describe("Reynolds number of the flow"),
+  flowVelocity_m_s: z.number().optional().describe("Freestream velocity in m/s"),
+  flowDescription: z.string().optional().describe("Description of flow conditions"),
+  convergencePlotUrl: z.string().optional().describe("URL to residual convergence plot"),
+  flowVisualizationUrl: z.string().optional().describe("URL to flow visualization image"),
+  computedAt: z.string().optional().describe("ISO timestamp of computation"),
+})
+export type CfdAnalysis = z.infer<typeof CfdAnalysisSchema>
+
+/** Topology optimization results */
+export const TopologyOptimizationSchema = z.object({
+  status: z.enum(["pending", "running", "complete", "failed"]),
+  originalMass_kg: z.number().optional(),
+  optimizedMass_kg: z.number().optional(),
+  massReduction_pct: z.number().optional().describe("Weight savings as percentage"),
+  volumeFraction: z.number().optional().describe("Achieved volume fraction (0–1)"),
+  targetVolumeFraction: z.number().optional().describe("Requested volume fraction"),
+  removableRegions: z.array(z.object({
+    name: z.string(),
+    centroid: z.tuple([z.number(), z.number(), z.number()]).optional(),
+    volumePercent: z.number().describe("Percentage of removable volume in this region"),
+  })).optional(),
+  visualizationUrl: z.string().optional().describe("URL to topology visualization image"),
+  optimizedStepUrl: z.string().optional(),
+  optimizedStlUrl: z.string().optional(),
+  computedAt: z.string().optional(),
+})
+export type TopologyOptimization = z.infer<typeof TopologyOptimizationSchema>
+
+/** EMI/EMC shielding effectiveness results */
+export const EmiShieldingSchema = z.object({
+  status: z.enum(["complete", "failed"]),
+  isConductive: z.boolean().optional(),
+  seAt1GHz_dB: z.number().optional().describe("Shielding effectiveness at 1 GHz in dB"),
+  overallRating: z.string().optional().describe("none | poor | moderate | good | excellent"),
+  recommendation: z.string().optional(),
+  wallThickness_mm: z.number().optional(),
+  visualizationUrl: z.string().optional(),
+  computedAt: z.string().optional(),
+})
+export type EmiShielding = z.infer<typeof EmiShieldingSchema>
+
+/** Fatigue life estimation results */
+export const FatigueSchema = z.object({
+  status: z.enum(["complete", "failed"]),
+  cyclesToFailure: z.number().optional(),
+  cyclesToFailureLabel: z.string().optional(),
+  lifeCategory: z.string().optional().describe("low_cycle | medium_cycle | high_cycle | very_high_cycle | infinite"),
+  description: z.string().optional(),
+  safetyFactor: z.number().optional(),
+  enduranceLimit_MPa: z.number().optional(),
+  stressAmplitude_MPa: z.number().optional(),
+  meanStress_MPa: z.number().optional(),
+  computedAt: z.string().optional(),
+})
+export type Fatigue = z.infer<typeof FatigueSchema>
+
+/** Impact/crash resistance estimation results */
+export const ImpactSchema = z.object({
+  status: z.enum(["complete", "failed"]),
+  impactVelocity_m_s: z.number().optional(),
+  kineticEnergy_J: z.number().optional(),
+  energyAbsorptionCapacity_J: z.number().optional(),
+  safetyFactor: z.number().optional(),
+  rating: z.string().optional().describe("excellent | adequate | marginal | insufficient"),
+  description: z.string().optional(),
+  computedAt: z.string().optional(),
+})
+export type Impact = z.infer<typeof ImpactSchema>
+
+/** Per-module analysis container — all analysis results for one module */
+export const ModuleAnalysisSchema = z.object({
+  massProperties: MassPropertiesSchema.optional(),
+  dfm: DfmAnalysisSchema.optional(),
+  structural: StructuralAnalysisSchema.optional(),
+  modal: ModalAnalysisSchema.optional(),
+  thermal: ThermalAnalysisSchema.optional(),
+  cfd: CfdAnalysisSchema.optional(),
+  topology: TopologyOptimizationSchema.optional(),
+  emiShielding: EmiShieldingSchema.optional(),
+  fatigue: FatigueSchema.optional(),
+  impact: ImpactSchema.optional(),
+})
+export type ModuleAnalysis = z.infer<typeof ModuleAnalysisSchema>
+
+/** Convergence criterion for the design optimization loop */
+export const ConvergenceCriterionSchema = z.object({
+  metric: z.string().describe("Name of the metric being checked"),
+  threshold: z.string().describe("Human-readable threshold description"),
+  currentValue: z.number().optional(),
+  targetValue: z.number().optional(),
+  met: z.boolean().describe("Whether this criterion is currently satisfied"),
+  source: z.string().describe("Which analysis produced this metric"),
+})
+export type ConvergenceCriterion = z.infer<typeof ConvergenceCriterionSchema>
+
+/** Record of a single iteration in the convergence loop */
+export const IterationRecordSchema = z.object({
+  iteration: z.number(),
+  timestamp: z.string(),
+  changesApplied: z.array(z.string()).describe("Description of changes made"),
+  criteriaMetCount: z.number(),
+  criteriaTotalCount: z.number(),
+})
+export type IterationRecord = z.infer<typeof IterationRecordSchema>
+
+/** System-level analysis (aggregated across all modules) */
+export const SystemAnalysisSchema = z.object({
+  totalMass_kg: z.number().optional(),
+  systemCenterOfGravity: z.tuple([z.number(), z.number(), z.number()]).optional(),
+  systemMomentOfInertia: MomentOfInertiaSchema.optional(),
+
+  // Convergence loop state
+  iterationCount: z.number().optional(),
+  maxIterations: z.number().optional(),
+  convergenceStatus: z.enum([
+    "not_started", "running", "converged", "max_iterations", "needs_review",
+  ]).optional(),
+  convergenceCriteria: z.array(ConvergenceCriterionSchema).optional(),
+  iterationHistory: z.array(IterationRecordSchema).optional(),
+
+  // Overall engineering grades
+  structuralGrade: z.enum(["pass", "marginal", "fail", "not_analyzed"]).optional(),
+  thermalGrade: z.enum(["pass", "marginal", "fail", "not_analyzed"]).optional(),
+  manufacturabilityGrade: z.enum(["pass", "marginal", "fail", "not_analyzed"]).optional(),
+
+  computedAt: z.string().optional(),
+})
+export type SystemAnalysis = z.infer<typeof SystemAnalysisSchema>
+
 // ─── Discipline enum ─────────────────────────────────────────────────
 
 export const DisciplineSchema = z.enum([
@@ -122,6 +376,22 @@ export const ModuleSpecSchema = z.object({
   imageUrl: z.string().optional().describe("URL of Gemini-generated blueprint image"),
   imageStatus: z.enum(["pending", "generating", "complete", "failed"]).optional()
     .describe("Image generation status"),
+  // 3D CAD model generation
+  cadModel: z.object({
+    status: z.enum(["pending", "generating", "complete", "failed"])
+      .describe("CAD model generation status"),
+    stepUrl: z.string().optional().describe("URL of STEP file for manufacturing"),
+    stlUrl: z.string().optional().describe("URL of STL mesh for 3D printing"),
+    svgIsoUrl: z.string().optional().describe("URL of isometric SVG engineering view"),
+    svgTopUrl: z.string().optional().describe("URL of top-down SVG engineering view"),
+    svgFrontUrl: z.string().optional().describe("URL of front SVG engineering view"),
+    svgRightUrl: z.string().optional().describe("URL of right-side SVG engineering view"),
+    cadQueryCode: z.string().optional().describe("The AI-generated CadQuery Python code"),
+    generatedAt: z.string().optional().describe("ISO timestamp of generation"),
+    // Engineering analysis results (computed alongside or after CAD generation)
+    analysis: ModuleAnalysisSchema.optional()
+      .describe("Engineering analysis results for this module's CAD model"),
+  }).optional().describe("AI-generated 3D CAD model data"),
   // Legacy fields preserved for backward compat with existing scans
   interview: InterviewStateSchema.optional(),
   supplier: z.string().optional(),
@@ -146,6 +416,9 @@ export const XRaySpecSchema = z.object({
   systemImageUrl: z.string().optional().describe("URL of Gemini-generated system diagram"),
   systemImageStatus: z.enum(["pending", "generating", "complete", "failed"]).optional()
     .describe("System image generation status"),
+  // System-level engineering analysis (aggregated across all modules)
+  systemAnalysis: SystemAnalysisSchema.optional()
+    .describe("Aggregated engineering analysis across all modules"),
 })
 
 export type XRaySpec = z.infer<typeof XRaySpecSchema>

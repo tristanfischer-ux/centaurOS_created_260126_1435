@@ -23,6 +23,7 @@ import {
     ShoppingBag,
     ScanSearch,
     Sparkles,
+    Boxes,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -62,6 +63,7 @@ const companyMoreNavigation = [
     { name: "Agents", href: "/agents", icon: Bot },
     { name: "Product X-Ray", href: "/product-xray", icon: ScanSearch },
     { name: "X-Ray v2", href: "/product-xray-v2", icon: Sparkles },
+    { name: "X-Ray 3D", href: "/product-xray-v3", icon: Boxes },
     { name: "Marketplace Orders", href: "/marketplace-orders", icon: ShoppingBag },
     { name: "Settings", href: "/settings", icon: Settings },
 ]

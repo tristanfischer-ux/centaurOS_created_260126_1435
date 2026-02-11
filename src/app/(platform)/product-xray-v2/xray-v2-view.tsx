@@ -28,6 +28,11 @@ import {
   matchPeopleAction,
   matchSuppliersAction,
   generateImagesAction,
+  generateCadModelsAction,
+  analyzeModulesAction,
+  runStructuralAnalysisAction,
+  runConvergenceStepAction,
+  runPremiumAnalysisAction,
 } from "@/actions/xray"
 
 import { ScanHero } from "./components/scan-hero"
@@ -40,6 +45,7 @@ import { RiskRegister } from "./components/risk-register"
 import { TeamMap } from "./components/team-map"
 import { SupplyChain } from "./components/supply-chain"
 import { DiagnosticCenter } from "./components/diagnostic-center"
+import { EngineeringSummary } from "./components/engineering-summary"
 
 import type { XRaySpec, ModuleSpec } from "../product-xray/services/xray-schema"
 import type { PersonMatch } from "../product-xray/services/people"
@@ -112,6 +118,12 @@ export function XRayV2View(): React.ReactNode {
   const [isScanning, setIsScanning] = useState(false)
   const [isGeneratingImages, setIsGeneratingImages] = useState(false)
   const [isHydrated, setIsHydrated] = useState(false)
+
+  // Analysis state
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isRunningStructural, setIsRunningStructural] = useState(false)
+  const [isRunningConvergence, setIsRunningConvergence] = useState(false)
+  const [isRunningPremium, setIsRunningPremium] = useState(false)
 
   // People / supplier matching state
   const [people, setPeople] = useState<PersonMatch[]>([])
@@ -237,6 +249,113 @@ export function XRayV2View(): React.ReactNode {
     persistSpec(next)
   }, [spec, setSpec, persistSpec])
 
+  // ── CAD model generation (per-module, opt-in) ──────────────────────
+  const handleGenerateCadModel = useCallback(async (moduleId: string): Promise<void> => {
+    if (!scanId) { toast.error("Scan first"); return }
+    toast.info("Generating 3D CAD model — this may take up to 2 minutes...")
+    try {
+      const result = await generateCadModelsAction(scanId, [moduleId])
+      if ("error" in result) { toast.error(result.error); return }
+      setSpec(result.spec)
+      const targetModule = result.spec.modules.find((m) => m.id === moduleId)
+      if (targetModule?.cadModel?.status === "complete") {
+        toast.success(`3D model generated for ${targetModule.name}`)
+      } else if (targetModule?.cadModel?.status === "failed") {
+        toast.error(`3D model generation failed for ${targetModule.name}`)
+      }
+    } catch (error) {
+      toast.error("CAD model generation failed")
+      console.error("[XRayV2] CAD generation error:", error instanceof Error ? error.message : "Unknown")
+    }
+  }, [scanId, setSpec])
+
+  // ── Engineering analysis ────────────────────────────────────────────
+  const handleRunAnalysis = useCallback(async (): Promise<void> => {
+    if (!scanId) { toast.error("Scan first"); return }
+    setIsAnalyzing(true)
+    toast.info("Running engineering analysis on all CAD models...")
+    try {
+      const result = await analyzeModulesAction(scanId)
+      if ("error" in result) { toast.error(result.error); return }
+      setSpec(result.spec)
+      const analyzed = result.spec.modules.filter((m) => m.cadModel?.analysis?.massProperties).length
+      toast.success(`Engineering analysis complete for ${analyzed} modules`)
+    } catch (error) {
+      toast.error("Engineering analysis failed")
+      console.error("[XRayV2] Analysis error:", error instanceof Error ? error.message : "Unknown")
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }, [scanId, setSpec])
+
+  // ── Structural FEA ────────────────────────────────────────────────
+  const handleRunStructural = useCallback(async (): Promise<void> => {
+    if (!scanId) { toast.error("Scan first"); return }
+    setIsRunningStructural(true)
+    toast.info("Running structural FEA on modules with CAD models...")
+    try {
+      const result = await runStructuralAnalysisAction(scanId)
+      if ("error" in result) { toast.error(result.error); return }
+      setSpec(result.spec)
+      const passed = result.spec.modules.filter(
+        (m) => (m.cadModel?.analysis?.structural?.safetyFactor ?? 0) >= 1.5,
+      ).length
+      const total = result.spec.modules.filter(
+        (m) => m.cadModel?.analysis?.structural,
+      ).length
+      toast.success(`Structural FEA complete: ${passed}/${total} modules pass`)
+    } catch (error) {
+      toast.error("Structural FEA failed")
+      console.error("[XRayV2] FEA error:", error instanceof Error ? error.message : "Unknown")
+    } finally {
+      setIsRunningStructural(false)
+    }
+  }, [scanId, setSpec])
+
+  // ── Convergence step ──────────────────────────────────────────────
+  const handleRunConvergence = useCallback(async (): Promise<void> => {
+    if (!scanId) { toast.error("Scan first"); return }
+    setIsRunningConvergence(true)
+    toast.info("Evaluating convergence criteria...")
+    try {
+      const result = await runConvergenceStepAction(scanId)
+      if ("error" in result) { toast.error(result.error); return }
+      setSpec(result.spec)
+      const { evaluation, shouldContinue } = result
+      if (evaluation.isConverged) {
+        toast.success("All convergence criteria met! Design is optimized.")
+      } else if (!shouldContinue) {
+        toast.warning("Max iterations reached. Review proposed changes.")
+      } else {
+        const failing = evaluation.totalCount - evaluation.metCount
+        toast.info(`${evaluation.proposedChanges.length} changes proposed. ${failing} criteria need improvement.`)
+      }
+    } catch (error) {
+      toast.error("Convergence evaluation failed")
+      console.error("[XRayV2] Convergence error:", error instanceof Error ? error.message : "Unknown")
+    } finally {
+      setIsRunningConvergence(false)
+    }
+  }, [scanId, setSpec])
+
+  /** Run all premium analyses (EMI, Fatigue, Impact) on all modules */
+  const handleRunPremium = useCallback(async (): Promise<void> => {
+    if (!scanId) { toast.error("Scan first"); return }
+    setIsRunningPremium(true)
+    toast.info("Running premium analyses (EMI, Fatigue, Impact)...")
+    try {
+      const result = await runPremiumAnalysisAction(scanId, ["emi", "fatigue", "impact"])
+      if ("error" in result) { toast.error(result.error); return }
+      setSpec(result.spec)
+      toast.success("Premium analyses complete!")
+    } catch (error) {
+      toast.error("Premium analysis failed")
+      console.error("[XRayV2] Premium analysis error:", error instanceof Error ? error.message : "Unknown")
+    } finally {
+      setIsRunningPremium(false)
+    }
+  }, [scanId, setSpec])
+
   // ── People matching ─────────────────────────────────────────────────
   const loadPeople = useCallback((forceRefresh = false): void => {
     if (spec.modules.length === 0) return
@@ -326,12 +445,26 @@ export function XRayV2View(): React.ReactNode {
           {/* Section 4: Architecture Map */}
           <ArchitectureMap spec={spec} />
 
-          {/* Section 5: Module Explorer (with blueprint images) */}
+          {/* Section 5: Module Explorer (with blueprint images + 3D models) */}
           <ModuleExplorer
             spec={spec}
             onModuleUpdate={handleModuleUpdate}
             scanId={scanId}
             onDeriveProcessClass={handleDeriveProcessClass}
+            onGenerateCadModel={handleGenerateCadModel}
+          />
+
+          {/* Section 5b: Engineering Analysis Summary */}
+          <EngineeringSummary
+            spec={spec}
+            onRunAnalysis={handleRunAnalysis}
+            isAnalyzing={isAnalyzing}
+            onRunStructural={handleRunStructural}
+            isRunningStructural={isRunningStructural}
+            onRunConvergence={handleRunConvergence}
+            isRunningConvergence={isRunningConvergence}
+            onRunPremium={handleRunPremium}
+            isRunningPremium={isRunningPremium}
           />
 
           {/* Section 6: Timeline */}
