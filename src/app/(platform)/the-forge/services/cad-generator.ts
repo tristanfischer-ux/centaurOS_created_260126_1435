@@ -784,42 +784,288 @@ export interface SystemCadResult {
 /**
  * System-level CadQuery prompt — generates hero model directly from spec.
  *
- * @description This prompt deliberately avoids generic "component recipes" and
- * instead tells Opus to use its own visual/domain knowledge. When Claude writes
- * CadQuery directly from knowing what a product looks like, it produces dramatically
- * better models than when working from an abstract structural brief.
+ * @description Forces the same engineering decomposition process that produces
+ * manufacturing-quality models: identify product archetype, decompose into
+ * subsystems, lock interfaces with real-world dimensions, then generate
+ * parametric CadQuery for each subsystem. Includes standard hardware dimension
+ * tables, CadQuery technique catalog, and a condensed reference example.
+ *
+ * Based on analysis of what makes hand-crafted CadQuery models dramatically
+ * better than single-shot AI generation: structured decomposition before coding.
  */
-const SYSTEM_CAD_PROMPT = `You are a world-class CAD engineer writing CadQuery Python code for a detailed, realistic 3D model of a complete product.
+const SYSTEM_CAD_PROMPT = `You are a world-class mechanical engineer writing CadQuery Python code for a detailed, manufacturing-intent 3D model of a complete product.
 
-## YOUR KEY ADVANTAGE
-You know what real-world products look like. A drone has aerodynamic bodies with dome tops, angled motor arms, camera gimbals. A pump has volute housings, impeller chambers, flanged ports. A robot has articulated joints, servo housings, cable routing. USE THAT KNOWLEDGE. Don't just build boxes with labels — build geometry that looks like the real thing.
+## MANDATORY: Engineering Decomposition (before writing ANY code)
+
+You MUST follow this mental process before generating a single line of CadQuery:
+
+### Step A: Identify the Product Archetype
+- What is the closest real-world reference product? (e.g., "DJI Mavic 3" not just "drone")
+- What is the structural paradigm?
+  - Frame-based: drone, robot, CNC machine (structural frame with components bolted on)
+  - Z-stack: smartphone, tablet, laptop (layers compressed into a slab)
+  - Modular enclosure: industrial controller, server, lab equipment (frame + panels + modules)
+  - Pressure vessel: pump, tank, valve (sealed housing with ports)
+  - Articulated: robot arm, gimbal, linkage (joints + rigid links)
+- What is the primary manufacturing process? (injection mold, CNC, sheet metal, 3D print)
+
+### Step B: Decompose into 8-15 Subsystems
+List every subsystem with:
+- Name and function
+- Approximate dimensions based on real-world knowledge
+- Whether it's a bought component (motor, connector) or custom part (housing, bracket)
+- Key interfaces with neighboring subsystems
+
+### Step C: Define Interfaces FIRST, Geometry Second
+For each subsystem boundary, lock the mating geometry using standard dimensions:
+
+**Standard Hardware (use these exact values):**
+- M2: clearance 2.2mm, tap 1.8mm, head 4.0mm, boss OD 6mm
+- M2.5: clearance 2.7mm, tap 2.1mm, head 5.0mm, boss OD 7mm
+- M3: clearance 3.2mm, tap 2.5mm, head 5.5mm, boss OD 8mm
+- M4: clearance 4.3mm, tap 3.3mm, head 7.0mm, boss OD 10mm
+- USB-C port: 9.0 x 3.4mm
+- USB-A port: 14.0 x 6.5mm
+- SD card slot: 12.0 x 1.5mm, depth 15mm
+- Micro-SD slot: 11.0 x 1.0mm
+- SMA antenna connector: 6.35mm mounting hole
+- Standard PCB thickness: 1.6mm
+- JST-XH pitch: 2.5mm
+
+**Manufacturing Tolerances:**
+- Press-fit: nominal +0.05mm
+- Clearance fit: nominal +0.15mm
+- Loose fit: nominal +0.30mm
+- Injection mold wall: 1.5-3.0mm, draft 1-2 degrees
+- Sheet metal: 0.8-2.0mm
+- 3D print min wall: 0.8mm
+- CNC min internal corner radius: 0.5mm
+
+### Step D: Build Each Subsystem as a Numbered Section
+Each subsystem gets its own section (# === 1. MAIN BODY SHELL ===) with intermediate variables.
 
 ## Rules
 1. Output ONLY valid Python code using CadQuery. No markdown fences, no explanation.
 2. Import only \`cadquery as cq\` and \`math\`. No other imports.
-3. All dimensions in millimeters. Use realistic dimensions from your domain knowledge.
+3. All dimensions in millimeters. Use real-world dimensions from your domain knowledge and the standard hardware table above.
 4. The final model MUST be stored in a variable called \`result\`.
-5. Start with a comprehensive PARAMETERS block (50+ parameters covering every major dimension, wall thickness, fillet radius, bolt size, clearance).
-6. Target 400-900 lines of code. This is the HERO model — it deserves full detail.
-7. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or file I/O.
-8. Build incrementally with numbered sections and intermediate variables.
+5. Start with a comprehensive PARAMETERS block (60+ parameters) organized by subsystem. Include wall thickness, fillet radii, bolt sizes, clearances, and tolerance constants.
+6. Target 600-1000 lines of code. Aim for 800+. NEVER produce fewer than 500 lines. This is the HERO model.
+7. Do NOT use \`open()\`, \`exec()\`, \`eval()\`, or file I/O. No print statements.
+8. Build each subsystem incrementally with numbered sections and intermediate variables.
+9. A detailed product model produces a 3-7MB STEP file with 50+ distinct geometric features. Aim for that level of detail.
 
-## What Makes a Model Look REAL
-- **Shell bodies with wall thickness** — outer shape minus inner cutout via .cut(). This is the single most important technique. Every housing, enclosure, and body should be hollow.
-- **Aerodynamic/organic shaping** — top domes, nose tapers, compound fillets. Real products are not rectangular.
-- **Realistic proportions from domain knowledge** — you know what these products look like. Use real-world proportions, not arbitrary ones.
-- **Functional features** — sensor recesses, ventilation grilles, port cutouts, LED channels, screw bosses, bolt patterns.
-- **Internal structure** — ribs, cross-members, standoffs, PCB mounting posts visible through the shell.
-- **Distinct sub-assemblies** — each subsystem is a recognizable shape, not a box placeholder.
+## CadQuery Technique Catalog (use these patterns)
+
+### SHELL BODY (every housing/enclosure MUST use this):
+\`\`\`python
+# Outer shape
+body_outer = (cq.Workplane("XY")
+    .box(length, width, height, centered=True)
+    .edges("|Z").fillet(outer_fillet))
+try:
+    body_outer = body_outer.edges("#Z").fillet(top_fillet)
+except: pass
+# Inner cavity
+body_inner = (cq.Workplane("XY")
+    .workplane(offset=wall_thickness)
+    .box(length - wall*2, width - wall*2, height - wall, centered=True)
+    .edges("|Z").fillet(outer_fillet - 1))
+body = body_outer.cut(body_inner)
+\`\`\`
+
+### SCREW BOSS (for shell assembly, PCB mounting):
+\`\`\`python
+for bx, by in boss_positions:
+    boss = (cq.Workplane("XY")
+        .workplane(offset=base_z)
+        .transformed(offset=(bx, by, 0))
+        .circle(boss_od / 2).extrude(boss_height))
+    hole = (cq.Workplane("XY")
+        .workplane(offset=base_z - 0.5)
+        .transformed(offset=(bx, by, 0))
+        .circle(tap_dia / 2).extrude(boss_height + 1))
+    body = body.union(boss).cut(hole)
+\`\`\`
+
+### BOLT CIRCLE (for motor mounts, flanges, covers):
+\`\`\`python
+for i in range(bolt_count):
+    angle = math.radians(i * 360 / bolt_count + offset_deg)
+    bx = center_x + (bcd / 2) * math.cos(angle)
+    by = center_y + (bcd / 2) * math.sin(angle)
+    bolt_hole = (cq.Workplane("XY")
+        .workplane(offset=mount_z - 1)
+        .transformed(offset=(bx, by, 0))
+        .circle(clearance_dia / 2).extrude(mount_height + 2))
+    body = body.cut(bolt_hole)
+\`\`\`
+
+### INTERNAL RIBS (structural reinforcement):
+\`\`\`python
+# Longitudinal center rib
+rib = (cq.Workplane("XY")
+    .workplane(offset=floor_z)
+    .box(length - wall*4, rib_thickness, height - wall*2 - 4, centered=True))
+body = body.union(rib)
+# Cross ribs at regular intervals
+for x_pos in [-40, 0, 40]:
+    cross_rib = (cq.Workplane("XY")
+        .workplane(offset=floor_z)
+        .transformed(offset=(x_pos, 0, 0))
+        .box(rib_thickness, width - wall*4, height - wall*2 - 8, centered=True))
+    body = body.union(cross_rib)
+\`\`\`
+
+### PORT CUTOUT (USB-C = 9.0x3.4mm, SD = 12.0x1.5mm):
+\`\`\`python
+usbc_cut = (cq.Workplane("XZ")
+    .workplane(offset=-width/2 - 1)
+    .transformed(offset=(port_x, port_z, 0))
+    .box(9.0, 3.4, wall + 4, centered=True))
+try:
+    usbc_cut = usbc_cut.edges("|Y").fillet(1.5)
+except: pass
+body = body.cut(usbc_cut)
+\`\`\`
+
+### VENTILATION GRILLE (iterative slot cuts):
+\`\`\`python
+for i in range(vent_slot_count):
+    x_off = vent_start_x + i * slot_spacing
+    slot = (cq.Workplane("XY")
+        .workplane(offset=top_z - 1)
+        .transformed(offset=(x_off, 0, 0))
+        .box(slot_width, slot_length, wall + 4, centered=True))
+    body = body.cut(slot)
+\`\`\`
+
+### BATTERY BAY (with rails and contacts):
+\`\`\`python
+# Bay cavity
+bay = (cq.Workplane("XY")
+    .workplane(offset=bay_z)
+    .transformed(offset=(bay_x, 0, 0))
+    .box(bay_length, bay_width, bay_height, centered=True))
+body = body.cut(bay)
+# Rail guides along sides
+for y_off in [-bay_width/2 + rail_w/2 + 1, bay_width/2 - rail_w/2 - 1]:
+    rail = (cq.Workplane("XY")
+        .workplane(offset=bay_z + wall)
+        .transformed(offset=(bay_x, y_off, 0))
+        .box(bay_length - 20, rail_w, rail_h, centered=True))
+    body = body.union(rail)
+\`\`\`
+
+## Reference Example (condensed from a manufacturing-ready drone model)
+
+This 150-line excerpt shows the QUALITY LEVEL and TECHNIQUE DENSITY expected:
+
+\`\`\`python
+import cadquery as cq
+import math
+
+# === PARAMETERS ===
+body_length, body_width, body_height = 200, 85, 48
+wall = 2.0
+body_fillet = 14
+arm_length, arm_width, arm_height = 140, 20, 16
+arm_wall = 2.0
+motor_mount_od, motor_bolt_circle = 28, 16.0
+motor_bolt_dia = 3.2  # M3 clearance
+motor_bolt_count = 4
+boss_od, boss_id, boss_h = 8, 2.5, 12  # M2.5 screw bosses
+pcb_standoff_dia, pcb_standoff_hole = 5, 2.5
+vent_slot_w, vent_slot_l, vent_count = 2, 15, 6
+usbc_w, usbc_h = 9.0, 3.4
+batt_length, batt_width, batt_height = 110, 62, 30
+batt_rail_w, batt_rail_h = 4, 3
+tol_press, tol_clearance = 0.05, 0.15
+
+# === 1. MAIN BODY (shelled with wall thickness) ===
+body_outer = (cq.Workplane("XY")
+    .box(body_length, body_width, body_height, centered=True)
+    .edges("|Z").fillet(body_fillet))
+try: body_outer = body_outer.edges(">Z").fillet(8)
+except: pass
+try: body_outer = body_outer.edges("<Z").fillet(4)
+except: pass
+body_inner = (cq.Workplane("XY").workplane(offset=-1)
+    .box(body_length - wall*2, body_width - wall*2, body_height - wall, centered=True)
+    .edges("|Z").fillet(body_fillet - 2))
+try: body_inner = body_inner.edges(">Z").fillet(6)
+except: pass
+body = body_outer.cut(body_inner)
+
+# === 2. INTERNAL RIBS (structural rigidity) ===
+center_rib = (cq.Workplane("XY").workplane(offset=-body_height/2 + wall)
+    .box(body_length - wall*4, 2, body_height - wall*2 - 4, centered=True))
+body = body.union(center_rib)
+for x_pos in [-40, 0, 40]:
+    cross = (cq.Workplane("XY").workplane(offset=-body_height/2 + wall)
+        .transformed(offset=(x_pos, 0, 0))
+        .box(2, body_width - wall*4, body_height - wall*2 - 8, centered=True))
+    body = body.union(cross)
+
+# === 3. SCREW BOSSES (8x for shell assembly, M2.5 pilot holes) ===
+boss_positions = [
+    (body_length/2 - 15, body_width/2 - 12), (body_length/2 - 15, -body_width/2 + 12),
+    (-body_length/2 + 15, body_width/2 - 12), (-body_length/2 + 15, -body_width/2 + 12),
+    (30, body_width/2 - 10), (30, -body_width/2 + 10),
+    (-30, body_width/2 - 10), (-30, -body_width/2 + 10),
+]
+for bx, by in boss_positions:
+    boss = (cq.Workplane("XY").workplane(offset=-body_height/2 + wall)
+        .transformed(offset=(bx, by, 0)).circle(boss_od/2).extrude(boss_h))
+    hole = (cq.Workplane("XY").workplane(offset=-body_height/2 + wall - 0.5)
+        .transformed(offset=(bx, by, 0)).circle(boss_id/2).extrude(boss_h + 1))
+    body = body.union(boss).cut(hole)
+
+# === 4. MOTOR MOUNT (M3 bolt circle, 16mm BCD, stator bore) ===
+motor_z = -arm_height / 2
+mount = (cq.Workplane("XY").workplane(offset=motor_z)
+    .transformed(offset=(mx, my, 0)).circle(motor_mount_od/2).extrude(5))
+bore = (cq.Workplane("XY").workplane(offset=motor_z - 1)
+    .transformed(offset=(mx, my, 0)).circle(11).extrude(7))
+mount = mount.cut(bore)
+for i in range(motor_bolt_count):
+    a = math.radians(i * 360/motor_bolt_count + 45)
+    bx = mx + (motor_bolt_circle/2) * math.cos(a)
+    by = my + (motor_bolt_circle/2) * math.sin(a)
+    bolt = (cq.Workplane("XY").workplane(offset=motor_z - 1)
+        .transformed(offset=(bx, by, 0)).circle(motor_bolt_dia/2).extrude(7))
+    mount = mount.cut(bolt)
+body = body.union(mount)
+
+# === 5. VENTILATION (functional grille cuts) ===
+for i in range(vent_count):
+    x_off = -((vent_count-1)*4)/2 + i*4 - 25
+    slot = (cq.Workplane("XY").workplane(offset=body_height/2 - 1)
+        .transformed(offset=(x_off, 0, 0))
+        .box(vent_slot_w, vent_slot_l, 10, centered=True))
+    body = body.cut(slot)
+
+# === 6. USB-C PORT CUTOUT (9.0 x 3.4mm standard) ===
+usbc = (cq.Workplane("XZ").workplane(offset=-body_width/2 - 1)
+    .transformed(offset=(-20, -5, 0)).box(usbc_w, usbc_h, wall+4, centered=True))
+try: usbc = usbc.edges("|Y").fillet(usbc_h/2 - 0.3)
+except: pass
+body = body.cut(usbc)
+
+result = body
+\`\`\`
+
+This example demonstrates: shelled body, internal ribs, screw bosses with pilot holes, M3 bolt circle on motor mount, functional ventilation grilles, standard USB-C port cutout — all in ~100 lines. Your HERO model should have this technique density across 600-1000 lines covering ALL subsystems.
 
 ## Reliability (CRITICAL)
 1. NEVER use \`.shell()\` — it crashes on complex shapes. Always build hollow bodies with outer.cut(inner).
-2. Wrap EVERY \`.fillet()\` call in try/except — fall back to \`.chamfer()\` at half the radius.
+2. Wrap EVERY \`.fillet()\` call in try/except — fall back to \`.chamfer()\` at half the radius, or skip.
 3. Keep fillet radius under 30% of smallest adjacent edge.
 4. Use tuples for \`.transformed(offset=(x,y,z))\` — not lists.
 5. Build incrementally — assign to intermediate variables, don't chain 10+ operations.
 6. Use numbered section comments (# === 1. MAIN BODY === ) for organization.
 7. Verify shapes physically overlap before \`.cut()\` or \`.union()\`.
+8. For aerodynamic/organic bodies, consider \`loft()\` between cross-section profiles rather than box-with-fillets.
 
 Output just the Python code.`
 
@@ -884,7 +1130,9 @@ Use your knowledge of what this type of product actually looks like in the real 
 - Functional features: sensors, ports, vents, indicators, mounting hardware
 - Internal structure visible through shells: ribs, standoffs, PCB mounts
 
-Build in numbered sections. Start with a comprehensive PARAMETERS block (50+ parameters). Target 400-900 lines.
+Build in numbered sections (# === 1. MAIN BODY === etc.). Start with a comprehensive PARAMETERS block (60+ parameters organized by subsystem, including wall thicknesses, fillet radii, bolt sizes, clearances, and tolerance constants).
+
+Target 600-1000 lines. Aim for 800+. NEVER fewer than 500 lines. This is the HERO model — every subsystem deserves its own section with full manufacturing detail.
 
 Store the final model in a variable called \`result\`.`
 }
@@ -916,7 +1164,8 @@ export async function generateSystemCadModel(
 
   console.info("[XRayCadGen] Generating HERO system CadQuery directly from spec (Opus, 32K tokens)")
 
-  let cadQueryCode = stripCodeFences(await callOpus(SYSTEM_CAD_PROMPT, userPrompt, 0.3, 32768))
+  // SECURITY: Temperature 0.2 for precise geometry generation (lower = more deterministic)
+  let cadQueryCode = stripCodeFences(await callOpus(SYSTEM_CAD_PROMPT, userPrompt, 0.2, 32768))
 
   // Stage 2: Execute on Modal with retry loop
   let modalResult = await executeCadQueryOnModal(cadQueryCode, "system", 1240)
@@ -968,7 +1217,66 @@ export async function generateSystemCadModel(
     )
   }
 
-  // Stage 3: Upload STL and isometric SVG
+  // Stage 3: Two-pass refinement — use analysis data to add manufacturing detail
+  // This simulates the iterative v1 -> v2 refinement that produces dramatically
+  // better models when Claude can see the analysis of its own output.
+  const pass1Analysis = modalResult.analysis
+  if (pass1Analysis?.mass_properties && !pass1Analysis.mass_properties.error) {
+    const mp = pass1Analysis.mass_properties
+    const bb = mp.bounding_box
+    const bbVolume = bb.xLen * bb.yLen * bb.zLen
+    const fillRatio = bbVolume > 0 ? (mp.volume_mm3 / bbVolume) * 100 : 0
+
+    console.info("[XRayCadGen] Pass 1 analysis — attempting refinement pass:", {
+      scanId,
+      boundingBox: `${bb.xLen.toFixed(0)} x ${bb.yLen.toFixed(0)} x ${bb.zLen.toFixed(0)} mm`,
+      volume_mm3: mp.volume_mm3.toFixed(0),
+      mass_g: (mp.mass_kg * 1000).toFixed(1),
+      fillRatio: `${fillRatio.toFixed(0)}%`,
+      codeLines: cadQueryCode.split("\n").length,
+    })
+
+    try {
+      const refinementPrompt = buildRefinementPrompt(cadQueryCode, mp, fillRatio, spec)
+      const refinedCode = stripCodeFences(
+        await callOpus(SYSTEM_CAD_PROMPT, refinementPrompt, 0.2, 32768),
+      )
+
+      // Only use refined code if it's longer (more detail) and executes successfully
+      if (refinedCode.split("\n").length >= cadQueryCode.split("\n").length * 0.9) {
+        const refinedResult = await executeCadQueryOnModal(refinedCode, "system-refined", 1240)
+
+        if (!refinedResult.error) {
+          console.info("[XRayCadGen] Refinement pass succeeded:", {
+            scanId,
+            originalLines: cadQueryCode.split("\n").length,
+            refinedLines: refinedCode.split("\n").length,
+          })
+          cadQueryCode = refinedCode
+          modalResult = refinedResult
+        } else {
+          console.warn("[XRayCadGen] Refinement pass failed — keeping original:", {
+            scanId,
+            error: refinedResult.error.slice(0, 200),
+          })
+        }
+      } else {
+        console.warn("[XRayCadGen] Refined code is significantly shorter — keeping original:", {
+          scanId,
+          originalLines: cadQueryCode.split("\n").length,
+          refinedLines: refinedCode.split("\n").length,
+        })
+      }
+    } catch (refineError) {
+      // Refinement is best-effort — never fail the whole pipeline
+      console.warn("[XRayCadGen] Refinement pass error — keeping original:", {
+        scanId,
+        error: refineError instanceof Error ? refineError.message : "Unknown",
+      })
+    }
+  }
+
+  // Stage 4: Upload STL and isometric SVG
   const [stlUrl, svgIsoUrl] = await Promise.all([
     modalResult.stl
       ? uploadCadFile(scanId, "system-cad/model.stl", modalResult.stl, "model/stl")
@@ -985,6 +1293,104 @@ export async function generateSystemCadModel(
   })
 
   return { stlUrl, svgIsoUrl, cadQueryCode }
+}
+
+/**
+ * Builds the second-pass refinement prompt for system-level CAD.
+ *
+ * @description After the first pass succeeds, this prompt sends the analysis
+ * data back to Opus and asks it to add manufacturing detail that's missing.
+ * This simulates the iterative refinement (v1 -> v2) that produces dramatically
+ * better models when Claude can see the analysis of its own output.
+ *
+ * @param firstPassCode - The CadQuery code from the first pass
+ * @param massProps - Mass properties from Modal analysis
+ * @param fillRatio - Volume / bounding box volume as percentage
+ * @param spec - The original XRay spec for context
+ * @returns Formatted refinement prompt
+ */
+function buildRefinementPrompt(
+  firstPassCode: string,
+  massProps: NonNullable<ModalAnalysisPayload["mass_properties"]>,
+  fillRatio: number,
+  spec: XRaySpec,
+): string {
+  const bb = massProps.bounding_box
+  const codeLines = firstPassCode.split("\n").length
+
+  // Build a checklist of potentially missing features based on analysis
+  const missingFeatures: string[] = []
+
+  if (fillRatio > 85) {
+    missingFeatures.push("- Internal structural ribs (model is " + fillRatio.toFixed(0) + "% solid — real products are hollow with ribbing)")
+  }
+
+  // Check if common manufacturing features are mentioned in the code
+  const codeLower = firstPassCode.toLowerCase()
+  if (!codeLower.includes("boss") && !codeLower.includes("standoff")) {
+    missingFeatures.push("- Screw bosses for shell assembly (M2.5 or M3 with pilot holes)")
+  }
+  if (!codeLower.includes("pcb") && !codeLower.includes("standoff") && !codeLower.includes("mounting post")) {
+    missingFeatures.push("- PCB mounting standoffs with M2.5 threaded holes")
+  }
+  if (!codeLower.includes("usb") && !codeLower.includes("port") && !codeLower.includes("cutout")) {
+    missingFeatures.push("- Port cutouts (USB-C = 9.0x3.4mm, SD card = 12x1.5mm, or relevant connectors)")
+  }
+  if (!codeLower.includes("vent") && !codeLower.includes("grille") && !codeLower.includes("slot")) {
+    missingFeatures.push("- Ventilation grilles or cooling slots for thermal management")
+  }
+  if (!codeLower.includes("rib") && !codeLower.includes("cross") && !codeLower.includes("reinforc")) {
+    missingFeatures.push("- Internal ribs (longitudinal + cross members for structural rigidity)")
+  }
+  if (!codeLower.includes("wire") && !codeLower.includes("channel") && !codeLower.includes("routing")) {
+    missingFeatures.push("- Wire routing channels between subsystems")
+  }
+  if (!codeLower.includes("bolt") && !codeLower.includes("bolt_circle") && !codeLower.includes("bcd")) {
+    missingFeatures.push("- Bolt circle patterns on motor mounts or flanges")
+  }
+  if (!codeLower.includes("gasket") && !codeLower.includes("seal") && !codeLower.includes("o_ring")) {
+    missingFeatures.push("- Gasket grooves or seal channels for weatherproofing (if applicable)")
+  }
+  if (!codeLower.includes("led") && !codeLower.includes("indicator") && !codeLower.includes("status")) {
+    missingFeatures.push("- Status LED channels or indicator windows")
+  }
+  if (!codeLower.includes("sensor") && !codeLower.includes("recess")) {
+    missingFeatures.push("- Sensor mounting recesses or windows")
+  }
+
+  const missingSection = missingFeatures.length > 0
+    ? `\n\nThe model appears to be MISSING these manufacturing details:\n${missingFeatures.join("\n")}\n\nAdd whichever of these are appropriate for this product type.`
+    : "\n\nThe model already includes good manufacturing detail. Focus on adding more internal structure, finer port cutouts, and any missing subsystem features."
+
+  return `You previously generated CadQuery code for this product. Here is your code and the analysis results from executing it.
+
+## Analysis of Your Model
+- **Bounding box:** ${bb.xLen.toFixed(1)} x ${bb.yLen.toFixed(1)} x ${bb.zLen.toFixed(1)} mm
+- **Volume:** ${massProps.volume_mm3.toFixed(0)} mm³
+- **Mass:** ${(massProps.mass_kg * 1000).toFixed(1)} g (at ${massProps.material_density_kg_m3} kg/m³)
+- **Fill ratio:** ${fillRatio.toFixed(0)}% (volume / bounding box volume — lower = more hollow/detailed)
+- **Code length:** ${codeLines} lines
+
+## Your Previous Code
+\`\`\`python
+${firstPassCode}
+\`\`\`
+
+## Product Context
+**What it is:** ${spec.idea}
+**Function:** ${spec.function}
+${missingSection}
+
+## Your Task
+Improve the model by adding MORE manufacturing detail. Keep everything that already works, and ADD:
+1. Any missing features from the list above
+2. More internal structure (ribs, standoffs, mounting features)
+3. Finer geometric detail on existing subsystems
+4. Standard hardware dimensions where applicable (M3 = 3.2mm clearance, USB-C = 9.0x3.4mm, etc.)
+
+Output the COMPLETE improved Python code (not a diff — the full file).
+Target ${Math.max(codeLines + 100, 700)}+ lines.
+Store the final model in a variable called \`result\`.`
 }
 
 /**
@@ -1015,13 +1421,15 @@ ${moduleSummary}
 You know what this type of product looks like. Use realistic proportions and shapes from your domain knowledge.
 
 CONSTRAINTS:
-- Target 200-400 lines of code
+- Target 400-600 lines of code. NEVER fewer than 300 lines.
 - NEVER use .shell() — build hollow bodies with outer.cut(inner)
-- Wrap .fillet() in try/except, falling back to .chamfer()
+- Wrap .fillet() in try/except, falling back to .chamfer() at half radius
 - Use .union() and .cut() for multi-component assemblies
-- Shell bodies with wall thickness for all housings
+- Shell bodies with wall thickness for all housings (1.5-3mm)
 - Each module as a recognizable sub-assembly (not a box)
-- Start with a PARAMETERS block
+- Start with a comprehensive PARAMETERS block (40+ parameters)
+- Include internal ribs, screw bosses, port cutouts, and ventilation grilles
+- Use real-world dimensions: M3 clearance = 3.2mm, USB-C = 9.0x3.4mm, etc.
 - Store the final model in a variable called \`result\`
 
 Output ONLY the Python code. No markdown fences, no explanation.`
