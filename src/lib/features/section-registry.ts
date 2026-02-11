@@ -23,6 +23,7 @@ import {
     Flame,
     Users,
     Bot,
+    UserSearch,
     GraduationCap,
     BookOpen,
     Lightbulb,
@@ -273,6 +274,13 @@ export const SECTIONS: Section[] = [
         features: [
             // ── People ──
             {
+                name: "Recruits",
+                description: "Find expert talent — fractional executives, specialists, and consultants",
+                route: "/recruits",
+                icon: UserSearch,
+                addedAt: new Date("2026-02-11"),
+            },
+            {
                 name: "Guild",
                 description: "Community hub — events, networking, and apprentice pool",
                 route: "/guild",
@@ -329,5 +337,6 @@ export function getAllSectionFeatures(): SectionFeature[] {
 /**
  * Index at which the "Supplies" sub-label begins in the marketplace section.
  * Used by the sidebar to render visual sub-labels.
+ * People: Recruits (0), Guild (1), Apprenticeship (2) → Supplies starts at 3.
  */
-export const MARKETPLACE_SUPPLIES_START_INDEX = 2
+export const MARKETPLACE_SUPPLIES_START_INDEX = 3

@@ -9,12 +9,18 @@ import type { ManufacturingTechnique } from '@/lib/manufacturing-techniques/type
 export type MarketplaceCategory = 'All' | 'People' | 'Products' | 'Services'
 export type SortOption = 'relevance' | 'rating' | 'price_low' | 'price_high' | 'newest'
 
-export const CATEGORIES: { id: MarketplaceCategory; label: string; icon: string }[] = [
+/** All known category definitions (People, Products, Services). */
+export const ALL_CATEGORIES: { id: MarketplaceCategory; label: string; icon: string }[] = [
     { id: 'All', label: 'All', icon: 'LayoutGrid' },
     { id: 'People', label: 'People', icon: 'Users' },
     { id: 'Products', label: 'Products', icon: 'Package' },
     { id: 'Services', label: 'Services', icon: 'Wrench' },
 ]
+
+/**
+ * @deprecated Use ALL_CATEGORIES and derive visible categories via allowedCategories.
+ */
+export const CATEGORIES = ALL_CATEGORIES
 
 export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
     { value: 'relevance', label: 'Relevance' },
@@ -24,19 +30,53 @@ export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
     { value: 'newest', label: 'Newest' },
 ]
 
+/** Content categories (excludes 'All' which is derived). */
+export type ContentCategory = Exclude<MarketplaceCategory, 'All'>
+
 interface UseMarketplaceStateProps {
     initialListings: MarketplaceListing[]
     initialSavedIds: string[]
+    /**
+     * Restrict which content categories are visible.
+     * When omitted, all categories are shown (People, Products, Services).
+     * When a single category is provided, the category pill row is hidden.
+     * When 2+ categories are provided, an "All" pill is prepended.
+     */
+    allowedCategories?: ContentCategory[]
 }
 
-export function useMarketplaceState({ initialListings, initialSavedIds }: UseMarketplaceStateProps) {
+export function useMarketplaceState({ initialListings, initialSavedIds, allowedCategories }: UseMarketplaceStateProps) {
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
 
+    // Derive visible categories from allowedCategories prop
+    const visibleCategories = useMemo(() => {
+        if (!allowedCategories || allowedCategories.length === 0) {
+            // No restriction — show all categories
+            return ALL_CATEGORIES
+        }
+        // Build category list from allowed entries
+        const allowed = ALL_CATEGORIES.filter(
+            c => c.id !== 'All' && allowedCategories.includes(c.id as ContentCategory)
+        )
+        // Prepend "All" only when there are 2+ content categories
+        if (allowed.length >= 2) {
+            const allEntry = ALL_CATEGORIES.find(c => c.id === 'All')!
+            return [allEntry, ...allowed]
+        }
+        return allowed
+    }, [allowedCategories])
+
+    // Determine default category: "All" if multiple, or the single allowed category
+    const defaultCategory: MarketplaceCategory = useMemo(() => {
+        if (visibleCategories.length === 1) return visibleCategories[0].id
+        return 'All'
+    }, [visibleCategories])
+
     // Core state
     const [activeCategory, setActiveCategory] = useState<MarketplaceCategory>(
-        (searchParams?.get('cat') as MarketplaceCategory) || 'All'
+        (searchParams?.get('cat') as MarketplaceCategory) || defaultCategory
     )
     const [searchQuery, setSearchQuery] = useState(searchParams?.get('q') || '')
     const [debouncedQuery, setDebouncedQuery] = useState(searchQuery)
@@ -119,11 +159,15 @@ export function useMarketplaceState({ initialListings, initialSavedIds }: UseMar
         return debouncedQuery.trim() !== '' || selectedSubcategories.size > 0 || sortBy !== 'relevance' || activeTechnique !== null
     }, [debouncedQuery, selectedSubcategories, sortBy, activeTechnique])
 
-    // Exclude AI listings from browsing (kept in DB for future use)
-    const browseListings = useMemo(
-        () => initialListings.filter(l => l.category !== 'AI'),
-        [initialListings]
-    )
+    // Exclude AI listings and restrict to allowed categories
+    const browseListings = useMemo(() => {
+        let listings = initialListings.filter(l => l.category !== 'AI')
+        if (allowedCategories && allowedCategories.length > 0) {
+            const allowed = new Set<string>(allowedCategories)
+            listings = listings.filter(l => allowed.has(l.category))
+        }
+        return listings
+    }, [initialListings, allowedCategories])
 
     // Filter and sort listings
     const filteredListings = useMemo(() => {
@@ -254,6 +298,7 @@ export function useMarketplaceState({ initialListings, initialSavedIds }: UseMar
         availableSubcategories,
         categoryCounts,
         hasActiveFilters,
+        visibleCategories,
 
         // Actions
         handleCategoryChange,

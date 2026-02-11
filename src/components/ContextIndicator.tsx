@@ -27,6 +27,7 @@ const PERSON_ROUTES = [
   '/marketplace',
   '/marketplace-hub',
   '/marketplace-orders',
+  '/recruits',
   '/guild',
   '/apprenticeship',
   '/inspiration',

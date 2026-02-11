@@ -71,6 +71,12 @@ interface MarketplaceToolbarProps {
     onClearAll: () => void
     /** Total number of results matching current filters */
     resultCount: number
+    /**
+     * Which categories to display as pills. When only one category is
+     * provided the pill row is hidden entirely (no point showing a single pill).
+     * Defaults to all categories.
+     */
+    visibleCategories?: { id: MarketplaceCategory; label: string; icon: string }[]
 }
 
 /**
@@ -93,11 +99,18 @@ export function MarketplaceToolbar({
     hasActiveFilters,
     onClearAll,
     resultCount,
+    visibleCategories,
 }: MarketplaceToolbarProps) {
     const [showSuggestions, setShowSuggestions] = useState(false)
     const searchRef = useRef<HTMLInputElement>(null)
 
-    const categories: MarketplaceCategory[] = ['People', 'Products', 'Services', 'All']
+    // Derive pill list from visibleCategories or fall back to default
+    const categories: MarketplaceCategory[] = visibleCategories
+        ? visibleCategories.map(c => c.id)
+        : ['People', 'Products', 'Services', 'All']
+
+    // Hide the pill row when there's only a single category (nothing to toggle)
+    const showCategoryPills = categories.length > 1
 
     // Show suggestion chips when search is focused and empty
     const handleFocus = useCallback(() => {
@@ -125,43 +138,45 @@ export function MarketplaceToolbar({
 
     return (
         <div className="space-y-3">
-            {/* Row 1: Category pills */}
-            <nav aria-label="Marketplace categories" className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                {categories.map((cat) => {
-                    const config = CATEGORY_CONFIG[cat]
-                    const Icon = config.icon
-                    const isActive = activeCategory === cat
-                    const count = counts[cat] || 0
+            {/* Row 1: Category pills (hidden when only one category) */}
+            {showCategoryPills && (
+                <nav aria-label="Marketplace categories" className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                    {categories.map((cat) => {
+                        const config = CATEGORY_CONFIG[cat]
+                        const Icon = config.icon
+                        const isActive = activeCategory === cat
+                        const count = counts[cat] || 0
 
-                    return (
-                        <button
-                            key={cat}
-                            onClick={() => onCategoryChange(cat)}
-                            className={cn(
-                                'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium',
-                                'transition-all duration-200 whitespace-nowrap shrink-0',
-                                'min-h-[44px]',
-                                isActive
-                                    ? config.activeClasses
-                                    : 'bg-muted text-muted-foreground hover:bg-secondary hover:text-foreground'
-                            )}
-                            aria-pressed={isActive}
-                            aria-label={`${cat === 'All' ? 'All categories' : cat} (${count})`}
-                        >
-                            <Icon className="h-4 w-4" aria-hidden="true" />
-                            <span>{cat}</span>
-                            <span className={cn(
-                                'text-xs px-1.5 py-0.5 rounded-full min-w-[24px] text-center',
-                                isActive
-                                    ? 'bg-white/20'
-                                    : 'bg-background'
-                            )}>
-                                {count}
-                            </span>
-                        </button>
-                    )
-                })}
-            </nav>
+                        return (
+                            <button
+                                key={cat}
+                                onClick={() => onCategoryChange(cat)}
+                                className={cn(
+                                    'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium',
+                                    'transition-all duration-200 whitespace-nowrap shrink-0',
+                                    'min-h-[44px]',
+                                    isActive
+                                        ? config.activeClasses
+                                        : 'bg-muted text-muted-foreground hover:bg-secondary hover:text-foreground'
+                                )}
+                                aria-pressed={isActive}
+                                aria-label={`${cat === 'All' ? 'All categories' : cat} (${count})`}
+                            >
+                                <Icon className="h-4 w-4" aria-hidden="true" />
+                                <span>{cat}</span>
+                                <span className={cn(
+                                    'text-xs px-1.5 py-0.5 rounded-full min-w-[24px] text-center',
+                                    isActive
+                                        ? 'bg-white/20'
+                                        : 'bg-background'
+                                )}>
+                                    {count}
+                                </span>
+                            </button>
+                        )
+                    })}
+                </nav>
+            )}
 
             {/* Row 2: Search + Sort + Filters */}
             <div className="flex flex-col sm:flex-row gap-3">

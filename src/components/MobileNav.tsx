@@ -27,6 +27,7 @@ import {
     Bell,
     Bot,
     UserCircle,
+    UserSearch,
     LogOut,
     Waypoints,
     Plus,
@@ -79,6 +80,7 @@ const workshopMoreNavigation = [
 
 // "More" dropdown — Marketplace section
 const marketplaceMoreNavigation = [
+    { name: "Recruits", href: "/recruits", icon: UserSearch },
     { name: "Guild", href: "/guild", icon: GraduationCap },
     { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen },
     { name: "Inspiration", href: "/inspiration", icon: Lightbulb },

@@ -9,7 +9,7 @@ import { MarketplaceDetailDialog } from './MarketplaceDetailDialog'
 import { MarketplaceRecommendations } from './MarketplaceRecommendations'
 import { MarketplaceSavedView } from './MarketplaceSavedView'
 import { MarketplaceCompareView } from './MarketplaceCompareView'
-import { useMarketplaceState, type MarketplaceCategory } from '../hooks/useMarketplaceState'
+import { useMarketplaceState, type MarketplaceCategory, type ContentCategory } from '../hooks/useMarketplaceState'
 import { dismissRecommendation } from '@/actions/marketplace'
 import { toast } from 'sonner'
 import {
@@ -35,6 +35,12 @@ interface MarketplaceBrowseProps {
     initialSavedIds: string[]
     initialSavedListings: MarketplaceListing[]
     foundryContext?: FoundryContext
+    /** Restrict visible categories. Omit to show all (People, Products, Services). */
+    allowedCategories?: ContentCategory[]
+    /** Page title displayed in the header. Defaults to "Marketplace". */
+    pageTitle?: string
+    /** Page subtitle displayed below the title. */
+    pageSubtitle?: string
 }
 
 const TABS: { id: MarketplaceTab; label: string; icon: React.ElementType }[] = [
@@ -56,8 +62,11 @@ export function MarketplaceBrowse({
     initialSavedIds,
     initialSavedListings,
     foundryContext,
+    allowedCategories,
+    pageTitle = 'Marketplace',
+    pageSubtitle = 'Find expert talent, products, and services to grow your business',
 }: MarketplaceBrowseProps) {
-    const state = useMarketplaceState({ initialListings, initialSavedIds })
+    const state = useMarketplaceState({ initialListings, initialSavedIds, allowedCategories })
     const [activeTab, setActiveTab] = useState<MarketplaceTab>('browse')
     const [compareListings, setCompareListings] = useState<MarketplaceListing[]>([])
     const [compareOrigin, setCompareOrigin] = useState<'browse' | 'saved'>('browse')
@@ -134,11 +143,11 @@ export function MarketplaceBrowse({
                     <div className="flex items-center gap-3 mb-1">
                         <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
                         <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                            Marketplace
+                            {pageTitle}
                         </h1>
                     </div>
                     <p className="text-muted-foreground text-sm ml-4">
-                        Find expert talent, products, and services to grow your business
+                        {pageSubtitle}
                     </p>
                 </div>
             </div>
@@ -216,6 +225,7 @@ export function MarketplaceBrowse({
                         hasActiveFilters={state.hasActiveFilters}
                         onClearAll={state.clearFilters}
                         resultCount={state.filteredListings.length}
+                        visibleCategories={state.visibleCategories}
                     />
 
                     {/* Technique filter banner (conditional - when arriving from Techniques Explorer) */}

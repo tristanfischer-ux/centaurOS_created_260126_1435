@@ -41,6 +41,7 @@ import {
     GraduationCap,
     BookOpen,
     UserCircle,
+    UserSearch,
     Settings,
     LogOut,
 } from "lucide-react"
@@ -102,6 +103,7 @@ const workshopNavigation = [
 // Section 4: "Marketplace" — Recruits and supplies
 // ─────────────────────────────────────────────────────────────────────────────
 const marketplacePeopleNavigation = [
+    { name: "Recruits", href: "/recruits", icon: UserSearch, tooltip: "Find expert talent — fractional executives, specialists, and consultants" },
     { name: "Guild", href: "/guild", icon: GraduationCap, tooltip: "Community hub — events, networking, apprentice pool" },
     { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen, tooltip: "Track apprenticeship progress, OTJT hours, and learning modules" },
 ]
