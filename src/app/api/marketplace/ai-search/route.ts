@@ -6,6 +6,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 import { buildAIContext } from "@/lib/ai-context/builder";
+import { aiGuard } from "@/lib/ai/guard";
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
@@ -100,16 +101,12 @@ type AISearchResponse = AISearchSuccessResponse | AISearchErrorResponse;
 
 export async function POST(req: NextRequest): Promise<NextResponse<AISearchResponse>> {
     try {
-        // Authenticate user
+        // AUTH + AI LIMIT: Check subscription tier AI limits
         const supabase = await createClient()
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        
-        if (authError || !user) {
-            return NextResponse.json(
-                { success: false, error: "Unauthorized" },
-                { status: 401 }
-            );
-        }
+        const guard = await aiGuard(supabase, 'ai_search')
+        if (guard.denied) return guard.response
+
+        const user = { id: guard.userId }
 
         // SECURITY: Rate limit to prevent OpenAI cost abuse (10 requests per minute per user)
         const headersList = await headers()
@@ -209,6 +206,13 @@ Set confidence:
             response_format: zodResponseFormat(SearchExtractionSchema, "marketplace_search"),
             temperature: 0.3, // Lower temperature for more consistent extraction
         });
+
+        // AUDIT: Track AI usage
+        await guard.trackUsage({
+            model: 'gpt-4o',
+            promptTokens: completion.usage?.prompt_tokens || 800,
+            completionTokens: completion.usage?.completion_tokens || 300,
+        })
 
         const parsed = completion.choices[0]?.message?.parsed as SearchExtractionResult | undefined;
 

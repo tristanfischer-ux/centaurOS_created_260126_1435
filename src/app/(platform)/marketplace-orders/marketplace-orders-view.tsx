@@ -191,21 +191,21 @@ export function MarketplaceOrdersView({
             {/* Summary Stats */}
             {totalOrders > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className="p-4 rounded-xl bg-muted border">
                         <div className="flex items-center gap-2 mb-1">
                             <Package className="h-4 w-4 text-muted-foreground" />
                             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Orders</span>
                         </div>
                         <p className="text-2xl font-semibold text-foreground">{totalOrders}</p>
                     </div>
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className="p-4 rounded-xl bg-muted border">
                         <div className="flex items-center gap-2 mb-1">
                             <TrendingUp className="h-4 w-4 text-muted-foreground" />
                             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Spend</span>
                         </div>
                         <p className="text-2xl font-semibold text-foreground">{formatCurrency(totalSpend)}</p>
                     </div>
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 hidden sm:block">
+                    <div className="p-4 rounded-xl bg-muted border hidden sm:block">
                         <div className="flex items-center gap-2 mb-1">
                             <ShoppingBag className="h-4 w-4 text-muted-foreground" />
                             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Active</span>
@@ -223,11 +223,11 @@ export function MarketplaceOrdersView({
                         placeholder="Search orders..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 border-slate-200"
+                        className="pl-10"
                     />
                 </div>
                 <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
-                    <SelectTrigger className="w-full sm:w-[180px] border-slate-200">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                         <ArrowUpDown className="h-4 w-4 mr-2" />
                         <SelectValue placeholder="Sort by" />
                     </SelectTrigger>
@@ -255,7 +255,7 @@ export function MarketplaceOrdersView({
                         <CheckCircle className="h-4 w-4" />
                         Completed
                         {completedOrders.length > 0 && (
-                            <Badge variant="secondary" className="ml-1 bg-emerald-50 text-emerald-600">
+                            <Badge variant="secondary" className="ml-1 bg-status-success-light text-status-success">
                                 {completedOrders.length}
                             </Badge>
                         )}

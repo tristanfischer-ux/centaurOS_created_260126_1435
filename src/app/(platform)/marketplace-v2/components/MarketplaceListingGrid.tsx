@@ -142,7 +142,7 @@ function ListRow({
                     onToggleCompare(listing.id)
                 }}
                 className={cn(
-                    'w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0',
+                    'min-w-[44px] min-h-[44px] w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0',
                     isSelectedForCompare
                         ? 'bg-international-orange text-white shadow-md'
                         : 'bg-muted text-muted-foreground opacity-0 group-hover:opacity-100'
@@ -230,9 +230,9 @@ function ListRow({
                 <button
                     onClick={handleSave}
                     className={cn(
-                        'w-8 h-8 rounded-full flex items-center justify-center transition-all',
+                        'min-w-[44px] min-h-[44px] w-8 h-8 rounded-full flex items-center justify-center transition-all',
                         isSaved
-                            ? 'bg-red-500 text-white'
+                            ? 'bg-destructive text-destructive-foreground'
                             : 'bg-muted text-muted-foreground opacity-0 group-hover:opacity-100'
                     )}
                     aria-label={isSaved ? 'Remove from saved' : 'Save for later'}
@@ -400,14 +400,14 @@ export function MarketplaceListingGrid({
                         <Button
                             size="sm"
                             onClick={handleCompare}
-                            className="gap-1.5 h-9 rounded-xl bg-white text-international-orange hover:bg-white/90 font-semibold"
+                            className="gap-1.5 h-9 rounded-xl bg-background text-international-orange hover:bg-background/90 font-semibold"
                         >
                             Compare Now
                             <ArrowRight className="w-4 h-4" />
                         </Button>
                         <button
                             onClick={clearCompareSelection}
-                            className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+                            className="min-w-[44px] min-h-[44px] w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
                             aria-label="Clear selection"
                         >
                             <X className="w-4 h-4" />

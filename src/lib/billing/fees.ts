@@ -85,16 +85,14 @@ export async function calculateOrderFee(
  * Get fee display information for UI
  * Returns a user-friendly description of the fee structure
  */
-export function getFeeDescription(role: UserRole): string {
-  switch (role) {
-    case 'apprentice':
-      return 'Apprentice rate: 5% platform fee (7% for retainers)'
-    case 'executive':
-    case 'founder':
-      return 'Standard rate: 8% platform fee (10% for retainers)'
-    default:
-      return '8% platform fee (10% for retainers)'
-  }
+/**
+ * Get fee display information for UI
+ *
+ * @description Returns a user-friendly description of the fee structure.
+ * Standardized to 10% across all roles as of Feb 2026.
+ */
+export function getFeeDescription(_role: UserRole): string {
+  return '10% platform fee on all transactions'
 }
 
 /**
@@ -119,29 +117,35 @@ export function calculateFeeBreakdownSync(
 /**
  * Fee tier information by role
  */
+/**
+ * Fee tier information by role
+ *
+ * @description Standardized to 10% across all roles as of Feb 2026.
+ * All roles now pay the same platform fee.
+ */
 export const FEE_TIERS = {
   executive: {
     label: 'Executive',
-    standardFee: 8,
+    standardFee: 10,
     retainerFee: 10,
-    description: 'Standard platform fees for executive professionals',
+    description: 'Standard 10% platform fee',
   },
   founder: {
     label: 'Founder',
-    standardFee: 8,
+    standardFee: 10,
     retainerFee: 10,
-    description: 'Standard platform fees for founders',
+    description: 'Standard 10% platform fee',
   },
   apprentice: {
     label: 'Apprentice',
-    standardFee: 5,
-    retainerFee: 7,
-    description: 'Reduced fees to encourage apprentice hiring',
+    standardFee: 10,
+    retainerFee: 10,
+    description: 'Standard 10% platform fee',
   },
   default: {
     label: 'Standard',
-    standardFee: 8,
+    standardFee: 10,
     retainerFee: 10,
-    description: 'Default platform fees',
+    description: 'Standard 10% platform fee',
   },
 } as const

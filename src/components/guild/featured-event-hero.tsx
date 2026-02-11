@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -17,6 +17,7 @@ import {
     Sparkles,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+import { toast } from "sonner"
 import { toggleRSVP } from "@/actions/guild-events"
 import { EVENT_TYPE_CONFIG } from "./guild-constants"
 import type { GuildEvent } from "@/actions/guild-events"
@@ -66,18 +67,26 @@ export function FeaturedEventHero({ event, rsvpStatus, onRSVPChange }: FeaturedE
     )
     const [loadingRsvp, setLoadingRsvp] = useState(false)
 
+    // Sync local state when parent RSVP status prop changes
+    useEffect(() => {
+        setLocalRsvp(rsvpStatus || { attending: false, count: 0 })
+    }, [rsvpStatus])
+
     const handleRSVP = useCallback(async () => {
         if (!event) return
         setLoadingRsvp(true)
         try {
             const result = await toggleRSVP(event.id)
-            if (!result.error) {
-                const newStatus = { attending: result.attending, count: result.attendeeCount }
-                setLocalRsvp(newStatus)
-                onRSVPChange?.(event.id, newStatus)
+            if (result.error) {
+                toast.error(result.error)
+                return
             }
+            const newStatus = { attending: result.attending, count: result.attendeeCount }
+            setLocalRsvp(newStatus)
+            onRSVPChange?.(event.id, newStatus)
         } catch (err) {
             console.error('[FeaturedEventHero] RSVP failed:', err instanceof Error ? err.message : 'Unknown error')
+            toast.error('Failed to update RSVP. Please try again.')
         } finally {
             setLoadingRsvp(false)
         }

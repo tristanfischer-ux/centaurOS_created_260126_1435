@@ -162,13 +162,19 @@ export interface PlatformFeeConfig {
 // ==========================================
 
 /**
- * Default platform fee percentage for standard orders (8%)
+ * Standard platform fee percentage for all transaction types (10%)
+ *
+ * @description Standardized to 10% across all order types as of Feb 2026.
+ * Previously varied: 8% orders, 10% retainers, 5% apprentice.
+ * Decision: single consistent rate simplifies pricing, eliminates confusion,
+ * and removes arbitrage potential between order types.
  */
-export const DEFAULT_PLATFORM_FEE_PERCENT = 8
+export const DEFAULT_PLATFORM_FEE_PERCENT = 10
 
 /**
  * Platform fee percentage for retainers and bookings (10%)
- * Higher rate includes escrow protection and ongoing management
+ * Now matches the standard rate — kept as a separate constant for
+ * backward compatibility with existing code that references it.
  */
 export const RETAINER_PLATFORM_FEE_PERCENT = 10
 
@@ -180,7 +186,7 @@ export const DEFAULT_VAT_RATE = 0.20
 /**
  * Calculate platform fee for any amount
  * @param amount Amount in smallest currency unit
- * @param feePercent Fee percentage (default: 8% for orders)
+ * @param feePercent Fee percentage (default: 10%)
  */
 export function calculatePlatformFeeAmount(
   amount: number,

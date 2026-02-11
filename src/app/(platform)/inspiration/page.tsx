@@ -40,6 +40,20 @@ async function InspirationData() {
       : Promise.resolve({ data: null }),
   ])
 
+  // Log any errors from parallel fetches so failures aren't silently swallowed
+  if (templatesResult.error) {
+    console.error('[Inspiration] Failed to fetch templates:', templatesResult.error)
+  }
+  if (packsResult.error) {
+    console.error('[Inspiration] Failed to fetch packs:', packsResult.error)
+  }
+  if (savedPacksResult.error) {
+    console.error('[Inspiration] Failed to fetch saved packs:', savedPacksResult.error)
+  }
+  if ('error' in membersResult && membersResult.error) {
+    console.error('[Inspiration] Failed to fetch members:', membersResult.error)
+  }
+
   // Transform members for use in dialogs
   const members = (membersResult.data || []).map(m => ({
     id: m.id,

@@ -226,8 +226,8 @@ export async function awardProposal(proposalId: string) {
     
     const providerProfile = proposal.provider_profiles as { id: string; listing_id: string | null }
     
-    // Calculate platform fee (8%)
-    const platformFee = proposal.quoted_price * 0.08
+    // Calculate platform fee (10% - standardized rate)
+    const platformFee = proposal.quoted_price * 0.10
     // Calculate VAT (20%)
     const vatAmount = (proposal.quoted_price + platformFee) * 0.20
     const totalAmount = proposal.quoted_price + platformFee + vatAmount

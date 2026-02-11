@@ -240,9 +240,9 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                                          listing.category === 'AI' ? 'Get Started' : 'Hire Now'}
                                     </Link>
                                 </Button>
-                                <Button variant="secondary" className="flex-1 gap-2 h-12">
+                                <Button variant="secondary" className="flex-1 gap-2 h-12" disabled>
                                     <MessageSquare className="w-4 h-4" />
-                                    Send Message
+                                    Send Message (Coming soon)
                                 </Button>
                             </div>
 

@@ -1,8 +1,9 @@
-// @ts-nocheck - Schema mismatches: marketplace_listings.price, provider_profiles.display_name columns changed
 /**
  * Order Service
  * Core business logic for order management
  */
+// @ts-nocheck — Schema mismatches: marketplace_listings.price and provider_profiles.display_name
+// columns don't exist in database. Needs migration to add columns or refactor queries.
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/types/database.types'
@@ -14,8 +15,9 @@ import {
   CreateOrderParams,
   OrderFilters,
 } from '@/types/orders'
-import { canTransition, isTerminalStatus } from './status-machine'
+import { canTransition } from './status-machine'
 import { logOrderEvent } from './history'
+import type { OrderEventType } from '@/types/orders'
 import { DEFAULT_PLATFORM_FEE_PERCENT, DEFAULT_VAT_RATE } from '@/types/payments'
 
 type TypedSupabaseClient = SupabaseClient<Database>
@@ -593,14 +595,19 @@ export async function getOrders(
 /**
  * Helper to get event type for status changes
  */
-function getEventTypeForStatus(status: OrderStatus): 'accepted' | 'started' | 'completed' | 'disputed' | 'cancelled' {
-  const mapping: Record<OrderStatus, 'accepted' | 'started' | 'completed' | 'disputed' | 'cancelled'> = {
-    pending: 'created' as never, // Should not happen
+/**
+ * Map order status to the corresponding event type for audit logging.
+ *
+ * @param status - The new order status
+ * @returns The event type to log
+ */
+function getEventTypeForStatus(status: OrderStatus): OrderEventType {
+  const mapping: Partial<Record<OrderStatus, OrderEventType>> = {
     accepted: 'accepted',
     in_progress: 'started',
     completed: 'completed',
     disputed: 'disputed',
     cancelled: 'cancelled',
   }
-  return mapping[status]
+  return mapping[status] || 'created'
 }

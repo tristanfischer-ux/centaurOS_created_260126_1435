@@ -13,15 +13,87 @@ import { isValidUUID, sanitizeErrorMessage } from '@/lib/security/sanitize'
 import type { Json } from '@/types/database.types'
 
 // =============================================
+// AUTH HELPERS
+// =============================================
+
+/**
+ * Verify the current user has access to an enrollment.
+ *
+ * @description Checks the user is the apprentice, mentor, buddy,
+ * or a Founder/Executive in the same foundry.
+ *
+ * @security Prevents IDOR by checking direct association or elevated role
+ * within the same foundry.
+ */
+async function verifyEnrollmentAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  enrollmentId: string
+): Promise<{ authorized: boolean; error?: string }> {
+  // AUTH: Get enrollment details for ownership check
+  const { data: enrollment } = await supabase
+    .from('apprenticeship_enrollments')
+    .select('foundry_id, apprentice_id, senior_mentor_id, workplace_buddy_id')
+    .eq('id', enrollmentId)
+    .single()
+
+  if (!enrollment) {
+    return { authorized: false, error: 'Enrollment not found' }
+  }
+
+  // AUTH: Check if user is directly associated with the enrollment
+  const isDirectlyAssociated =
+    enrollment.apprentice_id === userId ||
+    enrollment.senior_mentor_id === userId ||
+    enrollment.workplace_buddy_id === userId
+
+  if (isDirectlyAssociated) {
+    return { authorized: true }
+  }
+
+  // AUTH: Check if user is Founder/Executive in the same foundry
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, foundry_id')
+    .eq('id', userId)
+    .single()
+
+  if (
+    profile?.foundry_id === enrollment.foundry_id &&
+    profile?.role &&
+    ['Founder', 'Executive'].includes(profile.role)
+  ) {
+    return { authorized: true }
+  }
+
+  return { authorized: false, error: 'Not authorized to access this enrollment' }
+}
+
+// =============================================
 // DOCUMENT RETRIEVAL
 // =============================================
 
 /**
- * Get all documents for an enrollment
+ * Get all documents for an enrollment.
+ *
+ * @description Fetches every document attached to the given enrollment.
+ *
+ * @param enrollmentId - The enrollment to retrieve documents for
+ * @returns List of documents or an error
+ *
+ * @security Requires authenticated user with enrollment access
  */
 export async function getEnrollmentDocuments(enrollmentId: string) {
   const supabase = await createClient()
-  
+
+  // AUTH: Verify the caller is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // AUTH: Verify the caller has access to this enrollment
+  const access = await verifyEnrollmentAccess(supabase, user.id, enrollmentId)
+  if (!access.authorized) return { error: access.error }
+
   const { data: documents, error } = await supabase
     .from('apprenticeship_documents')
     .select('*')
@@ -29,7 +101,7 @@ export async function getEnrollmentDocuments(enrollmentId: string) {
     .order('created_at', { ascending: false })
   
   if (error) {
-    console.error('Error fetching documents:', error)
+    console.error('[ApprenticeshipDocs] Error fetching documents:', error)
     return { error: sanitizeErrorMessage(error) }
   }
   
@@ -104,11 +176,34 @@ export async function getPendingSignatures() {
 }
 
 /**
- * Get a single document by ID
+ * Get a single document by ID.
+ *
+ * @description Fetches a document and its related enrollment/profile data.
+ *
+ * @param documentId - The document to retrieve
+ * @returns The document with enrollment details, or an error
+ *
+ * @security Requires authenticated user with access to the parent enrollment
  */
 export async function getDocument(documentId: string) {
   const supabase = await createClient()
-  
+
+  // AUTH: Verify the caller is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // AUTH: Fetch the document to discover its enrollment, then verify access
+  const { data: docRef } = await supabase
+    .from('apprenticeship_documents')
+    .select('enrollment_id')
+    .eq('id', documentId)
+    .single()
+
+  if (!docRef) return { error: 'Document not found' }
+
+  const access = await verifyEnrollmentAccess(supabase, user.id, docRef.enrollment_id)
+  if (!access.authorized) return { error: access.error }
+
   const { data: document, error } = await supabase
     .from('apprenticeship_documents')
     .select(`
@@ -123,7 +218,7 @@ export async function getDocument(documentId: string) {
     .single()
   
   if (error) {
-    console.error('Error fetching document:', error)
+    console.error('[ApprenticeshipDocs] Error fetching document:', error)
     return { error: sanitizeErrorMessage(error) }
   }
   

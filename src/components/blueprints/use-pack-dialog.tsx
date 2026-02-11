@@ -58,11 +58,17 @@ interface UsePackDialogProps {
   pack: ObjectivePack
   trigger?: React.ReactNode
   members?: TeamMember[]
+  /** Controlled open state — when provided, the component is fully controlled */
+  open?: boolean
+  /** Controlled open change handler — required when `open` is provided */
+  onOpenChange?: (open: boolean) => void
 }
 
-export function UsePackDialog({ pack, trigger, members = [] }: UsePackDialogProps) {
+export function UsePackDialog({ pack, trigger, members = [], open: controlledOpen, onOpenChange }: UsePackDialogProps) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const setOpen = onOpenChange ?? setInternalOpen
   const [isCreating, setIsCreating] = useState(false)
   const [objectiveTitle, setObjectiveTitle] = useState(pack.title)
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>(
@@ -136,14 +142,18 @@ export function UsePackDialog({ pack, trigger, members = [] }: UsePackDialogProp
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
+      {trigger !== undefined ? (
+        <DialogTrigger asChild>
+          {trigger}
+        </DialogTrigger>
+      ) : controlledOpen === undefined ? (
+        <DialogTrigger asChild>
           <Button className="w-full" size="sm">
             Use This Pack
             <ArrowRight className="ml-2 h-3.5 w-3.5" />
           </Button>
-        )}
-      </DialogTrigger>
+        </DialogTrigger>
+      ) : null}
       <DialogContent size="lg" className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

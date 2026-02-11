@@ -45,10 +45,11 @@ export default async function GuildPage() {
     }
 
     // Fetch guild-relevant members for the network tab
-    // Only show Apprentice, Executive, and Founder roles
+    // SECURITY: Only show members from the current user's foundry
     const { data: members } = await supabase
         .from('profiles')
         .select('id, full_name, role, email, foundry_id')
+        .eq('foundry_id', profile.foundry_id)
         .in('role', ['Apprentice', 'Executive', 'Founder'])
         .order('full_name', { ascending: true })
         .limit(50)

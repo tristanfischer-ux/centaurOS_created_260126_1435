@@ -7,6 +7,63 @@ import type { ProgressReviewInput, SkillAssessmentInput } from '@/types/apprenti
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // =============================================
+// AUTH HELPERS
+// =============================================
+
+/**
+ * Verify the current user has access to an enrollment.
+ *
+ * @description Checks the user is the apprentice, mentor, buddy,
+ * or a Founder/Executive in the same foundry.
+ *
+ * @security Prevents IDOR by checking direct association or elevated role
+ * within the same foundry.
+ */
+async function verifyEnrollmentAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  enrollmentId: string
+): Promise<{ authorized: boolean; error?: string }> {
+  // AUTH: Get enrollment details for ownership check
+  const { data: enrollment } = await supabase
+    .from('apprenticeship_enrollments')
+    .select('foundry_id, apprentice_id, senior_mentor_id, workplace_buddy_id')
+    .eq('id', enrollmentId)
+    .single()
+
+  if (!enrollment) {
+    return { authorized: false, error: 'Enrollment not found' }
+  }
+
+  // AUTH: Check if user is directly associated with the enrollment
+  const isDirectlyAssociated =
+    enrollment.apprentice_id === userId ||
+    enrollment.senior_mentor_id === userId ||
+    enrollment.workplace_buddy_id === userId
+
+  if (isDirectlyAssociated) {
+    return { authorized: true }
+  }
+
+  // AUTH: Check if user is Founder/Executive in the same foundry
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, foundry_id')
+    .eq('id', userId)
+    .single()
+
+  if (
+    profile?.foundry_id === enrollment.foundry_id &&
+    profile?.role &&
+    ['Founder', 'Executive'].includes(profile.role)
+  ) {
+    return { authorized: true }
+  }
+
+  return { authorized: false, error: 'Not authorized to access this enrollment' }
+}
+
+// =============================================
 // PROGRESS REVIEWS
 // =============================================
 
@@ -205,7 +262,16 @@ export async function signProgressReview(reviewId: string) {
 }
 
 /**
- * Get progress reviews for an enrollment
+ * Get progress reviews for an enrollment.
+ *
+ * @description Fetches completed (and optionally upcoming) reviews
+ * for the given enrollment.
+ *
+ * @param enrollmentId - The enrollment to query
+ * @param options - Filter by type, limit, or include upcoming reviews
+ * @returns List of reviews or an error
+ *
+ * @security Requires authenticated user with enrollment access
  */
 export async function getProgressReviews(enrollmentId: string, options?: {
   includeUpcoming?: boolean
@@ -213,7 +279,15 @@ export async function getProgressReviews(enrollmentId: string, options?: {
   limit?: number
 }) {
   const supabase = await createClient()
-  
+
+  // AUTH: Verify the caller is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // AUTH: Verify the caller has access to this enrollment
+  const access = await verifyEnrollmentAccess(supabase, user.id, enrollmentId)
+  if (!access.authorized) return { error: access.error }
+
   let query = supabase
     .from('progress_reviews')
     .select(`
@@ -341,11 +415,26 @@ export async function bulkAssessSkills(
 }
 
 /**
- * Get skill assessments for an enrollment
+ * Get skill assessments for an enrollment.
+ *
+ * @description Fetches all skill assessments with skill and assessor details.
+ *
+ * @param enrollmentId - The enrollment to query
+ * @returns List of assessments or an error
+ *
+ * @security Requires authenticated user with enrollment access
  */
 export async function getSkillAssessments(enrollmentId: string) {
   const supabase = await createClient()
-  
+
+  // AUTH: Verify the caller is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // AUTH: Verify the caller has access to this enrollment
+  const access = await verifyEnrollmentAccess(supabase, user.id, enrollmentId)
+  if (!access.authorized) return { error: access.error }
+
   const { data: assessments, error } = await supabase
     .from('apprentice_skill_assessments')
     .select(`
@@ -362,11 +451,27 @@ export async function getSkillAssessments(enrollmentId: string) {
 }
 
 /**
- * Get skills gap analysis for an enrollment
+ * Get skills gap analysis for an enrollment.
+ *
+ * @description Compares current skill levels against programme targets
+ * and calculates gaps by category.
+ *
+ * @param enrollmentId - The enrollment to analyse
+ * @returns Gap analysis with per-category breakdowns or an error
+ *
+ * @security Requires authenticated user with enrollment access
  */
 export async function getSkillsGapAnalysis(enrollmentId: string) {
   const supabase = await createClient()
-  
+
+  // AUTH: Verify the caller is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // AUTH: Verify the caller has access to this enrollment
+  const access = await verifyEnrollmentAccess(supabase, user.id, enrollmentId)
+  if (!access.authorized) return { error: access.error }
+
   // Get enrollment with programme
   const { data: enrollment } = await supabase
     .from('apprenticeship_enrollments')
@@ -479,11 +584,34 @@ export async function getSkillsGapAnalysis(enrollmentId: string) {
 // =============================================
 
 /**
- * Start a learning module
+ * Start a learning module.
+ *
+ * @description Marks a module completion as in-progress with a timestamp.
+ *
+ * @param completionId - The module_completion record to update
+ * @returns Success flag or an error
+ *
+ * @security Requires authenticated user with access to the parent enrollment
  */
 export async function startModule(completionId: string) {
   const supabase = await createClient()
-  
+
+  // AUTH: Verify the caller is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // AUTH: Fetch the module completion to discover its enrollment, then verify access
+  const { data: moduleCompletion } = await supabase
+    .from('module_completions')
+    .select('enrollment_id')
+    .eq('id', completionId)
+    .single()
+
+  if (!moduleCompletion) return { error: 'Module completion not found' }
+
+  const access = await verifyEnrollmentAccess(supabase, user.id, moduleCompletion.enrollment_id)
+  if (!access.authorized) return { error: access.error }
+
   const { error } = await supabase
     .from('module_completions')
     .update({
@@ -500,7 +628,17 @@ export async function startModule(completionId: string) {
 }
 
 /**
- * Complete a learning module
+ * Complete a learning module.
+ *
+ * @description Marks a module as completed, optionally logs OTJT hours,
+ * and unlocks dependent modules.
+ *
+ * @param completionId - The module_completion record to update
+ * @param enrollmentId - The parent enrollment
+ * @param options - Optional score, reflection, and evidence URLs
+ * @returns Success flag or an error
+ *
+ * @security Requires authenticated user with enrollment access
  */
 export async function completeModule(
   completionId: string, 
@@ -512,7 +650,15 @@ export async function completeModule(
   }
 ) {
   const supabase = await createClient()
-  
+
+  // AUTH: Verify the caller is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // AUTH: Verify the caller has access to this enrollment
+  const access = await verifyEnrollmentAccess(supabase, user.id, enrollmentId)
+  if (!access.authorized) return { error: access.error }
+
   // Get module details for OTJT logging
   const { data: completion } = await supabase
     .from('module_completions')
@@ -558,11 +704,26 @@ export async function completeModule(
 }
 
 /**
- * Get module progress for an enrollment
+ * Get module progress for an enrollment.
+ *
+ * @description Returns all module completions with summary statistics.
+ *
+ * @param enrollmentId - The enrollment to query
+ * @returns Module list with progress summary or an error
+ *
+ * @security Requires authenticated user with enrollment access
  */
 export async function getModuleProgress(enrollmentId: string) {
   const supabase = await createClient()
-  
+
+  // AUTH: Verify the caller is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // AUTH: Verify the caller has access to this enrollment
+  const access = await verifyEnrollmentAccess(supabase, user.id, enrollmentId)
+  if (!access.authorized) return { error: access.error }
+
   const { data: completions, error } = await supabase
     .from('module_completions')
     .select(`
@@ -606,15 +767,14 @@ async function unlockDependentModules(enrollmentId: string, completedModuleId?: 
   
   if (!dependentModules || dependentModules.length === 0) return
   
-  // Update their completion status to available
-  for (const depModule of dependentModules) {
-    await supabase
-      .from('module_completions')
-      .update({ status: 'available', updated_at: new Date().toISOString() })
-      .eq('enrollment_id', enrollmentId)
-      .eq('module_id', depModule.id)
-      .eq('status', 'locked')
-  }
+  // PERFORMANCE: Single batch update using .in() instead of sequential loop
+  const dependentModuleIds = dependentModules.map(m => m.id)
+  await supabase
+    .from('module_completions')
+    .update({ status: 'available', updated_at: new Date().toISOString() })
+    .eq('enrollment_id', enrollmentId)
+    .in('module_id', dependentModuleIds)
+    .eq('status', 'locked')
 }
 
 // =============================================

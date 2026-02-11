@@ -128,13 +128,14 @@ export function generateMarketplaceUrl(
     const mapping = FUNCTION_SEARCH_TERMS[functionId]
     
     // Set category (from mapping, options, or default)
+    // Uses 'cat' and 'q' to match useMarketplaceState URL params
     const category = options?.category || mapping?.categories[0] || 'People'
-    params.set('tab', category)
+    params.set('cat', category)
 
     // Set search term if available
     const searchTerm = options?.searchTerm || mapping?.terms[0]
     if (searchTerm) {
-        params.set('search', searchTerm)
+        params.set('q', searchTerm)
     }
 
     return `${baseUrl}?${params.toString()}`

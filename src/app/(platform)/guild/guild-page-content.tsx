@@ -23,6 +23,7 @@ import { GuildStatsBar } from "@/components/guild/guild-stats-bar"
 import { EventsSection } from "@/components/guild/events-section"
 import { getMyAssignments } from "@/actions/project-assignments"
 import { getGuildEvents, getEventRSVPStatuses, getGuildEventsSummary, type GuildEvent } from "@/actions/guild-events"
+import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
 
 // ==========================================
@@ -93,6 +94,9 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
         try {
             // Load events for everyone
             const eventsResult = await getGuildEvents({ upcoming: true, limit: 10 })
+            if (eventsResult.error) {
+                toast.error('Failed to load events')
+            }
             if (eventsResult.data) {
                 // SECURITY: Filter executive-only events for non-executives client-side
                 // (server-side filtering is primary, this is a defense-in-depth measure)
@@ -123,12 +127,16 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
             // Load assignments for apprentices
             if (isApprentice) {
                 const result = await getMyAssignments()
+                if (result.error) {
+                    toast.error('Failed to load your assignments')
+                }
                 if (result.assignments) {
                     setMyAssignments(result.assignments)
                 }
             }
         } catch (err) {
             console.error('[Guild] Failed to load data:', err instanceof Error ? err.message : 'Unknown error')
+            toast.error('Failed to load Guild data. Please try again.')
         } finally {
             setLoading(false)
         }

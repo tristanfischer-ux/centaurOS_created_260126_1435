@@ -17,7 +17,7 @@ function OrdersLoadingSkeleton() {
     return (
         <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
-                <div key={i} className="border border-slate-200 rounded-xl p-6">
+                <div key={i} className="border rounded-xl p-6">
                     <div className="flex gap-4">
                         <Skeleton className="h-14 w-14 rounded-full" />
                         <div className="flex-1 space-y-2">
@@ -80,9 +80,9 @@ export default async function MarketplaceOrdersPage() {
 
             <Suspense fallback={<OrdersLoadingSkeleton />}>
                 <MarketplaceOrdersView
-                    activeOrders={activeResult.data}
-                    completedOrders={completedResult.data}
-                    cancelledOrders={cancelledResult.data}
+                    activeOrders={activeResult.data ?? []}
+                    completedOrders={completedResult.data ?? []}
+                    cancelledOrders={cancelledResult.data ?? []}
                     errors={errors}
                 />
             </Suspense>

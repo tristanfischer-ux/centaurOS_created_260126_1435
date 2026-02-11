@@ -26,6 +26,7 @@ export interface SubscriptionPlan {
     maxOrders?: number
     maxTeamMembers?: number
     maxRetainers?: number
+    maxAiTasksPerMonth: number
     apiAccess?: boolean
     prioritySupport?: boolean
     dedicatedAccount?: boolean
@@ -63,12 +64,14 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     features: [
       'Up to 5 orders per month',
       'Basic marketplace access',
+      '20 AI tasks per month',
       'Standard support',
     ],
     limits: {
       maxOrders: 5,
       maxTeamMembers: 1,
       maxRetainers: 0,
+      maxAiTasksPerMonth: 20,
       apiAccess: false,
       prioritySupport: false,
       dedicatedAccount: false,
@@ -85,12 +88,14 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       'Full marketplace access',
       'Up to 3 team members',
       '1 active retainer',
+      '100 AI tasks per month',
       'Email support',
     ],
     limits: {
       maxOrders: 25,
       maxTeamMembers: 3,
       maxRetainers: 1,
+      maxAiTasksPerMonth: 100,
       apiAccess: false,
       prioritySupport: false,
       dedicatedAccount: false,
@@ -109,6 +114,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       'Full marketplace access',
       'Up to 10 team members',
       'Unlimited retainers',
+      '500 AI tasks per month',
       'API access',
       'Priority support',
     ],
@@ -116,6 +122,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxOrders: undefined, // unlimited
       maxTeamMembers: 10,
       maxRetainers: undefined, // unlimited
+      maxAiTasksPerMonth: 500,
       apiAccess: true,
       prioritySupport: true,
       dedicatedAccount: false,
@@ -132,6 +139,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     features: [
       'Everything in Professional',
       'Unlimited team members',
+      'Unlimited AI tasks',
       'Dedicated account manager',
       'Custom integrations',
       'SLA guarantees',
@@ -141,6 +149,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxOrders: undefined,
       maxTeamMembers: undefined,
       maxRetainers: undefined,
+      maxAiTasksPerMonth: 10000, // effectively unlimited
       apiAccess: true,
       prioritySupport: true,
       dedicatedAccount: true,

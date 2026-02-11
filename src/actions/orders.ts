@@ -252,7 +252,9 @@ export async function completeOrder(
     return { success: false, error: "Not authorized to complete this order" }
   }
 
-  const result = await completeOrderService(supabase, orderId, user.id)
+  // Skip invoice generation here — invoices are generated in approveCompletion
+  // when the buyer approves, preventing duplicate invoice creation.
+  const result = await completeOrderService(supabase, orderId, user.id, { generateInvoices: false })
 
   if (result.success) {
     revalidatePath("/orders")

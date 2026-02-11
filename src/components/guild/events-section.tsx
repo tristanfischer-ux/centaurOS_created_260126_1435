@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -16,6 +16,7 @@ import {
     Video,
     ArrowRight,
 } from "lucide-react"
+import { toast } from "sonner"
 import { toggleRSVP } from "@/actions/guild-events"
 import { EVENT_TYPE_CONFIG } from "./guild-constants"
 import type { GuildEvent } from "@/actions/guild-events"
@@ -63,17 +64,23 @@ export function EventsSection({ events, rsvpStatuses, onRSVPChange }: EventsSect
     const [localRsvp, setLocalRsvp] = useState<Record<string, RSVPStatus>>(rsvpStatuses)
     const [loadingRsvp, setLoadingRsvp] = useState<string | null>(null)
 
+    // Sync local state when parent RSVP statuses change (e.g. after RSVP from hero component)
+    useEffect(() => { setLocalRsvp(rsvpStatuses) }, [rsvpStatuses])
+
     const handleRSVP = useCallback(async (eventId: string) => {
         setLoadingRsvp(eventId)
         try {
             const result = await toggleRSVP(eventId)
-            if (!result.error) {
-                const newStatus = { attending: result.attending, count: result.attendeeCount }
-                setLocalRsvp(prev => ({ ...prev, [eventId]: newStatus }))
-                onRSVPChange?.(eventId, newStatus)
+            if (result.error) {
+                toast.error(result.error)
+                return
             }
+            const newStatus = { attending: result.attending, count: result.attendeeCount }
+            setLocalRsvp(prev => ({ ...prev, [eventId]: newStatus }))
+            onRSVPChange?.(eventId, newStatus)
         } catch (err) {
             console.error('[EventsSection] RSVP failed:', err instanceof Error ? err.message : 'Unknown error')
+            toast.error('Failed to update RSVP. Please try again.')
         } finally {
             setLoadingRsvp(null)
         }

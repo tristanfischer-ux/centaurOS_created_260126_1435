@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useState, useCallback } from "react"
+import { memo, useState, useCallback, useEffect } from "react"
 import { MarketplaceListing, saveMarketplaceListing, unsaveMarketplaceListing } from "@/actions/marketplace"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -53,6 +53,9 @@ export const MarketCard = memo(function MarketCard({
     const [isSaving, setIsSaving] = useState(false)
     const [localSavedState, setLocalSavedState] = useState(isSaved)
     const [dialogOpen, setDialogOpen] = useState(false)
+
+    // Sync local state when parent prop changes (e.g. after save/unsave from another component)
+    useEffect(() => { setLocalSavedState(isSaved) }, [isSaved])
     
     // Use controlled or uncontrolled size
     const currentSize = onSizeChange ? size : internalSize

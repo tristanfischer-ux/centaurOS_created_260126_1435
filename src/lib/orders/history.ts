@@ -9,11 +9,25 @@ import { OrderEvent, OrderEventType } from '@/types/orders'
 
 type TypedSupabaseClient = SupabaseClient<Database>
 
-// The order_events table might not exist yet, so we'll use a generic approach
-// that can work with either a dedicated table or the existing audit mechanism
+// NOTE: The order_events table may not exist in the database yet.
+// Until the migration is created, events are logged to console for audit trail.
+// TODO(TECH-DEBT): Create order_events migration and remove console-only fallback.
 
 /**
- * Log an order event
+ * Log an order event.
+ *
+ * @description Logs order lifecycle events for audit trail. Currently logs to
+ * console since the order_events table may not exist. When the table is created,
+ * this will persist events to the database.
+ *
+ * @param supabase - Typed Supabase client
+ * @param orderId - The order this event belongs to
+ * @param eventType - Type of event (created, accepted, completed, etc.)
+ * @param details - Additional event details
+ * @param actorId - User who triggered the event
+ * @returns Success status
+ *
+ * @audit Logs order lifecycle events for compliance
  */
 export async function logOrderEvent(
   supabase: TypedSupabaseClient,
@@ -23,77 +37,54 @@ export async function logOrderEvent(
   actorId: string
 ): Promise<{ success: boolean; error: string | null }> {
   try {
-    // Try to insert into order_events table if it exists
-    // Fall back to a notifications or audit log approach
-    const eventData = {
-      order_id: orderId,
-      event_type: eventType,
+    // AUDIT: Log order event for audit trail
+    console.info('[OrderHistory] Event logged:', {
+      orderId,
+      eventType,
       details,
-      actor_id: actorId,
-      created_at: new Date().toISOString(),
-    }
+      actorId,
+      timestamp: new Date().toISOString(),
+    })
 
-    // First, try inserting into order_events (if the table exists)
-    const { error: eventError } = await supabase
-      .from('order_events' as 'notifications') // Type cast for flexibility
-      .insert(eventData as never)
-
-    if (eventError) {
-      // Table might not exist, log to console for now
-      console.log('Order event logged (table may not exist):', {
-        orderId,
-        eventType,
-        details,
-        actorId,
-      })
-      
-      // As a fallback, we could log to the notifications table
-      // but for now we'll just acknowledge the event
-    }
+    // When order_events table exists, uncomment this block:
+    // const { error: eventError } = await supabase
+    //   .from('order_events')
+    //   .insert({
+    //     order_id: orderId,
+    //     event_type: eventType,
+    //     details,
+    //     actor_id: actorId,
+    //     created_at: new Date().toISOString(),
+    //   })
+    //
+    // if (eventError) {
+    //   console.error('[OrderHistory] Failed to persist event:', eventError)
+    // }
 
     return { success: true, error: null }
   } catch (err) {
-    console.error('Error logging order event:', err)
+    console.error('[OrderHistory] Error logging order event:', err)
     return { success: false, error: 'Failed to log order event' }
   }
 }
 
 /**
- * Get order history/timeline
+ * Get order history/timeline.
+ *
+ * @description Since the order_events table may not exist yet, this delegates
+ * to buildOrderTimeline which reconstructs history from order data.
+ *
+ * @param supabase - Typed Supabase client
+ * @param orderId - The order to get history for
+ * @returns Array of order events
  */
 export async function getOrderHistory(
   supabase: TypedSupabaseClient,
   orderId: string
 ): Promise<{ data: OrderEvent[]; error: string | null }> {
-  try {
-    // Try to fetch from order_events table
-    const { data, error } = await supabase
-      .from('order_events' as 'notifications') // Type cast for flexibility
-      .select('*')
-      .eq('order_id' as never, orderId as never)
-      .order('created_at', { ascending: true })
-
-    if (error) {
-      // Table might not exist, return reconstructed history from order data
-      console.log('Order events table may not exist, returning empty history')
-      return { data: [], error: null }
-    }
-
-    // Map the data to OrderEvent type
-    const events: OrderEvent[] = (data || []).map((event: Record<string, unknown>) => ({
-      id: String(event.id),
-      order_id: String(event.order_id),
-      event_type: event.event_type as OrderEventType,
-      details: (event.details as Record<string, unknown>) || {},
-      actor_id: String(event.actor_id),
-      created_at: String(event.created_at),
-    }))
-
-    return { data: events, error: null }
-  } catch (err) {
-    console.error('Error fetching order history:', err)
-    return { data: [], error: 'Failed to fetch order history' }
-  }
+  // Delegate to buildOrderTimeline which reconstructs history from order data
+  // When order_events table is created, this can query it directly
+  return buildOrderTimeline(supabase, orderId)
 }
 
 /**

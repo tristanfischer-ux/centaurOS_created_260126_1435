@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { Shield, Building2, HelpCircle } from 'lucide-react'
+import { Shield, Building2, HelpCircle, CreditCard } from 'lucide-react'
 
 interface SettingsNavigationProps {
     isCompanyAdmin: boolean
@@ -13,11 +13,13 @@ export function SettingsNavigation({ isCompanyAdmin }: SettingsNavigationProps) 
     const pathname = usePathname()
 
     const personalNav = { name: 'Privacy & Data', href: '/settings', icon: Shield }
+    const billingNav = { name: 'Billing & Usage', href: '/settings/billing', icon: CreditCard }
     const companyNav = { name: 'Company', href: '/settings/company', icon: Building2 }
     const helpNav = { name: 'Help & Support', href: '/settings/help', icon: HelpCircle }
 
     const navigation = [
         personalNav,
+        billingNav,
         ...(isCompanyAdmin ? [companyNav] : []),
         helpNav,
     ]

@@ -87,7 +87,7 @@ export function MarketplaceFilterPanel({
                             onClick={() => onToggleSubcategory(sub)}
                             className={cn(
                                 'group text-left px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-150',
-                                'min-h-[36px]',
+                                'min-h-[44px]',
                                 isActive
                                     ? 'bg-foreground text-background shadow-sm'
                                     : 'bg-background text-muted-foreground border hover:bg-secondary hover:text-foreground'

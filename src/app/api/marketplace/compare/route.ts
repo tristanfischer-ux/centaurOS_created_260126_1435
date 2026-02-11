@@ -5,6 +5,7 @@ import { Json } from "@/types/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { buildAIContext } from "@/lib/ai-context/builder";
+import { aiGuard } from "@/lib/ai/guard";
 
 // SECURITY: Zod schema for input validation
 const MarketplaceListingSchema = z.object({
@@ -73,16 +74,10 @@ export async function POST(req: NextRequest) {
             );
         }
         
-        // Authenticate user
         const supabase = await createClient()
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        
-        if (authError || !user) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 }
-            );
-        }
+        const guard = await aiGuard(supabase, 'comparison_assistant')
+        if (guard.denied) return guard.response
+        const user = { id: guard.userId }
 
         // SECURITY: Rate limit to prevent OpenAI cost abuse (5 requests per minute per user)
         const rateLimitResult = await rateLimit('api', `compare:${user.id}`, { limit: 5, window: 60 })

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { getFoundryIdCached } from "@/lib/supabase/foundry-context";
+import { aiGuard } from "@/lib/ai/guard";
 
 /**
  * @file Team Member Comparison API
@@ -87,14 +88,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         
         // AUTH: Authenticate user
         const supabase = await createClient();
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError || !user) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 }
-            );
-        }
+        const guard = await aiGuard(supabase, 'comparison_assistant');
+        if (guard.denied) return guard.response;
+        const user = { id: guard.userId };
 
         // SECURITY: Rate limit to prevent OpenAI cost abuse (5 requests per minute per user)
         const rateLimitResult = await rateLimit('api', `team-compare:${user.id}`, { limit: 5, window: 60 });
@@ -233,6 +229,13 @@ Analyze their availability and recommend the best person for task delegation.`;
                 { role: "user", content: userPrompt }
             ],
             temperature: 0.7,
+        });
+
+        // AUDIT: Track AI usage
+        await guard.trackUsage({
+            model: 'gpt-4o',
+            promptTokens: completion.usage?.prompt_tokens || 1000,
+            completionTokens: completion.usage?.completion_tokens || 500,
         });
 
         if (!completion.choices || completion.choices.length === 0) {

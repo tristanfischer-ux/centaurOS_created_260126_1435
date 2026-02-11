@@ -5,6 +5,7 @@ import { stripe } from '@/lib/stripe/client'
 import { createClient } from '@/lib/supabase/server'
 import { confirmPayment } from '@/lib/payments/flow'
 import { sendNotification } from '@/lib/notifications'
+import { handleSubscriptionEvent } from '@/lib/billing/subscriptions'
 
 // Disable body parsing, we need raw body for webhook signature verification
 export const dynamic = 'force-dynamic'
@@ -848,6 +849,14 @@ export async function POST(request: NextRequest) {
       case 'charge.refunded':
         console.log('Charge refunded:', (event.data.object as Stripe.Charge).id,
           'Amount refunded:', (event.data.object as Stripe.Charge).amount_refunded)
+        break
+
+      // Subscription events — managed by handleSubscriptionEvent()
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted':
+      case 'invoice.payment_failed':
+        await handleSubscriptionEvent(event)
         break
 
       default:

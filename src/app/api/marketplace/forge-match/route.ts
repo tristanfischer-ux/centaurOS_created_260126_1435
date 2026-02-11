@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { Database } from '@/types/database.types'
 import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
+import { aiGuard } from '@/lib/ai/guard'
 
 // SECURITY: Zod schema for input validation
 const ForgeMatchRequestSchema = z.object({

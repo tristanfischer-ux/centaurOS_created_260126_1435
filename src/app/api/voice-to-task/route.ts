@@ -6,6 +6,7 @@ import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { sanitizeFileName } from "@/lib/security/sanitize";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
+import { aiGuard } from "@/lib/ai/guard";
 
 // SECURITY: Fail fast if OpenAI API key is not configured
 const apiKey = process.env.OPENAI_API_KEY
@@ -35,11 +36,12 @@ export async function POST(req: NextRequest) {
         }
         
         const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
 
-        if (!user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
+        // AUTH + AI LIMIT: Check subscription tier AI limits
+        const guard = await aiGuard(supabase, 'voice_to_task')
+        if (guard.denied) return guard.response
+
+        const user = { id: guard.userId }
 
         // SECURITY: Rate limit to prevent OpenAI cost abuse (5 requests per hour per user)
         const headersList = await headers()
@@ -123,6 +125,13 @@ export async function POST(req: NextRequest) {
             ],
             response_format: zodResponseFormat(TaskSchema, "task"),
         });
+
+        // AUDIT: Track AI usage (both Whisper transcription + GPT-4o parse)
+        await guard.trackUsage({
+            model: 'gpt-4o',
+            promptTokens: completion.usage?.prompt_tokens || 500,
+            completionTokens: completion.usage?.completion_tokens || 200,
+        })
 
         if (!completion.choices || completion.choices.length === 0) {
             return NextResponse.json({ error: "AI returned no response" }, { status: 500 });

@@ -386,7 +386,7 @@ export async function holdPayment(
 /**
  * Calculates the platform fee for a given amount
  * @param amount - Amount in smallest currency unit
- * @param feePercent - Fee percentage (default 8%)
+ * @param feePercent - Fee percentage (default 10%)
  * @returns The calculated fee
  */
 export function calculatePlatformFee(

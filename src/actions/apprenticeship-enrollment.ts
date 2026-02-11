@@ -9,6 +9,63 @@ import { isValidUUID, sanitizeErrorMessage } from '@/lib/security/sanitize'
 // NOTE: Types are in @/types/apprenticeship - import directly from there
 
 // =============================================
+// AUTH HELPERS
+// =============================================
+
+/**
+ * Verify the current user has access to an enrollment.
+ *
+ * @description Checks the user is the apprentice, mentor, buddy,
+ * or a Founder/Executive in the same foundry.
+ *
+ * @security Prevents IDOR by checking direct association or elevated role
+ * within the same foundry.
+ */
+async function verifyEnrollmentAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  enrollmentId: string
+): Promise<{ authorized: boolean; error?: string }> {
+  // AUTH: Get enrollment details for ownership check
+  const { data: enrollment } = await supabase
+    .from('apprenticeship_enrollments')
+    .select('foundry_id, apprentice_id, senior_mentor_id, workplace_buddy_id')
+    .eq('id', enrollmentId)
+    .single()
+
+  if (!enrollment) {
+    return { authorized: false, error: 'Enrollment not found' }
+  }
+
+  // AUTH: Check if user is directly associated with the enrollment
+  const isDirectlyAssociated =
+    enrollment.apprentice_id === userId ||
+    enrollment.senior_mentor_id === userId ||
+    enrollment.workplace_buddy_id === userId
+
+  if (isDirectlyAssociated) {
+    return { authorized: true }
+  }
+
+  // AUTH: Check if user is Founder/Executive in the same foundry
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, foundry_id')
+    .eq('id', userId)
+    .single()
+
+  if (
+    profile?.foundry_id === enrollment.foundry_id &&
+    profile?.role &&
+    ['Founder', 'Executive'].includes(profile.role)
+  ) {
+    return { authorized: true }
+  }
+
+  return { authorized: false, error: 'Not authorized to access this enrollment' }
+}
+
+// =============================================
 // ENROLLMENT MANAGEMENT
 // =============================================
 
@@ -115,11 +172,33 @@ export async function getEnrollmentForUser() {
 }
 
 /**
- * Get all enrollments for a foundry (for managers/mentors)
+ * Get all enrollments for a foundry (for managers/mentors).
+ *
+ * @description Returns active enrollments belonging to a foundry.
+ *
+ * @param foundryId - The foundry to list enrollments for
+ * @returns List of enrollments or an error
+ *
+ * @security Requires authenticated user who belongs to the requested foundry
  */
 export async function getFoundryEnrollments(foundryId: string) {
   const supabase = await createClient()
-  
+
+  // AUTH: Verify the caller is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // AUTH: Verify the caller belongs to this foundry
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('foundry_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || profile.foundry_id !== foundryId) {
+    return { error: 'Not authorized to access this foundry' }
+  }
+
   const { data: enrollments, error } = await supabase
     .from('apprenticeship_enrollments')
     .select(`
@@ -229,14 +308,31 @@ export async function getMenteeEnrollments() {
 }
 
 /**
- * Update enrollment status
+ * Update enrollment status.
+ *
+ * @description Transitions an enrollment to a new status, setting end date
+ * when completing or withdrawing.
+ *
+ * @param enrollmentId - The enrollment to update
+ * @param status - The target status
+ * @returns Success flag or an error
+ *
+ * @security Requires authenticated user with enrollment access
  */
 export async function updateEnrollmentStatus(
   enrollmentId: string, 
   status: 'enrolled' | 'active' | 'on_break' | 'gateway' | 'epa' | 'completed' | 'withdrawn'
 ) {
   const supabase = await createClient()
-  
+
+  // AUTH: Verify the caller is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // AUTH: Verify the caller has access to this enrollment
+  const access = await verifyEnrollmentAccess(supabase, user.id, enrollmentId)
+  if (!access.authorized) return { error: access.error }
+
   const updateData: Record<string, unknown> = {
     status,
     updated_at: new Date().toISOString()
@@ -261,7 +357,17 @@ export async function updateEnrollmentStatus(
 }
 
 /**
- * Assign mentors to an enrollment
+ * Assign mentors to an enrollment.
+ *
+ * @description Sets or clears the senior mentor and/or workplace buddy
+ * on an enrollment and creates introduction tasks.
+ *
+ * @param enrollmentId - The enrollment to update
+ * @param seniorMentorId - New senior mentor (undefined = no change, empty = clear)
+ * @param workplaceBuddyId - New workplace buddy (undefined = no change, empty = clear)
+ * @returns Success flag or an error
+ *
+ * @security Requires authenticated user with enrollment access
  */
 export async function assignMentors(
   enrollmentId: string,
@@ -269,7 +375,15 @@ export async function assignMentors(
   workplaceBuddyId?: string
 ) {
   const supabase = await createClient()
-  
+
+  // AUTH: Verify the caller is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // AUTH: Verify the caller has access to this enrollment
+  const access = await verifyEnrollmentAccess(supabase, user.id, enrollmentId)
+  if (!access.authorized) return { error: access.error }
+
   const updates: Record<string, unknown> = {
     updated_at: new Date().toISOString()
   }
@@ -474,16 +588,17 @@ async function createInductionObjective(
     }
   ]
   
-  for (const task of inductionTasks) {
-    await supabase.from('tasks').insert({
+  // PERFORMANCE: Single batch insert instead of sequential loop
+  await supabase.from('tasks').insert(
+    inductionTasks.map(task => ({
       ...task,
       objective_id: objective.id,
       creator_id: apprenticeId,
       assignee_id: apprenticeId,
       foundry_id: foundryId,
-      status: 'Pending'
-    })
-  }
+      status: 'Pending' as const
+    }))
+  )
 }
 
 async function scheduleStandardReviews(enrollmentId: string, reviewerId: string) {
@@ -538,13 +653,16 @@ async function scheduleStandardReviews(enrollmentId: string, reviewerId: string)
   const now = new Date()
   const futureReviews = reviews.filter(r => r.date > now)
   
-  for (const review of futureReviews) {
-    await supabase.from('progress_reviews').insert({
-      enrollment_id: enrollmentId,
-      reviewer_id: reviewerId,
-      review_type: review.type,
-      scheduled_date: review.date.toISOString().split('T')[0]
-    })
+  // PERFORMANCE: Single batch insert instead of sequential loop
+  if (futureReviews.length > 0) {
+    await supabase.from('progress_reviews').insert(
+      futureReviews.map(review => ({
+        enrollment_id: enrollmentId,
+        reviewer_id: reviewerId,
+        review_type: review.type,
+        scheduled_date: review.date.toISOString().split('T')[0]
+      }))
+    )
   }
 }
 

@@ -272,7 +272,7 @@ export function MarketplaceCompareView({
                     <thead>
                         <tr>
                             {/* Row label column */}
-                            <th className="sticky left-0 z-10 bg-muted/80 backdrop-blur-sm w-[140px] min-w-[140px] p-0">
+                            <th className="sticky left-0 z-10 bg-muted w-[140px] min-w-[140px] p-0">
                                 <span className="sr-only">Attribute</span>
                             </th>
                             {/* Listing header columns */}
@@ -294,10 +294,10 @@ export function MarketplaceCompareView({
                                                 <button
                                                     onClick={() => handleSave(listing.id)}
                                                     className={cn(
-                                                        'w-7 h-7 rounded-full flex items-center justify-center transition-all',
+                                                        'min-w-[44px] min-h-[44px] w-7 h-7 rounded-full flex items-center justify-center transition-all',
                                                         savedIds.has(listing.id)
-                                                            ? 'bg-red-500 text-white shadow-sm'
-                                                            : 'bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-500'
+                                                            ? 'bg-destructive text-destructive-foreground shadow-sm'
+                                                            : 'bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
                                                     )}
                                                     aria-label={savedIds.has(listing.id) ? 'Remove from favourites' : 'Add to favourites'}
                                                 >
@@ -305,7 +305,7 @@ export function MarketplaceCompareView({
                                                 </button>
                                                 <button
                                                     onClick={() => onRemove(listing.id)}
-                                                    className="w-7 h-7 rounded-full bg-muted hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors"
+                                                    className="min-w-[44px] min-h-[44px] w-7 h-7 rounded-full bg-muted hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors"
                                                     aria-label={`Remove ${listing.title} from comparison`}
                                                 >
                                                     <X className="w-3.5 h-3.5" />
@@ -351,7 +351,7 @@ export function MarketplaceCompareView({
                             return (
                                 <tr key={row.key} className="border-t border-border">
                                     {/* Row label */}
-                                    <td className="sticky left-0 z-10 bg-muted/60 backdrop-blur-sm px-4 py-3">
+                                    <td className="sticky left-0 z-10 bg-muted px-4 py-3">
                                         <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                             {row.icon && <row.icon className="w-3.5 h-3.5" aria-hidden="true" />}
                                             {row.label}
@@ -382,7 +382,7 @@ export function MarketplaceCompareView({
 
                         {/* CTA row */}
                         <tr className="border-t-2 border-border">
-                            <td className="sticky left-0 z-10 bg-muted/60 backdrop-blur-sm px-4 py-4">
+                            <td className="sticky left-0 z-10 bg-muted px-4 py-4">
                                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                     Action
                                 </span>

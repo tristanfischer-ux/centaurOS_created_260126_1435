@@ -386,8 +386,8 @@ export function EventDetailContent({
                                 </div>
                             )}
 
-                            {/* Online URL */}
-                            {event.event_url && (
+                            {/* Online URL — SECURITY: Only allow http(s) to prevent javascript: XSS */}
+                            {event.event_url && /^https?:\/\//i.test(event.event_url) && (
                                 <div className="flex items-start gap-3">
                                     <Video className="h-5 w-5 text-muted-foreground mt-0.5" />
                                     <div>

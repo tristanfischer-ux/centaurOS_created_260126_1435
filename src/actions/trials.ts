@@ -58,7 +58,7 @@ export async function createTrialOrder(input: TrialOrderInput) {
     
     const totalHours = input.trialDurationWeeks * input.trialHoursPerWeek
     const subtotal = baseRate * totalHours
-    const platformFee = subtotal * 0.08
+    const platformFee = subtotal * 0.10
     const vatAmount = (subtotal + platformFee) * 0.20
     const totalAmount = subtotal + platformFee + vatAmount
     
@@ -153,7 +153,7 @@ export async function convertTrialToFullEngagement(trialOrderId: string, engagem
     const monthlySubtotal = engagementDetails.monthlyRate || (baseRate * monthlyHours)
     const totalMonths = engagementDetails.durationMonths
     const subtotal = monthlySubtotal * totalMonths
-    const platformFee = subtotal * 0.08
+    const platformFee = subtotal * 0.10
     const vatAmount = (subtotal + platformFee) * 0.20
     const totalAmount = subtotal + platformFee + vatAmount
     

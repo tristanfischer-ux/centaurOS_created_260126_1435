@@ -1168,6 +1168,111 @@ export type Database = {
           },
         ]
       }
+      ai_usage_log: {
+        Row: {
+          completion_tokens: number
+          created_at: string
+          estimated_cost_usd: number
+          feature: string
+          foundry_id: string
+          id: string
+          metadata: Json | null
+          model: string
+          prompt_tokens: number
+          total_tokens: number
+          user_id: string
+        }
+        Insert: {
+          completion_tokens?: number
+          created_at?: string
+          estimated_cost_usd?: number
+          feature: string
+          foundry_id: string
+          id?: string
+          metadata?: Json | null
+          model?: string
+          prompt_tokens?: number
+          total_tokens?: number
+          user_id: string
+        }
+        Update: {
+          completion_tokens?: number
+          created_at?: string
+          estimated_cost_usd?: number
+          feature?: string
+          foundry_id?: string
+          id?: string
+          metadata?: Json | null
+          model?: string
+          prompt_tokens?: number
+          total_tokens?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_log_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "ai_usage_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage_monthly: {
+        Row: {
+          created_at: string
+          foundry_id: string
+          id: string
+          month_year: string
+          total_ai_tasks: number
+          total_cost_usd: number
+          total_tokens: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          foundry_id: string
+          id?: string
+          month_year: string
+          total_ai_tasks?: number
+          total_cost_usd?: number
+          total_tokens?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          month_year?: string
+          total_ai_tasks?: number
+          total_cost_usd?: number
+          total_tokens?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_monthly_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apprentice_skill_assessments: {
         Row: {
           assessed_at: string | null
@@ -11469,6 +11574,14 @@ export type Database = {
         Returns: string
       }
       get_active_foundry_id: { Args: { p_user_id: string }; Returns: string }
+      get_ai_usage_current_month: {
+        Args: { p_foundry_id: string }
+        Returns: {
+          total_ai_tasks: number
+          total_cost_usd: number
+          total_tokens: number
+        }[]
+      }
       get_blueprint_tasks: {
         Args: { p_blueprint_id: string }
         Returns: {
@@ -11693,6 +11806,22 @@ export type Database = {
       has_foundry_admin_access: {
         Args: { target_foundry_id: string; user_id: string }
         Returns: boolean
+      }
+      increment_ai_usage: {
+        Args: {
+          p_completion_tokens?: number
+          p_estimated_cost_usd?: number
+          p_feature: string
+          p_foundry_id: string
+          p_metadata?: Json
+          p_model?: string
+          p_prompt_tokens?: number
+          p_user_id: string
+        }
+        Returns: {
+          monthly_cost: number
+          monthly_task_count: number
+        }[]
       }
       increment_profile_views: {
         Args: { provider_id_input: string }

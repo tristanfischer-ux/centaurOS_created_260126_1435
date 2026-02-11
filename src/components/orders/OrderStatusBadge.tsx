@@ -72,7 +72,12 @@ export function OrderStatusBadge({
   showIcon = true,
   size = "default",
 }: OrderStatusBadgeProps) {
-  const config = statusConfig[status]
+  const config = statusConfig[status] ?? {
+    label: status,
+    variant: "secondary" as const,
+    icon: Clock,
+    description: `Status: ${status}`,
+  }
   const Icon = config.icon
 
   const sizeClasses = {

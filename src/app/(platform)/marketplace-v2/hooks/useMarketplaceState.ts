@@ -50,15 +50,24 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
     const pathname = usePathname()
     const searchParams = useSearchParams()
 
+    // PERFORMANCE: Stabilize allowedCategories array reference to prevent
+    // downstream useMemo invalidations on every render
+    const allowedCategoriesKey = allowedCategories ? allowedCategories.join(',') : ''
+    const stableAllowedCategories = useMemo(
+        () => allowedCategories,
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [allowedCategoriesKey]
+    )
+
     // Derive visible categories from allowedCategories prop
     const visibleCategories = useMemo(() => {
-        if (!allowedCategories || allowedCategories.length === 0) {
+        if (!stableAllowedCategories || stableAllowedCategories.length === 0) {
             // No restriction — show all categories
             return ALL_CATEGORIES
         }
         // Build category list from allowed entries
         const allowed = ALL_CATEGORIES.filter(
-            c => c.id !== 'All' && allowedCategories.includes(c.id as ContentCategory)
+            c => c.id !== 'All' && stableAllowedCategories.includes(c.id as ContentCategory)
         )
         // Prepend "All" only when there are 2+ content categories
         if (allowed.length >= 2) {
@@ -66,7 +75,7 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
             return [allEntry, ...allowed]
         }
         return allowed
-    }, [allowedCategories])
+    }, [stableAllowedCategories])
 
     // Determine default category: "All" if multiple, or the single allowed category
     const defaultCategory: MarketplaceCategory = useMemo(() => {
@@ -113,6 +122,11 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
         router.push(newURL, { scroll: false })
     }, [pathname, router])
 
+    // Sync debounced search query to URL
+    useEffect(() => {
+        updateURL(debouncedQuery, activeCategory)
+    }, [debouncedQuery]) // eslint-disable-line react-hooks/exhaustive-deps
+
     // Category change handler — auto-expands filters for non-All categories
     const handleCategoryChange = useCallback((cat: MarketplaceCategory) => {
         setActiveCategory(cat)
@@ -147,12 +161,19 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
         })
     }, [])
 
-    // Clear all filters
+    // Clear all filters (including technique from URL)
     const clearFilters = useCallback(() => {
         setSearchQuery('')
         setSelectedSubcategories(new Set())
         setSortBy('relevance')
-    }, [])
+        // Also clear technique filter from URL since hasActiveFilters includes it
+        if (techniqueSlug) {
+            const params = new URLSearchParams(searchParams?.toString() || '')
+            params.delete('technique')
+            const newURL = params.toString() ? `${pathname}?${params.toString()}` : pathname
+            router.push(newURL, { scroll: false })
+        }
+    }, [techniqueSlug, searchParams, pathname, router])
 
     // Check if any filters are active
     const hasActiveFilters = useMemo(() => {
@@ -162,12 +183,12 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
     // Exclude AI listings and restrict to allowed categories
     const browseListings = useMemo(() => {
         let listings = initialListings.filter(l => l.category !== 'AI')
-        if (allowedCategories && allowedCategories.length > 0) {
-            const allowed = new Set<string>(allowedCategories)
+        if (stableAllowedCategories && stableAllowedCategories.length > 0) {
+            const allowed = new Set<string>(stableAllowedCategories)
             listings = listings.filter(l => allowed.has(l.category))
         }
         return listings
-    }, [initialListings, allowedCategories])
+    }, [initialListings, stableAllowedCategories])
 
     // Filter and sort listings
     const filteredListings = useMemo(() => {

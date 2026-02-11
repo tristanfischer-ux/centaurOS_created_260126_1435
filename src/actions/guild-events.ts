@@ -68,7 +68,7 @@ export interface EventAttendee {
  * @param data - Event details including title, date, type, format, and location
  * @returns The created event or an error message
  *
- * @security Requires authenticated user. Role enforcement happens in the UI layer.
+ * @security Requires authenticated user with Executive or Founder role.
  * @audit Event creation is logged via Supabase audit trail.
  */
 export async function createGuildEvent(data: {
@@ -87,6 +87,17 @@ export async function createGuildEvent(data: {
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'Not authenticated' }
+
+        // AUTH: Verify user has Executive or Founder role (don't rely on UI-only enforcement)
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        if (!profile?.role || !['Founder', 'Executive'].includes(profile.role)) {
+            return { data: null, error: 'Only Executives and Founders can create events' }
+        }
 
         const foundryId = await getFoundryIdCached()
 
@@ -243,6 +254,33 @@ export async function updateGuildEvent(
     try {
         const supabase = await createClient()
 
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { success: false, error: 'Not authenticated' }
+
+        // AUTH: Verify user is event creator or Founder/Executive in same foundry
+        const { data: event } = await supabase
+            .from('guild_events')
+            .select('created_by, foundry_id')
+            .eq('id', eventId)
+            .single()
+
+        if (!event) return { success: false, error: 'Event not found' }
+
+        if (event.created_by !== user.id) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role, foundry_id')
+                .eq('id', user.id)
+                .single()
+
+            const isFoundryAdmin = profile?.foundry_id === event.foundry_id && 
+                profile?.role && ['Founder', 'Executive'].includes(profile.role)
+
+            if (!isFoundryAdmin) {
+                return { success: false, error: 'Not authorized to update this event' }
+            }
+        }
+
         const { error } = await supabase
             .from('guild_events')
             .update({
@@ -282,6 +320,33 @@ export async function updateGuildEvent(
 export async function deleteGuildEvent(eventId: string): Promise<{ success: boolean; error: string | null }> {
     try {
         const supabase = await createClient()
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { success: false, error: 'Not authenticated' }
+
+        // AUTH: Verify user is event creator or Founder/Executive in same foundry
+        const { data: event } = await supabase
+            .from('guild_events')
+            .select('created_by, foundry_id')
+            .eq('id', eventId)
+            .single()
+
+        if (!event) return { success: false, error: 'Event not found' }
+
+        if (event.created_by !== user.id) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role, foundry_id')
+                .eq('id', user.id)
+                .single()
+
+            const isFoundryAdmin = profile?.foundry_id === event.foundry_id && 
+                profile?.role && ['Founder', 'Executive'].includes(profile.role)
+
+            if (!isFoundryAdmin) {
+                return { success: false, error: 'Not authorized to delete this event' }
+            }
+        }
 
         const { error } = await supabase
             .from('guild_events')
@@ -349,6 +414,8 @@ export async function toggleRSVP(eventId: string): Promise<{
                 .eq('id', existing.id)
         } else {
             // SECURITY: Check capacity before inserting
+            // NOTE: This check + insert is not fully atomic. A database constraint
+            // or RPC function would be ideal. We mitigate by re-checking after insert.
             const { data: event } = await supabase
                 .from('guild_events')
                 .select('max_attendees')
@@ -375,6 +442,27 @@ export async function toggleRSVP(eventId: string): Promise<{
             if (insertError) {
                 console.error('[GuildEvents] toggleRSVP insert failed:', insertError)
                 return { attending: false, attendeeCount: 0, error: insertError.message }
+            }
+
+            // SECURITY: Post-insert capacity re-check to mitigate race conditions
+            // If we exceeded capacity due to concurrent RSVPs, roll back our insert
+            if (event?.max_attendees) {
+                const { count: postInsertCount } = await supabase
+                    .from('event_attendees')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('event_id', eventId)
+                    .eq('status', 'going')
+
+                if (postInsertCount !== null && postInsertCount > event.max_attendees) {
+                    // Roll back: delete our RSVP since capacity was exceeded
+                    await supabase
+                        .from('event_attendees')
+                        .delete()
+                        .eq('event_id', eventId)
+                        .eq('user_id', user.id)
+
+                    return { attending: false, attendeeCount: event.max_attendees, error: 'Event is at capacity' }
+                }
             }
         }
 

@@ -61,13 +61,17 @@ export default async function MarketplacePage() {
     // Fetch recommendations, saved IDs, and full saved listings in parallel
     if (foundryId) {
         const supabase = await createClient()
+        // SECURITY: Get user ID for defense-in-depth filtering on saved listings
+        const { data: { user } } = await supabase.auth.getUser()
 
         const [recsResult, savedResult, savedListingsResult] = await Promise.allSettled([
             supabase.rpc('get_marketplace_recommendations', {
                 p_foundry_id: foundryId,
                 p_limit: 5,
             }),
-            supabase.from('saved_marketplace_listings').select('listing_id'),
+            user
+                ? supabase.from('saved_marketplace_listings').select('listing_id').eq('user_id', user.id)
+                : Promise.resolve({ data: [] }),
             getSavedMarketplaceListings(),
         ])
 

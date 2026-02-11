@@ -140,8 +140,16 @@ export function OrderActions({
           router.push(`/orders/${orderId}#review`)
           return
 
+        case "submit_milestone":
+          toast.info('Milestone submission will be available once your seller starts work on the order.')
+          return
+
+        case "approve_milestone":
+          toast.info('You can approve milestones once the seller submits their work.')
+          return
+
         default:
-          toast.info(`Action "${action}" not implemented`)
+          toast.info(`Action "${action}" is not available yet.`)
           return
       }
 

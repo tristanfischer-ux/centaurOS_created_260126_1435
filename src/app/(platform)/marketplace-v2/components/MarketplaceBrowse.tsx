@@ -82,11 +82,16 @@ export function MarketplaceBrowse({
         setActiveTab('browse')
     }, [state])
 
-    // Handle recommendation dismiss
+    // Track recommendations in local state so dismissals update the UI
+    const [localRecommendations, setLocalRecommendations] = useState(initialRecommendations)
+
+    // Handle recommendation dismiss — remove from local state after server action
     const handleDismissRecommendation = useCallback(async (id: string) => {
         const result = await dismissRecommendation(id)
         if (result.error) {
             toast.error('Failed to dismiss')
+        } else {
+            setLocalRecommendations(prev => prev.filter(r => r.id !== id))
         }
     }, [])
 
@@ -203,7 +208,7 @@ export function MarketplaceBrowse({
                 <>
                     {/* AI + Gap Recommendations (compact, dismissible) */}
                     <MarketplaceRecommendations
-                        recommendations={initialRecommendations}
+                        recommendations={localRecommendations}
                         onApplyRecommendation={handleApplyRecommendation}
                         onDismiss={handleDismissRecommendation}
                         foundryContext={foundryContext}

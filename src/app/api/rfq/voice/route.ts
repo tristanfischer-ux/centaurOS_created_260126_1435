@@ -5,6 +5,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
+import { aiGuard } from "@/lib/ai/guard";
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
@@ -20,11 +21,9 @@ const RFQSchema = z.object({
 export async function POST(req: NextRequest) {
     try {
         const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-
-        if (!user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
+        const guard = await aiGuard(supabase, 'voice_to_rfq');
+        if (guard.denied) return guard.response;
+        const user = { id: guard.userId };
 
         // SECURITY: Rate limit to prevent OpenAI cost abuse (5 requests per hour per user)
         const headersList = await headers()
@@ -112,6 +111,13 @@ Be precise and comprehensive in extracting specifications.`
                 { role: "user", content: transcriptText },
             ],
             response_format: zodResponseFormat(RFQSchema, "rfq"),
+        });
+
+        // AUDIT: Track AI usage
+        await guard.trackUsage({
+            model: 'gpt-4o',
+            promptTokens: completion.usage?.prompt_tokens || 500,
+            completionTokens: completion.usage?.completion_tokens || 200,
         });
 
         const rfqData = completion.choices[0].message.parsed;

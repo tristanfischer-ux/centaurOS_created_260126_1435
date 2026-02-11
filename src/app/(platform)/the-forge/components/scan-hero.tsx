@@ -325,43 +325,47 @@ export function ScanHero({
           />
 
           {hasExistingSpec ? (
-            /* Post-scan: two options for iterating */
-            <div className="flex gap-3">
-              <Button
+            /* Post-scan: two clearly-described options for iterating */
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Fresh re-scan option */}
+              <button
+                type="button"
                 onClick={() => setShowRescanConfirm(true)}
                 disabled={isScanning || !localIdea.trim()}
-                variant="secondary"
-                className="flex-1 h-11"
+                className="group flex flex-col items-center gap-1.5 rounded-lg border border-input bg-background px-4 py-3 text-center transition-colors hover:border-muted-foreground/40 hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-50"
               >
-                {isScanning ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Scanning...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Fresh re-scan
-                  </>
-                )}
-              </Button>
-              <Button
+                <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  {isScanning && !lastActionWasRefine ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  {isScanning && !lastActionWasRefine ? "Scanning..." : "Fresh re-scan"}
+                </span>
+                <span className="text-xs leading-snug text-muted-foreground">
+                  Start over from scratch. Replaces all existing modules and data.
+                </span>
+              </button>
+
+              {/* Refine with changes option */}
+              <button
+                type="button"
                 onClick={handleRefine}
                 disabled={isScanning || !localIdea.trim()}
-                className="flex-1 bg-international-orange hover:bg-international-orange-hover text-white h-11"
+                className="group flex flex-col items-center gap-1.5 rounded-lg border-2 border-international-orange/60 bg-international-orange/5 px-4 py-3 text-center transition-colors hover:bg-international-orange/10 disabled:pointer-events-none disabled:opacity-50"
               >
-                {isScanning ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Refining...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Refine with changes
-                  </>
-                )}
-              </Button>
+                <span className="flex items-center gap-2 text-sm font-semibold text-international-orange">
+                  {isScanning && lastActionWasRefine ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  {isScanning && lastActionWasRefine ? "Refining..." : "Refine with changes"}
+                </span>
+                <span className="text-xs leading-snug text-muted-foreground">
+                  Keep your existing work. Only updates modules affected by your edits.
+                </span>
+              </button>
             </div>
           ) : (
             /* First scan: single CTA */

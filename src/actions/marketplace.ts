@@ -161,6 +161,7 @@ export async function getMarketplaceListings(category?: string) {
         .from('marketplace_listings')
         .select('*')
         .order('is_verified', { ascending: false })
+        .limit(200)
 
     if (category) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -271,6 +272,12 @@ export async function dismissRecommendation(recommendationId: string): Promise<{
             return { success: false, error: 'Not authenticated' }
         }
 
+        // AUTH: Get user's foundry for isolation check
+        const foundryId = await getFoundryIdCached()
+        if (!foundryId) {
+            return { success: false, error: 'No active foundry' }
+        }
+
         const { error } = await supabase
             .from('marketplace_recommendations')
             .update({
@@ -279,6 +286,7 @@ export async function dismissRecommendation(recommendationId: string): Promise<{
                 dismissed_by: user.id
             })
             .eq('id', recommendationId)
+            .eq('foundry_id', foundryId)
 
         if (error) {
             console.error('Error dismissing recommendation:', error)
@@ -374,7 +382,7 @@ export async function saveMarketplaceListing(listingId: string): Promise<{
 
         // Insert saved listing
         const { error } = await supabase
-            .from('saved_marketplace_listings' as any)
+            .from('saved_marketplace_listings')
             .insert({
                 user_id: user.id,
                 listing_id: listingId
@@ -419,7 +427,7 @@ export async function unsaveMarketplaceListing(listingId: string): Promise<{
         }
 
         const { error } = await supabase
-            .from('saved_marketplace_listings' as any)
+            .from('saved_marketplace_listings')
             .delete()
             .eq('user_id', user.id)
             .eq('listing_id', listingId)
@@ -458,7 +466,7 @@ export async function getSavedMarketplaceListings(): Promise<{
 
         // Get saved listing IDs
         const { data: savedListings, error: savedError } = await supabase
-            .from('saved_marketplace_listings' as any)
+            .from('saved_marketplace_listings')
             .select('listing_id, created_at')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
@@ -509,7 +517,7 @@ export async function getSavedListingIds(listingIds: string[]): Promise<Set<stri
         if (!user) return new Set()
 
         const { data, error } = await supabase
-            .from('saved_marketplace_listings' as any)
+            .from('saved_marketplace_listings')
             .select('listing_id')
             .eq('user_id', user.id)
             .in('listing_id', listingIds)

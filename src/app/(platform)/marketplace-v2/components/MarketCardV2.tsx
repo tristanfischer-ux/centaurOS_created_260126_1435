@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useState, useCallback } from 'react'
+import { memo, useState, useCallback, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -112,6 +112,9 @@ export const MarketCardV2 = memo(function MarketCardV2({
     const [isSaving, setIsSaving] = useState(false)
     const [localSaved, setLocalSaved] = useState(isSaved)
 
+    // Sync local state when parent prop changes (e.g. after save/unsave from another component)
+    useEffect(() => { setLocalSaved(isSaved) }, [isSaved])
+
     const attrs = listing.attributes || {}
     const isAI = listing.category === 'AI'
     const AIIcon = isAI ? getAIIcon(listing.subcategory) : null
@@ -172,10 +175,10 @@ export const MarketCardV2 = memo(function MarketCardV2({
                             onToggleCompare(listing.id)
                         }}
                         className={cn(
-                            'w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200',
+                            'min-w-[44px] min-h-[44px] w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200',
                             isSelectedForCompare
                                 ? 'bg-international-orange text-white shadow-md'
-                                : 'bg-background/80 backdrop-blur-sm text-muted-foreground opacity-0 group-hover:opacity-100 shadow-sm border'
+                                : 'bg-background/90 text-muted-foreground opacity-0 group-hover:opacity-100 shadow-sm border'
                         )}
                         aria-label={isSelectedForCompare ? 'Remove from comparison' : 'Add to comparison'}
                     >
@@ -187,10 +190,10 @@ export const MarketCardV2 = memo(function MarketCardV2({
                     onClick={handleSave}
                     disabled={isSaving}
                     className={cn(
-                        'w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200',
+                        'min-w-[44px] min-h-[44px] w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200',
                         localSaved
-                            ? 'bg-red-500 text-white shadow-md'
-                            : 'bg-background/80 backdrop-blur-sm text-muted-foreground opacity-0 group-hover:opacity-100 shadow-sm border'
+                            ? 'bg-destructive text-destructive-foreground shadow-md'
+                            : 'bg-background/90 text-muted-foreground opacity-0 group-hover:opacity-100 shadow-sm border'
                     )}
                     aria-label={localSaved ? 'Remove from saved' : 'Save for later'}
                 >
