@@ -188,8 +188,9 @@ function ModuleRow({
       id={`module-v2-${m.id}`}
       className={cn(
         "rounded-xl shadow-sm transition-all duration-200 overflow-hidden",
-        isExpanded && "shadow-md",
+        isExpanded && "shadow-md ring-1 ring-border",
       )}
+      style={isExpanded ? { borderLeftWidth: "4px", borderLeftColor: accentColor } : undefined}
     >
       {/* Compact row header */}
       <button
@@ -323,11 +324,14 @@ function ExpandedModuleDetail({
   }, [m.detail.expertQuestions])
 
   return (
-    <div className="border-t px-5 py-6 space-y-6 bg-muted/5">
+    <div
+      className="px-5 py-6 space-y-6"
+      style={{ backgroundColor: accentColor + "06", borderTop: `2px solid ${accentColor}30` }}
+    >
       {/* 1. Blueprint Image (HERO — first thing you see) */}
       {m.imageUrl && m.imageStatus === "complete" && (
         <>
-          <div className="rounded-xl overflow-hidden border bg-muted/5 p-4">
+          <div className="rounded-lg overflow-hidden border bg-muted/5 p-4">
             <button
               onClick={() => setLightboxOpen(true)}
               className="w-full cursor-zoom-in hover:opacity-90 transition-opacity"
@@ -370,7 +374,7 @@ function ExpandedModuleDetail({
         </>
       )}
       {m.imageStatus === "generating" && (
-        <div className="rounded-xl overflow-hidden relative">
+        <div className="rounded-lg overflow-hidden relative">
           <Skeleton className="h-48 w-full" />
           <div className="absolute inset-0 flex items-center justify-center">
             <span className="text-xs text-muted-foreground font-medium">Generating blueprint...</span>
@@ -390,9 +394,12 @@ function ExpandedModuleDetail({
       )}
 
       {/* 2. Technical Description */}
-      <div className="rounded-xl bg-muted/20 border p-4 space-y-2">
+      <div
+        className="rounded-lg border p-4 space-y-2"
+        style={{ backgroundColor: accentColor + "08", borderColor: accentColor + "20" }}
+      >
         <div className="flex items-center gap-2">
-          <Lightbulb className="h-3.5 w-3.5 text-chart-1 shrink-0" />
+          <Lightbulb className="h-3.5 w-3.5 shrink-0" style={{ color: accentColor }} />
           <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider inline-flex items-center gap-1.5">What it is <ForgeInfoTip text="A plain-English description of what this module does and why it matters to your overall product." /></h4>
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed">{m.detail.whatItIs}</p>
@@ -400,7 +407,7 @@ function ExpandedModuleDetail({
       </div>
 
       {/* 3. Process Flow (IO) */}
-      <div className="rounded-xl border bg-muted/10 p-4 space-y-3">
+      <div className="rounded-lg border bg-muted/10 p-4 space-y-3">
         <ForgeSectionHeader title={FORGE_EXPLANATIONS.processFlow.title} description={FORGE_EXPLANATIONS.processFlow.description} detail={FORGE_EXPLANATIONS.processFlow.detail}>
           <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
             <Gauge className="h-3.5 w-3.5 text-chart-2" />
@@ -470,7 +477,7 @@ function ExpandedModuleDetail({
       </div>
 
       {/* 5. Procurement */}
-      <div className="rounded-xl bg-chart-2/5 border border-chart-2/15 p-4 flex items-start gap-3">
+      <div className="rounded-lg bg-chart-2/5 border border-chart-2/15 p-4 flex items-start gap-3">
         <Truck className="h-4 w-4 text-chart-2 shrink-0 mt-0.5" />
         <div className="space-y-1 flex-1">
           <div className="flex items-center justify-between">
@@ -486,7 +493,7 @@ function ExpandedModuleDetail({
 
       {/* 6. Risks */}
       {(m.detail.commonFailureModes.length > 0 || derivedRisks.length > 0) && (
-        <div className="rounded-xl bg-status-warning-light/20 border border-status-warning/15 p-4 space-y-2">
+        <div className="rounded-lg bg-status-warning-light/20 border border-status-warning/15 p-4 space-y-2">
           <ForgeSectionHeader title={FORGE_EXPLANATIONS.riskIndicators.title} description={FORGE_EXPLANATIONS.riskIndicators.description} detail={FORGE_EXPLANATIONS.riskIndicators.detail}>
             <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
               <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
@@ -512,7 +519,7 @@ function ExpandedModuleDetail({
 
       {/* Derived process class */}
       {processClass && (
-        <div className="rounded-xl bg-status-success-light/30 border border-status-success/20 p-4 flex items-center gap-3">
+        <div className="rounded-lg bg-status-success-light/30 border border-status-success/20 p-4 flex items-center gap-3">
           <ShieldCheck className="h-5 w-5 text-status-success shrink-0" />
           <div>
             <h4 className="text-xs font-semibold text-foreground inline-flex items-center gap-1.5">Derived process class <ForgeInfoTip text={FORGE_EXPLANATIONS.derivedProcessClass.description} /></h4>
@@ -625,7 +632,7 @@ function CadModelSection({
   // No cadModel field at all — show generate button
   if (!cadModel) {
     return (
-      <div className="rounded-xl border border-dashed p-6 flex flex-col items-center justify-center gap-3 bg-muted/10">
+      <div className="rounded-lg border border-dashed p-6 flex flex-col items-center justify-center gap-3 bg-muted/10">
         <Boxes className="h-8 w-8 text-muted-foreground" />
         <div className="text-center">
           <p className="text-sm font-medium text-foreground">3D Engineering Model</p>
@@ -651,7 +658,7 @@ function CadModelSection({
   // Generating state
   if (isGenerating) {
     return (
-      <div className="rounded-xl border p-6 space-y-3">
+      <div className="rounded-lg border p-6 space-y-3">
         <div className="flex items-center gap-2">
           <Boxes className="h-4 w-4 text-chart-2" />
           <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
@@ -684,7 +691,7 @@ function CadModelSection({
       : "The generated code could not produce a valid model"
 
     return (
-      <div className="rounded-xl border border-destructive/20 bg-status-error-light/10 p-6 flex flex-col items-center gap-3">
+      <div className="rounded-lg border border-destructive/20 bg-status-error-light/10 p-6 flex flex-col items-center gap-3">
         <AlertTriangle className="h-6 w-6 text-destructive" />
         <div className="text-center">
           <p className="text-sm font-medium text-foreground">3D model generation failed</p>
@@ -712,7 +719,7 @@ function CadModelSection({
   const availableViews = SVG_VIEWS.filter((v) => cadModel[v.key])
 
   return (
-    <div className="rounded-xl border p-4 space-y-3">
+    <div className="rounded-lg border p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Boxes className="h-4 w-4 text-chart-2" />
@@ -901,7 +908,7 @@ function MassPropertiesCard({ mp }: { mp: MassProperties }): React.ReactNode {
   const bb = mp.boundingBox
 
   return (
-    <div className="rounded-xl border bg-muted/5 p-4 space-y-3">
+    <div className="rounded-lg border bg-muted/5 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Scale className="h-3.5 w-3.5 text-chart-1" />
@@ -969,7 +976,7 @@ function DfmReportCard({ dfm }: { dfm: DfmAnalysis }): React.ReactNode {
   const warningCount = dfm.issues.filter((i) => i.severity === "warning").length
 
   return (
-    <div className="rounded-xl border bg-muted/5 p-4 space-y-3">
+    <div className="rounded-lg border bg-muted/5 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Printer className="h-3.5 w-3.5 text-chart-2" />
