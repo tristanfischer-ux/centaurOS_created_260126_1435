@@ -390,27 +390,48 @@ def generate_cad(
         return result
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Compose: user code + export wrapper
+        # Prepare export wrapper (executed separately to survive user code crashes)
         export_code = EXPORT_TEMPLATE.format(
             output_dir=tmpdir,
             material_density=material_density,
         )
-        full_code = cadquery_code + "\n\n" + export_code
 
-        # Execute in isolated namespace
+        # Phase 1: Execute user code — may crash during result_exploded,
+        # but `result` is already in namespace by that point
         namespace: dict = {}
-        exec_error: str | None = None
+        user_exec_error: str | None = None
         try:
-            exec(full_code, namespace)  # noqa: S102 — intentional sandboxed exec
+            exec(cadquery_code, namespace)  # noqa: S102 — intentional sandboxed exec
         except Exception:
+            user_exec_error = traceback.format_exc()[-1500:]
+
+        # Phase 2: Execute export wrapper in the SAME namespace — can find
+        # `result` even if Phase 1 crashed partway through (e.g. during
+        # result_exploded). This is the key fix: the wrapper always runs.
+        export_exec_error: str | None = None
+        try:
+            exec(export_code, namespace)  # noqa: S102 — intentional sandboxed exec
+        except Exception:
+            export_exec_error = traceback.format_exc()[-1500:]
+
+        # Determine final error state:
+        # - If the export wrapper failed, that's the real error (no files)
+        # - If only user code failed but export succeeded, files were recovered
+        exec_error: str | None = None
+        if export_exec_error:
             exec_error = (
-                f"CadQuery execution failed for module '{module_id}': "
-                f"{traceback.format_exc()[-1500:]}"
+                f"CadQuery export failed for module '{module_id}': "
+                f"{export_exec_error}"
+            )
+        elif user_exec_error:
+            # User code crashed (likely during result_exploded) but export
+            # wrapper succeeded — log it but don't treat as fatal
+            exec_error = (
+                f"CadQuery execution warning for module '{module_id}': "
+                f"{user_exec_error}"
             )
 
-        # Read output files — attempt even after exec error to recover
-        # partial results (STEP/STL/SVGs written before the error point)
-        result: dict = {"error": exec_error}
+        # Read output files
         file_map = {
             "step": "model.step",
             "stl": "model.stl",
@@ -421,6 +442,7 @@ def generate_cad(
             "svg_exploded": "exploded_iso.svg",
         }
 
+        result: dict = {"error": exec_error}
         has_any_file = False
         for key, filename in file_map.items():
             filepath = os.path.join(tmpdir, filename)
@@ -431,8 +453,8 @@ def generate_cad(
             else:
                 result[key] = None
 
-        # If we recovered files despite the exec error, clear the error
-        # so the caller gets the partial result instead of a failure
+        # If we recovered files despite an error, clear the error
+        # so the caller gets the result instead of a failure
         if exec_error and has_any_file:
             result["error"] = None
 
