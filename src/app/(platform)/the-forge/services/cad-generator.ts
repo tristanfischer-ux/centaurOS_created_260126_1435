@@ -1315,62 +1315,73 @@ export async function generateSystemCadModel(
     )
   }
 
-  // Stage 3: Two-pass refinement — use analysis data to add manufacturing detail
-  // This simulates the iterative v1 -> v2 refinement that produces dramatically
-  // better models when Claude can see the analysis of its own output.
+  // Stage 3: Conditional refinement — only refine when first pass clearly needs it.
+  // The refinement pass adds ~60-90s (Opus + Modal), so only run it when the
+  // first pass is deficient: very solid geometry (high fill ratio) OR short code.
   const pass1Analysis = modalResult.analysis
   if (pass1Analysis?.mass_properties && !pass1Analysis.mass_properties.error) {
     const mp = pass1Analysis.mass_properties
     const bb = mp.bounding_box
     const bbVolume = bb.xLen * bb.yLen * bb.zLen
     const fillRatio = bbVolume > 0 ? (mp.volume_mm3 / bbVolume) * 100 : 0
+    const codeLines = cadQueryCode.split("\n").length
 
-    console.info("[XRayCadGen] Pass 1 analysis — attempting refinement pass:", {
+    // Quality gate: only refine if first pass is clearly deficient
+    const needsRefinement = fillRatio > 70 || codeLines < 300
+    const reason = fillRatio > 70
+      ? `high fill ratio (${fillRatio.toFixed(0)}% — model is too solid)`
+      : `short code (${codeLines} lines — insufficient detail)`
+
+    console.info("[XRayCadGen] Pass 1 analysis:", {
       scanId,
       boundingBox: `${bb.xLen.toFixed(0)} x ${bb.yLen.toFixed(0)} x ${bb.zLen.toFixed(0)} mm`,
       volume_mm3: mp.volume_mm3.toFixed(0),
       mass_g: (mp.mass_kg * 1000).toFixed(1),
       fillRatio: `${fillRatio.toFixed(0)}%`,
-      codeLines: cadQueryCode.split("\n").length,
+      codeLines,
+      needsRefinement,
+      reason: needsRefinement ? reason : "pass 1 is good enough — skipping refinement",
     })
 
-    try {
-      const refinementPrompt = buildRefinementPrompt(cadQueryCode, mp, fillRatio, spec)
-      const refinedCode = stripCodeFences(
-        await callOpus(SYSTEM_CAD_PROMPT, refinementPrompt, 0.2, 32768),
-      )
+    if (needsRefinement) {
+      try {
+        const refinementPrompt = buildRefinementPrompt(cadQueryCode, mp, fillRatio, spec)
+        const refinedCode = stripCodeFences(
+          await callOpus(SYSTEM_CAD_PROMPT, refinementPrompt, 0.2, 32768),
+        )
 
-      // Only use refined code if it's longer (more detail) and executes successfully
-      if (refinedCode.split("\n").length >= cadQueryCode.split("\n").length * 0.9) {
-        const refinedResult = await executeCadQueryOnModal(refinedCode, "system-refined", 1240)
+        // Only use refined code if it's longer (more detail) and executes successfully
+        if (refinedCode.split("\n").length >= codeLines * 0.9) {
+          const refinedResult = await executeCadQueryOnModal(refinedCode, "system-refined", 1240)
 
-        if (!refinedResult.error) {
-          console.info("[XRayCadGen] Refinement pass succeeded:", {
+          if (!refinedResult.error) {
+            console.info("[XRayCadGen] Refinement pass succeeded:", {
+              scanId,
+              originalLines: codeLines,
+              refinedLines: refinedCode.split("\n").length,
+            })
+            cadQueryCode = refinedCode
+            modalResult = refinedResult
+          } else {
+            console.warn("[XRayCadGen] Refinement pass failed — keeping original:", {
+              scanId,
+              error: refinedResult.error.slice(0, 200),
+            })
+          }
+        } else {
+          console.warn("[XRayCadGen] Refined code is significantly shorter — keeping original:", {
             scanId,
-            originalLines: cadQueryCode.split("\n").length,
+            originalLines: codeLines,
             refinedLines: refinedCode.split("\n").length,
           })
-          cadQueryCode = refinedCode
-          modalResult = refinedResult
-        } else {
-          console.warn("[XRayCadGen] Refinement pass failed — keeping original:", {
-            scanId,
-            error: refinedResult.error.slice(0, 200),
-          })
         }
-      } else {
-        console.warn("[XRayCadGen] Refined code is significantly shorter — keeping original:", {
+      } catch (refineError) {
+        // Refinement is best-effort — never fail the whole pipeline
+        console.warn("[XRayCadGen] Refinement pass error — keeping original:", {
           scanId,
-          originalLines: cadQueryCode.split("\n").length,
-          refinedLines: refinedCode.split("\n").length,
+          error: refineError instanceof Error ? refineError.message : "Unknown",
         })
       }
-    } catch (refineError) {
-      // Refinement is best-effort — never fail the whole pipeline
-      console.warn("[XRayCadGen] Refinement pass error — keeping original:", {
-        scanId,
-        error: refineError instanceof Error ? refineError.message : "Unknown",
-      })
     }
   }
 
