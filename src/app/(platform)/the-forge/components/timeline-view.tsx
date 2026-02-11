@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Clock, Box } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+import { ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import type { XRaySpec } from "../services/xray-schema"
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -72,8 +73,9 @@ export function TimelineView({ spec }: TimelineViewProps): React.ReactNode {
           <div className="flex items-center gap-3">
             <div className="w-1 h-7 bg-chart-4 rounded-full" />
             <div>
-              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">
+              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground inline-flex items-center gap-2">
                 Timeline
+                <ForgeInfoTip text={FORGE_EXPLANATIONS.timeline.description} />
               </h3>
               <p className="text-xs text-muted-foreground">
                 Module lead times — critical path highlighted
@@ -137,7 +139,7 @@ export function TimelineView({ spec }: TimelineViewProps): React.ReactNode {
         <div className="flex items-center gap-4 text-[11px] text-muted-foreground pt-2">
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-2 rounded-sm bg-international-orange/80" />
-            Critical path (longest lead time)
+            Critical path (longest lead time) <ForgeInfoTip text={FORGE_EXPLANATIONS.criticalPath.detail!} className="h-2.5 w-2.5" />
           </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-2 rounded-sm bg-muted/60" />

@@ -1,106 +1,115 @@
 # Agent Handover Document
-**Date:** February 7, 2026
-**Task:** Marketplace V2 — Full redesign, modular rebuild, and iterative UX polish
-**Status:** Complete ✅ (all deployed to production)
+**Date:** 2026-02-11
+**Task:** Fix all technical debt identified in comprehensive codebase audit (30 items)
+**Status:** Partially complete (Group 1 of 7 done)
 
 ---
 
 ## Context
 
-Rebuilt the entire Marketplace from scratch as a new modular page (`/marketplace-v2`), then promoted it to the main `/marketplace` route. The old monolithic `marketplace-view.tsx` (~1,900 lines) was replaced with 11 focused components and a dedicated state hook. Multiple rounds of user feedback were incorporated covering compare UX, view modes, navigation, and visual polish.
+A thorough codebase audit identified 30 issues across CRITICAL, HIGH, MEDIUM, and LOW severity. The work is organized into 7 groups, executed sequentially with full verification (`typecheck` + `build` + `test`) between each group. Group 1 (CRITICAL security fixes) is complete and verified. Groups 2-7 remain.
+
+**IMPORTANT CONSTRAINT:** The user is actively working on the Forge page. Do NOT modify any files under `src/app/(platform)/the-forge/` or forge-related components/services.
 
 ---
 
 ## COMPLETED ✅
 
-### New Marketplace Architecture
-- Created modular component structure under `src/app/(platform)/marketplace-v2/`
-- `page.tsx` — Server component with parallel data fetching
-- `hooks/useMarketplaceState.ts` — Centralized state management
-- `components/MarketplaceBrowse.tsx` — Main client orchestrator with tab navigation (Browse, Saved, Compare)
-- `components/MarketCardV2.tsx` — Redesigned card with social proof, pricing, hover-activated save + compare icons
-- `components/MarketplaceCategoryNav.tsx` — Compact category pills
-- `components/MarketplaceSearchToolbar.tsx` — Search, sort, filter controls
-- `components/MarketplaceFilterPanel.tsx` — Collapsible subcategory filters
-- `components/MarketplaceListingGrid.tsx` — Responsive grid with card/list toggle and floating compare bar
-- `components/MarketplaceDetailDialog.tsx` — Full listing detail in dialog
-- `components/MarketplaceRecommendations.tsx` — AI recommendations section
-- `components/FeaturedBanner.tsx` — Horizontal featured listings
+### Group 1: CRITICAL Security Fixes (6 items)
 
-### Saved & Compare Features
-- `components/MarketplaceSavedView.tsx` — Multi-column saved listings with compare selection
-- `components/MarketplaceCompareView.tsx` — Side-by-side comparison table with best-value highlighting, heart/favourite buttons, and remove controls
+**1a. Removed `@ts-nocheck` from 4 files + regenerated Supabase types**
+- Files modified: `src/actions/billing.ts`, `src/actions/money-map.ts`, `src/actions/pitch-prep.ts`, `src/app/api/webhooks/stripe/route.ts`
+- Types regenerated: `src/types/database.types.ts` (cleaned CLI output artifacts)
+- Type errors fixed in: `src/types/billing.ts` (7 interfaces updated for nullable DB columns), `src/actions/billing.ts` (2 runtime null checks), `src/actions/money-map.ts` (removed broken `getFoundryId` helper, replaced with `getFoundryIdCached`, fixed `MoneyMapSnapshot` type to use `Json`, added type guard), `src/actions/pitch-prep.ts` (split FK query into two separate queries, mapped team info to `Json`-compatible shape)
+- Also fixed: `src/app/api/webhooks/stripe/route.ts` (moved `type` into `metadata` field for `sendNotification`)
 
-### UX Polish (User Feedback Rounds)
-- Replaced compare checkboxes with Scale icons that appear on hover (matching Heart/save pattern)
-- Enhanced floating "Compare Now" bar — bright orange, glow shadow, slide-in animation
-- Added card/list view toggle on Browse tab
-- Two-column layout for Inspiration page
-- Added heart/favourite buttons to compare view columns
-- Fixed duplicate Inspiration link in sidebar
+**1b. Secured QA callback endpoint**
+- File: `src/app/api/admin/qa-tests/callback/route.ts`
+- Added `QA_CALLBACK_SECRET` Bearer token verification
+- Rejects all requests if secret not configured (503)
 
-### Deployment
-- Promoted `/marketplace-v2` to main `/marketplace` route
-- Old marketplace preserved but not linked
-- All changes merged to main via PRs and deployed to Vercel
-- All CI/CD pipelines passed successfully
+**1c. Fixed webhook auth bypasses (2 endpoints)**
+- `src/app/api/google/calendar/webhook/route.ts`: Changed from "skip if no secret" to "reject if no secret"
+- `src/app/api/email/inbound/route.ts`: Same fix
 
-### Files Modified
-- `src/app/(platform)/marketplace-v2/` — All new files (listed above)
-- `src/app/(platform)/marketplace/page.tsx` — Redirects to new marketplace
-- `src/components/Sidebar.tsx` — Fixed navigation links, removed duplicate Inspiration
-- `src/app/(platform)/inspiration/page.tsx` — Two-column layout
+**1d. Added auth + foundry isolation to `getTaskAssignees`**
+- File: `src/actions/team.ts` (lines ~707-750)
+- Added `supabase.auth.getUser()`, `getFoundryIdCached()`, and task-foundry verification
+
+**1e. Added foundry isolation to `getPendingApprovals` and `triggerAIWorker`**
+- File: `src/actions/tasks.ts`
+- `getPendingApprovals`: Added `getFoundryIdCached()` and `.eq('foundry_id', foundry_id)` filter
+- `triggerAIWorker`: Added foundry_id check and `.eq('foundry_id', foundry_id)` filter on task query
+
+**1f. Added rate limiting to AI execution endpoint**
+- File: `src/app/api/agents/execute/route.ts`
+- Added `rateLimit('api', 'agent-execute:${user.id}', { limit: 30, window: 3600 })`
+
+### Verification Results
+- `npm run typecheck`: Zero errors in modified files (345 pre-existing errors in other files)
+- `npm run build`: Successful (exit code 0, needs `NODE_OPTIONS="--max-old-space-size=8192"`)
+- `npm run test`: 17/17 suites, 182/182 tests passing
 
 ---
 
 ## REMAINING TASKS 🔧
 
-No blocking tasks remain. Potential future improvements:
+### Group 2: Structural Auth (withAuth migration)
+**Problem:** ~100 action files duplicate the same 4-line auth boilerplate. `withAuth` wrapper exists in `src/lib/server-action-utils.ts` but only 5 files use it.
+**Files to migrate (highest risk first):** `src/actions/tasks.ts`, `src/actions/team.ts`, `src/actions/orders.ts`, `src/actions/billing.ts`, `src/actions/messaging.ts`, `src/actions/marketplace.ts`, `src/actions/foundry.ts`, `src/actions/objectives.ts`
+**Also fix:** `getOrCreateAutoTeam` in `team.ts` (line ~221) missing auth
+**Approach:** Replace manual `createClient()` + `getUser()` + `getFoundryIdCached()` with `return withAuth(async ({ supabase, user, foundryId }) => { ... })`
+**Reference:** See `src/actions/canvas.ts` for the good pattern
 
-### Nice-to-Have: Compare View Enhancements
-- AI-powered comparison summary (GPT analysis of compared listings)
-- Export comparison as PDF
-- Share comparison via link
+### Group 3: Type Safety (remove all `any`)
+**Problem:** 52 uses of `any` across actions (25+), components (10), and lib/ (42). 30 of the lib/ occurrences are `(supabase as any)` that should resolve after type regeneration.
+**Key files:** `tasks.ts:1469`, `foundry.ts:19`, `certifications.ts` (7 casts), `ratings.ts` (5 casts), `disputes/service.ts`, `badges/badge-rules.ts`, `google/tokens.ts`, `search/service.ts`, `ai-providers/slide-renderer.ts`
+**Approach:** Fix with proper types, `unknown` + type guards, or typed helper functions
 
-### Nice-to-Have: Marketplace Polish
-- Persistent filter state in URL params
-- Infinite scroll / pagination for large result sets
-- Review/rating integration on cards
-- Provider response time badges
+### Group 4: API Route Hardening
+**Problem:** Missing rate limiting on 4 billing endpoints, `Math.random()` for filenames, 6 bare catch blocks, PII logging in Telegram webhook, duplicate dead code, missing Zod validation
+**Files:** `billing/portal/route.ts`, `billing/checkout/route.ts`, `billing/test-activate/route.ts`, `settings/telegram/unlink/route.ts`, `messages/upload/route.ts`, `tasks.ts:162`, `orders.ts:408`, `guild-events.ts:546`, `data-export.ts:210`, `smart-goals.ts:130`, `generate-advisory-answer.ts:272`, `bot/telegram/route.ts:105`, `marketplace/compare/route.ts:178-190`
 
-### Technical Debt
-- Old marketplace code at `src/app/(platform)/marketplace/marketplace-view.tsx` can be deleted once confident in the new version
-- Pre-existing lint warnings (806 warnings, 0 errors) across the codebase — none introduced by this work
+### Group 5: Code Deduplication
+**Problem:** 13 duplicate `getInitials` functions, 3 duplicate `formatCurrency`, 2 duplicate `formatAmount`, duplicate routes (`/tasks` vs `/new-tasks`, `/objectives` vs `/new-objectives`)
+**Approach:** Create shared utilities, consolidate routes (determine which to keep, redirect the other)
+
+### Group 6: UI/UX Fixes
+**Problem:** 2 Sheet usages (forbidden), 4 custom dialog widths, 11 direct Avatar usages, missing loading states on ~15 pages, ~245 hardcoded color violations (worst in agents/ directory), 12 console.log in production
+**Key files:** `blueprints/[id]/blueprint-detail-view.tsx`, `tasks/thread-drawer.tsx`, `agents/components/node-inspector.tsx` (~70 violations), `agents/components/prompt-node.tsx` (~40), `blueprints/blueprints-view.tsx` (~35)
+
+### Group 7: Documentation & Cleanup
+**Problem:** Missing JSDoc on ~50+ exported functions, missing return types on ~60+, 16 TODOs without tickets, 4 SVG elements without keyboard accessibility, ~20 files with unstructured error logging, 4 unused variables
+**Priority files:** `tasks.ts`, `team.ts`, `marketplace.ts`, `onboarding.ts`, `objectives.ts`, `StrategyRiver.tsx`
 
 ---
 
 ## USEFUL COMMANDS
 
 ```bash
-# Build locally
-npm run build
+# Typecheck (zero errors expected in modified files; 345 pre-existing in other files)
+npm run typecheck
 
-# Run linter
-npm run lint
+# Build (needs 8GB for this codebase)
+NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
-# Run unit tests
-npm test
+# Unit tests (17 suites, 182 tests)
+npm run test
 
-# Deploy (push to main triggers Vercel auto-deploy)
-git push origin main
+# Design token check (for UI groups)
+./scripts/check-design-tokens.sh
 
-# Check CI/CD status
-gh api repos/tristanfischer-ux/centaurOS_created_260126_1435/actions/runs --jq '.workflow_runs[:3] | .[] | "\(.status) \(.conclusion // "running") \(.name)"'
+# E2E tests
+npm run test:e2e
 ```
 
 ---
 
 ## QUICK START FOR NEXT AGENT
 
-1. Read this document
-2. The marketplace is at `src/app/(platform)/marketplace-v2/` — this is the active codebase
-3. The old marketplace at `src/app/(platform)/marketplace/marketplace-view.tsx` is unused but preserved
-4. All state is in `hooks/useMarketplaceState.ts` — start there to understand data flow
-5. UI component standards are in `.cursor/skills/ui-component-standards/SKILL.md`
-6. Color tokens are in `src/lib/marketplace-colors.ts`
-7. Note: The `zop` worktree has been cleaned up — work directly in the main repo
+1. Read this document and `~/.memory/master-preferences.md`
+2. Read the plan file: `~/.cursor/plans/fix_technical_debt_fd71f706.plan.md`
+3. Start with **Group 2** (withAuth migration) -- the `withAuth` pattern is in `src/lib/server-action-utils.ts`
+4. After each group, verify with: `npm run typecheck` + `NODE_OPTIONS="--max-old-space-size=8192" npm run build` + `npm run test`
+5. **DO NOT touch** any files under `src/app/(platform)/the-forge/` or forge-related components -- user is actively working there
+6. Reference `src/actions/canvas.ts` as the gold standard for the withAuth pattern

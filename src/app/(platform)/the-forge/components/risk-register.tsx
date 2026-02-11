@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, HelpCircle, ShieldAlert, Box } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+import { ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import type { XRaySpec } from "../services/xray-schema"
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -97,11 +98,12 @@ export function RiskRegister({ spec }: RiskRegisterProps): React.ReactNode {
           <div className="flex items-center gap-3">
             <div className="w-1 h-7 bg-status-warning rounded-full" />
             <div>
-              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground">
+              <h3 className="text-lg font-display font-semibold tracking-tight text-foreground inline-flex items-center gap-2">
                 Risk Register
+                <ForgeInfoTip text={FORGE_EXPLANATIONS.riskRegister.description} />
               </h3>
               <p className="text-xs text-muted-foreground">
-                All risks aggregated across modules
+                All risks aggregated across modules — a professional-grade risk inventory
               </p>
             </div>
           </div>
@@ -174,14 +176,17 @@ export function RiskRegister({ spec }: RiskRegisterProps): React.ReactNode {
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-status-warning" />
             Failure mode
+            <ForgeInfoTip text={FORGE_EXPLANATIONS.failureMode.description} className="h-2.5 w-2.5" />
           </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-chart-2" />
             Unknown / open question
+            <ForgeInfoTip text={FORGE_EXPLANATIONS.unknown.description} className="h-2.5 w-2.5" />
           </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-destructive" />
             Derived risk
+            <ForgeInfoTip text={FORGE_EXPLANATIONS.derivedRisk.description} className="h-2.5 w-2.5" />
           </div>
         </div>
       </CardContent>

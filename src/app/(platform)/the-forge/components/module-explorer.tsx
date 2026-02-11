@@ -54,6 +54,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+import { ForgeSectionHeader, ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import type { XRaySpec, ModuleSpec, ModuleAnalysis, MassProperties, DfmAnalysis, DfmIssue, StructuralAnalysis, StressHotspot, EmiShielding, Fatigue, Impact } from "../services/xray-schema"
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -392,7 +393,7 @@ function ExpandedModuleDetail({
       <div className="rounded-xl bg-muted/20 border p-4 space-y-2">
         <div className="flex items-center gap-2">
           <Lightbulb className="h-3.5 w-3.5 text-chart-1 shrink-0" />
-          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">What it is</h4>
+          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider inline-flex items-center gap-1.5">What it is <ForgeInfoTip text="A plain-English description of what this module does and why it matters to your overall product." /></h4>
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed">{m.detail.whatItIs}</p>
         <p className="text-sm text-muted-foreground leading-relaxed italic">{m.detail.whyItMatters}</p>
@@ -400,10 +401,12 @@ function ExpandedModuleDetail({
 
       {/* 3. Process Flow (IO) */}
       <div className="rounded-xl border bg-muted/10 p-4 space-y-3">
-        <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
-          <Gauge className="h-3.5 w-3.5 text-chart-2" />
-          Process flow
-        </h4>
+        <ForgeSectionHeader title={FORGE_EXPLANATIONS.processFlow.title} description={FORGE_EXPLANATIONS.processFlow.description} detail={FORGE_EXPLANATIONS.processFlow.detail}>
+          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+            <Gauge className="h-3.5 w-3.5 text-chart-2" />
+            Process flow
+          </h4>
+        </ForgeSectionHeader>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <ArrowRight className="h-3.5 w-3.5 text-chart-2 shrink-0" />
@@ -433,10 +436,12 @@ function ExpandedModuleDetail({
       {/* 4. Key Components + Acceptance Tests (side by side) */}
       <div className="grid md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
-            <Package className="h-3.5 w-3.5 text-chart-4" />
-            Key components ({m.keyParts.length})
-          </h4>
+          <ForgeSectionHeader title={FORGE_EXPLANATIONS.keyComponents.title} description={FORGE_EXPLANATIONS.keyComponents.description} detail={FORGE_EXPLANATIONS.keyComponents.detail}>
+            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <Package className="h-3.5 w-3.5 text-chart-4" />
+              Key components ({m.keyParts.length})
+            </h4>
+          </ForgeSectionHeader>
           <div className="flex flex-wrap gap-1.5">
             {m.keyParts.map((part, i) => (
               <span key={i} className="inline-flex items-center rounded-lg bg-muted/50 border px-2.5 py-1 text-xs text-foreground">
@@ -447,10 +452,12 @@ function ExpandedModuleDetail({
           </div>
         </div>
         <div className="space-y-2">
-          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
-            <ClipboardCheck className="h-3.5 w-3.5 text-chart-3" />
-            Acceptance tests ({m.tests.length})
-          </h4>
+          <ForgeSectionHeader title={FORGE_EXPLANATIONS.acceptanceTests.title} description={FORGE_EXPLANATIONS.acceptanceTests.description} detail={FORGE_EXPLANATIONS.acceptanceTests.detail}>
+            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <ClipboardCheck className="h-3.5 w-3.5 text-chart-3" />
+              Acceptance tests ({m.tests.length})
+            </h4>
+          </ForgeSectionHeader>
           <div className="space-y-1.5">
             {m.tests.map((test, i) => (
               <div key={i} className="flex items-start gap-2 rounded-lg bg-muted/30 border px-2.5 py-1.5">
@@ -467,7 +474,7 @@ function ExpandedModuleDetail({
         <Truck className="h-4 w-4 text-chart-2 shrink-0 mt-0.5" />
         <div className="space-y-1 flex-1">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-semibold text-foreground">Procurement &amp; lead time</h4>
+            <h4 className="text-xs font-semibold text-foreground inline-flex items-center gap-1.5">Procurement &amp; lead time <ForgeInfoTip text={FORGE_EXPLANATIONS.leadTime.description} /></h4>
             <Badge variant="secondary" className="text-[10px]">
               <Clock className="h-2.5 w-2.5 mr-1" />
               {m.requirements.leadWeeks} weeks
@@ -480,10 +487,12 @@ function ExpandedModuleDetail({
       {/* 6. Risks */}
       {(m.detail.commonFailureModes.length > 0 || derivedRisks.length > 0) && (
         <div className="rounded-xl bg-status-warning-light/20 border border-status-warning/15 p-4 space-y-2">
-          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
-            <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
-            Risk indicators
-          </h4>
+          <ForgeSectionHeader title={FORGE_EXPLANATIONS.riskIndicators.title} description={FORGE_EXPLANATIONS.riskIndicators.description} detail={FORGE_EXPLANATIONS.riskIndicators.detail}>
+            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
+              Risk indicators
+            </h4>
+          </ForgeSectionHeader>
           <div className="grid sm:grid-cols-2 gap-2">
             {m.detail.commonFailureModes.map((x, i) => (
               <div key={`fm-${i}`} className="flex items-start gap-2 text-sm">
@@ -506,7 +515,7 @@ function ExpandedModuleDetail({
         <div className="rounded-xl bg-status-success-light/30 border border-status-success/20 p-4 flex items-center gap-3">
           <ShieldCheck className="h-5 w-5 text-status-success shrink-0" />
           <div>
-            <h4 className="text-xs font-semibold text-foreground">Derived process class</h4>
+            <h4 className="text-xs font-semibold text-foreground inline-flex items-center gap-1.5">Derived process class <ForgeInfoTip text={FORGE_EXPLANATIONS.derivedProcessClass.description} /></h4>
             <p className="text-sm font-medium text-foreground">{processClass}</p>
           </div>
         </div>
@@ -517,8 +526,9 @@ function ExpandedModuleDetail({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Users className="h-3.5 w-3.5 text-chart-1" />
-            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider inline-flex items-center gap-1.5">
               Expert questions by discipline
+              <ForgeInfoTip text={FORGE_EXPLANATIONS.expertQuestions.description} />
             </h4>
           </div>
           {onOpenInterview && (
@@ -556,8 +566,9 @@ function ExpandedModuleDetail({
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <HelpCircle className="h-3.5 w-3.5 text-chart-5" />
-            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider inline-flex items-center gap-1.5">
               Unknowns to resolve
+              <ForgeInfoTip text={FORGE_EXPLANATIONS.unknownsToResolve.description} />
             </h4>
           </div>
           <ul className="space-y-1.5">
@@ -719,6 +730,7 @@ function CadModelSection({
             >
               <Download className="h-3 w-3" />
               STEP
+              <ForgeInfoTip text={FORGE_EXPLANATIONS.stepFile.description} className="h-2.5 w-2.5" />
             </a>
           )}
           {cadModel.stlUrl && (
@@ -729,6 +741,7 @@ function CadModelSection({
             >
               <Download className="h-3 w-3" />
               STL
+              <ForgeInfoTip text={FORGE_EXPLANATIONS.stlFile.description} className="h-2.5 w-2.5" />
             </a>
           )}
         </div>
@@ -841,12 +854,14 @@ function AnalysisSection({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Scale className="h-4 w-4 text-chart-1" />
-        <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
-          Engineering Analysis
-        </h4>
-      </div>
+      <ForgeSectionHeader title="Engineering Analysis" description="Automated structural, thermal, and manufacturing checks run on the 3D CAD model. These are the same tests a professional engineer would run — now automated for speed." detail="Each analysis card shows results you'd normally wait weeks to receive from a testing lab. Hover any section heading for more detail.">
+        <div className="flex items-center gap-2">
+          <Scale className="h-4 w-4 text-chart-1" />
+          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+            Engineering Analysis
+          </h4>
+        </div>
+      </ForgeSectionHeader>
 
       <div className="grid md:grid-cols-2 gap-3">
         {/* Mass Properties Card */}
@@ -893,6 +908,7 @@ function MassPropertiesCard({ mp }: { mp: MassProperties }): React.ReactNode {
           <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
             Mass Properties
           </span>
+          <ForgeInfoTip text={FORGE_EXPLANATIONS.massProperties.description} />
         </div>
         {mp.materialName && (
           <Badge variant="secondary" className="text-[10px]">
@@ -960,6 +976,7 @@ function DfmReportCard({ dfm }: { dfm: DfmAnalysis }): React.ReactNode {
           <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
             3D Print DFM
           </span>
+          <ForgeInfoTip text={FORGE_EXPLANATIONS.dfmCheck.description} />
         </div>
         <Badge
           variant={dfm.printable ? (warningCount > 0 ? "warning" : "success") : "destructive"}
@@ -1088,6 +1105,7 @@ function StructuralAnalysisCard({
         <CardTitle className="text-xs font-semibold flex items-center gap-2 uppercase tracking-wider">
           <ShieldCheck className="h-3.5 w-3.5 text-chart-2" />
           Structural Analysis (FEA)
+          <ForgeInfoTip text={FORGE_EXPLANATIONS.feaAnalysis.description} />
         </CardTitle>
       </CardHeader>
       <CardContent className="px-4 pb-4 space-y-4">
@@ -1157,8 +1175,9 @@ function StructuralAnalysisCard({
         {/* Stress Hotspots */}
         {structural.criticalLocations && structural.criticalLocations.length > 0 && (
           <div className="space-y-2">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide inline-flex items-center gap-1.5">
               Stress Hotspots
+              <ForgeInfoTip text={FORGE_EXPLANATIONS.stressHotspots.description} className="h-2.5 w-2.5" />
             </p>
             <div className="space-y-1">
               {structural.criticalLocations.slice(0, 5).map((hs: StressHotspot, i: number) => (
@@ -1246,6 +1265,7 @@ function EmiShieldingCard({ emi }: { emi: EmiShielding }): React.ReactNode {
           <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
             EMI Shielding
           </p>
+          <ForgeInfoTip text={FORGE_EXPLANATIONS.emiShielding.description} />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -1304,6 +1324,7 @@ function FatigueCard({ fatigue }: { fatigue: Fatigue }): React.ReactNode {
           <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
             Fatigue Life
           </p>
+          <ForgeInfoTip text={FORGE_EXPLANATIONS.fatigueLife.description} />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -1369,6 +1390,7 @@ function ImpactCard({ impact }: { impact: Impact }): React.ReactNode {
           <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
             Impact Resistance
           </p>
+          <ForgeInfoTip text={FORGE_EXPLANATIONS.impactResistance.description} />
         </div>
 
         <div className="grid grid-cols-2 gap-2">

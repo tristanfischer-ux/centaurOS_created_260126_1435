@@ -25,6 +25,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+import { ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import type { XRaySpec, ModuleSpec } from "../services/xray-schema"
 
 // ─── Animation Variants ──────────────────────────────────────────────
@@ -179,7 +180,7 @@ export function QuickInsights({
               Key Findings
             </h3>
             <p className="text-xs text-muted-foreground">
-              The most important things to know about your product
+              The most important things to know about your product — hover any card to learn more
             </p>
           </div>
         </div>
@@ -208,6 +209,15 @@ export function QuickInsights({
                   <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     {insight.label}
                   </span>
+                  <ForgeInfoTip
+                    text={
+                      insight.label === "Gating Module"
+                        ? FORGE_EXPLANATIONS.gatingModule.description
+                        : insight.label === "Highest Risk"
+                          ? FORGE_EXPLANATIONS.riskIndicators.description
+                          : FORGE_EXPLANATIONS.leadTime.description
+                    }
+                  />
                 </div>
                 <p className="text-sm font-semibold text-foreground">
                   {insight.value}

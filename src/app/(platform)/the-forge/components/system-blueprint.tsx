@@ -41,6 +41,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+import { ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import type { XRaySpec, ModuleSpec } from "../services/xray-schema"
 
 // Lazy-load the 3D viewer to avoid loading three.js until needed
@@ -489,10 +490,12 @@ export function SystemBlueprint({
                         <span className="inline-flex items-center gap-1">
                           <Cog className="h-2.5 w-2.5" />
                           {m.keyParts.length} parts
+                          <ForgeInfoTip text={FORGE_EXPLANATIONS.keyComponents.description} className="h-2.5 w-2.5" />
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <ShieldAlert className="h-2.5 w-2.5" />
                           {m.detail.commonFailureModes.length} risks
+                          <ForgeInfoTip text={FORGE_EXPLANATIONS.riskIndicators.description} className="h-2.5 w-2.5" />
                         </span>
                       </div>
 

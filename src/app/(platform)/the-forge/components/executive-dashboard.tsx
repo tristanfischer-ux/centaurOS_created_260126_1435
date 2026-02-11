@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+import { ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import type { XRaySpec, ModuleSpec } from "../services/xray-schema"
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -118,6 +119,7 @@ export function ExecutiveDashboard({ spec }: ExecutiveDashboardProps): React.Rea
       icon: Box,
       color: "text-chart-1",
       bg: "bg-chart-1/10",
+      tip: "The number of distinct physical sub-assemblies that make up your product. Each module is independently designable and procurable.",
     },
     {
       label: "Critical Path",
@@ -126,6 +128,7 @@ export function ExecutiveDashboard({ spec }: ExecutiveDashboardProps): React.Rea
       icon: Clock,
       color: "text-chart-2",
       bg: "bg-chart-2/10",
+      tip: FORGE_EXPLANATIONS.criticalPath.description,
     },
     {
       label: "Risks",
@@ -134,6 +137,7 @@ export function ExecutiveDashboard({ spec }: ExecutiveDashboardProps): React.Rea
       icon: AlertTriangle,
       color: "text-status-warning",
       bg: "bg-status-warning-light",
+      tip: "Total known failure modes plus open unknowns across all modules. Higher numbers mean more items to review and mitigate before manufacturing.",
     },
     {
       label: "Readiness",
@@ -142,6 +146,7 @@ export function ExecutiveDashboard({ spec }: ExecutiveDashboardProps): React.Rea
       icon: CheckCircle2,
       color: m.completionPct === 100 ? "text-status-success" : "text-chart-2",
       bg: m.completionPct === 100 ? "bg-status-success-light" : "bg-chart-2/10",
+      tip: "Percentage of expert questions answered across all modules. 100% means the design is fully specified — supplier quotes will be accurate.",
     },
     {
       label: "Est. Cost",
@@ -150,6 +155,7 @@ export function ExecutiveDashboard({ spec }: ExecutiveDashboardProps): React.Rea
       icon: DollarSign,
       color: "text-chart-4",
       bg: "bg-chart-4/10",
+      tip: "Sum of cost estimates across all modules. Becomes more accurate as you complete diagnostics and assign suppliers.",
     },
     {
       label: "Gating",
@@ -158,6 +164,7 @@ export function ExecutiveDashboard({ spec }: ExecutiveDashboardProps): React.Rea
       icon: ShieldCheck,
       color: m.gatingComplete ? "text-status-success" : "text-status-warning",
       bg: m.gatingComplete ? "bg-status-success-light" : "bg-status-warning-light",
+      tip: FORGE_EXPLANATIONS.gatingModule.description,
     },
   ]
 
@@ -182,8 +189,9 @@ export function ExecutiveDashboard({ spec }: ExecutiveDashboardProps): React.Rea
                   <p className="text-2xl font-display font-bold text-foreground tabular-nums leading-none">
                     {card.value}
                   </p>
-                  <p className="text-[11px] text-muted-foreground mt-1 font-medium">
+                  <p className="text-[11px] text-muted-foreground mt-1 font-medium inline-flex items-center gap-1">
                     {card.label}
+                    <ForgeInfoTip text={card.tip} />
                   </p>
                   <p className="text-[10px] text-muted-foreground">
                     {card.sub}

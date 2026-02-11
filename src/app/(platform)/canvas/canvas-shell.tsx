@@ -152,6 +152,16 @@ export function CanvasShell({
     }
   }, [riverData])
 
+  // ── Expand / Collapse all milestones ──
+  const handleExpandAll = useCallback((): void => {
+    const allIds = riverData.flatMap((so) => so.objectives.map((o) => o.id))
+    setExpandedObjectiveIds(new Set(allIds))
+  }, [riverData])
+
+  const handleCollapseAll = useCallback((): void => {
+    setExpandedObjectiveIds(new Set())
+  }, [])
+
   // ── Add-to-river dialog state ──
   const [addToRiverGoalId, setAddToRiverGoalId] = useState<string | null>(null)
 
@@ -231,15 +241,17 @@ export function CanvasShell({
         </div>
       </div>
 
-      {/* Strategic Objectives CRUD manager */}
-      <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-1">
-        <StrategicObjectivesManager
-          strategicObjectives={strategicObjectives}
-          objectives={regularObjectives}
-          activeFilter={_stratFilter}
-          onFilterChange={setStratFilter}
-        />
-      </div>
+      {/* Strategic Objectives CRUD manager — hidden on Strategy River tab (pills are non-functional there) */}
+      {activeTab !== 'river' && (
+        <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-1">
+          <StrategicObjectivesManager
+            strategicObjectives={strategicObjectives}
+            objectives={regularObjectives}
+            activeFilter={_stratFilter}
+            onFilterChange={setStratFilter}
+          />
+        </div>
+      )}
 
       {/* Tab bar with status badges */}
       <div className="flex items-center gap-1 px-4 sm:px-6 lg:px-8 py-2 border-b border-slate-100 bg-background" role="tablist" aria-label="Strategy views">
@@ -300,6 +312,8 @@ export function CanvasShell({
             onAddToRiver={handleAddToRiver}
             expandedObjectiveIds={expandedObjectiveIds}
             onExpandToggle={handleExpandToggle}
+            onExpandAll={handleExpandAll}
+            onCollapseAll={handleCollapseAll}
           />
         )}
       </div>
