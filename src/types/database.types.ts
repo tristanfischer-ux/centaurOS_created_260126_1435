@@ -11086,6 +11086,7 @@ export type Database = {
           idea: string
           name: string | null
           people_matches: Json | null
+          scan_status: string
           spec: Json
           stage: string
           status: string
@@ -11102,6 +11103,7 @@ export type Database = {
           idea: string
           name?: string | null
           people_matches?: Json | null
+          scan_status?: string
           spec?: Json
           stage?: string
           status?: string
@@ -11118,6 +11120,7 @@ export type Database = {
           idea?: string
           name?: string | null
           people_matches?: Json | null
+          scan_status?: string
           spec?: Json
           stage?: string
           status?: string
