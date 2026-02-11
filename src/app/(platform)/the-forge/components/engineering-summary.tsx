@@ -6,7 +6,7 @@
  * convergence status, and per-module analysis overview grid.
  *
  * @related
- * - Schema: src/app/(platform)/product-xray/services/xray-schema.ts
+ * - Schema: src/app/(platform)/the-forge/services/xray-schema.ts
  * - Module explorer: ./module-explorer.tsx (per-module detail)
  * - Server actions: src/actions/xray.ts (analyzeModulesAction)
  */

@@ -1,3 +1,15 @@
+/**
+ * @file ContextIndicator.tsx — Persistent context strip showing the active zone.
+ *
+ * @description Shows whether the user is in "Personal Space" (Me/Marketplace sections)
+ * or a company workspace (Plan/Workshop sections). Prevents "where am I?" confusion
+ * when users have multiple companies.
+ *
+ * @related
+ * - Sidebar: src/components/Sidebar.tsx
+ * - Section registry: src/lib/features/section-registry.ts
+ */
+
 'use client'
 
 import { usePathname } from 'next/navigation'
@@ -5,16 +17,19 @@ import { User, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
- * Routes that belong to the "Person" (Me) zone.
+ * Routes that belong to the "Person" (Me) zone or are not company-specific.
  * Everything not in this list is treated as Company context.
  */
 const PERSON_ROUTES = [
   '/home',
+  '/me',
+  '/my-profile',
   '/marketplace',
+  '/marketplace-hub',
   '/marketplace-orders',
   '/guild',
   '/apprenticeship',
-  '/my-profile',
+  '/inspiration',
   '/settings',
 ]
 

@@ -1,5 +1,5 @@
 /**
- * @file xray-view.tsx — Main Product X-Ray "Product Dossier" view
+ * @file xray-view.tsx — Main "The Forge" product dossier view (formerly Product X-Ray)
  *
  * @description Single-page scrollable product dossier that tells the story
  * of a product decomposition: idea → blueprint → architecture → modules →
@@ -10,7 +10,7 @@
  *
  * @related
  * - Server actions: src/actions/xray.ts
- * - Schema: src/app/(platform)/product-xray/services/xray-schema.ts
+ * - Schema: src/app/(platform)/the-forge/services/xray-schema.ts
  */
 
 "use client"
@@ -40,7 +40,6 @@ import {
 import { ScanHero } from "./components/scan-hero"
 import { SystemBlueprint } from "./components/system-blueprint"
 import { ExecutiveDashboard } from "./components/executive-dashboard"
-import { ArchitectureMap } from "./components/architecture-map"
 import { ModuleExplorer } from "./components/module-explorer"
 import { TimelineView } from "./components/timeline-view"
 import { RiskRegister } from "./components/risk-register"
@@ -200,7 +199,7 @@ export function XRayView(): React.ReactNode {
 
       // Trigger image generation in background
       setIsGeneratingImages(true)
-      toast.info("Generating AI blueprint images...")
+      toast.info("Generating blueprint images...")
       generateImagesAction(result.scanId)
         .then((imgResult) => {
           if ("spec" in imgResult) {
@@ -218,7 +217,7 @@ export function XRayView(): React.ReactNode {
         })
         .finally(() => setIsGeneratingImages(false))
     } catch (error) {
-      toast.error("Scan failed. Check that OPENAI_API_KEY is configured.")
+      toast.error("Scan failed. Please try again.")
       console.error("[XRay] Scan error:", error instanceof Error ? error.message : "Unknown")
     } finally {
       setIsScanning(false)
@@ -245,7 +244,7 @@ export function XRayView(): React.ReactNode {
       const needsImages = result.spec.modules.some((m) => m.imageStatus === "pending")
       if (needsImages) {
         setIsGeneratingImages(true)
-        toast.info("Generating AI blueprint images for updated modules...")
+        toast.info("Generating blueprint images for updated modules...")
         generateImagesAction(result.scanId)
           .then((imgResult) => {
             if ("spec" in imgResult) {
@@ -287,7 +286,7 @@ export function XRayView(): React.ReactNode {
   const handleGenerateImages = useCallback((): void => {
     if (!scanId) { toast.error("Scan first"); return }
     setIsGeneratingImages(true)
-    toast.info("Generating AI blueprint images...")
+    toast.info("Generating blueprint images...")
     generateImagesAction(scanId)
       .then((imgResult) => {
         if ("spec" in imgResult) {
@@ -509,8 +508,9 @@ export function XRayView(): React.ReactNode {
 
       {!isScanning && hasModules && (
         <>
-          {/* Section 2: System Blueprint (Hero Image) */}
+          {/* Section 2: System Blueprint (Hero Image + Module Status Grid) */}
           <SystemBlueprint
+            spec={spec}
             systemImageUrl={spec.systemImageUrl}
             systemImageStatus={spec.systemImageStatus}
             isGeneratingImages={isGeneratingImages}
@@ -522,10 +522,7 @@ export function XRayView(): React.ReactNode {
           {/* Section 3: Executive Dashboard */}
           <ExecutiveDashboard spec={spec} />
 
-          {/* Section 4: Architecture Map */}
-          <ArchitectureMap spec={spec} />
-
-          {/* Section 5: Module Explorer (with blueprint images + 3D models) */}
+          {/* Section 4: Module Explorer (with blueprint images + 3D models) */}
           <ModuleExplorer
             spec={spec}
             onModuleUpdate={handleModuleUpdate}
@@ -619,10 +616,10 @@ function PageHeader(): React.ReactNode {
     <div className="pb-4 border-b border-muted">
       <div className={typography.pageHeader}>
         <div className={typography.pageHeaderAccent} />
-        <h1 className={typography.h1}>Product X-Ray</h1>
+        <h1 className={typography.h1}>The Forge</h1>
       </div>
       <p className={cn(typography.pageSubtitle, "mt-1")}>
-        AI-powered product decomposition — scan an idea into a buildable engineering dossier.
+        Scan a product concept into a buildable engineering dossier — then connect with experts and suppliers to make it real.
       </p>
     </div>
   )
@@ -634,7 +631,7 @@ function ScanningPlaceholder(): React.ReactNode {
   return (
     <div className="space-y-6 animate-pulse">
       <div className="h-[300px] rounded-xl bg-muted/40 flex items-center justify-center">
-        <p className="text-sm text-muted-foreground font-medium">Scanning your idea with AI...</p>
+        <p className="text-sm text-muted-foreground font-medium">Scanning your idea...</p>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (

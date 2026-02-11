@@ -10,7 +10,8 @@ import {
   Calendar,
   Home,
   Lightbulb,
-  Bell
+  Bell,
+  Flame,
 } from 'lucide-react'
 import type { SlashCommand, CommandResult } from '../types'
 import { navigateResult, errorResult } from '../executor'
@@ -48,11 +49,11 @@ export const gotoCommand: SlashCommand = {
       'home': '/updates',
       'h': '/updates',
       'inbox': '/updates',
-      'tasks': '/tasks',
-      't': '/tasks',
-      'objectives': '/objectives',
-      'obj': '/objectives',
-      'o': '/objectives',
+      'tasks': '/new-tasks',
+      't': '/new-tasks',
+      'objectives': '/new-objectives',
+      'obj': '/new-objectives',
+      'o': '/new-objectives',
       'team': '/team',
       'roster': '/team',
       'r': '/team',
@@ -66,9 +67,19 @@ export const gotoCommand: SlashCommand = {
       'updates': '/updates',
       'timeline': '/timeline',
       'tl': '/timeline',
-      'inspiration': '/blueprints',
-      'ideas': '/blueprints',
-      'blueprints': '/blueprints'
+      'inspiration': '/inspiration',
+      'ideas': '/inspiration',
+      'blueprints': '/inspiration',
+      'forge': '/the-forge',
+      'xray': '/the-forge',
+      'x-ray': '/the-forge',
+      'product-xray': '/the-forge',
+      'agents': '/agents',
+      'strategy': '/canvas',
+      'canvas': '/canvas',
+      'guild': '/guild',
+      'workshop': '/workshop',
+      'plan': '/plan',
     }
     
     const path = routes[destination]
@@ -237,7 +248,19 @@ export const inspirationCommand: SlashCommand = {
   category: 'navigation',
   aliases: ['ideas', 'blueprints', 'productmap'],
   execute: async (): Promise<CommandResult> => {
-    return navigateResult('/blueprints')
+    return navigateResult('/inspiration')
+  }
+}
+
+export const forgeCommand: SlashCommand = {
+  name: 'forge',
+  description: 'Go to The Forge - scan an idea into a product dossier',
+  usage: '/forge',
+  icon: Flame,
+  category: 'navigation',
+  aliases: ['xray', 'product-xray'],
+  execute: async (): Promise<CommandResult> => {
+    return navigateResult('/the-forge')
   }
 }
 
@@ -254,5 +277,6 @@ export const navigationCommands: SlashCommand[] = [
   homeCommand,
   updatesCommand,
   timelineCommand,
-  inspirationCommand
+  inspirationCommand,
+  forgeCommand,
 ]

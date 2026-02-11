@@ -2,7 +2,7 @@
  * @file scan-hero.tsx — Idea input + scan CTA
  *
  * @description Compact card for entering a product idea and triggering
- * the AI scan. Shows the AI-derived function statement as a blockquote.
+ * the scan. Shows the derived function statement as a blockquote.
  * After a scan exists, offers "Fresh Re-scan" and "Refine with changes"
  * options so users can iterate on their idea.
  */
@@ -93,7 +93,7 @@ export function ScanHero({
               </h2>
             </div>
             <p className="text-sm text-muted-foreground pl-[1.375rem]">
-              Describe your product concept. AI will reverse-engineer it into modules, experts, and suppliers.
+              Describe your product concept and we&apos;ll create a first-draft engineering system for it — then use it to connect with experts and suppliers who can help bring it to life.
             </p>
           </div>
 
@@ -183,7 +183,7 @@ export function ScanHero({
             <AlertDialogTitle>Start a fresh re-scan?</AlertDialogTitle>
             <AlertDialogDescription>
               This will replace all existing modules, diagnostic answers, images, and
-              analysis with a completely new AI-generated result. This cannot be undone.
+              analysis with a completely new result. This cannot be undone.
               If you want to keep your existing work and just update it, use
               &ldquo;Refine with changes&rdquo; instead.
             </AlertDialogDescription>

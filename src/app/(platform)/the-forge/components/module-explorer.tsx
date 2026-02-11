@@ -687,7 +687,7 @@ function CadModelSection({
         <div className="text-center">
           <p className="text-sm font-medium text-foreground">3D model generation failed</p>
           <p className="text-xs text-muted-foreground mt-1">
-            The AI-generated code could not produce a valid model
+            The generated code could not produce a valid model
           </p>
         </div>
         {onGenerate && (

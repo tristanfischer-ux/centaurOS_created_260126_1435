@@ -71,7 +71,19 @@ If the build fails:
 | Missing env var | Add to `.env.local` or Vercel dashboard |
 | Module not found | Run `npm install` |
 
-## Step 3: Commit and Push
+## Step 2b: Supabase Migrations (MANDATORY — never skip, never ask)
+
+If ANY migration files were created or modified in this session:
+
+```bash
+npx supabase db push
+npx supabase gen types typescript --linked > src/types/database.types.ts
+npx tsc --noEmit  # verify types are clean
+```
+
+Do this AUTOMATICALLY. Do NOT ask the user. Do NOT offer to do it. Just do it.
+
+## Step 3: Commit and Push (with auto-logging)
 
 Once the local build succeeds:
 
@@ -82,9 +94,17 @@ git add .
 # Commit with descriptive message
 git commit -m "feat: description of changes"
 
-# Push to trigger Vercel deployment
-git push origin main
+# Push AND auto-log to daily memory using the deploy script
+./scripts/deploy.sh
 ```
+
+**CRITICAL**: Always use `./scripts/deploy.sh` instead of bare `git push`.
+This script pushes to origin AND automatically appends a deploy entry to
+`~/.memory/daily/YYYY-MM-DD.md`. This is the only reliable way to guarantee
+every deploy gets logged — it doesn't depend on the agent remembering.
+
+If `./scripts/deploy.sh` is not available (e.g., wrong directory), fall back to
+`git push origin main` but then MANUALLY log the deploy to the daily memory file.
 
 **Important**: Pushing to `main` triggers automatic Vercel deployment.
 

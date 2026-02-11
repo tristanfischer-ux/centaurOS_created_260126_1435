@@ -1,3 +1,23 @@
+/**
+ * @file Sidebar.tsx — Main navigation component with four-section layout.
+ *
+ * @description Organizes navigation into four purpose-driven sections:
+ * - "Me": personal pages (My Profile, Updates)
+ * - "Plan": strategy and execution (Strategy, Objectives, Tasks)
+ * - "Workshop": collaboration and building (The Forge, Team, Agents)
+ * - "Marketplace": recruits and supplies (Guild, Apprenticeship, Inspiration, Marketplace, Orders)
+ *
+ * Each section header is a clickable link to a visual intro page.
+ * A "New" dot appears on section headers when unseen features exist.
+ * Settings and account controls live in the footer.
+ *
+ * @related
+ * - Section registry: src/lib/features/section-registry.ts
+ * - Section header: src/components/sidebar/SectionHeader.tsx
+ * - New badge hook: src/hooks/useSectionNewBadge.ts
+ * - Mobile nav: src/components/MobileNav.tsx
+ */
+
 "use client"
 
 import React from "react"
@@ -15,7 +35,7 @@ import {
     Bell,
     Sparkles,
     Waypoints,
-    ScanSearch,
+    Flame,
     MessageSquarePlus,
     Plus,
     GraduationCap,
@@ -33,6 +53,9 @@ import { useZoomContext } from "@/components/ZoomProvider"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
+import { SectionHeader } from "@/components/sidebar/SectionHeader"
+import { useSectionNewBadges } from "@/hooks/useSectionNewBadge"
+import { MARKETPLACE_SUPPLIES_START_INDEX } from "@/lib/features/section-registry"
 import { signOut } from "@/actions/auth"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 
@@ -50,36 +73,43 @@ function isRouteActive(pathname: string, href: string): boolean {
 const APP_VERSION = "0.9.0"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Zone A: "Me" — Person-level navigation
+// Section 1: "Me" — Personal pages
 // ─────────────────────────────────────────────────────────────────────────────
-const personNavigation = [
+const meNavigation = [
     { name: "My Profile", href: "/my-profile", icon: UserCircle, tooltip: "Your profile, companies, and marketplace presence" },
+    { name: "Updates", href: "/updates", icon: Bell, tooltip: "Notes, comments, and changes across tasks and objectives" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Zone B: "Company" — Workspace navigation (work, strategy, team)
+// Section 2: "Plan" — Strategy and execution
 // ─────────────────────────────────────────────────────────────────────────────
-const companyNavigation = [
-    // Dashboard hidden for v1 — redirects to /updates
-    { name: "Updates", href: "/updates", icon: Bell, tooltip: "Notes, comments, and changes across tasks and objectives" },
+const planNavigation = [
     { name: "Strategy", href: "/canvas", icon: Waypoints, tooltip: "Strategy flow, timeline, and visual map of your strategic goals" },
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
-    { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
-    { name: "Agents", href: "/agents", icon: Bot, tooltip: "Prompt workflows — build, chain, and copy prompts" },
-    { name: "Product X-Ray", href: "/product-xray", icon: ScanSearch, tooltip: "AI-powered product dossier — scan an idea into a buildable engineering spec with 3D CAD models" },
-    { name: "Marketplace Orders", href: "/marketplace-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
-    { name: "Settings", href: "/settings", icon: Settings, tooltip: "Company configuration, integrations, and preferences" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Zone C: "Network" — Community and discovery
+// Section 3: "Workshop" — Where the work happens
 // ─────────────────────────────────────────────────────────────────────────────
-const networkNavigation = [
+const workshopNavigation = [
+    { name: "The Forge", href: "/the-forge", icon: Flame, tooltip: "Scan an idea into a buildable engineering dossier with 3D CAD models" },
+    { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
+    { name: "Agents", href: "/agents", icon: Bot, tooltip: "Prompt workflows — build, chain, and copy prompts" },
+]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 4: "Marketplace" — Recruits and supplies
+// ─────────────────────────────────────────────────────────────────────────────
+const marketplacePeopleNavigation = [
+    { name: "Guild", href: "/guild", icon: GraduationCap, tooltip: "Community hub — events, networking, apprentice pool" },
+    { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen, tooltip: "Track apprenticeship progress, OTJT hours, and learning modules" },
+]
+
+const marketplaceSuppliesNavigation = [
     { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
-    { name: "Guild", href: "/guild", icon: GraduationCap, tooltip: "Community hub — events, networking, opportunities" },
-    { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen, tooltip: "Track apprenticeship progress, OTJT hours, and learning modules" },
+    { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
 ]
 
 interface FoundryInfo {
@@ -100,21 +130,11 @@ interface SidebarProps {
     userFoundries?: FoundryInfo[]
 }
 
-/**
- * Sidebar — Main navigation component with three-zone layout.
- *
- * @description Organizes navigation into three clear zones:
- * - "Me" zone: person-level pages (My Profile)
- * - "Company" zone: workspace pages (Updates, Tasks, Team, Settings, etc.)
- * - "Network" zone: community and discovery (Marketplace, Guild, Apprenticeship, Inspiration)
- *
- * Sign Out lives in the footer below What's New.
- * Company switching lives on the My Profile page.
- */
 export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyAdmin, userFoundries }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { setZoom } = useZoomContext()
+    const { badges } = useSectionNewBadges()
     const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false)
     const [feedbackFeatureName, setFeedbackFeatureName] = React.useState<string | undefined>(undefined)
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
@@ -214,21 +234,30 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
             {/* Scrollable navigation */}
             <nav className="flex-1 overflow-y-auto px-3 py-1 space-y-1">
                 {/* ══════════════════════════════════════════════════ */}
-                {/* Zone A: "Me" — Person-level navigation            */}
+                {/* Section 1: "Me" — Personal pages                  */}
                 {/* ══════════════════════════════════════════════════ */}
-                <div className="px-3 pt-2 pb-1.5">
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                        Me
-                    </p>
+                <SectionHeader label="Me" introRoute="/me" hasNew={badges.me} />
+                {meNavigation.map(renderNavItem)}
+
+                {/* Unread messages indicator */}
+                <div className="px-0 pb-1">
+                    <UnreadIndicator />
                 </div>
-                {personNavigation.map(renderNavItem)}
 
                 {/* ══════════════════════════════════════════════════ */}
-                {/* Zone B: Company — Workspace navigation             */}
+                {/* Section 2: "Plan" — Strategy and execution         */}
                 {/* ══════════════════════════════════════════════════ */}
                 <div className="my-2 border-t border-slate-100" />
 
-                {/* Company section header — doubles as foundry switcher */}
+                <SectionHeader label="Plan" introRoute="/plan" hasNew={badges.plan} />
+                {planNavigation.map(renderNavItem)}
+
+                {/* ══════════════════════════════════════════════════ */}
+                {/* Section 3: "Workshop" — Where the work happens     */}
+                {/* ══════════════════════════════════════════════════ */}
+                <div className="my-2 border-t border-slate-100" />
+
+                {/* Foundry switcher — contextual to the Workshop section */}
                 <FoundrySwitcher
                     foundries={userFoundries || []}
                     currentFoundryId={foundryId}
@@ -237,28 +266,49 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                     userRole={userRole}
                 />
 
-                {/* Unread messages indicator */}
-                <div className="px-0 pb-1">
-                    <UnreadIndicator />
-                </div>
-
-                {companyNavigation.map(renderNavItem)}
+                <SectionHeader label="Workshop" introRoute="/workshop" hasNew={badges.workshop} />
+                {workshopNavigation.map(renderNavItem)}
 
                 {/* ══════════════════════════════════════════════════ */}
-                {/* Zone C: "Network" — Community and discovery        */}
+                {/* Section 4: "Marketplace" — Recruits and supplies   */}
                 {/* ══════════════════════════════════════════════════ */}
                 <div className="my-2 border-t border-slate-100" />
 
-                <div className="px-3 pt-2 pb-1.5">
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                        Network
+                <SectionHeader label="Marketplace" introRoute="/marketplace-hub" hasNew={badges.marketplace} />
+
+                {/* People sub-label */}
+                <div className="px-3 pt-1 pb-0.5">
+                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
+                        People
                     </p>
                 </div>
-                {networkNavigation.map(renderNavItem)}
+                {marketplacePeopleNavigation.map(renderNavItem)}
+
+                {/* Supplies sub-label */}
+                <div className="px-3 pt-2 pb-0.5">
+                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
+                        Supplies
+                    </p>
+                </div>
+                {marketplaceSuppliesNavigation.map(renderNavItem)}
             </nav>
 
-            {/* Footer — What's New, Zoom, Feedback, Version */}
+            {/* Footer — Settings, What's New, Sign Out, Zoom, Feedback, Version */}
             <div className="p-4 mt-auto space-y-3 border-t border-slate-100">
+                {/* Settings */}
+                <Link
+                    href="/settings"
+                    className={cn(
+                        isRouteActive(pathname, "/settings")
+                            ? "text-international-orange font-semibold"
+                            : "text-muted-foreground hover:text-foreground",
+                        "flex items-center gap-2 px-2 py-1.5 text-xs transition-colors rounded-md"
+                    )}
+                >
+                    <Settings className="h-3.5 w-3.5" />
+                    Settings
+                </Link>
+
                 {/* What's New link */}
                 <Link
                     href="/whats-new"

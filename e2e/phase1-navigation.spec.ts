@@ -2,271 +2,231 @@ import { test, expect } from '@playwright/test'
 import { FOUNDER_STORAGE, dismissOnboarding } from './auth-storage'
 
 /**
- * Phase 1 Navigation Restructure — Comprehensive E2E Tests
+ * Navigation Restructure — 4-Section Sidebar E2E Tests
  *
- * Tests the Person/Company navigation split, Person Hub, context indicator,
- * sidebar zones, and mobile navigation. Uses Founder persona for full access.
+ * Tests the restructured sidebar with Me / Plan / Workshop / Marketplace sections,
+ * section intro pages, The Forge rename (from Product X-Ray), and mobile navigation.
+ * Uses Founder persona for full access.
  */
 
-test.describe('Phase 1: Person/Company Navigation', () => {
+test.describe('Navigation: 4-Section Sidebar', () => {
   test.use({ storageState: FOUNDER_STORAGE })
 
   test.beforeEach(async ({ page }) => {
     await dismissOnboarding(page)
   })
 
-  // ─── Sidebar Structure ──────────────────────────────────────
+  // ─── Sidebar Section Headers ─────────────────────────────────────
 
-  test.describe('Sidebar — Zone Structure', () => {
-    test('sidebar has "Me" section label', async ({ page }) => {
-      await page.goto('/dashboard')
+  test.describe('Sidebar — Section Headers', () => {
+    test('sidebar has all 4 section headers @critical', async ({ page }) => {
+      await page.goto('/updates')
       await page.waitForLoadState('networkidle')
 
-      const meLabel = page.locator('nav').getByText('Me', { exact: true })
-      await expect(meLabel).toBeVisible({ timeout: 10_000 })
-    })
-
-    test('Person zone has Home link pointing to /home', async ({ page }) => {
-      await page.goto('/dashboard')
-      await page.waitForLoadState('networkidle')
-
-      const homeLink = page.locator('nav a[href="/home"]')
-      await expect(homeLink).toBeVisible({ timeout: 10_000 })
-      await expect(homeLink).toContainText('Home')
-    })
-
-    test('Person zone has Marketplace link', async ({ page }) => {
-      await page.goto('/dashboard')
-      await page.waitForLoadState('networkidle')
-
-      const link = page.locator('nav a[href="/marketplace"]')
-      await expect(link).toBeVisible({ timeout: 10_000 })
-    })
-
-    test('Person zone has Guild link', async ({ page }) => {
-      await page.goto('/dashboard')
-      await page.waitForLoadState('networkidle')
-
-      const link = page.locator('nav a[href="/guild"]')
-      await expect(link).toBeVisible({ timeout: 10_000 })
-    })
-
-    test('Person zone has Apprenticeship link', async ({ page }) => {
-      await page.goto('/dashboard')
-      await page.waitForLoadState('networkidle')
-
-      const link = page.locator('nav a[href="/apprenticeship"]')
-      await expect(link).toBeVisible({ timeout: 10_000 })
-    })
-
-    test('Company zone has Dashboard link pointing to /dashboard', async ({ page }) => {
-      await page.goto('/dashboard')
-      await page.waitForLoadState('networkidle')
-
-      const dashLink = page.locator('nav a[href="/dashboard"]')
-      await expect(dashLink).toBeVisible({ timeout: 10_000 })
-      await expect(dashLink).toContainText('Dashboard')
-    })
-
-    test('Company zone has all core work items', async ({ page }) => {
-      await page.goto('/dashboard')
-      await page.waitForLoadState('networkidle')
-
-      for (const route of ['/updates', '/new-objectives', '/new-tasks', '/team', '/agents', '/canvas', '/strategic-planner']) {
-        const link = page.locator(`nav a[href="${route}"]`)
-        await expect(link).toBeVisible({ timeout: 5_000 })
-      }
-    })
-
-    test('ForgeOS logo links to /home', async ({ page }) => {
-      await page.goto('/dashboard')
-      await page.waitForLoadState('networkidle')
-
-      const logo = page.locator('a:has-text("ForgeOS")').first()
-      await expect(logo).toHaveAttribute('href', '/home')
+      // All section header links should be visible in the nav
+      await expect(page.locator('nav a[href="/me"]')).toBeVisible({ timeout: 10_000 })
+      await expect(page.locator('nav a[href="/plan"]')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('nav a[href="/workshop"]')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('nav a[href="/marketplace-hub"]')).toBeVisible({ timeout: 5_000 })
     })
   })
 
-  // ─── Person Hub Page ────────────────────────────────────────
+  // ─── Sidebar Nav Items Per Section ─────────────────────────────────
 
-  test.describe('Person Hub (/home)', () => {
-    test('page loads without errors', async ({ page }) => {
-      const errors: string[] = []
-      page.on('console', (msg) => {
-        if (msg.type() === 'error') errors.push(msg.text())
-      })
-
-      await page.goto('/home')
+  test.describe('Sidebar — Nav Items', () => {
+    test('"Me" section has My Profile and Updates links', async ({ page }) => {
+      await page.goto('/updates')
       await page.waitForLoadState('networkidle')
 
-      // Filter non-critical errors
-      const critical = errors.filter(
-        (e) => !e.includes('favicon') && !e.includes('404') && !e.includes('Sentry')
-      )
-      expect(critical).toHaveLength(0)
+      await expect(page.locator('nav a[href="/my-profile"]')).toBeVisible({ timeout: 10_000 })
+      await expect(page.locator('nav a[href="/updates"]')).toBeVisible({ timeout: 5_000 })
     })
 
-    test('shows welcome heading with user name', async ({ page }) => {
-      await page.goto('/home')
+    test('"Plan" section has Strategy, Objectives, Tasks links', async ({ page }) => {
+      await page.goto('/updates')
       await page.waitForLoadState('networkidle')
 
-      const heading = page.getByRole('heading', { level: 1 })
-      await expect(heading).toContainText('Welcome back', { timeout: 10_000 })
+      await expect(page.locator('nav a[href="/canvas"]')).toBeVisible({ timeout: 10_000 })
+      await expect(page.locator('nav a[href="/new-objectives"]')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('nav a[href="/new-tasks"]')).toBeVisible({ timeout: 5_000 })
     })
 
-    test('shows "Your Companies" section', async ({ page }) => {
-      await page.goto('/home')
+    test('"Workshop" section has The Forge, Team, Agents links', async ({ page }) => {
+      await page.goto('/updates')
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByText('Your Companies')).toBeVisible({ timeout: 10_000 })
+      await expect(page.locator('nav a[href="/the-forge"]')).toBeVisible({ timeout: 10_000 })
+      await expect(page.locator('nav a[href="/team"]')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('nav a[href="/agents"]')).toBeVisible({ timeout: 5_000 })
     })
 
-    test('shows at least one company tile', async ({ page }) => {
-      await page.goto('/home')
+    test('"Marketplace" section has all 5 links', async ({ page }) => {
+      await page.goto('/updates')
       await page.waitForLoadState('networkidle')
 
-      // Company tiles are Cards with role badges
-      const tiles = page.locator('[class*="cursor-pointer"]').filter({ hasText: /Founder|Executive|Apprentice/ })
-      const count = await tiles.count()
-      expect(count).toBeGreaterThanOrEqual(1)
+      await expect(page.locator('nav a[href="/guild"]')).toBeVisible({ timeout: 10_000 })
+      await expect(page.locator('nav a[href="/apprenticeship"]')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('nav a[href="/inspiration"]')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('nav a[href="/marketplace"]')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('nav a[href="/marketplace-orders"]')).toBeVisible({ timeout: 5_000 })
     })
 
-    test('company tile shows role badge', async ({ page }) => {
-      await page.goto('/home')
+    test('Marketplace has "People" and "Supplies" sub-labels', async ({ page }) => {
+      await page.goto('/updates')
       await page.waitForLoadState('networkidle')
 
-      // Should see at least one role badge
-      const roleBadge = page.getByText(/^(Founder|Executive|Apprentice)$/i).first()
-      await expect(roleBadge).toBeVisible({ timeout: 10_000 })
-    })
+      const peopleLabel = page.locator('nav').getByText('People', { exact: true })
+      await expect(peopleLabel).toBeVisible({ timeout: 10_000 })
 
-    test('shows Quick Links section with Marketplace, Guild, My Profile', async ({ page }) => {
-      await page.goto('/home')
-      await page.waitForLoadState('networkidle')
-
-      await expect(page.getByText('Quick Links')).toBeVisible({ timeout: 10_000 })
-      await expect(page.locator('a[href="/marketplace"]').last()).toBeVisible()
-      await expect(page.locator('a[href="/guild"]').last()).toBeVisible()
-      await expect(page.locator('a[href="/my-profile"]').last()).toBeVisible()
-    })
-
-    test('clicking company tile navigates to dashboard', async ({ page }) => {
-      await page.goto('/home')
-      await page.waitForLoadState('networkidle')
-
-      // Click the first company tile
-      const tile = page.locator('[class*="cursor-pointer"]').filter({ hasText: /Founder|Executive|Apprentice/ }).first()
-      await tile.click()
-
-      // Should navigate to dashboard
-      await page.waitForURL('**/dashboard', { timeout: 15_000 })
+      const suppliesLabel = page.locator('nav').getByText('Supplies', { exact: true })
+      await expect(suppliesLabel).toBeVisible({ timeout: 5_000 })
     })
   })
 
-  // ─── Context Indicator ──────────────────────────────────────
+  // ─── Settings in Footer ──────────────────────────────────────────
 
-  test.describe('Context Indicator', () => {
-    test('shows "Personal Space" on /home', async ({ page }) => {
-      await page.goto('/home')
+  test.describe('Sidebar — Footer', () => {
+    test('Settings link is in sidebar footer @critical', async ({ page }) => {
+      await page.goto('/updates')
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByText('Personal Space')).toBeVisible({ timeout: 10_000 })
-    })
-
-    test('shows company name on /dashboard', async ({ page }) => {
-      await page.goto('/dashboard')
-      await page.waitForLoadState('networkidle')
-
-      // The context indicator should NOT show "Personal Space" on company pages
-      const personalLabel = page.getByText('Personal Space')
-      await expect(personalLabel).not.toBeVisible({ timeout: 5_000 })
-    })
-
-    test('shows "Personal Space" on /marketplace', async ({ page }) => {
-      await page.goto('/marketplace')
-      await page.waitForLoadState('networkidle')
-
-      await expect(page.getByText('Personal Space')).toBeVisible({ timeout: 10_000 })
-    })
-
-    test('shows "Personal Space" on /guild', async ({ page }) => {
-      await page.goto('/guild')
-      await page.waitForLoadState('networkidle')
-
-      await expect(page.getByText('Personal Space')).toBeVisible({ timeout: 10_000 })
+      const settingsLink = page.locator('a[href="/settings"]')
+      await expect(settingsLink).toBeVisible({ timeout: 10_000 })
     })
   })
 
-  // ─── Navigation Click-Through ───────────────────────────────
+  // ─── Section Intro Pages ─────────────────────────────────────────
+  // Scope assertions to `main` or the content area to avoid strict mode
+  // violations from the sidebar also containing the same text.
 
-  test.describe('Full Navigation Click-Through', () => {
-    test('Person zone links all load without error', async ({ page }) => {
-      const personRoutes = ['/home', '/marketplace', '/marketplace-orders', '/guild', '/apprenticeship']
+  test.describe('Section Intro Pages', () => {
+    // Use feature card links (a[href] h3) to avoid strict mode violations
+    // from other h3 elements on the page (onboarding cards, tips, etc.)
 
-      for (const route of personRoutes) {
-        await page.goto(route)
-        await page.waitForLoadState('networkidle')
-        // Check for crash — page should not show error boundary
-        const errorBoundary = page.getByText(/something went wrong|unexpected error/i)
-        const hasError = await errorBoundary.isVisible({ timeout: 2_000 }).catch(() => false)
-        expect(hasError, `${route} shows error boundary`).toBe(false)
-      }
+    test('/me intro page loads with tagline and feature cards @critical', async ({ page }) => {
+      await page.goto('/me')
+      await page.waitForLoadState('networkidle')
+
+      // Tagline is unique to the intro page
+      await expect(page.getByText('Your personal command centre')).toBeVisible({ timeout: 15_000 })
+
+      // Feature cards: scope to the link wrapper to avoid duplicates
+      await expect(page.locator('a[href="/my-profile"] h3')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/updates"] h3')).toBeVisible({ timeout: 5_000 })
     })
 
-    test('Company zone links all load without error', async ({ page }) => {
-      const companyRoutes = [
-        '/dashboard', '/updates', '/new-objectives', '/new-tasks',
-        '/team', '/agents', '/canvas', '/strategic-planner',
-        '/inspiration', '/tools/financial',
+    test('/plan intro page loads with tagline and feature cards @critical', async ({ page }) => {
+      await page.goto('/plan')
+      await page.waitForLoadState('networkidle')
+
+      await expect(page.getByText('From vision to action')).toBeVisible({ timeout: 15_000 })
+
+      // Feature cards scoped by their link href
+      await expect(page.locator('a[href="/canvas"] h3')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/new-objectives"] h3')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/new-tasks"] h3')).toBeVisible({ timeout: 5_000 })
+    })
+
+    test('/workshop intro page loads with tagline and feature cards @critical', async ({ page }) => {
+      await page.goto('/workshop')
+      await page.waitForLoadState('networkidle')
+
+      await expect(page.getByText('Where the work happens')).toBeVisible({ timeout: 15_000 })
+
+      // Feature cards scoped by their link href
+      await expect(page.locator('a[href="/the-forge"] h3')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/team"] h3')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/agents"] h3')).toBeVisible({ timeout: 5_000 })
+    })
+
+    test('/marketplace-hub intro page loads with tagline and feature cards @critical', async ({ page }) => {
+      await page.goto('/marketplace-hub')
+      await page.waitForLoadState('networkidle')
+
+      await expect(page.getByText('Recruits and supplies')).toBeVisible({ timeout: 15_000 })
+
+      // Feature cards scoped by their link href
+      await expect(page.locator('a[href="/guild"] h3')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/apprenticeship"] h3')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/inspiration"] h3')).toBeVisible({ timeout: 5_000 })
+    })
+  })
+
+  // ─── The Forge Rename ────────────────────────────────────────────
+
+  test.describe('The Forge (Product X-Ray Rename)', () => {
+    test('/the-forge page loads without error @critical', async ({ page }) => {
+      await page.goto('/the-forge')
+      await page.waitForLoadState('networkidle')
+
+      // Page should not show error boundary
+      const errorBoundary = page.getByText(/something went wrong|unexpected error/i)
+      const hasError = await errorBoundary.isVisible({ timeout: 2_000 }).catch(() => false)
+      expect(hasError, '/the-forge shows error boundary').toBe(false)
+    })
+
+    test('/product-xray redirects to /the-forge @critical', async ({ page }) => {
+      // Navigate and wait for redirects to settle
+      await page.goto('/product-xray', { waitUntil: 'networkidle' })
+
+      // Wait for URL to include /the-forge (server redirect may go through auth first)
+      await page.waitForURL('**/the-forge**', { timeout: 15_000 })
+      expect(page.url()).toContain('/the-forge')
+    })
+
+    test('sidebar shows "The Forge" link (not "Product X-Ray")', async ({ page }) => {
+      await page.goto('/updates')
+      await page.waitForLoadState('networkidle')
+
+      const forgeLink = page.locator('nav a[href="/the-forge"]')
+      await expect(forgeLink).toBeVisible({ timeout: 10_000 })
+      await expect(forgeLink).toContainText('The Forge')
+    })
+  })
+
+  // ─── Navigation Active States ────────────────────────────────────
+
+  test.describe('Active States', () => {
+    test('sidebar highlights active link on /updates', async ({ page }) => {
+      await page.goto('/updates')
+      await page.waitForLoadState('networkidle')
+
+      const updatesLink = page.locator('nav a[href="/updates"]')
+      await expect(updatesLink).toBeVisible({ timeout: 10_000 })
+      const classes = await updatesLink.getAttribute('class')
+      expect(classes).toContain('text-international-orange')
+    })
+
+    test('section header highlights when on intro page', async ({ page }) => {
+      await page.goto('/me')
+      await page.waitForLoadState('networkidle')
+
+      const meHeader = page.locator('nav a[href="/me"]')
+      await expect(meHeader).toBeVisible({ timeout: 10_000 })
+      const classes = await meHeader.getAttribute('class')
+      expect(classes).toContain('text-international-orange')
+    })
+  })
+
+  // ─── All Routes Load Without Error ─────────────────────────────────
+
+  test.describe('Full Route Click-Through', () => {
+    test('all sidebar nav destinations load without error @critical', async ({ page }) => {
+      const routes = [
+        '/my-profile', '/updates',
+        '/canvas', '/new-objectives', '/new-tasks',
+        '/the-forge', '/team', '/agents',
+        '/guild', '/apprenticeship', '/inspiration', '/marketplace', '/marketplace-orders',
+        '/me', '/plan', '/workshop', '/marketplace-hub',
       ]
 
-      for (const route of companyRoutes) {
+      for (const route of routes) {
         await page.goto(route)
         await page.waitForLoadState('networkidle')
         const errorBoundary = page.getByText(/something went wrong|unexpected error/i)
         const hasError = await errorBoundary.isVisible({ timeout: 2_000 }).catch(() => false)
         expect(hasError, `${route} shows error boundary`).toBe(false)
       }
-    })
-
-    test('sidebar Home link active state on /home', async ({ page }) => {
-      await page.goto('/home')
-      await page.waitForLoadState('networkidle')
-
-      const homeLink = page.locator('nav a[href="/home"]')
-      // Active state should have international-orange color class
-      const classes = await homeLink.getAttribute('class')
-      expect(classes).toContain('text-international-orange')
-    })
-
-    test('sidebar Dashboard link active state on /dashboard', async ({ page }) => {
-      await page.goto('/dashboard')
-      await page.waitForLoadState('networkidle')
-
-      const dashLink = page.locator('nav a[href="/dashboard"]')
-      const classes = await dashLink.getAttribute('class')
-      expect(classes).toContain('text-international-orange')
-    })
-  })
-
-  // ─── Command Palette ────────────────────────────────────────
-
-  test.describe('Command Palette', () => {
-    test('Cmd+K shows Home in navigation commands', async ({ page }) => {
-      await page.goto('/dashboard')
-      await page.waitForLoadState('networkidle')
-
-      // Open command palette
-      await page.keyboard.press('Meta+k')
-      await page.waitForTimeout(500)
-
-      // Type "home" to search
-      await page.keyboard.type('home')
-      await page.waitForTimeout(300)
-
-      // Should see Home command
-      const homeCmd = page.getByText('Home').first()
-      await expect(homeCmd).toBeVisible({ timeout: 5_000 })
     })
   })
 })

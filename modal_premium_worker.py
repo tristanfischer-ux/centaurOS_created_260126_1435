@@ -29,10 +29,12 @@ import tempfile
 premium_image = (
     modal.Image.from_registry("continuumio/miniconda3:24.7.1-0")
     .run_commands(
+        "apt-get update -qq && apt-get install -y -qq libosmesa6 libgl1-mesa-glx libglu1-mesa && apt-get clean",
         "conda install -y -c conda-forge python=3.11 cadquery=2.4 "
-        "matplotlib=3.8 numpy=1.26 scipy=1.12 -q",
+        "matplotlib=3.8 numpy=1.26 scipy=1.12 Pillow -q",
         "conda clean -afy",
     )
+    .pip_install("fastapi[standard]")
 )
 
 app = modal.App("forgeos-premium")

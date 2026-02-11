@@ -1,3 +1,15 @@
+/**
+ * @file MobileNav.tsx — Bottom navigation bar for mobile devices.
+ *
+ * @description Shows My Profile, Updates, Tasks in the main bar.
+ * "More" dropdown groups remaining items into four sections matching
+ * the sidebar: Plan, Workshop, Marketplace, and Account.
+ *
+ * @related
+ * - Sidebar: src/components/Sidebar.tsx
+ * - Section registry: src/lib/features/section-registry.ts
+ */
+
 "use client"
 
 import React from "react"
@@ -21,7 +33,7 @@ import {
     GraduationCap,
     BookOpen,
     ShoppingBag,
-    ScanSearch,
+    Flame,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -52,34 +64,28 @@ const mainNavigation = [
     { name: "Tasks", shortName: "Tasks", href: "/new-tasks", icon: CheckSquare },
 ]
 
-// "More" dropdown — Company section
-const companyMoreNavigation = [
-    { name: "Updates", href: "/updates", icon: Bell },
+// "More" dropdown — Plan section
+const planMoreNavigation = [
     { name: "Strategy", href: "/canvas", icon: Waypoints },
     { name: "Objectives", href: "/new-objectives", icon: Target },
+]
+
+// "More" dropdown — Workshop section
+const workshopMoreNavigation = [
+    { name: "The Forge", href: "/the-forge", icon: Flame },
     { name: "Team", href: "/team", icon: Users },
     { name: "Agents", href: "/agents", icon: Bot },
-    { name: "Product X-Ray", href: "/product-xray", icon: ScanSearch },
-    { name: "Marketplace Orders", href: "/marketplace-orders", icon: ShoppingBag },
-    { name: "Settings", href: "/settings", icon: Settings },
 ]
 
-// "More" dropdown — Network section
-const networkMoreNavigation = [
-    { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
-    { name: "Marketplace", href: "/marketplace", icon: Store },
+// "More" dropdown — Marketplace section
+const marketplaceMoreNavigation = [
     { name: "Guild", href: "/guild", icon: GraduationCap },
     { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen },
+    { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
+    { name: "Marketplace", href: "/marketplace", icon: Store },
+    { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag },
 ]
 
-// Switch Company now lives on the My Profile page
-
-/**
- * MobileNav — Bottom navigation bar for mobile devices.
- *
- * @description Shows My Profile, Dashboard, Tasks in the main bar.
- * "More" dropdown groups remaining items into Company, Network, and Account sections.
- */
 export function MobileNav() {
     const pathname = usePathname()
     const router = useRouter()
@@ -95,7 +101,30 @@ export function MobileNav() {
         router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
 
-    const allMoreItems = [...companyMoreNavigation, ...networkMoreNavigation]
+    const allMoreItems = [...planMoreNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
+
+    /**
+     * Renders a dropdown menu item with active state highlighting.
+     */
+    const renderDropdownItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }> }) => {
+        const isActive = isRouteActive(pathname, item.href)
+        return (
+            <DropdownMenuItem key={item.name} asChild>
+                <Link
+                    href={item.href}
+                    className={cn(
+                        "flex items-center justify-between gap-2 cursor-pointer w-full",
+                        isActive && "text-international-orange"
+                    )}
+                >
+                    <span className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        {item.name}
+                    </span>
+                </Link>
+            </DropdownMenuItem>
+        )
+    }
 
     return (
         <>
@@ -143,59 +172,44 @@ export function MobileNav() {
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe w-56">
-                        {/* Company section */}
+                        {/* Plan section */}
                         <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                            Company
+                            Plan
                         </DropdownMenuLabel>
-                        {companyMoreNavigation.map((item) => {
-                            const isActive = isRouteActive(pathname, item.href)
-                            return (
-                                <DropdownMenuItem key={item.name} asChild>
-                                    <Link
-                                        href={item.href}
-                                        className={cn(
-                                            "flex items-center justify-between gap-2 cursor-pointer w-full",
-                                            isActive && "text-international-orange"
-                                        )}
-                                    >
-                                        <span className="flex items-center gap-2">
-                                            <item.icon className="h-4 w-4" />
-                                            {item.name}
-                                        </span>
-                                    </Link>
-                                </DropdownMenuItem>
-                            )
-                        })}
+                        {planMoreNavigation.map(renderDropdownItem)}
 
                         <DropdownMenuSeparator />
 
-                        {/* Network section */}
+                        {/* Workshop section */}
                         <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                            Network
+                            Workshop
                         </DropdownMenuLabel>
-                        {networkMoreNavigation.map((item) => {
-                            const isActive = isRouteActive(pathname, item.href)
-                            return (
-                                <DropdownMenuItem key={item.name} asChild>
-                                    <Link
-                                        href={item.href}
-                                        className={cn(
-                                            "flex items-center justify-between gap-2 cursor-pointer w-full",
-                                            isActive && "text-international-orange"
-                                        )}
-                                    >
-                                        <span className="flex items-center gap-2">
-                                            <item.icon className="h-4 w-4" />
-                                            {item.name}
-                                        </span>
-                                    </Link>
-                                </DropdownMenuItem>
-                            )
-                        })}
+                        {workshopMoreNavigation.map(renderDropdownItem)}
 
                         <DropdownMenuSeparator />
 
-                        {/* Sign Out */}
+                        {/* Marketplace section */}
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                            Marketplace
+                        </DropdownMenuLabel>
+                        {marketplaceMoreNavigation.map(renderDropdownItem)}
+
+                        <DropdownMenuSeparator />
+
+                        {/* Settings + Sign Out */}
+                        <DropdownMenuItem asChild>
+                            <Link
+                                href="/settings"
+                                className={cn(
+                                    "flex items-center gap-2 cursor-pointer w-full",
+                                    isRouteActive(pathname, "/settings") && "text-international-orange"
+                                )}
+                            >
+                                <Settings className="h-4 w-4" />
+                                Settings
+                            </Link>
+                        </DropdownMenuItem>
+
                         <DropdownMenuItem asChild>
                             <form action={signOut} className="w-full">
                                 <button

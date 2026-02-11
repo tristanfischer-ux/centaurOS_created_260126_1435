@@ -84,7 +84,7 @@ ${moduleFlow}
 
 Material/signal flow path: ${ioChain}
 
-Style: Clean P&ID (Piping and Instrumentation Diagram) on white background. Each subsystem shown as a distinct, color-coded block with clear flow arrows showing material and signal paths between them. Label each subsystem block and each flow arrow. Use a clean, modern engineering style suitable for a technical specification document. The overall composition should read left-to-right. With ${spec.modules.length} modules, use a multi-row layout if needed to fit all blocks clearly without crowding - maintain clear spacing between blocks and keep all labels legible. Include a title block in the bottom-right corner.`
+Style: Clean, modern process flow diagram on a pure white background. Each subsystem shown as a distinct, softly color-coded rounded block with clear flow arrows showing material and signal paths between them. Label each subsystem block and each flow arrow with clean sans-serif typography. Use a minimal, contemporary design style with generous whitespace — NOT a traditional P&ID with dense annotations. The overall composition should read left-to-right. With ${spec.modules.length} modules, use a multi-row layout if needed to fit all blocks clearly without crowding — maintain clear spacing between blocks and keep all labels legible. Do NOT include any title block, document ID, revision number, date, project name, or engineer name anywhere on the diagram. No borders or frames around the diagram.`
 }
 
 // ─── Gemini API Caller ───────────────────────────────────────────────

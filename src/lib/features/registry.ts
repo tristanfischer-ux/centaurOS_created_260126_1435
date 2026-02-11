@@ -15,10 +15,17 @@ export interface Feature {
     route?: string // The route/URL for this feature (if applicable)
     releasedAt: Date
     category: FeatureCategory
+    section?: FeatureSection // Which sidebar section this feature belongs to
     status: FeatureStatus
     isVisibleInNav: boolean // Whether this feature appears in main navigation
     changelog?: string // Detailed changelog entry
 }
+
+export type FeatureSection =
+    | 'me'           // Personal pages (My Profile, Updates)
+    | 'plan'         // Strategy, Objectives, Tasks
+    | 'workshop'     // The Forge, Team, Agents
+    | 'marketplace'  // Guild, Apprenticeship, Inspiration, Marketplace, Orders
 
 export type FeatureCategory = 
     | 'core'           // Core platform features (tasks, objectives, etc.)
@@ -48,12 +55,25 @@ export const NEW_FEATURE_THRESHOLD_DAYS = 14
 export const FEATURE_REGISTRY: Feature[] = [
     // === February 2026 Features ===
     {
+        id: 'the-forge',
+        name: 'The Forge',
+        description: 'Scan an idea into a buildable engineering dossier with 3D CAD models',
+        route: '/the-forge',
+        releasedAt: new Date('2026-02-11'),
+        category: 'core',
+        section: 'workshop',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'The Forge (formerly Product X-Ray) — AI-powered product decomposition that transforms an idea into a complete engineering dossier with architecture diagrams, module breakdowns, risk analysis, and 3D CAD models.'
+    },
+    {
         id: 'canvas',
         name: 'Strategy',
         description: 'Strategy flow visualization, timeline, and visual map of strategic goals',
         route: '/canvas',
         releasedAt: new Date('2026-02-09'),
         category: 'strategic',
+        section: 'plan',
         status: 'stable',
         isVisibleInNav: true,
         changelog: 'Added Strategy — a visual workspace for mapping out your goals with flow visualization, timeline, and working backwards from deadlines. Plot objectives and tasks on an interactive timeline with drag-and-drop positioning.'
@@ -416,6 +436,13 @@ export function getHiddenFeatures(): Feature[] {
  */
 export function getFeaturesByCategory(category: FeatureCategory): Feature[] {
     return FEATURE_REGISTRY.filter(f => f.category === category)
+}
+
+/**
+ * Get features by sidebar section
+ */
+export function getFeaturesBySection(section: FeatureSection): Feature[] {
+    return FEATURE_REGISTRY.filter(f => f.section === section && f.status !== 'hidden')
 }
 
 /**

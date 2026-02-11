@@ -35,14 +35,15 @@ cfd_image = (
         "apt-get install -y -qq wget software-properties-common gnupg2 curl",
         "wget -qO - https://dl.openfoam.com/add-debian-repo.sh | bash",
         "apt-get update -qq",
-        "apt-get install -y -qq openfoam2312-default",
+        "apt-get install -y -qq openfoam2406-default",
         # Install miniconda for CadQuery (STEP→STL conversion)
         "wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/mc.sh",
         "bash /tmp/mc.sh -b -p /opt/conda && rm /tmp/mc.sh",
         "/opt/conda/bin/conda install -y -c conda-forge cadquery=2.4 gmsh=4.12 matplotlib=3.8 -q",
         "/opt/conda/bin/conda clean -afy",
     )
-    .env({"PATH": "/opt/conda/bin:/usr/lib/openfoam/openfoam2312/bin:/usr/lib/openfoam/openfoam2312/platforms/linux64GccDPInt32Opt/bin:$PATH"})
+    .env({"PATH": "/opt/conda/bin:/usr/lib/openfoam/openfoam2406/bin:/usr/lib/openfoam/openfoam2406/platforms/linux64GccDPInt32Opt/bin:$PATH"})
+    .pip_install("fastapi[standard]")
 )
 
 app = modal.App("forgeos-cfd")
@@ -751,7 +752,7 @@ def run_cfd(
         # Step 4: Run meshing pipeline
         try:
             # Source OpenFOAM environment and run
-            of_prefix = "source /usr/lib/openfoam/openfoam2312/etc/bashrc && "
+            of_prefix = "source /usr/lib/openfoam/openfoam2406/etc/bashrc && "
 
             # blockMesh — background mesh
             r = subprocess.run(

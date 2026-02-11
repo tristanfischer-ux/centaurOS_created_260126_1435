@@ -2,7 +2,7 @@
  * @file rfq-section.tsx — Request for Quotation section
  *
  * @description Renders the RFQ (Request for Quotation) summary card
- * in the Product X-Ray dossier. Shows cost estimates, process class,
+ * in The Forge dossier. Shows cost estimates, process class,
  * and module breakdown. RFQ generation from the full dossier is
  * planned but not yet implemented.
  *

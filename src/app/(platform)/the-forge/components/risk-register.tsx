@@ -158,7 +158,7 @@ export function RiskRegister({ spec }: RiskRegisterProps): React.ReactNode {
                         r.type === "unknown" && "bg-chart-2/10 text-chart-2",
                         r.type === "derived-risk" && "bg-destructive/10 text-destructive",
                       )}>
-                        {r.type === "failure-mode" ? "Risk" : r.type === "unknown" ? "Unknown" : "AI-derived"}
+                        {r.type === "failure-mode" ? "Risk" : r.type === "unknown" ? "Unknown" : "Derived"}
                       </span>
                     </div>
                   ))}
@@ -181,7 +181,7 @@ export function RiskRegister({ spec }: RiskRegisterProps): React.ReactNode {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-destructive" />
-            AI-derived risk
+            Derived risk
           </div>
         </div>
       </CardContent>

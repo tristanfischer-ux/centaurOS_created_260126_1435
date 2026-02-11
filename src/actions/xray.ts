@@ -1,7 +1,7 @@
 /**
- * @file xray.ts — Server actions for Product X-Ray
+ * @file xray.ts — Server actions for The Forge (formerly Product X-Ray)
  *
- * @description Provides server-side operations for the X-Ray feature:
+ * @description Provides server-side operations for The Forge feature:
  * - scanIdea: AI-powered product decomposition + DB persistence
  * - deriveProcessClass: AI derivation from diagnostic answers
  * - generateModuleImages: Gemini blueprint image generation
@@ -15,34 +15,34 @@
  * @audit Scan creation logged via console.info
  *
  * @related
- * - Schema: src/app/(platform)/product-xray/services/xray-schema.ts
- * - Scan service: src/app/(platform)/product-xray/services/scan.ts
- * - Image generator: src/app/(platform)/product-xray/services/image-generator.ts
- * - People service: src/app/(platform)/product-xray/services/people.ts
- * - Suppliers service: src/app/(platform)/product-xray/services/suppliers.ts
+ * - Schema: src/app/(platform)/the-forge/services/xray-schema.ts
+ * - Scan service: src/app/(platform)/the-forge/services/scan.ts
+ * - Image generator: src/app/(platform)/the-forge/services/image-generator.ts
+ * - People service: src/app/(platform)/the-forge/services/people.ts
+ * - Suppliers service: src/app/(platform)/the-forge/services/suppliers.ts
  */
 
 "use server"
 
 import { withAuth } from "@/lib/server-action-utils"
-import { scanIdea as scanIdeaService, deriveProcessClassAI, refineScanAI, refineModuleAI } from "@/app/(platform)/product-xray/services/scan"
-import { matchPeopleForModules } from "@/app/(platform)/product-xray/services/people"
-import { matchSuppliersForModule } from "@/app/(platform)/product-xray/services/suppliers"
-import { generateModuleImage, generateSystemImage } from "@/app/(platform)/product-xray/services/image-generator"
-import { generateModuleCadModel } from "@/app/(platform)/product-xray/services/cad-generator"
-import { runStructuralAnalysis } from "@/app/(platform)/product-xray/services/fea-generator"
-import { runCfdAnalysis } from "@/app/(platform)/product-xray/services/cfd-generator"
-import { runTopologyOptimization } from "@/app/(platform)/product-xray/services/topo-generator"
-import { runThermalAnalysis } from "@/app/(platform)/product-xray/services/thermal-generator"
-import { runEmiAnalysis, runFatigueAnalysis, runImpactAnalysis } from "@/app/(platform)/product-xray/services/premium-analysis-generator"
-import { runConvergenceStep } from "@/app/(platform)/product-xray/services/convergence-controller"
-import { enrichModules } from "@/app/(platform)/product-xray/services/inspiration-bridge"
+import { scanIdea as scanIdeaService, deriveProcessClassAI, refineScanAI, refineModuleAI } from "@/app/(platform)/the-forge/services/scan"
+import { matchPeopleForModules } from "@/app/(platform)/the-forge/services/people"
+import { matchSuppliersForModule } from "@/app/(platform)/the-forge/services/suppliers"
+import { generateModuleImage, generateSystemImage } from "@/app/(platform)/the-forge/services/image-generator"
+import { generateModuleCadModel } from "@/app/(platform)/the-forge/services/cad-generator"
+import { runStructuralAnalysis } from "@/app/(platform)/the-forge/services/fea-generator"
+import { runCfdAnalysis } from "@/app/(platform)/the-forge/services/cfd-generator"
+import { runTopologyOptimization } from "@/app/(platform)/the-forge/services/topo-generator"
+import { runThermalAnalysis } from "@/app/(platform)/the-forge/services/thermal-generator"
+import { runEmiAnalysis, runFatigueAnalysis, runImpactAnalysis } from "@/app/(platform)/the-forge/services/premium-analysis-generator"
+import { runConvergenceStep } from "@/app/(platform)/the-forge/services/convergence-controller"
+import { enrichModules } from "@/app/(platform)/the-forge/services/inspiration-bridge"
 
-import type { XRaySpec, ModuleSpec, SystemAnalysis, ModuleAnalysis } from "@/app/(platform)/product-xray/services/xray-schema"
-import type { PersonMatch } from "@/app/(platform)/product-xray/services/people"
-import type { SupplierMatch } from "@/app/(platform)/product-xray/services/suppliers"
-import type { ModuleEnrichment } from "@/app/(platform)/product-xray/services/inspiration-bridge"
-import type { ConvergenceEvaluation, ProposedChange } from "@/app/(platform)/product-xray/services/convergence-controller"
+import type { XRaySpec, ModuleSpec, SystemAnalysis, ModuleAnalysis } from "@/app/(platform)/the-forge/services/xray-schema"
+import type { PersonMatch } from "@/app/(platform)/the-forge/services/people"
+import type { SupplierMatch } from "@/app/(platform)/the-forge/services/suppliers"
+import type { ModuleEnrichment } from "@/app/(platform)/the-forge/services/inspiration-bridge"
+import type { ConvergenceEvaluation, ProposedChange } from "@/app/(platform)/the-forge/services/convergence-controller"
 import type { Json } from "@/types/database.types"
 
 // ─── Scan Actions ────────────────────────────────────────────────────

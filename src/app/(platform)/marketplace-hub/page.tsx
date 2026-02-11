@@ -1,0 +1,19 @@
+/**
+ * @file page.tsx — "Marketplace" section intro page
+ *
+ * @description High-impact visual overview of the Marketplace: Guild, Apprenticeship,
+ * Inspiration, Marketplace store, and Orders. Users visit this to understand the scope
+ * of the "Marketplace" section and see what's new.
+ */
+
+import type { Metadata } from "next"
+import { MarketplaceSectionIntro } from "./marketplace-section-intro"
+
+export const metadata: Metadata = {
+    title: "Marketplace | ForgeOS",
+    description: "Recruits and supplies — find people, services, and inspiration",
+}
+
+export default function MarketplaceHubPage(): React.ReactNode {
+    return <MarketplaceSectionIntro />
+}

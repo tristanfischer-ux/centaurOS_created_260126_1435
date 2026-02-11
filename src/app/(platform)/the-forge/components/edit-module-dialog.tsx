@@ -263,7 +263,7 @@ export function EditModuleDialog({
     try {
       const refined = await onRefineWithAI(draft)
       setDraft(refined)
-      toast.success("Module refined by AI — review changes before saving")
+      toast.success("Module refined — review changes before saving")
     } catch {
       // Error already toasted by the parent callback
     } finally {
@@ -475,7 +475,7 @@ export function EditModuleDialog({
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4 mr-2" />
-                    Refine with AI
+                    Refine
                   </>
                 )}
               </Button>

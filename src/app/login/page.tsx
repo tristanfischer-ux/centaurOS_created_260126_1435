@@ -1,169 +1,19 @@
-'use client'
+/**
+ * @file page.tsx — Login page (server wrapper for dynamic rendering)
+ *
+ * @description Forces dynamic rendering to avoid webpack prerender errors
+ * with server action references. The actual UI is in the client LoginView.
+ */
 
 import { Suspense } from 'react'
-import { useFormStatus } from 'react-dom'
-import { useSearchParams } from 'next/navigation'
-import { login } from './actions'
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import Image from 'next/image'
+import { LoginView } from './login-view'
 
-function SubmitButton() {
-    const { pending } = useFormStatus()
+export const dynamic = 'force-dynamic'
 
+export default function LoginPage(): React.ReactNode {
     return (
-        <Button
-            formAction={login}
-            className="w-full h-12 bg-accent hover:bg-accent/90 text-white font-medium tracking-wide uppercase text-sm transition-all duration-300 shadow-md hover:shadow-lg"
-            disabled={pending}
-        >
-            {pending ? 'Initializing Session...' : 'Access Foundry'}
-        </Button>
-    )
-}
-
-function ErrorMessage() {
-    const searchParams = useSearchParams()
-    const error = searchParams.get('error')
-
-    if (!error) return null
-
-    return (
-        <div 
-            role="alert" 
-            aria-live="polite"
-            className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-sm mb-6 flex items-center gap-3"
-        >
-            <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" aria-hidden="true" />
-            {error}
-        </div>
-    )
-}
-
-function LoginForm() {
-    const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://fractionalforge.app'
-    
-    return (
-        <div className="w-full max-w-sm mx-auto space-y-8 relative z-10">
-            <div className="space-y-2">
-                <a href={marketingDomain} className="inline-block mb-8 group">
-                    <span className="text-xs font-bold tracking-[0.3em] uppercase text-muted-foreground group-hover:text-international-orange transition-colors">
-                        ← Return to Site
-                    </span>
-                </a>
-                
-                <div className="mb-8">
-                    <h2 className="text-sm font-bold tracking-[0.2em] uppercase text-international-orange">
-                        Fractional Forge
-                    </h2>
-                </div>
-                
-                <div className="space-y-2">
-                    <h1 className="text-4xl font-display font-semibold text-foreground tracking-tight">
-                        Welcome Back.
-                    </h1>
-                    <p className="text-muted-foreground text-sm leading-relaxed">
-                        Enter your credentials to access <span className="font-semibold text-foreground">ForgeOS</span>.
-                    </p>
-                </div>
-            </div>
-
-            <form className="space-y-6">
-                <Suspense fallback={null}>
-                    <ErrorMessage />
-                </Suspense>
-
-                <div className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="email" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                            Email Address
-                            <span className="text-destructive ml-1" aria-label="required">*</span>
-                        </Label>
-                        <Input
-                            id="email"
-                            name="email"
-                            type="email"
-                            placeholder="you@company.com"
-                            autoFocus
-                            autoComplete="off"
-                            required
-                            aria-required="true"
-                            className="h-11 bg-background border focus:border-international-orange focus:ring-international-orange/20 transition-all font-medium"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="password" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                            Password
-                            <span className="text-destructive ml-1" aria-label="required">*</span>
-                        </Label>
-                        <Input
-                            id="password"
-                            name="password"
-                            type="password"
-                            autoComplete="current-password"
-                            required
-                            aria-required="true"
-                            className="h-11 bg-background border focus:border-international-orange focus:ring-international-orange/20 transition-all font-medium font-mono tracking-widest"
-                        />
-                    </div>
-                </div>
-
-                <SubmitButton />
-
-                <div className="text-center pt-4">
-                    <span className="text-xs text-muted-foreground">
-                        Protected by Forge Security Layer v4.3
-                    </span>
-                </div>
-            </form>
-        </div>
-    )
-}
-
-export default function LoginPage() {
-    return (
-        <div className="min-h-screen flex w-full bg-background">
-            {/* Left Side - Hero Image */}
-            <div className="hidden lg:flex w-1/2 relative bg-muted overflow-hidden">
-                <Image
-                    src="/images/forge-hero-working.png"
-                    alt="Team converting ideas to products, 3D printing a rocket engine"
-                    fill
-                    className="object-cover object-left"
-                    priority
-                    quality={100}
-                />
-
-                {/* Subtle Gradient for Text Readability */}
-                <div className="absolute inset-0 z-10 bg-gradient-to-t from-white/90 via-white/20 to-transparent" />
-
-                <div className="relative z-20 flex flex-col justify-end p-12 h-full text-foreground pb-20">
-                    <div className="h-1 w-20 bg-international-orange mb-6 shadow-[0_0_15px_rgba(255,69,0,0.6)]" />
-                    <h3 className="text-sm font-bold tracking-[0.2em] uppercase text-international-orange mb-2">
-                        Fractional Forge
-                    </h3>
-                    <h2 className="text-5xl font-display font-medium leading-[1.1] mb-6 tracking-tight drop-shadow-sm">
-                        We build atoms at the
-                        <br />
-                        <span className="text-international-orange">speed of bits.</span>
-                    </h2>
-                    <div className="flex items-center gap-4 text-sm font-mono text-muted-foreground tracking-wider uppercase font-semibold">
-                        <span>System Status: Optimal</span>
-                        <span className="h-2 w-2 rounded-full bg-international-orange animate-pulse shadow-[0_0_10px_rgba(255,69,0,0.8)]" />
-                        <span>Latency: 12ms</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Right Side - Login Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12 relative bg-background">
-                {/* Background Pattern for Right Side */}
-                <div
-                    className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#ea580c_1px,transparent_1px)] bg-[length:32px_32px]"
-                />
-                <LoginForm />
-            </div>
-        </div>
+        <Suspense fallback={null}>
+            <LoginView />
+        </Suspense>
     )
 }

@@ -34,10 +34,13 @@ import traceback
 topo_image = (
     modal.Image.from_registry("continuumio/miniconda3:24.7.1-0")
     .run_commands(
-        "conda install -y -c conda-forge python=3.11 cadquery=2.4 gmsh=4.12 "
+        "apt-get update -qq && apt-get install -y -qq libosmesa6 libgl1-mesa-glx libglu1-mesa "
+        "libxcursor1 libxft2 libxinerama1 libxrandr2 libfltk1.3 && apt-get clean",
+        "conda install -y -c conda-forge python=3.11 cadquery=2.4 "
         "calculix=2.21 matplotlib=3.8 numpy=1.26 scipy=1.12 -q",
         "conda clean -afy",
     )
+    .pip_install("gmsh", "fastapi[standard]")
 )
 
 app = modal.App("forgeos-topo")

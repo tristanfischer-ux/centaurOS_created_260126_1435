@@ -283,7 +283,7 @@ function DiagnosticQuestionnaire({
               {isDeriving ? (
                 <><Loader2 className="h-4 w-4 animate-spin mr-2" />Deriving process class...</>
               ) : (
-                <><ShieldCheck className="h-4 w-4 mr-2" />Derive process class (AI)</>
+                <><ShieldCheck className="h-4 w-4 mr-2" />Derive process class</>
               )}
             </Button>
           </div>
