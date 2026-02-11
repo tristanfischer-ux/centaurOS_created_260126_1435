@@ -326,25 +326,50 @@ export function XRayView(): React.ReactNode {
     persistSpec(next)
   }, [spec, setSpec, persistSpec])
 
-  // ── CAD model generation (per-module, opt-in) ──────────────────────
-  const handleGenerateCadModel = useCallback(async (moduleId: string): Promise<void> => {
+  // ── CAD model generation (per-module, fire-and-forget) ──────────────
+  /**
+   * Triggers background 3D CAD model generation.
+   *
+   * @description Immediately marks the module as "generating" and persists
+   * to DB, then fires the heavy CAD generation without blocking. The user
+   * can navigate away safely — the server action completes independently.
+   */
+  const handleGenerateCadModel = useCallback((moduleId: string): void => {
     if (!scanId) { toast.error("Scan first"); return }
-    toast.info("Generating 3D CAD model — this may take up to 2 minutes...")
-    try {
-      const result = await generateCadModelsAction(scanId, [moduleId])
-      if ("error" in result) { toast.error(result.error); return }
-      setSpec(result.spec)
-      const targetModule = result.spec.modules.find((m) => m.id === moduleId)
-      if (targetModule?.cadModel?.status === "complete") {
-        toast.success(`3D model generated for ${targetModule.name}`)
-      } else if (targetModule?.cadModel?.status === "failed") {
-        toast.error(`3D model generation failed for ${targetModule.name}`)
-      }
-    } catch (error) {
-      toast.error("CAD model generation failed")
-      console.error("[XRay] CAD generation error:", error instanceof Error ? error.message : "Unknown")
+
+    // Immediately set "generating" in local state
+    const currentSpec = specRef.current ?? spec
+    const updatedSpec: XRaySpec = {
+      ...currentSpec,
+      modules: currentSpec.modules.map((m) =>
+        m.id === moduleId
+          ? { ...m, cadModel: { status: "generating" as const, generatedAt: new Date().toISOString() } }
+          : m,
+      ),
     }
-  }, [scanId, setSpec])
+    setSpec(updatedSpec)
+
+    toast.info("Generating 3D CAD model — this may take up to 2 minutes. You can navigate away safely.")
+
+    // Persist "generating" status to DB
+    persistSpec(updatedSpec)
+
+    // Fire-and-forget — server action continues even if user navigates away
+    generateCadModelsAction(scanId, [moduleId])
+      .then((result) => {
+        if ("error" in result) { toast.error(result.error); return }
+        setSpec(result.spec)
+        const targetModule = result.spec.modules.find((m) => m.id === moduleId)
+        if (targetModule?.cadModel?.status === "complete") {
+          toast.success(`3D model generated for ${targetModule.name}`)
+        } else if (targetModule?.cadModel?.status === "failed") {
+          toast.error(`3D model generation failed for ${targetModule.name}`)
+        }
+      })
+      .catch((error) => {
+        console.warn("[XRay] CAD generation fetch interrupted (server continues):", error instanceof Error ? error.message : "Unknown")
+      })
+  }, [scanId, spec, setSpec, persistSpec])
 
   // ── Engineering analysis ────────────────────────────────────────────
   const handleRunAnalysis = useCallback(async (): Promise<void> => {

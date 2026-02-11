@@ -109,7 +109,8 @@ export interface ForgeProjectContextValue {
 
   // ── Image/CAD generation ──
   handleGenerateImages: () => void
-  handleGenerateCadModel: (moduleId: string) => Promise<void>
+  /** Fire-and-forget: starts background CAD generation that persists across navigation */
+  handleGenerateCadModel: (moduleId: string) => void
   handleRegenerateSystemCad: () => void
   isGeneratingImages: boolean
   isGeneratingSystemCad: boolean
@@ -278,6 +279,29 @@ export function ForgeProjectProvider({
               toast.success(`Concept ready: ${updatedSpec.modules.length} modules identified`)
             }
           }
+
+          // Detect background CAD model completions.
+          // When a module transitions from "generating" → "complete"/"failed",
+          // sync the full spec so the UI updates even if the user navigated
+          // to another tab within the project.
+          if (newRow.spec) {
+            const incomingSpec = newRow.spec as XRaySpec
+            const currentSpec = specRef.current
+            for (const incoming of incomingSpec.modules) {
+              const current = currentSpec.modules.find((m) => m.id === incoming.id)
+              if (
+                current?.cadModel?.status === "generating" &&
+                (incoming.cadModel?.status === "complete" || incoming.cadModel?.status === "failed")
+              ) {
+                setSpecInternal(incomingSpec)
+                specRef.current = incomingSpec
+                if (incoming.cadModel.status === "complete") {
+                  toast.success(`3D model generated for ${incoming.name}`)
+                }
+                break
+              }
+            }
+          }
         },
       )
       .subscribe()
@@ -437,22 +461,58 @@ export function ForgeProjectProvider({
       })
   }, [scanId])
 
-  // ── Generate CAD model ──
-  const handleGenerateCadModel = useCallback(async (moduleId: string): Promise<void> => {
-    toast.info("Generating 3D CAD model — this may take up to 2 minutes...")
-    try {
-      const result = await generateCadModelsAction(scanId, [moduleId])
-      if ("error" in result) { toast.error(result.error); return }
-      setSpecInternal(result.spec)
-      specRef.current = result.spec
-      const targetModule = result.spec.modules.find((m) => m.id === moduleId)
-      if (targetModule?.cadModel?.status === "complete") {
-        toast.success(`3D model generated for ${targetModule.name}`)
-      }
-    } catch (error) {
-      toast.error("CAD model generation failed")
-      console.error("[Forge] CAD error:", error instanceof Error ? error.message : "Unknown")
+  // ── Generate CAD model (fire-and-forget for background processing) ──
+  /**
+   * Triggers 3D CAD model generation for a module.
+   *
+   * @description Immediately marks the module as "generating" in local
+   * state AND the database, then fires the heavy CAD generation server
+   * action without awaiting it. The user can navigate away freely —
+   * the server action completes independently and persists results to DB.
+   * The Realtime subscription picks up the completion and syncs state.
+   */
+  const handleGenerateCadModel = useCallback((moduleId: string): void => {
+    // 1. Immediately mark the module as "generating" in local state
+    const updatedSpec: XRaySpec = {
+      ...specRef.current,
+      modules: specRef.current.modules.map((m) =>
+        m.id === moduleId
+          ? { ...m, cadModel: { status: "generating" as const, generatedAt: new Date().toISOString() } }
+          : m,
+      ),
     }
+    setSpecInternal(updatedSpec)
+    specRef.current = updatedSpec
+
+    toast.info("Generating 3D CAD model — this may take up to 2 minutes. You can navigate away safely.")
+
+    // 2. Persist "generating" status to DB so it survives full page reloads
+    updateScanSpecAction(scanId, updatedSpec).catch((err) => {
+      console.error("[Forge] Failed to persist generating status:", err instanceof Error ? err.message : "Unknown")
+    })
+
+    // 3. Fire the heavy CAD generation — don't await.
+    //    Server action runs server-side to completion even if client navigates away.
+    //    Realtime subscription will pick up the DB update when it finishes.
+    generateCadModelsAction(scanId, [moduleId])
+      .then((result) => {
+        if ("error" in result) {
+          toast.error(result.error)
+          return
+        }
+        // Update local state if component is still mounted
+        setSpecInternal(result.spec)
+        specRef.current = result.spec
+        const targetModule = result.spec.modules.find((m) => m.id === moduleId)
+        if (targetModule?.cadModel?.status === "complete") {
+          toast.success(`3D model generated for ${targetModule.name}`)
+        }
+      })
+      .catch((error) => {
+        // Client-side fetch may have been aborted by navigation — that's fine.
+        // The server action continues running and Realtime will sync the result.
+        console.warn("[Forge] CAD generation fetch interrupted (server continues):", error instanceof Error ? error.message : "Unknown")
+      })
   }, [scanId])
 
   // ── Regenerate system 3D model ──

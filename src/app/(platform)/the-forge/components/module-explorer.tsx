@@ -85,7 +85,7 @@ interface ModuleExplorerProps {
   scanId: string | null
   onDeriveProcessClass: (moduleId: string, answers: Record<string, string>) => Promise<void>
   /** Callback to trigger 3D CAD model generation for a specific module */
-  onGenerateCadModel?: (moduleId: string) => Promise<void>
+  onGenerateCadModel?: (moduleId: string) => void
   /** Callback to open the expert interview panel for a module */
   onOpenInterview?: (m: ModuleSpec) => void
   /** Callback to open the edit module dialog for a module */
@@ -172,7 +172,7 @@ function ModuleRow({
   onModuleUpdate: (m: ModuleSpec) => void
   scanId: string | null
   onDeriveProcessClass: (moduleId: string, answers: Record<string, string>) => Promise<void>
-  onGenerateCadModel?: (moduleId: string) => Promise<void>
+  onGenerateCadModel?: (moduleId: string) => void
   onOpenInterview?: (m: ModuleSpec) => void
   onEditModule?: (m: ModuleSpec) => void
 }): React.ReactNode {
@@ -304,11 +304,10 @@ function ExpandedModuleDetail({
   onModuleUpdate: (m: ModuleSpec) => void
   scanId: string | null
   onDeriveProcessClass: (moduleId: string, answers: Record<string, string>) => Promise<void>
-  onGenerateCadModel?: (moduleId: string) => Promise<void>
+  onGenerateCadModel?: (moduleId: string) => void
   onOpenInterview?: (m: ModuleSpec) => void
 }): React.ReactNode {
   const [lightboxOpen, setLightboxOpen] = useState(false)
-  const [cadGenerating, setCadGenerating] = useState(false)
   const processClass = m.diagnostic?.derivedProcessClass
   const derivedRisks = m.diagnostic?.derivedRisks || []
 
@@ -340,7 +339,10 @@ function ExpandedModuleDetail({
               />
             </button>
             <p className="text-xs text-muted-foreground text-center mt-2 font-medium">
-              {m.name} — Technical Illustration (click to enlarge)
+              {m.name} — Conceptual Illustration (click to enlarge)
+            </p>
+            <p className="text-[10px] text-muted-foreground text-center mt-0.5 italic">
+              For illustrative purposes only — not an engineering drawing
             </p>
           </div>
 
@@ -379,8 +381,6 @@ function ExpandedModuleDetail({
       <CadModelSection
         module={m}
         onGenerate={onGenerateCadModel}
-        isGenerating={cadGenerating}
-        onGeneratingChange={setCadGenerating}
       />
 
       {/* 1c. Engineering Analysis Results */}
@@ -595,27 +595,20 @@ type SvgViewKey = typeof SVG_VIEWS[number]["key"]
 function CadModelSection({
   module: m,
   onGenerate,
-  isGenerating,
-  onGeneratingChange,
 }: {
   module: ModuleSpec
-  onGenerate?: (moduleId: string) => Promise<void>
-  isGenerating: boolean
-  onGeneratingChange: (v: boolean) => void
+  /** Fire-and-forget callback — starts background generation */
+  onGenerate?: (moduleId: string) => void
 }): React.ReactNode {
   const [activeView, setActiveView] = useState<SvgViewKey>("svgIsoUrl")
   const [svgLightboxOpen, setSvgLightboxOpen] = useState(false)
   const cadModel = m.cadModel
+  const isGenerating = cadModel?.status === "generating"
 
-  /** Trigger CAD generation */
-  async function handleGenerate(): Promise<void> {
+  /** Trigger CAD generation (fire-and-forget — safe to navigate away) */
+  function handleGenerate(): void {
     if (!onGenerate || isGenerating) return
-    onGeneratingChange(true)
-    try {
-      await onGenerate(m.id)
-    } finally {
-      onGeneratingChange(false)
-    }
+    onGenerate(m.id)
   }
 
   // No cadModel field at all — show generate button
@@ -634,20 +627,10 @@ function CadModelSection({
             variant="default"
             size="sm"
             onClick={handleGenerate}
-            disabled={isGenerating}
             className="mt-1"
           >
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Boxes className="h-4 w-4 mr-2" />
-                Generate 3D Model
-              </>
-            )}
+            <Boxes className="h-4 w-4 mr-2" />
+            Generate 3D Model
           </Button>
         )}
       </div>
@@ -655,7 +638,7 @@ function CadModelSection({
   }
 
   // Generating state
-  if (cadModel.status === "generating" || isGenerating) {
+  if (isGenerating) {
     return (
       <div className="rounded-xl border p-6 space-y-3">
         <div className="flex items-center gap-2">
@@ -666,13 +649,16 @@ function CadModelSection({
         </div>
         <div className="relative">
           <Skeleton className="h-48 w-full rounded-lg" />
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               <span className="text-xs text-muted-foreground font-medium">
                 Generating 3D model...
               </span>
             </div>
+            <span className="text-[10px] text-muted-foreground">
+              You can navigate away — this continues in the background
+            </span>
           </div>
         </div>
       </div>
