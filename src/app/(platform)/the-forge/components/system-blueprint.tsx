@@ -19,6 +19,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, lazy, Suspense } from "react"
+import { useRouter, useParams } from "next/navigation"
 
 import { motion, type Variants } from "framer-motion"
 
@@ -192,6 +193,8 @@ export function SystemBlueprint({
   isGeneratingSystemCad = false,
   onRegenerateSystemCad,
 }: SystemBlueprintProps): React.ReactNode {
+  const router = useRouter()
+  const params = useParams<{ id: string }>()
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [heroView, setHeroView] = useState<HeroView>("diagram")
   const [stlLoadFailed, setStlLoadFailed] = useState(false)
@@ -470,12 +473,11 @@ export function SystemBlueprint({
                       key={m.id}
                       type="button"
                       variants={shouldAnimate ? moduleCardVariants : undefined}
-                      onClick={() =>
-                        document.getElementById(`module-v2-${m.id}`)?.scrollIntoView({
-                          behavior: "smooth",
-                          block: "start",
-                        })
-                      }
+                      onClick={() => {
+                        if (params.id) {
+                          router.push(`/the-forge/${params.id}/dossier?module=${encodeURIComponent(m.id)}`)
+                        }
+                      }}
                       className={cn(
                         "flex flex-col gap-2 rounded-lg border p-3 text-left",
                         "transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",

@@ -1,0 +1,45 @@
+{
+  "mass_properties": {
+    "mass_kg": 0.325402,
+    "volume_mm3": 262421.16,
+    "surface_area_mm2": 22266.04,
+    "center_of_gravity": [
+      0.0,
+      -40.0,
+      18.0
+    ],
+    "moment_of_inertia": {
+      "Ixx": 202.923425,
+      "Iyy": 202.923425,
+      "Izz": 304.010741,
+      "Ixy": 0.0,
+      "Ixz": -0.0,
+      "Iyz": 0.0
+    },
+    "bounding_box": {
+      "xLen": 90.06,
+      "yLen": 90.04,
+      "zLen": 45.1,
+      "xMin": -45.02,
+      "yMin": -85.02,
+      "zMin": -4.55,
+      "xMax": 45.04,
+      "yMax": 5.02,
+      "zMax": 40.55
+    },
+    "material_density_kg_m3": 1240.0
+  },
+  "dfm": {
+    "printable": true,
+    "issues": [],
+    "estimated_print_time_min": 56.8,
+    "estimated_material_g": 113.9,
+    "support_volume_pct": 10.0,
+    "compatible_printers": [
+      "Prusa MK4",
+      "Bambu Lab X1",
+      "Creality Ender 3",
+      "Voron 2.4 350"
+    ]
+  }
+}

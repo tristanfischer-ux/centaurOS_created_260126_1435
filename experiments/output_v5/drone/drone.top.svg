@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   width="800.0"
+   height="240.0"
+
+>
+    <g transform="scale(45.0, -45.0)   translate(-80.55555555555556,-22.444444444444443)" stroke-width="0.25"  fill="none">
+       <!-- hidden lines -->
+       <g  stroke="rgb(160,160,160)" fill="none" stroke-dasharray="0.25,0.25" >
+
+       </g>
+
+       <!-- solid lines -->
+       <g  stroke="rgb(0,0,0)" fill="none">
+			<path d="M89.0,18.0 L89.0,22.0 " />
+			<path d="M85.0,18.0 L85.0,22.0 " />
+			<path d="M89.0,18.0 L85.0,18.0 " />
+			<path d="M89.0,22.0 L85.0,22.0 " />
+
+       </g>
+    </g>
+    
+</svg>
