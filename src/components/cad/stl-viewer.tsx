@@ -141,12 +141,13 @@ export function STLViewer({ stlData, backgroundColor = "#1a1a1a" }: STLViewerPro
           {/* 3D Model */}
           <STLModel stlData={stlData} />
 
-          {/* Orbit controls */}
+          {/* Orbit controls — maxDistance scales with model size so large
+              models (e.g. houses at 12 000 mm) remain fully navigable */}
           <OrbitControls
             enableDamping
             dampingFactor={0.05}
-            minDistance={10}
-            maxDistance={5000}
+            minDistance={1}
+            maxDistance={50000}
             makeDefault
           />
         </Suspense>

@@ -68,7 +68,10 @@ export interface ExecutionResult {
   svgIso?: string
   svgTop?: string
   svgFront?: string
+  svgBack?: string
+  svgLeft?: string
   svgRight?: string
+  svgExploded?: string
   step?: string
   stl?: string
   bbox?: { xLen: number; yLen: number; zLen: number }
@@ -749,7 +752,10 @@ export async function executeCode(code: string): Promise<ExecutionResult> {
       svgIso: data.svg_iso ? `data:image/svg+xml;base64,${data.svg_iso}` : undefined,
       svgTop: data.svg_top ? `data:image/svg+xml;base64,${data.svg_top}` : undefined,
       svgFront: data.svg_front ? `data:image/svg+xml;base64,${data.svg_front}` : undefined,
+      svgBack: data.svg_back ? `data:image/svg+xml;base64,${data.svg_back}` : undefined,
+      svgLeft: data.svg_left ? `data:image/svg+xml;base64,${data.svg_left}` : undefined,
       svgRight: data.svg_right ? `data:image/svg+xml;base64,${data.svg_right}` : undefined,
+      svgExploded: data.svg_exploded ? `data:image/svg+xml;base64,${data.svg_exploded}` : undefined,
       step: data.step ? "available" : undefined,
       stl: data.stl ?? undefined,
       bbox: bb ? { xLen: Math.round(bb.xLen), yLen: Math.round(bb.yLen), zLen: Math.round(bb.zLen) } : undefined,

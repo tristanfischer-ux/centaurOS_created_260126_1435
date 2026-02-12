@@ -135,7 +135,8 @@ export default function CadLabClaudePage(): React.ReactNode {
   const [showCode, setShowCode] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
   const [fullscreenView, setFullscreenView] = useState<string | null>(null)
-  const [activeViewTab, setActiveViewTab] = useState<"3d" | "iso" | "front" | "top">("3d")
+  type ViewTab = "3d" | "iso" | "exploded" | "front" | "back" | "left" | "right" | "top"
+  const [activeViewTab, setActiveViewTab] = useState<ViewTab>("3d")
 
   const isAnyRunning =
     webStatus === "running" ||
@@ -764,12 +765,16 @@ export default function CadLabClaudePage(): React.ReactNode {
                 </div>
               </CardHeader>
               <CardContent>
-                <Tabs value={activeViewTab} onValueChange={(v) => setActiveViewTab(v as typeof activeViewTab)}>
-                  <TabsList className="grid w-full grid-cols-4">
-                    {execResult.stl && <TabsTrigger value="3d">3D Model</TabsTrigger>}
-                    {execResult.svgIso && <TabsTrigger value="iso">Isometric</TabsTrigger>}
-                    {execResult.svgFront && <TabsTrigger value="front">Front</TabsTrigger>}
-                    {execResult.svgTop && <TabsTrigger value="top">Top</TabsTrigger>}
+                <Tabs value={activeViewTab} onValueChange={(v) => setActiveViewTab(v as ViewTab)}>
+                  <TabsList className="flex w-full overflow-x-auto">
+                    {execResult.stl && <TabsTrigger value="3d" className="flex-1">3D Model</TabsTrigger>}
+                    {execResult.svgIso && <TabsTrigger value="iso" className="flex-1">Isometric</TabsTrigger>}
+                    {execResult.svgExploded && <TabsTrigger value="exploded" className="flex-1">Exploded</TabsTrigger>}
+                    {execResult.svgFront && <TabsTrigger value="front" className="flex-1">Front</TabsTrigger>}
+                    {execResult.svgBack && <TabsTrigger value="back" className="flex-1">Back</TabsTrigger>}
+                    {execResult.svgLeft && <TabsTrigger value="left" className="flex-1">Left</TabsTrigger>}
+                    {execResult.svgRight && <TabsTrigger value="right" className="flex-1">Right</TabsTrigger>}
+                    {execResult.svgTop && <TabsTrigger value="top" className="flex-1">Top</TabsTrigger>}
                   </TabsList>
                   {execResult.stl && (
                     <TabsContent value="3d" className="mt-4">
@@ -782,7 +787,15 @@ export default function CadLabClaudePage(): React.ReactNode {
                     <TabsContent value="iso" className="mt-4">
                       <div className="bg-muted rounded-lg p-2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={execResult.svgIso} alt="Isometric view" className="w-full" />
+                        <img src={execResult.svgIso} alt="Isometric view" className="w-full cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setFullscreenView("iso")} />
+                      </div>
+                    </TabsContent>
+                  )}
+                  {execResult.svgExploded && (
+                    <TabsContent value="exploded" className="mt-4">
+                      <div className="bg-muted rounded-lg p-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={execResult.svgExploded} alt="Exploded isometric view" className="w-full cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setFullscreenView("exploded")} />
                       </div>
                     </TabsContent>
                   )}
@@ -790,7 +803,31 @@ export default function CadLabClaudePage(): React.ReactNode {
                     <TabsContent value="front" className="mt-4">
                       <div className="bg-muted rounded-lg p-2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={execResult.svgFront} alt="Front view" className="w-full" />
+                        <img src={execResult.svgFront} alt="Front view" className="w-full cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setFullscreenView("front")} />
+                      </div>
+                    </TabsContent>
+                  )}
+                  {execResult.svgBack && (
+                    <TabsContent value="back" className="mt-4">
+                      <div className="bg-muted rounded-lg p-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={execResult.svgBack} alt="Back view" className="w-full cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setFullscreenView("back")} />
+                      </div>
+                    </TabsContent>
+                  )}
+                  {execResult.svgLeft && (
+                    <TabsContent value="left" className="mt-4">
+                      <div className="bg-muted rounded-lg p-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={execResult.svgLeft} alt="Left view" className="w-full cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setFullscreenView("left")} />
+                      </div>
+                    </TabsContent>
+                  )}
+                  {execResult.svgRight && (
+                    <TabsContent value="right" className="mt-4">
+                      <div className="bg-muted rounded-lg p-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={execResult.svgRight} alt="Right view" className="w-full cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setFullscreenView("right")} />
                       </div>
                     </TabsContent>
                   )}
@@ -798,7 +835,7 @@ export default function CadLabClaudePage(): React.ReactNode {
                     <TabsContent value="top" className="mt-4">
                       <div className="bg-muted rounded-lg p-2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={execResult.svgTop} alt="Top view" className="w-full" />
+                        <img src={execResult.svgTop} alt="Top view" className="w-full cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setFullscreenView("top")} />
                       </div>
                     </TabsContent>
                   )}
@@ -900,36 +937,40 @@ export default function CadLabClaudePage(): React.ReactNode {
       )}
 
       {/* ── Fullscreen overlay ── */}
-      {fullscreenView && execResult && (
-        <div
-          className="fixed inset-0 z-50 bg-background/95 flex items-center justify-center p-8"
-          onClick={() => setFullscreenView(null)}
-        >
-          <button
-            className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors text-sm font-mono"
+      {fullscreenView && execResult && (() => {
+        const svgMap: Record<string, string | undefined> = {
+          iso: execResult.svgIso,
+          exploded: execResult.svgExploded,
+          front: execResult.svgFront,
+          back: execResult.svgBack,
+          left: execResult.svgLeft,
+          right: execResult.svgRight,
+          top: execResult.svgTop,
+        }
+        const svgSrc = svgMap[fullscreenView]
+
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-background/95 flex items-center justify-center p-8"
             onClick={() => setFullscreenView(null)}
           >
-            ESC to close
-          </button>
-          {fullscreenView === "3d" && execResult.stl && (
-            <div className="w-full h-full" onClick={(e) => e.stopPropagation()}>
-              <STLViewer stlData={execResult.stl} />
-            </div>
-          )}
-          {fullscreenView === "iso" && execResult.svgIso && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={execResult.svgIso} alt="Isometric view" className="max-w-full max-h-full object-contain" />
-          )}
-          {fullscreenView === "front" && execResult.svgFront && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={execResult.svgFront} alt="Front view" className="max-w-full max-h-full object-contain" />
-          )}
-          {fullscreenView === "top" && execResult.svgTop && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={execResult.svgTop} alt="Top view" className="max-w-full max-h-full object-contain" />
-          )}
-        </div>
-      )}
+            <button
+              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors text-sm font-mono"
+              onClick={() => setFullscreenView(null)}
+            >
+              ESC to close
+            </button>
+            {fullscreenView === "3d" && execResult.stl ? (
+              <div className="w-full h-full" onClick={(e) => e.stopPropagation()}>
+                <STLViewer stlData={execResult.stl} />
+              </div>
+            ) : svgSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={svgSrc} alt={`${fullscreenView} view`} className="max-w-full max-h-full object-contain" />
+            ) : null}
+          </div>
+        )
+      })()}
     </div>
   )
 }
