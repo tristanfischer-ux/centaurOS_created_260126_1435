@@ -22,6 +22,7 @@ const config: Config = {
     testPathIgnorePatterns: [
         '<rootDir>/node_modules/',
         '<rootDir>/e2e/',
+        '<rootDir>/tests/e2e/',
     ],
     // Only match test files with .test. or .spec. patterns
     testMatch: [

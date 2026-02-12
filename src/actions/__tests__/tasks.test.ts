@@ -11,21 +11,31 @@ const VALID_ASSIGNEE_ID = '550e8400-e29b-41d4-a716-446655440005'
 const VALID_MEMBER_ID = '550e8400-e29b-41d4-a716-446655440006'
 const VALID_OTHER_USER_ID = '550e8400-e29b-41d4-a716-446655440007'
 
+// Helper to create a deeply chainable eq mock that resolves at any depth
+const createChainableEq = (data: unknown = null, error: unknown = null): jest.Mock => {
+    const eqMock: jest.Mock = jest.fn().mockImplementation(() => ({
+        eq: eqMock,
+        single: jest.fn().mockResolvedValue({ data, error }),
+        maybeSingle: jest.fn().mockResolvedValue({ data, error }),
+        is: jest.fn().mockImplementation(() => ({
+            eq: eqMock,
+            single: jest.fn().mockResolvedValue({ data, error }),
+            maybeSingle: jest.fn().mockResolvedValue({ data, error }),
+        })),
+        then: (resolve: (v: unknown) => void) => Promise.resolve({ data, error }).then(resolve),
+    }))
+    return eqMock
+}
+
 // Helper to create chainable mock
 const createChainableMock = (data: unknown = null, error: unknown = null) => ({
     select: jest.fn().mockReturnValue({
-        eq: jest.fn().mockReturnValue({
-            eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data, error }),
-                maybeSingle: jest.fn().mockResolvedValue({ data, error }),
-            }),
-            single: jest.fn().mockResolvedValue({ data, error }),
-            maybeSingle: jest.fn().mockResolvedValue({ data, error }),
-        }),
+        eq: createChainableEq(data, error),
         single: jest.fn().mockResolvedValue({ data, error }),
+        in: jest.fn().mockResolvedValue({ data: data ? [data] : [], error }),
     }),
     update: jest.fn().mockReturnValue({
-        eq: jest.fn().mockResolvedValue({ data, error }),
+        eq: createChainableEq(data, error),
     }),
     insert: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
@@ -33,8 +43,9 @@ const createChainableMock = (data: unknown = null, error: unknown = null) => ({
         }),
     }),
     delete: jest.fn().mockReturnValue({
-        eq: jest.fn().mockResolvedValue({ data, error }),
+        eq: createChainableEq(data, error),
     }),
+    upsert: jest.fn().mockResolvedValue({ data, error }),
 })
 
 // Mock Supabase
@@ -100,7 +111,7 @@ describe('Task Actions', () => {
                             })
                         }),
                         update: jest.fn().mockReturnValue({
-                            eq: jest.fn().mockResolvedValue({ error: null })
+                            eq: createChainableEq(null, null)
                         })
                     }
                 }
@@ -129,7 +140,7 @@ describe('Task Actions', () => {
                             })
                         }),
                         update: jest.fn().mockReturnValue({
-                            eq: jest.fn().mockResolvedValue({ error: null })
+                            eq: createChainableEq(null, null)
                         })
                     }
                 }
@@ -164,7 +175,7 @@ describe('Task Actions', () => {
                             })
                         }),
                         update: jest.fn().mockReturnValue({
-                            eq: jest.fn().mockResolvedValue({ error: null })
+                            eq: createChainableEq(null, null)
                         })
                     }
                 }
@@ -210,7 +221,7 @@ describe('Task Actions', () => {
                             })
                         }),
                         update: jest.fn().mockReturnValue({
-                            eq: jest.fn().mockResolvedValue({ error: null })
+                            eq: createChainableEq(null, null)
                         })
                     }
                 }
@@ -256,7 +267,7 @@ describe('Task Actions', () => {
                             })
                         }),
                         update: jest.fn().mockReturnValue({
-                            eq: jest.fn().mockResolvedValue({ error: null })
+                            eq: createChainableEq(null, null)
                         })
                     }
                 }
@@ -306,7 +317,7 @@ describe('Task Actions', () => {
                             })
                         }),
                         update: jest.fn().mockReturnValue({
-                            eq: jest.fn().mockResolvedValue({ error: null })
+                            eq: createChainableEq(null, null)
                         })
                     }
                 }
@@ -365,7 +376,7 @@ describe('Task Actions', () => {
                             })
                         }),
                         update: jest.fn().mockReturnValue({
-                            eq: jest.fn().mockResolvedValue({ error: null })
+                            eq: createChainableEq(null, null)
                         })
                     }
                 }
@@ -516,7 +527,7 @@ describe('Task Actions', () => {
                             })
                         }),
                         update: jest.fn().mockReturnValue({
-                            eq: jest.fn().mockResolvedValue({ error: null })
+                            eq: createChainableEq(null, null)
                         })
                     }
                 }
