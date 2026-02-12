@@ -17,7 +17,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Waypoints, Pencil, Banknote, Calculator, Link2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { StatusBadge } from '@/components/ui/status-badge'
 
 import StrategyRiver, { computeRiverStats } from '@/components/canvas/StrategyRiver'
 import { goalBundlesToRiverData } from '@/lib/canvas/strategy-river-adapter'
@@ -73,7 +74,7 @@ interface CanvasShellProps {
 // CONSTANTS
 // ============================================================================
 
-const TABS: { id: CanvasTab; label: string; icon: React.ElementType }[] = [
+const TABS: { id: CanvasTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'river', label: 'Strategy River', icon: Waypoints },
   { id: 'link-objectives', label: 'Link Objectives', icon: Link2 },
   { id: 'whiteboards', label: 'Whiteboards', icon: Pencil },
@@ -254,47 +255,36 @@ export function CanvasShell({
       )}
 
       {/* Tab bar with status badges */}
-      <div className="flex items-center gap-1 px-4 sm:px-6 lg:px-8 py-2 border-b border-slate-100 bg-background" role="tablist" aria-label="Strategy views">
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.id
-          const Icon = tab.icon
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CanvasTab)}>
+        <div className="flex items-center px-4 sm:px-6 lg:px-8 py-2 border-b border-slate-100 bg-background">
+          <TabsList aria-label="Strategy views">
+            {TABS.map((tab) => {
+              const Icon = tab.icon
+              return (
+                <TabsTrigger key={tab.id} value={tab.id}>
+                  <Icon className="h-4 w-4 mr-1.5" />
+                  {tab.label}
+                </TabsTrigger>
+              )
+            })}
+          </TabsList>
 
-          return (
-            <button
-              key={tab.id}
-              role="tab"
-              aria-selected={isActive}
-              aria-controls={`tabpanel-${tab.id}`}
-              id={`tab-${tab.id}`}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-                isActive
-                  ? 'bg-international-orange-light text-international-orange'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-            </button>
-          )
-        })}
-
-        {/* Status badges — shown when river tab active and has data */}
-        {activeTab === 'river' && riverData.length > 0 && (
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-status-success-light text-status-success">
-              ✓ {riverStats.done} done
-            </span>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-status-warning-light text-status-warning">
-              ⚡ {riverStats.inProgress} in progress
-            </span>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
-              ○ {riverStats.notStarted} not started
-            </span>
-          </div>
-        )}
-      </div>
+          {/* Status badges — shown when river tab active and has data */}
+          {activeTab === 'river' && riverData.length > 0 && (
+            <div className="ml-auto flex items-center gap-2">
+              <StatusBadge status="success" size="sm" dot>
+                {riverStats.done} done
+              </StatusBadge>
+              <StatusBadge status="warning" size="sm" dot>
+                {riverStats.inProgress} in progress
+              </StatusBadge>
+              <StatusBadge status="pending" size="sm" dot>
+                {riverStats.notStarted} not started
+              </StatusBadge>
+            </div>
+          )}
+        </div>
+      </Tabs>
 
       {/* Tab content */}
       <div id="tabpanel-river" role="tabpanel" aria-labelledby="tab-river" className={activeTab === 'river' ? 'block' : 'hidden'}>
