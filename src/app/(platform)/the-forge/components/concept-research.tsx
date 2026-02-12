@@ -162,6 +162,24 @@ export function ConceptResearch({
     }
   }, [idea, scanId, onResearchComplete])
 
+  // ── Auto-trigger research when idea exists but no report yet ──
+  // This removes the need for a separate "Research Product" button click.
+  // Runs once when the component mounts with a valid idea and no existing report.
+  const hasAutoTriggered = React.useRef(false)
+  useEffect(() => {
+    if (
+      idea.trim() &&
+      !hasReport &&
+      !isResearching &&
+      !isScanning &&
+      !savedResearch?.report &&
+      !hasAutoTriggered.current
+    ) {
+      hasAutoTriggered.current = true
+      handleResearch()
+    }
+  }, [idea, hasReport, isResearching, isScanning, savedResearch, handleResearch])
+
   // ── Save edited report ──
   const handleSaveEdits = useCallback(async (): Promise<void> => {
     try {
@@ -222,7 +240,7 @@ export function ConceptResearch({
           </Alert>
         )}
 
-        {/* Research button — show when no report yet or user wants to re-research */}
+        {/* Waiting state — shown when no report yet and not researching (auto-trigger pending) */}
         {!hasReport && !isResearching && (
           <div className="flex flex-col items-center gap-3 py-6">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-international-orange/10">
@@ -233,18 +251,11 @@ export function ConceptResearch({
                 Deep Product Research
               </p>
               <p className="text-sm text-muted-foreground">
-                Searches the web for specifications, competitors, materials, and engineering
+                Research will start automatically once your concept is ready. It searches
+                the web for specifications, competitors, materials, and engineering
                 considerations — then synthesizes everything into a structured report.
               </p>
             </div>
-            <Button
-              onClick={handleResearch}
-              disabled={!idea.trim() || isScanning}
-              className="bg-international-orange hover:bg-international-orange-hover text-white gap-2 h-11"
-            >
-              <Search className="h-4 w-4" />
-              Research Product
-            </Button>
           </div>
         )}
 

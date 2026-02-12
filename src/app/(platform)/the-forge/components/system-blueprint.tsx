@@ -1,24 +1,20 @@
 /**
- * @file system-blueprint.tsx — System diagram hero + 3D viewer + module status grid
+ * @file system-blueprint.tsx — System diagram hero + module status grid
  *
- * @description Displays the system-level visuals on the concept page:
- * 1. Hero section: Interactive 3D CAD viewer (when ready), system diagram, or generation skeleton
+ * @description Displays the system-level visuals on the dossier summary:
+ * 1. Hero section: System diagram image or generation skeleton
  * 2. Module Status Grid: per-module progress tracking with stagger animation
  *
- * The hero section prioritizes visual impact:
- * - System image appears first (~15s via Gemini)
- * - 3D CAD model replaces/augments it when ready (~60-120s via Modal)
- * - User can toggle between "3D Model" and "System Diagram" views
+ * 3D CAD model rendering has been removed for the time being.
+ * The hero section shows only the system diagram image.
  *
  * @related
  * - Schema: ../services/xray-schema.ts (XRaySpec, ModuleSpec)
- * - STL viewer: ./stl-viewer.tsx (3D rendering)
- * - CAD generator: ../services/cad-generator.ts (produces STL)
  */
 
 "use client"
 
-import React, { useState, useRef, useEffect, lazy, Suspense } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 
@@ -35,9 +31,7 @@ import {
   CheckCircle2,
   Cog,
   ImageIcon,
-  Layers,
   Loader2,
-  RotateCcw,
   ShieldAlert,
   Sparkles,
   X,
@@ -46,11 +40,6 @@ import { cn } from "@/lib/utils"
 
 import { ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import type { XRaySpec, ModuleSpec } from "../services/xray-schema"
-
-// Lazy-load the 3D viewer to avoid loading three.js until needed
-const StlViewer = lazy(() =>
-  import("./stl-viewer").then((mod) => ({ default: mod.StlViewer })),
-)
 
 // ─── Status Helpers ───────────────────────────────────────────────────
 
@@ -114,10 +103,6 @@ function isGatingDiagComplete(spec: XRaySpec): boolean {
   return !!gating.diagnostic?.derivedProcessClass
 }
 
-// ─── Hero View Types ──────────────────────────────────────────────────
-
-type HeroView = "3d" | "diagram" | "exploded"
-
 // ─── Animation Variants ──────────────────────────────────────────────
 
 /** Parent container variant — orchestrates stagger timing */
@@ -165,22 +150,18 @@ interface SystemBlueprintProps {
   canGenerate: boolean
   /** Whether a scan just completed (triggers stagger animation) */
   justScanned?: boolean
-  /** Whether the system CAD model is currently generating */
-  isGeneratingSystemCad?: boolean
-  /** Called to regenerate the system 3D model (after load failure) */
-  onRegenerateSystemCad?: () => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────
 
 /**
- * SystemBlueprint — Hero visual section with 3D viewer + module status grid.
+ * SystemBlueprint — Hero visual section with system diagram + module status grid.
  *
- * @description Prioritizes visual impact on the concept page:
- * 1. System image appears first (fast, ~15s)
- * 2. 3D CAD viewer activates when STL is ready (slower, ~60-120s)
- * 3. User can toggle between views
- * 4. Module status grid shows progress below
+ * @description Displays the system-level diagram and module progress:
+ * 1. System diagram image appears as the hero visual
+ * 2. Module status grid shows per-module progress below
+ *
+ * 3D CAD model rendering has been removed for the time being.
  */
 export function SystemBlueprint({
   spec,
@@ -191,13 +172,9 @@ export function SystemBlueprint({
   onGenerateImages,
   canGenerate,
   justScanned = false,
-  isGeneratingSystemCad = false,
-  onRegenerateSystemCad,
 }: SystemBlueprintProps): React.ReactNode {
   const params = useParams<{ id: string }>()
   const [lightboxOpen, setLightboxOpen] = useState(false)
-  const [heroView, setHeroView] = useState<HeroView>("diagram")
-  const [stlLoadFailed, setStlLoadFailed] = useState(false)
   const hasAnimatedRef = useRef(false)
   const shouldAnimate = justScanned && !hasAnimatedRef.current
 
@@ -207,16 +184,6 @@ export function SystemBlueprint({
     }
   }, [justScanned])
 
-  // Auto-switch to 3D view when the CAD model becomes available
-  const hasSystemCad = spec.systemCadUrl && spec.systemCadStatus === "complete"
-  const prevHadCad = useRef(false)
-  useEffect(() => {
-    if (hasSystemCad && !prevHadCad.current) {
-      setHeroView("3d")
-      prevHadCad.current = true
-    }
-  }, [hasSystemCad])
-
   const modules = spec.modules || []
   const n = modules.length
   const hasSystemImage = systemImageUrl && systemImageStatus === "complete"
@@ -224,7 +191,7 @@ export function SystemBlueprint({
   const diagComplete = isGatingDiagComplete(spec)
 
   // If no images at all and not generating, show the CTA
-  if (!hasSystemImage && !isGenerating && !hasImages && !hasSystemCad) {
+  if (!hasSystemImage && !isGenerating && !hasImages) {
     return (
       <Card className="rounded-xl shadow-sm border border-dashed border-muted-foreground/20">
         <CardContent className="py-12 flex flex-col items-center gap-4">
@@ -256,7 +223,7 @@ export function SystemBlueprint({
     <>
       <Card className="rounded-xl shadow-sm">
         <CardContent className="pt-6 pb-6 space-y-6">
-          {/* Header with view toggle */}
+          {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-1 h-7 bg-international-orange rounded-full" />
@@ -265,62 +232,16 @@ export function SystemBlueprint({
                   System Blueprint
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  {heroView === "3d"
-                    ? "Interactive 3D product model — drag to rotate, scroll to zoom"
-                    : "System-level process flow diagram"}
+                  System-level process flow diagram
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {/* View toggle — only show when both views available */}
-              {hasSystemCad && hasSystemImage && (
-                <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
-                  <button
-                    onClick={() => setHeroView("3d")}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                      heroView === "3d"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    <Box className="h-3.5 w-3.5" />
-                    3D Model
-                  </button>
-                  {spec.systemCadExplodedSvgUrl && (
-                    <button
-                      onClick={() => setHeroView("exploded")}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                        heroView === "exploded"
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      <Layers className="h-3.5 w-3.5" />
-                      Exploded
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setHeroView("diagram")}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                      heroView === "diagram"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    <ImageIcon className="h-3.5 w-3.5" />
-                    Diagram
-                  </button>
-                </div>
-              )}
-
-              {/* Generation indicators */}
-              {(isGenerating || isGeneratingSystemCad) && (
+              {/* Generation indicator */}
+              {isGenerating && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  {isGeneratingSystemCad ? "Building 3D model..." : "Generating images..."}
+                  Generating images...
                 </div>
               )}
               {n > 0 && (
@@ -332,98 +253,8 @@ export function SystemBlueprint({
             </div>
           </div>
 
-          {/* Hero Section — 3D viewer or system diagram */}
-          {heroView === "3d" && hasSystemCad && !stlLoadFailed ? (
-            <div className="space-y-2">
-              <Suspense fallback={<Skeleton className="h-[500px] w-full rounded-xl" />}>
-                <StlViewer
-                  stlUrl={spec.systemCadUrl!}
-                  height={500}
-                  onLoadError={() => {
-                    // Auto-fallback to diagram view when 3D fails to load
-                    setStlLoadFailed(true)
-                    setHeroView("diagram")
-                  }}
-                />
-              </Suspense>
-              <p className="text-xs text-muted-foreground text-center font-medium">
-                Interactive 3D Product Model — Drag to rotate, scroll to zoom
-              </p>
-            </div>
-          ) : heroView === "3d" && isGeneratingSystemCad ? (
-            /* 3D view selected but still generating */
-            <div className="relative rounded-xl overflow-hidden">
-              <Skeleton className="h-[500px] w-full" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3 bg-background/90 rounded-2xl px-8 py-5 shadow-sm">
-                  <RotateCcw className="h-8 w-8 animate-spin text-international-orange" style={{ animationDuration: "3s" }} />
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-foreground">Building 3D model...</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Generating CadQuery code and rendering the product
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : heroView === "3d" && (spec.systemCadStatus === "failed" || stlLoadFailed) ? (
-            /* 3D generation failed or STL failed to load — offer retry + diagram fallback */
-            <div className="rounded-xl border border-dashed border-muted-foreground/20 flex flex-col items-center justify-center gap-3 py-16">
-              <AlertTriangle className="h-8 w-8 text-muted-foreground" />
-              <div className="text-center space-y-1">
-                <p className="text-sm font-medium text-foreground">
-                  {stlLoadFailed ? "3D model failed to load" : "3D model generation failed"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {stlLoadFailed
-                    ? "The model file could not be rendered. Try regenerating it."
-                    : "The product geometry was too complex to render."}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {onRegenerateSystemCad && (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => {
-                      setStlLoadFailed(false)
-                      onRegenerateSystemCad()
-                    }}
-                    className="bg-international-orange hover:bg-international-orange-hover text-white"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                    Regenerate 3D Model
-                  </Button>
-                )}
-                {hasSystemImage && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setHeroView("diagram")}
-                  >
-                    <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
-                    View Diagram
-                  </Button>
-                )}
-              </div>
-            </div>
-          ) : heroView === "exploded" && spec.systemCadExplodedSvgUrl ? (
-            /* Exploded isometric view — shows all subsystems separated */
-            <div className="space-y-2">
-              <div className="w-full rounded-xl overflow-hidden border bg-background p-6">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={spec.systemCadExplodedSvgUrl}
-                  alt="Exploded isometric view showing all subsystems separated"
-                  className="w-full h-auto object-contain max-h-[600px]"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground text-center font-medium">
-                Exploded Isometric View — All subsystems separated along assembly axes
-              </p>
-            </div>
-          ) : hasSystemImage ? (
-            /* System diagram view */
+          {/* Hero Section — system diagram only */}
+          {hasSystemImage ? (
             <>
               <button
                 onClick={() => setLightboxOpen(true)}

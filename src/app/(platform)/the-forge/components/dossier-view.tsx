@@ -73,7 +73,6 @@ export function DossierView(): React.ReactNode {
     scanId,
     handleModuleUpdate,
     handleDeriveProcessClass,
-    handleGenerateCadModel,
     handleRefineModule,
     handleRunAnalysis,
     handleRunStructural,
@@ -90,9 +89,7 @@ export function DossierView(): React.ReactNode {
     isRunningPremium,
     // Summary tab needs these for SystemBlueprint
     isGeneratingImages,
-    isGeneratingSystemCad,
     handleGenerateImages,
-    handleRegenerateSystemCad,
   } = useForgeProject()
 
   // Read query params for deep-linking
@@ -159,16 +156,14 @@ export function DossierView(): React.ReactNode {
             {/* Executive metrics first — "at a glance" numbers */}
             <ExecutiveDashboard spec={spec} />
 
-            {/* System Blueprint — 3D model, diagram, module status grid */}
+            {/* System Blueprint — diagram + module status grid */}
             <SystemBlueprint
               spec={spec}
               systemImageUrl={spec.systemImageUrl}
               systemImageStatus={spec.systemImageStatus}
               isGeneratingImages={isGeneratingImages}
-              isGeneratingSystemCad={isGeneratingSystemCad}
               hasImages={spec.modules.some((m) => m.imageStatus === "complete")}
               onGenerateImages={handleGenerateImages}
-              onRegenerateSystemCad={handleRegenerateSystemCad}
               canGenerate={!!scanId}
             />
 
@@ -183,7 +178,6 @@ export function DossierView(): React.ReactNode {
             onModuleUpdate={handleModuleUpdate}
             scanId={scanId}
             onDeriveProcessClass={handleDeriveProcessClass}
-            onGenerateCadModel={handleGenerateCadModel}
             onOpenInterview={setInterviewModule}
             onEditModule={setEditingModule}
             defaultExpandedId={focusModuleId ?? undefined}

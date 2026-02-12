@@ -26,8 +26,6 @@ import {
   deriveProcessClassAction,
   generateImagesAction,
   generateModuleImagesAction,
-  generateSystemCadAction,
-  generateCadModelsAction,
   analyzeModulesAction,
   runStructuralAnalysisAction,
   runThermalAnalysisAction,
@@ -113,13 +111,9 @@ export interface ForgeProjectContextValue {
   handleRefineModule: (editedModule: ModuleSpec) => Promise<ModuleSpec>
   handleDeriveProcessClass: (moduleId: string, answers: Record<string, string>) => Promise<void>
 
-  // ── Image/CAD generation ──
+  // ── Image generation ──
   handleGenerateImages: () => void
-  /** Fire-and-forget: starts background CAD generation that persists across navigation */
-  handleGenerateCadModel: (moduleId: string) => void
-  handleRegenerateSystemCad: () => void
   isGeneratingImages: boolean
-  isGeneratingSystemCad: boolean
 
   // ── Engineering analysis ──
   handleRunAnalysis: () => Promise<void>
@@ -219,7 +213,6 @@ export function ForgeProjectProvider({
   const [spec, setSpecInternal] = useState<XRaySpec>(initialProject.spec)
   const [isScanning, setIsScanning] = useState(false)
   const [isGeneratingImages, setIsGeneratingImages] = useState(false)
-  const [isGeneratingSystemCad, setIsGeneratingSystemCad] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isRunningStructural, setIsRunningStructural] = useState(false)
   const [isRunningConvergence, setIsRunningConvergence] = useState(false)
@@ -286,26 +279,13 @@ export function ForgeProjectProvider({
             }
           }
 
-          // Detect background CAD model completions.
-          // When a module transitions from "generating" → "complete"/"failed",
-          // sync the full spec so the UI updates even if the user navigated
-          // to another tab within the project.
-          if (newRow.spec) {
+          // Sync spec on any update (e.g. image generation completions)
+          if (newRow.spec && newRow.scan_status !== "complete") {
             const incomingSpec = newRow.spec as XRaySpec
-            const currentSpec = specRef.current
-            for (const incoming of incomingSpec.modules) {
-              const current = currentSpec.modules.find((m) => m.id === incoming.id)
-              if (
-                current?.cadModel?.status === "generating" &&
-                (incoming.cadModel?.status === "complete" || incoming.cadModel?.status === "failed")
-              ) {
-                setSpecInternal(incomingSpec)
-                specRef.current = incomingSpec
-                if (incoming.cadModel.status === "complete") {
-                  toast.success(`3D model generated for ${incoming.name}`)
-                }
-                break
-              }
+            // Only update if the incoming spec has data we don't
+            if (incomingSpec.modules?.length > 0) {
+              setSpecInternal(incomingSpec)
+              specRef.current = incomingSpec
             }
           }
         },
@@ -344,7 +324,7 @@ export function ForgeProjectProvider({
     setSpec(next)
   }, [setSpec])
 
-  // ── Generate images (orchestrated: system image first, then CAD + module images in parallel) ──
+  // ── Generate images (system image first, then module images in parallel) ──
   // Defined before handleRefineScan because it's referenced in its dependency array.
   const handleGenerateImages = useCallback((): void => {
     setIsGeneratingImages(true)
@@ -370,29 +350,7 @@ export function ForgeProjectProvider({
       .finally(() => {
         setIsGeneratingImages(false)
 
-        // Phase 2: Fire-and-forget — system CAD + module images in parallel
-        // These run in the background while the user views the system diagram
-
-        // 2a: System-level 3D CAD model (slower, ~60-120s)
-        setIsGeneratingSystemCad(true)
-        generateSystemCadAction(scanId)
-          .then((cadResult) => {
-            if ("spec" in cadResult) {
-              setSpecInternal(cadResult.spec)
-              specRef.current = cadResult.spec
-              toast.success("3D product model ready — switch to 3D view")
-            } else {
-              console.error("[Forge] System CAD generation failed:", cadResult.error)
-              toast.error("3D model generation failed. You can still use the system diagram.")
-            }
-          })
-          .catch((err) => {
-            console.error("[Forge] System CAD generation failed:", err instanceof Error ? err.message : "Unknown")
-            toast.error("3D model generation failed. You can still use the system diagram.")
-          })
-          .finally(() => setIsGeneratingSystemCad(false))
-
-        // 2b: Module blueprint images (background, progressive via Realtime)
+        // Phase 2: Module blueprint images (background, progressive via Realtime)
         generateModuleImagesAction(scanId)
           .then((modResult) => {
             if ("spec" in modResult) {
@@ -471,83 +429,6 @@ export function ForgeProjectProvider({
       console.error("[Forge] Diagnostic error:", error instanceof Error ? error.message : "Unknown")
     }
   }, [scanId])
-
-  // ── Generate CAD model (fire-and-forget for background processing) ──
-  /**
-   * Triggers 3D CAD model generation for a module.
-   *
-   * @description Immediately marks the module as "generating" in local
-   * state AND the database, then fires the heavy CAD generation server
-   * action without awaiting it. The user can navigate away freely —
-   * the server action completes independently and persists results to DB.
-   * The Realtime subscription picks up the completion and syncs state.
-   */
-  const handleGenerateCadModel = useCallback((moduleId: string): void => {
-    // 1. Immediately mark the module as "generating" in local state
-    const updatedSpec: XRaySpec = {
-      ...specRef.current,
-      modules: specRef.current.modules.map((m) =>
-        m.id === moduleId
-          ? { ...m, cadModel: { status: "generating" as const, generatedAt: new Date().toISOString() } }
-          : m,
-      ),
-    }
-    setSpecInternal(updatedSpec)
-    specRef.current = updatedSpec
-
-    toast.info("Generating 3D CAD model — this may take up to 2 minutes. You can navigate away safely.")
-
-    // 2. Persist "generating" status to DB so it survives full page reloads
-    updateScanSpecAction(scanId, updatedSpec).catch((err) => {
-      console.error("[Forge] Failed to persist generating status:", err instanceof Error ? err.message : "Unknown")
-    })
-
-    // 3. Fire the heavy CAD generation — don't await.
-    //    Server action runs server-side to completion even if client navigates away.
-    //    Realtime subscription will pick up the DB update when it finishes.
-    generateCadModelsAction(scanId, [moduleId])
-      .then((result) => {
-        if ("error" in result) {
-          toast.error(result.error)
-          return
-        }
-        // Update local state if component is still mounted
-        setSpecInternal(result.spec)
-        specRef.current = result.spec
-        const targetModule = result.spec.modules.find((m) => m.id === moduleId)
-        if (targetModule?.cadModel?.status === "complete") {
-          toast.success(`3D model generated for ${targetModule.name}`)
-        }
-      })
-      .catch((error) => {
-        // Client-side fetch may have been aborted by navigation — that's fine.
-        // The server action continues running and Realtime will sync the result.
-        console.warn("[Forge] CAD generation fetch interrupted (server continues):", error instanceof Error ? error.message : "Unknown")
-      })
-  }, [scanId])
-
-  // ── Regenerate system 3D model ──
-  const handleRegenerateSystemCad = useCallback((): void => {
-    if (!scanId || isGeneratingSystemCad) return
-    setIsGeneratingSystemCad(true)
-    toast.info("Regenerating 3D product model — this may take up to 2 minutes...")
-    generateSystemCadAction(scanId)
-      .then((cadResult) => {
-        if ("spec" in cadResult) {
-          setSpecInternal(cadResult.spec)
-          specRef.current = cadResult.spec
-          toast.success("3D product model ready")
-        } else {
-          console.error("[Forge] System CAD regeneration failed:", cadResult.error)
-          toast.error("3D model regeneration failed. Try again later.")
-        }
-      })
-      .catch((err) => {
-        console.error("[Forge] System CAD regeneration error:", err instanceof Error ? err.message : "Unknown")
-        toast.error("3D model regeneration failed.")
-      })
-      .finally(() => setIsGeneratingSystemCad(false))
-  }, [scanId, isGeneratingSystemCad])
 
   // ── Engineering analysis ──
   const handleRunAnalysis = useCallback(async (): Promise<void> => {
@@ -883,10 +764,7 @@ export function ForgeProjectProvider({
     handleRefineModule,
     handleDeriveProcessClass,
     handleGenerateImages,
-    handleGenerateCadModel,
-    handleRegenerateSystemCad,
     isGeneratingImages,
-    isGeneratingSystemCad,
     handleRunAnalysis,
     handleRunStructural,
     handleRunConvergence,

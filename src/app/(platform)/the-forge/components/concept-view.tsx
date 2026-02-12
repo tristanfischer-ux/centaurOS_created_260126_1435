@@ -1,15 +1,14 @@
 /**
  * @file concept-view.tsx — Stage 1: Concept client component
  *
- * @description Renders the concept definition stage: ScanHero (idea input)
- * and ConceptResearch (product research with Gemini + Claude Opus).
+ * @description Renders the concept definition stage with a deliberate,
+ * step-by-step flow:
+ * 1. ScanHero — idea input and refinement
+ * 2. ConceptResearch — AI-powered product research (Gemini Search + Claude Opus)
+ * 3. Approval — user reviews the research and confirms ("Yes, I like it")
+ * 4. View Dossier CTA — manual navigation to the engineering dossier
  *
- * After a successful scan generates modules, the user is auto-navigated
- * to the Dossier's Summary tab where the System Blueprint, Key Findings,
- * and Executive Summary live. If the user returns to the Concept page
- * after scan, a CTA card links them back to the Dossier.
- *
- * The flow is: Enter idea → Research product → Generate modules → Dossier
+ * There is NO auto-navigation. The user controls every transition.
  *
  * @related
  * - Page: src/app/(platform)/the-forge/[id]/concept/page.tsx
@@ -20,11 +19,10 @@
 
 "use client"
 
-import React, { useRef, useEffect } from "react"
+import React, { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 
-import { CheckCircle2, ArrowRight } from "lucide-react"
+import { CheckCircle2, ArrowRight, ThumbsUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -35,15 +33,15 @@ import { ConceptResearch } from "./concept-research"
 /**
  * ConceptView — Stage 1 client component.
  *
- * @description Renders the concept flow:
+ * @description Renders the concept flow with manual progression:
  * 1. ScanHero — idea input and refinement
- * 2. ConceptResearch — AI-powered product research (Gemini Search + Claude Opus)
- * 3. Post-scan CTA — links to Dossier Summary after modules are generated
+ * 2. ConceptResearch — AI-powered product research (auto-triggers on scan)
+ * 3. Approval step — user confirms the research looks good
+ * 4. View Dossier CTA — user clicks to navigate to the dossier
  *
- * Auto-navigates to Dossier Summary tab when a scan completes.
+ * No auto-navigation. Every transition requires user action.
  */
 export function ConceptView(): React.ReactNode {
-  const router = useRouter()
   const {
     project,
     spec,
@@ -59,16 +57,8 @@ export function ConceptView(): React.ReactNode {
   // (covers the case where user navigated away and came back)
   const effectivelyScanning = isScanning || scanStatus === "scanning"
 
-  // Auto-navigate to Dossier Summary when scan completes.
-  // Detects the transition from scanning → not scanning with modules present.
-  const wasScanningRef = useRef(false)
-
-  useEffect(() => {
-    if (wasScanningRef.current && !effectivelyScanning && hasModules) {
-      router.push(`/the-forge/${scanId}/dossier?tab=summary`)
-    }
-    wasScanningRef.current = effectivelyScanning
-  }, [effectivelyScanning, hasModules, router, scanId])
+  // Manual approval state — user must confirm research before seeing dossier CTA
+  const [isApproved, setIsApproved] = useState(false)
 
   return (
     <div className="space-y-8">
@@ -83,7 +73,7 @@ export function ConceptView(): React.ReactNode {
         onIdeaChange={(idea) => setSpec({ ...spec, idea })}
       />
 
-      {/* Product research — appears after idea is entered, before module generation */}
+      {/* Product research — appears after idea is entered, auto-triggers on scan */}
       {spec.idea.trim() && (
         <ConceptResearch
           idea={spec.idea}
@@ -93,9 +83,37 @@ export function ConceptView(): React.ReactNode {
         />
       )}
 
-      {/* Post-scan CTA — shown when modules exist and user returns to Concept */}
-      {hasModules && !effectivelyScanning && (
-        <Card className="border-international-orange/20 bg-status-success-light/30">
+      {/* Approval step — shown when modules exist, user hasn't approved yet */}
+      {hasModules && !effectivelyScanning && !isApproved && (
+        <Card className="border-international-orange/20 bg-international-orange/5">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-international-orange/10">
+                <ThumbsUp className="h-6 w-6 text-international-orange" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-semibold text-foreground">
+                  Concept ready — {spec.modules.length} module{spec.modules.length !== 1 ? "s" : ""} identified
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Review the research above. If it looks good, confirm to proceed to the engineering dossier.
+                </p>
+              </div>
+              <Button
+                onClick={() => setIsApproved(true)}
+                className="shrink-0 bg-international-orange hover:bg-international-orange-hover text-white"
+              >
+                <ThumbsUp className="h-4 w-4 mr-2" />
+                Yes, I like it
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* View Dossier CTA — shown after user approves */}
+      {hasModules && !effectivelyScanning && isApproved && (
+        <Card className="border-status-success/20 bg-status-success-light/30">
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-status-success-light">
@@ -103,7 +121,7 @@ export function ConceptView(): React.ReactNode {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-semibold text-foreground">
-                  Concept created — {spec.modules.length} module{spec.modules.length !== 1 ? "s" : ""} identified
+                  Concept approved
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   View the engineering dossier for the system blueprint, key findings, and executive summary.

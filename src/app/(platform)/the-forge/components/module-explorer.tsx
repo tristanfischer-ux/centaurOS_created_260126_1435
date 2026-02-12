@@ -8,7 +8,7 @@
 
 "use client"
 
-import React, { useState, useMemo, lazy, Suspense } from "react"
+import React, { useState, useMemo } from "react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -35,9 +35,7 @@ import {
   X,
   ShieldCheck,
   Boxes,
-  Download,
   Loader2,
-  RotateCcw,
   Scale,
   Ruler,
   Printer,
@@ -53,11 +51,6 @@ import {
   Pencil,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-// Lazy-load 3D viewer — avoids loading three.js until a user opens the 3D tab
-const StlViewer = lazy(() =>
-  import("./stl-viewer").then((mod) => ({ default: mod.StlViewer })),
-)
 
 import { ForgeSectionHeader, ForgeInfoTip, FORGE_EXPLANATIONS } from "./forge-hover-explanations"
 import type { XRaySpec, ModuleSpec, ModuleAnalysis, MassProperties, DfmAnalysis, DfmIssue, StructuralAnalysis, StressHotspot, EmiShielding, Fatigue, Impact } from "../services/xray-schema"
@@ -90,8 +83,6 @@ interface ModuleExplorerProps {
   onModuleUpdate: (m: ModuleSpec) => void
   scanId: string | null
   onDeriveProcessClass: (moduleId: string, answers: Record<string, string>) => Promise<void>
-  /** Callback to trigger 3D CAD model generation for a specific module */
-  onGenerateCadModel?: (moduleId: string) => void
   /** Callback to open the expert interview panel for a module */
   onOpenInterview?: (m: ModuleSpec) => void
   /** Callback to open the edit module dialog for a module */
@@ -113,7 +104,6 @@ export function ModuleExplorer({
   onModuleUpdate,
   scanId,
   onDeriveProcessClass,
-  onGenerateCadModel,
   onOpenInterview,
   onEditModule,
   defaultExpandedId,
@@ -177,7 +167,6 @@ export function ModuleExplorer({
             onModuleUpdate={onModuleUpdate}
             scanId={scanId}
             onDeriveProcessClass={onDeriveProcessClass}
-            onGenerateCadModel={onGenerateCadModel}
             onOpenInterview={onOpenInterview}
             onEditModule={onEditModule}
           />
@@ -196,7 +185,6 @@ function ModuleRow({
   onModuleUpdate,
   scanId,
   onDeriveProcessClass,
-  onGenerateCadModel,
   onOpenInterview,
   onEditModule,
 }: {
@@ -206,7 +194,6 @@ function ModuleRow({
   onModuleUpdate: (m: ModuleSpec) => void
   scanId: string | null
   onDeriveProcessClass: (moduleId: string, answers: Record<string, string>) => Promise<void>
-  onGenerateCadModel?: (moduleId: string) => void
   onOpenInterview?: (m: ModuleSpec) => void
   onEditModule?: (m: ModuleSpec) => void
 }): React.ReactNode {
@@ -315,7 +302,6 @@ function ModuleRow({
           onModuleUpdate={onModuleUpdate}
           scanId={scanId}
           onDeriveProcessClass={onDeriveProcessClass}
-          onGenerateCadModel={onGenerateCadModel}
           onOpenInterview={onOpenInterview}
         />
       )}
@@ -331,7 +317,6 @@ function ExpandedModuleDetail({
   onModuleUpdate,
   scanId,
   onDeriveProcessClass,
-  onGenerateCadModel,
   onOpenInterview,
 }: {
   m: ModuleSpec
@@ -339,7 +324,6 @@ function ExpandedModuleDetail({
   onModuleUpdate: (m: ModuleSpec) => void
   scanId: string | null
   onDeriveProcessClass: (moduleId: string, answers: Record<string, string>) => Promise<void>
-  onGenerateCadModel?: (moduleId: string) => void
   onOpenInterview?: (m: ModuleSpec) => void
 }): React.ReactNode {
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -415,13 +399,7 @@ function ExpandedModuleDetail({
         </div>
       )}
 
-      {/* 1b. 3D CAD Model Section */}
-      <CadModelSection
-        module={m}
-        onGenerate={onGenerateCadModel}
-      />
-
-      {/* 1c. Engineering Analysis Results */}
+      {/* Engineering Analysis Results */}
       {m.cadModel?.analysis && (
         <AnalysisSection analysis={m.cadModel.analysis} moduleName={m.name} />
       )}
@@ -619,296 +597,6 @@ function ExpandedModuleDetail({
               </li>
             ))}
           </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── CAD Model Section ───────────────────────────────────────────────
-
-/** Active display mode for the CAD section: interactive 3D or one of the SVG projections */
-type CadViewMode = "3d" | "svgIsoUrl" | "svgTopUrl" | "svgFrontUrl" | "svgRightUrl"
-
-const SVG_VIEWS = [
-  { key: "svgIsoUrl" as const, label: "Isometric", short: "ISO" },
-  { key: "svgTopUrl" as const, label: "Top", short: "Top" },
-  { key: "svgFrontUrl" as const, label: "Front", short: "Front" },
-  { key: "svgRightUrl" as const, label: "Right", short: "Right" },
-]
-
-type SvgViewKey = typeof SVG_VIEWS[number]["key"]
-
-/**
- * CadModelSection — Interactive 3D viewer + SVG projection views + STEP/STL downloads.
- *
- * @description When the module has an STL file, the default view is an interactive
- * 3D model that can be rotated, zoomed, and panned. Users can switch to flat SVG
- * projections (ISO, Top, Front, Right) via tabs. Download links for STEP and STL
- * are always visible in the header.
- */
-function CadModelSection({
-  module: m,
-  onGenerate,
-}: {
-  module: ModuleSpec
-  /** Fire-and-forget callback — starts background generation */
-  onGenerate?: (moduleId: string) => void
-}): React.ReactNode {
-  const cadModel = m.cadModel
-  const has3d = !!(cadModel?.stlUrl && cadModel.status === "complete")
-
-  // Default to 3D if STL is available, otherwise fall back to isometric SVG
-  const [activeView, setActiveView] = useState<CadViewMode>(has3d ? "3d" : "svgIsoUrl")
-  const [svgLightboxOpen, setSvgLightboxOpen] = useState(false)
-  const [stlLoadFailed, setStlLoadFailed] = useState(false)
-  const isGenerating = cadModel?.status === "generating"
-
-  /** Trigger CAD generation (fire-and-forget — safe to navigate away) */
-  function handleGenerate(): void {
-    if (!onGenerate || isGenerating) return
-    onGenerate(m.id)
-  }
-
-  // No cadModel field at all — show generate button
-  if (!cadModel) {
-    return (
-      <div className="rounded-lg border border-dashed p-6 flex flex-col items-center justify-center gap-3 bg-muted/10">
-        <Boxes className="h-8 w-8 text-muted-foreground" />
-        <div className="text-center">
-          <p className="text-sm font-medium text-foreground">3D Engineering Model</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Generate a parametric 3D CAD model with STEP and STL exports
-          </p>
-        </div>
-        {onGenerate && (
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleGenerate}
-            className="mt-1"
-          >
-            <Boxes className="h-4 w-4 mr-2" />
-            Generate 3D Model
-          </Button>
-        )}
-      </div>
-    )
-  }
-
-  // Generating state
-  if (isGenerating) {
-    return (
-      <div className="rounded-lg border p-6 space-y-3">
-        <div className="flex items-center gap-2">
-          <Boxes className="h-4 w-4 text-chart-2" />
-          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
-            3D Engineering Model
-          </h4>
-        </div>
-        <div className="relative">
-          <Skeleton className="h-48 w-full rounded-lg" />
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              <span className="text-xs text-muted-foreground font-medium">
-                Generating 3D model...
-              </span>
-            </div>
-            <span className="text-[10px] text-muted-foreground">
-              You can navigate away — this continues in the background
-            </span>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Failed state
-  if (cadModel.status === "failed") {
-    // Strip internal prefixes like [XRayCadGen] for user-facing display
-    const displayError = cadModel.errorMessage
-      ? cadModel.errorMessage.replace(/\[XRayCadGen\]\s*/g, "").slice(0, 200)
-      : "The generated code could not produce a valid model"
-
-    return (
-      <div className="rounded-lg border border-destructive/20 bg-status-error-light/10 p-6 flex flex-col items-center gap-3">
-        <AlertTriangle className="h-6 w-6 text-destructive" />
-        <div className="text-center">
-          <p className="text-sm font-medium text-foreground">3D model generation failed</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {displayError}
-          </p>
-        </div>
-        {onGenerate && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleGenerate}
-            disabled={isGenerating}
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Retry
-          </Button>
-        )}
-      </div>
-    )
-  }
-
-  // Complete state — build the list of available view tabs
-  const availableSvgViews = SVG_VIEWS.filter((v) => cadModel[v.key])
-  const hasStl = !!(cadModel.stlUrl && !stlLoadFailed)
-  const activeSvgKey = activeView !== "3d" ? activeView as SvgViewKey : null
-  const activeSvgUrl = activeSvgKey ? cadModel[activeSvgKey] : null
-
-  return (
-    <div className="rounded-lg border p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Boxes className="h-4 w-4 text-chart-2" />
-          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
-            3D Engineering Model
-          </h4>
-        </div>
-        {/* Download buttons */}
-        <div className="flex items-center gap-2">
-          {cadModel.stepUrl && (
-            <a
-              href={cadModel.stepUrl}
-              download={`${m.id}-model.step`}
-              className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
-            >
-              <Download className="h-3 w-3" />
-              STEP
-              <ForgeInfoTip text={FORGE_EXPLANATIONS.stepFile.description} className="h-2.5 w-2.5" />
-            </a>
-          )}
-          {cadModel.stlUrl && (
-            <a
-              href={cadModel.stlUrl}
-              download={`${m.id}-model.stl`}
-              className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
-            >
-              <Download className="h-3 w-3" />
-              STL
-              <ForgeInfoTip text={FORGE_EXPLANATIONS.stlFile.description} className="h-2.5 w-2.5" />
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* View selector tabs — 3D + SVG projections */}
-      {(hasStl || availableSvgViews.length > 0) && (
-        <div className="flex items-center gap-1 bg-muted/30 rounded-lg p-1">
-          {/* 3D tab — only shown when STL is available */}
-          {hasStl && (
-            <button
-              onClick={() => setActiveView("3d")}
-              className={cn(
-                "flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                activeView === "3d"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Box className="h-3 w-3" />
-              3D
-            </button>
-          )}
-          {/* SVG projection tabs */}
-          {availableSvgViews.map((view) => (
-            <button
-              key={view.key}
-              onClick={() => setActiveView(view.key)}
-              className={cn(
-                "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                activeView === view.key
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {view.short}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Interactive 3D Viewer */}
-      {activeView === "3d" && hasStl && (
-        <div className="space-y-2">
-          <Suspense fallback={<Skeleton className="h-[350px] w-full rounded-xl" />}>
-            <StlViewer
-              stlUrl={cadModel.stlUrl!}
-              height={350}
-              className="rounded-xl"
-              onLoadError={() => {
-                // Fall back to SVG view if 3D fails to load
-                setStlLoadFailed(true)
-                const fallback = availableSvgViews[0]?.key ?? "svgIsoUrl"
-                setActiveView(fallback)
-              }}
-            />
-          </Suspense>
-          <p className="text-xs text-muted-foreground text-center font-medium">
-            {m.name} — Interactive 3D Model (drag to rotate, scroll to zoom)
-          </p>
-        </div>
-      )}
-
-      {/* SVG Display (shown when a projection tab is active) */}
-      {activeView !== "3d" && activeSvgUrl && (
-        <>
-          <button
-            onClick={() => setSvgLightboxOpen(true)}
-            className="w-full cursor-zoom-in hover:opacity-90 transition-opacity rounded-lg overflow-hidden bg-background border p-3"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={activeSvgUrl}
-              alt={`${m.name} — ${SVG_VIEWS.find((v) => v.key === activeSvgKey)?.label ?? "Engineering"} view`}
-              className="w-full h-auto object-contain max-h-[350px]"
-            />
-          </button>
-          <p className="text-xs text-muted-foreground text-center font-medium">
-            {m.name} — {SVG_VIEWS.find((v) => v.key === activeSvgKey)?.label ?? "Engineering"} View (click to enlarge)
-          </p>
-
-          {/* SVG Lightbox */}
-          <Dialog open={svgLightboxOpen} onOpenChange={setSvgLightboxOpen}>
-            <DialogContent size="xl" className="max-w-[95vw] max-h-[95vh] p-0">
-              <div className="relative">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-3 right-3 z-10 bg-background/90 hover:bg-background shadow-sm"
-                  onClick={() => setSvgLightboxOpen(false)}
-                  aria-label="Close"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-                <div className="overflow-auto max-h-[95vh] p-6">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={activeSvgUrl}
-                    alt={`${m.name} — ${SVG_VIEWS.find((v) => v.key === activeSvgKey)?.label ?? "Engineering"} view`}
-                    className="w-full h-auto"
-                  />
-                </div>
-              </div>
-              <DialogTitle className="sr-only">
-                {m.name} — {SVG_VIEWS.find((v) => v.key === activeSvgKey)?.label ?? "Engineering"} View
-              </DialogTitle>
-            </DialogContent>
-          </Dialog>
-        </>
-      )}
-
-      {/* No views available at all but model files exist */}
-      {activeView !== "3d" && !activeSvgUrl && !hasStl && (cadModel.stepUrl || cadModel.stlUrl) && (
-        <div className="rounded-lg bg-muted/20 border p-4 text-center">
-          <p className="text-xs text-muted-foreground">
-            SVG views unavailable. Download the STEP or STL file above to view in a CAD application.
-          </p>
         </div>
       )}
     </div>
