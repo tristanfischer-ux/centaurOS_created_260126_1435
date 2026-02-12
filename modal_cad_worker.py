@@ -101,12 +101,113 @@ MATERIAL_DENSITIES = {
 # ─── SVG ViewBox Refit ────────────────────────────────────────────────
 
 
+def _parse_path_coords(d: str) -> tuple[list[float], list[float]]:
+    """
+    Parse SVG path data and extract x,y coordinates respecting
+    the parameter count of each command.
+
+    SVG path commands have different parameter counts:
+      M/L/T: (x,y)         — 2 params per point
+      H:     (x)           — 1 param (horizontal line)
+      V:     (y)           — 1 param (vertical line)
+      C:     (x1,y1,x2,y2,x,y) — 6 params (cubic bezier)
+      S:     (x2,y2,x,y)  — 4 params (smooth cubic)
+      Q:     (x1,y1,x,y)  — 4 params (quadratic bezier)
+      A:     (rx,ry,rot,large,sweep,x,y) — 7 params (arc)
+      Z:     no params     — close path
+
+    Returns (coords_x, coords_y) lists.
+    """
+    coords_x: list[float] = []
+    coords_y: list[float] = []
+
+    # Number of coordinate-pair params per command (pairs, not individual values)
+    # H and V are special: they only move one axis
+    PAIR_COMMANDS = {"M", "L", "T"}       # Each repetition = 1 pair
+    CUBIC_COMMANDS = {"C"}                 # Each repetition = 3 pairs
+    SMOOTH_CUBIC = {"S"}                   # Each repetition = 2 pairs
+    QUAD_COMMANDS = {"Q"}                  # Each repetition = 2 pairs
+
+    # Tokenize: split into commands and numbers
+    tokens = re.findall(r"[MmLlHhVvCcSsQqTtAaZz]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?", d)
+
+    current_cmd = ""
+    nums: list[float] = []
+
+    def flush_command(cmd: str, numbers: list[float]) -> None:
+        """Process accumulated numbers for a command."""
+        uc = cmd.upper()
+
+        if uc in PAIR_COMMANDS:
+            # (x,y) pairs
+            for i in range(0, len(numbers) - 1, 2):
+                coords_x.append(numbers[i])
+                coords_y.append(numbers[i + 1])
+
+        elif uc == "H":
+            # Horizontal: only x values
+            for n in numbers:
+                coords_x.append(n)
+
+        elif uc == "V":
+            # Vertical: only y values
+            for n in numbers:
+                coords_y.append(n)
+
+        elif uc in CUBIC_COMMANDS:
+            # (x1,y1, x2,y2, x,y) — 6 values per segment
+            for i in range(0, len(numbers) - 1, 2):
+                coords_x.append(numbers[i])
+                coords_y.append(numbers[i + 1])
+
+        elif uc in SMOOTH_CUBIC:
+            # (x2,y2, x,y) — 4 values per segment
+            for i in range(0, len(numbers) - 1, 2):
+                coords_x.append(numbers[i])
+                coords_y.append(numbers[i + 1])
+
+        elif uc in QUAD_COMMANDS:
+            # (x1,y1, x,y) — 4 values per segment
+            for i in range(0, len(numbers) - 1, 2):
+                coords_x.append(numbers[i])
+                coords_y.append(numbers[i + 1])
+
+        elif uc == "A":
+            # (rx,ry, rotation, large-arc, sweep, x,y) — 7 per segment
+            # Only the last two (x,y) are coordinates
+            for i in range(0, len(numbers) - 6, 7):
+                coords_x.append(numbers[i + 5])
+                coords_y.append(numbers[i + 6])
+
+    for token in tokens:
+        if re.match(r"[MmLlHhVvCcSsQqTtAaZz]", token):
+            # New command — flush previous
+            if current_cmd and nums:
+                flush_command(current_cmd, nums)
+            current_cmd = token
+            nums = []
+        else:
+            try:
+                nums.append(float(token))
+            except ValueError:
+                pass
+
+    # Flush final command
+    if current_cmd and nums:
+        flush_command(current_cmd, nums)
+
+    return coords_x, coords_y
+
+
 def _refit_svg_viewbox(svg_path: str, padding_pct: float = 0.10) -> None:
     """
     Parse an SVG file, compute the tight bounding box of all visible
     content, and rewrite the viewBox so the drawing is centered with
-    proportional padding. Fixes CadQuery's exporter which leaves
-    geometry stuck in the top-left of a fixed 800x600 canvas.
+    proportional padding.
+
+    Fixes CadQuery's exporter which leaves geometry stuck in the
+    top-left of a fixed 800x600 canvas. Uses command-aware SVG path
+    parsing to correctly handle M, L, C, Q, A, H, V commands.
     """
     try:
         tree = ET.parse(svg_path)
@@ -117,7 +218,8 @@ def _refit_svg_viewbox(svg_path: str, padding_pct: float = 0.10) -> None:
         if root.tag.startswith("{"):
             ns = root.tag.split("}")[0] + "}"
 
-        # Collect all coordinate values from path, line, circle, rect, polyline
+        # Collect all coordinate values from drawing elements
+        # Skip <rect> which may be a background fill
         coords_x: list[float] = []
         coords_y: list[float] = []
 
@@ -143,29 +245,24 @@ def _refit_svg_viewbox(svg_path: str, padding_pct: float = 0.10) -> None:
                 coords_x.extend([cx - r, cx + r])
                 coords_y.extend([cy - r, cy + r])
 
-            # <rect x y width height>
-            elif tag == "rect":
-                x = float(elem.get("x", "0"))
-                y = float(elem.get("y", "0"))
-                w = float(elem.get("width", "0"))
-                h = float(elem.get("height", "0"))
-                coords_x.extend([x, x + w])
-                coords_y.extend([y, y + h])
+            # <ellipse cx cy rx ry>
+            elif tag == "ellipse":
+                cx = float(elem.get("cx", "0"))
+                cy = float(elem.get("cy", "0"))
+                rx = float(elem.get("rx", "0"))
+                ry = float(elem.get("ry", "0"))
+                coords_x.extend([cx - rx, cx + rx])
+                coords_y.extend([cy - ry, cy + ry])
 
-            # <path d="..."> — extract numbers from M, L, C, Q, A commands
+            # <path d="..."> — command-aware coordinate extraction
             elif tag == "path":
                 d = elem.get("d", "")
-                # Extract all number pairs from path data
-                numbers = re.findall(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?", d)
-                for i in range(0, len(numbers) - 1, 2):
-                    try:
-                        coords_x.append(float(numbers[i]))
-                        coords_y.append(float(numbers[i + 1]))
-                    except (ValueError, IndexError):
-                        pass
+                px, py = _parse_path_coords(d)
+                coords_x.extend(px)
+                coords_y.extend(py)
 
             # <polyline points="x1,y1 x2,y2 ...">
-            elif tag == "polyline" or tag == "polygon":
+            elif tag in ("polyline", "polygon"):
                 pts = elem.get("points", "")
                 pairs = pts.strip().split()
                 for pair in pairs:
@@ -201,6 +298,7 @@ def _refit_svg_viewbox(svg_path: str, padding_pct: float = 0.10) -> None:
         vb_h = content_h + 2 * pad_y
 
         root.set("viewBox", f"{vb_x:.2f} {vb_y:.2f} {vb_w:.2f} {vb_h:.2f}")
+        root.set("preserveAspectRatio", "xMidYMid meet")
 
         # Keep width/height for proper aspect ratio in img tags
         root.set("width", "100%")
@@ -226,13 +324,38 @@ _output_dir = "{output_dir}"
 _material_density = {material_density}  # kg/m³
 
 # The user code should produce a variable called `result` or `body_shell` or similar.
-# We search for the last CadQuery Workplane in local scope.
-_candidates = [v for v in reversed(list(locals().values()))
-               if isinstance(v, cq.Workplane)]
-if not _candidates:
-    raise RuntimeError("No CadQuery Workplane object found in script output")
+# We search for the last CadQuery Workplane, Assembly, or Compound in local scope.
+# For building models, result may be a cq.Assembly().toCompound() (a Compound/Shape).
+_model = None
 
-_model = _candidates[0]
+# Priority 1: Check for explicit `result` variable
+if "result" in locals():
+    _r = locals()["result"]
+    if isinstance(_r, cq.Workplane):
+        _model = _r
+    elif hasattr(cq, "Assembly") and isinstance(_r, cq.Assembly):
+        # Convert Assembly to Compound for export
+        _model = cq.Workplane("XY").newObject([_r.toCompound()])
+    elif hasattr(_r, "Volume"):
+        # It's a Shape/Compound — wrap it in a Workplane
+        _model = cq.Workplane("XY").newObject([_r])
+
+# Priority 2: Search for any Workplane in namespace
+if _model is None:
+    _candidates = [v for v in reversed(list(locals().values()))
+                   if isinstance(v, cq.Workplane)]
+    if _candidates:
+        _model = _candidates[0]
+
+# Priority 3: Search for any Assembly in namespace
+if _model is None and hasattr(cq, "Assembly"):
+    _assy_candidates = [v for v in reversed(list(locals().values()))
+                        if isinstance(v, cq.Assembly)]
+    if _assy_candidates:
+        _model = cq.Workplane("XY").newObject([_assy_candidates[0].toCompound()])
+
+if _model is None:
+    raise RuntimeError("No CadQuery Workplane, Assembly, or Compound found in script output")
 
 # Export STEP
 cq.exporters.export(_model, _os.path.join(_output_dir, "model.step"))
@@ -508,8 +631,8 @@ def _empty_result() -> dict:
 
 @app.function(
     image=cadquery_image,
-    timeout=300,   # 5 min — matches client-side AbortSignal; buildings need >2 min
-    memory=4096,   # 4 GB — complex boolean ops on large assemblies need headroom
+    timeout=600,   # 10 min — building/architectural models with 50+ components need extended time
+    memory=8192,   # 8 GB — large assemblies with many boolean ops need headroom
 )
 def generate_cad(
     cadquery_code: str,
@@ -641,8 +764,8 @@ def generate_cad(
 
 @app.function(
     image=cadquery_image,
-    timeout=300,   # 5 min — matches client-side AbortSignal; buildings need >2 min
-    memory=4096,   # 4 GB — complex boolean ops on large assemblies need headroom
+    timeout=600,   # 10 min — building/architectural models with 50+ components need extended time
+    memory=8192,   # 8 GB — large assemblies with many boolean ops need headroom
 )
 @modal.fastapi_endpoint(method="POST")
 def generate_cad_endpoint(item: dict) -> dict:
@@ -672,8 +795,8 @@ def generate_cad_endpoint(item: dict) -> dict:
 
 @app.function(
     image=cadquery_image,
-    timeout=300,   # Match main endpoint timeout for consistency
-    memory=4096,
+    timeout=600,   # Match main endpoint timeout for consistency
+    memory=8192,
 )
 @modal.fastapi_endpoint(method="POST")
 def analyze_cad_endpoint(item: dict) -> dict:

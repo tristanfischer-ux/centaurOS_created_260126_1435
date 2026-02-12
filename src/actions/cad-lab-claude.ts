@@ -451,14 +451,15 @@ CRITICAL RULES:
 
 ARCHITECTURAL / BUILDING MODELS (houses, cabins, buildings, shelters):
 If the product is a building or architectural structure, you MUST also plan:
-1. SUB-ASSEMBLY GROUPS: Divide components into 4-6 groups (e.g. Structure, Envelope, Interior, Fixtures). Each group will be unioned separately, then groups unioned together. This is critical for CadQuery performance.
-2. COMPONENT COUNT CAP: Maximum 20 unique make_*() functions total. Combine similar elements aggressively (e.g. "all exterior walls" as one function, not separate functions per wall).
-3. UNION BUDGET: Plan for max 30 total .union() calls and max 15 total .cut() calls across the entire script. Count them in the validation checklist.
-4. SIMPLIFICATION RULES: No individual balusters (use solid panels), no individual joists/rafters (use representative samples max 6), no decorative elements under 50mm, no fillets.
+1. SUB-ASSEMBLY GROUPS: Divide components into 6-10 groups (e.g. Foundation, Structure, Envelope, Roof, Interior Partitions, Doors/Windows, Stairs, Fixtures, Furniture, Landscaping). Each group will be unioned separately, then groups unioned together. This is critical for CadQuery performance.
+2. COMPONENT COUNT CAP: Maximum 50 unique make_*() functions total. You have headroom for detailed buildings — model walls, floors, roof, stairs, doors, windows, and furniture as separate functions where it improves clarity.
+3. UNION BUDGET: Plan for max 80 total .union() calls and max 40 total .cut() calls across the entire script. Count them in the validation checklist.
+4. SIMPLIFICATION RULES: No individual balusters (use solid panels), no individual joists/rafters (use representative samples max 15), no decorative elements under 50mm, no fillets.
 5. GABLE STRATEGY: Plan gable walls as "box + cut" not "wire profile" — note this in the table.
-6. FURNITURE IS OPTIONAL: If the structure already has 15+ boolean operations, mark furniture as "SKIP — complexity budget exceeded" in the component table.
+6. FURNITURE IS OPTIONAL: If the structure already has 40+ boolean operations, mark furniture as "SKIP — complexity budget exceeded" in the component table. Otherwise, include up to 10 furniture/fixture items.
 7. In the Space Budget, show floor plan zones along each axis clearly.
-8. TIMEOUT AWARENESS: The CadQuery execution has a 5-minute hard limit. Every union/cut adds time. Plan for simplicity — a clean model that renders is better than a detailed one that times out.
+8. TIMEOUT AWARENESS: The CadQuery execution has a 10-minute hard limit. Every union/cut adds time. Plan for simplicity — a clean model that renders is better than a detailed one that times out. Use CadQuery Assembly objects where possible to avoid boolean operations entirely.
+9. ASSEMBLY API STRATEGY: For large buildings (20+ components), prefer using cq.Assembly() to place sub-assemblies spatially without boolean unions. Only union within small sub-groups (max 10 unions per group), then add each sub-group to the Assembly. Export the Assembly as the final result. This is dramatically faster than chaining .union() calls.
 ${librarySection}`
 
     const result = await callClaude(
@@ -577,9 +578,10 @@ ASSEMBLY CONNECTION RULES (prevent floating/disconnected parts):
 ARCHITECTURAL / BUILDING MODEL RULES (for houses, buildings, structures):
 When building architectural models (houses, cabins, shelters, buildings), follow these additional rules:
 
-⚠️ EXECUTION BUDGET: Building models MUST complete CadQuery execution within 5 minutes.
+⚠️ EXECUTION BUDGET: Building models MUST complete CadQuery execution within 10 minutes.
 Every extra union/cut adds time. Keep geometry simple — prefer boxes over complex shapes.
 If in doubt, simplify further. A clean simple model is better than a complex one that times out.
+For large buildings (20+ components), use cq.Assembly() instead of chaining .union() calls — see Assembly API section below.
 
 WALL CONSTRUCTION:
 - Build ALL walls as simple box extrusions on the XY plane: .box(width, thickness, height)
@@ -604,28 +606,45 @@ ROOF CONSTRUCTION:
 
 SUB-ASSEMBLY STRATEGY (critical for performance):
 - Do NOT union all building components into one mega-solid sequentially
-- Instead, group components into 4-6 SUB-ASSEMBLIES and union within each group:
+- Instead, group components into 6-10 SUB-ASSEMBLIES and union within each group:
   structure = foundation.union(floor).union(walls).union(roof)
   interior = partitions.union(doors).union(stairs)
   fixtures = kitchen.union(bathroom)
   result = structure.union(interior).union(fixtures)
 - This produces the same result but is dramatically faster and less error-prone
-- Within each sub-assembly, keep to MAX 6-8 union operations
+- Within each sub-assembly, keep to MAX 10 union operations
 
-UNION BUDGET — HARD CAP:
-- Maximum 30 total .union() calls across the ENTIRE script
-- Maximum 15 total .cut() calls across the ENTIRE script
-- Count them mentally before writing code. If you exceed these limits, combine geometry.
+ASSEMBLY API (preferred for large buildings with 20+ components):
+- For large buildings, use cq.Assembly() instead of .union() chains:
+  assy = cq.Assembly()
+  assy.add(foundation, name="foundation", loc=cq.Location((0, 0, 0)))
+  assy.add(floor_slab, name="floor", loc=cq.Location((0, 0, foundation_h)))
+  assy.add(ext_walls, name="walls", loc=cq.Location((0, 0, foundation_h + slab_h)))
+  assy.add(roof, name="roof", loc=cq.Location((0, 0, wall_top_z)))
+  assy.add(interior_group, name="interior", loc=cq.Location((0, 0, foundation_h + slab_h)))
+  assy.add(furniture_group, name="furniture", loc=cq.Location((0, 0, foundation_h + slab_h)))
+- Each sub-group can still use .union() internally (e.g. all exterior walls unioned into one solid)
+- But the top-level assembly uses spatial placement, not boolean operations
+- This is DRAMATICALLY faster — O(n) instead of O(n²) for n components
+- To export: result = assy.toCompound()  # converts Assembly to a single Compound for STEP/STL export
+- Parts in an Assembly do NOT need to physically overlap (unlike .union())
+
+UNION BUDGET:
+- Maximum 80 total .union() calls across the ENTIRE script
+- Maximum 40 total .cut() calls across the ENTIRE script
+- Count them mentally before writing code. If you exceed these limits, use cq.Assembly() for top-level composition.
 - Example: instead of 4 separate wall functions unioned one-by-one, make ONE make_all_exterior_walls()
-  function that builds them as a single compound solid
+  function that builds them as a single compound solid, then add it to the Assembly
+- For buildings with 20+ components: use cq.Assembly() at the top level and only .union() within sub-groups
 
 FURNITURE AND FIXTURES (OPTIONAL — skip if structure already complex):
-- If the structure sub-assembly already has 15+ union/cut operations, SKIP furniture entirely
+- If the structure sub-assembly already has 40+ union/cut operations, SKIP furniture entirely
 - If included, simplify furniture to 1-2 primitive shapes each (a bed = box + headboard box)
 - Do NOT model individual balusters/spindles — use a solid panel
 - Skip ALL decorative details (towel rails, light fixtures, switches, handles)
-- Cap any loop that creates repeated elements (balusters, joists, rafters) to MAX 6 items
-- Maximum 5 furniture/fixture items total
+- Cap any loop that creates repeated elements (balusters, joists, rafters) to MAX 15 items
+- Maximum 10 furniture/fixture items total
+- Add furniture as a separate sub-group in the Assembly (not unioned into the structure)
 
 DIMENSIONAL SANITY:
 - Building dimensions are in mm (a house is typically 3000-12000mm per axis)
@@ -659,9 +678,9 @@ Generate the FULL CadQuery Python code. Requirements:
 5. Each function must build REAL geometry — no empty stubs, no "pass", no TODOs
 6. Use the assembly pattern: assy = None, then add() each component via union
 7. Include validation checks that verify dimensional constraints
-8. The LAST line MUST be exactly: result = assy
+8. The LAST line MUST be exactly: result = assy (for Workplane) or result = assy.toCompound() (for Assembly)
 
-This code will be executed in a CadQuery sandbox. The "result" variable must be a cq.Workplane containing the complete assembled model.`,
+This code will be executed in a CadQuery sandbox. The "result" variable must be a cq.Workplane or cq.Compound containing the complete assembled model. If using cq.Assembly(), call .toCompound() to convert it.`,
       "claude-opus-4-6",
       64000,
     )
@@ -745,7 +764,7 @@ export async function executeCode(code: string): Promise<ExecutionResult> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code: combinedCode, module_id: "cad-lab-claude", material_density: 1240 }),
-      signal: AbortSignal.timeout(300_000),
+      signal: AbortSignal.timeout(600_000), // 10 min — building models need extended execution time
     })
 
     if (!response.ok) {
@@ -818,7 +837,7 @@ async function callClaude(
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     }),
-    signal: AbortSignal.timeout(300_000),
+    signal: AbortSignal.timeout(600_000), // 10 min — large building models produce longer code generation
   })
 
   if (!response.ok) {

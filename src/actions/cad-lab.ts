@@ -100,7 +100,7 @@ async function callClaude(
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     }),
-    signal: AbortSignal.timeout(300_000), // 5 min for large generations
+    signal: AbortSignal.timeout(600_000), // 10 min — building models need extended generation time
   })
 
   if (!response.ok) {
@@ -319,7 +319,7 @@ async function executeOnModal(code: string): Promise<ModalResponse> {
       module_id: "cad-lab-v3",
       material_density: 1240,
     }),
-    signal: AbortSignal.timeout(300_000),
+    signal: AbortSignal.timeout(600_000), // 10 min — building models need extended execution time
   })
 
   if (!response.ok) {
