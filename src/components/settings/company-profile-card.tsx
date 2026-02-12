@@ -22,17 +22,20 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Building2, Pencil, Sparkles } from 'lucide-react'
 import { CompanyProfileDialog } from './company-profile-dialog'
-import type { CompanyProfile } from '@/types/foundry'
+import type { CompanyProfile, Sector } from '@/types/foundry'
 import {
   EMPLOYEE_COUNT_LABELS,
   REVENUE_RANGE_LABELS,
   FUNDING_STATUS_LABELS,
   BUSINESS_MODEL_LABELS,
+  SECTOR_LABELS,
 } from '@/types/foundry'
 
 interface CompanyProfileCardProps {
   /** Current company profile data (null if not yet set) */
   companyProfile: CompanyProfile | null
+  /** Current sector value from foundries table */
+  sector?: Sector | null
   /** Foundry ID */
   foundryId: string
   /** Current user ID */
@@ -43,6 +46,7 @@ interface CompanyProfileCardProps {
 
 export function CompanyProfileCard({
   companyProfile,
+  sector,
   foundryId,
   userId,
   isFounder,
@@ -84,16 +88,16 @@ export function CompanyProfileCard({
           {hasProfile ? (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <ProfileStat
+                label="Sector"
+                value={sector ? SECTOR_LABELS[sector] : null}
+              />
+              <ProfileStat
                 label="Team size"
                 value={companyProfile.employee_count ? EMPLOYEE_COUNT_LABELS[companyProfile.employee_count] : null}
               />
               <ProfileStat
                 label="Business model"
                 value={companyProfile.business_model ? BUSINESS_MODEL_LABELS[companyProfile.business_model] : null}
-              />
-              <ProfileStat
-                label="Revenue"
-                value={companyProfile.revenue_range ? REVENUE_RANGE_LABELS[companyProfile.revenue_range] : null}
               />
               <ProfileStat
                 label="Funding"
@@ -131,6 +135,7 @@ export function CompanyProfileCard({
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           initialData={companyProfile}
+          initialSector={sector}
           foundryId={foundryId}
           userId={userId}
         />

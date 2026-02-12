@@ -12,6 +12,7 @@
 import { revalidatePath } from 'next/cache'
 import { withAuth } from '@/lib/server-action-utils'
 import type { FoundryPurposeData, CompanyProfile } from '@/types/foundry'
+import type { Sector } from '@/types/foundry'
 import type { Json } from '@/types/database.types'
 
 export interface ActionResult {
@@ -219,14 +220,17 @@ export async function getFoundryPurpose(
 // --- Company Profile Actions ---
 
 /**
- * Updates the foundry's company profile (stage, size, revenue, funding status).
+ * Updates the foundry's company profile (stage, size, revenue, funding status)
+ * and optionally the standardised sector used for CAD component filtering.
  * 
  * @description Allows founders to set structured company context so the AI
  * can provide more relevant recommendations across advisory, marketplace,
- * and workflow features.
+ * and workflow features. The sector field controls which Tier 3 domain
+ * components appear in the CAD Lab.
  * 
  * @param {string} foundryId - The foundry to update
  * @param {CompanyProfile} profileData - Complete company profile data
+ * @param {Sector | null} [sector] - Optional standardised sector for CAD filtering
  * 
  * @returns {Promise<ActionResult>} Success status with error message if failed
  * 
@@ -235,7 +239,8 @@ export async function getFoundryPurpose(
  */
 export async function updateCompanyProfile(
   foundryId: string,
-  profileData: CompanyProfile
+  profileData: CompanyProfile,
+  sector?: Sector | null,
 ): Promise<ActionResult> {
   return withAuth(async ({ supabase, user }) => {
     // AUTH: Get current user's profile to check role
@@ -293,6 +298,25 @@ export async function updateCompanyProfile(
         return { success: false, error: `Failed to update company profile: ${rpcError.message}` }
       }
 
+      // Update sector if provided (separate column on foundries table)
+      if (sector !== undefined && sector !== null) {
+        const { error: sectorError } = await supabase.rpc('update_foundry_sector', {
+          p_foundry_id: foundryId,
+          p_sector: sector,
+        })
+
+        if (sectorError) {
+          console.error('[FoundryActions] Failed to update sector via RPC:', {
+            foundryId,
+            sector,
+            error: sectorError.message,
+            code: sectorError.code,
+          })
+          // Non-fatal: profile was saved successfully, sector update is secondary
+          console.warn('[FoundryActions] Profile saved but sector update failed')
+        }
+      }
+
       // AUDIT: Log the profile update
       console.info('[FoundryActions] Company profile updated:', {
         foundryId,
@@ -300,12 +324,14 @@ export async function updateCompanyProfile(
         hasEmployeeCount: !!profileData.employee_count,
         hasRevenueRange: !!profileData.revenue_range,
         hasFundingStatus: !!profileData.funding_status,
+        sector: sector ?? 'unchanged',
       })
 
       // Revalidate pages that use company context
       revalidatePath('/settings')
       revalidatePath('/objectives')
       revalidatePath('/advisory')
+      revalidatePath('/the-forge/cad-lab')
 
       return {
         success: true,
@@ -371,10 +397,16 @@ export async function getCompanyProfile(
         return { success: false, error: 'Failed to fetch company profile' }
       }
 
+      // Also fetch sector from the foundries table
+      const foundryData = data as { company_profile?: CompanyProfile | null; sector?: string | null }
+
       return {
         success: true,
         error: null,
-        data: (data as { company_profile?: CompanyProfile | null })?.company_profile ?? null,
+        data: {
+          profile: foundryData?.company_profile ?? null,
+          sector: (foundryData?.sector as Sector) ?? null,
+        },
       }
     } catch (error) {
       console.error('[FoundryActions] Unexpected error fetching company profile:', {

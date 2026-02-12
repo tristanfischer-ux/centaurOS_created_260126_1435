@@ -25,6 +25,43 @@ import type {
 import { checkRateLimit } from "@/lib/security/rate-limit"
 import { createClient } from "@/lib/supabase/server"
 import { CAD_INSTRUCTIONS } from "@/lib/cad-instructions"
+import { fetchLibrarySummary, formatLibraryForPrompt, prepareCodeWithLibrary } from "@/actions/component-library"
+import type { Sector } from "@/types/foundry"
+
+// ─── Sector Lookup ───────────────────────────────────────────────────
+
+/**
+ * Looks up the authenticated user's foundry sector for component filtering.
+ *
+ * @param supabase - Authenticated Supabase client
+ * @param userId - Authenticated user ID
+ * @returns The sector string or null if not set
+ */
+async function lookupUserSector(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<Sector | null> {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('foundry_id')
+      .eq('id', userId)
+      .single()
+
+    if (!profile?.foundry_id) return null
+
+    const { data: foundry } = await supabase
+      .from('foundries')
+      .select('sector')
+      .eq('id', profile.foundry_id)
+      .single()
+
+    return (foundry?.sector as Sector) ?? null
+  } catch {
+    console.warn('[CAD-LAB] Failed to look up user sector, continuing without filter')
+    return null
+  }
+}
 
 // ─── Claude API Call ─────────────────────────────────────────────────
 
@@ -508,6 +545,15 @@ export async function generateCadLabInterface(
   try {
     console.info("[CAD-LAB] Step 2: Generating interface definition...")
 
+    // Look up user's sector and fetch filtered library
+    const sector = await lookupUserSector(supabase, user.id)
+    const librarySummary = await fetchLibrarySummary(sector)
+    const librarySection = librarySummary.length > 0
+      ? `\n\nAVAILABLE COMPONENT LIBRARY (${librarySummary.length} pre-built parts):\n` +
+        librarySummary.map((c) => `  - ${c.slug} (${c.name}) [${c.category}]`).join("\n") +
+        "\n\nWhen a product component matches a library slug, mark it as \"LIBRARY: slug_name\" in the Source column."
+      : ""
+
     const systemPrompt = `You are an engineering planner for parametric CAD models. You are NOT writing code — this is pure engineering planning.
 
 Your job is to produce a text-only interface definition that will be used to generate CadQuery Python code. Every dimension must be a specific number in millimetres. The numbers must sum correctly — show ALL arithmetic step-by-step.
@@ -554,7 +600,9 @@ CRITICAL RULES:
 - Every position must be calculated from named quantities, not eyeballed
 - Components must not overlap spatially
 - DO NOT WRITE ANY CODE — this is pure engineering planning
-- Use the research report dimensions exactly — do not invent new numbers`
+- Use the research report dimensions exactly — do not invent new numbers
+- ALWAYS check the component library FIRST before planning custom geometry
+- Prefer library components over custom geometry — they produce recognisable, detailed parts${librarySection}`
 
     const userPrompt = `Product: ${description}
 
@@ -641,9 +689,16 @@ export async function generateCadLabModel(
     // ── Generate code with Claude ──
     console.info("[CAD-LAB] Step 3: Generating complete CadQuery code with Claude...")
 
+    // Look up user's sector and fetch filtered library for prompt injection
+    const sector = await lookupUserSector(supabase, user.id)
+    const librarySummary = await fetchLibrarySummary(sector)
+    const libraryPromptSection = await formatLibraryForPrompt(librarySummary)
+
     const systemPrompt = `You are generating a complete CadQuery parametric CAD model. Follow the methodology in this document EXACTLY:
 
 ${CAD_INSTRUCTIONS}
+
+${libraryPromptSection}
 
 ADDITIONAL RULES FOR THIS PIPELINE:
 - The final variable MUST be called "result" and be a cq.Workplane object
@@ -692,10 +747,19 @@ Generate the complete CadQuery Python code following the methodology. The code m
 
     console.info(`[CAD-LAB] Step 3: Code generated (${codeLines} lines, ${generationTime}ms)`)
 
+    // ── Prepend library function definitions for any used slugs ──
+    const { combinedCode, libraryComponents } = await prepareCodeWithLibrary(finalCode)
+    if (libraryComponents.length > 0) {
+      console.info("[CAD-LAB] Library components prepended for execution:", {
+        count: libraryComponents.length,
+        slugs: libraryComponents,
+      })
+    }
+
     // ── Execute on Modal ──
     console.info("[CAD-LAB] Step 4: Executing on Modal...")
     const modalStart = Date.now()
-    const modalResult = await executeOnModal(finalCode)
+    const modalResult = await executeOnModal(combinedCode)
     const modalTime = Date.now() - modalStart
 
     if (modalResult.error && !modalResult.svg_iso) {

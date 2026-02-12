@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/server"
 import { CAD_INSTRUCTIONS } from "@/lib/cad-instructions"
 import { fetchLibrarySummary, formatLibraryForPrompt, prepareCodeWithLibrary } from "@/actions/component-library"
 import type { LibraryComponentSummary } from "@/actions/component-library"
+import type { Sector } from "@/types/foundry"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -97,6 +98,38 @@ async function authCheck(): Promise<{ userId: string } | { error: string }> {
   if (rateLimitError) return { error: rateLimitError }
 
   return { userId: user.id }
+}
+
+/**
+ * Looks up the authenticated user's foundry sector for component filtering.
+ *
+ * @returns The sector string or null if not set
+ */
+async function lookupUserSector(): Promise<Sector | null> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('foundry_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.foundry_id) return null
+
+    const { data: foundry } = await supabase
+      .from('foundries')
+      .select('sector')
+      .eq('id', profile.foundry_id)
+      .single()
+
+    return (foundry?.sector as Sector) ?? null
+  } catch {
+    console.warn('[CadLabClaude] Failed to look up user sector, continuing without filter')
+    return null
+  }
 }
 
 // ─── Instructions (bundled as TypeScript constant) ───────────────────
@@ -356,8 +389,10 @@ export async function generateInterface(
 
   const start = Date.now()
   try {
-    // Fetch library summary to inject into interface definition step
-    const librarySummary = await fetchLibrarySummary()
+    // Look up user's sector for component filtering
+    const sector = await lookupUserSector()
+    // Fetch library summary filtered by sector
+    const librarySummary = await fetchLibrarySummary(sector)
     const librarySection = librarySummary.length > 0
       ? buildLibrarySectionForInterface(librarySummary)
       : ""
@@ -484,8 +519,10 @@ export async function generateCode(
 
   const start = Date.now()
   try {
-    // Fetch available library components to include in the prompt
-    const librarySummary = await fetchLibrarySummary()
+    // Look up user's sector for component filtering
+    const sector = await lookupUserSector()
+    // Fetch available library components filtered by sector
+    const librarySummary = await fetchLibrarySummary(sector)
     const libraryPromptSection = await formatLibraryForPrompt(librarySummary)
 
     const systemPrompt = `You are an expert CadQuery engineer generating production-quality parametric CAD models. Follow the methodology in this document EXACTLY — every rule was learned from real failures:

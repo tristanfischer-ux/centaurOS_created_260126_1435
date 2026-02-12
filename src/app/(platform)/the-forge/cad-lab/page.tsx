@@ -11,7 +11,7 @@
  * Not linked from navigation. Access via /the-forge/cad-lab (behind platform auth).
  */
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import {
   Loader2,
   Code2,
@@ -34,8 +34,11 @@ import {
   Ruler,
   Download,
   Printer,
+  Factory,
+  Info,
 } from "lucide-react"
 
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -51,6 +54,8 @@ import {
 import { CLAUDE_MODELS } from "@/lib/cad-lab-types"
 import { STLViewer } from "@/components/cad/stl-viewer"
 import { Markdown } from "@/components/ui/markdown"
+import { SECTOR_LABELS } from "@/types/foundry"
+import type { Sector } from "@/types/foundry"
 
 import type {
   CadLabResult,
@@ -60,6 +65,37 @@ import type {
 } from "@/lib/cad-lab-types"
 
 export default function CadLabPage(): React.ReactNode {
+  // ── Foundry sector (for component library filtering) ──
+  const [sector, setSector] = useState<Sector | null>(null)
+
+  useEffect(() => {
+    async function fetchSector(): Promise<void> {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('foundry_id')
+          .eq('id', user.id)
+          .single()
+        if (!profile?.foundry_id) return
+
+        const { data: foundry } = await supabase
+          .from('foundries')
+          .select('sector')
+          .eq('id', profile.foundry_id)
+          .single()
+
+        if (foundry?.sector) setSector(foundry.sector as Sector)
+      } catch {
+        // Non-critical — sector badge won't display
+      }
+    }
+    fetchSector()
+  }, [])
+
   // ── Input state ──
   const [subject, setSubject] = useState("")
   const [modelId, setModelId] = useState<ClaudeModelId>("claude-opus-4-6")
@@ -214,10 +250,20 @@ export default function CadLabPage(): React.ReactNode {
           <span className="text-xs font-mono bg-muted text-muted-foreground px-2 py-1 rounded">
             CLAUDE PIPELINE
           </span>
+          {sector && (
+            <span className="flex items-center gap-1.5 text-xs font-medium bg-international-orange-light text-international-orange px-2.5 py-1 rounded">
+              <Factory className="h-3 w-3" />
+              {SECTOR_LABELS[sector]} components active
+            </span>
+          )}
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Research → Interface Definition → Generate. Following the CadQuery methodology exactly.
         </p>
+        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>Component properties are engineering estimates from training data. Verify critical values against manufacturer datasheets.</span>
+        </div>
       </div>
 
       {/* Model selector */}

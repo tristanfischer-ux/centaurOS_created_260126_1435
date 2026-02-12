@@ -50,12 +50,14 @@ import type {
   RevenueRange,
   FundingStatus,
   BusinessModel,
+  Sector,
 } from '@/types/foundry'
 import {
   EMPLOYEE_COUNT_LABELS,
   REVENUE_RANGE_LABELS,
   FUNDING_STATUS_LABELS,
   BUSINESS_MODEL_LABELS,
+  SECTOR_LABELS,
 } from '@/types/foundry'
 import { toast } from 'sonner'
 
@@ -63,6 +65,8 @@ interface CompanyProfileDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialData: CompanyProfile | null
+  /** Initial sector value from the foundries table (separate from CompanyProfile JSONB) */
+  initialSector?: Sector | null
   foundryId: string
   userId: string
 }
@@ -80,6 +84,7 @@ export function CompanyProfileDialog({
   open,
   onOpenChange,
   initialData,
+  initialSector,
   foundryId,
   userId,
 }: CompanyProfileDialogProps) {
@@ -87,6 +92,7 @@ export function CompanyProfileDialog({
   const [isPending, startTransition] = useTransition()
   const [currentStep, setCurrentStep] = useState<FormStep>('basics')
   const [error, setError] = useState<string | null>(null)
+  const [sector, setSector] = useState<Sector | null>(initialSector ?? null)
 
   const [formData, setFormData] = useState<Partial<CompanyProfile>>({
     employee_count: initialData?.employee_count ?? null,
@@ -139,7 +145,7 @@ export function CompanyProfileDialog({
           updatedBy: userId,
         }
 
-        const result = await updateCompanyProfile(foundryId, profileData)
+        const result = await updateCompanyProfile(foundryId, profileData, sector)
 
         if (result.success) {
           toast.success('Company profile updated successfully')
@@ -223,10 +229,12 @@ export function CompanyProfileDialog({
               foundedYear={formData.founded_year ?? null}
               location={formData.location ?? ''}
               website={formData.website ?? ''}
+              sector={sector}
               onEmployeeCountChange={(v) => updateField('employee_count', v)}
               onFoundedYearChange={(v) => updateField('founded_year', v)}
               onLocationChange={(v) => updateField('location', v)}
               onWebsiteChange={(v) => updateField('website', v)}
+              onSectorChange={setSector}
             />
           )}
 
@@ -249,7 +257,7 @@ export function CompanyProfileDialog({
           )}
 
           {currentStep === 'review' && (
-            <StepReview formData={formData} />
+            <StepReview formData={formData} sector={sector} />
           )}
         </div>
 
@@ -309,26 +317,57 @@ function StepBasics({
   foundedYear,
   location,
   website,
+  sector,
   onEmployeeCountChange,
   onFoundedYearChange,
   onLocationChange,
   onWebsiteChange,
+  onSectorChange,
 }: {
   employeeCount: EmployeeCount | null
   foundedYear: number | null
   location: string
   website: string
+  sector: Sector | null
   onEmployeeCountChange: (v: EmployeeCount) => void
   onFoundedYearChange: (v: number | null) => void
   onLocationChange: (v: string) => void
   onWebsiteChange: (v: string) => void
+  onSectorChange: (v: Sector | null) => void
 }) {
   return (
     <div className="space-y-5">
       <div>
         <h3 className="text-lg font-semibold mb-1">Company Basics</h3>
         <p className="text-sm text-muted-foreground">
-          Help us understand the size and location of your company.
+          Help us understand the size, sector, and location of your company.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="sector">
+          <Building2 className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+          Industry sector
+        </Label>
+        <Select
+          value={sector ?? ''}
+          onValueChange={(v) => onSectorChange(v as Sector)}
+        >
+          <SelectTrigger id="sector">
+            <SelectValue placeholder="Select your industry sector" />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.entries(SECTOR_LABELS) as [Sector, string][]).map(
+              ([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              )
+            )}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Used to show relevant components in the CAD Lab.
         </p>
       </div>
 
@@ -520,8 +559,9 @@ function StepFunding({
   )
 }
 
-function StepReview({ formData }: { formData: Partial<CompanyProfile> }) {
+function StepReview({ formData, sector }: { formData: Partial<CompanyProfile>; sector: Sector | null }) {
   const items: { label: string; value: string | null }[] = [
+    { label: 'Sector', value: sector ? SECTOR_LABELS[sector] : null },
     { label: 'Team size', value: formData.employee_count ? EMPLOYEE_COUNT_LABELS[formData.employee_count] : null },
     { label: 'Founded', value: formData.founded_year ? String(formData.founded_year) : null },
     { label: 'Location', value: formData.location || null },

@@ -48,6 +48,68 @@ export interface FoundryPurposeData {
  */
 export type UpdateFoundryPurposeData = Partial<Omit<FoundryPurposeData, 'updatedAt' | 'updatedBy'>>
 
+// --- Sector (for CAD Lab component filtering) ---
+
+/** Standardised industry sector used for CAD component library filtering */
+export type Sector =
+  | 'aerospace'
+  | 'agriculture'
+  | 'automotive'
+  | 'construction'
+  | 'consumer_electronics'
+  | 'defence'
+  | 'energy'
+  | 'food_processing'
+  | 'logistics'
+  | 'manufacturing'
+  | 'marine'
+  | 'medical'
+  | 'mining'
+  | 'robotics'
+  | 'other'
+
+/** Display labels for sector dropdown */
+export const SECTOR_LABELS: Record<Sector, string> = {
+  aerospace: 'Aerospace & Space',
+  agriculture: 'Agriculture & Farming',
+  automotive: 'Automotive',
+  construction: 'Construction & Architecture',
+  consumer_electronics: 'Consumer Electronics & IoT',
+  defence: 'Defence & Security',
+  energy: 'Energy & Renewables',
+  food_processing: 'Food Processing & Biotech',
+  logistics: 'Logistics & Warehousing',
+  manufacturing: 'General Manufacturing',
+  marine: 'Marine & Subsea',
+  medical: 'Medical & Healthcare',
+  mining: 'Mining & Extraction',
+  robotics: 'Robotics & Drones',
+  other: 'Other',
+}
+
+/**
+ * Maps each sector to the Tier 3 domain component categories it should include.
+ * Tier 1 (universal) and Tier 2 (electromechanical) are always included.
+ * Only Tier 3 (domain) components are filtered by sector.
+ */
+export const SECTOR_COMPONENT_DOMAINS: Record<Sector, string[]> = {
+  aerospace: ['cubesat', 'drone'],
+  agriculture: ['vertical_farming', 'bsf_breeding'],
+  automotive: [],
+  construction: ['eps_architectural'],
+  consumer_electronics: [],
+  defence: ['drone', 'cubesat'],
+  energy: ['brine_mining'],
+  food_processing: ['bsf_breeding', 'vertical_farming'],
+  logistics: [],
+  manufacturing: [],
+  marine: ['brine_mining'],
+  medical: [],
+  mining: ['brine_mining'],
+  robotics: ['drone'],
+  other: [],
+}
+
 // --- Company Profile ---
 
 /** How many employees the company has */
