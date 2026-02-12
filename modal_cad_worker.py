@@ -240,11 +240,29 @@ cq.exporters.export(_model, _os.path.join(_output_dir, "model.step"))
 # Export STL
 cq.exporters.export(_model, _os.path.join(_output_dir, "model.stl"))
 
+# === SVG Export Parameters — scale with model size ===
+# Large models (buildings at 3000-12000 mm) need thicker strokes and
+# larger canvases so the line drawings remain legible.
+_svg_width = 800
+_svg_height = 600
+_svg_stroke = 0.25
+_svg_margin = 20
+try:
+    _pre_bb = _model.val().BoundingBox()
+    _max_dim = max(_pre_bb.xlen, _pre_bb.ylen, _pre_bb.zlen)
+    # Scale stroke proportionally — 0.25 at 200mm, ~6.0 at 12000mm
+    _svg_stroke = max(0.25, _max_dim / 2000.0)
+    # Use larger canvas for buildings (>5000mm in any axis)
+    if _max_dim > 5000:
+        _svg_width = 1200
+        _svg_height = 900
+        _svg_margin = 30
+except Exception:
+    pass  # Fall back to defaults if bounding box fails
+
 # Export SVG views
 # Projection directions follow right-hand rule: vector points FROM camera TOWARD object
 # Positive Z component = right-way-up orientation (ground at bottom)
-# Reference: vertical farm uses (1, 0.8, 0.3) for right-way-up isometric
-# CRITICAL: width/height must be specified to avoid empty/tiny SVG output
 _views = {{
     "iso": (1, 0.8, 0.3),      # Isometric, slightly upward — shows feet/base at bottom
     "top": (0, 0, -1),         # Looking straight down
@@ -258,13 +276,13 @@ for _name, _dir in _views.items():
         _model,
         _os.path.join(_output_dir, f"{{_name}}.svg"),
         opt={{
-            "width": 800,
-            "height": 600,
-            "marginLeft": 20,
-            "marginTop": 20,
+            "width": _svg_width,
+            "height": _svg_height,
+            "marginLeft": _svg_margin,
+            "marginTop": _svg_margin,
             "projectionDir": _dir,
             "showHidden": False,
-            "strokeWidth": 0.25,
+            "strokeWidth": _svg_stroke,
         }},
     )
 
@@ -278,13 +296,13 @@ try:
             _exploded_model,
             _os.path.join(_output_dir, "exploded_iso.svg"),
             opt={{
-                "width": 800,
-                "height": 600,
-                "marginLeft": 20,
-                "marginTop": 20,
-                "projectionDir": (1, 0.4, 0.8),  # Exploded iso: slight upward angle to show layer separation
+                "width": _svg_width,
+                "height": _svg_height,
+                "marginLeft": _svg_margin,
+                "marginTop": _svg_margin,
+                "projectionDir": (1, 0.4, 0.8),
                 "showHidden": False,
-                "strokeWidth": 0.25,
+                "strokeWidth": _svg_stroke,
             }},
         )
 except Exception:
@@ -490,8 +508,8 @@ def _empty_result() -> dict:
 
 @app.function(
     image=cadquery_image,
-    timeout=120,
-    memory=2048,
+    timeout=300,   # 5 min — matches client-side AbortSignal; buildings need >2 min
+    memory=4096,   # 4 GB — complex boolean ops on large assemblies need headroom
 )
 def generate_cad(
     cadquery_code: str,
@@ -623,8 +641,8 @@ def generate_cad(
 
 @app.function(
     image=cadquery_image,
-    timeout=120,
-    memory=2048,
+    timeout=300,   # 5 min — matches client-side AbortSignal; buildings need >2 min
+    memory=4096,   # 4 GB — complex boolean ops on large assemblies need headroom
 )
 @modal.fastapi_endpoint(method="POST")
 def generate_cad_endpoint(item: dict) -> dict:
@@ -654,8 +672,8 @@ def generate_cad_endpoint(item: dict) -> dict:
 
 @app.function(
     image=cadquery_image,
-    timeout=90,
-    memory=2048,
+    timeout=300,   # Match main endpoint timeout for consistency
+    memory=4096,
 )
 @modal.fastapi_endpoint(method="POST")
 def analyze_cad_endpoint(item: dict) -> dict:

@@ -54,17 +54,23 @@ function STLModel({ stlData }: { stlData: string }) {
     }
   }, [stlData])
 
-  // Calculate bounding sphere and box for camera/grid positioning
-  const { boundingSphere, yMin } = useMemo(() => {
+  // Calculate bounding sphere, box, and vertex count for camera/grid/wireframe decisions
+  const { boundingSphere, yMin, vertexCount } = useMemo(() => {
     geometry.computeBoundingSphere()
     geometry.computeBoundingBox()
+    const posAttr = geometry.getAttribute("position")
     return {
       boundingSphere: geometry.boundingSphere,
       yMin: geometry.boundingBox?.min.y ?? 0,
+      vertexCount: posAttr ? posAttr.count : 0,
     }
   }, [geometry])
 
   const r = boundingSphere?.radius ?? 500
+
+  // Skip wireframe on complex models (>50k vertices) to avoid doubling GPU
+  // draw calls for negligible visual benefit — typical for large buildings
+  const showWireframe = vertexCount < 50_000
 
   return (
     <>
@@ -78,15 +84,17 @@ function STLModel({ stlData }: { stlData: string }) {
         />
       </mesh>
 
-      {/* Wireframe overlay for engineering context */}
-      <mesh geometry={geometry}>
-        <meshBasicMaterial
-          color="#404040"
-          wireframe
-          transparent
-          opacity={0.1}
-        />
-      </mesh>
+      {/* Wireframe overlay for engineering context — disabled on large models */}
+      {showWireframe && (
+        <mesh geometry={geometry}>
+          <meshBasicMaterial
+            color="#404040"
+            wireframe
+            transparent
+            opacity={0.1}
+          />
+        </mesh>
+      )}
 
       {/* Camera setup based on model size */}
       <PerspectiveCamera

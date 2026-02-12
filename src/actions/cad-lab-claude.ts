@@ -451,11 +451,14 @@ CRITICAL RULES:
 
 ARCHITECTURAL / BUILDING MODELS (houses, cabins, buildings, shelters):
 If the product is a building or architectural structure, you MUST also plan:
-1. SUB-ASSEMBLY GROUPS: Divide components into 4-6 groups (e.g. Structure, Envelope, Interior, Fixtures, Furniture). Each group will be unioned separately, then groups unioned together. This is critical for CadQuery performance.
-2. COMPONENT COUNT CAP: Maximum 25 unique make_*() functions total. Combine similar elements (e.g. "all interior walls" as one function, not separate functions per wall).
-3. SIMPLIFICATION RULES: No individual balusters (use solid panels), no individual joists/rafters (use representative samples max 6), no decorative elements under 50mm.
-4. GABLE STRATEGY: Plan gable walls as "box + cut" not "wire profile" — note this in the table.
-5. In the Space Budget, show floor plan zones along each axis clearly.
+1. SUB-ASSEMBLY GROUPS: Divide components into 4-6 groups (e.g. Structure, Envelope, Interior, Fixtures). Each group will be unioned separately, then groups unioned together. This is critical for CadQuery performance.
+2. COMPONENT COUNT CAP: Maximum 20 unique make_*() functions total. Combine similar elements aggressively (e.g. "all exterior walls" as one function, not separate functions per wall).
+3. UNION BUDGET: Plan for max 30 total .union() calls and max 15 total .cut() calls across the entire script. Count them in the validation checklist.
+4. SIMPLIFICATION RULES: No individual balusters (use solid panels), no individual joists/rafters (use representative samples max 6), no decorative elements under 50mm, no fillets.
+5. GABLE STRATEGY: Plan gable walls as "box + cut" not "wire profile" — note this in the table.
+6. FURNITURE IS OPTIONAL: If the structure already has 15+ boolean operations, mark furniture as "SKIP — complexity budget exceeded" in the component table.
+7. In the Space Budget, show floor plan zones along each axis clearly.
+8. TIMEOUT AWARENESS: The CadQuery execution has a 5-minute hard limit. Every union/cut adds time. Plan for simplicity — a clean model that renders is better than a detailed one that times out.
 ${librarySection}`
 
     const result = await callClaude(
@@ -574,11 +577,16 @@ ASSEMBLY CONNECTION RULES (prevent floating/disconnected parts):
 ARCHITECTURAL / BUILDING MODEL RULES (for houses, buildings, structures):
 When building architectural models (houses, cabins, shelters, buildings), follow these additional rules:
 
+⚠️ EXECUTION BUDGET: Building models MUST complete CadQuery execution within 5 minutes.
+Every extra union/cut adds time. Keep geometry simple — prefer boxes over complex shapes.
+If in doubt, simplify further. A clean simple model is better than a complex one that times out.
+
 WALL CONSTRUCTION:
 - Build ALL walls as simple box extrusions on the XY plane: .box(width, thickness, height)
 - NEVER use wire profiles (.moveTo/.lineTo/.close) for wall shapes
 - Cut window and door openings INTO the walls using .cut() with box shapes
 - Extend cut boxes 20mm wider than the wall thickness to ensure clean boolean operations
+- Combine all exterior walls of one side into a SINGLE box where possible (reduces unions)
 
 GABLE WALLS (triangular sections above eave line):
 - NEVER build gables using wire profiles or .moveTo/.lineTo/.close — this crashes CadQuery
@@ -595,26 +603,35 @@ ROOF CONSTRUCTION:
 - Flat roofs are just horizontal boxes
 
 SUB-ASSEMBLY STRATEGY (critical for performance):
-- Do NOT union all 30+ building components into one mega-solid sequentially
+- Do NOT union all building components into one mega-solid sequentially
 - Instead, group components into 4-6 SUB-ASSEMBLIES and union within each group:
   structure = foundation.union(floor).union(walls).union(roof)
   interior = partitions.union(doors).union(stairs)
   fixtures = kitchen.union(bathroom)
-  furniture = sofa.union(table).union(beds)
-  result = structure.union(interior).union(fixtures).union(furniture)
+  result = structure.union(interior).union(fixtures)
 - This produces the same result but is dramatically faster and less error-prone
-- Within each sub-assembly, keep to MAX 8-10 union operations
+- Within each sub-assembly, keep to MAX 6-8 union operations
 
-FURNITURE AND FIXTURES:
-- Simplify furniture to 2-3 primitive shapes each (a bed = base + mattress + headboard)
-- Do NOT model individual balusters/spindles if there would be more than 10 — use a solid panel instead
-- Skip decorative details (towel rails, light fixtures, switches) that add unions without visual impact
-- Cap any loop that creates repeated elements (balusters, joists, rafters) to MAX 10 items
+UNION BUDGET — HARD CAP:
+- Maximum 30 total .union() calls across the ENTIRE script
+- Maximum 15 total .cut() calls across the ENTIRE script
+- Count them mentally before writing code. If you exceed these limits, combine geometry.
+- Example: instead of 4 separate wall functions unioned one-by-one, make ONE make_all_exterior_walls()
+  function that builds them as a single compound solid
+
+FURNITURE AND FIXTURES (OPTIONAL — skip if structure already complex):
+- If the structure sub-assembly already has 15+ union/cut operations, SKIP furniture entirely
+- If included, simplify furniture to 1-2 primitive shapes each (a bed = box + headboard box)
+- Do NOT model individual balusters/spindles — use a solid panel
+- Skip ALL decorative details (towel rails, light fixtures, switches, handles)
+- Cap any loop that creates repeated elements (balusters, joists, rafters) to MAX 6 items
+- Maximum 5 furniture/fixture items total
 
 DIMENSIONAL SANITY:
 - Building dimensions are in mm (a house is typically 3000-12000mm per axis)
 - Always verify your bounding box mentally: a 6m × 12m house = 6000 × 12000 × ~5500mm
 - If any dimension exceeds 25000mm, something is wrong — likely doubled geometry
+- AVOID fillets entirely on buildings — they are the #1 cause of CadQuery hangs on large geometry
 
 CODE QUALITY REQUIREMENTS:
 - Every component from the interface definition MUST have its own make_*() function.
