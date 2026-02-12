@@ -19,7 +19,8 @@
 "use client"
 
 import React, { useState, useRef, useEffect, lazy, Suspense } from "react"
-import { useRouter, useParams } from "next/navigation"
+import Link from "next/link"
+import { useParams } from "next/navigation"
 
 import { motion, type Variants } from "framer-motion"
 
@@ -193,7 +194,6 @@ export function SystemBlueprint({
   isGeneratingSystemCad = false,
   onRegenerateSystemCad,
 }: SystemBlueprintProps): React.ReactNode {
-  const router = useRouter()
   const params = useParams<{ id: string }>()
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [heroView, setHeroView] = useState<HeroView>("diagram")
@@ -469,21 +469,19 @@ export function SystemBlueprint({
                   const dotColor = statusDotColor(status)
 
                   return (
-                    <motion.button
+                    <Link
                       key={m.id}
-                      type="button"
-                      variants={shouldAnimate ? moduleCardVariants : undefined}
-                      onClick={() => {
-                        if (params.id) {
-                          router.push(`/the-forge/${params.id}/dossier?module=${encodeURIComponent(m.id)}`)
-                        }
-                      }}
-                      className={cn(
-                        "flex flex-col gap-2 rounded-lg border p-3 text-left",
-                        "transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
-                        "bg-background cursor-pointer",
-                      )}
+                      href={params.id ? `/the-forge/${params.id}/dossier?module=${encodeURIComponent(m.id)}` : "#"}
+                      className="block"
                     >
+                      <motion.div
+                        variants={shouldAnimate ? moduleCardVariants : undefined}
+                        className={cn(
+                          "flex flex-col gap-2 rounded-lg border p-3 text-left",
+                          "transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
+                          "bg-background cursor-pointer",
+                        )}
+                      >
                       {/* Module name + status dot */}
                       <div className="flex items-center gap-2">
                         <span
@@ -544,7 +542,8 @@ export function SystemBlueprint({
                           {m.requirements.leadWeeks}w
                         </Badge>
                       </div>
-                    </motion.button>
+                      </motion.div>
+                    </Link>
                   )
                 })}
               </motion.div>
