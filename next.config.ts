@@ -113,7 +113,8 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.stripe.com https://api.openai.com https://*.sentry.io https://*.ingest.sentry.io",
+              // SECURITY: raw.githack.com hosts drei-assets HDR environment maps for Three.js 3D viewer
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.stripe.com https://api.openai.com https://*.sentry.io https://*.ingest.sentry.io https://raw.githack.com",
               "frame-src 'self' https://*.stripe.com",
               // SECURITY: worker-src allows Three.js Web Workers for 3D rendering (blob: URLs)
               "worker-src 'self' blob:",
