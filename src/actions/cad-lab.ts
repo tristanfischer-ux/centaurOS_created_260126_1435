@@ -238,12 +238,27 @@ interface ModalResponse {
   svg_iso: string | null
   svg_top: string | null
   svg_front: string | null
+  svg_back: string | null
   svg_right: string | null
+  svg_left: string | null
+  svg_exploded: string | null
   analysis: {
     mass_properties?: {
       mass_kg?: number
       volume_mm3?: number
+      surface_area_mm2?: number
+      center_of_gravity?: [number, number, number]
+      material_density_kg_m3?: number
       bounding_box?: { xLen: number; yLen: number; zLen: number }
+      error?: string
+    }
+    dfm?: {
+      printable?: boolean
+      issues?: Array<{ severity: string; category: string; message: string }>
+      estimated_print_time_min?: number
+      estimated_material_g?: number
+      support_volume_pct?: number
+      compatible_printers?: string[]
       error?: string
     }
   } | null
@@ -635,6 +650,7 @@ ADDITIONAL RULES FOR THIS PIPELINE:
 - Do NOT include any cq.exporters calls — the execution environment handles export
 - Do NOT include any print() statements
 - Do NOT import os or use open()
+- After assembling "result", also create "result_exploded" — a cq.Workplane that shows all major components translated apart along Z by 1.5× their height for visual separation. This produces an exploded assembly drawing. Wrap the result_exploded creation in a try/except so it never blocks the main result.
 - Output ONLY the Python code inside a single \`\`\`python code fence. No explanations before or after.`
 
     const userPrompt = `Build a parametric CAD model of: ${description}
@@ -650,7 +666,8 @@ Generate the complete CadQuery Python code following the methodology. The code m
 2. Put all primary parameters at the top, calculate all derived values
 3. Include validation checks
 4. Assemble everything with union calls
-5. Assign the final assembly to a variable called "result"`
+5. Assign the final assembly to a variable called "result"
+6. Create "result_exploded" showing all components spread apart along Z for an exploded view (wrap in try/except)`
 
     const codeResult = await callClaude(systemPrompt, userPrompt, modelId, 64000)
     totalTokensIn += codeResult.tokensIn
@@ -745,21 +762,48 @@ Generate the complete CadQuery Python code following the methodology. The code m
       `[CAD-LAB] Pipeline complete: ${codeLines} lines, ${bboxResult?.xLen ?? "?"}×${bboxResult?.yLen ?? "?"}×${bboxResult?.zLen ?? "?"}mm, ${Date.now() - pipelineStart}ms total`,
     )
 
+    // ── Extract DFM analysis ──
+    const dfmRaw = modalResult.analysis?.dfm
+    const dfmResult = dfmRaw && !dfmRaw.error
+      ? {
+          printable: dfmRaw.printable ?? false,
+          issues: dfmRaw.issues ?? [],
+          estimatedPrintTimeMin: dfmRaw.estimated_print_time_min ?? 0,
+          estimatedMaterialG: dfmRaw.estimated_material_g ?? 0,
+          supportVolumePct: dfmRaw.support_volume_pct ?? 0,
+          compatiblePrinters: dfmRaw.compatible_printers ?? [],
+        }
+      : undefined
+
+    // ── Extract mass properties ──
+    const massPropsResult = mp && !mp.error
+      ? {
+          massKg: mp.mass_kg ?? 0,
+          volumeMm3: mp.volume_mm3 ?? 0,
+          surfaceAreaMm2: mp.surface_area_mm2 ?? 0,
+          centerOfGravity: (mp.center_of_gravity ?? [0, 0, 0]) as [number, number, number],
+          materialDensityKgM3: mp.material_density_kg_m3 ?? 1240,
+        }
+      : undefined
+
+    // ── Helper to make data URI from base64 SVG ──
+    const svgUri = (b64: string | null): string | undefined =>
+      b64 ? `data:image/svg+xml;base64,${b64}` : undefined
+
     return {
       success: true,
       code: finalCode,
       codeLines,
       generationTime,
       modalTime,
-      svgIso: modalResult.svg_iso
-        ? `data:image/svg+xml;base64,${modalResult.svg_iso}`
-        : undefined,
-      svgTop: modalResult.svg_top
-        ? `data:image/svg+xml;base64,${modalResult.svg_top}`
-        : undefined,
-      svgFront: modalResult.svg_front
-        ? `data:image/svg+xml;base64,${modalResult.svg_front}`
-        : undefined,
+      svgIso: svgUri(modalResult.svg_iso),
+      svgTop: svgUri(modalResult.svg_top),
+      svgFront: svgUri(modalResult.svg_front),
+      svgBack: svgUri(modalResult.svg_back),
+      svgRight: svgUri(modalResult.svg_right),
+      svgLeft: svgUri(modalResult.svg_left),
+      svgExploded: svgUri(modalResult.svg_exploded),
+      stepData: modalResult.step || undefined,
       stepSize: stepSizeKb,
       stlData: modalResult.stl || undefined,
       stlSize: modalResult.stl ? Math.round(atob(modalResult.stl).length / 1024) : undefined,
@@ -767,6 +811,8 @@ Generate the complete CadQuery Python code following the methodology. The code m
       fillRatio,
       massGrams: mp?.mass_kg ? Math.round(mp.mass_kg * 1000 * 10) / 10 : undefined,
       volumeMm3: vol ? Math.round(vol) : undefined,
+      dfm: dfmResult,
+      massProperties: massPropsResult,
       tokensIn: totalTokensIn,
       tokensOut: totalTokensOut,
       modelUsed: modelId,

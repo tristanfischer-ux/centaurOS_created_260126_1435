@@ -15,6 +15,36 @@ export const CLAUDE_MODELS = [
 
 export type ClaudeModelId = (typeof CLAUDE_MODELS)[number]["id"]
 
+/** DFM (Design for Manufacturability) analysis result */
+export interface CadLabDfmResult {
+  /** Whether the part is printable on common FDM printers */
+  printable: boolean
+  /** DFM issues found (severity: critical/warning/info) */
+  issues: Array<{ severity: string; category: string; message: string }>
+  /** Estimated print time in minutes (FDM, 20% infill) */
+  estimatedPrintTimeMin: number
+  /** Estimated material usage in grams */
+  estimatedMaterialG: number
+  /** Support volume estimate as percentage of part volume */
+  supportVolumePct: number
+  /** List of compatible FDM printers by build volume */
+  compatiblePrinters: string[]
+}
+
+/** Mass properties computed from the solid model */
+export interface CadLabMassProperties {
+  /** Mass in kilograms */
+  massKg: number
+  /** Volume in mm³ */
+  volumeMm3: number
+  /** Surface area in mm² */
+  surfaceAreaMm2: number
+  /** Center of gravity [x, y, z] in mm */
+  centerOfGravity: [number, number, number]
+  /** Material density used for calculation (kg/m³) */
+  materialDensityKgM3: number
+}
+
 /** Result from the main CAD generation pipeline */
 export interface CadLabResult {
   success: boolean
@@ -33,6 +63,16 @@ export interface CadLabResult {
   svgTop?: string
   /** Base64-encoded SVG front view */
   svgFront?: string
+  /** Base64-encoded SVG back view */
+  svgBack?: string
+  /** Base64-encoded SVG right view */
+  svgRight?: string
+  /** Base64-encoded SVG left view */
+  svgLeft?: string
+  /** Base64-encoded SVG exploded isometric view */
+  svgExploded?: string
+  /** Base64-encoded STEP file for download */
+  stepData?: string
   /** STEP file size in KB */
   stepSize?: number
   /** Base64-encoded STL data for 3D viewer */
@@ -47,6 +87,10 @@ export interface CadLabResult {
   massGrams?: number
   /** Volume in mm³ */
   volumeMm3?: number
+  /** DFM analysis from Modal execution */
+  dfm?: CadLabDfmResult
+  /** Mass properties from Modal execution */
+  massProperties?: CadLabMassProperties
   /** Total input tokens used */
   tokensIn?: number
   /** Total output tokens used */

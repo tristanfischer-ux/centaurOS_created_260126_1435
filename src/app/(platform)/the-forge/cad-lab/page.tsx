@@ -32,6 +32,8 @@ import {
   Check,
   Maximize2,
   Ruler,
+  Download,
+  Printer,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -60,7 +62,7 @@ import type {
 export default function CadLabPage(): React.ReactNode {
   // ── Input state ──
   const [subject, setSubject] = useState("")
-  const [modelId, setModelId] = useState<ClaudeModelId>("claude-opus-4-20250514")
+  const [modelId, setModelId] = useState<ClaudeModelId>("claude-opus-4-6")
 
   // ── Step 1: Research state ──
   const [isResearching, setIsResearching] = useState(false)
@@ -80,8 +82,9 @@ export default function CadLabPage(): React.ReactNode {
   const [codeCopied, setCodeCopied] = useState(false)
 
   // ── View state ──
+  type ViewTab = "3d" | "iso" | "exploded" | "front" | "back" | "left" | "right" | "top"
   const [fullscreenView, setFullscreenView] = useState<string | null>(null)
-  const [activeViewTab, setActiveViewTab] = useState<"3d" | "iso" | "front" | "top">("3d")
+  const [activeViewTab, setActiveViewTab] = useState<ViewTab>("3d")
 
   // ── Step 1: Research ──
   const handleResearch = useCallback(async () => {
@@ -174,6 +177,27 @@ export default function CadLabPage(): React.ReactNode {
     setResult(null)
     setEditableReport("")
     setEditableInterface("")
+  }, [])
+
+  // ── Download helper ──
+  const handleDownload = useCallback((filename: string, base64Data: string, isBinary: boolean = true) => {
+    try {
+      const byteString = atob(base64Data)
+      const bytes = new Uint8Array(byteString.length)
+      for (let i = 0; i < byteString.length; i++) {
+        bytes[i] = byteString.charCodeAt(i)
+      }
+      const mimeType = isBinary ? "application/octet-stream" : "application/step"
+      const blob = new Blob([bytes], { type: mimeType })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error("[CAD-LAB] Download failed:", err)
+    }
   }, [])
 
   const hasResearch = researchResult?.success && editableReport.trim().length > 0
@@ -551,24 +575,52 @@ export default function CadLabPage(): React.ReactNode {
                     <Box className="h-4 w-4" />
                     Views
                   </CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setFullscreenView(activeViewTab)}
-                    className="gap-1.5"
-                  >
-                    <Maximize2 className="h-3.5 w-3.5" />
-                    Fullscreen
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {result.stepData && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload("model.step", result.stepData!, false)}
+                        className="gap-1.5"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        STEP
+                      </Button>
+                    )}
+                    {result.stlData && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload("model.stl", result.stlData!)}
+                        className="gap-1.5"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        STL
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFullscreenView(activeViewTab)}
+                      className="gap-1.5"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                      Fullscreen
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <Tabs value={activeViewTab} onValueChange={(v) => setActiveViewTab(v as typeof activeViewTab)}>
-                  <TabsList className="grid w-full grid-cols-4">
-                    {result.stlData && <TabsTrigger value="3d">3D Model</TabsTrigger>}
-                    {result.svgIso && <TabsTrigger value="iso">Isometric</TabsTrigger>}
-                    {result.svgFront && <TabsTrigger value="front">Front</TabsTrigger>}
-                    {result.svgTop && <TabsTrigger value="top">Top</TabsTrigger>}
+                <Tabs value={activeViewTab} onValueChange={(v) => setActiveViewTab(v as ViewTab)}>
+                  <TabsList className="flex w-full overflow-x-auto">
+                    {result.stlData && <TabsTrigger value="3d" className="flex-1">3D Model</TabsTrigger>}
+                    {result.svgIso && <TabsTrigger value="iso" className="flex-1">Isometric</TabsTrigger>}
+                    {result.svgExploded && <TabsTrigger value="exploded" className="flex-1">Exploded</TabsTrigger>}
+                    {result.svgFront && <TabsTrigger value="front" className="flex-1">Front</TabsTrigger>}
+                    {result.svgBack && <TabsTrigger value="back" className="flex-1">Back</TabsTrigger>}
+                    {result.svgLeft && <TabsTrigger value="left" className="flex-1">Left</TabsTrigger>}
+                    {result.svgRight && <TabsTrigger value="right" className="flex-1">Right</TabsTrigger>}
+                    {result.svgTop && <TabsTrigger value="top" className="flex-1">Top</TabsTrigger>}
                   </TabsList>
 
                   {result.stlData && (
@@ -581,43 +633,43 @@ export default function CadLabPage(): React.ReactNode {
 
                   {result.svgIso && (
                     <TabsContent value="iso" className="mt-4">
-                      <div className="bg-muted rounded-lg p-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={result.svgIso}
-                          alt="Isometric view"
-                          className="w-full cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => setFullscreenView("iso")}
-                        />
-                      </div>
+                      <SvgView src={result.svgIso} alt="Isometric view" onClick={() => setFullscreenView("iso")} />
+                    </TabsContent>
+                  )}
+
+                  {result.svgExploded && (
+                    <TabsContent value="exploded" className="mt-4">
+                      <SvgView src={result.svgExploded} alt="Exploded isometric view" onClick={() => setFullscreenView("exploded")} />
                     </TabsContent>
                   )}
 
                   {result.svgFront && (
                     <TabsContent value="front" className="mt-4">
-                      <div className="bg-muted rounded-lg p-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={result.svgFront}
-                          alt="Front view"
-                          className="w-full cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => setFullscreenView("front")}
-                        />
-                      </div>
+                      <SvgView src={result.svgFront} alt="Front view" onClick={() => setFullscreenView("front")} />
+                    </TabsContent>
+                  )}
+
+                  {result.svgBack && (
+                    <TabsContent value="back" className="mt-4">
+                      <SvgView src={result.svgBack} alt="Back view" onClick={() => setFullscreenView("back")} />
+                    </TabsContent>
+                  )}
+
+                  {result.svgLeft && (
+                    <TabsContent value="left" className="mt-4">
+                      <SvgView src={result.svgLeft} alt="Left view" onClick={() => setFullscreenView("left")} />
+                    </TabsContent>
+                  )}
+
+                  {result.svgRight && (
+                    <TabsContent value="right" className="mt-4">
+                      <SvgView src={result.svgRight} alt="Right view" onClick={() => setFullscreenView("right")} />
                     </TabsContent>
                   )}
 
                   {result.svgTop && (
                     <TabsContent value="top" className="mt-4">
-                      <div className="bg-muted rounded-lg p-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={result.svgTop}
-                          alt="Top view"
-                          className="w-full cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => setFullscreenView("top")}
-                        />
-                      </div>
+                      <SvgView src={result.svgTop} alt="Top view" onClick={() => setFullscreenView("top")} />
                     </TabsContent>
                   )}
                 </Tabs>
@@ -696,6 +748,95 @@ export default function CadLabPage(): React.ReactNode {
             </CardContent>
           </Card>
 
+          {/* Manufacturability Analysis */}
+          {result.dfm && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Printer className="h-4 w-4" />
+                  Manufacturability (DFM)
+                  <span className={`text-xs font-mono px-2 py-0.5 rounded ${result.dfm.printable ? "bg-status-success-light text-status-success" : "bg-status-error-light text-destructive"}`}>
+                    {result.dfm.printable ? "PRINTABLE" : "NOT PRINTABLE"}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Metric
+                    icon={<Timer className="h-3.5 w-3.5" />}
+                    label="Est. Print Time"
+                    value={result.dfm.estimatedPrintTimeMin > 60
+                      ? `${(result.dfm.estimatedPrintTimeMin / 60).toFixed(1)} hrs`
+                      : `${result.dfm.estimatedPrintTimeMin} min`
+                    }
+                  />
+                  <Metric
+                    label="Est. Material"
+                    value={`${result.dfm.estimatedMaterialG} g`}
+                  />
+                  <Metric
+                    label="Support Volume"
+                    value={`~${result.dfm.supportVolumePct}%`}
+                  />
+                  {result.massProperties && (
+                    <Metric
+                      label="Surface Area"
+                      value={result.massProperties.surfaceAreaMm2 > 0
+                        ? `${Math.round(result.massProperties.surfaceAreaMm2).toLocaleString()} mm²`
+                        : "N/A"
+                      }
+                    />
+                  )}
+                </div>
+
+                {result.dfm.compatiblePrinters.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Compatible Printers</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {result.dfm.compatiblePrinters.map((printer) => (
+                        <span
+                          key={printer}
+                          className="text-xs font-mono bg-muted px-2 py-0.5 rounded"
+                        >
+                          {printer}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {result.massProperties && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Center of Gravity</p>
+                    <p className="text-xs font-mono text-foreground">
+                      ({result.massProperties.centerOfGravity[0].toFixed(1)}, {result.massProperties.centerOfGravity[1].toFixed(1)}, {result.massProperties.centerOfGravity[2].toFixed(1)}) mm
+                    </p>
+                  </div>
+                )}
+
+                {result.dfm.issues.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">Issues</p>
+                    {result.dfm.issues.map((issue, i) => (
+                      <div
+                        key={i}
+                        className={`p-2 rounded text-xs font-mono ${
+                          issue.severity === "critical"
+                            ? "bg-status-error-light text-destructive"
+                            : issue.severity === "warning"
+                              ? "bg-status-warning-light text-status-warning-dark"
+                              : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        <span className="font-semibold uppercase">{issue.severity}:</span> {issue.message}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Code */}
           {result.code && (
             <Card>
@@ -747,34 +888,11 @@ export default function CadLabPage(): React.ReactNode {
 
       {/* ── Fullscreen overlay ── */}
       {fullscreenView && result && (
-        <div
-          className="fixed inset-0 z-50 bg-background/95 flex items-center justify-center p-8"
-          onClick={() => setFullscreenView(null)}
-        >
-          <button
-            className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors text-sm font-mono"
-            onClick={() => setFullscreenView(null)}
-          >
-            ESC to close
-          </button>
-          {fullscreenView === "3d" && result.stlData && (
-            <div className="w-full h-full" onClick={(e) => e.stopPropagation()}>
-              <STLViewer stlData={result.stlData} />
-            </div>
-          )}
-          {fullscreenView === "iso" && result.svgIso && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={result.svgIso} alt="Isometric view" className="max-w-full max-h-full object-contain" />
-          )}
-          {fullscreenView === "front" && result.svgFront && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={result.svgFront} alt="Front view" className="max-w-full max-h-full object-contain" />
-          )}
-          {fullscreenView === "top" && result.svgTop && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={result.svgTop} alt="Top view" className="max-w-full max-h-full object-contain" />
-          )}
-        </div>
+        <FullscreenOverlay
+          view={fullscreenView}
+          result={result}
+          onClose={() => setFullscreenView(null)}
+        />
       )}
     </div>
   )
@@ -801,6 +919,85 @@ function Metric({
         {label}
       </p>
       <p className="text-sm font-semibold text-foreground font-mono">{value}</p>
+    </div>
+  )
+}
+
+/**
+ * SvgView — renders an SVG engineering drawing in a clickable container.
+ *
+ * @description Reusable component for all orthographic/isometric SVG views.
+ * Clicking opens the fullscreen overlay.
+ */
+function SvgView({
+  src,
+  alt,
+  onClick,
+}: {
+  src: string
+  alt: string
+  onClick: () => void
+}): React.ReactNode {
+  return (
+    <div className="bg-muted rounded-lg p-2">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        className="w-full cursor-pointer hover:opacity-90 transition-opacity"
+        onClick={onClick}
+      />
+    </div>
+  )
+}
+
+/**
+ * FullscreenOverlay — renders a full-viewport overlay for any view tab.
+ *
+ * @description Supports 3D STL viewer and all SVG orthographic views.
+ * Maps view name to the corresponding SVG data URI from the result.
+ */
+function FullscreenOverlay({
+  view,
+  result,
+  onClose,
+}: {
+  view: string
+  result: CadLabResult
+  onClose: () => void
+}): React.ReactNode {
+  /** Map of SVG view names to their data URIs */
+  const svgMap: Record<string, string | undefined> = {
+    iso: result.svgIso,
+    exploded: result.svgExploded,
+    front: result.svgFront,
+    back: result.svgBack,
+    left: result.svgLeft,
+    right: result.svgRight,
+    top: result.svgTop,
+  }
+
+  const svgSrc = svgMap[view]
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-background/95 flex items-center justify-center p-8"
+      onClick={onClose}
+    >
+      <button
+        className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors text-sm font-mono"
+        onClick={onClose}
+      >
+        ESC to close
+      </button>
+      {view === "3d" && result.stlData ? (
+        <div className="w-full h-full" onClick={(e) => e.stopPropagation()}>
+          <STLViewer stlData={result.stlData} />
+        </div>
+      ) : svgSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={svgSrc} alt={`${view} view`} className="max-w-full max-h-full object-contain" />
+      ) : null}
     </div>
   )
 }

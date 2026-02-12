@@ -40,6 +40,10 @@ function STLModel({ stlData }: { stlData: string }) {
       // Center geometry at origin
       geometry.center()
 
+      // CadQuery uses Z-up coordinate system; Three.js uses Y-up.
+      // Rotate -90° around X to convert so models appear right-way-up.
+      geometry.rotateX(-Math.PI / 2)
+
       // Compute normals for proper lighting
       geometry.computeVertexNormals()
 
@@ -50,11 +54,17 @@ function STLModel({ stlData }: { stlData: string }) {
     }
   }, [stlData])
 
-  // Calculate bounding sphere for camera positioning
-  const boundingSphere = useMemo(() => {
+  // Calculate bounding sphere and box for camera/grid positioning
+  const { boundingSphere, yMin } = useMemo(() => {
     geometry.computeBoundingSphere()
-    return geometry.boundingSphere
+    geometry.computeBoundingBox()
+    return {
+      boundingSphere: geometry.boundingSphere,
+      yMin: geometry.boundingBox?.min.y ?? 0,
+    }
   }, [geometry])
+
+  const r = boundingSphere?.radius ?? 500
 
   return (
     <>
@@ -81,31 +91,24 @@ function STLModel({ stlData }: { stlData: string }) {
       {/* Camera setup based on model size */}
       <PerspectiveCamera
         makeDefault
-        position={[
-          boundingSphere?.radius ? boundingSphere.radius * 1.5 : 500,
-          boundingSphere?.radius ? boundingSphere.radius * 1.2 : 400,
-          boundingSphere?.radius ? boundingSphere.radius * 1.5 : 500,
-        ]}
+        position={[r * 1.5, r * 1.2, r * 1.5]}
         fov={50}
       />
 
-      {/* Grid at Z=0 (ground plane) */}
+      {/* Grid on Y ground plane (at bottom of model) */}
       <Grid
-        args={[
-          boundingSphere?.radius ? boundingSphere.radius * 4 : 2000,
-          boundingSphere?.radius ? boundingSphere.radius * 4 : 2000,
-        ]}
-        cellSize={boundingSphere?.radius ? boundingSphere.radius / 10 : 50}
+        args={[r * 4, r * 4]}
+        cellSize={r / 10}
         cellThickness={0.5}
         cellColor="#6e6e6e"
-        sectionSize={boundingSphere?.radius ? boundingSphere.radius / 2 : 200}
+        sectionSize={r / 2}
         sectionThickness={1}
         sectionColor="#9d4b4b"
-        fadeDistance={boundingSphere?.radius ? boundingSphere.radius * 8 : 4000}
+        fadeDistance={r * 8}
         fadeStrength={1}
         followCamera={false}
         infiniteGrid
-        position={[0, 0, 0]}
+        position={[0, yMin, 0]}
       />
     </>
   )

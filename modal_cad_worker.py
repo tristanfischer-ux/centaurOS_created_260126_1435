@@ -24,6 +24,7 @@ import os
 import re
 import tempfile
 import traceback
+import xml.etree.ElementTree as ET
 
 # ─── Container Image ──────────────────────────────────────────────────
 
@@ -97,6 +98,121 @@ MATERIAL_DENSITIES = {
 }
 
 
+# ─── SVG ViewBox Refit ────────────────────────────────────────────────
+
+
+def _refit_svg_viewbox(svg_path: str, padding_pct: float = 0.10) -> None:
+    """
+    Parse an SVG file, compute the tight bounding box of all visible
+    content, and rewrite the viewBox so the drawing is centered with
+    proportional padding. Fixes CadQuery's exporter which leaves
+    geometry stuck in the top-left of a fixed 800x600 canvas.
+    """
+    try:
+        tree = ET.parse(svg_path)
+        root = tree.getroot()
+
+        # CadQuery SVGs use default namespace
+        ns = ""
+        if root.tag.startswith("{"):
+            ns = root.tag.split("}")[0] + "}"
+
+        # Collect all coordinate values from path, line, circle, rect, polyline
+        coords_x: list[float] = []
+        coords_y: list[float] = []
+
+        for elem in root.iter():
+            tag = elem.tag.replace(ns, "")
+
+            # <line x1 y1 x2 y2>
+            if tag == "line":
+                for attr in ("x1", "x2"):
+                    v = elem.get(attr)
+                    if v:
+                        coords_x.append(float(v))
+                for attr in ("y1", "y2"):
+                    v = elem.get(attr)
+                    if v:
+                        coords_y.append(float(v))
+
+            # <circle cx cy r>
+            elif tag == "circle":
+                cx = float(elem.get("cx", "0"))
+                cy = float(elem.get("cy", "0"))
+                r = float(elem.get("r", "0"))
+                coords_x.extend([cx - r, cx + r])
+                coords_y.extend([cy - r, cy + r])
+
+            # <rect x y width height>
+            elif tag == "rect":
+                x = float(elem.get("x", "0"))
+                y = float(elem.get("y", "0"))
+                w = float(elem.get("width", "0"))
+                h = float(elem.get("height", "0"))
+                coords_x.extend([x, x + w])
+                coords_y.extend([y, y + h])
+
+            # <path d="..."> — extract numbers from M, L, C, Q, A commands
+            elif tag == "path":
+                d = elem.get("d", "")
+                # Extract all number pairs from path data
+                numbers = re.findall(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?", d)
+                for i in range(0, len(numbers) - 1, 2):
+                    try:
+                        coords_x.append(float(numbers[i]))
+                        coords_y.append(float(numbers[i + 1]))
+                    except (ValueError, IndexError):
+                        pass
+
+            # <polyline points="x1,y1 x2,y2 ...">
+            elif tag == "polyline" or tag == "polygon":
+                pts = elem.get("points", "")
+                pairs = pts.strip().split()
+                for pair in pairs:
+                    parts = pair.split(",")
+                    if len(parts) == 2:
+                        try:
+                            coords_x.append(float(parts[0]))
+                            coords_y.append(float(parts[1]))
+                        except ValueError:
+                            pass
+
+        if not coords_x or not coords_y:
+            return  # No content found — leave SVG as is
+
+        min_x = min(coords_x)
+        max_x = max(coords_x)
+        min_y = min(coords_y)
+        max_y = max(coords_y)
+
+        content_w = max_x - min_x
+        content_h = max_y - min_y
+
+        if content_w < 0.01 or content_h < 0.01:
+            return  # Degenerate — leave as is
+
+        # Add padding
+        pad_x = content_w * padding_pct
+        pad_y = content_h * padding_pct
+
+        vb_x = min_x - pad_x
+        vb_y = min_y - pad_y
+        vb_w = content_w + 2 * pad_x
+        vb_h = content_h + 2 * pad_y
+
+        root.set("viewBox", f"{vb_x:.2f} {vb_y:.2f} {vb_w:.2f} {vb_h:.2f}")
+
+        # Keep width/height for proper aspect ratio in img tags
+        root.set("width", "100%")
+        root.set("height", "100%")
+
+        tree.write(svg_path, xml_declaration=True, encoding="unicode")
+
+    except Exception as e:
+        print(f"WARNING: SVG viewBox refit failed for {svg_path}: {e}")
+        # Non-fatal — leave the SVG as CadQuery produced it
+
+
 # ─── Export Wrapper (with mass properties + DFM) ──────────────────────
 
 EXPORT_TEMPLATE = '''
@@ -133,7 +249,9 @@ _views = {{
     "iso": (1, 0.8, 0.3),      # Isometric, slightly upward — shows feet/base at bottom
     "top": (0, 0, -1),         # Looking straight down
     "front": (0, 1, 0),        # Front elevation (Y-axis view)
+    "back": (0, -1, 0),        # Back elevation (negative Y-axis view)
     "right": (1, 0, 0),        # Right side elevation (X-axis view)
+    "left": (-1, 0, 0),        # Left side elevation (negative X-axis view)
 }}
 for _name, _dir in _views.items():
     cq.exporters.export(
@@ -362,7 +480,9 @@ def _empty_result() -> dict:
         "svg_iso": None,
         "svg_top": None,
         "svg_front": None,
+        "svg_back": None,
         "svg_right": None,
+        "svg_left": None,
         "svg_exploded": None,
         "analysis": None,
     }
@@ -443,6 +563,12 @@ def generate_cad(
                 f"{user_exec_error}"
             )
 
+        # Post-process SVG viewBoxes so drawings are centered
+        for svg_name in ["iso", "top", "front", "back", "right", "left", "exploded_iso"]:
+            svg_path = os.path.join(tmpdir, f"{svg_name}.svg")
+            if os.path.exists(svg_path):
+                _refit_svg_viewbox(svg_path)
+
         # Read output files
         file_map = {
             "step": "model.step",
@@ -450,7 +576,9 @@ def generate_cad(
             "svg_iso": "iso.svg",
             "svg_top": "top.svg",
             "svg_front": "front.svg",
+            "svg_back": "back.svg",
             "svg_right": "right.svg",
+            "svg_left": "left.svg",
             "svg_exploded": "exploded_iso.svg",
         }
 
@@ -584,7 +712,7 @@ result = (
     if output["error"]:
         print(f"ERROR: {output['error']}")
     else:
-        for key in ["step", "stl", "svg_iso", "svg_top", "svg_front", "svg_right"]:
+        for key in ["step", "stl", "svg_iso", "svg_top", "svg_front", "svg_back", "svg_right", "svg_left", "svg_exploded"]:
             val = output.get(key)
             if val:
                 size_kb = len(val) * 3 / 4 / 1024  # base64 -> bytes -> KB
