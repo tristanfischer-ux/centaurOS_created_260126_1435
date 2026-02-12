@@ -28,6 +28,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Markdown } from "@/components/ui/markdown"
 import {
   Search,
   Globe,
@@ -292,8 +293,8 @@ export function ConceptResearch({
               </div>
             )}
 
-            {/* Editable report */}
-            <div className="space-y-2">
+            {/* Research report display */}
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground flex items-center gap-2">
                   <FileText className="h-4 w-4 text-muted-foreground" />
@@ -323,12 +324,28 @@ export function ConceptResearch({
                   </Button>
                 </div>
               </div>
-              <Textarea
-                value={report}
-                onChange={(e) => handleReportChange(e.target.value)}
-                className="min-h-[300px] font-mono text-sm leading-relaxed resize-y"
-                placeholder="Research report will appear here..."
-              />
+
+              {/* Rendered markdown view */}
+              <div className="border rounded-lg p-5 bg-muted/20">
+                <Markdown content={report} className="text-sm text-foreground" />
+              </div>
+
+              {/* Collapsible raw editor */}
+              <details className="border rounded-lg">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/50 transition-colors select-none">
+                  Edit raw markdown
+                </summary>
+                <div className="px-4 pb-4 pt-2 border-t">
+                  <Textarea
+                    value={report}
+                    onChange={(e) => handleReportChange(e.target.value)}
+                    className="min-h-[300px] font-mono text-xs leading-relaxed resize-y"
+                    placeholder="Research report will appear here..."
+                    disabled={isScanning}
+                  />
+                </div>
+              </details>
+
               <p className="text-xs text-muted-foreground">
                 You can edit this report before proceeding. Changes will be used as context
                 when generating your product modules.

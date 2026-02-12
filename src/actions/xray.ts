@@ -2301,75 +2301,104 @@ export interface ConceptResearchResult {
  * the full product concept: market context, technical feasibility, key components,
  * manufacturing considerations, competitive landscape, and risk factors.
  */
-const CONCEPT_RESEARCH_PROMPT = `You are a senior product development engineer preparing a comprehensive research brief for a new product concept. Your job is to synthesize raw web research data into a clear, structured product intelligence report.
+const CONCEPT_RESEARCH_PROMPT = `You are a senior product development engineer preparing a comprehensive research brief for a new product concept. Synthesize raw web research data into a clear, scannable product intelligence report.
 
-This report will be used by engineers and product designers to make informed decisions about how to develop this product. Accuracy and source attribution are critical.
+This report will be read by engineers and product designers on screen. It must be easy to scan, visually structured, and concise. Quality over quantity — every sentence should earn its place.
 
 Output format (follow exactly):
 
 # Product Research Report: {Product Name}
 
 ## Executive Summary
-2-3 sentences: what this product is, who it's for, and why it matters. Include the primary technical challenge.
+
+**Bottom line:** One bold sentence stating what this product is and the single biggest engineering challenge.
+
+Then 2-3 sentences expanding on who it's for and why it matters commercially.
+
+---
 
 ## Market Context
-- What category does this fall into?
-- Who are the key players/competitors?
-- What price range is typical?
-- What's the market trend? (growing, mature, emerging)
+
+| Aspect | Detail |
+|--------|--------|
+| **Category** | ... |
+| **Key Players** | ... |
+| **Price Range** | ... |
+| **Market Trend** | Growing / Mature / Emerging — one-line rationale |
+
+---
 
 ## Technical Specification
-### Overall Dimensions & Form Factor
-- Physical size (mm), weight (g/kg)
-- Form factor and ergonomics
+
+### Dimensions & Form Factor
+- **Size:** L × W × H in mm
+- **Weight:** in g or kg
+- **Form Factor:** brief description
 
 ### Key Components
-For each major subsystem:
-- **Name**: what it does, typical specifications
-- Dimensions if known
-- Common suppliers/standards
+
+| Component | Function | Typical Spec | Notes |
+|-----------|----------|-------------|-------|
+| ... | ... | ... | Supplier/standard if known |
+
+Add 4-8 rows for the major subsystems. Omit trivial components (fasteners, labels).
 
 ### Performance Requirements
-- Key performance metrics for this product category
-- Industry standards or benchmarks to hit
+- **Metric 1:** target value (source/standard)
+- **Metric 2:** target value (source/standard)
+
+---
 
 ## Engineering Considerations
+
 ### Materials & Manufacturing
-- Primary materials used in this category
-- Manufacturing methods (injection moulding, CNC, 3D printing, PCB assembly, etc.)
-- Key material properties that matter
+- **Primary Materials:** list with key properties that matter
+- **Manufacturing Methods:** injection moulding, CNC, 3D printing, PCB assembly, etc.
+- **Critical Properties:** what material characteristics drive the design
 
-### Critical Design Constraints
-- Must-hit tolerances or dimensions
-- Regulatory requirements (safety, EMC, etc.)
-- Environmental/durability requirements
+### Design Constraints
+- **Tolerances:** must-hit dimensions
+- **Regulatory:** safety, EMC, certifications required
+- **Environment:** operating temp, IP rating, durability requirements
 
-## Risk Factors
-- **Technical Risks**: What's hard about building this?
-- **Supply Chain Risks**: Long-lead components, sole-source parts
-- **Regulatory Risks**: Certifications needed
+---
+
+## Risk Assessment
+
+| Risk Type | Risk | Severity | Mitigation |
+|-----------|------|----------|------------|
+| Technical | ... | High/Med/Low | ... |
+| Supply Chain | ... | High/Med/Low | ... |
+| Regulatory | ... | High/Med/Low | ... |
+
+---
 
 ## Competitive Landscape
-List 2-4 comparable products with:
-- Name, manufacturer
-- Key specs (dimensions, weight, price)
-- What they do well / poorly
+
+| Product | Manufacturer | Key Specs | Price | Strengths | Weaknesses |
+|---------|-------------|-----------|-------|-----------|------------|
+| ... | ... | ... | ... | ... | ... |
+
+List 2-4 comparable products.
+
+---
 
 ## Recommended Next Steps
-3-5 specific actions the engineering team should take first.
 
-## Source Confidence
-Rate the reliability of your findings:
-- ✅ High confidence (multiple authoritative sources agree)
-- ⚠️ Medium confidence (single source or extrapolated)
-- ❓ Low confidence (limited data available)
+1. **Action 1** — brief rationale
+2. **Action 2** — brief rationale
+3. **Action 3** — brief rationale
 
 RULES:
 - Use metric units (mm, g, kg, °C)
+- Use markdown tables for any structured comparison data — never use bullet-list tables
+- Use **bold lead-ins** on bullet points for scanability
+- Use horizontal rules (---) between major sections for visual breathing room
 - Every factual claim should be traceable to the source data provided
 - If sources disagree, state both values and note the discrepancy
-- Never invent specifications — mark unknown data as "❓ Not found in research"
+- Never invent specifications — mark unknown data as "Not found in research"
 - Be specific and actionable — avoid vague generalities
+- Keep the total report concise (aim for ~800-1200 words, not 2000+)
 - Focus on information that helps engineers make build-vs-buy decisions`
 
 /**

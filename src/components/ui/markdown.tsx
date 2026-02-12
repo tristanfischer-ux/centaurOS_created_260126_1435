@@ -4,7 +4,9 @@ import ReactMarkdown from 'react-markdown'
 import { cn } from '@/lib/utils'
 
 interface MarkdownProps {
+  /** Markdown string to render */
   content: string
+  /** Additional CSS classes for the wrapper */
   className?: string
 }
 
@@ -22,6 +24,18 @@ function isValidUrl(url: string | undefined): boolean {
   }
 }
 
+/**
+ * Markdown — renders markdown content with polished, report-quality typography.
+ *
+ * @description Provides styled rendering for research reports, documentation,
+ * and any markdown content. Uses semantic color tokens for consistency.
+ *
+ * @param content - The markdown string to render
+ * @param className - Additional CSS classes for the wrapper
+ *
+ * @example
+ * <Markdown content={report} className="text-sm" />
+ */
 export function Markdown({ content, className }: MarkdownProps) {
   if (!content) return null
 
@@ -29,13 +43,33 @@ export function Markdown({ content, className }: MarkdownProps) {
     <div className={cn('markdown-content', className)}>
       <ReactMarkdown
         components={{
-        p: ({ children }) => <p className="my-1 text-inherit">{children}</p>,
-        h1: ({ children }) => <h1 className="my-2 text-xl font-bold">{children}</h1>,
-        h2: ({ children }) => <h2 className="my-2 text-lg font-bold">{children}</h2>,
-        h3: ({ children }) => <h3 className="my-2 text-base font-bold">{children}</h3>,
-        ul: ({ children }) => <ul className="my-1 ml-4 list-disc">{children}</ul>,
-        ol: ({ children }) => <ol className="my-1 ml-4 list-decimal">{children}</ol>,
-        li: ({ children }) => <li className="my-0.5">{children}</li>,
+        p: ({ children }) => (
+          <p className="my-2.5 leading-relaxed text-inherit">{children}</p>
+        ),
+        h1: ({ children }) => (
+          <h1 className="mt-6 mb-3 text-xl font-bold text-foreground first:mt-0">
+            {children}
+          </h1>
+        ),
+        h2: ({ children }) => (
+          <h2 className="mt-8 mb-3 text-lg font-bold text-foreground border-b border-muted pb-2 first:mt-0">
+            {children}
+          </h2>
+        ),
+        h3: ({ children }) => (
+          <h3 className="mt-5 mb-2 text-base font-semibold text-foreground">
+            {children}
+          </h3>
+        ),
+        ul: ({ children }) => (
+          <ul className="my-2 ml-5 list-disc space-y-1">{children}</ul>
+        ),
+        ol: ({ children }) => (
+          <ol className="my-2 ml-5 list-decimal space-y-1">{children}</ol>
+        ),
+        li: ({ children }) => (
+          <li className="leading-relaxed pl-1">{children}</li>
+        ),
         // SECURITY: Validate URLs to prevent XSS via javascript: or data: URLs
         a: ({ href, children }) => {
           const safeHref = isValidUrl(href) ? href : '#'
@@ -44,40 +78,50 @@ export function Markdown({ content, className }: MarkdownProps) {
               href={safeHref} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-primary hover:underline"
+              className="text-primary hover:underline underline-offset-2"
             >
               {children}
             </a>
           )
         },
         code: ({ children }) => (
-          <code className="bg-muted px-1 py-0.5 rounded text-sm text-foreground font-mono">
+          <code className="bg-muted px-1.5 py-0.5 rounded text-[0.9em] text-foreground font-mono">
             {children}
           </code>
         ),
         pre: ({ children }) => (
-          <pre className="bg-muted p-3 rounded overflow-x-auto my-2">
+          <pre className="bg-muted p-4 rounded-lg overflow-x-auto my-3 text-sm">
             {children}
           </pre>
         ),
         blockquote: ({ children }) => (
-          <blockquote className="border-l-4 border-slate-300 pl-4 my-2 italic text-muted-foreground">
+          <blockquote className="border-l-4 border-international-orange/40 pl-4 my-4 text-muted-foreground">
             {children}
           </blockquote>
         ),
-        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+        strong: ({ children }) => (
+          <strong className="font-semibold text-foreground">{children}</strong>
+        ),
         em: ({ children }) => <em className="italic">{children}</em>,
-        hr: () => <hr className="my-3 border-t border-slate-200" />,
+        hr: () => <hr className="my-6 border-t border-muted" />,
         table: ({ children }) => (
-          <div className="my-2 overflow-x-auto">
+          <div className="my-4 overflow-x-auto rounded-lg border">
             <table className="w-full border-collapse text-sm">{children}</table>
           </div>
         ),
-        thead: ({ children }) => <thead className="bg-muted">{children}</thead>,
+        thead: ({ children }) => (
+          <thead className="bg-muted/60">{children}</thead>
+        ),
         tbody: ({ children }) => <tbody>{children}</tbody>,
-        tr: ({ children }) => <tr className="border-b border-slate-200">{children}</tr>,
-        th: ({ children }) => <th className="px-3 py-1.5 text-left font-semibold border border-slate-200">{children}</th>,
-        td: ({ children }) => <td className="px-3 py-1.5 border border-slate-200">{children}</td>,
+        tr: ({ children }) => (
+          <tr className="border-b border-muted last:border-b-0">{children}</tr>
+        ),
+        th: ({ children }) => (
+          <th className="px-4 py-2 text-left font-semibold text-foreground">{children}</th>
+        ),
+        td: ({ children }) => (
+          <td className="px-4 py-2 text-muted-foreground">{children}</td>
+        ),
         }}
       >
         {content}

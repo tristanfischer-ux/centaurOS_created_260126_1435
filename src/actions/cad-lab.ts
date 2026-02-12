@@ -39,7 +39,10 @@ interface ComponentDef {
 /** Parsed interface definition with structured data */
 interface InterfaceDef {
   target_bbox: { x: number; y: number; z: number }
-  motor_diagonal_mm: number
+  /** Product-specific critical dimension (e.g., motor diagonal for drones, tube ID for capsule loaders) */
+  critical_dimension_mm?: number
+  /** Human-readable name for the critical dimension (e.g., "motor-to-motor diagonal") */
+  critical_dimension_name?: string
   components: ComponentDef[]
   raw_text: string
 }
@@ -146,35 +149,9 @@ Key constraints:
 - Total BBox: ~1500×1100×2250mm (includes reservoir beside rack, posts, and top clearance)
 - Fill ratio: 5-8% (hollow trays, pipes, and reservoir — NOT solid blocks)`
 
-/** Target constraints for post-execution validation */
-const DRONE_TARGET = {
-  motorDiagonalMm: 302,
-  minBBoxX: 300,
-  maxBBoxX: 600,
-  minBBoxY: 250,
-  maxBBoxY: 500,
-  minBBoxZ: 80,
-  maxBBoxZ: 200,
-}
-
-const SMARTPHONE_TARGET = {
-  thicknessMm: 7.9,
-  minBBoxX: 140,
-  maxBBoxX: 150,
-  minBBoxY: 68,
-  maxBBoxY: 75,
-  minBBoxZ: 7.5,  // Normal (non-exploded)
-  maxBBoxZ: 200,  // Exploded view
-}
-
-const VERTICAL_FARM_TARGET = {
-  minBBoxX: 1400,
-  maxBBoxX: 1600,
-  minBBoxY: 1000,
-  maxBBoxY: 1200,
-  minBBoxZ: 2100,
-  maxBBoxZ: 2500,
-}
+// Product-specific target constants removed — validation now uses the
+// interface definition's target_bbox dynamically. Hardcoded BBox ranges
+// for drones/phones/farms were causing false failures on any other product.
 
 // ─── Pass 1: Interface Definition Prompt ─────────────────────────────
 
@@ -221,7 +198,7 @@ Example from Vertical Farm:
 
 === DERIVED CONSTRAINTS ===
 - Target BBox: W×D×H mm (calculated from component positions, not guessed)
-- Critical dimensions: [Motor-to-motor diagonal, wheelbase, exploded spacing, etc.] = N mm (show calculation)
+- Critical dimension: Identify the single most important dimension for THIS product (e.g., motor-to-motor diagonal for a drone, tube inner diameter for a capsule loader, overall height for a tower) = N mm (show calculation)
 - Total unique component types: N
 - Total component instances: N (sum of all qty values)
 
@@ -238,7 +215,8 @@ Example from Vertical Farm:
 \`\`\`json
 {
   "target_bbox": {"x": NUMBER, "y": NUMBER, "z": NUMBER},
-  "motor_diagonal_mm": NUMBER,
+  "critical_dimension_mm": NUMBER,
+  "critical_dimension_name": "string describing what this dimension measures (e.g. motor-to-motor diagonal, magazine tube inner diameter, overall tower height)",
   "components": [
     {"name": "snake_case_name", "description": "Brief description with sub-features", "w_mm": NUMBER, "d_mm": NUMBER, "h_mm": NUMBER, "qty": NUMBER},
     ...
@@ -431,6 +409,39 @@ SAFE PATTERNS (use these):
         mount = mount.union(rib)
     result = result.union(mount)
 
+18. Tapered / conical shapes (loft between exactly 2 parallel profiles):
+    # Use for funnels, chutes, capsule bodies, bottle necks, nozzles
+    # ONLY 2 profiles allowed — bottom circle → top circle
+    tapered = (
+        cq.Workplane("XY")
+        .workplane(offset=base_z)
+        .circle(bottom_radius)
+        .workplane(offset=height)
+        .circle(top_radius)
+        .loft()
+    )
+    result = result.union(tapered)
+
+    # Hollow tapered shape (funnel / chute with wall thickness):
+    outer = (
+        cq.Workplane("XY")
+        .workplane(offset=base_z)
+        .circle(bottom_od / 2)
+        .workplane(offset=height)
+        .circle(top_od / 2)
+        .loft()
+    )
+    inner = (
+        cq.Workplane("XY")
+        .workplane(offset=base_z)
+        .circle(bottom_od / 2 - wall)
+        .workplane(offset=height)
+        .circle(top_od / 2 - wall)
+        .loft()
+    )
+    funnel = outer.cut(inner)
+    result = result.union(funnel)
+
 OPTIONAL HELPER FUNCTIONS:
 If multiple components share a pattern (rounded rectangles, hollow cylinders),
 you may define helpers at the top:
@@ -442,11 +453,12 @@ def hollow_cylinder(wp, od, id, h):
     return wp.circle(od/2).circle(id/2).extrude(h)
 
 AVOID (these crash or produce incorrect geometry):
-- .loft(), .sweep(), .mirror() — approximate with extrudes instead
+- .sweep(), .mirror() — approximate with extrudes or lofts instead
 - .rotate(), .translate(), .moved() on existing bodies — use .transformed() instead
 - cq.Compound, cq.Solid, cq.Assembly — always return cq.Workplane
 - cq.Workplane("YZ"), cq.Workplane("XZ") — use .transformed(rotate=...) instead
 - import os, open(), print(), cq.exporters
+- .loft() with 3+ profiles — keep it to 2-profile transitions (see safe pattern 18)
 
 CONTEXT FOR THIS COMPONENT:
 You have access to the FULL interface definition (not just this component's row) because you need to know:
@@ -901,9 +913,11 @@ async function searchCadModels(
  * Determines which hardcoded reference to use based on product description.
  *
  * @description Keyword matching to select the most relevant reference library.
- * Falls back to drone reference if no match.
+ * Returns null for unknown product types — the research report or web search
+ * provides dimensions instead. Injecting an irrelevant reference (e.g. drone
+ * specs for a coffee machine) does more harm than good.
  */
-function selectProductReference(description: string): string {
+function selectProductReference(description: string): string | null {
   const lowerDesc = description.toLowerCase()
 
   if (
@@ -937,27 +951,30 @@ function selectProductReference(description: string): string {
     return DRONE_REFERENCE
   }
 
-  // Default fallback
-  return DRONE_REFERENCE
+  // No matching reference — rely on research report and web search instead
+  return null
 }
 
 /**
  * Merges all reference sources into a single context string for Pass 1.
  *
- * @description Concatenates hardcoded library (safety net), web research
- * results, CAD model references, and user-pasted research. The hardcoded
- * library is selected based on product type.
+ * @description Prioritizes user-provided research (most specific), then web
+ * research, then CAD model references. Hardcoded reference library is only
+ * included when the product matches a known type (drone/smartphone/farm) —
+ * injecting irrelevant references pollutes the LLM context.
  */
 function buildReferenceContext(
-  hardcodedRef: string,
+  hardcodedRef: string | null,
   webSpecs: string,
   cadModels: ThingiverseResult[],
   userResearch: string,
 ): string {
   const sections: string[] = []
 
-  // Always include hardcoded reference as baseline
-  sections.push(hardcodedRef)
+  // User-pasted research first (highest priority — most specific and relevant)
+  if (userResearch.trim()) {
+    sections.push(`=== USER-PROVIDED RESEARCH (primary reference) ===\n${userResearch}`)
+  }
 
   // Web research (if available)
   if (webSpecs.trim()) {
@@ -974,9 +991,9 @@ function buildReferenceContext(
     )
   }
 
-  // User-pasted research (highest priority — most specific)
-  if (userResearch.trim()) {
-    sections.push(`=== USER-PROVIDED RESEARCH ===\n${userResearch}`)
+  // Hardcoded reference only when product type matches (null = unknown product)
+  if (hardcodedRef) {
+    sections.push(hardcodedRef)
   }
 
   return sections.join("\n\n")
@@ -1011,7 +1028,7 @@ async function generateInterfaceDefinition(
 Reference dimensions and research:
 ${referenceData}
 
-Generate the complete interface definition following the exact format specified. Make sure the motor-to-motor diagonal matches the reference target (~302mm for this drone). Calculate ALL positions from named quantities.`
+Generate the complete interface definition following the exact format specified. Identify the critical dimension(s) for THIS product from the research data and validate them in the DERIVED CONSTRAINTS section. Calculate ALL positions from named quantities.`
 
   const { text, tokensIn, tokensOut } = await callGemini(
     INTERFACE_SYSTEM_PROMPT,
@@ -1039,6 +1056,9 @@ function parseInterfaceDefinition(text: string): InterfaceDef | null {
   try {
     const data = JSON.parse(jsonMatch[1]) as {
       target_bbox?: { x?: number; y?: number; z?: number }
+      critical_dimension_mm?: number
+      critical_dimension_name?: string
+      // Support legacy field name for backward compatibility
       motor_diagonal_mm?: number
       components?: Array<{
         name?: string
@@ -1058,7 +1078,8 @@ function parseInterfaceDefinition(text: string): InterfaceDef | null {
         y: data.target_bbox.y ?? 0,
         z: data.target_bbox.z ?? 0,
       },
-      motor_diagonal_mm: data.motor_diagonal_mm ?? 0,
+      critical_dimension_mm: data.critical_dimension_mm ?? data.motor_diagonal_mm,
+      critical_dimension_name: data.critical_dimension_name,
       components: data.components.map((c) => ({
         name: c.name ?? "unknown",
         description: c.description ?? "",
@@ -1078,10 +1099,13 @@ function parseInterfaceDefinition(text: string): InterfaceDef | null {
 // ─── Validate Interface Definition ───────────────────────────────────
 
 /**
- * Validates that the interface definition meets dimensional constraints.
+ * Validates the structural integrity of an interface definition.
  *
- * @description Checks BBox within 10% of target, motor diagonal within
- * 5mm, all components have dimensions, and no parsing failures.
+ * @description Product-agnostic validation: checks that components exist,
+ * all have valid dimensions, BBox is non-zero, and the definition has
+ * enough detail for a quality model. Does NOT check against any
+ * product-specific targets — the LLM determines correct dimensions
+ * from the research context.
  *
  * @param iface - Parsed interface definition
  * @returns Validation result with specific error messages
@@ -1095,26 +1119,10 @@ function validateInterfaceDefinition(
 
   const errors: string[] = []
 
-  // Check motor diagonal within 5mm of target
-  if (iface.motor_diagonal_mm > 0) {
-    const diff = Math.abs(iface.motor_diagonal_mm - DRONE_TARGET.motorDiagonalMm)
-    if (diff > 5) {
-      errors.push(
-        `Motor diagonal is ${iface.motor_diagonal_mm}mm but target is ${DRONE_TARGET.motorDiagonalMm}mm (${diff.toFixed(0)}mm off, max 5mm)`,
-      )
-    }
-  }
-
-  // Check BBox is reasonable
+  // Check BBox is non-zero and reasonable (at least 1mm in each axis)
   const bb = iface.target_bbox
-  if (bb.x < DRONE_TARGET.minBBoxX || bb.x > DRONE_TARGET.maxBBoxX) {
-    errors.push(`BBox X=${bb.x}mm is outside expected range ${DRONE_TARGET.minBBoxX}-${DRONE_TARGET.maxBBoxX}mm`)
-  }
-  if (bb.y < DRONE_TARGET.minBBoxY || bb.y > DRONE_TARGET.maxBBoxY) {
-    errors.push(`BBox Y=${bb.y}mm is outside expected range ${DRONE_TARGET.minBBoxY}-${DRONE_TARGET.maxBBoxY}mm`)
-  }
-  if (bb.z < DRONE_TARGET.minBBoxZ || bb.z > DRONE_TARGET.maxBBoxZ) {
-    errors.push(`BBox Z=${bb.z}mm is outside expected range ${DRONE_TARGET.minBBoxZ}-${DRONE_TARGET.maxBBoxZ}mm`)
+  if (bb.x <= 0 || bb.y <= 0 || bb.z <= 0) {
+    errors.push(`BBox has zero or negative dimension(s): ${bb.x}×${bb.y}×${bb.z}mm`)
   }
 
   // Check all components have dimensions
@@ -1124,9 +1132,18 @@ function validateInterfaceDefinition(
     }
   }
 
-  // Must have at least 3 components
+  // Must have at least 6 unique component types for a detailed model
   if (iface.components.length < 6) {
     errors.push(`Only ${iface.components.length} components — expected at least 6 for a detailed model`)
+  }
+
+  // Check that no component is larger than the BBox (likely a data error)
+  for (const comp of iface.components) {
+    if (comp.w_mm > bb.x * 1.5 || comp.d_mm > bb.y * 1.5 || comp.h_mm > bb.z * 1.5) {
+      errors.push(
+        `Component "${comp.name}" (${comp.w_mm}×${comp.d_mm}×${comp.h_mm}mm) exceeds 150% of BBox (${bb.x}×${bb.y}×${bb.z}mm) — likely a dimension error`,
+      )
+    }
   }
 
   return { valid: errors.length === 0, errors }
@@ -1270,7 +1287,6 @@ function validateComponentLocally(
     { pattern: "cq.Compound", label: "cq.Compound" },
     { pattern: "cq.Solid.make", label: "cq.Solid.make*" },
     { pattern: "cq.Assembly", label: "cq.Assembly" },
-    { pattern: '.loft(', label: ".loft()" },
     { pattern: '.sweep(', label: ".sweep()" },
     { pattern: 'Workplane("YZ")', label: 'Workplane("YZ")' },
     { pattern: 'Workplane("XZ")', label: 'Workplane("XZ")' },
@@ -1420,7 +1436,7 @@ For components with qty > 1 in the interface (like arms, motors, propellers), ca
  * @param bbox - Bounding box from Modal execution
  * @param fillRatio - Volume fill ratio (%)
  * @param stepSizeKb - STEP file size in KB
- * @param targetBBox - Target dimensions from interface definition (optional, uses DRONE_TARGET as fallback)
+ * @param targetBBox - Target dimensions from interface definition (optional, skips BBox validation if not provided)
  */
 function postExecutionValidation(
   bbox: { xLen: number; yLen: number; zLen: number } | undefined,
@@ -1432,7 +1448,7 @@ function postExecutionValidation(
   const tolerance = 0.10  // 10% tolerance
 
   if (bbox) {
-    if (targetBBox) {
+    if (targetBBox && targetBBox.x > 0 && targetBBox.y > 0 && targetBBox.z > 0) {
       // Dynamic validation against interface definition target
       const xDiff = Math.abs(bbox.xLen - targetBBox.x) / targetBBox.x
       const yDiff = Math.abs(bbox.yLen - targetBBox.y) / targetBBox.y
@@ -1450,18 +1466,10 @@ function postExecutionValidation(
         const pct = (zDiff * 100).toFixed(1)
         warnings.push(`BBox Z=${bbox.zLen}mm is ${pct}% off target ${targetBBox.z}mm (max ${tolerance * 100}%)`)
       }
-    } else {
-      // Fallback to hardcoded drone target if no interface definition provided
-      if (bbox.xLen < DRONE_TARGET.minBBoxX || bbox.xLen > DRONE_TARGET.maxBBoxX) {
-        warnings.push(`BBox X=${bbox.xLen}mm outside expected ${DRONE_TARGET.minBBoxX}-${DRONE_TARGET.maxBBoxX}mm`)
-      }
-      if (bbox.yLen < DRONE_TARGET.minBBoxY || bbox.yLen > DRONE_TARGET.maxBBoxY) {
-        warnings.push(`BBox Y=${bbox.yLen}mm outside expected ${DRONE_TARGET.minBBoxY}-${DRONE_TARGET.maxBBoxY}mm`)
-      }
-      if (bbox.zLen < DRONE_TARGET.minBBoxZ || bbox.zLen > DRONE_TARGET.maxBBoxZ) {
-        warnings.push(`BBox Z=${bbox.zLen}mm outside expected ${DRONE_TARGET.minBBoxZ}-${DRONE_TARGET.maxBBoxZ}mm`)
-      }
     }
+    // No fallback to hardcoded targets — if no interface definition target
+    // exists, skip BBox validation rather than checking against irrelevant
+    // product-specific dimensions.
 
     // Check for degenerate or suspicious dimensions
     if (bbox.xLen < 1 || bbox.yLen < 1 || bbox.zLen < 1) {
@@ -1607,9 +1615,11 @@ export async function runCadLabResearch(
       rawDataSections.push(`=== RAW WEB SEARCH RESULTS ===\n${webSpecs}`)
     }
 
-    // Always include hardcoded reference as baseline (select based on product type)
+    // Only include hardcoded reference if product type matches a known category
     const selectedReference = selectProductReference(description)
-    rawDataSections.push(`=== HARDCODED REFERENCE LIBRARY ===\n${selectedReference}`)
+    if (selectedReference) {
+      rawDataSections.push(`=== HARDCODED REFERENCE LIBRARY ===\n${selectedReference}`)
+    }
 
     if (cadModels.length > 0) {
       const modelList = cadModels
@@ -1692,16 +1702,17 @@ export async function generateCadLabModel(
   try {
     // ── Pass 0: Reference data ──
     // If a research report is provided (from Step 1), use it directly.
-    // Otherwise fall back to hardcoded reference + optional web search.
+    // Otherwise fall back to web search. Hardcoded reference is only
+    // included when the product matches a known type (drone/phone/farm).
     let researchSources: Array<{ uri: string; title: string }> = []
     let referenceModels: ThingiverseResult[] = []
     let referenceData: string
 
-    // Select appropriate hardcoded reference based on product type
+    // Only include hardcoded reference if product type is recognized
     const selectedReference = selectProductReference(description)
 
     if (researchContext && researchContext.trim().length > 100) {
-      // Research report already provided — use it + hardcoded fallback
+      // Research report already provided — use it as primary reference
       console.info("[CAD-LAB] Pass 0: Using provided research report")
       referenceData = buildReferenceContext(selectedReference, "", [], researchContext)
     } else {
