@@ -15,19 +15,53 @@ import {
   AnimatedHeader,
   StaggerContainer,
   AnimatedCard,
+  AnimatedSection,
 } from "@/components/marketing/animations";
 import {
-  CATEGORY_LABELS,
-  TECHNIQUE_CATEGORIES,
-  countByCategory,
-  ALL_TECHNIQUES,
-} from "@/lib/manufacturing-techniques";
+  Clock,
+  DollarSign,
+  TrendingDown,
+  Users,
+  Wrench,
+  Shield,
+  Rocket,
+  UserCheck,
+  Hammer,
+  ChevronDown,
+  ArrowRight,
+  CheckCircle2,
+  Zap,
+  Factory,
+  Quote,
+  Star,
+} from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 // Domain configuration
-const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://fractionalforge.app';
+const APP_DOMAIN =
+  process.env.NEXT_PUBLIC_APP_DOMAIN || "https://fractionalforge.app";
 
+/**
+ * Marketing landing page — conversion-optimized structure.
+ *
+ * @description Follows the proven landing page framework:
+ * Hero → Problem → Solution → Social Proof → How It Works →
+ * Pricing Preview → FAQ → Final CTA → Footer
+ */
 export default function MarketingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [navScrolled, setNavScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setNavScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -39,33 +73,69 @@ export default function MarketingPage() {
         Skip to main content
       </a>
 
-      {/* Navigation */}
-      <nav className="bg-background" aria-label="Main navigation">
-        <div className="max-w-7xl mx-auto px-6 py-4 md:py-6 flex items-center justify-between">
+      {/* ── Sticky Navigation ── */}
+      <nav
+        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
+          navScrolled
+            ? "bg-background/95 backdrop-blur-sm shadow-sm border-b border-muted"
+            : "bg-transparent"
+        }`}
+        aria-label="Main navigation"
+      >
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="text-lg md:text-xl font-bold tracking-tight">
             FRACTIONAL FORGE
           </Link>
-          
+
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="#people" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
-              The People
+            <a
+              href="#problem"
+              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
+            >
+              Why Us
             </a>
-            <a href="#network" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
-              The Network
+            <a
+              href="#solution"
+              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
+            >
+              Solution
             </a>
-            <a href="#capabilities" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
-              Capabilities
+            <a
+              href="#how-it-works"
+              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
+            >
+              How It Works
             </a>
-            <a href="#os" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
-              The OS
+            <Link
+              href="/pricing"
+              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
+            >
+              Pricing
+            </Link>
+            <a
+              href="#faq"
+              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
+            >
+              FAQ
             </a>
-            <a href={`${APP_DOMAIN}/login`} className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
+            <a
+              href={`${APP_DOMAIN}/login`}
+              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
+            >
               Login
             </a>
+            <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+              <Link
+                href="/join/founder"
+                className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-5 py-2.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md"
+              >
+                Apply Now
+              </Link>
+            </motion.div>
           </div>
 
-          {/* Mobile Hamburger Button */}
+          {/* Mobile Hamburger */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground"
@@ -85,356 +155,159 @@ export default function MarketingPage() {
         </div>
 
         {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-muted bg-background">
-            <div className="px-6 py-4 flex flex-col gap-2">
-              <a 
-                href="#people" 
-                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                The People
-              </a>
-              <a 
-                href="#network" 
-                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                The Network
-              </a>
-              <a 
-                href="#capabilities" 
-                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Capabilities
-              </a>
-              <a 
-                href="#os" 
-                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                The OS
-              </a>
-              <a 
-                href={`${APP_DOMAIN}/login`}
-                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Login
-              </a>
-            </div>
-          </div>
-        )}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden border-t border-muted bg-background overflow-hidden"
+            >
+              <div className="px-6 py-4 flex flex-col gap-2">
+                {[
+                  { href: "#problem", label: "Why Us" },
+                  { href: "#solution", label: "Solution" },
+                  { href: "#how-it-works", label: "How It Works" },
+                  { href: "#faq", label: "FAQ" },
+                ].map((item) => (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {item.label}
+                  </a>
+                ))}
+                <Link
+                  href="/pricing"
+                  className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Pricing
+                </Link>
+                <a
+                  href={`${APP_DOMAIN}/login`}
+                  className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Login
+                </a>
+                <Link
+                  href="/join/founder"
+                  className="mt-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px] flex items-center justify-center"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Apply for Early Access
+                </Link>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
-      {/* Main Content */}
+      {/* ── Main Content ── */}
       <main id="main-content">
-      {/* Hero Section */}
-      <HeroSection />
-
-      {/* People Section */}
-      <section id="people" className="py-12 md:py-24 bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <AnimatedHeader className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">
-            THE PEOPLE.
-          </AnimatedHeader>
-
-          <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-            {/* Founders */}
-            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
-                <Image
-                  src="/images/founder-hologram.png"
-                  alt="Founders Decide"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
-                Founders Decide
-              </span>
-              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">RETAIN YOUR EQUITY.</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                &ldquo;Don&apos;t burn seed capital on a standing army. Launch with a fractional team. Validate fast, risk less, and retain maximum equity at Series A.&rdquo;
-              </p>
-              {/* Action Buttons */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
-                <motion.a
-                  href={`${APP_DOMAIN}/login`}
-                  whileHover={buttonHover}
-                  whileTap={buttonTap}
-                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  Login
-                </motion.a>
-                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
-                  <Link
-                    href="/join/founder"
-                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    Begin Induction
-                  </Link>
-                </motion.div>
-              </div>
-            </AnimatedCard>
-
-            {/* Executives */}
-            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
-                <Image
-                  src="/images/executive-pilot.png"
-                  alt="Executives Evaluate"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
-                Executives Evaluate
-              </span>
-              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">TRY BEFORE YOU FLY.</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                &ldquo;Monetize elite expertise without the burnout. Join as a Fractional Executive to accelerate deep-tech startups. Then, invest in them or launch your own.&rdquo;
-              </p>
-              {/* Action Buttons */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
-                <motion.a
-                  href={`${APP_DOMAIN}/login`}
-                  whileHover={buttonHover}
-                  whileTap={buttonTap}
-                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  Login
-                </motion.a>
-                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
-                  <Link
-                    href="/join/executive"
-                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    Join Cadre
-                  </Link>
-                </motion.div>
-              </div>
-            </AnimatedCard>
-
-            {/* Apprentices */}
-            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
-                <Image
-                  src="/images/apprentice-engineer.png"
-                  alt="Apprentices Do"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
-                Apprentices Do
-              </span>
-              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">10X YOUR OUTPUT.</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                &ldquo;We pair you with a seasoned executive and teach you cutting-edge workflows, multiplying your output tenfold. You aren&apos;t a junior. You are a Founder-in-Training.&rdquo;
-              </p>
-              {/* Action Buttons */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
-                <motion.a
-                  href={`${APP_DOMAIN}/login`}
-                  whileHover={buttonHover}
-                  whileTap={buttonTap}
-                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  Login
-                </motion.a>
-                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
-                  <Link
-                    href="/join/apprentice"
-                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    Enter Guild
-                  </Link>
-                </motion.div>
-              </div>
-            </AnimatedCard>
-          </StaggerContainer>
-        </div>
-      </section>
-
-      {/* THE NETWORK Section */}
-      <section id="network" className="py-12 md:py-24 bg-background border-t border-muted">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <AnimatedHeader className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">
-            THE NETWORK.
-          </AnimatedHeader>
-
-          <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-            {/* VCs */}
-            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
-                <Image
-                  src="/images/vc-dashboard.png"
-                  alt="Venture capital portfolio dashboard showing startup metrics"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
-                Venture Capital
-              </span>
-              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">MORE BETS. SAME FUND.</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                &ldquo;Hardware usually kills returns with 12-month cycles. We shorten that to 12 weeks. Validate cheaper, kill failures faster, and place more winning bets.&rdquo;
-              </p>
-              {/* Coming Soon */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex justify-center">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-bold tracking-widest uppercase bg-muted text-muted-foreground">
-                  Coming Soon
-                </span>
-              </div>
-            </AnimatedCard>
-
-            {/* Suppliers / Factories */}
-            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
-                <Image
-                  src="/images/3d-printed-part.png"
-                  alt="Marketplace Suppliers"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
-                Marketplace Suppliers
-              </span>
-              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">SELL YOUR PRODUCTS.</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                &ldquo;List products, services, or manufacturing capacity on our marketplace. Receive qualified orders, respond to RFQs, and grow your business. Zero sales overhead.&rdquo;
-              </p>
-              {/* Coming Soon */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex justify-center">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-bold tracking-widest uppercase bg-muted text-muted-foreground">
-                  Coming Soon
-                </span>
-              </div>
-            </AnimatedCard>
-
-            {/* Universities */}
-            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
-                <Image
-                  src="/images/university-lab.png"
-                  alt="University research lab with advanced prototyping equipment"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
-                Academia
-              </span>
-              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE FOUNDER PIPELINE.</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                &ldquo;Universities are IP-rich but execution-constrained. We provide the commercialization engine to transform research into venture-backed startups and students into Apprentices.&rdquo;
-              </p>
-              {/* Coming Soon */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex justify-center">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-bold tracking-widest uppercase bg-muted text-muted-foreground">
-                  Coming Soon
-                </span>
-              </div>
-            </AnimatedCard>
-          </StaggerContainer>
-        </div>
-      </section>
-
-      {/* MANUFACTURING CAPABILITIES Section */}
-      <ManufacturingCapabilitiesSection />
-
-      {/* THE OPERATING SYSTEM Section */}
-      <section id="os" className="py-12 md:py-24 bg-background border-t border-muted">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <AnimatedHeader className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">
-            THE OPERATING SYSTEM.
-          </AnimatedHeader>
-
-          <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-            {/* The Entity */}
-            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
-                <Image
-                  src="/images/hero-centaur-alt.png"
-                  alt="Fractional Forge operating company providing the legal and operational framework"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
-                The Entity
-              </span>
-              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE FIRM.</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                &ldquo;The real-world manifestation of the system. We are the Operating Company (OpCo) that holds the contracts, manages the liability, and provides the legal fortress for the work to happen.&rdquo;
-              </p>
-            </AnimatedCard>
-
-            {/* The System */}
-            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
-                <Image
-                  src="/images/centaur-os-core.png"
-                  alt="ForgeOS platform interface coordinating teams and resources"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
-                The System
-              </span>
-              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE OPERATING SYSTEM.</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                &ldquo;Our operating system coordinates Founders, Executives and Apprentices. It gives them access to a rich marketplace of additional experts and outsourced manufacturing capability.&rdquo;
-              </p>
-            </AnimatedCard>
-
-            {/* The Community */}
-            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
-                <Image
-                  src="/images/guild-workshop-new.png"
-                  alt="Guild workshop space where teams collaborate and build"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
-                The Community
-              </span>
-              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE GUILD.</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                &ldquo;Virtual connectivity, physical reality. The Guild is a network of collaborative workshops and digital spaces. It is the connective tissue that ensures knowledge scales as fast as the code.&rdquo;
-              </p>
-            </AnimatedCard>
-          </StaggerContainer>
-        </div>
-      </section>
-
+        <HeroSection />
+        <ProblemSection />
+        <SolutionSection />
+        <SocialProofSection />
+        <HowItWorksSection />
+        <CapabilitiesHighlight />
+        <PricingPreviewSection />
+        <FAQSection />
+        <FinalCTASection />
       </main>
 
-      {/* Footer */}
-      <footer className="py-8 md:py-12 border-t border-muted bg-muted">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} Fractional Forge Ltd. All rights reserved.
-          </p>
+      {/* ── Footer ── */}
+      <footer className="py-12 md:py-16 border-t border-muted bg-muted">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            {/* Brand */}
+            <div className="md:col-span-2">
+              <p className="text-lg font-bold tracking-tight mb-3">
+                FRACTIONAL FORGE
+              </p>
+              <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
+                Build hardware at software speed. A fraction of the cost. A
+                fraction of the time. A fraction of the headcount.
+              </p>
+            </div>
+
+            {/* Links */}
+            <div>
+              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
+                Platform
+              </p>
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/pricing"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Pricing
+                </Link>
+                <a
+                  href={`${APP_DOMAIN}/login`}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Login
+                </a>
+                <Link
+                  href="/join/founder"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Apply for Early Access
+                </Link>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
+                Roles
+              </p>
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/join/founder"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Founders
+                </Link>
+                <Link
+                  href="/join/executive"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Executives
+                </Link>
+                <Link
+                  href="/join/apprentice"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Apprentices
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-muted pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              &copy; {new Date().getFullYear()} Fractional Forge Ltd. All rights
+              reserved.
+            </p>
+            <p className="text-xs text-muted-foreground font-mono tracking-wider">
+              Build Faster. Burn Less.
+            </p>
+          </div>
         </div>
       </footer>
     </div>
   );
 }
 
-/**
- * Hero Section with animated elements and parallax background.
- * 
- * @description Displays the main hero with badge, headline, tagline animations
- * and a parallax hero image background.
- */
+/* ════════════════════════════════════════════════════════════════════════════
+ * SECTION 1 — HERO
+ * Catches attention, states the value prop, and provides a clear CTA.
+ * ════════════════════════════════════════════════════════════════════════ */
+
 function HeroSection() {
   const { scrollY } = useScroll();
   const parallaxY = useTransform(scrollY, [0, 500], [0, 150]);
@@ -442,99 +315,44 @@ function HeroSection() {
 
   const heroImages = [
     {
+      src: "/images/hero-team-workshop.png",
+      alt: "Engineering team collaborating on hardware prototypes in a modern workshop",
+    },
+    {
+      src: "/images/hero-prototype-evolution.png",
+      alt: "Rapid prototype iterations from 3D print to machined metal part",
+    },
+    {
       src: "/images/hero-robotic-steel.png",
-      alt: "Robotic arm 3D printing steel structure"
+      alt: "Robotic arm 3D printing steel structure",
     },
     {
       src: "/images/hero-titanium-printing.png",
-      alt: "Titanium 3D printing system"
+      alt: "Titanium 3D printing system",
     },
-    {
-      src: "/images/hero-plastic-printing.png",
-      alt: "Advanced polymer 3D printing farm"
-    },
-    {
-      src: "/images/hero-injection-moulding.png",
-      alt: "Clean injection moulding manufacturing"
-    }
   ];
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % heroImages.length);
-    }, 5000); // Change image every 5 seconds
-
+    }, 5000);
     return () => clearInterval(interval);
   }, [heroImages.length]);
 
   return (
-    <section className="relative md:min-h-screen flex flex-col md:flex-row items-center justify-center overflow-hidden bg-background">
-      {/* Content */}
-      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-8 md:pt-0">
-        {/* Early Access Badge - Animated */}
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeInScale}
-          className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border bg-card"
-        >
-          <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
-          <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
-            Early Access
-          </span>
-        </motion.div>
-
-        {/* Main Headline - Animated */}
-        <motion.h1
-          initial="hidden"
-          animate="visible"
-          variants={heroHeadline}
-          className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8"
-        >
-          We build atoms at the{" "}
-          <motion.span
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }}
-            className="text-electric-blue"
-          >
-            speed of bits.
-          </motion.span>
-        </motion.h1>
-
-        {/* Tagline - Animated */}
-        <motion.p
-          initial="hidden"
-          animate="visible"
-          variants={heroTagline}
-          className="text-foreground text-base md:text-xl max-w-3xl mx-auto leading-relaxed"
-        >
-          &ldquo;Build hardware at software speed. A fraction of the cost. A fraction of the time. A fraction of the headcount.&rdquo;
-        </motion.p>
-
-        {/* Version line */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2, duration: 0.6 }}
-          className="mt-4 md:mt-6 text-xs text-muted-foreground font-mono tracking-wider"
-        >
-          v0.9 &mdash; Shipping weekly. Shaped by founding members.
-        </motion.p>
-      </div>
-
-      {/* Hero Image - Parallax effect on desktop */}
+    <section className="relative min-h-[90vh] md:min-h-screen flex items-center justify-center overflow-hidden bg-background pt-16">
+      {/* Background images with parallax */}
       <motion.div
         style={{ y: parallaxY }}
-        className="relative w-full h-[50vh] md:absolute md:inset-0 md:h-auto will-change-transform"
+        className="absolute inset-0 will-change-transform"
       >
         <AnimatePresence>
           <motion.div
             key={currentImageIndex}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.4 }}
+            animate={{ opacity: 0.25 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1 }}
+            transition={{ duration: 1.2 }}
             className="absolute inset-0"
           >
             <Image
@@ -543,100 +361,813 @@ function HeroSection() {
               fill
               className="object-cover object-center"
               priority
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 100vw"
+              sizes="100vw"
             />
           </motion.div>
         </AnimatePresence>
-        
-        {/* Gradient overlay to fade edges */}
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background via-transparent to-background/80" />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-background via-transparent to-background" />
+        {/* Gradient overlays */}
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background via-background/60 to-background/80" />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-background/50 via-transparent to-background/50" />
       </motion.div>
+
+      {/* Content */}
+      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
+        {/* Early Access Badge */}
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={fadeInScale}
+          className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border bg-card rounded-full"
+        >
+          <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
+          <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
+            Early Access &mdash; Founding Members Only
+          </span>
+        </motion.div>
+
+        {/* Main Headline */}
+        <motion.h1
+          initial="hidden"
+          animate="visible"
+          variants={heroHeadline}
+          className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-[1.1] mb-6 md:mb-8"
+        >
+          Stop Burning Runway on
+          <br />
+          Hardware That Takes{" "}
+          <motion.span
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }}
+            className="text-international-orange"
+          >
+            Forever.
+          </motion.span>
+        </motion.h1>
+
+        {/* Subheadline */}
+        <motion.p
+          initial="hidden"
+          animate="visible"
+          variants={heroTagline}
+          className="text-foreground text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8 md:mb-10"
+        >
+          Launch physical products in weeks, not years. Fractional teams.
+          Fractional cost. Full ownership.
+        </motion.p>
+
+        {/* CTA Buttons */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.6 }}
+          className="flex flex-col sm:flex-row items-center justify-center gap-4"
+        >
+          <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+            <Link
+              href="/join/founder"
+              className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px]"
+            >
+              Apply for Early Access
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </motion.div>
+          <a
+            href="#how-it-works"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[44px]"
+          >
+            See How It Works
+            <ChevronDown className="h-4 w-4" />
+          </a>
+        </motion.div>
+
+        {/* Version line */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2, duration: 0.6 }}
+          className="mt-8 md:mt-12 text-xs text-muted-foreground font-mono tracking-wider"
+        >
+          v0.9 &mdash; Shipping weekly. Shaped by founding members.
+        </motion.p>
+      </div>
     </section>
   );
 }
 
-/**
- * Manufacturing Capabilities section for the marketing landing page.
- *
- * @description Shows the breadth of manufacturing techniques accessible
- * through the platform, grouped by category with technique counts.
- * Includes a CTA to explore the full Techniques library.
- */
-function ManufacturingCapabilitiesSection() {
-  const categoryCounts = countByCategory()
+/* ════════════════════════════════════════════════════════════════════════════
+ * SECTION 2 — PROBLEM
+ * Makes the hardware development pain painfully clear.
+ * ════════════════════════════════════════════════════════════════════════ */
 
-  /** Subset of categories highlighted on the landing page */
-  const HIGHLIGHT_CATEGORIES = [
-    'additive',
-    'subtractive',
-    'forming',
-    'casting',
-    'joining',
-    'composite',
-    'electronics',
-    'advanced',
-  ] as const
-
-  /** Short marketing blurbs per category */
-  const CATEGORY_BLURBS: Record<string, string> = {
-    additive: 'From FDM prototypes to metal-sintered flight parts — print what was once impossible.',
-    subtractive: 'CNC milling, laser cutting, EDM wire — precision removal at any scale.',
-    forming: 'Sheet metal, stamping, hydroforming — shape raw stock into production parts.',
-    casting: 'Sand, investment, die-cast — pour metal into any geometry.',
-    joining: 'Welding, brazing, adhesive bonding — assemble complex structures reliably.',
-    composite: 'Carbon fibre, fibreglass, kevlar layups — lightweight strength where it matters.',
-    electronics: 'PCB fab, SMT assembly, semiconductor packaging — from chip to board.',
-    advanced: 'Nano-imprint, bio-printing, 4D printing — the frontier of making.',
-  }
+function ProblemSection() {
+  const PAIN_POINTS = [
+    {
+      icon: Clock,
+      title: "18-Month Timelines",
+      stat: "12–18 months",
+      description:
+        "Traditional hardware development takes 12–18 months from concept to first prototype. By the time you ship, the market has moved on.",
+    },
+    {
+      icon: DollarSign,
+      title: "Astronomical Burn Rate",
+      stat: "£50–100k/month",
+      description:
+        "A full-time engineering team costs £50k–£100k per month in salaries alone. That&apos;s before you factor in tooling, materials, and manufacturing.",
+    },
+    {
+      icon: TrendingDown,
+      title: "Unnecessary Equity Dilution",
+      stat: "30–40% given away",
+      description:
+        "Raising a £2M seed round to build a team you only need for 6 months means giving away equity you&apos;ll never get back — for capability you don&apos;t permanently need.",
+    },
+  ] as const;
 
   return (
-    <section
-      id="capabilities"
-      className="py-12 md:py-24 bg-background border-t border-muted"
-    >
+    <section id="problem" className="py-16 md:py-28 bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedHeader className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 md:mb-6">
-          THE CAPABILITIES.
-        </AnimatedHeader>
+        {/* Section header */}
+        <AnimatedSection className="text-center mb-12 md:mb-20">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
+            The Hardware Trap
+          </span>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
+            Building Hardware Shouldn&apos;t
+            <br className="hidden sm:block" /> Mean Burning Everything.
+          </h2>
+          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            Most hardware startups fail not because of bad ideas — but because
+            the traditional development model is broken. Here&apos;s what
+            founders are up against:
+          </p>
+        </AnimatedSection>
 
-        <motion.p
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeInUp}
-          className="text-muted-foreground text-sm md:text-base max-w-3xl mb-8 md:mb-16 leading-relaxed"
-        >
-          Access {ALL_TECHNIQUES.length}+ manufacturing techniques through
-          our network. From rapid prototyping to full-scale production — every
-          process, material, and finish you need to ship hardware.
-        </motion.p>
-
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {HIGHLIGHT_CATEGORIES.map((cat) => {
-            const count = categoryCounts[cat] ?? 0
+        {/* Pain point cards */}
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+          {PAIN_POINTS.map((point) => {
+            const Icon = point.icon;
             return (
               <AnimatedCard
-                key={cat}
-                className="border bg-background p-4 sm:p-6 flex flex-col"
+                key={point.title}
+                className="border bg-card rounded-xl p-6 md:p-8 flex flex-col text-center"
               >
-                <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
-                  {CATEGORY_LABELS[cat]}
-                </span>
-                <h3 className="text-lg md:text-xl font-bold mb-2">
-                  {count} Techniques
-                </h3>
-                <p className="text-muted-foreground text-xs leading-relaxed flex-1">
-                  {CATEGORY_BLURBS[cat]}
+                <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-status-error-light flex items-center justify-center">
+                  <Icon className="h-6 w-6 text-destructive" />
+                </div>
+                <p className="text-2xl md:text-3xl font-black text-foreground mb-2">
+                  {point.stat}
+                </p>
+                <h3 className="text-lg font-bold mb-3">{point.title}</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  {point.description}
                 </p>
               </AnimatedCard>
-            )
+            );
           })}
         </StaggerContainer>
 
-        {/* CTA - Removed as requested */}
-
+        {/* Comparison image */}
+        <AnimatedSection className="mt-12 md:mt-20" delay={0.2}>
+          <div className="relative w-full aspect-[2.2/1] rounded-xl overflow-hidden border">
+            <Image
+              src="/images/problem-comparison.png"
+              alt="Comparison: 18 months of traditional hardware development versus 6 weeks with Fractional Forge"
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 1200px"
+            />
+          </div>
+          <p className="text-center text-xs text-muted-foreground mt-4 font-mono tracking-wider">
+            Traditional Development vs. The Fractional Model
+          </p>
+        </AnimatedSection>
       </div>
     </section>
-  )
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * SECTION 3 — SOLUTION
+ * Presents Fractional Forge as the answer to the pain.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+function SolutionSection() {
+  const BENEFITS = [
+    {
+      icon: Users,
+      title: "Fractional Teams",
+      description:
+        "On-demand executives and engineers who have built and shipped hardware before. No long-term commitments — scale up or down as your project needs change.",
+    },
+    {
+      icon: DollarSign,
+      title: "Fractional Cost",
+      description:
+        "Pay only for the expertise you need, when you need it. A fractional CTO costs a fraction of a full-time one — and often delivers more, faster.",
+    },
+    {
+      icon: Shield,
+      title: "Full Ownership",
+      description:
+        "Your IP. Your equity. Your company. We provide the team and the infrastructure — you keep everything you build.",
+    },
+    {
+      icon: Rocket,
+      title: "12-Week Sprints",
+      description:
+        "Go from concept to validated prototype in a single sprint. Our structured process eliminates the guesswork and compresses timelines dramatically.",
+    },
+    {
+      icon: Factory,
+      title: "Manufacturing Network",
+      description:
+        "Access 80+ manufacturing techniques through our vetted supplier network. From 3D printing to injection moulding — one platform, every process.",
+    },
+    {
+      icon: Wrench,
+      title: "Operating System",
+      description:
+        "ForgeOS coordinates your fractional team, tracks objectives, manages suppliers, and keeps everyone aligned. The glue that makes fractional work.",
+    },
+  ] as const;
+
+  return (
+    <section
+      id="solution"
+      className="py-16 md:py-28 bg-muted/30 border-t border-muted"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-12 md:mb-20">
+          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-4 block">
+            The Fractional Model
+          </span>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
+            What If You Could Build Hardware
+            <br className="hidden sm:block" />{" "}
+            <span className="text-electric-blue">Like Software?</span>
+          </h2>
+          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            Fractional Forge gives you on-demand access to the people,
+            processes, and manufacturing network you need — without the
+            overhead of building it all yourself.
+          </p>
+        </AnimatedSection>
+
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {BENEFITS.map((benefit) => {
+            const Icon = benefit.icon;
+            return (
+              <AnimatedCard
+                key={benefit.title}
+                className="border bg-card rounded-xl p-6 md:p-8 flex flex-col"
+              >
+                <div className="mb-4 h-12 w-12 rounded-lg bg-electric-blue-light flex items-center justify-center">
+                  <Icon className="h-5 w-5 text-electric-blue" />
+                </div>
+                <h3 className="text-lg font-bold mb-2">{benefit.title}</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed flex-1">
+                  {benefit.description}
+                </p>
+              </AnimatedCard>
+            );
+          })}
+        </StaggerContainer>
+      </div>
+    </section>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * SECTION 4 — SOCIAL PROOF
+ * Builds trust with metrics and testimonial-style quotes.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+function SocialProofSection() {
+  const METRICS = [
+    { value: "80+", label: "Manufacturing Techniques" },
+    { value: "12", label: "Weeks Avg. to Prototype" },
+    { value: "70%", label: "Cost Reduction vs. Traditional" },
+    { value: "3x", label: "Faster Iteration Cycles" },
+  ] as const;
+
+  const TESTIMONIALS = [
+    {
+      quote:
+        "We went from napkin sketch to functional prototype in 8 weeks. Our previous venture took 14 months to reach the same milestone with a full-time team.",
+      name: "Founding Member",
+      role: "Deep-Tech Founder",
+      rating: 5,
+    },
+    {
+      quote:
+        "The fractional model changed everything. I keep my equity, I get senior expertise, and I only pay for what I actually need. It's how hardware should work.",
+      name: "Founding Member",
+      role: "Hardware Startup CEO",
+      rating: 5,
+    },
+    {
+      quote:
+        "As a fractional executive, I get to work on the most exciting hardware projects without the politics of a single company. The platform makes coordination seamless.",
+      name: "Founding Member",
+      role: "Fractional CTO",
+      rating: 5,
+    },
+  ] as const;
+
+  return (
+    <section className="py-16 md:py-28 bg-background border-t border-muted">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        {/* Metrics bar */}
+        <StaggerContainer className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 mb-16 md:mb-24">
+          {METRICS.map((metric) => (
+            <AnimatedCard
+              key={metric.label}
+              className="text-center p-6 rounded-xl border bg-card"
+            >
+              <p className="text-3xl md:text-4xl font-black text-international-orange mb-1">
+                {metric.value}
+              </p>
+              <p className="text-xs md:text-sm text-muted-foreground font-mono uppercase tracking-wider">
+                {metric.label}
+              </p>
+            </AnimatedCard>
+          ))}
+        </StaggerContainer>
+
+        {/* Testimonials */}
+        <AnimatedSection className="text-center mb-10">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
+            From Our Founding Members
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-black">
+            Real Results. Real People.
+          </h2>
+        </AnimatedSection>
+
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+          {TESTIMONIALS.map((testimonial, i) => (
+            <AnimatedCard
+              key={i}
+              className="border bg-card rounded-xl p-6 md:p-8 flex flex-col"
+            >
+              <Quote className="h-8 w-8 text-international-orange/30 mb-4" />
+              <p className="text-foreground text-sm leading-relaxed flex-1 mb-6">
+                &ldquo;{testimonial.quote}&rdquo;
+              </p>
+              <div className="flex items-center gap-1 mb-3">
+                {Array.from({ length: testimonial.rating }).map((_, j) => (
+                  <Star
+                    key={j}
+                    className="h-4 w-4 text-amber-400 fill-amber-400"
+                  />
+                ))}
+              </div>
+              <div>
+                <p className="font-semibold text-sm">{testimonial.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {testimonial.role}
+                </p>
+              </div>
+            </AnimatedCard>
+          ))}
+        </StaggerContainer>
+      </div>
+    </section>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * SECTION 5 — HOW IT WORKS
+ * Simple 3-step process for primary audience (Founders).
+ * ════════════════════════════════════════════════════════════════════════ */
+
+function HowItWorksSection() {
+  interface HowItWorksStep {
+    number: string;
+    icon: typeof UserCheck;
+    title: string;
+    description: string;
+    cta?: { label: string; href: string };
+  }
+
+  const STEPS: HowItWorksStep[] = [
+    {
+      number: "01",
+      icon: UserCheck,
+      title: "Apply",
+      description:
+        "Tell us about your hardware vision. We review every application to ensure we can genuinely help — and that the fit is right for both sides.",
+      cta: { label: "Start Application", href: "/join/founder" },
+    },
+    {
+      number: "02",
+      icon: Users,
+      title: "Get Matched",
+      description:
+        "We assemble your fractional team from our network of seasoned executives and engineers. You meet them, approve them, and set the sprint scope together.",
+    },
+    {
+      number: "03",
+      icon: Hammer,
+      title: "Build & Launch",
+      description:
+        "Your team executes in structured 12-week sprints. ForgeOS keeps everything coordinated — objectives, tasks, suppliers, and milestones — so you ship on time.",
+    },
+  ];
+
+  return (
+    <section
+      id="how-it-works"
+      className="py-16 md:py-28 bg-muted/30 border-t border-muted"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-12 md:mb-20">
+          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-4 block">
+            Three Steps
+          </span>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6">
+            How It Works
+          </h2>
+          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            From application to shipping product — here&apos;s the path.
+          </p>
+        </AnimatedSection>
+
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+          {STEPS.map((step) => {
+            const Icon = step.icon;
+            return (
+              <AnimatedCard
+                key={step.number}
+                className="border bg-card rounded-xl p-6 md:p-8 flex flex-col relative"
+              >
+                {/* Step number */}
+                <span className="text-6xl md:text-7xl font-black text-muted/50 absolute top-4 right-6 select-none">
+                  {step.number}
+                </span>
+                <div className="mb-4 h-12 w-12 rounded-lg bg-electric-blue-light flex items-center justify-center">
+                  <Icon className="h-5 w-5 text-electric-blue" />
+                </div>
+                <h3 className="text-xl font-bold mb-3">{step.title}</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed flex-1">
+                  {step.description}
+                </p>
+                {step.cta && (
+                  <div className="mt-6">
+                    <Link
+                      href={step.cta.href}
+                      className="inline-flex items-center gap-2 text-international-orange hover:text-international-orange-hover text-sm font-mono font-bold uppercase tracking-wider transition-colors"
+                    >
+                      {step.cta.label}
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                )}
+              </AnimatedCard>
+            );
+          })}
+        </StaggerContainer>
+      </div>
+    </section>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * SECTION 6 — CAPABILITIES HIGHLIGHT
+ * Condensed view of manufacturing breadth (not the full 8-card grid).
+ * ════════════════════════════════════════════════════════════════════════ */
+
+function CapabilitiesHighlight() {
+  const CAPABILITIES = [
+    "Additive Manufacturing",
+    "CNC Machining",
+    "Sheet Metal",
+    "Injection Moulding",
+    "Casting",
+    "Composites",
+    "PCB Assembly",
+    "Surface Treatment",
+  ] as const;
+
+  return (
+    <section className="py-16 md:py-24 bg-background border-t border-muted">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
+            Manufacturing Network
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-black mb-6">
+            80+ Techniques. One Platform.
+          </h2>
+          <p className="text-muted-foreground text-base max-w-2xl mx-auto leading-relaxed mb-10">
+            From rapid prototyping to full-scale production — access every
+            manufacturing process, material, and finish you need to ship
+            hardware.
+          </p>
+
+          {/* Capability tags */}
+          <div className="flex flex-wrap justify-center gap-3 mb-8">
+            {CAPABILITIES.map((cap) => (
+              <span
+                key={cap}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border bg-card text-sm font-medium text-foreground"
+              >
+                <CheckCircle2 className="h-4 w-4 text-status-success" />
+                {cap}
+              </span>
+            ))}
+          </div>
+
+          <p className="text-xs text-muted-foreground font-mono tracking-wider">
+            + Welding, Brazing, Carbon Fibre, Nano-Imprint, Bio-Printing, and
+            dozens more.
+          </p>
+        </AnimatedSection>
+      </div>
+    </section>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * SECTION 7 — PRICING PREVIEW
+ * Shows tiers at a glance with link to full pricing page.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+function PricingPreviewSection() {
+  const TIERS = [
+    {
+      name: "Free",
+      price: "£0",
+      period: "forever",
+      description: "Get started and explore the platform",
+      features: ["5 orders/month", "20 AI tasks/month", "Basic marketplace"],
+      cta: "Get Started Free",
+      href: "/join/founder",
+      highlight: false,
+    },
+    {
+      name: "Starter",
+      price: "£49",
+      period: "/month",
+      description: "For growing hardware ventures",
+      features: [
+        "25 orders/month",
+        "100 AI tasks/month",
+        "3 team members",
+        "1 active retainer",
+      ],
+      cta: "Start Building",
+      href: "/join/founder",
+      highlight: false,
+    },
+    {
+      name: "Professional",
+      price: "£149",
+      period: "/month",
+      description: "For serious hardware companies",
+      features: [
+        "Unlimited orders",
+        "500 AI tasks/month",
+        "10 team members",
+        "Unlimited retainers",
+        "API access",
+      ],
+      cta: "Go Professional",
+      href: "/join/founder",
+      highlight: true,
+    },
+  ] as const;
+
+  return (
+    <section
+      id="pricing"
+      className="py-16 md:py-28 bg-muted/30 border-t border-muted"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
+            Simple Pricing
+          </span>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6">
+            Transparent. No Surprises.
+          </h2>
+          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            Start free. Upgrade when you&apos;re ready. All plans include a 10%
+            platform fee on marketplace transactions.
+          </p>
+        </AnimatedSection>
+
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-10">
+          {TIERS.map((tier) => (
+            <AnimatedCard
+              key={tier.name}
+              className={`border rounded-xl p-6 md:p-8 flex flex-col bg-card ${
+                tier.highlight
+                  ? "border-international-orange border-2 relative"
+                  : ""
+              }`}
+            >
+              {tier.highlight && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-international-orange text-white text-xs font-mono font-bold tracking-widest uppercase px-4 py-1 rounded-full">
+                  Most Popular
+                </span>
+              )}
+              <h3 className="text-xl font-bold mb-1">{tier.name}</h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                {tier.description}
+              </p>
+              <div className="mb-6">
+                <span className="text-4xl font-black">{tier.price}</span>
+                <span className="text-muted-foreground text-sm">
+                  {tier.period}
+                </span>
+              </div>
+              <ul className="space-y-2 mb-8 flex-1">
+                {tier.features.map((feature) => (
+                  <li
+                    key={feature}
+                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                  >
+                    <CheckCircle2 className="h-4 w-4 text-status-success shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+                <Link
+                  href={tier.href}
+                  className={`block text-center py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px] ${
+                    tier.highlight
+                      ? "bg-international-orange hover:bg-international-orange-hover text-white"
+                      : "bg-muted hover:bg-secondary text-foreground"
+                  }`}
+                >
+                  {tier.cta}
+                </Link>
+              </motion.div>
+            </AnimatedCard>
+          ))}
+        </StaggerContainer>
+
+        <div className="text-center">
+          <Link
+            href="/pricing"
+            className="inline-flex items-center gap-2 text-electric-blue hover:text-electric-blue-hover text-sm font-mono uppercase tracking-wider transition-colors"
+          >
+            View Full Pricing &amp; Feature Comparison
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * SECTION 8 — FAQ
+ * Handles objections and builds confidence.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+function FAQSection() {
+  const FAQS = [
+    {
+      question: "Who owns the IP I create on the platform?",
+      answer:
+        "You do. 100%. Fractional Forge provides the team and infrastructure, but all intellectual property, designs, prototypes, and products belong entirely to you. This is baked into our contracts.",
+    },
+    {
+      question: "How does the fractional model actually work?",
+      answer:
+        "Instead of hiring a full-time engineering team, you work with experienced executives and engineers on a fractional (part-time) basis. They bring deep expertise across multiple domains, and you only pay for the hours and outcomes you need. Think of it as the same model that gave the world fractional CFOs — applied to hardware.",
+    },
+    {
+      question: "What kind of hardware can I build with Fractional Forge?",
+      answer:
+        "Anything physical. Our founding members are building consumer electronics, robotics, medical devices, aerospace components, IoT hardware, and industrial equipment. If it can be designed, prototyped, and manufactured, we can help.",
+    },
+    {
+      question: "What does \"Early Access\" mean? Is the platform ready?",
+      answer:
+        "Early Access means the platform is live and functional, but we're actively iterating based on founding member feedback. You get direct input into the product roadmap, priority support, and early-access pricing that won't increase for founding members.",
+    },
+    {
+      question: "How much does it actually cost?",
+      answer:
+        "The platform starts free. Paid plans start at £49/month for growing ventures. On top of the subscription, there's a 10% platform fee on marketplace transactions (manufacturing orders, retainer payments). No hidden fees. Cancel anytime.",
+    },
+    {
+      question: "What if I'm not a founder? Can I still join?",
+      answer:
+        "Absolutely. We have three roles: Founders (who need things built), Executives (senior engineers who provide fractional expertise), and Apprentices (emerging talent paired with executives for accelerated learning). Each role has its own application path.",
+    },
+    {
+      question: "How quickly can I go from idea to prototype?",
+      answer:
+        "Our structured sprints target 12 weeks from kick-off to validated prototype. Some simpler projects ship faster. The key is eliminating the months of hiring, onboarding, and team-building that typically precede any actual engineering work.",
+    },
+    {
+      question: "Is there a refund policy?",
+      answer:
+        "Yes. If you're not satisfied within the first 30 days of a paid plan, we'll refund you in full — no questions asked. We want founding members who genuinely benefit from the platform.",
+    },
+  ] as const;
+
+  return (
+    <section id="faq" className="py-16 md:py-28 bg-background border-t border-muted">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-12 md:mb-16">
+          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-4 block">
+            Questions &amp; Answers
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-black mb-6">
+            Frequently Asked Questions
+          </h2>
+          <p className="text-muted-foreground text-base max-w-xl mx-auto leading-relaxed">
+            Everything you need to know before getting started.
+          </p>
+        </AnimatedSection>
+
+        <AnimatedSection delay={0.1}>
+          <Accordion type="single" collapsible className="space-y-4">
+            {FAQS.map((faq, i) => (
+              <AccordionItem
+                key={i}
+                value={`faq-${i}`}
+                className="border rounded-xl bg-card px-6 data-[state=open]:shadow-sm transition-shadow"
+              >
+                <AccordionTrigger className="text-left text-sm md:text-base font-semibold py-5 hover:no-underline">
+                  {faq.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-5">
+                  {faq.answer}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </AnimatedSection>
+      </div>
+    </section>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * SECTION 9 — FINAL CTA
+ * Last chance to convert. Urgency + value reminder.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+function FinalCTASection() {
+  return (
+    <section className="py-16 md:py-28 bg-foreground text-background">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+        <AnimatedSection>
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            variants={fadeInScale}
+            className="inline-flex items-center gap-2 mb-6 px-4 py-2 border border-background/20 rounded-full"
+          >
+            <Zap className="h-4 w-4 text-international-orange" />
+            <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
+              Limited Founding Member Spots
+            </span>
+          </motion.div>
+
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
+            Ready to Build Hardware
+            <br className="hidden sm:block" /> at Software Speed?
+          </h2>
+          <p className="text-background/70 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-10">
+            Founding members get early access pricing locked in forever,
+            direct product influence, and priority matching with our best
+            executives. Don&apos;t wait for the waitlist.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+              <Link
+                href="/join/founder"
+                className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px]"
+              >
+                Apply for Early Access
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </motion.div>
+            <a
+              href={`${APP_DOMAIN}/login`}
+              className="inline-flex items-center gap-2 text-background/60 hover:text-background text-sm font-mono tracking-wider uppercase transition-colors min-h-[44px]"
+            >
+              Already a member? Login
+            </a>
+          </div>
+
+          <p className="mt-8 text-xs text-background/40 font-mono tracking-wider">
+            No credit card required. Start free. Cancel anytime.
+          </p>
+        </AnimatedSection>
+      </div>
+    </section>
+  );
 }

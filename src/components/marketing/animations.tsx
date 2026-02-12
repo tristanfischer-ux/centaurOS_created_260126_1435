@@ -83,7 +83,7 @@ export const heroTagline: Variants = {
 // Button hover/tap animations
 export const buttonHover = {
   scale: 1.03,
-  transition: { type: "spring", stiffness: 400, damping: 17 }
+  transition: { type: "spring" as const, stiffness: 400, damping: 17 }
 };
 
 export const buttonTap = {
