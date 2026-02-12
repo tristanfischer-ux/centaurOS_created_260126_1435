@@ -128,6 +128,7 @@ cq.exporters.export(_model, _os.path.join(_output_dir, "model.stl"))
 # Projection directions follow right-hand rule: vector points FROM camera TOWARD object
 # Positive Z component = right-way-up orientation (ground at bottom)
 # Reference: vertical farm uses (1, 0.8, 0.3) for right-way-up isometric
+# CRITICAL: width/height must be specified to avoid empty/tiny SVG output
 _views = {{
     "iso": (1, 0.8, 0.3),      # Isometric, slightly upward — shows feet/base at bottom
     "top": (0, 0, -1),         # Looking straight down
@@ -139,6 +140,10 @@ for _name, _dir in _views.items():
         _model,
         _os.path.join(_output_dir, f"{{_name}}.svg"),
         opt={{
+            "width": 800,
+            "height": 600,
+            "marginLeft": 20,
+            "marginTop": 20,
             "projectionDir": _dir,
             "showHidden": False,
             "strokeWidth": 0.25,
@@ -155,6 +160,10 @@ try:
             _exploded_model,
             _os.path.join(_output_dir, "exploded_iso.svg"),
             opt={{
+                "width": 800,
+                "height": 600,
+                "marginLeft": 20,
+                "marginTop": 20,
                 "projectionDir": (1, 0.4, 0.8),  # Exploded iso: slight upward angle to show layer separation
                 "showHidden": False,
                 "strokeWidth": 0.25,
@@ -451,10 +460,19 @@ def generate_cad(
             filepath = os.path.join(tmpdir, filename)
             if os.path.exists(filepath):
                 with open(filepath, "rb") as f:  # noqa: SIM115
-                    result[key] = base64.b64encode(f.read()).decode("utf-8")
+                    file_bytes = f.read()
+                    result[key] = base64.b64encode(file_bytes).decode("utf-8")
+                    # Debug logging for SVG files
+                    if filename.endswith(".svg"):
+                        try:
+                            svg_preview = file_bytes.decode("utf-8")[:300]
+                            print(f"SVG {key}: {len(file_bytes)} bytes, preview: {svg_preview}")
+                        except Exception:
+                            pass
                 has_any_file = True
             else:
                 result[key] = None
+                print(f"WARNING: Expected file not found: {filename}")
 
         # If we recovered files despite an error, clear the error
         # so the caller gets the result instead of a failure
@@ -480,7 +498,7 @@ def generate_cad(
     timeout=120,
     memory=2048,
 )
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def generate_cad_endpoint(item: dict) -> dict:
     """
     HTTP POST endpoint for CadQuery generation + analysis.
@@ -511,7 +529,7 @@ def generate_cad_endpoint(item: dict) -> dict:
     timeout=90,
     memory=2048,
 )
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def analyze_cad_endpoint(item: dict) -> dict:
     """
     HTTP POST endpoint for analysis-only (no file export).

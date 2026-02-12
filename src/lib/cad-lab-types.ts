@@ -27,6 +27,7 @@ export interface CadLabResult {
   svgTop?: string
   svgFront?: string
   stepSize?: number
+  stlData?: string
   stlSize?: number
   bbox?: { xLen: number; yLen: number; zLen: number }
   fillRatio?: number

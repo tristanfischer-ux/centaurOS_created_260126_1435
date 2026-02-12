@@ -31,6 +31,9 @@ import {
   RotateCcw,
   Copy,
   Check,
+  Maximize2,
+  X,
+  Cube,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -38,9 +41,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import { runCadLabResearch, generateCadLabModel } from "@/actions/cad-lab"
 import { GEMINI_MODELS } from "@/lib/cad-lab-types"
+import { STLViewer } from "@/components/cad/stl-viewer"
 
 import type { CadLabResult, CadLabResearchResult, GeminiModelId } from "@/lib/cad-lab-types"
 
@@ -61,6 +67,10 @@ export default function CadLabPage(): React.ReactNode {
   const [showCode, setShowCode] = useState(false)
   const [showInterface, setShowInterface] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
+
+  // ── View state ──
+  const [fullscreenView, setFullscreenView] = useState<string | null>(null)
+  const [activeViewTab, setActiveViewTab] = useState<"3d" | "iso" | "front" | "top">("3d")
 
   // ── Step 1: Research ──
   const handleResearch = useCallback(async () => {
@@ -531,42 +541,85 @@ export default function CadLabPage(): React.ReactNode {
             </Card>
           )}
 
-          {/* SVGs */}
-          {(result.svgIso || result.svgFront || result.svgTop) && (
+          {/* Views (3D + 2D Projections) */}
+          {(result.stlData || result.svgIso || result.svgFront || result.svgTop) && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Views</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Cube className="h-4 w-4" />
+                    Views
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFullscreenView(activeViewTab)}
+                    className="gap-1.5"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                    Fullscreen
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Tabs value={activeViewTab} onValueChange={(v) => setActiveViewTab(v as typeof activeViewTab)}>
+                  <TabsList className="grid w-full grid-cols-4">
+                    {result.stlData && <TabsTrigger value="3d">3D Model</TabsTrigger>}
+                    {result.svgIso && <TabsTrigger value="iso">Isometric</TabsTrigger>}
+                    {result.svgFront && <TabsTrigger value="front">Front</TabsTrigger>}
+                    {result.svgTop && <TabsTrigger value="top">Top</TabsTrigger>}
+                  </TabsList>
+
+                  {result.stlData && (
+                    <TabsContent value="3d" className="mt-4">
+                      <div className="h-[500px] bg-muted/30 rounded-lg overflow-hidden">
+                        <STLViewer stlData={result.stlData} />
+                      </div>
+                    </TabsContent>
+                  )}
+
                   {result.svgIso && (
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground font-mono">Isometric</p>
+                    <TabsContent value="iso" className="mt-4">
                       <div className="bg-muted rounded-lg p-2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={result.svgIso} alt="Isometric view" className="w-full" />
+                        <img
+                          src={result.svgIso}
+                          alt="Isometric view"
+                          className="w-full cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setFullscreenView("iso")}
+                        />
                       </div>
-                    </div>
+                    </TabsContent>
                   )}
+
                   {result.svgFront && (
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground font-mono">Front</p>
+                    <TabsContent value="front" className="mt-4">
                       <div className="bg-muted rounded-lg p-2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={result.svgFront} alt="Front view" className="w-full" />
+                        <img
+                          src={result.svgFront}
+                          alt="Front view"
+                          className="w-full cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setFullscreenView("front")}
+                        />
                       </div>
-                    </div>
+                    </TabsContent>
                   )}
+
                   {result.svgTop && (
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground font-mono">Top</p>
+                    <TabsContent value="top" className="mt-4">
                       <div className="bg-muted rounded-lg p-2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={result.svgTop} alt="Top view" className="w-full" />
+                        <img
+                          src={result.svgTop}
+                          alt="Top view"
+                          className="w-full cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setFullscreenView("top")}
+                        />
                       </div>
-                    </div>
+                    </TabsContent>
                   )}
-                </div>
+                </Tabs>
               </CardContent>
             </Card>
           )}

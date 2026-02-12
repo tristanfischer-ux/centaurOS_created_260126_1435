@@ -1606,6 +1606,7 @@ export async function generateCadLabModel(
         ? `data:image/svg+xml;base64,${modalResult.svg_front}`
         : undefined,
       stepSize: stepSizeKb,
+      stlData: modalResult.stl || undefined,
       stlSize: modalResult.stl ? Math.round(atob(modalResult.stl).length / 1024) : undefined,
       bbox: bboxResult,
       fillRatio,
