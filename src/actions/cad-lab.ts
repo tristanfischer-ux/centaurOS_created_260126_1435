@@ -602,7 +602,9 @@ CRITICAL RULES:
 - DO NOT WRITE ANY CODE — this is pure engineering planning
 - Use the research report dimensions exactly — do not invent new numbers
 - ALWAYS check the component library FIRST before planning custom geometry
-- Prefer library components over custom geometry — they produce recognisable, detailed parts${librarySection}`
+- Prefer library components over custom geometry — they produce recognisable, detailed parts
+- If the research report contains unanswered clarifying questions (e.g. "Key Clarifications Required"), DO NOT repeat them or ask your own. Instead, answer each one yourself using the best engineering judgment based on standard industry practice. Document each decision clearly, e.g.: "RESOLVED: Veranda is within the 12×6m footprint (standard for transportable homes in AU)"
+- Your output must be complete and ready for code generation with zero follow-up needed${librarySection}`
 
     const userPrompt = `Product: ${description}
 
@@ -722,7 +724,9 @@ Generate the complete CadQuery Python code following the methodology. The code m
 3. Include validation checks
 4. Assemble everything with union calls
 5. Assign the final assembly to a variable called "result"
-6. Create "result_exploded" showing all components spread apart along Z for an exploded view (wrap in try/except)`
+6. Create "result_exploded" showing all components spread apart along Z for an exploded view (wrap in try/except)
+
+If the research report or interface definition contains any unresolved questions or ambiguities, resolve them with your best engineering judgment and proceed. Do not ask for clarification — make the best decision and add a code comment noting the assumption.`
 
     const codeResult = await callClaude(systemPrompt, userPrompt, modelId, 64000)
     totalTokensIn += codeResult.tokensIn
