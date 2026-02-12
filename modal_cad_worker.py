@@ -125,11 +125,14 @@ cq.exporters.export(_model, _os.path.join(_output_dir, "model.step"))
 cq.exporters.export(_model, _os.path.join(_output_dir, "model.stl"))
 
 # Export SVG views
+# Projection directions follow right-hand rule: vector points FROM camera TOWARD object
+# Positive Z component = right-way-up orientation (ground at bottom)
+# Reference: vertical farm uses (1, 0.8, 0.3) for right-way-up isometric
 _views = {{
-    "iso": (1, 1, -1),
-    "top": (0, 0, -1),
-    "front": (-1, 0, 0),
-    "right": (0, 1, 0),
+    "iso": (1, 0.8, 0.3),      # Isometric, slightly upward — shows feet/base at bottom
+    "top": (0, 0, -1),         # Looking straight down
+    "front": (0, 1, 0),        # Front elevation (Y-axis view)
+    "right": (1, 0, 0),        # Right side elevation (X-axis view)
 }}
 for _name, _dir in _views.items():
     cq.exporters.export(
@@ -152,7 +155,7 @@ try:
             _exploded_model,
             _os.path.join(_output_dir, "exploded_iso.svg"),
             opt={{
-                "projectionDir": (1, 1, -1),
+                "projectionDir": (1, 0.4, 0.8),  # Exploded iso: slight upward angle to show layer separation
                 "showHidden": False,
                 "strokeWidth": 0.25,
             }},

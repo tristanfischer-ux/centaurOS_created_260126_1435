@@ -108,6 +108,19 @@ Output EXACTLY this format:
 | Component | Qty | Size (mm) | Position (x,y,z) | Notes |
 |-----------|-----|-----------|-------------------|-------|
 [One row per unique component type. Position is the centre point.]
+[For each component, include functional sub-features if applicable:
+ - Screw bosses / mounting points
+ - Cutouts (ports, buttons, vents, grilles)
+ - Hollow sections (wall thickness for shells/containers)
+ - Sub-assemblies (shields, connectors, brackets, tabs)]
+
+=== CONNECTION MAP ===
+[For assemblies with flows (water, air, electrical, structural loads), trace complete paths]
+Example:
+- Water: Reservoir → Pump → Riser → Headers → Drips → Trays → Drains → Return → Reservoir
+- Power: Battery → PCB → Components
+- Structure: Frame posts → Rails → Cross-braces → Mounting points
+[If no flows apply, write "N/A"]
 
 === DERIVED CONSTRAINTS ===
 - Target BBox: W×D×H mm
@@ -186,11 +199,46 @@ RULES:
 - The function may accept extra parameters beyond (x, y, z) if the component
   needs them (e.g. angle for arms). Declare defaults for all extra params.
 
-DO NOT USE:
-- .loft(), .sweep(), .mirror()
-- cq.Compound, cq.Solid, cq.Assembly
-- cq.Workplane("YZ"), cq.Workplane("XZ")
-- .rotate(), .translate(), .moved() on an existing body
+SAFE PATTERNS (use these):
+
+1. Positioning:
+   cq.Workplane("XY").workplane(offset=z).transformed(offset=(x, y, 0))
+
+2. Hollow containers (trays, reservoirs, frames):
+   outer = wp.box(100, 50, 30)
+   inner = wp.workplane(offset=wall).box(100 - wall*2, 50 - wall*2, 30)
+   result = outer.cut(inner)
+
+3. Pipes / hollow cylinders:
+   wp.circle(od/2).circle(od/2 - wall).extrude(length)
+
+4. Fillets (on simple shapes, BEFORE union):
+   part = wp.box(50, 30, 20).edges(">Z").fillet(2)
+   # THEN union: assembly = assembly.union(part)
+
+5. Sketches for complex 2D profiles:
+   wp.sketch().rect(w, d).vertices().fillet(r).finalize().extrude(h)
+
+6. Screw bosses:
+   boss = wp.circle(boss_dia/2).extrude(height)
+   hole = wp.circle(screw_dia/2).extrude(height + 1)
+   result = result.union(boss).cut(hole)
+
+OPTIONAL HELPER FUNCTIONS:
+If multiple components share a pattern (rounded rectangles, hollow cylinders),
+you may define helpers at the top:
+
+def rounded_rect_solid(wp, w, h, r, t):
+    return wp.sketch().rect(w, h).vertices().fillet(r).finalize().extrude(t)
+
+def hollow_cylinder(wp, od, id, h):
+    return wp.circle(od/2).circle(id/2).extrude(h)
+
+AVOID (these crash or produce incorrect geometry):
+- .loft(), .sweep(), .mirror() — approximate with extrudes instead
+- .rotate(), .translate(), .moved() on existing bodies — use .transformed() instead
+- cq.Compound, cq.Solid, cq.Assembly — always return cq.Workplane
+- cq.Workplane("YZ"), cq.Workplane("XZ") — use .transformed(rotate=...) instead
 - import os, open(), print(), cq.exporters
 
 Output ONLY the Python code. No explanations.`
@@ -1071,23 +1119,51 @@ For components with qty > 1 in the interface (like arms, motors, propellers), ca
  * @description Checks BBox within 10% of target, fill ratio < 15%,
  * STEP size > 500KB. Logs warnings but does NOT block the result —
  * a slightly wrong model is more useful than no model.
+ *
+ * @param bbox - Bounding box from Modal execution
+ * @param fillRatio - Volume fill ratio (%)
+ * @param stepSizeKb - STEP file size in KB
+ * @param targetBBox - Target dimensions from interface definition (optional, uses DRONE_TARGET as fallback)
  */
 function postExecutionValidation(
   bbox: { xLen: number; yLen: number; zLen: number } | undefined,
   fillRatio: number | undefined,
   stepSizeKb: number | undefined,
+  targetBBox?: { x: number; y: number; z: number },
 ): { warnings: string[] } {
   const warnings: string[] = []
+  const tolerance = 0.10  // 10% tolerance
 
   if (bbox) {
-    if (bbox.xLen < DRONE_TARGET.minBBoxX || bbox.xLen > DRONE_TARGET.maxBBoxX) {
-      warnings.push(`BBox X=${bbox.xLen}mm outside expected ${DRONE_TARGET.minBBoxX}-${DRONE_TARGET.maxBBoxX}mm`)
-    }
-    if (bbox.yLen < DRONE_TARGET.minBBoxY || bbox.yLen > DRONE_TARGET.maxBBoxY) {
-      warnings.push(`BBox Y=${bbox.yLen}mm outside expected ${DRONE_TARGET.minBBoxY}-${DRONE_TARGET.maxBBoxY}mm`)
-    }
-    if (bbox.zLen < DRONE_TARGET.minBBoxZ || bbox.zLen > DRONE_TARGET.maxBBoxZ) {
-      warnings.push(`BBox Z=${bbox.zLen}mm outside expected ${DRONE_TARGET.minBBoxZ}-${DRONE_TARGET.maxBBoxZ}mm`)
+    if (targetBBox) {
+      // Dynamic validation against interface definition target
+      const xDiff = Math.abs(bbox.xLen - targetBBox.x) / targetBBox.x
+      const yDiff = Math.abs(bbox.yLen - targetBBox.y) / targetBBox.y
+      const zDiff = Math.abs(bbox.zLen - targetBBox.z) / targetBBox.z
+
+      if (xDiff > tolerance) {
+        const pct = (xDiff * 100).toFixed(1)
+        warnings.push(`BBox X=${bbox.xLen}mm is ${pct}% off target ${targetBBox.x}mm (max ${tolerance * 100}%)`)
+      }
+      if (yDiff > tolerance) {
+        const pct = (yDiff * 100).toFixed(1)
+        warnings.push(`BBox Y=${bbox.yLen}mm is ${pct}% off target ${targetBBox.y}mm (max ${tolerance * 100}%)`)
+      }
+      if (zDiff > tolerance) {
+        const pct = (zDiff * 100).toFixed(1)
+        warnings.push(`BBox Z=${bbox.zLen}mm is ${pct}% off target ${targetBBox.z}mm (max ${tolerance * 100}%)`)
+      }
+    } else {
+      // Fallback to hardcoded drone target if no interface definition provided
+      if (bbox.xLen < DRONE_TARGET.minBBoxX || bbox.xLen > DRONE_TARGET.maxBBoxX) {
+        warnings.push(`BBox X=${bbox.xLen}mm outside expected ${DRONE_TARGET.minBBoxX}-${DRONE_TARGET.maxBBoxX}mm`)
+      }
+      if (bbox.yLen < DRONE_TARGET.minBBoxY || bbox.yLen > DRONE_TARGET.maxBBoxY) {
+        warnings.push(`BBox Y=${bbox.yLen}mm outside expected ${DRONE_TARGET.minBBoxY}-${DRONE_TARGET.maxBBoxY}mm`)
+      }
+      if (bbox.zLen < DRONE_TARGET.minBBoxZ || bbox.zLen > DRONE_TARGET.maxBBoxZ) {
+        warnings.push(`BBox Z=${bbox.zLen}mm outside expected ${DRONE_TARGET.minBBoxZ}-${DRONE_TARGET.maxBBoxZ}mm`)
+      }
     }
   } else {
     warnings.push("No bounding box returned from Modal")
@@ -1508,7 +1584,12 @@ export async function generateCadLabModel(
       : undefined
 
     // ── Post-execution validation ──
-    const { warnings } = postExecutionValidation(bboxResult, fillRatio, stepSizeKb)
+    const { warnings } = postExecutionValidation(
+      bboxResult,
+      fillRatio,
+      stepSizeKb,
+      interfaceParsed?.target_bbox,  // Pass target dimensions from interface definition
+    )
 
     return {
       success: true,
