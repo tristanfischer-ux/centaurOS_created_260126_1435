@@ -33,7 +33,7 @@ export default function NewScanPage(): React.ReactNode {
           <h1 className={typography.h1}>Create Concept</h1>
         </div>
         <p className={cn(typography.pageSubtitle, "mt-1")}>
-          Describe your product idea and we will create a first draft engineering document.
+          Describe your product idea and we will decompose it into a buildable engineering dossier.
         </p>
       </div>
 
