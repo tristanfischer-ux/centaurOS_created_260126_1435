@@ -390,7 +390,7 @@ CRITICAL RULES:
     const result = await callClaude(
       systemPrompt,
       `Product: ${description}\n\nResearch Report (use these dimensions — do not invent new ones):\n${researchReport}\n\nGenerate the complete interface definition.`,
-      "claude-opus-4-20250514",
+      "claude-opus-4-6",
       8192,
     )
 
@@ -453,8 +453,8 @@ Generate the complete CadQuery Python code. The code must:
 3. Include validation checks
 4. Assemble everything with union calls
 5. Assign the final assembly to a variable called "result"`,
-      "claude-opus-4-20250514",
-      32000,
+      "claude-opus-4-6",
+      64000,
     )
 
     let code = extractCode(result.text)
@@ -559,8 +559,8 @@ export async function executeCode(code: string): Promise<ExecutionResult> {
 async function callClaude(
   systemPrompt: string,
   userPrompt: string,
-  modelId: string = "claude-opus-4-20250514",
-  maxTokens: number = 16384,
+  modelId: string = "claude-opus-4-6",
+  maxTokens: number = 64000,
 ): Promise<{ text: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")

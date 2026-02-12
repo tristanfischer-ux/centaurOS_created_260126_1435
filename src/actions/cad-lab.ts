@@ -40,7 +40,7 @@ import { CAD_INSTRUCTIONS } from "@/lib/cad-instructions"
 async function callClaude(
   systemPrompt: string,
   userPrompt: string,
-  modelId: ClaudeModelId = "claude-opus-4-20250514",
+  modelId: ClaudeModelId = "claude-opus-4-6",
   maxTokens: number = 16384,
 ): Promise<{
   text: string
@@ -477,7 +477,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.`
 export async function generateCadLabInterface(
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-20250514",
+  modelId: ClaudeModelId = "claude-opus-4-6",
 ): Promise<CadLabInterfaceResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -607,7 +607,7 @@ export async function generateCadLabModel(
   description: string,
   researchReport: string,
   interfaceDefinition: string,
-  modelId: ClaudeModelId = "claude-opus-4-20250514",
+  modelId: ClaudeModelId = "claude-opus-4-6",
 ): Promise<CadLabResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -652,7 +652,7 @@ Generate the complete CadQuery Python code following the methodology. The code m
 4. Assemble everything with union calls
 5. Assign the final assembly to a variable called "result"`
 
-    const codeResult = await callClaude(systemPrompt, userPrompt, modelId, 32000)
+    const codeResult = await callClaude(systemPrompt, userPrompt, modelId, 64000)
     totalTokensIn += codeResult.tokensIn
     totalTokensOut += codeResult.tokensOut
 
