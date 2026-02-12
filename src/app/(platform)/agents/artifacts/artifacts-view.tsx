@@ -233,11 +233,11 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search artifacts..."
+            placeholder="Search saved outputs..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 pr-10"
-            aria-label="Search artifacts"
+            aria-label="Search saved outputs"
           />
           {searchQuery && (
             <button
@@ -315,7 +315,7 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
                         type="button"
                         onClick={(e) => handleToggleStar(e, artifact.id)}
                         className="shrink-0 p-1 rounded-md hover:bg-muted transition-colors"
-                        aria-label={artifact.is_starred ? 'Unstar artifact' : 'Star artifact'}
+                        aria-label={artifact.is_starred ? 'Remove from starred' : 'Add to starred'}
                       >
                         <Star
                           className={cn(
@@ -369,12 +369,12 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
             <Sparkles className="h-8 w-8 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-1">
-            No artifacts yet
+            No saved outputs yet
           </h3>
           <p className="text-sm text-muted-foreground max-w-sm">
             {debouncedSearch || activeTypeFilter !== 'all' || starredOnly
-              ? 'No artifacts match your current filters. Try adjusting your search or filters.'
-              : 'Run an agent workflow to generate your first artifact. Artifacts are saved automatically when workflows complete.'}
+              ? 'No saved outputs match your current filters. Try adjusting your search or filters.'
+              : 'Run an agent workflow to generate your first output. Outputs are saved automatically when workflows complete.'}
           </p>
         </div>
       )}

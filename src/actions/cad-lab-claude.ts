@@ -20,6 +20,7 @@ import { checkRateLimit } from "@/lib/security/rate-limit"
 import { createClient } from "@/lib/supabase/server"
 import { CAD_INSTRUCTIONS } from "@/lib/cad-instructions"
 import { fetchLibrarySummary, formatLibraryForPrompt, prepareCodeWithLibrary } from "@/actions/component-library"
+import type { LibraryComponentSummary } from "@/actions/component-library"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -355,11 +356,17 @@ export async function generateInterface(
 
   const start = Date.now()
   try {
+    // Fetch library summary to inject into interface definition step
+    const librarySummary = await fetchLibrarySummary()
+    const librarySection = librarySummary.length > 0
+      ? buildLibrarySectionForInterface(librarySummary)
+      : ""
+
     const systemPrompt = `You are an engineering planner for parametric CAD models. You are NOT writing code — this is pure engineering planning.
 
 Produce a text-only interface definition. Every dimension must be a specific number in millimetres. Numbers must sum correctly — show ALL arithmetic step-by-step.
 
-Output EXACTLY these 4 sections:
+Output EXACTLY these 5 sections:
 
 === a) SPACE BUDGET ===
 How components stack/fit within the overall envelope. Must add up arithmetically.
@@ -368,10 +375,17 @@ Show: base_z + component1_h + gap + component2_h + ... = total_h
 Rule: if the numbers don't add up in text, they won't add up in 3D.
 
 === b) COMPONENT PLACEMENT TABLE ===
-| Component | Qty | Dimensions (mm) | Position (x,y,z) | Notes |
-|-----------|-----|-----------------|-------------------|-------|
+| Component | Qty | Dimensions (mm) | Position (x,y,z) | Source | Notes |
+|-----------|-----|-----------------|-------------------|--------|-------|
 One row per unique component type. Position is centre point.
 Minimum 6 unique component types.
+
+The "Source" column MUST be one of:
+  - "LIBRARY: slug_name" — if a pre-built library component matches (use the exact slug)
+  - "CUSTOM" — if no library component matches and custom geometry is needed
+
+For LIBRARY components, use their default dimensions or override with product-specific values.
+For CUSTOM components, you define the geometry from scratch.
 
 === c) CONNECTION MAP ===
 For assemblies with flows (water, air, electrical, structural), trace COMPLETE paths.
@@ -383,12 +397,20 @@ Example:
   - [ ] Magazine ID (39mm) > capsule flange (37mm) — clearance
   - [ ] 10 capsules x 29mm = 290mm < tube height 315mm — fits
 
+=== e) LIBRARY USAGE SUMMARY ===
+List which library components will be used and which need custom geometry:
+  LIBRARY: [list of slug names that match components in this product]
+  CUSTOM: [list of components that need custom make_*() functions]
+
 CRITICAL RULES:
 - SHOW ALL ARITHMETIC step-by-step
 - Every position calculated from named quantities, not eyeballed
 - Components must not overlap spatially
 - DO NOT WRITE ANY CODE
-- Use the research report dimensions exactly — do not invent new numbers`
+- Use the research report dimensions exactly — do not invent new numbers
+- ALWAYS check the component library FIRST before planning custom geometry
+- Prefer library components over custom geometry — they produce recognisable, detailed parts
+${librarySection}`
 
     const result = await callClaude(
       systemPrompt,
@@ -406,6 +428,39 @@ CRITICAL RULES:
       timeMs: Date.now() - start,
     }
   }
+}
+
+/**
+ * Builds a compact library reference for the interface definition step.
+ * Lists available component slugs grouped by domain so the planner can
+ * annotate which parts come from the library vs need custom geometry.
+ *
+ * @param components - Library component summaries from Supabase
+ * @returns Formatted text block for the system prompt
+ */
+function buildLibrarySectionForInterface(
+  components: LibraryComponentSummary[],
+): string {
+  // Group by tier for compact display
+  const byTier: Record<string, LibraryComponentSummary[]> = {}
+  for (const c of components) {
+    const key = c.tier === "universal" ? "Universal" :
+      c.tier === "electromechanical" ? "Electromechanical" : "Domain-Specific"
+    if (!byTier[key]) byTier[key] = []
+    byTier[key].push(c)
+  }
+
+  const sections: string[] = []
+  for (const [tierLabel, items] of Object.entries(byTier)) {
+    const slugList = items.map((c) => `${c.slug} (${c.name})`).join(", ")
+    sections.push(`  ${tierLabel}: ${slugList}`)
+  }
+
+  return `
+AVAILABLE COMPONENT LIBRARY (${components.length} pre-built parts):
+${sections.join("\n")}
+
+When a product component matches a library slug, mark it as "LIBRARY: slug_name" in the Source column.`
 }
 
 // ─── Step 3: Generate CadQuery Code ──────────────────────────────────

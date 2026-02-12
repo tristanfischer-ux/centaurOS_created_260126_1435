@@ -999,8 +999,8 @@ function AgentsFlowInner({
                 }
 
                 if (artifact) {
-                    toast.success("Artifact saved", {
-                        description: "View it in Artifacts",
+                    toast.success("Output saved", {
+                        description: "View it in Saved Outputs",
                         action: {
                             label: "Open",
                             onClick: () => window.location.href = "/agents/artifacts",

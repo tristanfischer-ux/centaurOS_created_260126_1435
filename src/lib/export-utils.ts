@@ -120,24 +120,69 @@ function markdownToHtml(markdown: string): string {
 }
 
 /**
+ * Maximum content length (in characters) that html2pdf.js can reliably handle.
+ * Content exceeding this is truncated with a notice.
+ */
+const PDF_MAX_CONTENT_LENGTH = 200_000
+
+/**
+ * Timeout (ms) for the html2pdf conversion. If it takes longer, we surface
+ * an error instead of silently hanging.
+ */
+const PDF_GENERATION_TIMEOUT_MS = 30_000
+
+/**
+ * Strips base64 data URIs from content that would cause html2pdf.js to choke.
+ * Replaces them with a placeholder note so the user knows images were removed.
+ *
+ * @param content - Raw markdown/text content
+ * @returns Cleaned content with base64 images replaced
+ */
+function stripBase64Images(content: string): string {
+    return content.replace(
+        /!\[([^\]]*)\]\(data:[^;]+;base64,[A-Za-z0-9+/=]+\)/g,
+        '[Image: $1 — see original for full image]'
+    ).replace(
+        /data:[^;]+;base64,[A-Za-z0-9+/=]+/g,
+        '[Image removed for PDF export]'
+    )
+}
+
+/**
  * Exports content as a PDF file using html2pdf.js (dynamic import).
  *
  * @description Renders markdown content as styled HTML, then converts to PDF
- * using html2pdf.js. The library is dynamically imported to avoid bundling
- * at compile time.
+ * using html2pdf.js. Base64 images are stripped before conversion because
+ * html2pdf.js (which uses html2canvas internally) silently fails on very
+ * large HTML payloads. Content exceeding 200K characters is truncated.
  *
  * @param content - Markdown or plain text content
  * @param filename - Download filename (should end in .pdf)
+ *
+ * @throws {Error} If PDF generation times out or fails
  */
 export async function exportAsPDF(
     content: string,
     filename: string
 ): Promise<void> {
+    // VALIDATION: Strip base64 images that cause html2pdf.js to silently fail
+    let cleanContent = stripBase64Images(content)
+
+    // VALIDATION: Truncate very large content to prevent memory issues
+    if (cleanContent.length > PDF_MAX_CONTENT_LENGTH) {
+        console.warn(
+            `[ExportUtils] Content too large for PDF (${cleanContent.length} chars), truncating to ${PDF_MAX_CONTENT_LENGTH}`
+        )
+        cleanContent =
+            cleanContent.substring(0, PDF_MAX_CONTENT_LENGTH) +
+            '\n\n---\n\n*[Content truncated for PDF export. Download as Markdown for the full document.]*'
+    }
+
     // Dynamic import to avoid bundle size impact
     const html2pdfModule = await import("html2pdf.js")
     const html2pdf = html2pdfModule.default
 
-    const htmlContent = markdownToHtml(content)
+    const htmlContent = markdownToHtml(cleanContent)
 
     const wrapper = document.createElement("div")
     wrapper.innerHTML = htmlContent
@@ -150,12 +195,21 @@ export async function exportAsPDF(
     const options = {
         margin: [10, 15, 10, 15],
         filename: filename,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
+        image: { type: "jpeg", quality: 0.85 },
+        html2canvas: { scale: 1.5, useCORS: true, logging: false },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
     }
 
-    await html2pdf().set(options).from(wrapper).save()
+    // Wrap in a timeout so silent failures are surfaced to the caller
+    const pdfPromise = html2pdf().set(options).from(wrapper).save()
+    const timeoutPromise = new Promise<never>((_resolve, reject) =>
+        setTimeout(
+            () => reject(new Error('PDF generation timed out. Try downloading as Markdown instead.')),
+            PDF_GENERATION_TIMEOUT_MS
+        )
+    )
+
+    await Promise.race([pdfPromise, timeoutPromise])
 }
 
 /**

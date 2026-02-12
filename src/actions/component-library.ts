@@ -37,6 +37,7 @@ export interface LibraryComponentCode {
 // ─── All available library function slugs (for detection) ───────────
 
 const LIBRARY_FUNCTION_SLUGS = [
+  // ─── Tier 1: Universal Primitives (14) ───
   "hex_bolt",
   "hex_nut",
   "socket_head_cap_screw",
@@ -51,6 +52,7 @@ const LIBRARY_FUNCTION_SLUGS = [
   "round_tube",
   "square_tube",
   "l_bracket",
+  // ─── Tier 2: Electromechanical (7) ───
   "brushless_motor_outrunner",
   "brushless_motor_pancake",
   "stepper_motor_nema",
@@ -58,6 +60,56 @@ const LIBRARY_FUNCTION_SLUGS = [
   "tactile_switch",
   "axial_fan",
   "centrifugal_pump",
+  // ─── Tier 3: BSF Breeding (5) ───
+  "breeding_cage",
+  "egg_collection_plate",
+  "larvae_rearing_tray",
+  "ventilation_louvre",
+  "harvesting_screen",
+  // ─── Tier 3: Brine Mining (7) ───
+  "pressure_vessel",
+  "hydrocyclone",
+  "crystalliser_vessel",
+  "filter_press_plate",
+  "product_hopper",
+  "pipe_flange",
+  "control_valve",
+  // ─── Tier 3: EPS Architectural (6) ───
+  "eps_block",
+  "hot_wire_cutter_frame",
+  "reinforcing_mesh_panel",
+  "corner_bead",
+  "anchor_bracket",
+  "surface_texture_panel",
+  // ─── Tier 3: CubeSats (10) ───
+  "cubesat_frame",
+  "solar_panel_cubesat",
+  "reaction_wheel",
+  "magnetorquer",
+  "star_tracker",
+  "patch_antenna_cubesat",
+  "deployable_antenna",
+  "separation_spring",
+  "kill_switch",
+  "cold_gas_thruster",
+  // ─── Tier 3: Drones (8) ───
+  "propeller_airfoil",
+  "fpv_camera",
+  "esc_board",
+  "gps_module",
+  "lipo_battery_pack",
+  "cylindrical_cell_18650",
+  "sma_antenna",
+  "frame_plate",
+  // ─── Tier 3: Vertical Farming (8) ───
+  "nft_channel",
+  "led_grow_light_bar",
+  "grow_tray",
+  "net_pot",
+  "nutrient_reservoir",
+  "sensor_probe",
+  "drip_emitter",
+  "vertical_tower_section",
 ] as const
 
 export type LibrarySlug = (typeof LIBRARY_FUNCTION_SLUGS)[number]
@@ -166,10 +218,14 @@ export async function formatLibraryForPrompt(
 
   return `COMPONENT LIBRARY — REUSABLE PARTS:
 The following ${components.length} pre-built CadQuery functions are available in the execution
-environment. For standard components (motors, fasteners, bearings, connectors, tubes,
-brackets, PCBs, switches, fans, pumps), call these functions instead of writing geometry
-from scratch. Each function takes a single params dict and returns a cq.Workplane
-centered at origin, base at Z=0.
+environment. For any component that matches a library part, call the library function instead
+of writing geometry from scratch. Each function takes a single params dict and returns a
+cq.Workplane centered at origin, base at Z=0.
+
+The library spans:
+- Tier 1 (universal): fasteners, bearings, connectors, tubes, brackets
+- Tier 2 (electromechanical): motors, PCBs, switches, fans, pumps
+- Tier 3 (domain): drones, CubeSats, vertical farming, BSF breeding, brine mining, EPS architectural
 
 Available components:
 ${lines.join("\n")}
@@ -180,7 +236,8 @@ LIBRARY USAGE RULES:
 - The library functions are pre-loaded — do NOT redefine them in your code
 - For product-specific custom geometry (enclosures, frames, unique shapes), write make_*() functions as usual
 - You CAN pass custom parameters to override defaults for any library function
-- Library parts produce RECOGNISABLE geometry (visible bolt threads, motor windings, bearing balls, etc.) — much better than simple cylinder/box approximations`
+- Library parts produce RECOGNISABLE geometry (visible bolt threads, motor windings, bearing balls, etc.) — much better than simple cylinder/box approximations
+- For domain-specific products (drones, CubeSats, farms), check the Tier 3 library FIRST — many specialised parts are available`
 }
 
 // ─── detectLibraryUsage ──────────────────────────────────────────────

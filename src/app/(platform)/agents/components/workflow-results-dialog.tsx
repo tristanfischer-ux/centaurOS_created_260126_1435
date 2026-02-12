@@ -399,7 +399,7 @@ export function WorkflowResultsDialog({
                                     className="gap-1.5 text-xs h-8"
                                 >
                                     <FileOutput className="w-3.5 h-3.5" />
-                                    View Artifacts
+                                    View Saved Outputs
                                 </Button>
                             </Link>
                         </div>

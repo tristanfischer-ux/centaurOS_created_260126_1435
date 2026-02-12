@@ -216,7 +216,7 @@ export function ArtifactDetailDialog({
       }
 
       if (data) {
-        toast.success('Artifact saved')
+        toast.success('Saved successfully')
         setIsEditing(false)
         onUpdate?.(data)
       }
@@ -412,7 +412,7 @@ export function ArtifactDetailDialog({
         return
       }
 
-      toast.success('Artifact deleted')
+      toast.success('Output deleted')
       onOpenChange(false)
       onDelete?.(artifact.id)
     } catch (err) {
@@ -485,7 +485,7 @@ export function ArtifactDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="lg" className="max-h-[90vh] flex flex-col gap-0 p-0">
+      <DialogContent size="xl" className="max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
         {/* Visually hidden description for accessibility */}
         <DialogDescription className="sr-only">
           Detail view for artifact: {artifact.title}
@@ -503,7 +503,7 @@ export function ArtifactDetailDialog({
                   value={editTitle}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditTitle(e.target.value)}
                   className="text-lg font-semibold"
-                  placeholder="Artifact title"
+                  placeholder="Output title"
                   autoFocus
                 />
               ) : (
@@ -657,7 +657,7 @@ export function ArtifactDetailDialog({
               variant={isEditing ? 'secondary' : 'ghost'}
               size="sm"
               onClick={isEditing ? handleCancelEditing : handleStartEditing}
-              aria-label={isEditing ? 'Cancel editing' : 'Edit artifact'}
+              aria-label={isEditing ? 'Cancel editing' : 'Edit output'}
             >
               {isEditing ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
             </Button>
@@ -667,78 +667,76 @@ export function ArtifactDetailDialog({
         {/* ================================================================ */}
         {/* BODY                                                             */}
         {/* ================================================================ */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {isEditing ? (
-            /* ---- Edit mode: split view ---- */
-            <div className="flex h-full">
-              {/* Left: textarea */}
-              <div className="flex-1 flex flex-col border-r">
-                <div className="px-4 py-2 border-b">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Edit
-                  </p>
-                </div>
-                <textarea
-                  value={editContent}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditContent(e.target.value)}
-                  className="flex-1 w-full p-4 text-sm font-mono bg-background text-foreground resize-none focus:outline-none"
-                  placeholder="Write your content in markdown..."
-                />
-                <div className="px-4 py-3 border-t flex items-center gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={handleSaveEdit}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-3 w-3" />
-                        Save
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCancelEditing}
-                    disabled={isSaving}
-                  >
-                    Cancel
-                  </Button>
-                </div>
+        {isEditing ? (
+          /* ---- Edit mode: split view ---- */
+          <div className="flex flex-1 min-h-0">
+            {/* Left: textarea */}
+            <div className="flex-1 flex flex-col border-r min-w-0">
+              <div className="px-4 py-2 border-b">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Edit
+                </p>
               </div>
-
-              {/* Right: live preview */}
-              <div className="flex-1 flex flex-col">
-                <div className="px-4 py-2 border-b">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Preview
-                  </p>
-                </div>
-                <ScrollArea className="flex-1">
-                  <div className="p-6">
-                    <Markdown content={editContent} />
-                  </div>
-                </ScrollArea>
+              <textarea
+                value={editContent}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditContent(e.target.value)}
+                className="flex-1 w-full p-4 text-sm font-mono bg-background text-foreground resize-none focus:outline-none"
+                placeholder="Write your content in markdown..."
+              />
+              <div className="px-4 py-3 border-t flex items-center gap-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleSaveEdit}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-3 w-3" />
+                      Save
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancelEditing}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
               </div>
             </div>
-          ) : (
-            /* ---- View mode: rendered markdown ---- */
-            <ScrollArea className="h-full">
-              <div className="p-6">
-                <Markdown
-                  content={previewVersion ? previewVersion.content : artifact.content}
-                />
+
+            {/* Right: live preview */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <div className="px-4 py-2 border-b">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Preview
+                </p>
               </div>
-            </ScrollArea>
-          )}
-        </div>
+              <ScrollArea className="flex-1">
+                <div className="p-6">
+                  <Markdown content={editContent} />
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+        ) : (
+          /* ---- View mode: rendered markdown ---- */
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="p-6">
+              <Markdown
+                content={previewVersion ? previewVersion.content : artifact.content}
+              />
+            </div>
+          </ScrollArea>
+        )}
 
         {/* ================================================================ */}
         {/* EMAIL INLINE FORM (Phase 2)                                      */}
@@ -917,7 +915,7 @@ export function ArtifactDetailDialog({
             {/* Delete */}
             {showDeleteConfirm ? (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Delete this artifact?</span>
+                <span className="text-sm text-muted-foreground">Delete this saved output?</span>
                 <Button
                   variant="destructive"
                   size="sm"
@@ -945,7 +943,7 @@ export function ArtifactDetailDialog({
                 size="sm"
                 onClick={() => setShowDeleteConfirm(true)}
                 className="text-destructive hover:text-destructive"
-                aria-label="Delete artifact"
+                aria-label="Delete saved output"
               >
                 <Trash2 className="h-4 w-4" />
                 <span className="ml-1">Delete</span>

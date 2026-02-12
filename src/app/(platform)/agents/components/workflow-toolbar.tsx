@@ -419,7 +419,7 @@ export function WorkflowToolbar({
                                 className="gap-1.5 text-xs"
                             >
                                 <FileOutput className="w-3.5 h-3.5" />
-                                Artifacts
+                                Saved Outputs
                             </Button>
                         </Link>
                     </TooltipTrigger>
