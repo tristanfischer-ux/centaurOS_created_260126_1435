@@ -153,6 +153,7 @@ export default async function CanvasPage() {
             objectives={objectivesForDialog}
           />
         }
+        whiteboardCount={whiteboards.length}
         purposeData={(foundry as { purpose_data?: FoundryPurposeData | null } | null)?.purpose_data ?? null}
         isFounder={profile.role === 'Founder'}
         foundryId={foundryId}

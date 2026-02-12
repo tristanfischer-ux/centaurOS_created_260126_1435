@@ -60,6 +60,8 @@ interface CanvasShellProps {
   regularObjectives: RegularObjective[]
   /** Server-rendered whiteboard list */
   whiteboardList: React.ReactNode
+  /** Total number of whiteboards (for tab-bar badge) */
+  whiteboardCount: number
   /** Company purpose data for strategic context display */
   purposeData: FoundryPurposeData | null
   /** Whether current user is a founder (can edit purpose) */
@@ -95,6 +97,7 @@ export function CanvasShell({
   strategicObjectives,
   regularObjectives,
   whiteboardList,
+  whiteboardCount,
   purposeData,
   isFounder,
   foundryId,
@@ -118,6 +121,13 @@ export function CanvasShell({
 
   // Compute task status counts for the tab bar badges
   const riverStats = useMemo(() => computeRiverStats(riverData), [riverData])
+
+  // Compute linked/unlinked objective counts for link-objectives tab badge
+  const linkStats = useMemo(() => {
+    const linked = regularObjectives.filter((o) => o.parent_objective_id !== null).length
+    const unlinked = regularObjectives.filter((o) => o.parent_objective_id === null).length
+    return { linked, unlinked }
+  }, [regularObjectives])
 
   // ── Milestone expansion state (controlled from manager pills → river) ──
   const [expandedObjectiveIds, setExpandedObjectiveIds] = useState<Set<string>>(() => {
@@ -269,20 +279,37 @@ export function CanvasShell({
             })}
           </TabsList>
 
-          {/* Status badges — shown when river tab active and has data */}
-          {activeTab === 'river' && riverData.length > 0 && (
-            <div className="ml-auto flex items-center gap-2">
-              <StatusBadge status="success" size="sm" dot>
-                {riverStats.done} done
+          {/* Status badges — contextual per active tab */}
+          <div className="ml-auto flex items-center gap-2">
+            {activeTab === 'river' && riverData.length > 0 && (
+              <>
+                <StatusBadge status="success" size="sm" dot>
+                  {riverStats.done} done
+                </StatusBadge>
+                <StatusBadge status="warning" size="sm" dot>
+                  {riverStats.inProgress} in progress
+                </StatusBadge>
+                <StatusBadge status="pending" size="sm" dot>
+                  {riverStats.notStarted} not started
+                </StatusBadge>
+              </>
+            )}
+            {activeTab === 'link-objectives' && regularObjectives.length > 0 && (
+              <>
+                <StatusBadge status="success" size="sm" dot>
+                  {linkStats.linked} linked
+                </StatusBadge>
+                <StatusBadge status="pending" size="sm" dot>
+                  {linkStats.unlinked} unlinked
+                </StatusBadge>
+              </>
+            )}
+            {activeTab === 'whiteboards' && (
+              <StatusBadge status="info" size="sm" dot>
+                {whiteboardCount} {whiteboardCount === 1 ? 'whiteboard' : 'whiteboards'}
               </StatusBadge>
-              <StatusBadge status="warning" size="sm" dot>
-                {riverStats.inProgress} in progress
-              </StatusBadge>
-              <StatusBadge status="pending" size="sm" dot>
-                {riverStats.notStarted} not started
-              </StatusBadge>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </Tabs>
 
