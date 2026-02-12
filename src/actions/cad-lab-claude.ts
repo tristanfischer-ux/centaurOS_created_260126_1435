@@ -438,12 +438,26 @@ CRITICAL EXECUTION ENVIRONMENT RULES:
 4. Do NOT import os, sys, or use open(). Only import cadquery and math.
 5. Output ONLY the Python code inside a single \`\`\`python code fence.
 
+GEOMETRY SAFETY RULES (these prevent runtime crashes in CadQuery):
+- NEVER use Workplane("XZ") or Workplane("YZ") — they cause coordinate confusion. Always start from Workplane("XY") and use .transformed(rotate=(...)) to change orientation.
+- NEVER use .intersect() with wire profiles (.moveTo/.lineTo/.close) — this produces degenerate geometry and crashes. Use .cut() with simple solid shapes instead.
+- For aerodynamic or tapered shapes, use one of these SAFE patterns:
+  a) .loft() between exactly 2 cross-sections (bottom profile → top profile)
+  b) .cut() with angled boxes to carve away material
+  c) Sketch API: .sketch().rect(w,d).vertices().fillet(r).finalize().extrude(h) for rounded shapes
+- NEVER use .intersect() at all — it is fragile. Use .cut() to subtract material instead.
+- NEVER use .sweep() — it crashes on complex paths.
+- NEVER use .rotate() or .translate() — use .transformed(offset=...) and .workplane(offset=z).
+- Fillet only BEFORE union, only on simple geometry, max 3mm radius.
+- Guard against zero/negative dimensions: use max(value, minimum) for any computed dimension.
+
 CODE QUALITY REQUIREMENTS:
 - Every component from the interface definition MUST have its own make_*() function.
 - Each function must contain REAL geometry (circles, extrudes, cuts, lofts) — not stubs or placeholders.
 - Include detailed inline comments explaining what each section builds.
 - Typical complete models are 400-800+ lines. Do NOT generate abbreviated or skeleton code.
-- If the interface definition lists 10 components, you must model all 10 with real geometry.`
+- If the interface definition lists 10 components, you must model all 10 with real geometry.
+- For complex body shapes (e.g. aerodynamic fuselage), use a rounded-rect extrusion as the base, then .cut() with angled solids to create tapers. Do NOT try to create complex wire profiles.`
 
     const result = await callClaude(
       systemPrompt,
