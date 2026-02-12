@@ -213,7 +213,7 @@ export function QuickAssignDialog({ open, onOpenChange, unassignedTasks, members
             }
             onOpenChange(isOpen)
         }}>
-            <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+            <DialogContent size="md" className="max-h-[85vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-foreground">
                         <Zap className="h-5 w-5 text-international-orange" />

@@ -79,7 +79,7 @@ export default async function CompanySettingsPage({ searchParams }: CompanySetti
     let memberCount = 0
     if (profile?.foundry_id) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { count } = await (supabase as any)
+        const { count } = await supabase
             .from('foundry_memberships')
             .select('*', { count: 'exact', head: true })
             .eq('foundry_id', profile.foundry_id)

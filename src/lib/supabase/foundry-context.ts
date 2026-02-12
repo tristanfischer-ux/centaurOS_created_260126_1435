@@ -109,8 +109,7 @@ export async function getUserFoundries(): Promise<Array<{
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .rpc('get_user_foundries', { p_user_id: user.id })
 
   if (error || !data) {

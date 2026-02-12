@@ -3,10 +3,9 @@
  */
 
 import { NextResponse } from 'next/server'
-import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
-import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
+import { rateLimit } from '@/lib/security/rate-limit'
 
 // SECURITY: Use cryptographically secure random number generation
 function generateVerificationCode(): string {
@@ -38,8 +37,6 @@ export async function POST() {
         }
 
         // SECURITY: Rate limit code generation (3 codes per 15 minutes per user)
-        const headersList = await headers()
-        const clientIP = getClientIP(headersList)
         const rateLimitResult = await rateLimit('api', `telegram-code:${user.id}`, { limit: 3, window: 900 })
         if (!rateLimitResult.success) {
             return NextResponse.json(

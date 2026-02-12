@@ -5,11 +5,12 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
@@ -207,9 +208,9 @@ export function DomainActionPanel({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader className="text-left">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size="lg" className="max-h-[90vh]">
+        <DialogHeader>
           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
             <span>{templateName}</span>
             {path !== domain.name && (
@@ -219,7 +220,7 @@ export function DomainActionPanel({
               </>
             )}
           </div>
-          <SheetTitle className="text-xl flex items-center gap-2">
+          <DialogTitle className="text-xl flex items-center gap-2">
             {domain.name}
             {domain.criticality === 'critical' && (
               <Badge variant="destructive" className="text-xs">
@@ -227,7 +228,7 @@ export function DomainActionPanel({
                 Critical
               </Badge>
             )}
-          </SheetTitle>
+          </DialogTitle>
           {categoryColors && (
             <Badge 
               variant="secondary" 
@@ -236,8 +237,9 @@ export function DomainActionPanel({
               {domain.category}
             </Badge>
           )}
-        </SheetHeader>
+        </DialogHeader>
 
+        <ScrollArea className="max-h-[70vh]">
         <div className="mt-6 space-y-6">
           {/* Section 1: Quick Overview - Show key info upfront */}
           <section className="space-y-4">
@@ -542,8 +544,9 @@ export function DomainActionPanel({
             </>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   )
 }
 

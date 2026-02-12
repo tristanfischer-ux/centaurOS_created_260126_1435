@@ -408,7 +408,7 @@ export async function awardBadge(
         })
 
     if (error) {
-        console.error('Error awarding badge:', error)
+        console.error('[BadgeRules] Error awarding badge:', { error: error instanceof Error ? error.message : 'Unknown error' })
         return { success: false, error: error.message }
     }
 

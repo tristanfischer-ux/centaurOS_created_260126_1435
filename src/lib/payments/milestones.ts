@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Milestone, MilestoneInput, MilestoneStatus } from '@/types/payments'
 import { releaseToSeller } from './flow'
 import { sendNotification } from '@/lib/notifications'
+import { formatCurrencyFromMinorUnits } from '@/lib/format'
 
 /**
  * Creates milestones for an order
@@ -96,7 +97,7 @@ export async function createMilestones(
 
     return { milestones: mappedMilestones, error: null }
   } catch (error) {
-    console.error('Error creating milestones:', error)
+    console.error('[Milestones] Error creating milestones:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       milestones: null,
       error: error instanceof Error ? error.message : 'Failed to create milestones',
@@ -140,7 +141,7 @@ export async function getMilestones(
 
     return { milestones, error: null }
   } catch (error) {
-    console.error('Error getting milestones:', error)
+    console.error('[Milestones] Error getting milestones:', { error: error instanceof Error ? error.message : 'Unknown error', orderId })
     return {
       milestones: null,
       error: error instanceof Error ? error.message : 'Failed to get milestones',
@@ -228,7 +229,7 @@ export async function submitMilestone(
           },
         })
       } catch (notifyError) {
-        console.error('Error sending buyer notification:', notifyError)
+        console.error('[Milestones] Error sending buyer notification:', { error: notifyError instanceof Error ? notifyError.message : 'Unknown error', milestoneId })
       }
     }
 
@@ -248,7 +249,7 @@ export async function submitMilestone(
       error: null,
     }
   } catch (error) {
-    console.error('Error submitting milestone:', error)
+    console.error('[Milestones] Error submitting milestone:', { error: error instanceof Error ? error.message : 'Unknown error', milestoneId })
     return {
       milestone: null,
       error: error instanceof Error ? error.message : 'Failed to submit milestone',
@@ -359,7 +360,7 @@ export async function approveMilestone(milestoneId: string): Promise<
           userId: order.seller.user.id,
           type: 'milestone_approved',
           title: 'Milestone Approved - Payment Released',
-          message: `"${milestone.title}" has been approved. Payment of ${formatAmount(releaseResult.sellerAmount!, milestone.order.currency || 'GBP')} is being transferred to your account.`,
+          message: `"${milestone.title}" has been approved. Payment of ${formatCurrencyFromMinorUnits(releaseResult.sellerAmount!, milestone.order.currency || 'GBP')} is being transferred to your account.`,
           link: `/provider-portal/orders/${order.id}`,
           metadata: {
             orderId: order.id,
@@ -370,7 +371,7 @@ export async function approveMilestone(milestoneId: string): Promise<
           },
         })
       } catch (notifyError) {
-        console.error('Error sending seller notification:', notifyError)
+        console.error('[Milestones] Error sending seller notification:', { error: notifyError instanceof Error ? notifyError.message : 'Unknown error', milestoneId })
       }
     }
 
@@ -395,7 +396,7 @@ export async function approveMilestone(milestoneId: string): Promise<
       error: null,
     }
   } catch (error) {
-    console.error('Error approving milestone:', error)
+    console.error('[Milestones] Error approving milestone:', { error: error instanceof Error ? error.message : 'Unknown error', milestoneId })
     return {
       milestone: null,
       payment: null,
@@ -517,7 +518,7 @@ export async function disputeMilestone(
       .single()
 
     if (disputeError) {
-      console.error('Error creating dispute record:', disputeError)
+      console.error('[Milestones] Error creating dispute record:', { error: disputeError instanceof Error ? disputeError.message : 'Unknown error' })
     }
 
     // Update order status to disputed
@@ -544,7 +545,7 @@ export async function disputeMilestone(
           },
         })
       } catch (notifyError) {
-        console.error('Error sending dispute notification:', notifyError)
+        console.error('[Milestones] Error sending dispute notification:', { error: notifyError instanceof Error ? notifyError.message : 'Unknown error' })
       }
     }
 
@@ -565,7 +566,7 @@ export async function disputeMilestone(
       error: null,
     }
   } catch (error) {
-    console.error('Error disputing milestone:', error)
+    console.error('[Milestones] Error disputing milestone:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       milestone: null,
       disputeId: null,
@@ -574,14 +575,3 @@ export async function disputeMilestone(
   }
 }
 
-/**
- * Helper to format amount for display
- */
-function formatAmount(amount: number, currency: string): string {
-  const formatter = new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: currency.toUpperCase(),
-    minimumFractionDigits: 2,
-  })
-  return formatter.format(amount / 100)
-}

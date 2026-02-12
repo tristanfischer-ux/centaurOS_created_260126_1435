@@ -176,7 +176,7 @@ export async function updateNotificationPreferences(
         // Upsert preference
         // Note: notification_preferences table may not be in generated types yet
          
-        const { error } = await (supabase as any)
+        const { error } = await supabase
             .from('notification_preferences')
             .upsert({
                 user_id: user.id,
@@ -333,7 +333,7 @@ export async function updateSMSPhoneNumber(
         // Upsert SMS preference with phone number
         // Note: notification_preferences table may not be in generated types yet
          
-        const { error } = await (supabase as any)
+        const { error } = await supabase
             .from('notification_preferences')
             .upsert({
                 user_id: user.id,

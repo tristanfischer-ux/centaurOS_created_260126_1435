@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { cn } from "@/lib/utils"
+import { cn, getInitials } from "@/lib/utils"
 import { getCategoryBadgeClasses, getAvatarGradient, type MarketplaceCategory } from "@/lib/marketplace-colors"
 import { 
     ShieldCheck, MapPin, Clock, Briefcase,
@@ -26,15 +26,6 @@ interface MarketCardProps {
     onSizeChange?: (id: string, size: CardSize) => void
     isSaved?: boolean
     onSaveToggle?: (id: string, isSaved: boolean) => void
-}
-
-// Generate initials from title
-function getInitials(title: string): string {
-    const words = title.trim().split(/\s+/)
-    if (words.length === 1) {
-        return words[0].substring(0, 2).toUpperCase()
-    }
-    return (words[0][0] + words[1][0]).toUpperCase()
 }
 
 // Avatar gradients now imported from shared lib (marketplace-colors.ts)

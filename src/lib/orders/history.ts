@@ -124,7 +124,7 @@ export async function getOrderHistoryWithActors(
 
     return { data: eventsWithActors, error: null }
   } catch (err) {
-    console.error('Error fetching order history with actors:', err)
+    console.error('[OrderHistory] Error fetching order history with actors:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: [], error: 'Failed to fetch order history' }
   }
 }
@@ -267,7 +267,7 @@ export async function buildOrderTimeline(
 
     return { data: timeline, error: null }
   } catch (err) {
-    console.error('Error building order timeline:', err)
+    console.error('[OrderHistory] Error building order timeline:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: [], error: 'Failed to build order timeline' }
   }
 }

@@ -216,20 +216,8 @@ export function getVATRateForTreatment(treatment: TaxTreatment): number {
   }
 }
 
-/**
- * Format currency amount for display
- * @param amount Amount to format
- * @param currency Currency code (default GBP)
- * @returns Formatted string
- */
-export function formatCurrency(amount: number, currency: string = 'GBP'): string {
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount)
-}
+// formatCurrency is re-exported from @/lib/format for backward compatibility
+export { formatCurrency } from '@/lib/format'
 
 /**
  * Format VAT rate as percentage for display

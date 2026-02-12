@@ -48,7 +48,7 @@ export async function getSellerFeePercent(
       || DEFAULT_FEE_CONFIG.default[orderType]
       || DEFAULT_PLATFORM_FEE_PERCENT
   } catch (error) {
-    console.error('Error getting seller fee percent:', error)
+    console.error('[BillingFees] Error getting seller fee percent:', { error: error instanceof Error ? error.message : 'Unknown error' })
     // Return default based on order type
     return orderType === 'retainer' ? RETAINER_PLATFORM_FEE_PERCENT : DEFAULT_PLATFORM_FEE_PERCENT
   }

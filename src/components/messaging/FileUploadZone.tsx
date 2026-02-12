@@ -244,7 +244,7 @@ export function ImageLightbox({
 }: ImageLightboxProps) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl p-0 bg-background/95 backdrop-blur-sm">
+      <DialogContent size="lg" className="p-0 bg-background">
         <div className="relative w-full min-h-[400px] max-h-[80vh] flex items-center justify-center p-4">
           <div className="relative w-full h-full">
             <Image

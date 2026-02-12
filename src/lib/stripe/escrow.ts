@@ -137,7 +137,7 @@ export async function createPaymentIntent(
       error: null,
     }
   } catch (error) {
-    console.error('Error creating payment intent:', error)
+    console.error('[Escrow] Error creating payment intent:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       paymentIntent: null,
       error: error instanceof Error ? error.message : 'Failed to create payment intent',
@@ -195,7 +195,7 @@ export async function transferToSeller(
       error: null,
     }
   } catch (error) {
-    console.error('Error transferring to seller:', error)
+    console.error('[Escrow] Error transferring to seller:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       transfer: null,
       error: error instanceof Error ? error.message : 'Failed to transfer funds',
@@ -239,7 +239,7 @@ export async function refundPayment(
       error: null,
     }
   } catch (error) {
-    console.error('Error refunding payment:', error)
+    console.error('[Escrow] Error refunding payment:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       refund: null,
       error: error instanceof Error ? error.message : 'Failed to refund payment',
@@ -281,7 +281,7 @@ export async function getPaymentIntentStatus(
       error: null,
     }
   } catch (error) {
-    console.error('Error getting payment intent status:', error)
+    console.error('[Escrow] Error getting payment intent status:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       paymentIntent: null,
       error: error instanceof Error ? error.message : 'Failed to get payment status',
@@ -317,7 +317,7 @@ async function recordEscrowTransaction(params: {
       .single()
 
     if (error) {
-      console.error('Error recording escrow transaction:', error)
+      console.error('[Escrow] Error recording escrow transaction:', { error: error instanceof Error ? error.message : 'Unknown error' })
       return { transaction: null, error: error.message }
     }
 
@@ -334,7 +334,7 @@ async function recordEscrowTransaction(params: {
       error: null,
     }
   } catch (error) {
-    console.error('Error recording escrow transaction:', error)
+    console.error('[Escrow] Error recording escrow transaction:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       transaction: null,
       error: error instanceof Error ? error.message : 'Failed to record transaction',
@@ -375,7 +375,7 @@ export async function holdPayment(
 
     return { transaction: result.transaction, error: null }
   } catch (error) {
-    console.error('Error holding payment:', error)
+    console.error('[Escrow] Error holding payment:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       transaction: null,
       error: error instanceof Error ? error.message : 'Failed to hold payment',
@@ -428,8 +428,7 @@ export async function releaseEscrow(
 
     // Use atomic function to check available balance with row-level locking
     // This prevents race conditions when multiple releases are attempted simultaneously
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: balanceData, error: balanceError } = await (supabase as any).rpc(
+    const { data: balanceData, error: balanceError } = await supabase.rpc(
       'get_escrow_balance_atomic',
       { p_order_id: orderId }
     )
@@ -566,7 +565,7 @@ export async function releaseEscrow(
 
     if (feeResult.error || !feeResult.transaction) {
       // Log but don't fail - the transfer was successful
-      console.error('Failed to record fee transaction:', feeResult.error)
+      console.error('[Escrow] Failed to record fee transaction:', { error: feeResult.error })
     }
 
     // Check if all funds have been released and update order status
@@ -597,7 +596,7 @@ export async function releaseEscrow(
       error: null,
     }
   } catch (error) {
-    console.error('Error releasing escrow:', error)
+    console.error('[Escrow] Error releasing escrow:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       transfer: null,
       transaction: null,
@@ -625,8 +624,7 @@ export async function releaseAllEscrow(orderId: string): Promise<
     const supabase = await createClient()
 
     // Use atomic function to check available balance with row-level locking
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: balanceData, error: balanceError } = await (supabase as any).rpc(
+    const { data: balanceData, error: balanceError } = await supabase.rpc(
       'get_escrow_balance_atomic',
       { p_order_id: orderId }
     )
@@ -664,7 +662,7 @@ export async function releaseAllEscrow(orderId: string): Promise<
     // Release remaining funds
     return releaseEscrow({ orderId, amount: remainingAmount })
   } catch (error) {
-    console.error('Error releasing all escrow:', error)
+    console.error('[Escrow] Error releasing all escrow:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       transfer: null,
       transaction: null,
@@ -819,7 +817,7 @@ export async function processRefund(
     })
 
     if (txResult.error || !txResult.transaction) {
-      console.error('Failed to record refund transaction:', txResult.error)
+      console.error('[Escrow] Failed to record refund transaction:', { error: txResult.error })
     }
 
     // Update order escrow status
@@ -836,7 +834,7 @@ export async function processRefund(
       error: null,
     }
   } catch (error) {
-    console.error('Error processing refund:', error)
+    console.error('[Escrow] Error processing refund:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       refund: null,
       transaction: null,
@@ -914,7 +912,7 @@ export async function getEscrowBalance(orderId: string): Promise<
       error: null,
     }
   } catch (error) {
-    console.error('Error getting escrow balance:', error)
+    console.error('[Escrow] Error getting escrow balance:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       totalHeld: null,
       totalReleased: null,

@@ -72,8 +72,7 @@ export async function getInsightsSummary(
     const since = new Date()
     since.setDate(since.getDate() - days)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: events, error } = await (supabase as any)
+    const { data: events, error } = await supabase
       .from('activity_events')
       .select('event_type, event_data')
       .eq('foundry_id', foundryId)

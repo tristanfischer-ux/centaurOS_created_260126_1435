@@ -176,7 +176,7 @@ export async function generateBuyerInvoice(
 
     return { data: invoice, error: null }
   } catch (err) {
-    console.error('Error generating buyer invoice:', err)
+    console.error('[InvoiceGenerator] Error generating buyer invoice:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: null, error: 'Failed to generate invoice' }
   }
 }
@@ -285,7 +285,7 @@ export async function generateSellerSelfBill(
 
     return { data: invoice, error: null }
   } catch (err) {
-    console.error('Error generating seller self-bill:', err)
+    console.error('[InvoiceGenerator] Error generating seller self-bill:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: null, error: 'Failed to generate self-bill' }
   }
 }
@@ -387,7 +387,7 @@ export async function generatePlatformFeeInvoice(
 
     return { data: invoice, error: null }
   } catch (err) {
-    console.error('Error generating platform fee invoice:', err)
+    console.error('[InvoiceGenerator] Error generating platform fee invoice:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: null, error: 'Failed to generate platform fee invoice' }
   }
 }
@@ -464,13 +464,13 @@ export async function storeInvoiceDocument(
       })
 
     if (error) {
-      console.error('Error storing invoice document:', error)
+      console.error('[InvoiceGenerator] Error storing invoice document:', { error: error instanceof Error ? error.message : 'Unknown error' })
       return { success: false, error: 'Failed to store invoice' }
     }
 
     return { success: true, error: null }
   } catch (err) {
-    console.error('Error in storeInvoiceDocument:', err)
+    console.error('[InvoiceGenerator] Error in storeInvoiceDocument:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { success: false, error: 'An unexpected error occurred' }
   }
 }
@@ -494,7 +494,7 @@ export async function getOrderInvoices(
       .order('generated_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching order invoices:', error)
+      console.error('[InvoiceGenerator] Error fetching order invoices:', { error: error instanceof Error ? error.message : 'Unknown error' })
       return { data: [], error: 'Failed to fetch invoices' }
     }
 
@@ -507,7 +507,7 @@ export async function getOrderInvoices(
 
     return { data: documents, error: null }
   } catch (err) {
-    console.error('Error in getOrderInvoices:', err)
+    console.error('[InvoiceGenerator] Error in getOrderInvoices:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: [], error: 'An unexpected error occurred' }
   }
 }

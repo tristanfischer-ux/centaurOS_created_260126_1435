@@ -75,7 +75,7 @@ export default async function PlatformLayout({
         // Note: foundry_admin_permissions table is new and may not be in generated types yet
         if (profile.role !== "Founder") {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { data: adminPerm } = await (supabase as any)
+            const { data: adminPerm } = await supabase
                 .from("foundry_admin_permissions")
                 .select("id")
                 .eq("foundry_id", profile.foundry_id)

@@ -291,7 +291,7 @@ export async function getSupplierAnalytics(
       error: null
     }
   } catch (err) {
-    console.error('Error fetching supplier analytics:', err)
+    console.error('[Analytics] Error fetching supplier analytics:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: null, error: 'Failed to fetch analytics' }
   }
 }
@@ -417,7 +417,7 @@ export async function getBuyerAnalytics(
       error: null
     }
   } catch (err) {
-    console.error('Error fetching buyer analytics:', err)
+    console.error('[Analytics] Error fetching buyer analytics:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: null, error: 'Failed to fetch analytics' }
   }
 }
@@ -578,7 +578,7 @@ export async function getPlatformAnalytics(
       error: null
     }
   } catch (err) {
-    console.error('Error fetching platform analytics:', err)
+    console.error('[Analytics] Error fetching platform analytics:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: null, error: 'Failed to fetch analytics' }
   }
 }

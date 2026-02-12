@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { headers } from 'next/headers'
 import OpenAI from 'openai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { Database } from '@/types/database.types'
-import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
+import { rateLimit } from '@/lib/security/rate-limit'
 import { aiGuard } from '@/lib/ai/guard'
 
 // SECURITY: Zod schema for input validation
@@ -61,8 +60,6 @@ export async function POST(
         }
 
         // SECURITY: Rate limit AI endpoints (10 requests per minute per user)
-        const headersList = await headers()
-        const clientIP = getClientIP(headersList)
         const rateLimitResult = await rateLimit('api', `forge-match:${user.id}`, { limit: 10, window: 60 })
         if (!rateLimitResult.success) {
             return NextResponse.json(

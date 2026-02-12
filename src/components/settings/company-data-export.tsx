@@ -12,8 +12,7 @@ export function CompanyDataExport() {
     async function handleExport() {
         setIsExporting(true)
         try {
-            // TODO: Implement company-wide data export action
-            // This will export all foundry data (tasks, objectives, team, etc.)
+            // TODO(TECH-DEBT): Implement company-wide data export action
             await new Promise(resolve => setTimeout(resolve, 2000)) // Placeholder
             toast.success('Company data export initiated. You will receive a download link via email.')
         } catch (error) {

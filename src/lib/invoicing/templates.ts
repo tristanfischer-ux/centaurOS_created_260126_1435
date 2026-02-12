@@ -11,23 +11,7 @@ import {
   TAX_TREATMENT_LABELS,
   COUNTRY_LABELS,
 } from '@/types/invoices'
-
-/**
- * Format currency for display
- * @param amount Amount to format
- * @param currency Currency code
- * @returns Formatted currency string
- */
-export function formatCurrency(amount: number, currency: string = 'GBP'): string {
-  const symbols: Record<string, string> = {
-    GBP: '£',
-    EUR: '€',
-    USD: '$',
-  }
-  
-  const symbol = symbols[currency] || currency
-  return `${symbol}${amount.toFixed(2)}`
-}
+import { formatCurrency } from '@/lib/format'
 
 /**
  * Format date for invoice display

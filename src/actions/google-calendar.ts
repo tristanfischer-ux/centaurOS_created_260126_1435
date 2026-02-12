@@ -64,7 +64,7 @@ export async function syncTaskToCalendar(
 
     // Check for existing sync mapping
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existing } = await (supabase as any)
+    const { data: existing } = await supabase
         .from('calendar_sync_mappings')
         .select('google_event_id, google_calendar_id')
         .eq('user_id', user.id)
@@ -92,7 +92,7 @@ export async function syncTaskToCalendar(
 
         if (result.success) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (supabase as any)
+            await supabase
                 .from('calendar_sync_mappings')
                 .update({ last_synced_at: new Date().toISOString(), updated_at: new Date().toISOString() })
                 .eq('user_id', user.id)
@@ -109,7 +109,7 @@ export async function syncTaskToCalendar(
     if (result.success && result.eventId) {
         // Save sync mapping
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any)
+        await supabase
             .from('calendar_sync_mappings')
             .insert({
                 user_id: user.id,
@@ -190,7 +190,7 @@ export async function syncDiscoveryCallToCalendar(
     if (result.success && result.eventId) {
         // Save sync mapping
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any)
+        await supabase
             .from('calendar_sync_mappings')
             .insert({
                 user_id: user.id,
@@ -205,7 +205,7 @@ export async function syncDiscoveryCallToCalendar(
         // Update the discovery call with the Meet link
         if (result.meetLink) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (supabase as any)
+            await supabase
                 .from('discovery_calls')
                 .update({ meeting_url: result.meetLink })
                 .eq('id', callId)
@@ -245,7 +245,7 @@ export async function removeCalendarSync(
 
     // Find existing mapping
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: mapping } = await (supabase as any)
+    const { data: mapping } = await supabase
         .from('calendar_sync_mappings')
         .select('google_event_id, google_calendar_id')
         .eq('user_id', user.id)
@@ -264,7 +264,7 @@ export async function removeCalendarSync(
 
     // Remove mapping regardless of whether the Google API call succeeded
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any)
+    await supabase
         .from('calendar_sync_mappings')
         .delete()
         .eq('user_id', user.id)

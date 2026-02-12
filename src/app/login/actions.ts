@@ -94,7 +94,7 @@ export async function login(formData: FormData) {
 
         // Check how many foundries the user belongs to
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { count } = await (supabase as any)
+        const { count } = await supabase
             .from('foundry_memberships')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', loggedInUser.id)

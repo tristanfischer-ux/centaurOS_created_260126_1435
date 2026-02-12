@@ -121,7 +121,7 @@ export function WorkflowTemplatesDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[80vh] p-0">
+            <DialogContent size="lg" className="max-h-[80vh] p-0">
                 <DialogHeader className="p-6 pb-4">
                     <DialogTitle className="font-display text-xl">
                         Workflow Templates

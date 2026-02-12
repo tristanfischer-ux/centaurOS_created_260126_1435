@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { formatDistanceToNow } from "date-fns"
 import { Loader2, Send, Check, X, Forward, Paperclip, Bot, Upload } from "lucide-react"
@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Markdown } from "@/components/ui/markdown"
 import { MentionInput } from "@/components/ui/mention-input"
@@ -296,20 +295,19 @@ export function ThreadDrawer({
     }
 
     return (
-        <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="w-full sm:w-[400px] md:w-[540px] flex flex-col h-full bg-card">
-                <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-muted-foreground/30 md:hidden" />
-                <SheetHeader>
-                    <SheetTitle className="text-foreground">{taskTitle}</SheetTitle>
-                    <SheetDescription className="flex items-center gap-2">
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
+                <DialogHeader>
+                    <DialogTitle className="text-foreground">{taskTitle}</DialogTitle>
+                    <DialogDescription className="flex items-center gap-2">
                         <Badge className={getStatusBadgeClass(taskStatus)}>
                             {taskStatus?.replace(/_/g, ' ')}
                         </Badge>
                         {assigneeName && (
                             <span className="text-muted-foreground">• {assigneeName}</span>
                         )}
-                    </SheetDescription>
-                </SheetHeader>
+                    </DialogDescription>
+                </DialogHeader>
 
                 {/* Task Actions */}
                 <div className="mt-4 p-3 bg-muted/30 border border-border space-y-3">
@@ -626,7 +624,7 @@ export function ThreadDrawer({
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-            </SheetContent>
-        </Sheet>
+            </DialogContent>
+        </Dialog>
     )
 }

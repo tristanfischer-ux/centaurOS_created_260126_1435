@@ -1,8 +1,8 @@
 'use server'
 
 
-import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { withUser, type ActionError } from '@/lib/server-action-utils'
 import {
   createConversation,
   sendMessage,
@@ -41,28 +41,18 @@ export interface StartConversationParams {
 /**
  * Get all conversations for the current user
  */
-export async function getConversations(status?: ConversationStatus): Promise<{
-  success: boolean
-  data?: ConversationWithParticipants[]
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
+export async function getConversations(status?: ConversationStatus) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const conversations = await getConversationsForUser(supabase, user.id, status)
+      return { success: true as const, data: conversations }
+    } catch (error) {
+      console.error('Failed to get conversations:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to get conversations' 
+      }
     }
-
-    const conversations = await getConversationsForUser(supabase, user.id, status)
-    return { success: true, data: conversations }
-  } catch (error) {
-    console.error('Failed to get conversations:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to get conversations' 
-    }
-  }
+  })
 }
 
 /**
@@ -72,43 +62,30 @@ export async function getConversationMessages(
   conversationId: string,
   limit = 50,
   before?: string
-): Promise<{
-  success: boolean
-  data?: {
-    messages: MessageWithSender[]
-    conversation: ConversationWithParticipants | null
-  }
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const [messages, conversation] = await Promise.all([
+        getMessages(supabase, conversationId, limit, before),
+        getConversation(supabase, conversationId)
+      ])
 
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
-    }
+      // AUTH: Verify user is part of this conversation
+      if (conversation && conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
+        return { error: 'Access denied' }
+      }
 
-    const [messages, conversation] = await Promise.all([
-      getMessages(supabase, conversationId, limit, before),
-      getConversation(supabase, conversationId)
-    ])
-
-    // Verify user is part of this conversation
-    if (conversation && conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
-      return { success: false, error: 'Access denied' }
+      return { 
+        success: true as const, 
+        data: { messages, conversation } 
+      }
+    } catch (error) {
+      console.error('Failed to get conversation messages:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to get messages' 
+      }
     }
-
-    return { 
-      success: true, 
-      data: { messages, conversation } 
-    }
-  } catch (error) {
-    console.error('Failed to get conversation messages:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to get messages' 
-    }
-  }
+  })
 }
 
 /**
@@ -118,67 +95,57 @@ export async function sendNewMessage(
   conversationId: string,
   content: string,
   fileUrl?: string
-): Promise<{
-  success: boolean
-  data?: MessageWithSender
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // AUTH: Verify user is part of this conversation
+      const conversation = await getConversation(supabase, conversationId)
+      if (!conversation) {
+        return { error: 'Conversation not found' }
+      }
+      if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
+        return { error: 'Access denied' }
+      }
 
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
-    }
+      const message = await sendMessage(supabase, {
+        conversationId,
+        senderId: user.id,
+        content,
+        messageType: fileUrl ? 'file' : 'text',
+        fileUrl
+      })
 
-    // Verify user is part of this conversation
-    const conversation = await getConversation(supabase, conversationId)
-    if (!conversation) {
-      return { success: false, error: 'Conversation not found' }
-    }
-    if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
-      return { success: false, error: 'Access denied' }
-    }
+      // Get the sender info separately since types aren't generated yet
+      // SECURITY: Don't include email in client-facing response
+      const { data: sender } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .eq('id', user.id)
+        .single()
 
-    const message = await sendMessage(supabase, {
-      conversationId,
-      senderId: user.id,
-      content,
-      messageType: fileUrl ? 'file' : 'text',
-      fileUrl
-    })
-
-    // Get the sender info separately since types aren't generated yet
-    // SECURITY: Don't include email in client-facing response
-    const { data: sender } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url')
-      .eq('id', user.id)
-      .single()
-
-    revalidatePath('/messages')
-    
-    const messageWithSender: MessageWithSender = {
-      ...message,
-      sender: {
-        id: sender?.id || user.id,
-        full_name: sender?.full_name || null,
-        avatar_url: sender?.avatar_url || null,
-        email: '', // Intentionally empty for security - not sent to client
+      revalidatePath('/messages')
+      
+      const messageWithSender: MessageWithSender = {
+        ...message,
+        sender: {
+          id: sender?.id || user.id,
+          full_name: sender?.full_name || null,
+          avatar_url: sender?.avatar_url || null,
+          email: '', // Intentionally empty for security - not sent to client
+        }
+      }
+      
+      return { 
+        success: true as const, 
+        data: messageWithSender
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to send message' 
       }
     }
-    
-    return { 
-      success: true, 
-      data: messageWithSender
-    }
-  } catch (error) {
-    console.error('Failed to send message:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to send message' 
-    }
-  }
+  })
 }
 
 /**
@@ -186,53 +153,43 @@ export async function sendNewMessage(
  */
 export async function startConversation(
   params: StartConversationParams
-): Promise<{
-  success: boolean
-  data?: ConversationWithParticipants
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const { sellerId, orderId, rfqId, listingId, initialMessage } = params
 
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
-    }
-
-    const { sellerId, orderId, rfqId, listingId, initialMessage } = params
-
-    // Create the conversation
-    const conversation = await createConversation(supabase, {
-      buyerId: user.id,
-      sellerId,
-      orderId,
-      rfqId,
-      listingId
-    })
-
-    // Send initial message if provided
-    if (initialMessage) {
-      await sendMessage(supabase, {
-        conversationId: conversation.id,
-        senderId: user.id,
-        content: initialMessage,
-        messageType: 'text'
+      // Create the conversation
+      const conversation = await createConversation(supabase, {
+        buyerId: user.id,
+        sellerId,
+        orderId,
+        rfqId,
+        listingId
       })
-    }
 
-    // Get full conversation with participants
-    const fullConversation = await getConversation(supabase, conversation.id)
+      // Send initial message if provided
+      if (initialMessage) {
+        await sendMessage(supabase, {
+          conversationId: conversation.id,
+          senderId: user.id,
+          content: initialMessage,
+          messageType: 'text'
+        })
+      }
 
-    revalidatePath('/messages')
-    
-    return { success: true, data: fullConversation || undefined }
-  } catch (error) {
-    console.error('Failed to start conversation:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to start conversation' 
+      // Get full conversation with participants
+      const fullConversation = await getConversation(supabase, conversation.id)
+
+      revalidatePath('/messages')
+      
+      return { success: true as const, data: fullConversation || undefined }
+    } catch (error) {
+      console.error('Failed to start conversation:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to start conversation' 
+      }
     }
-  }
+  })
 }
 
 /**
@@ -240,29 +197,19 @@ export async function startConversation(
  */
 export async function markConversationRead(
   conversationId: string
-): Promise<{
-  success: boolean
-  markedCount?: number
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const count = await markAsRead(supabase, conversationId, user.id)
+      
+      return { success: true as const, markedCount: count }
+    } catch (error) {
+      console.error('Failed to mark conversation as read:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to mark as read' 
+      }
     }
-
-    const count = await markAsRead(supabase, conversationId, user.id)
-    
-    return { success: true, markedCount: count }
-  } catch (error) {
-    console.error('Failed to mark conversation as read:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to mark as read' 
-    }
-  }
+  })
 }
 
 /**
@@ -270,39 +217,30 @@ export async function markConversationRead(
  */
 export async function archiveConversation(
   conversationId: string
-): Promise<{
-  success: boolean
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // AUTH: Verify user is part of this conversation
+      const conversation = await getConversation(supabase, conversationId)
+      if (!conversation) {
+        return { error: 'Conversation not found' }
+      }
+      if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
+        return { error: 'Access denied' }
+      }
 
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
+      await archiveConv(supabase, conversationId)
+      
+      revalidatePath('/messages')
+      
+      return { success: true as const }
+    } catch (error) {
+      console.error('Failed to archive conversation:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to archive conversation' 
+      }
     }
-
-    // Verify user is part of this conversation
-    const conversation = await getConversation(supabase, conversationId)
-    if (!conversation) {
-      return { success: false, error: 'Conversation not found' }
-    }
-    if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
-      return { success: false, error: 'Access denied' }
-    }
-
-    await archiveConv(supabase, conversationId)
-    
-    revalidatePath('/messages')
-    
-    return { success: true }
-  } catch (error) {
-    console.error('Failed to archive conversation:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to archive conversation' 
-    }
-  }
+  })
 }
 
 /**
@@ -310,39 +248,30 @@ export async function archiveConversation(
  */
 export async function unarchiveConversation(
   conversationId: string
-): Promise<{
-  success: boolean
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // SECURITY: Verify user is part of this conversation
+      const conversation = await getConversation(supabase, conversationId)
+      if (!conversation) {
+        return { error: 'Conversation not found' }
+      }
+      if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
+        return { error: 'Access denied' }
+      }
 
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
+      await unarchiveConv(supabase, conversationId)
+      
+      revalidatePath('/messages')
+      
+      return { success: true as const }
+    } catch (error) {
+      console.error('Failed to unarchive conversation:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to unarchive conversation' 
+      }
     }
-
-    // Security: Verify user is part of this conversation
-    const conversation = await getConversation(supabase, conversationId)
-    if (!conversation) {
-      return { success: false, error: 'Conversation not found' }
-    }
-    if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
-      return { success: false, error: 'Access denied' }
-    }
-
-    await unarchiveConv(supabase, conversationId)
-    
-    revalidatePath('/messages')
-    
-    return { success: true }
-  } catch (error) {
-    console.error('Failed to unarchive conversation:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to unarchive conversation' 
-    }
-  }
+  })
 }
 
 /**
@@ -351,40 +280,31 @@ export async function unarchiveConversation(
 export async function createSystemMessage(
   conversationId: string,
   content: string
-): Promise<{
-  success: boolean
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // SECURITY: Verify user is part of this conversation
+      const conversation = await getConversation(supabase, conversationId)
+      if (!conversation) {
+        return { error: 'Conversation not found' }
+      }
+      if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
+        return { error: 'Access denied' }
+      }
 
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
-    }
+      // SECURITY: Sanitize content to prevent injection
+      const sanitizedContent = content.trim().slice(0, 2000) // Limit length
 
-    // Security: Verify user is part of this conversation
-    const conversation = await getConversation(supabase, conversationId)
-    if (!conversation) {
-      return { success: false, error: 'Conversation not found' }
+      await sendSystemMessage(supabase, conversationId, sanitizedContent)
+      
+      return { success: true as const }
+    } catch (error) {
+      console.error('Failed to create system message:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to create system message' 
+      }
     }
-    if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
-      return { success: false, error: 'Access denied' }
-    }
-
-    // Security: Sanitize content to prevent injection
-    const sanitizedContent = content.trim().slice(0, 2000) // Limit length
-
-    await sendSystemMessage(supabase, conversationId, sanitizedContent)
-    
-    return { success: true }
-  } catch (error) {
-    console.error('Failed to create system message:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to create system message' 
-    }
-  }
+  })
 }
 
 // ============================================================================
@@ -397,64 +317,54 @@ export async function createSystemMessage(
 export async function startDirectMessage(
   participantId: string,
   initialMessage?: string
-): Promise<{
-  success: boolean
-  data?: ConversationWithParticipants
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // VALIDATION: Validate participant exists
+      const { data: participant } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('id', participantId)
+        .single()
 
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
-    }
+      if (!participant) {
+        return { error: 'User not found' }
+      }
 
-    // Validate participant exists
-    const { data: participant } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('id', participantId)
-      .single()
+      // VALIDATION: Cannot message yourself
+      if (participantId === user.id) {
+        return { error: 'Cannot message yourself' }
+      }
 
-    if (!participant) {
-      return { success: false, error: 'User not found' }
-    }
-
-    // Cannot message yourself
-    if (participantId === user.id) {
-      return { success: false, error: 'Cannot message yourself' }
-    }
-
-    const conversation = await createDirectConversation(supabase, {
-      creatorId: user.id,
-      participantId
-    })
-
-    // Send initial message if provided
-    if (initialMessage?.trim()) {
-      await sendMessage(supabase, {
-        conversationId: conversation.id,
-        senderId: user.id,
-        content: initialMessage.trim(),
-        messageType: 'text'
+      const conversation = await createDirectConversation(supabase, {
+        creatorId: user.id,
+        participantId
       })
-    }
 
-    // Get full conversation with participants
-    const fullConversation = await getConversation(supabase, conversation.id)
+      // Send initial message if provided
+      if (initialMessage?.trim()) {
+        await sendMessage(supabase, {
+          conversationId: conversation.id,
+          senderId: user.id,
+          content: initialMessage.trim(),
+          messageType: 'text'
+        })
+      }
 
-    revalidatePath('/updates')
-    revalidatePath('/messages')
-    
-    return { success: true, data: fullConversation || undefined }
-  } catch (error) {
-    console.error('Failed to start direct message:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to start conversation' 
+      // Get full conversation with participants
+      const fullConversation = await getConversation(supabase, conversation.id)
+
+      revalidatePath('/updates')
+      revalidatePath('/messages')
+      
+      return { success: true as const, data: fullConversation || undefined }
+    } catch (error) {
+      console.error('Failed to start direct message:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to start conversation' 
+      }
     }
-  }
+  })
 }
 
 /**
@@ -463,84 +373,74 @@ export async function startDirectMessage(
 export async function startTaskDiscussion(
   taskId: string,
   initialMessage?: string
-): Promise<{
-  success: boolean
-  data?: ConversationWithParticipants
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // Get task details and assignees
+      const { data: task, error: taskError } = await supabase
+        .from('tasks')
+        .select(`
+          id, 
+          title, 
+          task_number,
+          assignee_id,
+          creator_id
+        `)
+        .eq('id', taskId)
+        .single()
 
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
-    }
+      if (taskError || !task) {
+        return { error: 'Task not found' }
+      }
 
-    // Get task details and assignees
-    const { data: task, error: taskError } = await supabase
-      .from('tasks')
-      .select(`
-        id, 
-        title, 
-        task_number,
-        assignee_id,
-        creator_id
-      `)
-      .eq('id', taskId)
-      .single()
+      // Get all assignees from task_assignees table
+      const { data: assignees } = await supabase
+        .from('task_assignees')
+        .select('profile_id')
+        .eq('task_id', taskId)
 
-    if (taskError || !task) {
-      return { success: false, error: 'Task not found' }
-    }
+      // Build participant list (creator, primary assignee, and all additional assignees)
+      const participantIds = new Set<string>()
+      participantIds.add(user.id) // Current user
+      if (task.creator_id) participantIds.add(task.creator_id)
+      if (task.assignee_id) participantIds.add(task.assignee_id)
+      assignees?.forEach(a => participantIds.add(a.profile_id))
 
-    // Get all assignees from task_assignees table
-    const { data: assignees } = await supabase
-      .from('task_assignees')
-      .select('profile_id')
-      .eq('task_id', taskId)
-
-    // Build participant list (creator, primary assignee, and all additional assignees)
-    const participantIds = new Set<string>()
-    participantIds.add(user.id) // Current user
-    if (task.creator_id) participantIds.add(task.creator_id)
-    if (task.assignee_id) participantIds.add(task.assignee_id)
-    assignees?.forEach(a => participantIds.add(a.profile_id))
-
-    const conversation = await createTaskConversation(supabase, {
-      creatorId: user.id,
-      taskId: task.id,
-      taskTitle: task.title,
-      taskNumber: task.task_number,
-      participantIds: Array.from(participantIds)
-    })
-
-    // Send initial message or system message
-    if (initialMessage?.trim()) {
-      await sendMessage(supabase, {
-        conversationId: conversation.id,
-        senderId: user.id,
-        content: initialMessage.trim(),
-        messageType: 'text'
+      const conversation = await createTaskConversation(supabase, {
+        creatorId: user.id,
+        taskId: task.id,
+        taskTitle: task.title,
+        taskNumber: task.task_number,
+        participantIds: Array.from(participantIds)
       })
-    } else {
-      // Send system message about discussion start
-      await sendSystemMessage(supabase, conversation.id, 
-        `Discussion started about task #${task.task_number}: ${task.title}`)
-    }
 
-    const fullConversation = await getConversation(supabase, conversation.id)
+      // Send initial message or system message
+      if (initialMessage?.trim()) {
+        await sendMessage(supabase, {
+          conversationId: conversation.id,
+          senderId: user.id,
+          content: initialMessage.trim(),
+          messageType: 'text'
+        })
+      } else {
+        // Send system message about discussion start
+        await sendSystemMessage(supabase, conversation.id, 
+          `Discussion started about task #${task.task_number}: ${task.title}`)
+      }
 
-    revalidatePath('/tasks')
-    revalidatePath('/updates')
-    
-    return { success: true, data: fullConversation || undefined }
-  } catch (error) {
-    console.error('Failed to start task discussion:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to start discussion' 
+      const fullConversation = await getConversation(supabase, conversation.id)
+
+      revalidatePath('/tasks')
+      revalidatePath('/updates')
+      
+      return { success: true as const, data: fullConversation || undefined }
+    } catch (error) {
+      console.error('Failed to start task discussion:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to start discussion' 
+      }
     }
-  }
+  })
 }
 
 /**
@@ -549,80 +449,70 @@ export async function startTaskDiscussion(
 export async function startObjectiveDiscussion(
   objectiveId: string,
   initialMessage?: string
-): Promise<{
-  success: boolean
-  data?: ConversationWithParticipants
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // Get objective details
+      const { data: objective, error: objError } = await supabase
+        .from('objectives')
+        .select('id, title, creator_id')
+        .eq('id', objectiveId)
+        .single()
 
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
-    }
+      if (objError || !objective) {
+        return { error: 'Objective not found' }
+      }
 
-    // Get objective details
-    const { data: objective, error: objError } = await supabase
-      .from('objectives')
-      .select('id, title, creator_id')
-      .eq('id', objectiveId)
-      .single()
+      // Get all assignees from tasks under this objective
+      const { data: taskAssignees } = await supabase
+        .from('tasks')
+        .select('assignee_id, creator_id')
+        .eq('objective_id', objectiveId)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
 
-    if (objError || !objective) {
-      return { success: false, error: 'Objective not found' }
-    }
-
-    // Get all assignees from tasks under this objective
-    const { data: taskAssignees } = await supabase
-      .from('tasks')
-      .select('assignee_id, creator_id')
-      .eq('objective_id', objectiveId)
-      .eq('is_ghost', false)
-      .is('deleted_at', null)
-
-    // Build participant list
-    const participantIds = new Set<string>()
-    participantIds.add(user.id)
-    if (objective.creator_id) participantIds.add(objective.creator_id)
-    taskAssignees?.forEach(t => {
-      if (t.assignee_id) participantIds.add(t.assignee_id)
-      if (t.creator_id) participantIds.add(t.creator_id)
-    })
-
-    const conversation = await createObjectiveConversation(supabase, {
-      creatorId: user.id,
-      objectiveId: objective.id,
-      objectiveTitle: objective.title,
-      participantIds: Array.from(participantIds)
-    })
-
-    // Send initial message or system message
-    if (initialMessage?.trim()) {
-      await sendMessage(supabase, {
-        conversationId: conversation.id,
-        senderId: user.id,
-        content: initialMessage.trim(),
-        messageType: 'text'
+      // Build participant list
+      const participantIds = new Set<string>()
+      participantIds.add(user.id)
+      if (objective.creator_id) participantIds.add(objective.creator_id)
+      taskAssignees?.forEach(t => {
+        if (t.assignee_id) participantIds.add(t.assignee_id)
+        if (t.creator_id) participantIds.add(t.creator_id)
       })
-    } else {
-      await sendSystemMessage(supabase, conversation.id, 
-        `Discussion started for objective: ${objective.title}`)
-    }
 
-    const fullConversation = await getConversation(supabase, conversation.id)
+      const conversation = await createObjectiveConversation(supabase, {
+        creatorId: user.id,
+        objectiveId: objective.id,
+        objectiveTitle: objective.title,
+        participantIds: Array.from(participantIds)
+      })
 
-    revalidatePath('/objectives')
-    revalidatePath('/updates')
-    
-    return { success: true, data: fullConversation || undefined }
-  } catch (error) {
-    console.error('Failed to start objective discussion:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to start discussion' 
+      // Send initial message or system message
+      if (initialMessage?.trim()) {
+        await sendMessage(supabase, {
+          conversationId: conversation.id,
+          senderId: user.id,
+          content: initialMessage.trim(),
+          messageType: 'text'
+        })
+      } else {
+        await sendSystemMessage(supabase, conversation.id, 
+          `Discussion started for objective: ${objective.title}`)
+      }
+
+      const fullConversation = await getConversation(supabase, conversation.id)
+
+      revalidatePath('/objectives')
+      revalidatePath('/updates')
+      
+      return { success: true as const, data: fullConversation || undefined }
+    } catch (error) {
+      console.error('Failed to start objective discussion:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to start discussion' 
+      }
     }
-  }
+  })
 }
 
 /**
@@ -632,86 +522,76 @@ export async function contactExpert(
   providerId: string,
   listingId?: string,
   initialMessage?: string
-): Promise<{
-  success: boolean
-  data?: ConversationWithParticipants
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
-    }
-
-    // Get provider's user_id from provider_profiles
-    const { data: provider, error: providerError } = await supabase
-      .from('provider_profiles')
-      .select('user_id')
-      .eq('id', providerId)
-      .single()
-
-    // If providerId is not in provider_profiles, assume it's already a user_id
-    const expertUserId = provider?.user_id || providerId
-
-    // Validate expert user exists
-    const { data: expertProfile } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('id', expertUserId)
-      .single()
-
-    if (!expertProfile) {
-      return { success: false, error: 'Expert not found' }
-    }
-
-    // Cannot message yourself
-    if (expertUserId === user.id) {
-      return { success: false, error: 'Cannot message yourself' }
-    }
-
-    // Get listing title if listingId provided
-    let listingTitle: string | undefined
-    if (listingId) {
-      const { data: listing } = await supabase
-        .from('marketplace_listings')
-        .select('title')
-        .eq('id', listingId)
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // Get provider's user_id from provider_profiles
+      const { data: provider, error: providerError } = await supabase
+        .from('provider_profiles')
+        .select('user_id')
+        .eq('id', providerId)
         .single()
-      listingTitle = listing?.title
-    }
 
-    const conversation = await createExpertConversation(supabase, {
-      creatorId: user.id,
-      expertUserId,
-      listingId,
-      listingTitle
-    })
+      // If providerId is not in provider_profiles, assume it's already a user_id
+      const expertUserId = provider?.user_id || providerId
 
-    // Send initial message if provided
-    if (initialMessage?.trim()) {
-      await sendMessage(supabase, {
-        conversationId: conversation.id,
-        senderId: user.id,
-        content: initialMessage.trim(),
-        messageType: 'text'
+      // VALIDATION: Validate expert user exists
+      const { data: expertProfile } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('id', expertUserId)
+        .single()
+
+      if (!expertProfile) {
+        return { error: 'Expert not found' }
+      }
+
+      // VALIDATION: Cannot message yourself
+      if (expertUserId === user.id) {
+        return { error: 'Cannot message yourself' }
+      }
+
+      // Get listing title if listingId provided
+      let listingTitle: string | undefined
+      if (listingId) {
+        const { data: listing } = await supabase
+          .from('marketplace_listings')
+          .select('title')
+          .eq('id', listingId)
+          .single()
+        listingTitle = listing?.title
+      }
+
+      const conversation = await createExpertConversation(supabase, {
+        creatorId: user.id,
+        expertUserId,
+        listingId,
+        listingTitle
       })
-    }
 
-    const fullConversation = await getConversation(supabase, conversation.id)
+      // Send initial message if provided
+      if (initialMessage?.trim()) {
+        await sendMessage(supabase, {
+          conversationId: conversation.id,
+          senderId: user.id,
+          content: initialMessage.trim(),
+          messageType: 'text'
+        })
+      }
 
-    revalidatePath('/marketplace')
-    revalidatePath('/updates')
-    
-    return { success: true, data: fullConversation || undefined }
-  } catch (error) {
-    console.error('Failed to contact expert:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to contact expert' 
+      const fullConversation = await getConversation(supabase, conversation.id)
+
+      revalidatePath('/marketplace')
+      revalidatePath('/updates')
+      
+      return { success: true as const, data: fullConversation || undefined }
+    } catch (error) {
+      console.error('Failed to contact expert:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to contact expert' 
+      }
     }
-  }
+  })
 }
 
 /**
@@ -721,52 +601,33 @@ export async function getEnhancedConversations(options?: {
   status?: ConversationStatus
   type?: ConversationType
   limit?: number
-}): Promise<{
-  success: boolean
-  data?: ConversationWithParticipants[]
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
+}) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const conversations = await getEnhancedConversationsForUser(supabase, user.id, options)
+      return { success: true as const, data: conversations }
+    } catch (error) {
+      console.error('Failed to get enhanced conversations:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to get conversations' 
+      }
     }
-
-    const conversations = await getEnhancedConversationsForUser(supabase, user.id, options)
-    return { success: true, data: conversations }
-  } catch (error) {
-    console.error('Failed to get enhanced conversations:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to get conversations' 
-    }
-  }
+  })
 }
 
 /**
  * Get total unread message count for the current user
  */
-export async function getUnreadCount(): Promise<{
-  success: boolean
-  count?: number
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
+export async function getUnreadCount() {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const count = await getUnreadCountForUser(supabase, user.id)
+      return { success: true as const, count }
+    } catch (error) {
+      console.error('Failed to get unread count:', error)
+      return { error: 'Failed to get unread count', count: 0 }
     }
-
-    const count = await getUnreadCountForUser(supabase, user.id)
-    return { success: true, count }
-  } catch (error) {
-    console.error('Failed to get unread count:', error)
-    return { success: false, count: 0, error: 'Failed to get unread count' }
-  }
+  })
 }
 
 /**
@@ -774,28 +635,19 @@ export async function getUnreadCount(): Promise<{
  */
 export async function markConversationAsReadEnhanced(
   conversationId: string
-): Promise<{
-  success: boolean
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      await markConversationAsRead(supabase, conversationId, user.id)
+      
+      return { success: true as const }
+    } catch (error) {
+      console.error('Failed to mark conversation as read:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to mark as read' 
+      }
     }
-
-    await markConversationAsRead(supabase, conversationId, user.id)
-    
-    return { success: true }
-  } catch (error) {
-    console.error('Failed to mark conversation as read:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to mark as read' 
-    }
-  }
+  })
 }
 
 /**
@@ -804,32 +656,22 @@ export async function markConversationAsReadEnhanced(
 export async function searchConversations(
   query: string,
   limit = 20
-): Promise<{
-  success: boolean
-  data?: ConversationWithParticipants[]
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      if (!query.trim()) {
+        return { success: true as const, data: [] as ConversationWithParticipants[] }
+      }
 
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
+      const conversations = await searchConvs(supabase, user.id, query.trim(), limit)
+      return { success: true as const, data: conversations }
+    } catch (error) {
+      console.error('Failed to search conversations:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to search' 
+      }
     }
-
-    if (!query.trim()) {
-      return { success: true, data: [] }
-    }
-
-    const conversations = await searchConvs(supabase, user.id, query.trim(), limit)
-    return { success: true, data: conversations }
-  } catch (error) {
-    console.error('Failed to search conversations:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to search' 
-    }
-  }
+  })
 }
 
 /**
@@ -837,29 +679,19 @@ export async function searchConversations(
  */
 export async function toggleConversationMute(
   conversationId: string
-): Promise<{
-  success: boolean
-  isMuted?: boolean
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const isMuted = await toggleMute(supabase, conversationId, user.id)
+      
+      return { success: true as const, isMuted }
+    } catch (error) {
+      console.error('Failed to toggle mute:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to toggle mute' 
+      }
     }
-
-    const isMuted = await toggleMute(supabase, conversationId, user.id)
-    
-    return { success: true, isMuted }
-  } catch (error) {
-    console.error('Failed to toggle mute:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to toggle mute' 
-    }
-  }
+  })
 }
 
 /**
@@ -867,41 +699,25 @@ export async function toggleConversationMute(
  */
 export async function getParticipants(
   conversationId: string
-): Promise<{
-  success: boolean
-  data?: Array<{
-    id: string
-    profile_id: string
-    full_name: string | null
-    avatar_url: string | null
-    role?: string | null
-  }>
-  error?: string
-}> {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const participants = await getConversationParticipants(supabase, conversationId)
+      
+      const data = participants.map(p => ({
+        id: p.id,
+        profile_id: p.profile_id,
+        full_name: p.profile?.full_name || null,
+        avatar_url: p.profile?.avatar_url || null,
+        role: p.profile?.role
+      }))
 
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
+      return { success: true as const, data }
+    } catch (error) {
+      console.error('Failed to get participants:', error)
+      return { 
+        error: error instanceof Error ? error.message : 'Failed to get participants' 
+      }
     }
-
-    const participants = await getConversationParticipants(supabase, conversationId)
-    
-    const data = participants.map(p => ({
-      id: p.id,
-      profile_id: p.profile_id,
-      full_name: p.profile?.full_name || null,
-      avatar_url: p.profile?.avatar_url || null,
-      role: p.profile?.role
-    }))
-
-    return { success: true, data }
-  } catch (error) {
-    console.error('Failed to get participants:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to get participants' 
-    }
-  }
+  })
 }

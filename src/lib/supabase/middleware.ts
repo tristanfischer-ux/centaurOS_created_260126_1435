@@ -108,8 +108,7 @@ export async function updateSession(request: NextRequest) {
             }
             
             // Check foundry membership count for multi-foundry users
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { count } = await (supabase as any)
+            const { count } = await supabase
                 .from('foundry_memberships')
                 .select('*', { count: 'exact', head: true })
                 .eq('user_id', user.id)

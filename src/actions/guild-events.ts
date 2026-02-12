@@ -543,7 +543,11 @@ export async function isAttending(eventId: string): Promise<boolean> {
             .maybeSingle()
 
         return !!data
-    } catch {
+    } catch (error) {
+        console.error('[GuildEvents] isAttending check failed:', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            eventId,
+        })
         return false
     }
 }

@@ -133,7 +133,7 @@ export async function createOrder(
       .single()
 
     if (orderError) {
-      console.error('Error creating order:', orderError)
+      console.error('[OrderService] Error creating order:', { error: orderError instanceof Error ? orderError.message : 'Unknown error' })
       return { data: null, error: 'Failed to create order' }
     }
 
@@ -153,7 +153,7 @@ export async function createOrder(
         .insert(milestonesData)
 
       if (milestonesError) {
-        console.error('Error creating milestones:', milestonesError)
+        console.error('[OrderService] Error creating milestones:', { error: milestonesError instanceof Error ? milestonesError.message : 'Unknown error' })
         // Don't fail the order creation, just log the error
       }
     }
@@ -167,7 +167,7 @@ export async function createOrder(
 
     return { data: order as Order, error: null }
   } catch (err) {
-    console.error('Error in createOrder:', err)
+    console.error('[OrderService] Error in createOrder:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: null, error: 'An unexpected error occurred' }
   }
 }
@@ -210,7 +210,7 @@ export async function getOrder(
       .single()
 
     if (error) {
-      console.error('Error fetching order:', error)
+      console.error('[OrderService] Error fetching order:', { error: error instanceof Error ? error.message : 'Unknown error' })
       return { data: null, error: 'Order not found' }
     }
 
@@ -254,7 +254,7 @@ export async function getOrder(
 
     return { data: orderWithDetails, error: null }
   } catch (err) {
-    console.error('Error in getOrder:', err)
+    console.error('[OrderService] Error in getOrder:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: null, error: 'An unexpected error occurred' }
   }
 }
@@ -303,7 +303,7 @@ export async function updateOrderStatus(
       .eq('id', orderId)
 
     if (updateError) {
-      console.error('Error updating order status:', updateError)
+      console.error('[OrderService] Error updating order status:', { error: updateError instanceof Error ? updateError.message : 'Unknown error' })
       return { success: false, error: 'Failed to update order status' }
     }
 
@@ -316,7 +316,7 @@ export async function updateOrderStatus(
 
     return { success: true, error: null }
   } catch (err) {
-    console.error('Error in updateOrderStatus:', err)
+    console.error('[OrderService] Error in updateOrderStatus:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { success: false, error: 'An unexpected error occurred' }
   }
 }
@@ -362,7 +362,7 @@ export async function cancelOrder(
       .eq('id', orderId)
 
     if (updateError) {
-      console.error('Error cancelling order:', updateError)
+      console.error('[OrderService] Error cancelling order:', { error: updateError instanceof Error ? updateError.message : 'Unknown error' })
       return { success: false, error: 'Failed to cancel order' }
     }
 
@@ -375,7 +375,7 @@ export async function cancelOrder(
 
     return { success: true, error: null }
   } catch (err) {
-    console.error('Error in cancelOrder:', err)
+    console.error('[OrderService] Error in cancelOrder:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { success: false, error: 'An unexpected error occurred' }
   }
 }
@@ -425,7 +425,7 @@ export async function completeOrder(
       .eq('id', orderId)
 
     if (updateError) {
-      console.error('Error completing order:', updateError)
+      console.error('[OrderService] Error completing order:', { error: updateError instanceof Error ? updateError.message : 'Unknown error' })
       return { success: false, error: 'Failed to complete order' }
     }
 
@@ -457,7 +457,7 @@ export async function completeOrder(
         
         invoiceErrors = [...invoiceErrors, ...invoiceResult.errors]
       } catch (invoiceErr) {
-        console.error('Error generating invoices:', invoiceErr)
+        console.error('[OrderService] Error generating invoices:', { error: invoiceErr instanceof Error ? invoiceErr.message : 'Unknown error' })
         invoiceErrors.push('Failed to generate invoices')
       }
     }
@@ -468,7 +468,7 @@ export async function completeOrder(
       invoiceErrors: invoiceErrors.length > 0 ? invoiceErrors : undefined
     }
   } catch (err) {
-    console.error('Error in completeOrder:', err)
+    console.error('[OrderService] Error in completeOrder:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { success: false, error: 'An unexpected error occurred' }
   }
 }
@@ -565,7 +565,7 @@ export async function getOrders(
     const { data, error, count } = await query
 
     if (error) {
-      console.error('Error fetching orders:', error)
+      console.error('[OrderService] Error fetching orders:', { error: error instanceof Error ? error.message : 'Unknown error' })
       return { data: [], error: 'Failed to fetch orders', count: 0 }
     }
 
@@ -587,7 +587,7 @@ export async function getOrders(
 
     return { data: orders, error: null, count: count || 0 }
   } catch (err) {
-    console.error('Error in getOrders:', err)
+    console.error('[OrderService] Error in getOrders:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: [], error: 'An unexpected error occurred', count: 0 }
   }
 }

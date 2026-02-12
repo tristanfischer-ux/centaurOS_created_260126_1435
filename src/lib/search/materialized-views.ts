@@ -324,13 +324,13 @@ export async function refreshSearchRanking(): Promise<{
     const { error } = await (supabase as any).rpc('refresh_search_ranking')
     
     if (error) {
-      console.error('Error refreshing search ranking:', error)
+      console.error('[SearchViews] Error refreshing search ranking:', { error: error instanceof Error ? error.message : 'Unknown error' })
       return { success: false, error: error.message }
     }
     
     return { success: true, error: null }
   } catch (err) {
-    console.error('Failed to refresh search ranking:', err)
+    console.error('[SearchViews] Failed to refresh search ranking:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { success: false, error: 'Failed to refresh search ranking' }
   }
 }
@@ -385,13 +385,13 @@ export async function fullTextSearch(
     const { data, error } = await queryBuilder
     
     if (error) {
-      console.error('Full-text search error:', error)
+      console.error('[SearchViews] Full-text search error:', { error: error instanceof Error ? error.message : 'Unknown error' })
       return { data: null, error: error.message }
     }
     
     return { data, error: null }
   } catch (err) {
-    console.error('Full-text search failed:', err)
+    console.error('[SearchViews] Full-text search failed:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { data: null, error: 'Search failed' }
   }
 }

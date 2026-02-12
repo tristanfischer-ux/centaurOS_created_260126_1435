@@ -72,7 +72,7 @@ export function WorkflowTemplateIntroDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[90vh] p-0">
+            <DialogContent size="md" className="max-h-[90vh] p-0">
                 {/* Header */}
                 <DialogHeader className="p-6 pb-4">
                     <div className="flex items-center gap-3">

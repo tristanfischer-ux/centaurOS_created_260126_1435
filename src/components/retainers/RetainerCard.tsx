@@ -5,7 +5,6 @@ import Link from 'next/link'
 import {
   Clock,
   Calendar,
-  User,
   Play,
   Pause,
   XCircle,
@@ -17,7 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -140,12 +139,11 @@ export function RetainerCard({
         <CardContent className="pt-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={otherParty.avatar} alt={otherParty.name} />
-                <AvatarFallback>
-                  <User className="h-5 w-5" />
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                name={otherParty.name}
+                avatarUrl={otherParty.avatar}
+                size="md"
+              />
               <div>
                 <p className="font-medium">{otherParty.name}</p>
                 <p className="text-sm text-muted-foreground">
@@ -176,12 +174,11 @@ export function RetainerCard({
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <Avatar className="h-12 w-12">
-                <AvatarImage src={otherParty.avatar} alt={otherParty.name} />
-                <AvatarFallback>
-                  <User className="h-6 w-6" />
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                name={otherParty.name}
+                avatarUrl={otherParty.avatar}
+                size="lg"
+              />
               <div>
                 <CardTitle className="text-lg">{otherParty.name}</CardTitle>
                 <p className="text-sm text-muted-foreground">

@@ -59,7 +59,7 @@ export async function getSheetsIntegration(): Promise<{
     const hasAccess = profile.role === 'Founder' || profile.role === 'Executive'
     if (!hasAccess) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: adminPerm } = await (supabase as any)
+        const { data: adminPerm } = await supabase
             .from('foundry_admin_permissions')
             .select('id')
             .eq('foundry_id', foundry_id)
@@ -73,7 +73,7 @@ export async function getSheetsIntegration(): Promise<{
     
     // Get integration config
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
         .from('foundry_integrations')
         .select('*')
         .eq('foundry_id', foundry_id)
@@ -142,7 +142,7 @@ export async function updateSheetsIntegration(updates: {
     const hasAccess = profile.role === 'Founder' || profile.role === 'Executive'
     if (!hasAccess) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: adminPerm } = await (supabase as any)
+        const { data: adminPerm } = await supabase
             .from('foundry_admin_permissions')
             .select('id')
             .eq('foundry_id', foundry_id)
@@ -156,7 +156,7 @@ export async function updateSheetsIntegration(updates: {
     
     // Get existing config
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existing } = await (supabase as any)
+    const { data: existing } = await supabase
         .from('foundry_integrations')
         .select('*')
         .eq('foundry_id', foundry_id)
@@ -172,7 +172,7 @@ export async function updateSheetsIntegration(updates: {
     }
     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
         .from('foundry_integrations')
         .upsert({
             foundry_id,
@@ -242,7 +242,7 @@ export async function triggerManualSync(): Promise<{
         }
         
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any)
+        await supabase
             .from('foundry_integrations')
             .update({
                 config: {

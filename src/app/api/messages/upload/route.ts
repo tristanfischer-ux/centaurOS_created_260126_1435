@@ -114,9 +114,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // SECURITY: Generate safe filename with timestamp and random component
+    // SECURITY: Use crypto for secure random generation
     const timestamp = Date.now()
-    const randomSuffix = Math.random().toString(36).substring(2, 15)
+    const randomSuffix = crypto.randomUUID().replace(/-/g, '').substring(0, 13)
     // SECURITY: Remove special characters from filename
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
     const fileName = `${timestamp}-${randomSuffix}-${safeName}`

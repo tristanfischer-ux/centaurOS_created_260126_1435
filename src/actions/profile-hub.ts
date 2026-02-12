@@ -98,7 +98,7 @@ export async function getProfileHubData(): Promise<ProfileHubData | null> {
       .eq('id', user.id)
       .single(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
+    supabase
       .from('provider_profiles')
       .select(`
         id, headline, bio, day_rate, hourly_rate, currency, 
@@ -328,7 +328,7 @@ export async function updateMarketplaceProfile(formData: FormData): Promise<{ su
 
   // Check if provider profile exists
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: existing } = await (supabase as any)
+  const { data: existing } = await supabase
     .from('provider_profiles')
     .select('id')
     .eq('user_id', user.id)
@@ -350,7 +350,7 @@ export async function updateMarketplaceProfile(formData: FormData): Promise<{ su
     if (specializations !== null) updateData.specializations = specializations
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('provider_profiles')
       .update(updateData)
       .eq('user_id', user.id)
@@ -365,7 +365,7 @@ export async function updateMarketplaceProfile(formData: FormData): Promise<{ su
   } else {
     // Create new provider profile
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('provider_profiles')
       .insert({
         user_id: user.id,

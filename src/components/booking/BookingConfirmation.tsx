@@ -8,13 +8,12 @@ import {
     ExternalLink,
     ShieldCheck,
     Clock,
-    User,
     ArrowRight,
     Sparkles
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
@@ -85,15 +84,11 @@ export function BookingConfirmation({
                 <CardContent className="space-y-6">
                     {/* Provider Info */}
                     <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
-                        <Avatar className="h-14 w-14">
-                            <AvatarImage 
-                                src={confirmation.providerAvatarUrl} 
-                                alt={confirmation.providerName} 
-                            />
-                            <AvatarFallback>
-                                <User className="h-6 w-6" />
-                            </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                            name={confirmation.providerName}
+                            avatarUrl={confirmation.providerAvatarUrl}
+                            size="xl"
+                        />
                         <div className="flex-1">
                             <h4 className="font-semibold text-lg">{confirmation.providerName}</h4>
                             <p className="text-muted-foreground">{confirmation.listingTitle}</p>

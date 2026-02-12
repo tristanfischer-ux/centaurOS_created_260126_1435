@@ -68,7 +68,7 @@ export async function searchMarketplace(params: SearchParams): Promise<SearchRes
     const { data: listings, error } = await query
 
     if (error) {
-      console.error('Search query error:', error)
+      console.error('[SearchService] Search query error:', { error: error instanceof Error ? error.message : 'Unknown error' })
       return createEmptyResponse(params)
     }
 
@@ -196,7 +196,7 @@ export async function searchMarketplace(params: SearchParams): Promise<SearchRes
       suggestions,
     }
   } catch (err) {
-    console.error('Search error:', err)
+    console.error('[SearchService] Search error:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return createEmptyResponse(params)
   }
 }
@@ -232,8 +232,7 @@ async function fetchProviderData(
 
   try {
     // Fetch provider profiles linked to listings
-    // Using any cast since provider_profiles table may not be in generated types
-    const { data: providers } = await (supabase as any)
+    const { data: providers } = await supabase
       .from('provider_profiles')
       .select(`
         id,
@@ -248,16 +247,16 @@ async function fetchProviderData(
         updated_at
       `)
       .in('listing_id', listingIds)
-      .eq('is_active', true) as { data: any[] | null }
+      .eq('is_active', true)
 
     if (!providers) return providerMap
 
     // Fetch ratings for each provider
-    const providerIds = providers.map((p: any) => p.id)
-    const { data: ratings } = await (supabase as any)
+    const providerIds = providers.map((p) => p.id)
+    const { data: ratings } = await supabase
       .from('provider_reviews')
       .select('reviewee_id, rating')
-      .in('reviewee_id', providerIds) as { data: any[] | null }
+      .in('reviewee_id', providerIds)
 
     // Calculate average ratings
     const ratingMap: Record<string, { sum: number; count: number }> = {}
@@ -270,11 +269,11 @@ async function fetchProviderData(
     }
 
     // Fetch order counts
-    const { data: orderCounts } = await (supabase as any)
+    const { data: orderCounts } = await supabase
       .from('orders')
       .select('seller_id')
       .in('seller_id', providerIds)
-      .eq('status', 'completed') as { data: any[] | null }
+      .eq('status', 'completed')
 
     const orderCountMap: Record<string, number> = {}
     for (const order of orderCounts || []) {
@@ -302,7 +301,7 @@ async function fetchProviderData(
       }
     }
   } catch (err) {
-    console.error('Error fetching provider data:', err)
+    console.error('[SearchService] Error fetching provider data:', { error: err instanceof Error ? err.message : 'Unknown error' })
   }
 
   return providerMap
@@ -446,7 +445,7 @@ export async function getSearchSuggestions(
 
     return suggestions.slice(0, 10) // Limit total suggestions
   } catch (err) {
-    console.error('Error getting search suggestions:', err)
+    console.error('[SearchService] Error getting search suggestions:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return []
   }
 }
@@ -470,13 +469,13 @@ export async function getRecentSearches(userId: string): Promise<RecentSearch[]>
       .limit(10)
 
     if (error) {
-      console.error('Error fetching recent searches:', error)
+      console.error('[SearchService] Error fetching recent searches:', { error: error instanceof Error ? error.message : 'Unknown error', userId })
       return []
     }
 
     return (data || []) as RecentSearch[]
   } catch (err) {
-    console.error('Failed to fetch recent searches:', err)
+    console.error('[SearchService] Failed to fetch recent searches:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return []
   }
 }
@@ -519,10 +518,10 @@ async function saveRecentSearch(
 .then(() => {
   // Increment count (separate query since upsert doesn't support increment)
   supabase.rpc('increment_search_count', { search_query: query.trim().toLowerCase() })
-    .catch(err => console.error('Failed to increment search count:', err))
+    .catch(err => console.error('[SearchService] Failed to increment search count:', { error: err instanceof Error ? err.message : 'Unknown error' }))
 })
   } catch (err) {
-    console.error('Error saving recent search:', err)
+    console.error('[SearchService] Error saving recent search:', { error: err instanceof Error ? err.message : 'Unknown error' })
   }
 }
 
@@ -555,7 +554,7 @@ export async function saveSearch(
 
     return { success: true, error: null }
   } catch (err) {
-    console.error('Error saving search:', err)
+    console.error('[SearchService] Error saving search:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { success: false, error: 'Failed to save search' }
   }
 }
@@ -582,7 +581,7 @@ export async function deleteRecentSearch(
 
     return { success: true, error: null }
   } catch (err) {
-    console.error('Error deleting recent search:', err)
+    console.error('[SearchService] Error deleting recent search:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { success: false, error: 'Failed to delete search' }
   }
 }
@@ -607,7 +606,7 @@ export async function clearRecentSearches(
 
     return { success: true, error: null }
   } catch (err) {
-    console.error('Error clearing recent searches:', err)
+    console.error('[SearchService] Error clearing recent searches:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { success: false, error: 'Failed to clear searches' }
   }
 }
@@ -630,13 +629,13 @@ export async function getSavedSearches(userId: string): Promise<SavedSearch[]> {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching saved searches:', error)
+      console.error('[SearchService] Error fetching saved searches:', { error: error instanceof Error ? error.message : 'Unknown error', userId })
       return []
     }
 
     return (data || []) as SavedSearch[]
   } catch (err) {
-    console.error('Failed to fetch saved searches:', err)
+    console.error('[SearchService] Failed to fetch saved searches:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return []
   }
 }
@@ -674,7 +673,7 @@ export async function createSavedSearch(
 
     return { success: true, searchId: data.id, error: null }
   } catch (err) {
-    console.error('Error creating saved search:', err)
+    console.error('[SearchService] Error creating saved search:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { success: false, error: 'Failed to save search' }
   }
 }
@@ -701,7 +700,7 @@ export async function deleteSavedSearch(
 
     return { success: true, error: null }
   } catch (err) {
-    console.error('Error deleting saved search:', err)
+    console.error('[SearchService] Error deleting saved search:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { success: false, error: 'Failed to delete saved search' }
   }
 }
@@ -733,7 +732,7 @@ export async function getPopularSearches(
     const { data, error } = await query
 
     if (error) {
-      console.error('Error fetching popular searches:', error)
+      console.error('[SearchService] Error fetching popular searches:', { error: error instanceof Error ? error.message : 'Unknown error' })
       return []
     }
 
@@ -744,7 +743,7 @@ export async function getPopularSearches(
       trending: item.trending,
     }))
   } catch (err) {
-    console.error('Failed to fetch popular searches:', err)
+    console.error('[SearchService] Failed to fetch popular searches:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return []
   }
 }

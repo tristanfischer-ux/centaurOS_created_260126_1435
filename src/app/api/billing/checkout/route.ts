@@ -7,9 +7,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createSubscriptionCheckout } from '@/lib/billing/subscriptions'
-import type { SubscriptionTier } from '@/lib/billing/subscriptions'
+import { rateLimit } from '@/lib/security/rate-limit'
+
+// VALIDATION: Zod schema prevents invalid tier and billing period values
+const checkoutSchema = z.object({
+  tier: z.enum(['starter', 'professional', 'enterprise']),
+  billingPeriod: z.enum(['monthly', 'annual']).default('monthly'),
+})
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -21,29 +28,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // VALIDATION: Parse and validate request body
+    // SECURITY: Rate limit to prevent abuse
+    const rateLimitResult = await rateLimit('api', `billing-checkout:${user.id}`, { limit: 5, window: 60 * 1000 })
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please wait before trying again.' },
+        { status: 429 }
+      )
+    }
+
+    // VALIDATION: Parse and validate request body with Zod schema
     const body = await request.json()
-    const tier = body.tier as SubscriptionTier
-    const billingPeriod = body.billingPeriod || 'monthly'
+    const parsed = checkoutSchema.safeParse(body)
 
-    if (!tier || !['starter', 'professional', 'enterprise'].includes(tier)) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Invalid tier. Must be starter, professional, or enterprise.' },
+        { error: 'Invalid request body', details: parsed.error.flatten().fieldErrors },
         { status: 400 }
       )
     }
 
-    if (!['monthly', 'annual'].includes(billingPeriod)) {
-      return NextResponse.json(
-        { error: 'Invalid billing period. Must be monthly or annual.' },
-        { status: 400 }
-      )
-    }
+    const { tier, billingPeriod } = parsed.data
 
     const { url, error } = await createSubscriptionCheckout(
       user.id,
       tier,
-      billingPeriod as 'monthly' | 'annual'
+      billingPeriod
     )
 
     if (error || !url) {

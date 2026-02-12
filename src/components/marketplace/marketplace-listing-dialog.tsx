@@ -147,7 +147,7 @@ export function MarketplaceListingDialog({
                     )}
                 </DialogTrigger>
             )}
-            <DialogContent size="lg" className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogContent size="lg" className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <div className="flex items-center gap-2 mb-1">
                         <Badge

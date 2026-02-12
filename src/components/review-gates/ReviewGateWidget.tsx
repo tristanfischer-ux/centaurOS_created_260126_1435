@@ -152,7 +152,7 @@ export function ReviewGateWidget() {
               )
             })}
             <div className="pt-2">
-              <Link href="/tasks">
+              <Link href="/new-tasks">
                 <Button variant="outline" size="sm" className="w-full h-8 text-xs">
                   View All Reviews
                   <ArrowRight className="h-3 w-3 ml-1" />

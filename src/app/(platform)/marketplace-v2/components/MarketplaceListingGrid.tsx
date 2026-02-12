@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ViewToggle } from '@/components/ui/view-toggle'
-import { cn } from '@/lib/utils'
+import { cn, getInitials } from '@/lib/utils'
 import {
     getCategoryBadgeClasses,
     getAvatarGradient,
@@ -53,12 +53,6 @@ function getAIIcon(subcategory: string): React.ElementType {
         case 'Automation': return Zap
         default: return Bot
     }
-}
-
-function getInitials(title: string): string {
-    const words = title.trim().split(/\s+/)
-    if (words.length === 1) return words[0].substring(0, 2).toUpperCase()
-    return (words[0][0] + words[1][0]).toUpperCase()
 }
 
 function getDisplayPrice(attrs: Record<string, unknown>): string | null {

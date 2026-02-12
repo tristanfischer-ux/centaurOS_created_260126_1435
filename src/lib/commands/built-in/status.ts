@@ -45,8 +45,7 @@ export const statusCommand: SlashCommand = {
       }
     }
     
-    // TODO: Integrate with PresenceProvider to update status
-    // For now, show what would be set
+    // TODO(TECH-DEBT): Integrate with PresenceProvider to update status
     const statusText = emoji ? `${emoji} ${message}` : message
     
     if (!statusText) {
@@ -78,8 +77,7 @@ export const dndCommand: SlashCommand = {
   execute: async (args: string[], context: CommandContext): Promise<CommandResult> => {
     const duration = args.join(' ') || '1h'
     
-    // TODO: Integrate with PresenceProvider
-    // dispatch event to trigger focus mode
+    // TODO(TECH-DEBT): Integrate with PresenceProvider for DND mode
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('set-dnd', { detail: { duration } }))
     }
@@ -108,7 +106,7 @@ export const awayCommand: SlashCommand = {
   execute: async (args: string[]): Promise<CommandResult> => {
     const message = args.join(' ')
     
-    // TODO: Integrate with PresenceProvider
+    // TODO(TECH-DEBT): Integrate with PresenceProvider for away status
     if (message) {
       return actionResult(`Status set to away: ${message}`)
     }
@@ -127,7 +125,7 @@ export const activeCommand: SlashCommand = {
   category: 'status',
   aliases: ['online', 'back'],
   execute: async (): Promise<CommandResult> => {
-    // TODO: Integrate with PresenceProvider
+    // TODO(TECH-DEBT): Integrate with PresenceProvider for active status
     return actionResult('Status set to active')
   }
 }

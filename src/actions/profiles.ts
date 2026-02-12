@@ -151,8 +151,7 @@ export async function updateProfileDetails(
         return { success: false, error: updateError.message }
     }
     
-    // TODO: Add audit logging once audit_logs table is created
-    // AUDIT: Profile update should be logged
+    // TODO(TECH-DEBT): Add audit logging for profile updates
     
     // Revalidate relevant pages
     revalidatePath('/team')

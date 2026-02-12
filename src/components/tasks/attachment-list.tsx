@@ -314,11 +314,6 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                             )}
                             {getFileType(previewFile.file_name) === 'pdf' && fileUrls[previewFile.file_path] && (() => {
                                 const sanitizedUrl = sanitizeFileSrc(fileUrls[previewFile.file_path])
-                                console.log('PDF Preview:', { 
-                                    fileName: previewFile.file_name,
-                                    rawUrl: fileUrls[previewFile.file_path],
-                                    sanitizedUrl 
-                                })
                                 if (!sanitizedUrl) {
                                     return (
                                         <div className="flex flex-col items-center justify-center h-[60vh] text-muted-foreground">
@@ -347,7 +342,6 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                             src={`${sanitizedUrl}#toolbar=1&navpanes=1&scrollbar=1`}
                                             className="w-full h-full rounded border bg-muted"
                                             title={previewFile.file_name}
-                                            onLoad={() => console.log('PDF loaded successfully')}
                                             onError={(e) => {
                                                 console.error('PDF iframe error:', e)
                                                 toast.error('Failed to load PDF preview. Try downloading instead.')

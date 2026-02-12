@@ -63,7 +63,7 @@ export async function getGuildApprentices(): Promise<{
   const apprenticeIds = apprentices?.map(a => a.id) || []
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: assignments } = await (supabase as any)
+  const { data: assignments } = await supabase
     .from('project_assignments')
     .select('apprentice_id')
     .in('apprentice_id', apprenticeIds)
@@ -144,7 +144,7 @@ export async function assignApprenticeToProject(
   
   // Create the assignment
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('project_assignments')
     .insert({
       apprentice_id: apprenticeId,
@@ -191,7 +191,7 @@ export async function getFoundryAssignments(): Promise<{
   }
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('project_assignments')
     .select(`
       id,
@@ -260,7 +260,7 @@ export async function getMyAssignments(): Promise<{
   }
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('project_assignments')
     .select(`
       id,
@@ -325,7 +325,7 @@ export async function updateAssignmentStatus(
   }
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('project_assignments')
     .update({
       status,

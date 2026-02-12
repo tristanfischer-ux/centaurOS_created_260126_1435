@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Badge } from '@/components/ui/badge'
 import {
     DropdownMenu,
@@ -129,12 +129,12 @@ export function OrderSummaryCard({
             <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row gap-4">
                     {/* Provider Avatar */}
-                    <Avatar className="h-14 w-14 flex-shrink-0">
-                        <AvatarImage src={order.providerAvatarUrl} alt={order.providerName} />
-                        <AvatarFallback>
-                            <User className="h-6 w-6" />
-                        </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                        name={order.providerName}
+                        avatarUrl={order.providerAvatarUrl}
+                        size="xl"
+                        className="flex-shrink-0"
+                    />
 
                     {/* Main Content */}
                     <div className="flex-1 min-w-0">
@@ -288,12 +288,11 @@ export function OrderSummaryCardCompact({
         >
             <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                        <AvatarImage src={order.providerAvatarUrl} alt={order.providerName} />
-                        <AvatarFallback>
-                            <User className="h-4 w-4" />
-                        </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                        name={order.providerName}
+                        avatarUrl={order.providerAvatarUrl}
+                        size="lg"
+                    />
                     <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{order.listingTitle}</p>
                         <p className="text-sm text-muted-foreground">

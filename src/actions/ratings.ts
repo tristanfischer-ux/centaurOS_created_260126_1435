@@ -70,7 +70,7 @@ export async function getProviderRatings(providerId: string): Promise<{
         const supabase = await createClient()
 
         // Using type assertion since table not in generated types
-        const { data: reviews, error } = await (supabase as any)
+        const { data: reviews, error } = await supabase
             .from('provider_ratings')
             .select('rating')
             .eq('provider_id', providerId) as { data: RatingRecord[] | null; error: any }
@@ -136,7 +136,7 @@ export async function getProviderReviews(
         const supabase = await createClient()
 
         // Get total count - using type assertion since table not in generated types
-        const { count, error: countError } = await (supabase as any)
+        const { count, error: countError } = await supabase
             .from('provider_ratings')
             .select('id', { count: 'exact', head: true })
             .eq('provider_id', providerId) as { count: number | null; error: any }
@@ -147,7 +147,7 @@ export async function getProviderReviews(
         }
 
         // Get reviews with reviewer info
-        const { data: reviews, error } = await (supabase as any)
+        const { data: reviews, error } = await supabase
             .from('provider_ratings')
             .select(`
                 id,
@@ -226,7 +226,7 @@ export async function submitProviderReview(data: {
 
         // Check if user already reviewed this provider for this order
         if (data.orderId) {
-            const { data: existingReview } = await (supabase as any)
+            const { data: existingReview } = await supabase
                 .from('provider_ratings')
                 .select('id')
                 .eq('provider_id', data.providerId)
@@ -242,7 +242,7 @@ export async function submitProviderReview(data: {
         // Determine if this is a verified purchase
         let isVerifiedPurchase = false
         if (data.orderId) {
-            const { data: order } = await (supabase as any)
+            const { data: order } = await supabase
                 .from('orders')
                 .select('id, buyer_id, status')
                 .eq('id', data.orderId)
@@ -253,7 +253,7 @@ export async function submitProviderReview(data: {
             isVerifiedPurchase = !!order
         }
 
-        const { error } = await (supabase as any)
+        const { error } = await supabase
             .from('provider_ratings')
             .insert({
                 provider_id: data.providerId,

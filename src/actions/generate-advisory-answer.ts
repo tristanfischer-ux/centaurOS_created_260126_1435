@@ -153,12 +153,12 @@ Please provide a helpful, practical answer for a startup founder.`
 
             return { result }
         } catch (parseError) {
-            console.error('Failed to parse AI response:', parseError)
+            console.error('[AdvisoryService] Failed to parse AI response:', { error: parseError instanceof Error ? parseError.message : 'Unknown error' })
             return { error: 'Failed to parse AI response. Please try again.' }
         }
 
     } catch (error) {
-        console.error('Advisory answer generation failed:', error)
+        console.error('[AdvisoryService] Advisory answer generation failed:', { error: error instanceof Error ? error.message : 'Unknown error' })
         return { error: 'Failed to generate answer. Please try again.' }
     }
 }
@@ -230,7 +230,7 @@ Return ONLY a raw JSON object with this structure:
 
         return { result }
     } catch (error) {
-        console.error('Structured answer generation failed:', error)
+        console.error('[AdvisoryService] Structured answer generation failed:', { error: error instanceof Error ? error.message : 'Unknown error' })
         return { error: 'Failed to generate structured answer' }
     }
 }
@@ -269,7 +269,10 @@ Return JSON only: { "category": "...", "tags": ["...", "..."] }`
             category: validateCategory(parsed.category),
             tags: Array.isArray(parsed.tags) ? parsed.tags.map((t: unknown) => String(t)) : []
         }
-    } catch {
+    } catch (error) {
+        console.error('[Advisory] Failed to suggest question category:', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+        })
         return { category: 'General', tags: [] }
     }
 }

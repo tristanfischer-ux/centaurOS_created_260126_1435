@@ -30,8 +30,7 @@ export async function executeCommand(
   
   // Check role requirements
   if (command.requiredRoles && command.requiredRoles.length > 0) {
-    // TODO: Get user role from context and validate
-    // For now, allow all commands
+    // TODO(TECH-DEBT): Get user role from context and validate permissions
   }
   
   // Validate arguments

@@ -58,8 +58,7 @@ export const remindCommand: SlashCommand = {
       return errorResult('Please provide a reminder message')
     }
     
-    // TODO: Save reminder to database
-    // For now, just acknowledge
+    // TODO(TECH-DEBT): Persist reminder to database
     const formattedTime = remindAt.toLocaleString('en-US', {
       weekday: 'short',
       hour: 'numeric',

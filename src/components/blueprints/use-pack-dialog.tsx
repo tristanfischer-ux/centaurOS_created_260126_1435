@@ -154,7 +154,7 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent size="lg" className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent size="lg" className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-electric-blue" />

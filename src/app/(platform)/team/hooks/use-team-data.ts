@@ -10,6 +10,7 @@
  */
 
 import { useMemo } from 'react'
+import { getInitials } from '@/lib/utils'
 import { getCoverageStatus } from '../constants'
 import type {
   TeamMember,
@@ -75,16 +76,6 @@ export interface TeamDataResult {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────
-
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((s) => s[0])
-    .filter(Boolean)
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-}
 
 /**
  * Converts a server-side OrbitProfile into the orbit's TeamMember shape.

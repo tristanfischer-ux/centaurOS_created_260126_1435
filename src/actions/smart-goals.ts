@@ -127,8 +127,12 @@ export async function smartifyGoal(
       includeActivity: false,
       includeObjectives: true,
     })
-  } catch {
+  } catch (error) {
     // Non-critical — proceed without business context
+    console.warn('[SmartGoals] Failed to build AI context:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        foundryId,
+    })
   }
 
   // SECURITY: Sanitize user input before injecting into prompt

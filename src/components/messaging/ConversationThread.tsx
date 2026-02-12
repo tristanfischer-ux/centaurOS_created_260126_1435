@@ -130,7 +130,7 @@ function MessageContextTag({
       )}
       {objective && (
         <Link 
-          href={`/objectives?objectiveId=${objective.id}`}
+          href={`/new-objectives?objectiveId=${objective.id}`}
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <Badge variant="secondary" className="text-xs px-1.5 py-0 gap-1">

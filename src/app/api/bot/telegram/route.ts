@@ -102,7 +102,13 @@ export async function POST(req: NextRequest) {
         }
 
         const update: TelegramUpdate = await req.json()
-        console.log('Telegram update:', JSON.stringify(update, null, 2))
+        // SENSITIVE: Redacted PII from Telegram webhook logging
+        console.log('[TelegramWebhook] Received update:', {
+            update_id: update.update_id,
+            chat_id: update.message?.chat?.id ?? update.callback_query?.message?.chat?.id,
+            has_message: !!update.message,
+            has_callback: !!update.callback_query,
+        })
 
         // Handle callback queries (button presses)
         if (update.callback_query) {

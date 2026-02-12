@@ -8,7 +8,6 @@ import {
   CheckCircle,
   Loader2,
   AlertCircle,
-  User,
   Star,
   TrendingDown,
 } from 'lucide-react'
@@ -17,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { cn } from '@/lib/utils'
@@ -176,12 +175,11 @@ export function RetainerSetup({
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16">
-              <AvatarImage src={provider?.avatarUrl} alt={provider?.name} />
-              <AvatarFallback>
-                <User className="h-8 w-8" />
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              name={provider?.name}
+              avatarUrl={provider?.avatarUrl}
+              size="xl"
+            />
             <div className="flex-1">
               <h3 className="text-lg font-semibold">{provider?.name}</h3>
               {provider?.headline && (

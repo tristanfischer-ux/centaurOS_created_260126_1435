@@ -477,7 +477,7 @@ export async function resolveDispute(
 
           if (releaseResult.error) {
             // Log but don't fail - refund already processed
-            console.error(`Dispute ${disputeId}: Failed to release to seller: ${releaseResult.error}`)
+            console.error('[DisputeService] Failed to release to seller:', { disputeId, error: releaseResult.error })
           } else if (releaseResult.transfer) {
             transferId = releaseResult.transfer.id
             console.log(`Dispute ${disputeId}: Released ${releaseAmount} to seller (Transfer ID: ${transferId})`)
@@ -487,7 +487,7 @@ export async function resolveDispute(
     }
 
   } catch (err) {
-    console.error('Error processing dispute resolution payments:', err)
+    console.error('[DisputeService] Error processing dispute resolution payments:', { error: err instanceof Error ? err.message : 'Unknown error' })
     return { 
       success: false, 
       error: `Payment processing failed: ${err instanceof Error ? err.message : 'Unknown error'}` 
@@ -507,7 +507,7 @@ export async function resolveDispute(
 
   if (updateError) {
     // Log payment details even if DB update fails
-    console.error('Dispute DB update failed but payments processed:', { refundId, transferId })
+    console.error('[DisputeService] Dispute DB update failed but payments processed:', { refundId, transferId })
     return { success: false, error: updateError.message }
   }
 

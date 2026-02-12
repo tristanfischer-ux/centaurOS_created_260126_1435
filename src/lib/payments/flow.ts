@@ -32,6 +32,7 @@ import {
   flagSuspiciousActivity,
   updateVelocityUsage 
 } from '@/lib/fraud/detection'
+import { formatCurrencyFromMinorUnits } from '@/lib/format'
 
 /**
  * Response type for initiatePayment
@@ -233,7 +234,7 @@ export async function initiatePayment(
       .eq('id', orderId)
 
     if (updateError) {
-      console.error('Error updating order with payment intent:', updateError)
+      console.error('[PaymentFlow] Error updating order with payment intent:', { error: updateError instanceof Error ? updateError.message : 'Unknown error', orderId })
       // Don't fail - payment intent is created, can be retrieved later
     }
 
@@ -245,7 +246,7 @@ export async function initiatePayment(
     })
 
     if (txError) {
-      console.error('Error recording deposit transaction:', txError)
+      console.error('[PaymentFlow] Error recording deposit transaction:', { error: txError instanceof Error ? txError.message : 'Unknown error', orderId })
       // Don't fail - payment can still proceed
     }
 
@@ -283,7 +284,7 @@ export async function initiatePayment(
 
     return { paymentIntent, order: updatedOrder, error: null }
   } catch (error) {
-    console.error('Error initiating payment:', error)
+    console.error('[PaymentFlow] Error initiating payment:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       paymentIntent: null,
       order: null,
@@ -339,7 +340,7 @@ export async function confirmPayment(
     const amountInPounds = Number(order.total_amount) / 100
     const velocityUpdateResult = await updateVelocityUsage(supabase, order.buyer_id, amountInPounds)
     if (!velocityUpdateResult.success) {
-      console.error('Failed to update velocity usage:', velocityUpdateResult.error)
+      console.error('[PaymentFlow] Failed to update velocity usage:', { error: velocityUpdateResult.error })
       // Don't fail the payment confirmation for velocity tracking errors
     }
 
@@ -360,7 +361,7 @@ export async function confirmPayment(
           userId: seller.user.id,
           type: 'payment_received',
           title: 'Payment Received',
-          message: `Payment of ${formatAmount(Number(order.total_amount), order.currency)} has been received and held in escrow for order ${order.order_number}.`,
+          message: `Payment of ${formatCurrencyFromMinorUnits(Number(order.total_amount), order.currency)} has been received and held in escrow for order ${order.order_number}.`,
           link: `/provider-portal/orders/${order.id}`,
           metadata: {
             orderId: order.id,
@@ -370,14 +371,14 @@ export async function confirmPayment(
           },
         })
       } catch (notifyError) {
-        console.error('Error sending seller notification:', notifyError)
+        console.error('[PaymentFlow] Error sending seller notification:', { error: notifyError instanceof Error ? notifyError.message : 'Unknown error' })
         // Don't fail the payment confirmation for notification errors
       }
     }
 
     return { transaction: result.transaction, error: null }
   } catch (error) {
-    console.error('Error confirming payment:', error)
+    console.error('[PaymentFlow] Error confirming payment:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       transaction: null,
       error: error instanceof Error ? error.message : 'Failed to confirm payment',
@@ -493,7 +494,7 @@ export async function releaseToSeller(
       error: null,
     }
   } catch (error) {
-    console.error('Error releasing to seller:', error)
+    console.error('[PaymentFlow] Error releasing to seller:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       transfer: null,
       sellerAmount: null,
@@ -623,7 +624,7 @@ export async function getPaymentStatus(
       error: null,
     }
   } catch (error) {
-    console.error('Error getting payment status:', error)
+    console.error('[PaymentFlow] Error getting payment status:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return {
       status: null,
       error: error instanceof Error ? error.message : 'Failed to get payment status',
@@ -631,14 +632,3 @@ export async function getPaymentStatus(
   }
 }
 
-/**
- * Helper to format amount for display
- */
-function formatAmount(amount: number, currency: string): string {
-  const formatter = new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: currency.toUpperCase(),
-    minimumFractionDigits: 2,
-  })
-  return formatter.format(amount / 100)
-}

@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { CoverageIndicator } from './coverage-indicator'
 import type { DomainCoverageWithDetails, CoverageStatus, Expertise } from '@/types/blueprints'
@@ -79,12 +79,12 @@ export function DomainDetailPanel({
   return (
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header */}
-      <SheetHeader className="space-y-1 pb-4 border-b">
+      <DialogHeader className="space-y-1 pb-4 border-b">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3 min-w-0 flex-1">
             <CoverageIndicator status={coverage.status} showIcon size="lg" showLabel={false} />
             <div className="min-w-0 flex-1">
-              <SheetTitle className="text-lg leading-tight">{domain.name}</SheetTitle>
+              <DialogTitle className="text-lg leading-tight">{domain.name}</DialogTitle>
               {coverage.domain_path && coverage.domain_path !== domain.name && (
                 <p className="text-sm text-muted-foreground mt-0.5 truncate">
                   {coverage.domain_path}
@@ -114,7 +114,7 @@ export function DomainDetailPanel({
             </Badge>
           )}
         </div>
-      </SheetHeader>
+      </DialogHeader>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto space-y-6 py-6">

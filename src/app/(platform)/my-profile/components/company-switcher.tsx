@@ -11,7 +11,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { typography } from '@/lib/design-system'
-import { cn } from '@/lib/utils'
+import { cn, getInitials } from '@/lib/utils'
 
 interface FoundryInfo {
   foundryId: string
@@ -28,18 +28,6 @@ interface CompanySwitcherProps {
   switchingTo: string | null
   isPending: boolean
   onCompanyClick: (foundryId: string) => void
-}
-
-/**
- * Extracts up to 2-character initials from a name.
- */
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((word) => word[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
 }
 
 /**

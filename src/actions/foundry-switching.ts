@@ -22,7 +22,7 @@ export async function switchFoundry(foundryId: string): Promise<{
 
   // Use the database function to switch foundry (validates membership internally)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .rpc('switch_active_foundry', {
       p_user_id: user.id,
       p_foundry_id: foundryId,
@@ -57,7 +57,7 @@ export async function getFoundryCount(): Promise<number> {
   if (!user) return 0
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count, error } = await (supabase as any)
+  const { count, error } = await supabase
     .from('foundry_memberships')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id)

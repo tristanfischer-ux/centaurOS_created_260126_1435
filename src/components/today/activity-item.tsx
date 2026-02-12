@@ -179,7 +179,7 @@ export function ActivityItem({ item, onReply, onTaskClick }: ActivityItemProps) 
   const getSourceLink = () => {
     switch (item.source.type) {
       case 'task':
-        return `/tasks?task=${item.source.id}`
+        return `/new-tasks?task=${item.source.id}`
       case 'objective':
         return `/objectives/${item.source.id}`
       case 'conversation':

@@ -65,10 +65,7 @@ export function captureError(error: Error | unknown, context?: ErrorContext): vo
   //   extra: context?.extra,
   // })
   
-  // TODO: Uncomment when Sentry is installed
-  // if (typeof window !== 'undefined' && window.Sentry) {
-  //   window.Sentry.captureException(error, { extra: context })
-  // }
+  // TODO(TECH-DEBT): Enable Sentry captureException when installed
 }
 
 /**
@@ -89,12 +86,7 @@ export function captureMessage(
 ): void {
   console.log(`[Monitoring] ${level.toUpperCase()}: ${message}`, context)
   
-  // TODO: Uncomment when Sentry is installed
-  // Sentry.captureMessage(message, {
-  //   level,
-  //   tags: { feature: context?.feature },
-  //   extra: context?.extra,
-  // })
+  // TODO(TECH-DEBT): Enable Sentry captureMessage when installed
 }
 
 /**
@@ -116,12 +108,7 @@ export function setUserContext(
 ): void {
   console.log('[Monitoring] User context set:', { userId, foundryId })
   
-  // TODO: Uncomment when Sentry is installed
-  // Sentry.setUser({
-  //   id: userId,
-  //   email,
-  // })
-  // Sentry.setTag('foundry_id', foundryId)
+  // TODO(TECH-DEBT): Enable Sentry setUser when installed
 }
 
 /**
@@ -130,8 +117,7 @@ export function setUserContext(
 export function clearUserContext(): void {
   console.log('[Monitoring] User context cleared')
   
-  // TODO: Uncomment when Sentry is installed
-  // Sentry.setUser(null)
+  // TODO(TECH-DEBT): Enable Sentry clearUser when installed
 }
 
 /**
@@ -158,8 +144,7 @@ export function startTransaction(name: string, op: string): { finish: () => void
       const duration = Date.now() - start
       console.log(`[Monitoring] Transaction "${name}" completed in ${duration}ms`)
       
-      // TODO: Uncomment when Sentry is installed
-      // Would use Sentry.startTransaction() and transaction.finish()
+      // TODO(TECH-DEBT): Enable Sentry transaction tracking when installed
     }
   }
 }

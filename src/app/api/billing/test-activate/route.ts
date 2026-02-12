@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { rateLimit } from '@/lib/security/rate-limit'
 import type { SubscriptionTier } from '@/lib/billing/subscriptions'
 
 const VALID_TIERS: SubscriptionTier[] = ['starter', 'professional', 'enterprise']
@@ -33,6 +34,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // SECURITY: Rate limit to prevent abuse
+    const rateLimitResult = await rateLimit('api', `test-activate:${user.id}`, { limit: 3, window: 60 * 1000 })
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please wait before trying again.' },
+        { status: 429 }
+      )
     }
 
     // VALIDATION: Parse and validate tier

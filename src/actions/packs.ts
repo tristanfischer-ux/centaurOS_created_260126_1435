@@ -99,7 +99,7 @@ export async function getObjectivePacks(options?: GetObjectivePacksOptions): Pro
         try {
             // Fetch from subsystem_objective_packs table with subsystem category
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const result = await (supabase as any)
+            const result = await supabase
                 .from('subsystem_objective_packs')
                 .select(`
                     id,

@@ -4,7 +4,7 @@ import { memo, useState, useCallback } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
+import { cn, getInitials } from "@/lib/utils"
 import { 
     Brain, Zap, GitCompareArrows, Eye, ChevronDown, ChevronUp,
     Briefcase, MapPin, Clock, CheckCircle2, Calendar, Mail, Phone,
@@ -59,16 +59,6 @@ interface TeamMemberCardProps {
     onTaskClick?: (taskId: string) => void
     presenceStatus?: DisplayPresenceStatus
     presence?: PresenceData | null
-}
-
-/**
- * Get initials from full name for avatar display.
- */
-function getInitials(name: string | null): string {
-    if (!name) return '?'
-    const parts = name.trim().split(/\s+/)
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
 }
 
 /**

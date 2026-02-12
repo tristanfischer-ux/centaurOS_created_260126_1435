@@ -11,7 +11,6 @@ import {
     ArrowRight,
     Loader2,
     AlertCircle,
-    User,
     FileText,
     Clock,
     Repeat,
@@ -21,7 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Badge } from '@/components/ui/badge'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
@@ -332,12 +331,11 @@ export function BookingWizard({ listing, provider, onCancel }: BookingWizardProp
                         <Card>
                             <CardContent className="pt-6">
                                 <div className="flex items-center gap-4">
-                                    <Avatar className="h-16 w-16">
-                                        <AvatarImage src={provider.avatarUrl} alt={provider.name} />
-                                        <AvatarFallback>
-                                            <User className="h-8 w-8" />
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <UserAvatar
+                                        name={provider.name}
+                                        avatarUrl={provider.avatarUrl}
+                                        size="xl"
+                                    />
                                     <div className="flex-1">
                                         <h3 className="text-lg font-semibold">{provider.name}</h3>
                                         <p className="text-muted-foreground">{listing.title}</p>
@@ -467,12 +465,11 @@ export function BookingWizard({ listing, provider, onCancel }: BookingWizardProp
                         <Card>
                             <CardContent className="pt-6">
                                 <div className="flex items-center gap-4">
-                                    <Avatar className="h-16 w-16">
-                                        <AvatarImage src={provider.avatarUrl} alt={provider.name} />
-                                        <AvatarFallback>
-                                            <User className="h-8 w-8" />
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <UserAvatar
+                                        name={provider.name}
+                                        avatarUrl={provider.avatarUrl}
+                                        size="xl"
+                                    />
                                     <div className="flex-1">
                                         <h3 className="text-lg font-semibold">{provider.name}</h3>
                                         <p className="text-muted-foreground">{listing.title}</p>
@@ -538,12 +535,11 @@ export function BookingWizard({ listing, provider, onCancel }: BookingWizardProp
                             <CardContent className="space-y-4">
                                 {/* Provider */}
                                 <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
-                                    <Avatar className="h-12 w-12">
-                                        <AvatarImage src={provider.avatarUrl} alt={provider.name} />
-                                        <AvatarFallback>
-                                            <User className="h-6 w-6" />
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <UserAvatar
+                                        name={provider.name}
+                                        avatarUrl={provider.avatarUrl}
+                                        size="lg"
+                                    />
                                     <div>
                                         <h4 className="font-semibold">{provider.name}</h4>
                                         <p className="text-sm text-muted-foreground">{listing.title}</p>

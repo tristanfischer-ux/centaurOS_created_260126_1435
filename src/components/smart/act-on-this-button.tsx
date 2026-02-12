@@ -53,7 +53,7 @@ export function ActOnThisButton({
     (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
       // Navigate to objectives page with prefill
       const prefillText = suggestion?.title || rawIdea
-      router.push(`/objectives?prefill=${encodeURIComponent(prefillText)}`)
+      router.push(`/new-objectives?prefill=${encodeURIComponent(prefillText)}`)
     },
     [router]
   )
@@ -63,7 +63,7 @@ export function ActOnThisButton({
     (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
       // Navigate to tasks page with prefill
       const prefillText = suggestion?.title || rawIdea
-      router.push(`/tasks?prefill=${encodeURIComponent(prefillText)}`)
+      router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     },
     [router]
   )

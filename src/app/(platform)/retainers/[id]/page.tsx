@@ -7,7 +7,6 @@ import {
   Calendar,
   PoundSterling,
   TrendingUp,
-  User,
   Settings,
   Pause,
   Play,
@@ -18,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
@@ -137,12 +136,11 @@ export default async function RetainerDetailPage({ params }: RetainerDetailPageP
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div className="flex items-center gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={otherParty.avatar} alt={otherParty.name} />
-            <AvatarFallback>
-              <User className="h-8 w-8" />
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            name={otherParty.name}
+            avatarUrl={otherParty.avatar}
+            size="xl"
+          />
           <div>
             <h1 className="text-2xl font-bold">{otherParty.name}</h1>
             <p className="text-muted-foreground">{otherParty.label}</p>

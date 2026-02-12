@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { 
   Download, 
@@ -14,7 +14,6 @@ import {
   ShoppingCart, 
   TrendingUp,
   Users,
-  User,
   Zap
 } from "lucide-react"
 import { SupplierAnalytics, AnalyticsPeriod, CategoryDataPoint } from "@/types/analytics"
@@ -338,12 +337,11 @@ export function SupplierDashboard({
                     className="flex items-center justify-between p-3 rounded-lg bg-muted"
                   >
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={client.avatarUrl} />
-                        <AvatarFallback>
-                          <User className="h-5 w-5" />
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        name={client.name}
+                        avatarUrl={client.avatarUrl}
+                        size="md"
+                      />
                       <div>
                         <p className="font-medium">{client.name}</p>
                         <p className="text-sm text-muted-foreground">

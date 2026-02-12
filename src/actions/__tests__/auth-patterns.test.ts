@@ -112,8 +112,9 @@ describe('Authentication Guards', () => {
       })
 
       const result = await getConversations()
-      expect(result.success).toBe(false)
+      // withUser returns { error: 'Unauthorized' } on auth failure (success is undefined, not false)
       expect(result.error).toBeDefined()
+      expect(result.success).toBeFalsy()
     })
   })
 

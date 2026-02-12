@@ -9,7 +9,6 @@ import {
     Heart,
     ArrowRight,
     Star,
-    User,
     Search,
     Sparkles,
     BarChart3
@@ -17,7 +16,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { OrderSummaryCardCompact } from '@/components/buyer/OrderSummaryCard'
 import { BuyerOnboarding, BuyerOnboardingBanner } from '@/components/buyer/BuyerOnboarding'
 import type { BuyerDashboardStats, OrderSummary, FavoriteProvider } from '@/types/booking'
@@ -304,12 +303,11 @@ export function BuyerDashboardView({
                                             className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 -mx-2 px-2 py-1 rounded-lg transition-colors"
                                             onClick={() => router.push(`/marketplace?provider=${provider.providerId}`)}
                                         >
-                                            <Avatar className="h-9 w-9">
-                                                <AvatarImage src={provider.avatarUrl} alt={provider.name} />
-                                                <AvatarFallback>
-                                                    <User className="h-4 w-4" />
-                                                </AvatarFallback>
-                                            </Avatar>
+                                            <UserAvatar
+                                                name={provider.name}
+                                                avatarUrl={provider.avatarUrl}
+                                                size="md"
+                                            />
                                             <div className="flex-1 min-w-0">
                                                 <p className="font-medium text-sm truncate">
                                                     {provider.name}
@@ -362,12 +360,11 @@ function ProviderCard({ provider, onClick }: ProviderCardProps) {
         >
             <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                    <Avatar className="h-12 w-12">
-                        <AvatarImage src={provider.avatarUrl} alt={provider.name} />
-                        <AvatarFallback>
-                            <User className="h-5 w-5" />
-                        </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                        name={provider.name}
+                        avatarUrl={provider.avatarUrl}
+                        size="lg"
+                    />
                     <div className="flex-1 min-w-0">
                         <h4 className="font-semibold truncate">{provider.name}</h4>
                         {provider.headline && (

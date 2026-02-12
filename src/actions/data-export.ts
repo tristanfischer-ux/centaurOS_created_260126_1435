@@ -53,7 +53,7 @@ export async function exportFoundryData(
     
     if (!hasAccess) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: adminPerm } = await (supabase as any)
+        const { data: adminPerm } = await supabase
             .from('foundry_admin_permissions')
             .select('id')
             .eq('foundry_id', foundry_id)
@@ -84,7 +84,7 @@ export async function exportFoundryData(
         const csv = convertToCSV(allData)
         return { data: csv }
     } catch (err) {
-        console.error('Export error:', err)
+        console.error('[DataExport] Export failed:', { error: err instanceof Error ? err.message : 'Unknown error' })
         return { error: 'Failed to export data' }
     }
 }
@@ -207,7 +207,11 @@ async function fetchTableData(
                         completed_at
                     `)
                     .limit(1000)
-            } catch {
+            } catch (error) {
+                console.error('[DataExport] Failed to query orders table:', {
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    foundryId,
+                })
                 return []
             }
             break
@@ -219,7 +223,7 @@ async function fetchTableData(
     const { data, error } = await query.order('created_at', { ascending: false }).limit(10000)
     
     if (error) {
-        console.error(`Error fetching ${table}:`, error)
+        console.error('[DataExport] Error fetching table:', { table, error: error instanceof Error ? error.message : 'Unknown error' })
         return []
     }
     

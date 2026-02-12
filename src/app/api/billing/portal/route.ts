@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createBillingPortalSession } from '@/lib/billing/subscriptions'
+import { rateLimit } from '@/lib/security/rate-limit'
 
 export async function POST(): Promise<NextResponse> {
   try {
@@ -19,6 +20,15 @@ export async function POST(): Promise<NextResponse> {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // SECURITY: Rate limit to prevent abuse
+    const rateLimitResult = await rateLimit('api', `billing-portal:${user.id}`, { limit: 10, window: 60 * 1000 })
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please wait before trying again.' },
+        { status: 429 }
+      )
     }
 
     const { url, error } = await createBillingPortalSession(user.id)

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
@@ -479,12 +479,11 @@ export function AdminDashboard({
                     <span className="text-sm font-medium text-muted-foreground w-4">
                       {index + 1}
                     </span>
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={provider.avatarUrl} />
-                      <AvatarFallback>
-                        <User className="h-4 w-4" />
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      name={provider.name}
+                      avatarUrl={provider.avatarUrl}
+                      size="sm"
+                    />
                     <div>
                       <p className="text-sm font-medium">{provider.name}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -527,12 +526,11 @@ export function AdminDashboard({
                     <span className="text-sm font-medium text-muted-foreground w-4">
                       {index + 1}
                     </span>
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={buyer.avatarUrl} />
-                      <AvatarFallback>
-                        <User className="h-4 w-4" />
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      name={buyer.name}
+                      avatarUrl={buyer.avatarUrl}
+                      size="sm"
+                    />
                     <div>
                       <p className="text-sm font-medium">{buyer.name}</p>
                       <p className="text-xs text-muted-foreground">

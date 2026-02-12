@@ -49,8 +49,7 @@ export async function getGoogleToken(
 ): Promise<GoogleTokenRecord | null> {
     const supabase = await createClient()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
         .from('google_oauth_tokens')
         .select('*')
         .eq('user_id', userId)
@@ -85,8 +84,7 @@ export async function saveGoogleToken(
 ): Promise<{ success: boolean; error?: string }> {
     const supabase = await createClient()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    const { error } = await supabase
         .from('google_oauth_tokens')
         .upsert(
             {
@@ -138,15 +136,13 @@ export async function deleteGoogleToken(
     const supabase = await createClient()
 
     // Also delete all calendar sync mappings for this user-foundry
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any)
+    await supabase
         .from('calendar_sync_mappings')
         .delete()
         .eq('user_id', userId)
         .eq('foundry_id', foundryId)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    const { error } = await supabase
         .from('google_oauth_tokens')
         .delete()
         .eq('user_id', userId)

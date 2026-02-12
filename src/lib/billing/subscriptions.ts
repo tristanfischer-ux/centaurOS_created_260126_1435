@@ -71,7 +71,7 @@ export async function getUserSubscription(userId: string): Promise<{
       error: null,
     }
   } catch (error) {
-    console.error('Error getting user subscription:', error)
+    console.error('[Subscriptions] Error getting user subscription:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return { subscription: null, error: 'Failed to get subscription' }
   }
 }
@@ -152,7 +152,7 @@ export async function createSubscriptionCheckout(
     
     return { url: session.url, error: null }
   } catch (error) {
-    console.error('Error creating subscription checkout:', error)
+    console.error('[Subscriptions] Error creating subscription checkout:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return { url: null, error: 'Failed to create checkout session' }
   }
 }
@@ -183,7 +183,7 @@ export async function createBillingPortalSession(
     
     return { url: session.url, error: null }
   } catch (error) {
-    console.error('Error creating billing portal session:', error)
+    console.error('[Subscriptions] Error creating billing portal session:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return { url: null, error: 'Failed to create billing portal session' }
   }
 }
@@ -216,7 +216,7 @@ export async function cancelSubscription(
     
     return { success: true, error: null }
   } catch (error) {
-    console.error('Error canceling subscription:', error)
+    console.error('[Subscriptions] Error canceling subscription:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return { success: false, error: 'Failed to cancel subscription' }
   }
 }
@@ -249,7 +249,7 @@ export async function resumeSubscription(
     
     return { success: true, error: null }
   } catch (error) {
-    console.error('Error resuming subscription:', error)
+    console.error('[Subscriptions] Error resuming subscription:', { error: error instanceof Error ? error.message : 'Unknown error' })
     return { success: false, error: 'Failed to resume subscription' }
   }
 }
@@ -269,7 +269,7 @@ export async function handleSubscriptionEvent(
       const userId = subscription.metadata.user_id
       
       if (!userId) {
-        console.error('No user_id in subscription metadata')
+        console.error('[Subscriptions] No user_id in subscription metadata')
         return
       }
       

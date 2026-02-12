@@ -449,7 +449,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                         const above = t.side === 'above'
                         const avatarC = getAvatarColors(t.assigneeRole)
                         return (
-                          <g key={`${t.id}-ui`} onMouseEnter={() => setHovTask(t.id)} onMouseLeave={() => setHovTask(null)} onClick={() => onTaskClick?.(t.id)} style={{ cursor: 'pointer' }}>
+                          <g key={`${t.id}-ui`} tabIndex={0} role="button" aria-label={`Task: ${t.title} — ${st.label}`} onMouseEnter={() => setHovTask(t.id)} onMouseLeave={() => setHovTask(null)} onClick={() => onTaskClick?.(t.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTaskClick?.(t.id) } }} style={{ cursor: 'pointer' }}>
                             <line x1={t.sx} y1={t.y} x2={t.ex} y2={t.y} stroke={st.solid} strokeWidth={BAND_W - 1} strokeLinecap="round" opacity={isH ? 0.65 : 0.4} />
                             <line x1={t.sx} y1={t.y} x2={t.ex} y2={t.y} stroke="transparent" strokeWidth={BAND_W + 10} />
                             <circle cx={t.sx - 13} cy={t.y} r={7} fill={avatarC.bg} />
@@ -484,7 +484,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                   const rH = obj.rw / 2
                   const gap = Math.max(rH + 20, 26)
                   return (
-                    <g key={obj.id} onMouseEnter={() => setHovObj(obj.id)} onMouseLeave={() => setHovObj(null)} onClick={() => toggleMilestone(obj.id)} style={{ cursor: 'pointer' }}>
+                    <g key={obj.id} tabIndex={0} role="button" aria-label={`Milestone: ${obj.title} — ${tp}% complete, ${obj.tasks.length} tasks`} onMouseEnter={() => setHovObj(obj.id)} onMouseLeave={() => setHovObj(null)} onClick={() => toggleMilestone(obj.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMilestone(obj.id) } }} style={{ cursor: 'pointer' }}>
                       {past && <circle cx={obj.cx} cy={ry} r={18} fill={so.color} opacity=".07" />}
                       <circle cx={obj.cx} cy={ry} r={isH ? 13 : 10} fill={obj.isExpanded ? so.color : 'white'} stroke={so.color} strokeWidth={past ? 3 : 2} filter="url(#strategy-ds)" />
                       <circle cx={obj.cx} cy={ry} r={past ? 4 : 2} fill={obj.isExpanded ? 'white' : (past ? so.color : '#CBD5E1')} />
@@ -504,7 +504,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                 <circle cx={eX} cy={ry} r={12} fill={so.color + '08'} stroke={so.color} strokeWidth="2" />
                 <circle cx={eX} cy={ry} r={7} fill="white" stroke={so.color} strokeWidth="1.5" filter="url(#strategy-ds)" />
                 <text x={eX} y={ry + 1} textAnchor="middle" dominantBaseline="central" fill={so.color} fontSize="8" fontFamily={FONT} fontWeight="900">◆</text>
-                <g onClick={() => onGoalClick?.(so.id)} style={{ cursor: 'pointer' }}>
+                <g tabIndex={0} role="button" aria-label={`Strategic goal: ${so.title}`} onClick={() => onGoalClick?.(so.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onGoalClick?.(so.id) } }} style={{ cursor: 'pointer' }}>
                   <text x={eX} y={ry - 18} textAnchor="middle" fill="#0F172A" fontSize="10" fontFamily={FONT} fontWeight="800">{so.title}</text>
                   <text x={eX} y={ry + 22} textAnchor="middle" fill={so.color} fontSize="9" fontFamily={FONT} fontWeight="700">
                     {new Date(so.targetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -512,7 +512,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                 </g>
 
                 {/* SO title (left column) — click toggles expand/collapse of all milestones in this SO */}
-                <g onClick={() => toggleExpand(so.id)} style={{ cursor: 'pointer' }}>
+                <g tabIndex={0} role="button" aria-label={`Toggle milestones for ${so.title}`} onClick={() => toggleExpand(so.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(so.id) } }} style={{ cursor: 'pointer' }}>
                   <text x={14} y={ry - 5} fill="#0F172A" fontSize="12" fontFamily={FONT} fontWeight="800">{so.title}</text>
                   <text x={14} y={ry + 9} fill={so.color} fontSize="10" fontFamily={FONT} fontWeight="700">
                     {pct}% · {new Date(so.targetDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}

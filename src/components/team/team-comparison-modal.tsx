@@ -155,9 +155,6 @@ export function TeamComparisonModal({
         }
     }
 
-    // Debug logging
-    console.log('[TeamComparisonModal] Received members:', members.length, members.map(m => ({ id: m?.id, name: m?.full_name })))
-
     if (!members || members.length === 0) {
         console.warn('[TeamComparisonModal] No members provided')
         // Show error dialog instead of returning null (which causes empty modal)

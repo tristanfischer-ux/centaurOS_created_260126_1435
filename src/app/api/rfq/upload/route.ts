@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
-import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
+import { rateLimit } from '@/lib/security/rate-limit'
 
 // Maximum file size: 25MB
 const MAX_FILE_SIZE = 25 * 1024 * 1024
@@ -49,8 +48,6 @@ export async function POST(request: NextRequest) {
     }
 
     // SECURITY: Rate limit file uploads (10 per minute per user)
-    const headersList = await headers()
-    const clientIP = getClientIP(headersList)
     const rateLimitResult = await rateLimit('api', `rfq-upload:${user.id}`, { limit: 10, window: 60 })
     if (!rateLimitResult.success) {
       return NextResponse.json(

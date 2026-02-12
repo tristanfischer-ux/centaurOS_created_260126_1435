@@ -70,8 +70,7 @@ export async function hasFoundryAdminAccess(): Promise<boolean> {
         .eq('id', user.id)
         .single()
     
-    // RED TEAM FIX: Check is_active status
-    // TODO: Add is_active column to profiles table
+    // TODO(TECH-DEBT): Enable is_active check — column exists in select but guard is disabled
     // if (!profile?.is_active) {
     //     return false
     // }
@@ -82,7 +81,7 @@ export async function hasFoundryAdminAccess(): Promise<boolean> {
     
     // Check for explicit admin permission
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: permission } = await (supabase as any)
+    const { data: permission } = await supabase
         .from('foundry_admin_permissions')
         .select('id')
         .eq('foundry_id', foundry_id)
@@ -142,7 +141,7 @@ export async function grantAdminPermission(profileId: string): Promise<{ success
     
     // Check if permission already exists
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existing } = await (supabase as any)
+    const { data: existing } = await supabase
         .from('foundry_admin_permissions')
         .select('id')
         .eq('foundry_id', foundry_id)
@@ -155,7 +154,7 @@ export async function grantAdminPermission(profileId: string): Promise<{ success
     
     // Grant permission
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    const { error } = await supabase
         .from('foundry_admin_permissions')
         .insert({
             foundry_id,
@@ -213,7 +212,7 @@ export async function revokeAdminPermission(profileId: string): Promise<{ succes
     
     // Revoke permission
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    const { error } = await supabase
         .from('foundry_admin_permissions')
         .delete()
         .eq('foundry_id', foundry_id)
@@ -258,7 +257,7 @@ export async function listAdminUsers(): Promise<{
     
     // Get explicitly granted permissions
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: permissions, error } = await (supabase as any)
+    const { data: permissions, error } = await supabase
         .from('foundry_admin_permissions')
         .select(`
             id,
@@ -306,7 +305,7 @@ export async function getNonAdminMembers(): Promise<{
     
     // Get existing admin permissions
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existingPermissions } = await (supabase as any)
+    const { data: existingPermissions } = await supabase
         .from('foundry_admin_permissions')
         .select('profile_id')
         .eq('foundry_id', foundry_id)

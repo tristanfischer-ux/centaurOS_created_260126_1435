@@ -135,9 +135,7 @@ export async function logSecurityEvent(params: {
         console.log(logMessage)
     }
 
-    // TODO: In production, integrate with a proper logging service
-    // Example integrations:
-    // - DataDog: await datadogLogs.log(event)
+    // TODO(TECH-DEBT): Integrate with production logging service (DataDog, etc.)
     // - CloudWatch: await cloudwatch.putLogEvents(...)
     // - Database: await supabase.from('security_audit_log').insert(event)
 }

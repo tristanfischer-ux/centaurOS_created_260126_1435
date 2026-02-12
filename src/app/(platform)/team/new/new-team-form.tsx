@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { cn } from "@/lib/utils"
+import { cn, getInitials } from "@/lib/utils"
 import {
     ArrowLeft, Search, Users, Check, X, Brain,
     Activity, Briefcase, Loader2, AlertCircle, Sparkles
@@ -53,12 +53,6 @@ function getRoleConfig(role: string) {
         case 'AI_Agent': return { color: 'text-purple-600', bg: 'bg-purple-100', border: 'border-purple-200' }
         default: return { color: 'text-muted-foreground', bg: 'bg-muted', border: 'border-muted' }
     }
-}
-
-function getInitials(name: string): string {
-    const parts = name.trim().split(/\s+/)
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
 }
 
 

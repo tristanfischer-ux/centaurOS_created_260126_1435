@@ -261,21 +261,18 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
             return
         }
 
-        console.log('Starting file upload:', file.name, file.size, 'bytes')
         setIsUploading(true)
         
         try {
             const formData = new FormData()
             formData.append('file', file)
 
-            console.log('Calling uploadTaskAttachment for task:', task.id)
             const result = await uploadTaskAttachment(task.id, formData)
             
             if (result.error) {
                 console.error('Upload failed:', result.error)
                 toast.error(`Upload failed: ${result.error}`)
             } else {
-                console.log('Upload successful')
                 toast.success(`Uploaded ${file.name}`)
                 
                 // Refresh attachments
@@ -988,7 +985,6 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
                                     e.stopPropagation()
                                     const file = e.target.files?.[0]
                                     if (file && !isUploading) {
-                                        console.log('File selected:', file.name)
                                         await handleFileUpload(file)
                                     }
                                 }}

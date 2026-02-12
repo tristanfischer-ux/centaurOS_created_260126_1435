@@ -182,13 +182,6 @@ Analyze these options and provide your recommendation.`;
             );
         }
 
-        if (!completion.choices || completion.choices.length === 0) {
-            return NextResponse.json(
-                { error: "AI returned no response" },
-                { status: 500 }
-            );
-        }
-
         const content = completion.choices[0].message.content;
         if (!content) {
             return NextResponse.json(

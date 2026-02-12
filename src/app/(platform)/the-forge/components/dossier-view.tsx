@@ -13,6 +13,7 @@
 "use client"
 
 import React, { useState } from "react"
+import { useSearchParams } from "next/navigation"
 
 import { Boxes, FlaskConical, Clock, AlertTriangle, Stethoscope, FileCheck2 } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -63,6 +64,10 @@ export function DossierView(): React.ReactNode {
     isRunningConvergence,
     isRunningPremium,
   } = useForgeProject()
+
+  // Read ?module= query param to deep-link into a specific module
+  const searchParams = useSearchParams()
+  const focusModuleId = searchParams.get("module")
 
   // Dialog state for interview and edit panels
   const [interviewModule, setInterviewModule] = useState<ModuleSpec | null>(null)
@@ -118,6 +123,7 @@ export function DossierView(): React.ReactNode {
             onGenerateCadModel={handleGenerateCadModel}
             onOpenInterview={setInterviewModule}
             onEditModule={setEditingModule}
+            defaultExpandedId={focusModuleId ?? undefined}
           />
         </TabsContent>
 

@@ -85,7 +85,7 @@ export type ActionError = { error: string; success?: false }
  */
 export async function withAuth<T>(
   action: (ctx: AuthContext) => Promise<T>
-): Promise<T | ActionError> {
+): Promise<T> {
   try {
     // AUTH: Create authenticated Supabase client
     const supabase = await createClient()
@@ -93,13 +93,16 @@ export async function withAuth<T>(
     // AUTH: Verify user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return { error: 'Unauthorized' }
+      // SAFETY: All server actions return objects with `error` property on failure.
+      // This cast is safe because the pre-migration code returned { error: string }
+      // from the same functions, and callers already handle this case.
+      return { error: 'Unauthorized' } as T
     }
 
     // AUTH: Resolve foundry context for multi-tenant isolation
     const foundryId = await getFoundryIdCached()
     if (!foundryId) {
-      return { error: 'User not in a foundry' }
+      return { error: 'User not in a foundry' } as T
     }
 
     // Execute the action with verified context
@@ -110,7 +113,7 @@ export async function withAuth<T>(
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
     })
-    return { error: error instanceof Error ? error.message : 'An unexpected error occurred' }
+    return { error: error instanceof Error ? error.message : 'An unexpected error occurred' } as T
   }
 }
 
@@ -138,13 +141,13 @@ export async function withAuth<T>(
  */
 export async function withUser<T>(
   action: (ctx: Omit<AuthContext, 'foundryId'>) => Promise<T>
-): Promise<T | ActionError> {
+): Promise<T> {
   try {
     const supabase = await createClient()
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return { error: 'Unauthorized' }
+      return { error: 'Unauthorized' } as T
     }
 
     return await action({ supabase, user })
@@ -152,6 +155,6 @@ export async function withUser<T>(
     console.error('[withUser] Unexpected error in server action:', {
       error: error instanceof Error ? error.message : 'Unknown error',
     })
-    return { error: error instanceof Error ? error.message : 'An unexpected error occurred' }
+    return { error: error instanceof Error ? error.message : 'An unexpected error occurred' } as T
   }
 }

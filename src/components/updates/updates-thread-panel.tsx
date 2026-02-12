@@ -162,7 +162,7 @@ export function UpdatesThreadPanel({
     ? `/new-tasks?taskId=${source.id}`
     : isConversation
       ? `/updates`
-      : `/objectives`
+      : `/new-objectives`
 
   // Choose icon and color based on source type
   const sourceIcon = isTask

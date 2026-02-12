@@ -112,7 +112,7 @@ export function CreateBlueprintDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px]">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle className="text-xl">Create New Blueprint</DialogTitle>
         </DialogHeader>

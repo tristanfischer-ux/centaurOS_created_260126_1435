@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import {
@@ -106,7 +107,7 @@ export function BlueprintDetailView({
   }
 
   const handleAddExpertise = () => {
-    // TODO: Open add expertise dialog
+    // TODO(TECH-DEBT): Open add expertise dialog
     toast.info('Add expertise dialog coming soon')
   }
 
@@ -312,7 +313,7 @@ export function BlueprintDetailView({
               coverage={coverage}
               onCreateObjective={(title, description) => {
                 toast.info('Creating objective: ' + title)
-                // TODO: Implement objective creation
+                // TODO(TECH-DEBT): Implement objective creation from blueprint
               }}
             />
           ) : (
@@ -436,21 +437,23 @@ export function BlueprintDetailView({
         </TabsContent>
       </Tabs>
 
-      {/* Domain detail panel (Sheet) */}
-      <Sheet open={!!selectedDomain} onOpenChange={(open) => !open && setSelectedDomain(null)}>
-        <SheetContent side="right" className="w-[480px] sm:max-w-[480px] overflow-y-auto">
-          {selectedDomain && (
-            <DomainDetailPanel
-              coverage={selectedDomain}
-              onClose={() => setSelectedDomain(null)}
-              onUpdateStatus={handleUpdateStatus}
-              onAddExpertise={handleAddExpertise}
-              onRemoveExpertise={handleRemoveExpertise}
-              isUpdating={isUpdating}
-            />
-          )}
-        </SheetContent>
-      </Sheet>
+      {/* Domain detail dialog */}
+      <Dialog open={!!selectedDomain} onOpenChange={(open) => !open && setSelectedDomain(null)}>
+        <DialogContent size="lg" className="max-h-[90vh]">
+          <ScrollArea className="max-h-[85vh]">
+            {selectedDomain && (
+              <DomainDetailPanel
+                coverage={selectedDomain}
+                onClose={() => setSelectedDomain(null)}
+                onUpdateStatus={handleUpdateStatus}
+                onAddExpertise={handleAddExpertise}
+                onRemoveExpertise={handleRemoveExpertise}
+                isUpdating={isUpdating}
+              />
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

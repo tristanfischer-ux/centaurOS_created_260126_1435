@@ -271,7 +271,7 @@ export async function offboardMember(
     
     // RED TEAM FIX: Cancel any pending invitations sent BY the departing user
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any)
+    await supabase
         .from('company_invitations')
         .delete()
         .eq('invited_by', memberId)

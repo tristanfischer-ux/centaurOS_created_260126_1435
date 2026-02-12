@@ -7,6 +7,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { withUser } from '@/lib/server-action-utils'
 import { stripe } from '@/lib/stripe/client'
 import { revalidatePath } from 'next/cache'
 import {
@@ -16,7 +17,6 @@ import {
   FailedPayment,
   PayoutPreferences,
   PayoutRequest,
-  PlatformFeeConfig,
   ExchangeRate,
   UserRole,
   FeeOrderType,
@@ -35,54 +35,49 @@ export async function getOrCreateStripeCustomer(): Promise<{
   customerId: string | null
   error: string | null
 }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { customerId: null, error: 'Not authenticated' }
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // Check if user already has a Stripe customer ID
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('stripe_customer_id, email, full_name')
+        .eq('id', user.id)
+        .single()
+      
+      if (profileError) {
+        return { customerId: null, error: 'Failed to fetch profile' }
+      }
+      
+      if (profile.stripe_customer_id) {
+        return { customerId: profile.stripe_customer_id, error: null }
+      }
+      
+      // Create new Stripe customer
+      const customer = await stripe.customers.create({
+        email: profile.email || user.email,
+        name: profile.full_name || undefined,
+        metadata: {
+          user_id: user.id,
+        },
+      })
+      
+      // Store customer ID in profile
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ stripe_customer_id: customer.id })
+        .eq('id', user.id)
+      
+      if (updateError) {
+        console.error('Failed to store Stripe customer ID:', updateError)
+        // Still return the customer ID since it was created
+      }
+      
+      return { customerId: customer.id, error: null }
+    } catch (error) {
+      console.error('Error in getOrCreateStripeCustomer:', error)
+      return { customerId: null, error: 'Failed to create Stripe customer' }
     }
-    
-    // Check if user already has a Stripe customer ID
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('stripe_customer_id, email, full_name')
-      .eq('id', user.id)
-      .single()
-    
-    if (profileError) {
-      return { customerId: null, error: 'Failed to fetch profile' }
-    }
-    
-    if (profile.stripe_customer_id) {
-      return { customerId: profile.stripe_customer_id, error: null }
-    }
-    
-    // Create new Stripe customer
-    const customer = await stripe.customers.create({
-      email: profile.email || user.email,
-      name: profile.full_name || undefined,
-      metadata: {
-        user_id: user.id,
-      },
-    })
-    
-    // Store customer ID in profile
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ stripe_customer_id: customer.id })
-      .eq('id', user.id)
-    
-    if (updateError) {
-      console.error('Failed to store Stripe customer ID:', updateError)
-      // Still return the customer ID since it was created
-    }
-    
-    return { customerId: customer.id, error: null }
-  } catch (error) {
-    console.error('Error in getOrCreateStripeCustomer:', error)
-    return { customerId: null, error: 'Failed to create Stripe customer' }
-  }
+  })
 }
 
 // ==========================================
@@ -96,45 +91,40 @@ export async function getSavedPaymentMethods(): Promise<{
   methods: SavedPaymentMethod[]
   error: string | null
 }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { methods: [], error: 'Not authenticated' }
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const { data, error } = await supabase
+        .from('saved_payment_methods')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('is_default', { ascending: false })
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        return { methods: [], error: error.message }
+      }
+      
+      const methods: SavedPaymentMethod[] = (data || []).map(m => ({
+        id: m.id,
+        userId: m.user_id,
+        stripePaymentMethodId: m.stripe_payment_method_id,
+        cardBrand: m.card_brand,
+        cardLastFour: m.card_last_four,
+        cardExpMonth: m.card_exp_month,
+        cardExpYear: m.card_exp_year,
+        isDefault: m.is_default,
+        billingName: m.billing_name,
+        billingEmail: m.billing_email,
+        createdAt: m.created_at,
+        updatedAt: m.updated_at,
+      }))
+      
+      return { methods, error: null }
+    } catch (error) {
+      console.error('Error in getSavedPaymentMethods:', error)
+      return { methods: [], error: 'Failed to fetch payment methods' }
     }
-    
-    const { data, error } = await supabase
-      .from('saved_payment_methods')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('is_default', { ascending: false })
-      .order('created_at', { ascending: false })
-    
-    if (error) {
-      return { methods: [], error: error.message }
-    }
-    
-    const methods: SavedPaymentMethod[] = (data || []).map(m => ({
-      id: m.id,
-      userId: m.user_id,
-      stripePaymentMethodId: m.stripe_payment_method_id,
-      cardBrand: m.card_brand,
-      cardLastFour: m.card_last_four,
-      cardExpMonth: m.card_exp_month,
-      cardExpYear: m.card_exp_year,
-      isDefault: m.is_default,
-      billingName: m.billing_name,
-      billingEmail: m.billing_email,
-      createdAt: m.created_at,
-      updatedAt: m.updated_at,
-    }))
-    
-    return { methods, error: null }
-  } catch (error) {
-    console.error('Error in getSavedPaymentMethods:', error)
-    return { methods: [], error: 'Failed to fetch payment methods' }
-  }
+  })
 }
 
 /**
@@ -170,73 +160,68 @@ export async function savePaymentMethod(
   stripePaymentMethodId: string,
   setAsDefault: boolean = false
 ): Promise<{ method: SavedPaymentMethod | null; error: string | null }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { method: null, error: 'Not authenticated' }
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // Retrieve payment method details from Stripe
+      const paymentMethod = await stripe.paymentMethods.retrieve(stripePaymentMethodId)
+      
+      if (!paymentMethod.card) {
+        return { method: null, error: 'Only card payment methods are supported' }
+      }
+      
+      // Check if this is the user's first payment method
+      const { count } = await supabase
+        .from('saved_payment_methods')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+      
+      const isFirstMethod = (count || 0) === 0
+      
+      // Save to database
+      const { data, error } = await supabase
+        .from('saved_payment_methods')
+        .insert({
+          user_id: user.id,
+          stripe_payment_method_id: stripePaymentMethodId,
+          card_brand: paymentMethod.card.brand,
+          card_last_four: paymentMethod.card.last4,
+          card_exp_month: paymentMethod.card.exp_month,
+          card_exp_year: paymentMethod.card.exp_year,
+          is_default: setAsDefault || isFirstMethod, // First card is always default
+          billing_name: paymentMethod.billing_details.name,
+          billing_email: paymentMethod.billing_details.email,
+        })
+        .select()
+        .single()
+      
+      if (error) {
+        return { method: null, error: error.message }
+      }
+      
+      const method: SavedPaymentMethod = {
+        id: data.id,
+        userId: data.user_id,
+        stripePaymentMethodId: data.stripe_payment_method_id,
+        cardBrand: data.card_brand,
+        cardLastFour: data.card_last_four,
+        cardExpMonth: data.card_exp_month,
+        cardExpYear: data.card_exp_year,
+        isDefault: data.is_default,
+        billingName: data.billing_name,
+        billingEmail: data.billing_email,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      }
+      
+      revalidatePath('/settings')
+      revalidatePath('/buyer')
+      
+      return { method, error: null }
+    } catch (error) {
+      console.error('Error in savePaymentMethod:', error)
+      return { method: null, error: 'Failed to save payment method' }
     }
-    
-    // Retrieve payment method details from Stripe
-    const paymentMethod = await stripe.paymentMethods.retrieve(stripePaymentMethodId)
-    
-    if (!paymentMethod.card) {
-      return { method: null, error: 'Only card payment methods are supported' }
-    }
-    
-    // Check if this is the user's first payment method
-    const { count } = await supabase
-      .from('saved_payment_methods')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-    
-    const isFirstMethod = (count || 0) === 0
-    
-    // Save to database
-    const { data, error } = await supabase
-      .from('saved_payment_methods')
-      .insert({
-        user_id: user.id,
-        stripe_payment_method_id: stripePaymentMethodId,
-        card_brand: paymentMethod.card.brand,
-        card_last_four: paymentMethod.card.last4,
-        card_exp_month: paymentMethod.card.exp_month,
-        card_exp_year: paymentMethod.card.exp_year,
-        is_default: setAsDefault || isFirstMethod, // First card is always default
-        billing_name: paymentMethod.billing_details.name,
-        billing_email: paymentMethod.billing_details.email,
-      })
-      .select()
-      .single()
-    
-    if (error) {
-      return { method: null, error: error.message }
-    }
-    
-    const method: SavedPaymentMethod = {
-      id: data.id,
-      userId: data.user_id,
-      stripePaymentMethodId: data.stripe_payment_method_id,
-      cardBrand: data.card_brand,
-      cardLastFour: data.card_last_four,
-      cardExpMonth: data.card_exp_month,
-      cardExpYear: data.card_exp_year,
-      isDefault: data.is_default,
-      billingName: data.billing_name,
-      billingEmail: data.billing_email,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-    }
-    
-    revalidatePath('/settings')
-    revalidatePath('/buyer')
-    
-    return { method, error: null }
-  } catch (error) {
-    console.error('Error in savePaymentMethod:', error)
-    return { method: null, error: 'Failed to save payment method' }
-  }
+  })
 }
 
 /**
@@ -245,32 +230,27 @@ export async function savePaymentMethod(
 export async function setDefaultPaymentMethod(
   paymentMethodId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { success: false, error: 'Not authenticated' }
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // Verify ownership and update
+      const { error } = await supabase
+        .from('saved_payment_methods')
+        .update({ is_default: true, updated_at: new Date().toISOString() })
+        .eq('id', paymentMethodId)
+        .eq('user_id', user.id)
+      
+      if (error) {
+        return { success: false, error: error.message }
+      }
+      
+      revalidatePath('/settings')
+      
+      return { success: true, error: null }
+    } catch (error) {
+      console.error('Error in setDefaultPaymentMethod:', error)
+      return { success: false, error: 'Failed to set default payment method' }
     }
-    
-    // Verify ownership and update
-    const { error } = await supabase
-      .from('saved_payment_methods')
-      .update({ is_default: true, updated_at: new Date().toISOString() })
-      .eq('id', paymentMethodId)
-      .eq('user_id', user.id)
-    
-    if (error) {
-      return { success: false, error: error.message }
-    }
-    
-    revalidatePath('/settings')
-    
-    return { success: true, error: null }
-  } catch (error) {
-    console.error('Error in setDefaultPaymentMethod:', error)
-    return { success: false, error: 'Failed to set default payment method' }
-  }
+  })
 }
 
 /**
@@ -279,69 +259,64 @@ export async function setDefaultPaymentMethod(
 export async function deletePaymentMethod(
   paymentMethodId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { success: false, error: 'Not authenticated' }
-    }
-    
-    // Get the payment method to get Stripe ID
-    const { data: method, error: fetchError } = await supabase
-      .from('saved_payment_methods')
-      .select('stripe_payment_method_id, is_default')
-      .eq('id', paymentMethodId)
-      .eq('user_id', user.id)
-      .single()
-    
-    if (fetchError || !method) {
-      return { success: false, error: 'Payment method not found' }
-    }
-    
-    // Detach from Stripe customer
+  return withUser(async ({ supabase, user }) => {
     try {
-      await stripe.paymentMethods.detach(method.stripe_payment_method_id)
-    } catch (stripeError) {
-      console.error('Failed to detach payment method from Stripe:', stripeError)
-      // Continue with deletion even if Stripe detach fails
-    }
-    
-    // Delete from database
-    const { error } = await supabase
-      .from('saved_payment_methods')
-      .delete()
-      .eq('id', paymentMethodId)
-      .eq('user_id', user.id)
-    
-    if (error) {
-      return { success: false, error: error.message }
-    }
-    
-    // If deleted method was default, set another as default
-    if (method.is_default) {
-      const { data: remaining } = await supabase
+      // Get the payment method to get Stripe ID
+      const { data: method, error: fetchError } = await supabase
         .from('saved_payment_methods')
-        .select('id')
+        .select('stripe_payment_method_id, is_default')
+        .eq('id', paymentMethodId)
         .eq('user_id', user.id)
-        .limit(1)
         .single()
       
-      if (remaining) {
-        await supabase
-          .from('saved_payment_methods')
-          .update({ is_default: true })
-          .eq('id', remaining.id)
+      if (fetchError || !method) {
+        return { success: false, error: 'Payment method not found' }
       }
+      
+      // Detach from Stripe customer
+      try {
+        await stripe.paymentMethods.detach(method.stripe_payment_method_id)
+      } catch (stripeError) {
+        console.error('Failed to detach payment method from Stripe:', stripeError)
+        // Continue with deletion even if Stripe detach fails
+      }
+      
+      // Delete from database
+      const { error } = await supabase
+        .from('saved_payment_methods')
+        .delete()
+        .eq('id', paymentMethodId)
+        .eq('user_id', user.id)
+      
+      if (error) {
+        return { success: false, error: error.message }
+      }
+      
+      // If deleted method was default, set another as default
+      if (method.is_default) {
+        const { data: remaining } = await supabase
+          .from('saved_payment_methods')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .single()
+        
+        if (remaining) {
+          await supabase
+            .from('saved_payment_methods')
+            .update({ is_default: true })
+            .eq('id', remaining.id)
+        }
+      }
+      
+      revalidatePath('/settings')
+      
+      return { success: true, error: null }
+    } catch (error) {
+      console.error('Error in deletePaymentMethod:', error)
+      return { success: false, error: 'Failed to delete payment method' }
     }
-    
-    revalidatePath('/settings')
-    
-    return { success: true, error: null }
-  } catch (error) {
-    console.error('Error in deletePaymentMethod:', error)
-    return { success: false, error: 'Failed to delete payment method' }
-  }
+  })
 }
 
 // ==========================================
@@ -355,56 +330,51 @@ export async function getAccountBalance(): Promise<{
   balance: AccountBalance | null
   error: string | null
 }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { balance: null, error: 'Not authenticated' }
-    }
-    
-    const { data, error } = await supabase
-      .from('account_balances')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
-    
-    if (error && error.code !== 'PGRST116') { // Not found is OK
-      return { balance: null, error: error.message }
-    }
-    
-    if (!data) {
-      // Return default balance
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const { data, error } = await supabase
+        .from('account_balances')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+      
+      if (error && error.code !== 'PGRST116') { // Not found is OK
+        return { balance: null, error: error.message }
+      }
+      
+      if (!data) {
+        // Return default balance
+        return {
+          balance: {
+            id: '',
+            userId: user.id,
+            balanceAmount: 0,
+            currency: 'GBP',
+            lastToppedUpAt: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          error: null,
+        }
+      }
+      
       return {
         balance: {
-          id: '',
-          userId: user.id,
-          balanceAmount: 0,
-          currency: 'GBP',
-          lastToppedUpAt: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          id: data.id,
+          userId: data.user_id,
+          balanceAmount: data.balance_amount,
+          currency: data.currency,
+          lastToppedUpAt: data.last_topped_up_at,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
         },
         error: null,
       }
+    } catch (error) {
+      console.error('Error in getAccountBalance:', error)
+      return { balance: null, error: 'Failed to fetch account balance' }
     }
-    
-    return {
-      balance: {
-        id: data.id,
-        userId: data.user_id,
-        balanceAmount: data.balance_amount,
-        currency: data.currency,
-        lastToppedUpAt: data.last_topped_up_at,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      },
-      error: null,
-    }
-  } catch (error) {
-    console.error('Error in getAccountBalance:', error)
-    return { balance: null, error: 'Failed to fetch account balance' }
-  }
+  })
 }
 
 /**
@@ -413,44 +383,39 @@ export async function getAccountBalance(): Promise<{
 export async function getBalanceTransactions(
   limit: number = 20
 ): Promise<{ transactions: BalanceTransaction[]; error: string | null }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { transactions: [], error: 'Not authenticated' }
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const { data, error } = await supabase
+        .from('balance_transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+      
+      if (error) {
+        return { transactions: [], error: error.message }
+      }
+      
+      const transactions: BalanceTransaction[] = (data || []).map(t => ({
+        id: t.id,
+        userId: t.user_id,
+        transactionType: t.transaction_type,
+        amount: t.amount,
+        balanceBefore: t.balance_before,
+        balanceAfter: t.balance_after,
+        referenceType: t.reference_type,
+        referenceId: t.reference_id,
+        stripePaymentIntentId: t.stripe_payment_intent_id,
+        description: t.description,
+        createdAt: t.created_at,
+      }))
+      
+      return { transactions, error: null }
+    } catch (error) {
+      console.error('Error in getBalanceTransactions:', error)
+      return { transactions: [], error: 'Failed to fetch transactions' }
     }
-    
-    const { data, error } = await supabase
-      .from('balance_transactions')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(limit)
-    
-    if (error) {
-      return { transactions: [], error: error.message }
-    }
-    
-    const transactions: BalanceTransaction[] = (data || []).map(t => ({
-      id: t.id,
-      userId: t.user_id,
-      transactionType: t.transaction_type,
-      amount: t.amount,
-      balanceBefore: t.balance_before,
-      balanceAfter: t.balance_after,
-      referenceType: t.reference_type,
-      referenceId: t.reference_id,
-      stripePaymentIntentId: t.stripe_payment_intent_id,
-      description: t.description,
-      createdAt: t.created_at,
-    }))
-    
-    return { transactions, error: null }
-  } catch (error) {
-    console.error('Error in getBalanceTransactions:', error)
-    return { transactions: [], error: 'Failed to fetch transactions' }
-  }
+  })
 }
 
 /**
@@ -464,45 +429,44 @@ export async function createBalanceTopUpIntent(
   paymentIntentId: string | null
   error: string | null
 }> {
-  try {
-    if (amount < 500) { // £5 minimum
-      return { clientSecret: null, paymentIntentId: null, error: 'Minimum top-up amount is £5' }
+  return withUser(async ({ user }) => {
+    try {
+      if (amount < 500) { // £5 minimum
+        return { clientSecret: null, paymentIntentId: null, error: 'Minimum top-up amount is £5' }
+      }
+      
+      if (amount > 10000000) { // £100,000 maximum
+        return { clientSecret: null, paymentIntentId: null, error: 'Maximum top-up amount is £100,000' }
+      }
+      
+      const { customerId, error: customerError } = await getOrCreateStripeCustomer()
+      
+      if (customerError || !customerId) {
+        return { clientSecret: null, paymentIntentId: null, error: customerError || 'Failed to get customer' }
+      }
+      
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount,
+        currency: 'gbp',
+        customer: customerId,
+        payment_method: paymentMethodId,
+        setup_future_usage: paymentMethodId ? undefined : 'off_session',
+        metadata: {
+          type: 'balance_top_up',
+          user_id: user.id,
+        },
+      })
+      
+      return {
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        error: null,
+      }
+    } catch (error) {
+      console.error('Error in createBalanceTopUpIntent:', error)
+      return { clientSecret: null, paymentIntentId: null, error: 'Failed to create payment intent' }
     }
-    
-    if (amount > 10000000) { // £100,000 maximum
-      return { clientSecret: null, paymentIntentId: null, error: 'Maximum top-up amount is £100,000' }
-    }
-    
-    const { customerId, error: customerError } = await getOrCreateStripeCustomer()
-    
-    if (customerError || !customerId) {
-      return { clientSecret: null, paymentIntentId: null, error: customerError || 'Failed to get customer' }
-    }
-    
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency: 'gbp',
-      customer: customerId,
-      payment_method: paymentMethodId,
-      setup_future_usage: paymentMethodId ? undefined : 'off_session',
-      metadata: {
-        type: 'balance_top_up',
-        user_id: user?.id || '',
-      },
-    })
-    
-    return {
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
-      error: null,
-    }
-  } catch (error) {
-    console.error('Error in createBalanceTopUpIntent:', error)
-    return { clientSecret: null, paymentIntentId: null, error: 'Failed to create payment intent' }
-  }
+  })
 }
 
 /**
@@ -637,49 +601,44 @@ export async function getFailedPayments(): Promise<{
   payments: FailedPayment[]
   error: string | null
 }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { payments: [], error: 'Not authenticated' }
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const { data, error } = await supabase
+        .from('failed_payments')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('status', ['pending', 'retrying'])
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        return { payments: [], error: error.message }
+      }
+      
+      const payments: FailedPayment[] = (data || []).map(p => ({
+        id: p.id,
+        orderId: p.order_id,
+        timesheetId: p.timesheet_id,
+        userId: p.user_id,
+        stripePaymentIntentId: p.stripe_payment_intent_id,
+        failureCode: p.failure_code,
+        failureMessage: p.failure_message,
+        amount: p.amount,
+        currency: p.currency,
+        retryCount: p.retry_count,
+        maxRetries: p.max_retries,
+        nextRetryAt: p.next_retry_at,
+        lastRetryAt: p.last_retry_at,
+        status: p.status,
+        createdAt: p.created_at,
+        resolvedAt: p.resolved_at,
+      }))
+      
+      return { payments, error: null }
+    } catch (error) {
+      console.error('Error in getFailedPayments:', error)
+      return { payments: [], error: 'Failed to fetch failed payments' }
     }
-    
-    const { data, error } = await supabase
-      .from('failed_payments')
-      .select('*')
-      .eq('user_id', user.id)
-      .in('status', ['pending', 'retrying'])
-      .order('created_at', { ascending: false })
-    
-    if (error) {
-      return { payments: [], error: error.message }
-    }
-    
-    const payments: FailedPayment[] = (data || []).map(p => ({
-      id: p.id,
-      orderId: p.order_id,
-      timesheetId: p.timesheet_id,
-      userId: p.user_id,
-      stripePaymentIntentId: p.stripe_payment_intent_id,
-      failureCode: p.failure_code,
-      failureMessage: p.failure_message,
-      amount: p.amount,
-      currency: p.currency,
-      retryCount: p.retry_count,
-      maxRetries: p.max_retries,
-      nextRetryAt: p.next_retry_at,
-      lastRetryAt: p.last_retry_at,
-      status: p.status,
-      createdAt: p.created_at,
-      resolvedAt: p.resolved_at,
-    }))
-    
-    return { payments, error: null }
-  } catch (error) {
-    console.error('Error in getFailedPayments:', error)
-    return { payments: [], error: 'Failed to fetch failed payments' }
-  }
+  })
 }
 
 /**
@@ -689,86 +648,81 @@ export async function retryFailedPayment(
   failedPaymentId: string,
   paymentMethodId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { success: false, error: 'Not authenticated' }
-    }
-    
-    // Get failed payment details
-    const { data: failedPayment, error: fetchError } = await supabase
-      .from('failed_payments')
-      .select('*, order:orders(*)')
-      .eq('id', failedPaymentId)
-      .eq('user_id', user.id)
-      .single()
-    
-    if (fetchError || !failedPayment) {
-      return { success: false, error: 'Failed payment not found' }
-    }
-    
-    if (failedPayment.status === 'succeeded') {
-      return { success: true, error: null }
-    }
-    
-    if (failedPayment.status === 'exhausted' || failedPayment.status === 'cancelled') {
-      return { success: false, error: 'This payment cannot be retried' }
-    }
-    
-    const { customerId, error: customerError } = await getOrCreateStripeCustomer()
-    
-    if (customerError || !customerId) {
-      return { success: false, error: 'Failed to get customer' }
-    }
-    
-    // Create new payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: failedPayment.amount,
-      currency: (failedPayment.currency ?? 'GBP').toLowerCase(),
-      customer: customerId,
-      payment_method: paymentMethodId,
-      confirm: true,
-      off_session: true,
-      metadata: {
-        failed_payment_id: failedPaymentId,
-        order_id: failedPayment.order_id || '',
-        retry_of: failedPayment.stripe_payment_intent_id || '',
-      },
-    })
-    
-    if (paymentIntent.status === 'succeeded') {
-      // Mark as succeeded
-      await supabase
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // Get failed payment details
+      const { data: failedPayment, error: fetchError } = await supabase
         .from('failed_payments')
-        .update({
-          status: 'succeeded',
-          resolved_at: new Date().toISOString(),
-        })
+        .select('*, order:orders(*)')
         .eq('id', failedPaymentId)
+        .eq('user_id', user.id)
+        .single()
       
-      // If this was for an order, update the order
-      if (failedPayment.order_id) {
-        await supabase
-          .from('orders')
-          .update({
-            stripe_payment_intent_id: paymentIntent.id,
-            escrow_status: 'held',
-          })
-          .eq('id', failedPayment.order_id)
+      if (fetchError || !failedPayment) {
+        return { success: false, error: 'Failed payment not found' }
       }
       
-      revalidatePath('/buyer')
-      return { success: true, error: null }
+      if (failedPayment.status === 'succeeded') {
+        return { success: true, error: null }
+      }
+      
+      if (failedPayment.status === 'exhausted' || failedPayment.status === 'cancelled') {
+        return { success: false, error: 'This payment cannot be retried' }
+      }
+      
+      const { customerId, error: customerError } = await getOrCreateStripeCustomer()
+      
+      if (customerError || !customerId) {
+        return { success: false, error: 'Failed to get customer' }
+      }
+      
+      // Create new payment intent
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: failedPayment.amount,
+        currency: (failedPayment.currency ?? 'GBP').toLowerCase(),
+        customer: customerId,
+        payment_method: paymentMethodId,
+        confirm: true,
+        off_session: true,
+        metadata: {
+          failed_payment_id: failedPaymentId,
+          order_id: failedPayment.order_id || '',
+          retry_of: failedPayment.stripe_payment_intent_id || '',
+        },
+      })
+      
+      if (paymentIntent.status === 'succeeded') {
+        // Mark as succeeded
+        await supabase
+          .from('failed_payments')
+          .update({
+            status: 'succeeded',
+            resolved_at: new Date().toISOString(),
+          })
+          .eq('id', failedPaymentId)
+        
+        // If this was for an order, update the order
+        if (failedPayment.order_id) {
+          await supabase
+            .from('orders')
+            .update({
+              stripe_payment_intent_id: paymentIntent.id,
+              escrow_status: 'held',
+            })
+            .eq('id', failedPayment.order_id)
+        }
+        
+        revalidatePath('/buyer')
+        return { success: true, error: null }
+      }
+      
+      // Payment didn't succeed immediately
+      return { success: false, error: 'Payment requires additional action' }
+    } catch (error) {
+      console.error('Error in retryFailedPayment:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to retry payment' }
     }
-    
-    // Payment didn't succeed immediately
-    return { success: false, error: 'Payment requires additional action' }
-  } catch (error) {
-    console.error('Error in retryFailedPayment:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to retry payment' }
-  }
+  })
 }
 
 // ==========================================
@@ -782,69 +736,64 @@ export async function getPayoutPreferences(): Promise<{
   preferences: PayoutPreferences | null
   error: string | null
 }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { preferences: null, error: 'Not authenticated' }
-    }
-    
-    // Get provider profile
-    const { data: provider } = await supabase
-      .from('provider_profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-    
-    if (!provider) {
-      return { preferences: null, error: 'Not a provider' }
-    }
-    
-    const { data, error } = await supabase
-      .from('payout_preferences')
-      .select('*')
-      .eq('provider_id', provider.id)
-      .single()
-    
-    if (error && error.code !== 'PGRST116') {
-      return { preferences: null, error: error.message }
-    }
-    
-    if (!data) {
-      // Return default preferences
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // Get provider profile
+      const { data: provider } = await supabase
+        .from('provider_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single()
+      
+      if (!provider) {
+        return { preferences: null, error: 'Not a provider' }
+      }
+      
+      const { data, error } = await supabase
+        .from('payout_preferences')
+        .select('*')
+        .eq('provider_id', provider.id)
+        .single()
+      
+      if (error && error.code !== 'PGRST116') {
+        return { preferences: null, error: error.message }
+      }
+      
+      if (!data) {
+        // Return default preferences
+        return {
+          preferences: {
+            id: '',
+            providerId: provider.id,
+            payoutSchedule: 'automatic',
+            minimumPayoutAmount: 5000, // £50
+            preferredPayoutDay: null,
+            instantPayoutEnabled: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          error: null,
+        }
+      }
+      
       return {
         preferences: {
-          id: '',
-          providerId: provider.id,
-          payoutSchedule: 'automatic',
-          minimumPayoutAmount: 5000, // £50
-          preferredPayoutDay: null,
-          instantPayoutEnabled: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          id: data.id,
+          providerId: data.provider_id,
+          payoutSchedule: data.payout_schedule,
+          minimumPayoutAmount: data.minimum_payout_amount,
+          preferredPayoutDay: data.preferred_payout_day,
+          instantPayoutEnabled: data.instant_payout_enabled,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
         },
         error: null,
       }
+    } catch (error) {
+      console.error('Error in getPayoutPreferences:', error)
+      return { preferences: null, error: 'Failed to fetch payout preferences' }
     }
-    
-    return {
-      preferences: {
-        id: data.id,
-        providerId: data.provider_id,
-        payoutSchedule: data.payout_schedule,
-        minimumPayoutAmount: data.minimum_payout_amount,
-        preferredPayoutDay: data.preferred_payout_day,
-        instantPayoutEnabled: data.instant_payout_enabled,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      },
-      error: null,
-    }
-  } catch (error) {
-    console.error('Error in getPayoutPreferences:', error)
-    return { preferences: null, error: 'Failed to fetch payout preferences' }
-  }
+  })
 }
 
 /**
@@ -853,54 +802,49 @@ export async function getPayoutPreferences(): Promise<{
 export async function updatePayoutPreferences(
   preferences: Partial<Pick<PayoutPreferences, 'payoutSchedule' | 'minimumPayoutAmount' | 'preferredPayoutDay'>>
 ): Promise<{ success: boolean; error: string | null }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { success: false, error: 'Not authenticated' }
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // Get provider profile
+      const { data: provider } = await supabase
+        .from('provider_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single()
+      
+      if (!provider) {
+        return { success: false, error: 'Not a provider' }
+      }
+      
+      // Validate minimum payout amount
+      if (preferences.minimumPayoutAmount != null && preferences.minimumPayoutAmount < 100) {
+        return { success: false, error: 'Minimum payout amount must be at least £1' }
+      }
+      
+      // Upsert preferences
+      const { error } = await supabase
+        .from('payout_preferences')
+        .upsert({
+          provider_id: provider.id,
+          payout_schedule: preferences.payoutSchedule,
+          minimum_payout_amount: preferences.minimumPayoutAmount,
+          preferred_payout_day: preferences.preferredPayoutDay,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'provider_id',
+        })
+      
+      if (error) {
+        return { success: false, error: error.message }
+      }
+      
+      revalidatePath('/provider-portal/payments')
+      
+      return { success: true, error: null }
+    } catch (error) {
+      console.error('Error in updatePayoutPreferences:', error)
+      return { success: false, error: 'Failed to update payout preferences' }
     }
-    
-    // Get provider profile
-    const { data: provider } = await supabase
-      .from('provider_profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-    
-    if (!provider) {
-      return { success: false, error: 'Not a provider' }
-    }
-    
-    // Validate minimum payout amount
-    if (preferences.minimumPayoutAmount != null && preferences.minimumPayoutAmount < 100) {
-      return { success: false, error: 'Minimum payout amount must be at least £1' }
-    }
-    
-    // Upsert preferences
-    const { error } = await supabase
-      .from('payout_preferences')
-      .upsert({
-        provider_id: provider.id,
-        payout_schedule: preferences.payoutSchedule,
-        minimum_payout_amount: preferences.minimumPayoutAmount,
-        preferred_payout_day: preferences.preferredPayoutDay,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'provider_id',
-      })
-    
-    if (error) {
-      return { success: false, error: error.message }
-    }
-    
-    revalidatePath('/provider-portal/payments')
-    
-    return { success: true, error: null }
-  } catch (error) {
-    console.error('Error in updatePayoutPreferences:', error)
-    return { success: false, error: 'Failed to update payout preferences' }
-  }
+  })
 }
 
 /**
@@ -909,112 +853,107 @@ export async function updatePayoutPreferences(
 export async function requestPayout(
   amount: number
 ): Promise<{ request: PayoutRequest | null; error: string | null }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { request: null, error: 'Not authenticated' }
-    }
-    
-    // Get provider profile with Stripe account
-    const { data: provider } = await supabase
-      .from('provider_profiles')
-      .select('id, stripe_account_id')
-      .eq('user_id', user.id)
-      .single()
-    
-    if (!provider || !provider.stripe_account_id) {
-      return { request: null, error: 'Provider not found or Stripe account not connected' }
-    }
-    
-    // Check available balance from Stripe
-    const balance = await stripe.balance.retrieve({
-      stripeAccount: provider.stripe_account_id,
-    })
-    
-    const availableGBP = balance.available.find(b => b.currency === 'gbp')?.amount || 0
-    
-    if (amount > availableGBP) {
-      return { request: null, error: `Insufficient balance. Available: £${(availableGBP / 100).toFixed(2)}` }
-    }
-    
-    if (amount < 100) { // £1 minimum
-      return { request: null, error: 'Minimum payout amount is £1' }
-    }
-    
-    // Create payout request
-    const { data, error } = await supabase
-      .from('payout_requests')
-      .insert({
-        provider_id: provider.id,
-        amount,
-        currency: 'GBP',
-        status: 'pending',
-      })
-      .select()
-      .single()
-    
-    if (error) {
-      return { request: null, error: error.message }
-    }
-    
-    // Initiate the payout in Stripe
+  return withUser(async ({ supabase, user }) => {
     try {
-      const payout = await stripe.payouts.create({
-        amount,
-        currency: 'gbp',
-        metadata: {
-          payout_request_id: data.id,
-          provider_id: provider.id,
-        },
-      }, {
+      // Get provider profile with Stripe account
+      const { data: provider } = await supabase
+        .from('provider_profiles')
+        .select('id, stripe_account_id')
+        .eq('user_id', user.id)
+        .single()
+      
+      if (!provider || !provider.stripe_account_id) {
+        return { request: null, error: 'Provider not found or Stripe account not connected' }
+      }
+      
+      // Check available balance from Stripe
+      const balance = await stripe.balance.retrieve({
         stripeAccount: provider.stripe_account_id,
       })
       
-      // Update request with payout ID
-      await supabase
-        .from('payout_requests')
-        .update({
-          stripe_payout_id: payout.id,
-          status: 'processing',
-          processed_at: new Date().toISOString(),
-        })
-        .eq('id', data.id)
-    } catch (stripeError) {
-      // Mark as failed
-      await supabase
-        .from('payout_requests')
-        .update({
-          status: 'failed',
-          failure_reason: stripeError instanceof Error ? stripeError.message : 'Failed to initiate payout',
-        })
-        .eq('id', data.id)
+      const availableGBP = balance.available.find(b => b.currency === 'gbp')?.amount || 0
       
-      return { request: null, error: 'Failed to initiate payout with Stripe' }
+      if (amount > availableGBP) {
+        return { request: null, error: `Insufficient balance. Available: £${(availableGBP / 100).toFixed(2)}` }
+      }
+      
+      if (amount < 100) { // £1 minimum
+        return { request: null, error: 'Minimum payout amount is £1' }
+      }
+      
+      // Create payout request
+      const { data, error } = await supabase
+        .from('payout_requests')
+        .insert({
+          provider_id: provider.id,
+          amount,
+          currency: 'GBP',
+          status: 'pending',
+        })
+        .select()
+        .single()
+      
+      if (error) {
+        return { request: null, error: error.message }
+      }
+      
+      // Initiate the payout in Stripe
+      try {
+        const payout = await stripe.payouts.create({
+          amount,
+          currency: 'gbp',
+          metadata: {
+            payout_request_id: data.id,
+            provider_id: provider.id,
+          },
+        }, {
+          stripeAccount: provider.stripe_account_id,
+        })
+        
+        // Update request with payout ID
+        await supabase
+          .from('payout_requests')
+          .update({
+            stripe_payout_id: payout.id,
+            status: 'processing',
+            processed_at: new Date().toISOString(),
+          })
+          .eq('id', data.id)
+      } catch (stripeError) {
+        // Mark as failed
+        await supabase
+          .from('payout_requests')
+          .update({
+            status: 'failed',
+            failure_reason: stripeError instanceof Error ? stripeError.message : 'Failed to initiate payout',
+          })
+          .eq('id', data.id)
+        
+        return { request: null, error: 'Failed to initiate payout with Stripe' }
+      }
+      
+      revalidatePath('/provider-portal/payments')
+      
+      return {
+        request: {
+          id: data.id,
+          providerId: data.provider_id,
+          amount: data.amount,
+          currency: data.currency,
+          status: 'processing',
+          stripePayoutId: null,
+          failureReason: null,
+          requestedAt: data.requested_at,
+          processedAt: new Date().toISOString(),
+          completedAt: null,
+        },
+        error: null,
+      }
+    } catch (error) {
+      console.error('Error in requestPayout:', error)
+      return { request: null, error: 'Failed to request payout' }
     }
-    
-    revalidatePath('/provider-portal/payments')
-    
-    return {
-      request: {
-        id: data.id,
-        providerId: data.provider_id,
-        amount: data.amount,
-        currency: data.currency,
-        status: 'processing',
-        stripePayoutId: null,
-        failureReason: null,
-        requestedAt: data.requested_at,
-        processedAt: new Date().toISOString(),
-        completedAt: null,
-      },
-      error: null,
-    }
-  } catch (error) {
-    console.error('Error in requestPayout:', error)
-    return { request: null, error: 'Failed to request payout' }
-  }
+  })
 }
 
 // ==========================================
@@ -1028,24 +967,19 @@ export async function getPreferredCurrency(): Promise<{
   currency: SupportedCurrency
   error: string | null
 }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('preferred_currency')
+        .eq('id', user.id)
+        .single()
+      
+      return { currency: (data?.preferred_currency as SupportedCurrency) || 'GBP', error: null }
+    } catch (error) {
       return { currency: 'GBP', error: null }
     }
-    
-    const { data } = await supabase
-      .from('profiles')
-      .select('preferred_currency')
-      .eq('id', user.id)
-      .single()
-    
-    return { currency: (data?.preferred_currency as SupportedCurrency) || 'GBP', error: null }
-  } catch (error) {
-    return { currency: 'GBP', error: null }
-  }
+  })
 }
 
 /**
@@ -1054,30 +988,25 @@ export async function getPreferredCurrency(): Promise<{
 export async function updatePreferredCurrency(
   currency: SupportedCurrency
 ): Promise<{ success: boolean; error: string | null }> {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return { success: false, error: 'Not authenticated' }
+  return withUser(async ({ supabase, user }) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ preferred_currency: currency })
+        .eq('id', user.id)
+      
+      if (error) {
+        return { success: false, error: error.message }
+      }
+      
+      revalidatePath('/settings')
+      
+      return { success: true, error: null }
+    } catch (error) {
+      console.error('Error in updatePreferredCurrency:', error)
+      return { success: false, error: 'Failed to update currency preference' }
     }
-    
-    const { error } = await supabase
-      .from('profiles')
-      .update({ preferred_currency: currency })
-      .eq('id', user.id)
-    
-    if (error) {
-      return { success: false, error: error.message }
-    }
-    
-    revalidatePath('/settings')
-    
-    return { success: true, error: null }
-  } catch (error) {
-    console.error('Error in updatePreferredCurrency:', error)
-    return { success: false, error: 'Failed to update currency preference' }
-  }
+  })
 }
 
 /**

@@ -104,7 +104,7 @@ export async function addMemberToTeam(
         return { success: false, error: insertError.message }
     }
     
-    // TODO: Add audit logging once audit_logs table is created
+    // TODO(TECH-DEBT): Add audit logging for team member changes
     
     revalidatePath('/team')
     return { success: true, error: null }
@@ -177,7 +177,7 @@ export async function removeMemberFromTeam(
         return { success: false, error: deleteError.message }
     }
     
-    // TODO: Add audit logging once audit_logs table is created
+    // TODO(TECH-DEBT): Add audit logging for team member changes
     
     revalidatePath('/team')
     return { success: true, error: null }
@@ -278,7 +278,7 @@ export async function assignTaskToMember(
             .eq('id', taskId)
     }
     
-    // TODO: Add audit logging once audit_logs table is created
+    // TODO(TECH-DEBT): Add audit logging for team member changes
     
     revalidatePath('/team')
     revalidatePath('/tasks')
@@ -365,7 +365,7 @@ export async function unassignTaskFromMember(
             .eq('id', taskId)
     }
     
-    // TODO: Add audit logging once audit_logs table is created
+    // TODO(TECH-DEBT): Add audit logging for team member changes
     
     revalidatePath('/team')
     revalidatePath('/tasks')

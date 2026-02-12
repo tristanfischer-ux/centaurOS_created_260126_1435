@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { sanitizeFileName } from "@/lib/security/sanitize";
-import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
+import { rateLimit } from "@/lib/security/rate-limit";
 import { aiGuard } from "@/lib/ai/guard";
 
 // SECURITY: Fail fast if OpenAI API key is not configured
@@ -44,8 +43,6 @@ export async function POST(req: NextRequest) {
         const user = { id: guard.userId }
 
         // SECURITY: Rate limit to prevent OpenAI cost abuse (5 requests per hour per user)
-        const headersList = await headers()
-        const clientIP = getClientIP(headersList)
         const rateLimitResult = await rateLimit('api', `voice-to-task:${user.id}`, { limit: 5, window: 3600 })
         if (!rateLimitResult.success) {
             return NextResponse.json(

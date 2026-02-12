@@ -30,7 +30,7 @@ export async function checkAndAwardBadges(providerId: string): Promise<{
         for (const result of eligibilityResults) {
             if (result.eligible && !result.alreadyHas) {
                 // Award the badge - using type assertion since table not in generated types
-                const { error } = await (supabase as any)
+                const { error } = await supabase
                     .from('provider_badges')
                     .insert({
                         provider_id: providerId,
@@ -70,7 +70,7 @@ export async function awardBadge(
         const supabase = await createClient()
         
         // Check if badge already exists - using type assertion since table not in generated types
-        const { data: existing } = await (supabase as any)
+        const { data: existing } = await supabase
             .from('provider_badges')
             .select('id')
             .eq('provider_id', providerId)
@@ -81,7 +81,7 @@ export async function awardBadge(
             return { success: false, error: 'Provider already has this badge' }
         }
 
-        const { error } = await (supabase as any)
+        const { error } = await supabase
             .from('provider_badges')
             .insert({
                 provider_id: providerId,
@@ -117,7 +117,7 @@ export async function revokeBadge(
         const supabase = await createClient()
 
         // Using type assertion since table not in generated types
-        const { error } = await (supabase as any)
+        const { error } = await supabase
             .from('provider_badges')
             .delete()
             .eq('provider_id', providerId)
