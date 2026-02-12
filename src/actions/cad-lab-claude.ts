@@ -16,11 +16,9 @@
  * @security Server-side only. Uses admin API keys.
  */
 
-import { readFileSync } from "fs"
-import { join } from "path"
-
 import { checkRateLimit } from "@/lib/security/rate-limit"
 import { createClient } from "@/lib/supabase/server"
+import { CAD_INSTRUCTIONS } from "@/lib/cad-instructions"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -97,16 +95,9 @@ async function authCheck(): Promise<{ userId: string } | { error: string }> {
   return { userId: user.id }
 }
 
-// ─── Instructions (read from disk) ───────────────────────────────────
-
-let _cachedInstructions: string | null = null
-
-function getCadInstructions(): string {
-  if (_cachedInstructions) return _cachedInstructions
-  const filePath = join(process.cwd(), "CLAUDE_CAD_INSTRUCTIONS_1214.md")
-  _cachedInstructions = readFileSync(filePath, "utf-8")
-  return _cachedInstructions
-}
+// ─── Instructions (bundled as TypeScript constant) ───────────────────
+// CAD_INSTRUCTIONS is imported from @/lib/cad-instructions
+// This ensures it works on Vercel serverless (no filesystem access needed)
 
 // ─── Step 1a: Web Search for Real Dimensions ─────────────────────────
 
@@ -435,11 +426,9 @@ export async function generateCode(
 
   const start = Date.now()
   try {
-    const cadInstructions = getCadInstructions()
-
     const systemPrompt = `You are generating a complete CadQuery parametric CAD model. Follow the methodology in this document EXACTLY:
 
-${cadInstructions}
+${CAD_INSTRUCTIONS}
 
 ADDITIONAL RULES:
 - The final variable MUST be called "result" and be a cq.Workplane object

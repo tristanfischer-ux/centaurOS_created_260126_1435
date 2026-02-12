@@ -16,9 +16,6 @@
  * @security Server-side only, uses admin API keys.
  */
 
-import { readFileSync } from "fs"
-import { join } from "path"
-
 import type {
   ClaudeModelId,
   CadLabResult,
@@ -27,36 +24,7 @@ import type {
 } from "@/lib/cad-lab-types"
 import { checkRateLimit } from "@/lib/security/rate-limit"
 import { createClient } from "@/lib/supabase/server"
-
-// ─── Instructions Document (read from disk at runtime) ───────────────
-
-/**
- * Reads the CadQuery methodology instructions from disk.
- *
- * @description Read at runtime so the document can be updated without
- * redeploying. Cached in-memory for the lifetime of the server process.
- *
- * @returns Full text of CLAUDE_CAD_INSTRUCTIONS_1214.md
- */
-let _cachedInstructions: string | null = null
-
-function getCadInstructions(): string {
-  if (_cachedInstructions) return _cachedInstructions
-
-  try {
-    const filePath = join(process.cwd(), "CLAUDE_CAD_INSTRUCTIONS_1214.md")
-    _cachedInstructions = readFileSync(filePath, "utf-8")
-    return _cachedInstructions
-  } catch (error) {
-    console.error(
-      "[CAD-LAB] Failed to read CLAUDE_CAD_INSTRUCTIONS_1214.md:",
-      error instanceof Error ? error.message : "Unknown error",
-    )
-    throw new Error(
-      "CAD instructions file not found. Ensure CLAUDE_CAD_INSTRUCTIONS_1214.md exists in the project root.",
-    )
-  }
-}
+import { CAD_INSTRUCTIONS } from "@/lib/cad-instructions"
 
 // ─── Claude API Call ─────────────────────────────────────────────────
 
@@ -655,15 +623,12 @@ export async function generateCadLabModel(
   let totalTokensOut = 0
 
   try {
-    // ── Read instructions from disk ──
-    const cadInstructions = getCadInstructions()
-
     // ── Generate code with Claude ──
     console.info("[CAD-LAB] Step 3: Generating complete CadQuery code with Claude...")
 
     const systemPrompt = `You are generating a complete CadQuery parametric CAD model. Follow the methodology in this document EXACTLY:
 
-${cadInstructions}
+${CAD_INSTRUCTIONS}
 
 ADDITIONAL RULES FOR THIS PIPELINE:
 - The final variable MUST be called "result" and be a cq.Workplane object
