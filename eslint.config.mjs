@@ -23,6 +23,13 @@ const eslintConfig = defineConfig([
     "quick-fix-dp.js",
     "test-daily-pulse.js",
     "test-daily-pulse-e2e.js",
+    "comprehensive-team-test.js",
+    "comprehensive-test.js",
+    "investigate-overlay-bug.js",
+    "test-cad-pipeline.js",
+    "test-team-page-v2.js",
+    "test-team-page.js",
+    "test-cad-lab-improvements.ts",
     "src/actions/__tests__/activity.test.ts",
     // Generated Playwright report/trace artifacts
     "playwright-report/**",

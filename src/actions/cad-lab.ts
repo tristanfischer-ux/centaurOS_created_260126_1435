@@ -11,8 +11,9 @@
  *   Pass N+2: Modal executes complete assembly (single call)
  *
  * Key insight: "Banning operations is treating symptoms. The disease is:
- * no interface definition." Each component function is short enough (30-80
- * lines) that the LLM stays within safe CadQuery patterns naturally.
+ * no interface definition." Each component function is detailed enough
+ * (60-150 lines) to include real engineering sub-features (screw bosses,
+ * cutouts, cavities, ribs, fillets) while staying within safe CadQuery patterns.
  *
  * @security Server-side only, uses admin API keys.
  */
@@ -200,12 +201,13 @@ Output EXACTLY this format:
 | Component | Qty | Size (mm) | Position (x,y,z) | Sub-Features | Notes |
 |-----------|-----|-----------|-------------------|--------------|-------|
 [One row per unique component type. Position is the centre point.]
-[Sub-Features column is MANDATORY for these component types:
- - Containers (trays, reservoirs, cases): Wall thickness, hollow cavity, drain outlets
- - Electronics (PCB, battery): EMI shields, flex connector tabs, mounting holes
- - Structural (frames, mounts): Screw bosses (dia + hole dia), cross-braces, ribs
- - Functional (motors, cameras): Lens barrels, mounting flanges, connector cutouts
- - Enclosures (body shells, covers): Button cutouts, port openings, speaker grille holes, screw boss locations]
+[Sub-Features column is MANDATORY — minimum 3 sub-features per component. Examples by type:
+ - Containers (trays, reservoirs, cases): Wall thickness, hollow cavity, drain outlets, mounting tabs, lid/seal rim, internal baffles
+ - Electronics (PCB, battery): EMI shields, flex connector tabs, mounting holes, component outlines, thermal pads, connector cutouts
+ - Structural (frames, mounts): Screw bosses (dia + hole dia), cross-braces, ribs, gussets, weight-reduction pockets
+ - Functional (motors, cameras): Lens barrels, mounting flanges with bolt pattern, connector cutouts, ventilation slots, shaft bore
+ - Enclosures (body shells, covers): Button cutouts, port openings, speaker grille holes, screw boss locations, internal ribs, snap-fit clips
+ - Connectors (pipes, wires, tubes): End fittings, flange faces, wall penetration bosses]
 [Example from Smartphone: Midframe → Sub-Features: "14× screw bosses (Ø4mm boss, Ø2.5mm hole), USB-C cutout (9×3mm), speaker grille (6× Ø1mm holes), power/volume button cutouts"]
 
 === CONNECTION MAP ===
@@ -251,7 +253,17 @@ CRITICAL RULES:
 - Connection maps must show COMPLETE paths (loop back to start OR terminate at endpoint)
 - Components must not overlap spatially — check each pair and list conflicts
 - The JSON component list must match the placement table exactly
-- DO NOT WRITE ANY CODE — this is pure engineering planning`
+- DO NOT WRITE ANY CODE — this is pure engineering planning
+- Minimum 6 unique component types for any model. A well-decomposed model has 6-12 unique types.
+  Example decomposition for a quadcopter drone:
+    body_shell, arm (qty 4), motor_mount (qty 4), propeller (qty 4), battery,
+    flight_controller, camera_gimbal, landing_gear (qty 4) = 8 unique types, 22 instances
+  Example decomposition for a smartphone exploded view:
+    display_glass, display_panel, faceid_module, midframe, main_pcb, battery,
+    magsafe_coil, taptic_engine, camera_module, rear_glass = 10 unique types, 10 instances
+- Each component in the placement table MUST list 3-5 sub-features in the Sub-Features column.
+  Sub-features are the internal details that make the component realistic:
+  bosses, holes, cutouts, cavities, ribs, channels, flanges, tabs, grilles, etc.`
 
 // ─── Pass 2-N: Component Function Prompt ─────────────────────────────
 
@@ -310,10 +322,16 @@ RULES:
 - For angled features, use .transformed(rotate=(rx, ry, rz)) to set up
   the workplane before creating geometry
 - ALL derived dimensions must be calculated from named parameters at the top
-- Keep it under 80 lines
+- Target 60-150 lines per component. Include ALL sub-features from the interface definition.
+  Short components (under 40 lines) indicate missing sub-features.
+- EVERY sub-feature listed in the interface definition MUST appear in the code.
+  Cross-reference the interface placement table's "Sub-Features" column.
+  If the interface says "4x screw bosses, USB-C cutout, speaker grille",
+  then your code MUST have loops/cuts for all three feature types.
+- Use loops for repeated features (screw bosses, holes, ribs, channels).
+  Do NOT copy-paste the same geometry N times — use a for loop with positions.
 - The function may accept extra parameters beyond (x, y, z) if the component
   needs them (e.g. angle for arms). Declare defaults for all extra params.
-- **Include sub-features** listed in the interface definition (screw bosses, cutouts, shields, tabs, etc.)
 
 SAFE PATTERNS (use these):
 
@@ -341,31 +359,77 @@ SAFE PATTERNS (use these):
    result = result.union(boss).cut(hole)
 
 7. EMI shields (small boxes on PCBs):
-   shield = wp.box(ew, eh, 1.5).edges("|Z").fillet(0.5)
-   result = result.union(shield.translate((ex, ey, ez)))
+   shield = wp.workplane(offset=ez).transformed(offset=(ex, ey, 0)).box(ew, eh, 1.5)
+   result = result.union(shield)
 
 8. Flex connector tabs (thin extrusions):
-   tab = wp.rect(tab_w, tab_h).extrude(0.2)
-   result = result.union(tab.translate((tab_x, tab_y, tab_z)))
+   tab = wp.workplane(offset=tab_z).transformed(offset=(tab_x, tab_y, 0)).rect(tab_w, tab_h).extrude(0.2)
+   result = result.union(tab)
 
 9. Lens barrels (nested cylinders):
-   outer_barrel = wp.circle(barrel_od/2).extrude(barrel_h)
-   inner_barrel = wp.circle(barrel_id/2).extrude(barrel_h + 1)
-   barrel = outer_barrel.cut(inner_barrel)
-   result = result.union(barrel.translate((lens_x, lens_y, lens_z)))
+   outer = wp.workplane(offset=lens_z).transformed(offset=(lens_x, lens_y, 0)).circle(barrel_od/2).extrude(barrel_h)
+   inner = wp.workplane(offset=lens_z).transformed(offset=(lens_x, lens_y, 0)).circle(barrel_id/2).extrude(barrel_h + 1)
+   barrel = outer.cut(inner)
+   result = result.union(barrel)
 
 10. Button/port cutouts (small holes or rectangular cuts):
-    cutout = wp.rect(cutout_w, cutout_h).extrude(wall + 1)
-    result = result.cut(cutout.translate((cutout_x, cutout_y, cutout_z)))
+    cutout = wp.workplane(offset=cutout_z).transformed(offset=(cutout_x, cutout_y, 0)).rect(cutout_w, cutout_h).extrude(wall + 1)
+    result = result.cut(cutout)
 
 11. Speaker grille holes (array of small circles):
     for gx, gy in grille_positions:
-        hole = wp.circle(hole_dia/2).extrude(wall + 1)
-        result = result.cut(hole.translate((gx, gy, grille_z)))
+        hole = wp.workplane(offset=grille_z).transformed(offset=(gx, gy, 0)).circle(hole_dia/2).extrude(wall + 1)
+        result = result.cut(hole)
 
 12. Drain outlets (circular cutouts with optional rim):
-    outlet_hole = wp.circle(outlet_dia/2).extrude(wall + 1)
-    result = result.cut(outlet_hole.translate((outlet_x, outlet_y, outlet_z)))
+    outlet = wp.workplane(offset=outlet_z).transformed(offset=(outlet_x, outlet_y, 0)).circle(outlet_dia/2).extrude(wall + 1)
+    result = result.cut(outlet)
+
+13. Internal ribs / reinforcement walls (for structural components):
+    rib_positions = [-30, 0, 30]  # evenly spaced
+    for rx in rib_positions:
+        rib = wp.workplane(offset=wall).transformed(offset=(rx, 0, 0)).rect(wall, d - wall*2).extrude(h - wall*2)
+        result = result.union(rib)
+
+14. Mounting flanges with bolt pattern (for motors, sensors, cameras):
+    flange = wp.circle(flange_dia/2).extrude(flange_h)
+    for angle_deg in [0, 90, 180, 270]:
+        hx = mount_radius * math.cos(math.radians(angle_deg))
+        hy = mount_radius * math.sin(math.radians(angle_deg))
+        hole = wp.transformed(offset=(hx, hy, 0)).circle(bolt_dia/2).extrude(flange_h + 1)
+        flange = flange.cut(hole)
+    result = result.union(flange)
+
+15. Channel / groove features (for NFT trays, wire routing):
+    for i in range(num_channels):
+        cy = channel_start + i * channel_spacing
+        channel = wp.workplane(offset=floor_z).transformed(offset=(0, cy, 0)).rect(channel_w, channel_d).extrude(channel_h)
+        result = result.cut(channel)
+
+16. Snap-fit clips / retention features:
+    clip = wp.workplane(offset=clip_z).transformed(offset=(clip_x, clip_y, 0)).rect(clip_w, clip_d).extrude(clip_h)
+    barb = wp.workplane(offset=clip_z + clip_h).transformed(offset=(clip_x, clip_y + clip_d/2, 0)).rect(clip_w, barb_d).extrude(barb_h)
+    result = result.union(clip).union(barb)
+
+17. Multi-feature example — detailed motor mount (shows how to combine patterns):
+    # Base flange
+    mount = wp.circle(flange_od/2).extrude(flange_h)
+    # Central bore for motor shaft
+    bore = wp.circle(shaft_dia/2).extrude(flange_h + 1)
+    mount = mount.cut(bore)
+    # 4x mounting bolt holes on bolt circle
+    for angle in [0, 90, 180, 270]:
+        bx = bolt_circle_r * math.cos(math.radians(angle))
+        by = bolt_circle_r * math.sin(math.radians(angle))
+        bolt_hole = wp.transformed(offset=(bx, by, 0)).circle(bolt_dia/2).extrude(flange_h + 1)
+        mount = mount.cut(bolt_hole)
+    # Stiffening ribs between bolt holes
+    for angle in [45, 135, 225, 315]:
+        rx = rib_r * math.cos(math.radians(angle))
+        ry = rib_r * math.sin(math.radians(angle))
+        rib = wp.transformed(offset=(rx, ry, 0)).rect(rib_w, rib_l).extrude(rib_h)
+        mount = mount.union(rib)
+    result = result.union(mount)
 
 OPTIONAL HELPER FUNCTIONS:
 If multiple components share a pattern (rounded rectangles, hollow cylinders),
@@ -1061,8 +1125,8 @@ function validateInterfaceDefinition(
   }
 
   // Must have at least 3 components
-  if (iface.components.length < 3) {
-    errors.push(`Only ${iface.components.length} components — expected at least 3`)
+  if (iface.components.length < 6) {
+    errors.push(`Only ${iface.components.length} components — expected at least 6 for a detailed model`)
   }
 
   return { valid: errors.length === 0, errors }
@@ -1226,9 +1290,12 @@ function validateComponentLocally(
   let stripped = false
   let stripCount = 0
   let cleaned = code
+  // .translate() is intentionally NOT banned here — it's safe and necessary
+  // for positioning sub-features (screw bosses, cutouts, shields) within a
+  // component before .union()/.cut(). Only body-level repositioning is bad,
+  // and the prompt teaches .transformed() for that (line 304).
   const softBanned = [
     /\s*\.rotate\([^)]*\)/g,
-    /\s*\.translate\([^)]*\)/g,
     /\s*\.mirror\([^)]*\)/g,
     /\s*\.moved\([^)]*\)/g,
   ]
@@ -1312,9 +1379,9 @@ For components with qty > 1 in the interface (like arms, motors, propellers), ca
   let code = extractCode(text)
 
   // Safety net on assembly code too
+  // .translate() is intentionally allowed — needed for sub-feature positioning
   const softBanned = [
     /\s*\.rotate\([^)]*\)/g,
-    /\s*\.translate\([^)]*\)/g,
     /\s*\.mirror\([^)]*\)/g,
     /\s*\.moved\([^)]*\)/g,
   ]
@@ -1425,10 +1492,10 @@ function postExecutionValidation(
 
   // STEP file size validation (quality proxy)
   if (stepSizeKb != null) {
-    if (stepSizeKb < 50) {
-      warnings.push(`STEP size ${stepSizeKb}KB is very small (<50KB) — model likely has minimal geometry or failed to export properly`)
-    } else if (stepSizeKb < 500) {
-      warnings.push(`STEP size ${stepSizeKb}KB is small (expected >500KB for detailed model) — may lack sub-component detail`)
+    if (stepSizeKb < 100) {
+      warnings.push(`STEP size ${stepSizeKb}KB is very small (<100KB) — model likely has minimal geometry or failed to export properly`)
+    } else if (stepSizeKb < 800) {
+      warnings.push(`STEP size ${stepSizeKb}KB is below target (expected >800KB for detailed model with 6+ components) — may lack sub-component detail`)
     }
     // No upper bound warning — large files are fine (more detail is good)
   } else {
