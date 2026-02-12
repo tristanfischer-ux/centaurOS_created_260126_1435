@@ -1,6 +1,0 @@
-CadQuery export failed for module 'v6-drone': Traceback (most recent call last):
-  File "/root/modal_cad_worker.py", line 413, in generate_cad
-    exec(export_code, namespace)  # noqa: S102 — intentional sandboxed exec
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "<string>", line 16, in <module>
-RuntimeError: No CadQuery Workplane object found in script output

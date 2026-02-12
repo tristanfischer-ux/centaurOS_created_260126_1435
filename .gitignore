@@ -12,6 +12,11 @@ public/sw.js.map
 public/workbox-*.js
 public/workbox-*.js.map
 
+# Experiment / CAD output (large binaries)
+__pycache__/
+drone_output/
+experiments/
+
 # Playwright
 /playwright-report/
 /test-results/
