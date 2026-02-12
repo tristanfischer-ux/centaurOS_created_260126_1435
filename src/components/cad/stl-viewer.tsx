@@ -12,7 +12,7 @@
 
 import { Suspense, useMemo } from "react"
 import { Canvas } from "@react-three/fiber"
-import { OrbitControls, Grid, PerspectiveCamera, Environment } from "@react-three/drei"
+import { OrbitControls, Grid, PerspectiveCamera } from "@react-three/drei"
 import * as THREE from "three"
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js"
 
@@ -131,8 +131,9 @@ export function STLViewer({ stlData, backgroundColor = "#1a1a1a" }: STLViewerPro
           />
           <directionalLight position={[-10, -10, -5]} intensity={0.3} />
 
-          {/* Environment map for realistic reflections */}
-          <Environment preset="city" />
+          {/* Fill light from below for better visibility (replaces external HDR environment map) */}
+          <directionalLight position={[0, -5, 5]} intensity={0.2} />
+          <hemisphereLight intensity={0.5} color="#ffffff" groundColor="#444444" />
 
           {/* 3D Model */}
           <STLModel stlData={stlData} />
