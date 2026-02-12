@@ -37,7 +37,7 @@ export interface LibraryComponentCode {
 // ─── All available library function slugs (for detection) ───────────
 
 const LIBRARY_FUNCTION_SLUGS = [
-  // ─── Tier 1: Universal Primitives (14) ───
+  // ─── Tier 1: Universal Primitives — Original (14) ───
   "hex_bolt",
   "hex_nut",
   "socket_head_cap_screw",
@@ -52,7 +52,35 @@ const LIBRARY_FUNCTION_SLUGS = [
   "round_tube",
   "square_tube",
   "l_bracket",
-  // ─── Tier 2: Electromechanical (7) ───
+  // ─── Tier 1: Universal Primitives — Expansion (27) ───
+  "compression_spring",
+  "torsion_spring",
+  "shaft",
+  "shaft_coupling_jaw",
+  "spur_gear",
+  "timing_pulley",
+  "lead_screw",
+  "linear_rail",
+  "o_ring",
+  "circlip",
+  "dowel_pin",
+  "keyway_key",
+  "aluminium_extrusion",
+  "corner_bracket_extrusion",
+  "t_nut",
+  "din_rail",
+  "rivet",
+  "threaded_rod",
+  "set_screw",
+  "levelling_foot",
+  "rubber_foot",
+  "cable_gland",
+  "hinge_butt",
+  "p_clip",
+  "compression_fitting",
+  "push_fit_connector",
+  "thrust_washer",
+  // ─── Tier 2: Electromechanical — Original (7) ───
   "brushless_motor_outrunner",
   "brushless_motor_pancake",
   "stepper_motor_nema",
@@ -60,6 +88,20 @@ const LIBRARY_FUNCTION_SLUGS = [
   "tactile_switch",
   "axial_fan",
   "centrifugal_pump",
+  // ─── Tier 2: Electromechanical — Expansion (13) ───
+  "servo_motor",
+  "dc_gearmotor",
+  "solenoid_linear",
+  "relay_module",
+  "voltage_regulator_module",
+  "oled_display",
+  "limit_switch",
+  "heatsink_extruded",
+  "terminal_block",
+  "led_indicator",
+  "piezo_buzzer",
+  "rotary_encoder",
+  "battery_holder_18650",
   // ─── Tier 3: BSF Breeding (5) ───
   "breeding_cage",
   "egg_collection_plate",
@@ -223,8 +265,8 @@ of writing geometry from scratch. Each function takes a single params dict and r
 cq.Workplane centered at origin, base at Z=0.
 
 The library spans:
-- Tier 1 (universal): fasteners, bearings, connectors, tubes, brackets
-- Tier 2 (electromechanical): motors, PCBs, switches, fans, pumps
+- Tier 1 (universal): fasteners, bearings, springs, shafts, gears, pulleys, lead screws, linear rails, seals, extrusions, connectors, tubes, brackets, hinges, fittings
+- Tier 2 (electromechanical): motors (brushless, stepper, servo, DC geared), solenoids, relays, PCBs, switches, fans, pumps, heatsinks, displays, encoders, battery holders, terminal blocks, LEDs, buzzers
 - Tier 3 (domain): drones, CubeSats, vertical farming, BSF breeding, brine mining, EPS architectural
 
 Available components:
