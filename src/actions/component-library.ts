@@ -215,6 +215,44 @@ const LIBRARY_FUNCTION_SLUGS = [
   "roof_tile",
   "gutter_profile",
   "steel_lintel",
+  // ─── Tier 3: Architectural Styles — Georgian (6) ───
+  "georgian_sash_window",
+  "georgian_fanlight",
+  "georgian_dentil_cornice",
+  "georgian_panelled_door",
+  "georgian_quoin",
+  "georgian_iron_railing",
+  // ─── Tier 3: Architectural Styles — Victorian (5) ───
+  "victorian_bay_window",
+  "victorian_ridge_tile",
+  "victorian_porch_column",
+  "victorian_bargeboard",
+  "victorian_tile_hanging",
+  // ─── Tier 3: Architectural Styles — Tudor (4) ───
+  "tudor_half_timber",
+  "tudor_herringbone_brick",
+  "tudor_mullioned_window",
+  "tudor_chimney_stack",
+  // ─── Tier 3: Architectural Styles — Arts & Crafts (3) ───
+  "ac_catslide_dormer",
+  "ac_inglenook_surround",
+  "ac_leaded_casement",
+  // ─── Tier 3: Architectural Styles — Neo-Classical (3) ───
+  "classical_column",
+  "classical_pediment",
+  "classical_balustrade",
+  // ─── Tier 3: Architectural Styles — Art Deco (3) ───
+  "deco_crittall_window",
+  "deco_sunburst_panel",
+  "deco_stepped_parapet",
+  // ─── Tier 3: Architectural Styles — Brutalist (2) ───
+  "brise_soleil",
+  "brutalist_balcony",
+  // ─── Tier 3: Architectural Styles — Contemporary (4) ───
+  "zinc_standing_seam_panel",
+  "frameless_glass_balustrade",
+  "corten_panel",
+  "perforated_metal_screen",
 ] as const
 
 export type LibrarySlug = (typeof LIBRARY_FUNCTION_SLUGS)[number]
@@ -341,7 +379,7 @@ cq.Workplane centered at origin, base at Z=0.
 The library spans:
 - Tier 1 (universal): fasteners, bearings, springs, shafts, gears, pulleys, lead screws, linear rails, seals, extrusions, connectors, tubes, brackets, hinges, fittings
 - Tier 2 (electromechanical): motors (brushless, stepper, servo, DC geared), solenoids, relays, PCBs, switches, fans, pumps, heatsinks, displays, encoders, battery holders, terminal blocks, LEDs, buzzers
-- Tier 3 (domain): EV/automotive (motors, drivetrain, battery, chassis, brakes, suspension, steering, sensors), drones, CubeSats, vertical farming, BSF breeding, brine mining, EPS architectural, house/residential (kitchen cabinets, worktops, sinks, taps, hobs, ovens, extractors, baths, showers, WCs, basins, vanity units, towel rails, beds, wardrobes, desks, tables, internal/external doors, bifolds, windows, sash windows, roof windows, switches, sockets, downlights, radiators, TRVs, boilers, roof tiles, gutters, lintels)
+- Tier 3 (domain): EV/automotive (motors, drivetrain, battery, chassis, brakes, suspension, steering, sensors), drones, CubeSats, vertical farming, BSF breeding, brine mining, EPS architectural, house/residential (kitchen cabinets, worktops, sinks, taps, hobs, ovens, extractors, baths, showers, WCs, basins, vanity units, towel rails, beds, wardrobes, desks, tables, internal/external doors, bifolds, windows, sash windows, roof windows, switches, sockets, downlights, radiators, TRVs, boilers, roof tiles, gutters, lintels), architectural styles (Georgian sash windows, fanlights, dentil cornices, panelled doors, quoins, iron railings; Victorian bay windows, ridge tiles, porch columns, bargeboards, tile hanging; Tudor half-timber, herringbone brick, mullioned windows, chimney stacks; Arts & Crafts catslide dormers, inglenook surrounds, leaded casements; Neo-Classical columns, pediments, balustrades; Art Deco Crittall windows, sunburst panels, stepped parapets; Brutalist brise-soleil, cantilevered balconies; Contemporary zinc standing seam, frameless glass balustrades, corten panels, perforated metal screens)
 
 Available components:
 ${lines.join("\n")}

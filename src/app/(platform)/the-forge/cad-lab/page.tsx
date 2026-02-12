@@ -11,7 +11,7 @@
  * Not linked from navigation. Access via /the-forge/cad-lab (behind platform auth).
  */
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import {
   Loader2,
   Code2,
@@ -36,6 +36,11 @@ import {
   Printer,
   Factory,
   Info,
+  Save,
+  FolderOpen,
+  Plus,
+  Trash2,
+  Clock,
 } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
@@ -50,21 +55,44 @@ import {
   runCadLabResearch,
   generateCadLabInterface,
   generateCadLabModel,
+  decomposeIntoModules,
 } from "@/actions/cad-lab"
+import {
+  listCadLabProjects,
+  loadCadLabProject,
+  createCadLabProject,
+  saveCadLabResearch,
+  saveCadLabInterface,
+  saveCadLabResult,
+  saveCadLabModules,
+  deleteCadLabProject,
+} from "@/actions/cad-lab-projects"
+import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 import { CLAUDE_MODELS } from "@/lib/cad-lab-types"
 import { STLViewer } from "@/components/cad/stl-viewer"
 import { Markdown } from "@/components/ui/markdown"
 import { SECTOR_LABELS } from "@/types/foundry"
 import type { Sector } from "@/types/foundry"
 
+import { CadLabAnalysisDashboard } from "@/components/cad/cad-lab-analysis-dashboard"
+
 import type {
   CadLabResult,
   CadLabResearchResult,
   CadLabInterfaceResult,
+  CadLabModule,
   ClaudeModelId,
 } from "@/lib/cad-lab-types"
 
 export default function CadLabPage(): React.ReactNode {
+  // ── Project persistence state ──
+  const [projects, setProjects] = useState<CadLabProjectSummary[]>([])
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
+  const [showProjects, setShowProjects] = useState(false)
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<string | null>(null)
+
   // ── Foundry sector (for component library filtering) ──
   const [sector, setSector] = useState<Sector | null>(null)
 
@@ -122,6 +150,149 @@ export default function CadLabPage(): React.ReactNode {
   const [fullscreenView, setFullscreenView] = useState<string | null>(null)
   const [activeViewTab, setActiveViewTab] = useState<ViewTab>("3d")
 
+  // ── Module decomposition state ──
+  const [isDecomposing, setIsDecomposing] = useState(false)
+  const [modules, setModules] = useState<CadLabModule[]>([])
+  const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
+  const [activeModuleId, setActiveModuleId] = useState<string | null>(null)
+
+  // ── Project List: Load projects on mount ──
+  const refreshProjects = useCallback(async () => {
+    setIsLoadingProjects(true)
+    try {
+      const res = await listCadLabProjects()
+      if ("projects" in res) {
+        setProjects(res.projects)
+      }
+    } catch {
+      // Non-critical — project list just won't load
+    } finally {
+      setIsLoadingProjects(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshProjects()
+  }, [refreshProjects])
+
+  // ── Create or get project for auto-save ──
+  const ensureProject = useCallback(async (): Promise<string | null> => {
+    if (activeProjectId) return activeProjectId
+
+    if (!subject.trim()) return null
+
+    try {
+      const res = await createCadLabProject(subject, modelId)
+      if ("projectId" in res) {
+        setActiveProjectId(res.projectId)
+        return res.projectId
+      }
+    } catch {
+      console.error("[CAD-LAB] Failed to create project for auto-save")
+    }
+    return null
+  }, [activeProjectId, subject, modelId])
+
+  // ── Decompose into modules ──
+  const handleDecompose = useCallback(async () => {
+    if (!editableReport.trim()) return
+    setIsDecomposing(true)
+    try {
+      const res = await decomposeIntoModules(subject, editableReport, modelId)
+      if (res.success && res.modules.length > 0) {
+        setModules(res.modules)
+        // Auto-save modules
+        if (activeProjectId) {
+          await saveCadLabModules(activeProjectId, res.modules)
+          setLastSaved(new Date().toISOString())
+          refreshProjects()
+        }
+      }
+    } catch (err) {
+      console.error("[CAD-LAB] Decomposition failed:", err)
+    } finally {
+      setIsDecomposing(false)
+    }
+  }, [editableReport, subject, modelId, activeProjectId, refreshProjects])
+
+  // ── Generate CAD for a specific module ──
+  const handleModuleGenerate = useCallback(async (moduleId: string, step: "interface" | "generate") => {
+    const mod = modules.find((m) => m.id === moduleId)
+    if (!mod) return
+
+    setActiveModuleId(moduleId)
+
+    if (step === "interface") {
+      // Generate interface definition for this module
+      const moduleResearchText = mod.moduleResearch || `Module: ${mod.name}\nPurpose: ${mod.purpose}\nKey Parts: ${mod.keyParts.join(", ")}\nDescription: ${mod.description}\n\nFrom parent research:\n${editableReport}`
+
+      try {
+        const res = await generateCadLabInterface(
+          `${mod.name} — ${mod.purpose}`,
+          moduleResearchText,
+          modelId,
+        )
+        if (res.success) {
+          setModules((prev) =>
+            prev.map((m) =>
+              m.id === moduleId
+                ? { ...m, interfaceDefinition: res.interfaceDefinition, status: "interface_ready" as const }
+                : m,
+            ),
+          )
+          // Auto-save
+          if (activeProjectId) {
+            const updatedModules = modules.map((m) =>
+              m.id === moduleId
+                ? { ...m, interfaceDefinition: res.interfaceDefinition, status: "interface_ready" as const }
+                : m,
+            )
+            await saveCadLabModules(activeProjectId, updatedModules)
+            setLastSaved(new Date().toISOString())
+          }
+        }
+      } catch (err) {
+        console.error("[CAD-LAB] Module interface generation failed:", err)
+      }
+    } else if (step === "generate") {
+      // Generate CadQuery code for this module
+      const moduleResearchText = mod.moduleResearch || `Module: ${mod.name}\nPurpose: ${mod.purpose}\nKey Parts: ${mod.keyParts.join(", ")}\nDescription: ${mod.description}\n\nFrom parent research:\n${editableReport}`
+
+      try {
+        const res = await generateCadLabModel(
+          `${mod.name} — ${mod.purpose}`,
+          moduleResearchText,
+          mod.interfaceDefinition || "",
+          modelId,
+        )
+        // Strip binary data for module storage
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { stlData, stepData, ...resultWithoutBinary } = res
+        setModules((prev) =>
+          prev.map((m) =>
+            m.id === moduleId
+              ? { ...m, result: resultWithoutBinary, code: res.code, status: "generated" as const }
+              : m,
+          ),
+        )
+        // Auto-save
+        if (activeProjectId) {
+          const updatedModules = modules.map((m) =>
+            m.id === moduleId
+              ? { ...m, result: resultWithoutBinary, code: res.code, status: "generated" as const }
+              : m,
+          )
+          await saveCadLabModules(activeProjectId, updatedModules)
+          setLastSaved(new Date().toISOString())
+        }
+      } catch (err) {
+        console.error("[CAD-LAB] Module CAD generation failed:", err)
+      }
+    }
+
+    setActiveModuleId(null)
+  }, [modules, editableReport, modelId, activeProjectId])
+
   // ── Step 1: Research ──
   const handleResearch = useCallback(async () => {
     setIsResearching(true)
@@ -134,6 +305,18 @@ export default function CadLabPage(): React.ReactNode {
       const res = await runCadLabResearch(subject)
       setResearchResult(res)
       setEditableReport(res.report)
+
+      // Auto-save: create project if needed, then save research
+      if (res.success) {
+        const projId = await ensureProject()
+        if (projId) {
+          setIsSaving(true)
+          await saveCadLabResearch(projId, res)
+          setLastSaved(new Date().toISOString())
+          setIsSaving(false)
+          refreshProjects()
+        }
+      }
     } catch (err) {
       setResearchResult({
         success: false,
@@ -146,7 +329,7 @@ export default function CadLabPage(): React.ReactNode {
     } finally {
       setIsResearching(false)
     }
-  }, [subject])
+  }, [subject, ensureProject, refreshProjects])
 
   // ── Step 2: Interface Definition ──
   const handleGenerateInterface = useCallback(async () => {
@@ -158,6 +341,14 @@ export default function CadLabPage(): React.ReactNode {
       const res = await generateCadLabInterface(subject, editableReport, modelId)
       setInterfaceResult(res)
       setEditableInterface(res.interfaceDefinition)
+
+      // Auto-save interface definition
+      if (res.success && activeProjectId) {
+        setIsSaving(true)
+        await saveCadLabInterface(activeProjectId, res.interfaceDefinition)
+        setLastSaved(new Date().toISOString())
+        setIsSaving(false)
+      }
     } catch (err) {
       setInterfaceResult({
         success: false,
@@ -170,7 +361,7 @@ export default function CadLabPage(): React.ReactNode {
     } finally {
       setIsGeneratingInterface(false)
     }
-  }, [subject, editableReport, modelId])
+  }, [subject, editableReport, modelId, activeProjectId])
 
   // ── Step 3: Generate Code + Execute ──
   const handleGenerate = useCallback(async () => {
@@ -184,6 +375,15 @@ export default function CadLabPage(): React.ReactNode {
         modelId,
       )
       setResult(res)
+
+      // Auto-save generation result
+      if (activeProjectId) {
+        setIsSaving(true)
+        await saveCadLabResult(activeProjectId, res)
+        setLastSaved(new Date().toISOString())
+        setIsSaving(false)
+        refreshProjects()
+      }
     } catch (err) {
       setResult({
         success: false,
@@ -192,7 +392,7 @@ export default function CadLabPage(): React.ReactNode {
     } finally {
       setIsGenerating(false)
     }
-  }, [subject, editableReport, editableInterface, modelId])
+  }, [subject, editableReport, editableInterface, modelId, activeProjectId, refreshProjects])
 
   // ── Copy code to clipboard ──
   const handleCopyCode = useCallback(async () => {
@@ -213,7 +413,88 @@ export default function CadLabPage(): React.ReactNode {
     setResult(null)
     setEditableReport("")
     setEditableInterface("")
+    setActiveProjectId(null)
+    setLastSaved(null)
+    setModules([])
+    setExpandedModuleId(null)
+    setActiveModuleId(null)
   }, [])
+
+  // ── Load a saved project ──
+  const handleLoadProject = useCallback(async (projectId: string) => {
+    try {
+      const res = await loadCadLabProject(projectId)
+      if ("error" in res) return
+
+      const p = res.project
+
+      // Restore all state from the loaded project
+      setSubject(p.subject)
+      setModelId(p.modelId)
+      setActiveProjectId(p.id)
+
+      if (p.research) {
+        setResearchResult({
+          success: true,
+          report: p.research.report,
+          sources: p.research.sources,
+          referenceModels: p.research.referenceModels,
+          researchTime: p.research.researchTime,
+        })
+        setEditableReport(p.research.report)
+      } else {
+        setResearchResult(null)
+        setEditableReport("")
+      }
+
+      if (p.interfaceDefinition) {
+        setInterfaceResult({
+          success: true,
+          interfaceDefinition: p.interfaceDefinition,
+          generationTime: 0,
+          tokensIn: 0,
+          tokensOut: 0,
+        })
+        setEditableInterface(p.interfaceDefinition)
+      } else {
+        setInterfaceResult(null)
+        setEditableInterface("")
+      }
+
+      if (p.result) {
+        setResult(p.result as CadLabResult)
+      } else {
+        setResult(null)
+      }
+
+      if (p.modules && p.modules.length > 0) {
+        setModules(p.modules)
+      } else {
+        setModules([])
+      }
+
+      setLastSaved(p.updatedAt)
+      setShowProjects(false)
+    } catch {
+      console.error("[CAD-LAB] Failed to load project")
+    }
+  }, [])
+
+  // ── Delete a project ──
+  const handleDeleteProject = useCallback(async (projectId: string) => {
+    try {
+      const res = await deleteCadLabProject(projectId)
+      if ("success" in res) {
+        setProjects((prev) => prev.filter((p) => p.id !== projectId))
+        if (activeProjectId === projectId) {
+          setActiveProjectId(null)
+          setLastSaved(null)
+        }
+      }
+    } catch {
+      console.error("[CAD-LAB] Failed to delete project")
+    }
+  }, [activeProjectId])
 
   // ── Download helper ──
   const handleDownload = useCallback((filename: string, base64Data: string, isBinary: boolean = true) => {
@@ -238,24 +519,50 @@ export default function CadLabPage(): React.ReactNode {
 
   const hasResearch = researchResult?.success && editableReport.trim().length > 0
   const hasInterface = interfaceResult?.success && editableInterface.trim().length > 0
-  const isAnyLoading = isResearching || isGeneratingInterface || isGenerating
+  const isAnyLoading = isResearching || isGeneratingInterface || isGenerating || isDecomposing
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="pb-4 border-b border-muted">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-1 rounded-full bg-international-orange" />
-          <h1 className="text-2xl font-bold text-foreground">CAD Lab</h1>
-          <span className="text-xs font-mono bg-muted text-muted-foreground px-2 py-1 rounded">
-            CLAUDE PIPELINE
-          </span>
-          {sector && (
-            <span className="flex items-center gap-1.5 text-xs font-medium bg-international-orange-light text-international-orange px-2.5 py-1 rounded">
-              <Factory className="h-3 w-3" />
-              {SECTOR_LABELS[sector]} components active
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-1 rounded-full bg-international-orange" />
+            <h1 className="text-2xl font-bold text-foreground">CAD Lab</h1>
+            <span className="text-xs font-mono bg-muted text-muted-foreground px-2 py-1 rounded">
+              CLAUDE PIPELINE
             </span>
-          )}
+            {sector && (
+              <span className="flex items-center gap-1.5 text-xs font-medium bg-international-orange-light text-international-orange px-2.5 py-1 rounded">
+                <Factory className="h-3 w-3" />
+                {SECTOR_LABELS[sector]} components active
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Save status indicator */}
+            {activeProjectId && (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                {isSaving ? (
+                  <><Loader2 className="h-3 w-3 animate-spin" /> Saving...</>
+                ) : lastSaved ? (
+                  <><Save className="h-3 w-3 text-status-success" /> Saved</>
+                ) : null}
+              </span>
+            )}
+            <Button
+              variant={showProjects ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setShowProjects(!showProjects)
+                if (!showProjects) refreshProjects()
+              }}
+              className="gap-1.5"
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+              Projects{projects.length > 0 ? ` (${projects.length})` : ""}
+            </Button>
+          </div>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Research → Interface Definition → Generate. Following the CadQuery methodology exactly.
@@ -265,6 +572,90 @@ export default function CadLabPage(): React.ReactNode {
           <span>Component properties are engineering estimates from training data. Verify critical values against manufacturer datasheets.</span>
         </div>
       </div>
+
+      {/* Project list panel */}
+      {showProjects && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FolderOpen className="h-4 w-4" />
+                Saved Projects
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  handleReset()
+                  setShowProjects(false)
+                }}
+                className="gap-1.5"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New Project
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingProjects ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : projects.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No saved projects yet. Start researching a product and it will be saved automatically.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {projects.map((project) => (
+                  <div
+                    key={project.id}
+                    className={`flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors hover:bg-muted/50 ${
+                      activeProjectId === project.id ? "border-international-orange bg-international-orange-light/30" : "border-muted"
+                    }`}
+                    onClick={() => handleLoadProject(project.id)}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {project.name}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
+                          project.status === "generated"
+                            ? "bg-status-success-light text-status-success"
+                            : project.status === "interface_ready"
+                              ? "bg-status-info-light text-status-info"
+                              : project.status === "researched"
+                                ? "bg-status-warning-light text-status-warning"
+                                : "bg-muted text-muted-foreground"
+                        }`}>
+                          {project.status.replace("_", " ")}
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {formatRelativeTime(project.updatedAt)}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteProject(project.id)
+                      }}
+                      aria-label="Delete project"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Model selector */}
       <Card>
@@ -448,6 +839,245 @@ export default function CadLabPage(): React.ReactNode {
             </CardContent>
           )}
         </Card>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODULE DECOMPOSITION (optional, after research)                */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {hasResearch && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Box className="h-4 w-4" />
+              Module Decomposition
+              {modules.length > 0 && (
+                <span className="text-xs font-normal text-status-success flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {modules.length} modules
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Break this product into physical sub-assemblies. Each module can then be modelled separately with its own CAD pipeline.
+            </p>
+            <Button
+              onClick={handleDecompose}
+              disabled={isAnyLoading || isDecomposing || !hasResearch}
+              variant={modules.length > 0 ? "secondary" : "outline"}
+            >
+              {isDecomposing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Decomposing...
+                </>
+              ) : modules.length > 0 ? (
+                <>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Re-decompose
+                </>
+              ) : (
+                <>
+                  <Box className="h-4 w-4 mr-2" />
+                  Decompose into Modules
+                </>
+              )}
+            </Button>
+
+            {/* Module list */}
+            {modules.length > 0 && (
+              <div className="space-y-2 mt-4">
+                {modules.map((mod) => (
+                  <div
+                    key={mod.id}
+                    className="border rounded-md overflow-hidden"
+                  >
+                    {/* Module header (always visible) */}
+                    <button
+                      onClick={() => setExpandedModuleId(expandedModuleId === mod.id ? null : mod.id)}
+                      className="flex items-center justify-between w-full p-3 text-left hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className={`h-2 w-2 rounded-full flex-shrink-0 ${
+                          mod.status === "generated"
+                            ? "bg-status-success"
+                            : mod.status === "interface_ready"
+                              ? "bg-status-info"
+                              : "bg-muted-foreground"
+                        }`} />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{mod.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{mod.purpose}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-xs text-muted-foreground">{mod.leadWeeks}w lead</span>
+                        <span className="text-xs font-mono text-muted-foreground">{mod.keyParts.length} parts</span>
+                        {expandedModuleId === mod.id ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Expanded module detail */}
+                    {expandedModuleId === mod.id && (
+                      <div className="border-t p-4 space-y-4 bg-muted/20">
+                        {/* Description */}
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Description</p>
+                          <p className="text-sm text-foreground">{mod.description}</p>
+                        </div>
+
+                        {/* IO Flow */}
+                        <div className="flex items-center gap-4 text-xs">
+                          <div>
+                            <p className="font-semibold text-muted-foreground mb-1">Inputs</p>
+                            {mod.inputs.map((inp, i) => (
+                              <span key={i} className="inline-block bg-muted px-2 py-0.5 rounded mr-1 mb-1 font-mono">{inp}</span>
+                            ))}
+                          </div>
+                          <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold text-muted-foreground mb-1">Outputs</p>
+                            {mod.outputs.map((out, i) => (
+                              <span key={i} className="inline-block bg-muted px-2 py-0.5 rounded mr-1 mb-1 font-mono">{out}</span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Key Parts */}
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Key Components</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {mod.keyParts.map((part, i) => (
+                              <span key={i} className="text-xs bg-muted px-2 py-0.5 rounded font-mono">
+                                {part}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Risks & Unknowns */}
+                        {(mod.failureModes.length > 0 || mod.unknowns.length > 0) && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {mod.failureModes.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Failure Modes</p>
+                                <ul className="space-y-1">
+                                  {mod.failureModes.map((fm, i) => (
+                                    <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                                      <AlertTriangle className="h-3 w-3 text-status-warning flex-shrink-0 mt-0.5" />
+                                      {fm}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {mod.unknowns.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Unknowns</p>
+                                <ul className="space-y-1">
+                                  {mod.unknowns.map((u, i) => (
+                                    <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                                      <Info className="h-3 w-3 text-status-info flex-shrink-0 mt-0.5" />
+                                      {u}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Module CAD pipeline actions */}
+                        <div className="flex items-center gap-2 pt-2 border-t border-muted">
+                          {mod.status === "pending" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleModuleGenerate(mod.id, "interface")}
+                              disabled={activeModuleId !== null}
+                            >
+                              {activeModuleId === mod.id ? (
+                                <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Generating Interface...</>
+                              ) : (
+                                <><Ruler className="h-3.5 w-3.5 mr-1.5" /> Generate Interface</>
+                              )}
+                            </Button>
+                          )}
+                          {mod.status === "interface_ready" && (
+                            <>
+                              <span className="text-xs text-status-success flex items-center gap-1">
+                                <CheckCircle2 className="h-3 w-3" /> Interface ready
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleModuleGenerate(mod.id, "generate")}
+                                disabled={activeModuleId !== null}
+                              >
+                                {activeModuleId === mod.id ? (
+                                  <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Generating CAD...</>
+                                ) : (
+                                  <><ArrowRight className="h-3.5 w-3.5 mr-1.5" /> Generate CAD</>
+                                )}
+                              </Button>
+                            </>
+                          )}
+                          {mod.status === "generated" && (
+                            <span className="text-xs text-status-success flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3" /> CAD generated
+                              {mod.result?.bbox && (
+                                <span className="text-muted-foreground ml-2">
+                                  {mod.result.bbox.xLen}×{mod.result.bbox.yLen}×{mod.result.bbox.zLen}mm
+                                </span>
+                              )}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Module interface definition (if generated) */}
+                        {mod.interfaceDefinition && (
+                          <details className="border rounded-md">
+                            <summary className="cursor-pointer p-2 text-xs font-medium hover:bg-muted/50 transition-colors">
+                              View interface definition
+                            </summary>
+                            <div className="p-3 border-t">
+                              <pre className="text-xs font-mono whitespace-pre-wrap text-foreground">
+                                {mod.interfaceDefinition}
+                              </pre>
+                            </div>
+                          </details>
+                        )}
+
+                        {/* Module SVG preview (if generated) */}
+                        {mod.result?.svgIso && (
+                          <div className="bg-muted rounded-lg p-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={mod.result.svgIso} alt={`${mod.name} isometric view`} className="w-full" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* ENGINEERING ANALYSIS (after modules, shows generated metrics)   */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modules.length > 0 && (
+        <CadLabAnalysisDashboard
+          modules={modules}
+          projectName={subject}
+        />
       )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
@@ -944,6 +1574,29 @@ export default function CadLabPage(): React.ReactNode {
   )
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Formats an ISO timestamp into a human-readable relative time string.
+ *
+ * @param isoDate - ISO 8601 timestamp
+ * @returns Relative time string (e.g., "2 hours ago", "yesterday")
+ */
+function formatRelativeTime(isoDate: string): string {
+  const date = new Date(isoDate)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  const diffHr = Math.floor(diffMin / 60)
+  const diffDay = Math.floor(diffHr / 24)
+
+  if (diffMin < 1) return "just now"
+  if (diffMin < 60) return `${diffMin}m ago`
+  if (diffHr < 24) return `${diffHr}h ago`
+  if (diffDay < 7) return `${diffDay}d ago`
+  return date.toLocaleDateString()
+}
+
 // ─── Sub-components ──────────────────────────────────────────────────
 
 /**
@@ -970,9 +1623,148 @@ function Metric({
 }
 
 /**
+ * InlineSvg — decodes a base64 SVG data URI, renders it inline,
+ * and refits the viewBox using the browser's native bounding-box computation.
+ *
+ * @description Fixes CadQuery's SVG exporter which often produces SVGs with
+ * incorrect viewBoxes (content stuck in a corner of a large canvas). Uses
+ * getBBox() on individual drawing elements for pixel-perfect content detection,
+ * skipping background rects that would throw off the calculation.
+ *
+ * @param src - base64 SVG data URI (data:image/svg+xml;base64,...)
+ * @param alt - accessible label for the image
+ * @param className - container CSS classes
+ * @param onClick - optional click handler
+ */
+function InlineSvg({
+  src,
+  alt,
+  className,
+  onClick,
+}: {
+  src: string
+  alt: string
+  className?: string
+  onClick?: (e: React.MouseEvent) => void
+}): React.ReactNode {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    // Decode base64 data URI → raw SVG string
+    const base64Match = src.match(/^data:image\/svg\+xml;base64,(.+)$/)
+    if (!base64Match) {
+      container.innerHTML = ""
+      return
+    }
+
+    let decoded: string
+    try {
+      decoded = atob(base64Match[1])
+    } catch {
+      container.innerHTML = ""
+      return
+    }
+
+    // Parse SVG via DOMParser
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(decoded, "image/svg+xml")
+    const parsedSvg = doc.documentElement
+
+    // Abort if parse failed or result isn't SVG
+    if (parsedSvg.querySelector("parsererror") || parsedSvg.tagName !== "svg") {
+      container.innerHTML = ""
+      return
+    }
+
+    // SECURITY: Remove any script elements
+    parsedSvg.querySelectorAll("script").forEach((s) => s.remove())
+
+    // Insert into container (hidden until viewBox is corrected)
+    container.innerHTML = ""
+    const svgNode = document.importNode(parsedSvg, true) as unknown as SVGSVGElement
+    svgNode.style.width = "100%"
+    svgNode.style.height = "100%"
+    svgNode.style.opacity = "0"
+    svgNode.setAttribute("preserveAspectRatio", "xMidYMid meet")
+    container.appendChild(svgNode)
+
+    // Refit viewBox using the browser's native bounding-box computation.
+    // Double-rAF ensures the SVG is fully laid out before measuring.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try {
+          // Compute tight bounding box from drawing elements only.
+          // Skip <rect> which may be a background fill that would
+          // encompass the entire canvas and defeat the purpose.
+          const drawingEls = svgNode.querySelectorAll(
+            "path, line, circle, polyline, polygon, ellipse"
+          )
+          let minX = Infinity
+          let minY = Infinity
+          let maxX = -Infinity
+          let maxY = -Infinity
+          let hasContent = false
+
+          drawingEls.forEach((el) => {
+            try {
+              const bbox = (el as SVGGraphicsElement).getBBox()
+              if (bbox.width > 0 || bbox.height > 0) {
+                minX = Math.min(minX, bbox.x)
+                minY = Math.min(minY, bbox.y)
+                maxX = Math.max(maxX, bbox.x + bbox.width)
+                maxY = Math.max(maxY, bbox.y + bbox.height)
+                hasContent = true
+              }
+            } catch {
+              // Individual element getBBox can fail if not rendered
+            }
+          })
+
+          if (hasContent) {
+            const contentW = maxX - minX
+            const contentH = maxY - minY
+            if (contentW > 0.01 && contentH > 0.01) {
+              const padX = contentW * 0.1
+              const padY = contentH * 0.1
+              svgNode.setAttribute(
+                "viewBox",
+                `${minX - padX} ${minY - padY} ${contentW + 2 * padX} ${contentH + 2 * padY}`
+              )
+            }
+          }
+        } catch {
+          // Leave viewBox as-is if measurement fails
+        }
+
+        // Reveal the SVG now that viewBox is corrected
+        svgNode.style.opacity = "1"
+        svgNode.style.transition = "opacity 150ms ease-in"
+      })
+    })
+
+    return () => {
+      container.innerHTML = ""
+    }
+  }, [src])
+
+  return (
+    <div
+      ref={containerRef}
+      className={className}
+      onClick={onClick}
+      role="img"
+      aria-label={alt}
+    />
+  )
+}
+
+/**
  * SvgView — renders an SVG engineering drawing in a clickable container.
  *
- * @description Reusable component for all orthographic/isometric SVG views.
+ * @description Wrapper around InlineSvg for orthographic/isometric SVG views.
  * Clicking opens the fullscreen overlay.
  */
 function SvgView({
@@ -985,15 +1777,12 @@ function SvgView({
   onClick: () => void
 }): React.ReactNode {
   return (
-    <div className="bg-muted rounded-lg p-2">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={alt}
-        className="w-full cursor-pointer hover:opacity-90 transition-opacity"
-        onClick={onClick}
-      />
-    </div>
+    <InlineSvg
+      src={src}
+      alt={alt}
+      className="bg-muted/30 rounded-lg p-4 h-[500px] cursor-pointer hover:opacity-90 transition-opacity"
+      onClick={onClick}
+    />
   )
 }
 
@@ -1041,8 +1830,11 @@ function FullscreenOverlay({
           <STLViewer stlData={result.stlData} />
         </div>
       ) : svgSrc ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={svgSrc} alt={`${view} view`} className="max-w-full max-h-full object-contain" />
+        <InlineSvg
+          src={svgSrc}
+          alt={`${view} view`}
+          className="w-full h-full"
+        />
       ) : null}
     </div>
   )

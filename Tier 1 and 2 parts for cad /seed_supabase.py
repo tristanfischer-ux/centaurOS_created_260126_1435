@@ -23,6 +23,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tier1_universal import TIER1_REGISTRY
 from tier2_electromechanical import TIER2_REGISTRY
 from tier3_house import TIER3_HOUSE
+from tier3_logistics import TIER3_LOGISTICS
+from tier3_arch_styles import TIER3_ARCH_STYLES
 
 # Connect
 url = os.environ.get("SUPABASE_URL")
@@ -38,6 +40,8 @@ FULL_REGISTRY = {}
 FULL_REGISTRY.update(TIER1_REGISTRY)
 FULL_REGISTRY.update(TIER2_REGISTRY)
 FULL_REGISTRY.update(TIER3_HOUSE)
+FULL_REGISTRY.update(TIER3_LOGISTICS)
+FULL_REGISTRY.update(TIER3_ARCH_STYLES)
 
 # Tier mapping
 TIER_MAP = {}
@@ -46,6 +50,10 @@ for slug in TIER1_REGISTRY:
 for slug in TIER2_REGISTRY:
     TIER_MAP[slug] = "electromechanical"
 for slug in TIER3_HOUSE:
+    TIER_MAP[slug] = "domain"
+for slug in TIER3_LOGISTICS:
+    TIER_MAP[slug] = "domain"
+for slug in TIER3_ARCH_STYLES:
     TIER_MAP[slug] = "domain"
 
 

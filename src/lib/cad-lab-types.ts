@@ -116,6 +116,66 @@ export interface CadLabInterfaceResult {
   tokensOut: number
 }
 
+// ─── Module Types ────────────────────────────────────────────────────
+
+/**
+ * A single module within a CAD Lab project.
+ *
+ * @description After research, a product can be decomposed into modules.
+ * Each module represents a physical sub-assembly that can independently
+ * go through the 3-step CAD pipeline (research → interface → generate).
+ */
+export interface CadLabModule {
+  /** Unique identifier (lowercase, no spaces) */
+  id: string
+  /** Human-readable module name */
+  name: string
+  /** One-sentence purpose */
+  purpose: string
+  /** Input streams/signals */
+  inputs: string[]
+  /** Output streams/signals */
+  outputs: string[]
+  /** Major physical components */
+  keyParts: string[]
+  /** Estimated procurement lead time in weeks */
+  leadWeeks: number
+  /** Technical description (1-2 paragraphs) */
+  description: string
+  /** Why this module is critical to the system */
+  whyItMatters: string
+  /** Common failure modes */
+  failureModes: string[]
+  /** Open questions to resolve */
+  unknowns: string[]
+
+  // ── Per-module pipeline state ──
+
+  /** Edited research for this module (derived from parent) */
+  moduleResearch?: string
+  /** Interface definition for this module */
+  interfaceDefinition?: string
+  /** Generation result (without binary data) */
+  result?: Omit<CadLabResult, "stlData" | "stepData">
+  /** Generated CadQuery code */
+  code?: string
+  /** Pipeline status */
+  status: "pending" | "researched" | "interface_ready" | "generated"
+}
+
+/** Result from module decomposition */
+export interface CadLabDecompositionResult {
+  success: boolean
+  error?: string
+  /** Array of decomposed modules */
+  modules: CadLabModule[]
+  /** Time taken in ms */
+  decompositionTime: number
+  /** Tokens used */
+  tokensIn: number
+  tokensOut: number
+}
+
 /** Result from the standalone research step (Step 1) */
 export interface CadLabResearchResult {
   success: boolean

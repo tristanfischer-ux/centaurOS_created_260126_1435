@@ -1,0 +1,441 @@
+"use server"
+
+/**
+ * @file cad-lab-projects.ts — Server actions for persisting CAD Lab projects.
+ *
+ * @description Provides CRUD operations for CAD Lab projects so users can
+ * save, load, and resume their 3-step pipeline work (research → interface
+ * definition → generation). Projects are isolated by foundry via RLS.
+ *
+ * @security All actions require authentication and foundry membership.
+ * RLS policies ensure foundry-level data isolation.
+ *
+ * @audit Project mutations are tracked via updated_at timestamps.
+ */
+
+import { withAuth } from "@/lib/server-action-utils"
+import type { Json } from "@/types/database.types"
+import type {
+  CadLabResult,
+  CadLabResearchResult,
+  CadLabInterfaceResult,
+  CadLabModule,
+  ClaudeModelId,
+} from "@/lib/cad-lab-types"
+
+// ─── Types ───────────────────────────────────────────────────────────
+
+/** Summary returned in project list (excludes large data) */
+export interface CadLabProjectSummary {
+  id: string
+  name: string
+  subject: string
+  status: string
+  stage: string
+  thumbnailSvg: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** Full project data for loading into the editor */
+export interface CadLabProjectData {
+  id: string
+  name: string
+  subject: string
+  modelId: ClaudeModelId
+  status: string
+  stage: string
+
+  /** Step 1 research results */
+  research: {
+    report: string
+    sources: Array<{ uri: string; title: string }>
+    referenceModels: Array<{ name: string; url: string }>
+    researchTime: number
+  } | null
+
+  /** Step 2 interface definition text */
+  interfaceDefinition: string | null
+
+  /** Step 3 generation results (without large binary data) */
+  result: Omit<CadLabResult, "stlData" | "stepData"> | null
+
+  /** Generated CadQuery code */
+  generatedCode: string | null
+
+  /** Decomposed modules */
+  modules: CadLabModule[] | null
+
+  createdAt: string
+  updatedAt: string
+}
+
+// ─── List Projects ───────────────────────────────────────────────────
+
+/**
+ * Lists all CAD Lab projects for the current user's foundry.
+ *
+ * @description Returns a summary list sorted by most recently updated.
+ * Excludes large data (research reports, code, results) for performance.
+ *
+ * @returns Array of project summaries or error
+ */
+export async function listCadLabProjects(): Promise<
+  { projects: CadLabProjectSummary[] } | { error: string }
+> {
+  return withAuth(async ({ supabase }) => {
+    const { data: projects, error } = await supabase
+      .from("cad_lab_projects")
+      .select("id, name, subject, status, stage, thumbnail_svg, created_at, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(50)
+
+    if (error) {
+      console.error("[CAD-LAB-PROJECTS] Failed to list projects:", error.message)
+      return { error: `Failed to list projects: ${error.message}` }
+    }
+
+    return {
+      projects: (projects || []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        subject: p.subject,
+        status: p.status,
+        stage: p.stage,
+        thumbnailSvg: p.thumbnail_svg,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+      })),
+    }
+  })
+}
+
+// ─── Load Project ────────────────────────────────────────────────────
+
+/**
+ * Loads a full CAD Lab project by ID.
+ *
+ * @description Returns all project data needed to restore the editor state.
+ * Excludes large binary data (STL/STEP) which can be regenerated from code.
+ *
+ * @param projectId - UUID of the project to load
+ * @returns Full project data or error
+ *
+ * @security RLS ensures users can only load projects in their foundry
+ */
+export async function loadCadLabProject(
+  projectId: string,
+): Promise<{ project: CadLabProjectData } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    // VALIDATION: Check UUID format
+    if (!projectId || !/^[0-9a-f-]{36}$/.test(projectId)) {
+      return { error: "Invalid project ID" }
+    }
+
+    const { data: project, error } = await supabase
+      .from("cad_lab_projects")
+      .select("*")
+      .eq("id", projectId)
+      .single()
+
+    if (error || !project) {
+      console.error("[CAD-LAB-PROJECTS] Failed to load project:", error?.message)
+      return { error: "Project not found" }
+    }
+
+    // Parse JSONB fields
+    const research = project.research as CadLabProjectData["research"]
+    const result = project.result as CadLabProjectData["result"]
+    const modules = (project.modules as CadLabModule[] | null) ?? null
+
+    return {
+      project: {
+        id: project.id,
+        name: project.name,
+        subject: project.subject,
+        modelId: (project.model_id || "claude-opus-4-6") as ClaudeModelId,
+        status: project.status,
+        stage: project.stage,
+        research,
+        interfaceDefinition: project.interface_definition,
+        result,
+        generatedCode: project.generated_code,
+        modules,
+        createdAt: project.created_at,
+        updatedAt: project.updated_at,
+      },
+    }
+  })
+}
+
+// ─── Create Project ──────────────────────────────────────────────────
+
+/**
+ * Creates a new CAD Lab project.
+ *
+ * @description Called when the user starts a new design. Creates a minimal
+ * project record that gets updated as pipeline steps complete.
+ *
+ * @param subject - Product description (what to model)
+ * @param modelId - Claude model to use
+ * @returns Created project ID or error
+ *
+ * @audit Logs project creation with foundry and user context
+ */
+export async function createCadLabProject(
+  subject: string,
+  modelId: ClaudeModelId = "claude-opus-4-6",
+): Promise<{ projectId: string } | { error: string }> {
+  return withAuth(async ({ supabase, foundryId, user }) => {
+    // VALIDATION: Subject is required
+    if (!subject.trim()) {
+      return { error: "Subject is required" }
+    }
+
+    // Generate a name from the subject (first ~50 chars)
+    const name = subject.length > 50 ? `${subject.slice(0, 47)}...` : subject
+
+    const { data, error } = await supabase
+      .from("cad_lab_projects")
+      .insert({
+        foundry_id: foundryId,
+        created_by: user.id,
+        name,
+        subject: subject.trim(),
+        model_id: modelId,
+        status: "draft",
+        stage: "design",
+      })
+      .select("id")
+      .single()
+
+    if (error) {
+      console.error("[CAD-LAB-PROJECTS] Failed to create project:", error.message)
+      return { error: `Failed to create project: ${error.message}` }
+    }
+
+    // AUDIT: Log project creation
+    console.info("[CAD-LAB-PROJECTS] Project created:", {
+      projectId: data.id,
+      foundryId,
+      userId: user.id,
+      subject: subject.slice(0, 50),
+    })
+
+    return { projectId: data.id }
+  })
+}
+
+// ─── Save Research (Step 1) ──────────────────────────────────────────
+
+/**
+ * Saves Step 1 research results to an existing project.
+ *
+ * @param projectId - Project to update
+ * @param research - Research results from Step 1
+ * @returns Success or error
+ */
+export async function saveCadLabResearch(
+  projectId: string,
+  research: CadLabResearchResult,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const researchData = {
+      report: research.report,
+      sources: research.sources,
+      referenceModels: research.referenceModels,
+      researchTime: research.researchTime,
+    }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({
+        research: researchData as unknown as Json,
+        status: "researched",
+      })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[CAD-LAB-PROJECTS] Failed to save research:", error.message)
+      return { error: `Failed to save research: ${error.message}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Save Interface Definition (Step 2) ──────────────────────────────
+
+/**
+ * Saves Step 2 interface definition to an existing project.
+ *
+ * @param projectId - Project to update
+ * @param interfaceDefinition - The text-only engineering plan
+ * @returns Success or error
+ */
+export async function saveCadLabInterface(
+  projectId: string,
+  interfaceDefinition: string,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({
+        interface_definition: interfaceDefinition,
+        status: "interface_ready",
+      })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[CAD-LAB-PROJECTS] Failed to save interface:", error.message)
+      return { error: `Failed to save interface: ${error.message}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Save Generation Result (Step 3) ─────────────────────────────────
+
+/**
+ * Saves Step 3 generation results to an existing project.
+ *
+ * @description Saves the CAD generation result excluding large binary data
+ * (STL/STEP). The generated code is saved separately for easy access.
+ * The isometric SVG is saved as a thumbnail for the project list.
+ *
+ * @param projectId - Project to update
+ * @param result - Generation result from Step 3
+ * @returns Success or error
+ */
+export async function saveCadLabResult(
+  projectId: string,
+  result: CadLabResult,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    // Strip large binary data before persisting to JSONB
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { stlData, stepData, ...resultWithoutBinary } = result
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({
+        result: resultWithoutBinary as unknown as Json,
+        generated_code: result.code || null,
+        thumbnail_svg: result.svgIso || null,
+        status: result.success ? "generated" : "interface_ready",
+      })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[CAD-LAB-PROJECTS] Failed to save result:", error.message)
+      return { error: `Failed to save result: ${error.message}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Save Modules ────────────────────────────────────────────────────
+
+/**
+ * Saves module decomposition results to an existing project.
+ *
+ * @param projectId - Project to update
+ * @param modules - Array of decomposed modules
+ * @returns Success or error
+ */
+export async function saveCadLabModules(
+  projectId: string,
+  modules: CadLabModule[],
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({
+        modules: modules as unknown as Json,
+      })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[CAD-LAB-PROJECTS] Failed to save modules:", error.message)
+      return { error: `Failed to save modules: ${error.message}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Rename Project ──────────────────────────────────────────────────
+
+/**
+ * Renames a CAD Lab project.
+ *
+ * @param projectId - Project to rename
+ * @param name - New name (max 200 chars)
+ * @returns Success or error
+ */
+export async function renameCadLabProject(
+  projectId: string,
+  name: string,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+    if (!name.trim()) return { error: "Name is required" }
+    if (name.length > 200) return { error: "Name must be 200 characters or less" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ name: name.trim() })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[CAD-LAB-PROJECTS] Failed to rename project:", error.message)
+      return { error: `Failed to rename: ${error.message}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Delete Project ──────────────────────────────────────────────────
+
+/**
+ * Deletes a CAD Lab project.
+ *
+ * @param projectId - Project to delete
+ * @returns Success or error
+ *
+ * @security RLS ensures only foundry members can delete
+ * @audit Logs deletion for audit trail
+ */
+export async function deleteCadLabProject(
+  projectId: string,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase, user }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .delete()
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[CAD-LAB-PROJECTS] Failed to delete project:", error.message)
+      return { error: `Failed to delete: ${error.message}` }
+    }
+
+    // AUDIT: Log deletion
+    console.info("[CAD-LAB-PROJECTS] Project deleted:", { projectId, userId: user.id })
+
+    return { success: true as const }
+  })
+}

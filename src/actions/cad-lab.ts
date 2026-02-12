@@ -21,6 +21,8 @@ import type {
   CadLabResult,
   CadLabResearchResult,
   CadLabInterfaceResult,
+  CadLabDecompositionResult,
+  CadLabModule,
 } from "@/lib/cad-lab-types"
 import { checkRateLimit } from "@/lib/security/rate-limit"
 import { createClient } from "@/lib/supabase/server"
@@ -702,29 +704,56 @@ ${CAD_INSTRUCTIONS}
 
 ${libraryPromptSection}
 
-ADDITIONAL RULES FOR THIS PIPELINE:
-- The final variable MUST be called "result" and be a cq.Workplane object
+EXECUTION ENVIRONMENT RULES:
+- The final variable MUST be called "result" and be a cq.Workplane or cq.Compound object
 - Do NOT include any cq.exporters calls — the execution environment handles export
 - Do NOT include any print() statements
-- Do NOT import os or use open()
+- Do NOT import os, sys, or use open(). Only import cadquery and math.
 - After assembling "result", also create "result_exploded" — a cq.Workplane that shows all major components translated apart along Z by 1.5× their height for visual separation. This produces an exploded assembly drawing. Wrap the result_exploded creation in a try/except so it never blocks the main result.
-- Output ONLY the Python code inside a single \`\`\`python code fence. No explanations before or after.`
+- Output ONLY the Python code inside a single \`\`\`python code fence. No explanations before or after.
+
+SELF-CONTAINED CODE (CRITICAL — violating this crashes execution):
+- Your script MUST be 100% self-contained. Every function you call MUST be defined with \`def\` in YOUR script.
+- Do NOT call external component library functions like kitchen_base_cabinet(), composite_front_door(), brushless_motor_outrunner(), bed_frame(), shower_tray(), casement_window(), etc.
+- These library functions are NOT available in the execution sandbox. If even ONE undefined function is called, the script crashes with NameError and produces NO output at all.
+- Build ALL geometry from scratch in your own make_*() functions using cq.Workplane primitives (.box(), .cylinder(), .extrude(), .cut(), etc.).
+- PRE-FLIGHT CHECK: Before outputting code, mentally trace every function call in your script and verify it has a matching \`def\` statement. If you find any call to a function you did not define, remove it or replace it with inline geometry.
+
+Z-COORDINATE / VERTICAL POSITION SANITY (prevents doubled heights):
+- When positioning components vertically, use EXACTLY ONE reference frame. Either:
+  (a) All z-offsets are ABSOLUTE from z=0 (ground level), OR
+  (b) All z-offsets are RELATIVE to a named base variable
+- NEVER add a base_z that already includes wall_height and THEN add wall_height again. This doubles the height.
+- Example of the BUG: roof_z = foundation_h + floor_h + wall_h  ... then later ...  .transformed(offset=(0, 0, roof_z + wall_h + rise/2))  ← wall_h is counted TWICE
+- CORRECT pattern: define roof_base_z = foundation_h + floor_h + wall_h ONCE, then position roof at roof_base_z + rise/2
+- VERIFY: After writing all z-positions, check that the highest point of the model matches the expected total height. If a house should be ~6000mm tall, the roof peak must be near 6000mm — not 9000mm or 12000mm.
+
+ASSEMBLY STRATEGY FOR COMPLEX MODELS:
+- For models with 20+ components (buildings, vehicles, complex machines), use cq.Assembly() at the top level instead of chaining .union() calls.
+- .union() chains on large models are O(n²) and WILL timeout. Use .union() only within small sub-groups (max 10 unions per sub-group).
+- Add each sub-group to the Assembly using .add() with a cq.Location for spatial placement.
+- The final line should be: result = assy.toCompound()
+- For simpler models (<15 components), the .union() chain pattern is fine.`
 
     const userPrompt = `Build a parametric CAD model of: ${description}
 
-=== RESEARCH REPORT ===
+=== RESEARCH REPORT (use these real dimensions — do NOT invent dimensions) ===
 ${researchReport}
 
-=== INTERFACE DEFINITION ===
+=== INTERFACE DEFINITION (implement EVERY component listed here) ===
 ${interfaceDefinition}
 
 Generate the complete CadQuery Python code following the methodology. The code must:
-1. Define every component as a function (make_componentname)
-2. Put all primary parameters at the top, calculate all derived values
-3. Include validation checks
-4. Assemble everything with union calls
-5. Assign the final assembly to a variable called "result"
-6. Create "result_exploded" showing all components spread apart along Z for an exploded view (wrap in try/except)
+1. Start with "import cadquery as cq" and "import math" (if needed)
+2. Define ALL primary parameters at the top with comments showing source dimensions
+3. Calculate ALL derived values from primary parameters (never hardcode derived values)
+4. Create a make_*() function for EACH component — each must build REAL geometry, no stubs
+5. For complex models (20+ components): use cq.Assembly() at the top level, .union() only in small sub-groups
+6. For simpler models: use the .union() assembly pattern
+7. CRITICAL: Every function you call MUST be defined with \`def\` in your script. Do NOT call external library functions.
+8. Verify all z-positions add up: the highest point should match the expected total height
+9. Assign the final assembly to a variable called "result"
+10. Create "result_exploded" showing all components spread apart along Z for an exploded view (wrap in try/except)
 
 If the research report or interface definition contains any unresolved questions or ambiguities, resolve them with your best engineering judgment and proceed. Do not ask for clarification — make the best decision and add a code comment noting the assumption.`
 
@@ -896,6 +925,165 @@ If the research report or interface definition contains any unresolved questions
       tokensIn: totalTokensIn,
       tokensOut: totalTokensOut,
       modelUsed: modelId,
+    }
+  }
+}
+
+// ─── Module Decomposition (exported) ─────────────────────────────────
+
+/** Prompt for decomposing a product into modules */
+const MODULE_DECOMPOSITION_PROMPT = `You are a senior systems engineer decomposing a product into physical sub-assemblies (modules) for engineering analysis and 3D CAD modelling.
+
+Given a product description and research report, break the product down into 4-8 distinct physical modules. Each module represents a sub-assembly that could be:
+- Designed independently
+- Procured from different suppliers
+- Tested separately
+- Modelled as its own 3D CAD model
+
+Output STRICTLY as a JSON array with this exact structure for each module:
+
+[
+  {
+    "id": "lowercase_no_spaces",
+    "name": "Human Readable Name",
+    "purpose": "One sentence: what this module does",
+    "inputs": ["Input stream or signal 1", "Input 2"],
+    "outputs": ["Output stream or signal 1"],
+    "keyParts": ["Part 1 with spec", "Part 2 with spec", "Part 3"],
+    "leadWeeks": 6,
+    "description": "1-2 paragraph technical description of what this module physically is, its operating principle, and key material choices.",
+    "whyItMatters": "Why this module is critical to the overall system.",
+    "failureModes": ["Failure mode 1", "Failure mode 2"],
+    "unknowns": ["Open question 1", "Open question 2"]
+  }
+]
+
+RULES:
+- Generate 4-8 modules (more for complex products, fewer for simple ones)
+- Each module MUST have at least 3 keyParts
+- leadWeeks should be realistic (1-2 for off-the-shelf, 4-8 for custom, 12+ for specialised)
+- Every module must have at least 1 input and 1 output
+- Modules should cover the ENTIRE product — no gaps
+- Use dimensions from the research report — do not invent new ones
+- If the research report mentions sub-components, those are good module candidates
+- Output ONLY the JSON array — no markdown, no explanation`
+
+/**
+ * Decomposes a product into physical modules based on the research report.
+ *
+ * @description After Step 1 research is complete, this action breaks the
+ * product into 4-8 physical sub-assemblies. Each module can then
+ * independently go through the 3-step CAD pipeline.
+ *
+ * @param description - Product description
+ * @param researchReport - Research report from Step 1
+ * @param modelId - Claude model to use
+ * @returns Array of decomposed modules
+ */
+export async function decomposeIntoModules(
+  description: string,
+  researchReport: string,
+  modelId: ClaudeModelId = "claude-opus-4-6",
+): Promise<CadLabDecompositionResult> {
+  // AUTH: Verify user is authenticated
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Unauthorized" } as unknown as CadLabDecompositionResult
+
+  // SECURITY: Rate limit
+  const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
+  if (rateLimitError) return { error: rateLimitError } as unknown as CadLabDecompositionResult
+
+  const start = Date.now()
+
+  try {
+    console.info("[CAD-LAB] Decomposing product into modules...")
+
+    const userPrompt = `Product: ${description}
+
+Research Report:
+${researchReport}
+
+Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
+
+    const { text, tokensIn, tokensOut } = await callClaude(
+      MODULE_DECOMPOSITION_PROMPT,
+      userPrompt,
+      modelId,
+      8192,
+    )
+
+    // Parse JSON from response (strip markdown fences if present)
+    let jsonText = text.trim()
+    if (jsonText.startsWith("```")) {
+      jsonText = jsonText.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "")
+    }
+
+    let rawModules: unknown[]
+    try {
+      rawModules = JSON.parse(jsonText)
+    } catch {
+      console.error("[CAD-LAB] Failed to parse module JSON:", jsonText.slice(0, 200))
+      return {
+        success: false,
+        error: "Failed to parse module decomposition — AI returned invalid JSON",
+        modules: [],
+        decompositionTime: Date.now() - start,
+        tokensIn,
+        tokensOut,
+      }
+    }
+
+    if (!Array.isArray(rawModules) || rawModules.length === 0) {
+      return {
+        success: false,
+        error: "AI returned empty or invalid module array",
+        modules: [],
+        decompositionTime: Date.now() - start,
+        tokensIn,
+        tokensOut,
+      }
+    }
+
+    // Validate and clean each module
+    const modules: CadLabModule[] = rawModules.map((raw) => {
+      const m = raw as Record<string, unknown>
+      return {
+        id: String(m.id || "unknown").toLowerCase().replace(/\s+/g, "_"),
+        name: String(m.name || "Unnamed Module"),
+        purpose: String(m.purpose || ""),
+        inputs: Array.isArray(m.inputs) ? m.inputs.map(String) : ["Input"],
+        outputs: Array.isArray(m.outputs) ? m.outputs.map(String) : ["Output"],
+        keyParts: Array.isArray(m.keyParts) ? m.keyParts.map(String) : [],
+        leadWeeks: typeof m.leadWeeks === "number" ? m.leadWeeks : 4,
+        description: String(m.description || ""),
+        whyItMatters: String(m.whyItMatters || ""),
+        failureModes: Array.isArray(m.failureModes) ? m.failureModes.map(String) : [],
+        unknowns: Array.isArray(m.unknowns) ? m.unknowns.map(String) : [],
+        status: "pending" as const,
+      }
+    })
+
+    console.info(
+      `[CAD-LAB] Decomposed into ${modules.length} modules in ${Date.now() - start}ms`,
+    )
+
+    return {
+      success: true,
+      modules,
+      decompositionTime: Date.now() - start,
+      tokensIn,
+      tokensOut,
+    }
+  } catch (error) {
+    console.error("[CAD-LAB] Module decomposition failed:", error instanceof Error ? error.message : error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Module decomposition failed",
+      modules: [],
+      decompositionTime: Date.now() - start,
+      tokensIn: 0,
+      tokensOut: 0,
     }
   }
 }

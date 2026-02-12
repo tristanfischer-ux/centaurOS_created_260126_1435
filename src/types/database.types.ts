@@ -2506,6 +2506,63 @@ export type Database = {
         }
         Relationships: []
       }
+      cad_lab_projects: {
+        Row: {
+          created_at: string
+          created_by: string
+          foundry_id: string
+          generated_code: string | null
+          id: string
+          interface_definition: string | null
+          model_id: string
+          modules: Json | null
+          name: string
+          research: Json | null
+          result: Json | null
+          stage: string
+          status: string
+          subject: string
+          thumbnail_svg: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          foundry_id: string
+          generated_code?: string | null
+          id?: string
+          interface_definition?: string | null
+          model_id?: string
+          modules?: Json | null
+          name?: string
+          research?: Json | null
+          result?: Json | null
+          stage?: string
+          status?: string
+          subject: string
+          thumbnail_svg?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          foundry_id?: string
+          generated_code?: string | null
+          id?: string
+          interface_definition?: string | null
+          model_id?: string
+          modules?: Json | null
+          name?: string
+          research?: Json | null
+          result?: Json | null
+          stage?: string
+          status?: string
+          subject?: string
+          thumbnail_svg?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       calendar_sync_mappings: {
         Row: {
           created_at: string

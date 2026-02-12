@@ -600,42 +600,105 @@ GABLE WALLS (triangular sections above eave line):
 - Alternatively, skip gable walls entirely and let the roof panels close the ends
 
 ROOF CONSTRUCTION:
-- Build each roof slope as a single rotated box: .transformed(rotate=(0, pitch_angle, 0)).box(...)
-- Two roof slopes + a ridge cap is sufficient for a pitched roof
-- Flat roofs are just horizontal boxes
+- Flat roofs are just horizontal boxes — simplest option.
+- For pitched/gable roofs, build each slope as a SINGLE tilted box.
+- NEVER chain two .transformed() calls (offset then rotate) — the rotation axis shifts unpredictably.
+- Instead, compute the center position of the tilted slab mathematically and place it with ONE .transformed().
+
+CONCRETE GABLE ROOF EXAMPLE (two slopes meeting at ridge):
+  import math
+  roof_pitch_deg = 20.0
+  half_span = house_width / 2 + overhang  # horizontal distance from center to eave
+  slope_length = house_length + 2 * overhang
+  slope_width = half_span / math.cos(math.radians(roof_pitch_deg))  # hypotenuse
+  roof_thickness = 200.0
+  ridge_z = eave_z + half_span * math.tan(math.radians(roof_pitch_deg))
+
+  # Left slope — compute center of tilted slab
+  left_center_y = house_width / 2 - half_span / 2  # midpoint between ridge and left eave
+  left_center_z = eave_z + (ridge_z - eave_z) / 2  # midpoint height
+  left_roof = (
+      cq.Workplane("XY")
+      .transformed(offset=(house_length / 2, left_center_y, left_center_z),
+                   rotate=(roof_pitch_deg, 0, 0))
+      .box(slope_length, slope_width, roof_thickness)
+  )
+
+  # Right slope — mirror the Y position and negate the pitch
+  right_center_y = house_width / 2 + half_span / 2
+  right_roof = (
+      cq.Workplane("XY")
+      .transformed(offset=(house_length / 2, right_center_y, left_center_z),
+                   rotate=(-roof_pitch_deg, 0, 0))
+      .box(slope_length, slope_width, roof_thickness)
+  )
+
+  roof = left_roof.union(right_roof)  # only 1 union for the entire roof
+
+KEY RULE: Use a SINGLE .transformed(offset=(...), rotate=(...)) call — not two chained .transformed() calls. Two chained calls rotate around the wrong axis and produce geometry at unpredictable positions.
 
 SUB-ASSEMBLY STRATEGY (critical for performance):
 - Do NOT union all building components into one mega-solid sequentially
-- Instead, group components into 6-10 SUB-ASSEMBLIES and union within each group:
-  structure = foundation.union(floor).union(walls).union(roof)
-  interior = partitions.union(doors).union(stairs)
-  fixtures = kitchen.union(bathroom)
-  result = structure.union(interior).union(fixtures)
-- This produces the same result but is dramatically faster and less error-prone
+- Instead, group components into 6-10 SUB-ASSEMBLIES and union within each group
 - Within each sub-assembly, keep to MAX 10 union operations
 
-ASSEMBLY API (preferred for large buildings with 20+ components):
-- For large buildings, use cq.Assembly() instead of .union() chains:
+ASSEMBLY API (MANDATORY for all architectural/building models):
+- For ALL buildings, houses, cabins, and structures, you MUST use cq.Assembly() at the top level.
+- Do NOT chain .union() at the top level for buildings. Top-level .union() chains on large models are O(n²) and WILL timeout.
+- Use .union() ONLY within small sub-groups (max 10 unions per sub-group).
+- Add each sub-group to the Assembly using .add() with a cq.Location for spatial placement.
+- Parts in an Assembly do NOT need to physically overlap (unlike .union()).
+- The final line MUST be: result = assy.toCompound()
+
+CONCRETE EXAMPLE — correct building assembly pattern:
+  import cadquery as cq
+  import math
+
+  # ... parameter definitions ...
+
+  def make_foundation(): ...     # returns cq.Workplane
+  def make_exterior_walls(): ... # returns cq.Workplane (hollow box with window cuts)
+  def make_interior_walls(): ... # returns cq.Workplane
+  def make_roof(): ...           # returns cq.Workplane
+  def make_floor_slab(): ...     # returns cq.Workplane
+  def make_staircase(): ...      # returns cq.Workplane
+  def make_kitchen(): ...        # returns cq.Workplane (cabinets + worktop unioned together)
+  def make_bathroom(): ...       # returns cq.Workplane
+
+  # Build sub-groups using .union() (max 10 unions per group)
+  structure = make_foundation()
+  structure = structure.union(make_floor_slab())
+  structure = structure.union(make_exterior_walls())
+
+  interior = make_interior_walls()
+  interior = interior.union(make_staircase())
+
+  fitout = make_kitchen()
+  fitout = fitout.union(make_bathroom())
+
+  roof = make_roof()
+
+  # TOP-LEVEL: Use Assembly (NOT .union()) to combine sub-groups
   assy = cq.Assembly()
-  assy.add(foundation, name="foundation", loc=cq.Location((0, 0, 0)))
-  assy.add(floor_slab, name="floor", loc=cq.Location((0, 0, foundation_h)))
-  assy.add(ext_walls, name="walls", loc=cq.Location((0, 0, foundation_h + slab_h)))
-  assy.add(roof, name="roof", loc=cq.Location((0, 0, wall_top_z)))
-  assy.add(interior_group, name="interior", loc=cq.Location((0, 0, foundation_h + slab_h)))
-  assy.add(furniture_group, name="furniture", loc=cq.Location((0, 0, foundation_h + slab_h)))
-- Each sub-group can still use .union() internally (e.g. all exterior walls unioned into one solid)
-- But the top-level assembly uses spatial placement, not boolean operations
-- This is DRAMATICALLY faster — O(n) instead of O(n²) for n components
-- To export: result = assy.toCompound()  # converts Assembly to a single Compound for STEP/STL export
-- Parts in an Assembly do NOT need to physically overlap (unlike .union())
+  assy.add(structure, name="structure", loc=cq.Location((0, 0, 0)))
+  assy.add(interior, name="interior", loc=cq.Location((0, 0, 0)))
+  assy.add(fitout, name="fitout", loc=cq.Location((0, 0, 0)))
+  assy.add(roof, name="roof", loc=cq.Location((0, 0, 0)))
+
+  result = assy.toCompound()
+
+WRONG PATTERN (do NOT do this for buildings):
+  # This chains .union() at the top level — it WILL timeout for large buildings
+  result = foundation.union(floor).union(walls).union(roof).union(interior).union(kitchen).union(bathroom)
 
 UNION BUDGET:
 - Maximum 80 total .union() calls across the ENTIRE script
 - Maximum 40 total .cut() calls across the ENTIRE script
-- Count them mentally before writing code. If you exceed these limits, use cq.Assembly() for top-level composition.
+- Count them mentally before writing code. If you exceed these limits, simplify.
+- Each sub-group should have MAX 10 .union() calls internally.
+- The top-level assembly uses cq.Assembly().add() — these do NOT count toward the union budget.
 - Example: instead of 4 separate wall functions unioned one-by-one, make ONE make_all_exterior_walls()
   function that builds them as a single compound solid, then add it to the Assembly
-- For buildings with 20+ components: use cq.Assembly() at the top level and only .union() within sub-groups
 
 FURNITURE AND FIXTURES (OPTIONAL — skip if structure already complex):
 - If the structure sub-assembly already has 40+ union/cut operations, SKIP furniture entirely
@@ -645,6 +708,15 @@ FURNITURE AND FIXTURES (OPTIONAL — skip if structure already complex):
 - Cap any loop that creates repeated elements (balusters, joists, rafters) to MAX 15 items
 - Maximum 10 furniture/fixture items total
 - Add furniture as a separate sub-group in the Assembly (not unioned into the structure)
+
+STAIRCASE GEOMETRY (critical — staircases waste union budget if modeled wrong):
+- NEVER model a staircase as N individual box risers unioned in a loop. A 15-step staircase built this way wastes 14 union budget slots.
+- Instead, model the staircase as a SINGLE solid ramp/wedge shape:
+  stair_block = cq.Workplane("XY").box(going, width, total_rise).translate((x, y, z))
+  # Cut a triangular wedge from the top to create the slope:
+  wedge_cut = cq.Workplane("XY").box(...).transformed(rotate=(0, 0, angle)).box(...)
+- Alternatively, use a simple rectangular box as the stair volume (acceptable simplification).
+- Guard rails: ONE solid panel, not individual balusters.
 
 DIMENSIONAL SANITY:
 - Building dimensions are in mm (a house is typically 3000-12000mm per axis)
@@ -658,7 +730,15 @@ CODE QUALITY REQUIREMENTS:
 - Include detailed inline comments explaining what each section builds.
 - Typical complete models are 400-800+ lines. Do NOT generate abbreviated or skeleton code.
 - If the interface definition lists 10 components, you must model all 10 with real geometry.
-- For complex body shapes (e.g. aerodynamic fuselage), use a rounded-rect extrusion as the base, then .cut() with angled solids to create tapers. Do NOT try to create complex wire profiles.`
+- For complex body shapes (e.g. aerodynamic fuselage), use a rounded-rect extrusion as the base, then .cut() with angled solids to create tapers. Do NOT try to create complex wire profiles.
+
+SELF-CONTAINED CODE (CRITICAL — violating this crashes execution):
+- Your script MUST be 100% self-contained. Every function you call MUST be defined with \`def\` in YOUR script.
+- Do NOT call external component library functions like kitchen_base_cabinet(), composite_front_door(), brushless_motor_outrunner(), bed_frame(), shower_tray(), casement_window(), etc.
+- These library functions may NOT be available in the execution sandbox. If even ONE undefined function is called, the script crashes with NameError and produces NO output at all.
+- Build ALL geometry from scratch in your own make_*() functions using cq.Workplane primitives (.box(), .cylinder(), .extrude(), .cut(), etc.).
+- The ONLY allowed imports are: \`import cadquery as cq\` and \`import math\`.
+- Before writing the final code, mentally trace every function call and verify it has a matching \`def\` in your script.`
 
     const result = await callClaude(
       systemPrompt,
@@ -676,9 +756,10 @@ Generate the FULL CadQuery Python code. Requirements:
 3. Calculate ALL derived values from primary parameters (never hardcode derived values)
 4. Create a make_*() function for EACH component in the interface definition
 5. Each function must build REAL geometry — no empty stubs, no "pass", no TODOs
-6. Use the assembly pattern: assy = None, then add() each component via union
+6. For buildings: use cq.Assembly() at the top level. Use .union() only within small sub-groups (max 10). For non-buildings: use the union assembly pattern.
 7. Include validation checks that verify dimensional constraints
-8. The LAST line MUST be exactly: result = assy (for Workplane) or result = assy.toCompound() (for Assembly)
+8. The LAST line MUST be: result = assy.toCompound() (for Assembly) or result = assy (for Workplane)
+9. CRITICAL: Your code must be 100% self-contained. Every function you call must be defined with def in your script. Do NOT call external library functions.
 
 This code will be executed in a CadQuery sandbox. The "result" variable must be a cq.Workplane or cq.Compound containing the complete assembled model. If using cq.Assembly(), call .toCompound() to convert it.`,
       "claude-opus-4-6",
@@ -715,6 +796,13 @@ This code will be executed in a CadQuery sandbox. The "result" variable must be 
         code += "\n\n# Expose assembly to execution sandbox\nresult = model\n"
       }
       // If none found, the Modal worker will still search for any cq.Workplane
+    }
+
+    // VALIDATION: Static analysis to catch common code-generation errors
+    // before sending to Modal (expensive 10-min execution)
+    const warnings = validateGeneratedCode(code)
+    if (warnings.length > 0) {
+      console.warn("[CadLabClaude] Code validation warnings:", warnings)
     }
 
     return {
@@ -857,4 +945,93 @@ function extractCode(text: string): string {
     return text.split("```")[1]?.split("```")[0]?.trim() ?? text.trim()
   }
   return text.trim()
+}
+
+// ─── Post-generation validation ──────────────────────────────────────
+
+/** Built-in Python/math functions allowed as bare calls in generated code. */
+const ALLOWED_BUILTINS = new Set([
+  "range", "len", "max", "min", "abs", "round", "int", "float", "str",
+  "print", "isinstance", "enumerate", "zip", "sorted", "reversed",
+  "list", "dict", "tuple", "set", "bool", "type", "sum", "any", "all",
+])
+
+/**
+ * Statically validates generated CadQuery code before sending to Modal.
+ * Catches common code-generation errors that would crash execution.
+ *
+ * @param code - Generated CadQuery Python code
+ * @returns Array of warning strings (empty = no issues found)
+ */
+function validateGeneratedCode(code: string): string[] {
+  const warnings: string[] = []
+
+  // 1. Detect undefined function calls
+  const definedFunctions = new Set<string>()
+  const defPattern = /^def\s+(\w+)\s*\(/gm
+  let defMatch: RegExpExecArray | null
+  while ((defMatch = defPattern.exec(code)) !== null) {
+    definedFunctions.add(defMatch[1])
+  }
+
+  // Find bare function calls (not method calls after a dot)
+  const callPattern = /(?<![.\w])(\w+)\s*\(/g
+  const calledFunctions = new Set<string>()
+  let callMatch: RegExpExecArray | null
+  while ((callMatch = callPattern.exec(code)) !== null) {
+    const name = callMatch[1]
+    // Skip Python keywords, CadQuery constructors, and common patterns
+    if (name === "cq" || name === "Workplane" || name === "Assembly"
+      || name === "Location" || name === "Vector" || name === "Compound"
+      || name === "def" || name === "class" || name === "if" || name === "for"
+      || name === "while" || name === "return" || name === "import"
+      || name === "from" || name === "except" || name === "raise"
+      || name === "lambda" || name === "not" || name === "and" || name === "or"
+      || name === "math" || name === "True" || name === "False" || name === "None"
+    ) continue
+    calledFunctions.add(name)
+  }
+
+  const undefinedCalls: string[] = []
+  for (const name of calledFunctions) {
+    if (!definedFunctions.has(name) && !ALLOWED_BUILTINS.has(name)) {
+      undefinedCalls.push(name)
+    }
+  }
+
+  if (undefinedCalls.length > 0) {
+    warnings.push(
+      `Undefined function calls detected (will crash with NameError): ${undefinedCalls.join(", ")}. `
+      + `Every function called must be defined with def in the script.`
+    )
+  }
+
+  // 2. Count union/cut operations
+  const unionCount = (code.match(/\.union\s*\(/g) ?? []).length
+  const cutCount = (code.match(/\.cut\s*\(/g) ?? []).length
+
+  if (unionCount > 80) {
+    warnings.push(
+      `Union budget exceeded: ${unionCount} .union() calls (max 80). `
+      + `Use cq.Assembly() for top-level composition to reduce unions.`
+    )
+  }
+  if (cutCount > 40) {
+    warnings.push(
+      `Cut budget exceeded: ${cutCount} .cut() calls (max 40). `
+      + `Simplify geometry or combine walls before cutting.`
+    )
+  }
+
+  // 3. Detect chained .transformed() antipattern
+  const chainedTransformed = /\.transformed\s*\([^)]*\)\s*\n?\s*\.transformed\s*\(/g
+  const chainedCount = (code.match(chainedTransformed) ?? []).length
+  if (chainedCount > 0) {
+    warnings.push(
+      `Chained .transformed() calls detected (${chainedCount} instances). `
+      + `Use a single .transformed(offset=(...), rotate=(...)) call instead.`
+    )
+  }
+
+  return warnings
 }
