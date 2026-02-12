@@ -29,6 +29,8 @@ import {
   Search,
   ArrowRight,
   RotateCcw,
+  Copy,
+  Check,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -58,6 +60,7 @@ export default function CadLabPage(): React.ReactNode {
   const [result, setResult] = useState<CadLabResult | null>(null)
   const [showCode, setShowCode] = useState(false)
   const [showInterface, setShowInterface] = useState(false)
+  const [codeCopied, setCodeCopied] = useState(false)
 
   // ── Step 1: Research ──
   const handleResearch = useCallback(async () => {
@@ -82,6 +85,18 @@ export default function CadLabPage(): React.ReactNode {
       setIsResearching(false)
     }
   }, [subject])
+
+  // ── Copy code to clipboard ──
+  const handleCopyCode = useCallback(async () => {
+    if (!result?.code) return
+    try {
+      await navigator.clipboard.writeText(result.code)
+      setCodeCopied(true)
+      setTimeout(() => setCodeCopied(false), 2000)
+    } catch (err) {
+      console.error("Failed to copy code:", err)
+    }
+  }, [result?.code])
 
   // ── Step 2: Generate ──
   const handleGenerate = useCallback(async () => {
@@ -643,9 +658,29 @@ export default function CadLabPage(): React.ReactNode {
                     <Code2 className="h-4 w-4" />
                     Generated Code
                   </CardTitle>
-                  <Button variant="ghost" size="sm" onClick={() => setShowCode(!showCode)}>
-                    {showCode ? "Hide" : "Show"}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopyCode}
+                      className="gap-1.5"
+                    >
+                      {codeCopied ? (
+                        <>
+                          <Check className="h-3.5 w-3.5" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" />
+                          Copy
+                        </>
+                      )}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setShowCode(!showCode)}>
+                      {showCode ? "Hide" : "Show"}
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               {showCode && (
