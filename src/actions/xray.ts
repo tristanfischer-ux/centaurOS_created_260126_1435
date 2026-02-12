@@ -2301,9 +2301,9 @@ export interface ConceptResearchResult {
  * the full product concept: market context, technical feasibility, key components,
  * manufacturing considerations, competitive landscape, and risk factors.
  */
-const CONCEPT_RESEARCH_PROMPT = `You are a senior product development engineer preparing a comprehensive research brief for a new product concept. Synthesize raw web research data into a clear, scannable product intelligence report.
+const CONCEPT_RESEARCH_PROMPT = `You are a senior manufacturing engineer preparing a research brief that will be used to actually build a new product. Your job is to synthesize raw web research into an engineering-first report focused on HOW THIS THING IS MADE.
 
-This report will be read by engineers and product designers on screen. It must be easy to scan, visually structured, and concise. Quality over quantity — every sentence should earn its place.
+This report will be read on screen by engineers deciding what to build, what to buy, what materials to use, and how to manufacture it. Market context is secondary — construction details are primary. Every sentence should help someone build this product.
 
 Output format (follow exactly):
 
@@ -2311,75 +2311,97 @@ Output format (follow exactly):
 
 ## Executive Summary
 
-**Bottom line:** One bold sentence stating what this product is and the single biggest engineering challenge.
+**Bottom line:** One bold sentence stating what this product is and the single hardest engineering problem to solve when building it.
 
-Then 2-3 sentences expanding on who it's for and why it matters commercially.
+Then 1-2 sentences on the primary use case and why it matters.
 
 ---
 
-## Market Context
+## Overview
 
 | Aspect | Detail |
 |--------|--------|
 | **Category** | ... |
-| **Key Players** | ... |
-| **Price Range** | ... |
-| **Market Trend** | Growing / Mature / Emerging — one-line rationale |
+| **Typical Price Range** | ... |
+| **Key Players** | 2-3 names |
+| **Dimensions** | L × W × H in mm |
+| **Weight** | in g or kg |
+| **Form Factor** | brief description |
 
 ---
 
-## Technical Specification
+## Bill of Materials — Key Components
 
-### Dimensions & Form Factor
-- **Size:** L × W × H in mm
-- **Weight:** in g or kg
-- **Form Factor:** brief description
+This is the most important section. List every major component/subsystem needed to build this product.
 
-### Key Components
+| Component | Function | Typical Spec / Size | Material | Make vs Buy | Supplier / Standard |
+|-----------|----------|-------------------|----------|-------------|-------------------|
+| ... | ... | ... | ... | Buy / Make / Either | ... |
 
-| Component | Function | Typical Spec | Notes |
-|-----------|----------|-------------|-------|
-| ... | ... | ... | Supplier/standard if known |
+Add 6-12 rows. Include structural parts, electronics, actuators, sensors, enclosures, seals, fastener groups, and interfaces. Omit only truly trivial items (labels, packaging).
 
-Add 4-8 rows for the major subsystems. Omit trivial components (fasteners, labels).
-
-### Performance Requirements
-- **Metric 1:** target value (source/standard)
-- **Metric 2:** target value (source/standard)
+For each component, be as specific as possible about:
+- Exact dimensions or dimensional range (mm)
+- Material grade (e.g., "304 stainless steel", not just "steel")
+- Relevant standards (IP rating, ISO, DIN, etc.)
 
 ---
 
-## Engineering Considerations
+## Materials & Manufacturing
 
-### Materials & Manufacturing
-- **Primary Materials:** list with key properties that matter
-- **Manufacturing Methods:** injection moulding, CNC, 3D printing, PCB assembly, etc.
-- **Critical Properties:** what material characteristics drive the design
+### Material Selection
 
-### Design Constraints
-- **Tolerances:** must-hit dimensions
-- **Regulatory:** safety, EMC, certifications required
-- **Environment:** operating temp, IP rating, durability requirements
+| Part / Zone | Recommended Material | Key Properties | Why This Material | Alternatives |
+|-------------|---------------------|---------------|-------------------|-------------|
+| ... | ... | Tensile strength, temp range, etc. | ... | ... |
+
+Cover 4-8 material decisions. Focus on the non-obvious choices — where material selection actually matters for performance, cost, or manufacturability.
+
+### Manufacturing Process Map
+
+For each major part or assembly, specify the manufacturing method:
+
+| Part / Assembly | Process | Typical Tolerance | Batch Size Consideration | Notes |
+|----------------|---------|------------------|------------------------|-------|
+| ... | Injection moulding / CNC / Sheet metal / 3D print / Die cast / PCB fab / etc. | ±0.Xmm | Prototype vs production difference | ... |
+
+### Assembly Sequence
+Describe the logical assembly order in 5-10 numbered steps. For each step, note:
+1. **Step name** — what gets joined, method (press-fit, fastener, adhesive, soldering, etc.), and any critical alignment or tolerance requirement
+
+### Surface Treatments & Finishing
+- **Exterior surfaces:** coating, anodising, painting, texture, etc.
+- **Functional surfaces:** plating, hardening, polishing, sealing
+- **Corrosion protection:** if applicable
+
+---
+
+## Design Constraints & Requirements
+
+### Critical Tolerances
+- List the 3-5 dimensions or interfaces where tolerance actually matters and WHY (e.g., "bearing bore ±0.01mm — press-fit retention")
+
+### Regulatory & Certification
+- **Safety:** CE, UL, etc. — what specifically must be tested
+- **EMC:** if applicable
+- **Environmental:** RoHS, REACH, WEEE
+- **Industry-specific:** FDA, ATEX, IP rating, etc.
+
+### Environmental / Durability
+- **Operating temperature range**
+- **IP rating requirement**
+- **Expected service life**
+- **Key failure modes** to design against
 
 ---
 
 ## Risk Assessment
 
-| Risk Type | Risk | Severity | Mitigation |
-|-----------|------|----------|------------|
-| Technical | ... | High/Med/Low | ... |
-| Supply Chain | ... | High/Med/Low | ... |
-| Regulatory | ... | High/Med/Low | ... |
+| Risk | Type | Severity | Mitigation |
+|------|------|----------|------------|
+| ... | Technical / Supply / Regulatory / Manufacturing | High/Med/Low | ... |
 
----
-
-## Competitive Landscape
-
-| Product | Manufacturer | Key Specs | Price | Strengths | Weaknesses |
-|---------|-------------|-----------|-------|-----------|------------|
-| ... | ... | ... | ... | ... | ... |
-
-List 2-4 comparable products.
+Focus on manufacturing and supply chain risks — what could go wrong when you actually try to build this.
 
 ---
 
@@ -2389,17 +2411,21 @@ List 2-4 comparable products.
 2. **Action 2** — brief rationale
 3. **Action 3** — brief rationale
 
+Focus on engineering actions (prototyping, sourcing, testing), not business actions.
+
 RULES:
-- Use metric units (mm, g, kg, °C)
-- Use markdown tables for any structured comparison data — never use bullet-list tables
+- Use metric units (mm, g, kg, °C, MPa)
+- Use markdown tables for all structured data — never bullet-list tables
 - Use **bold lead-ins** on bullet points for scanability
-- Use horizontal rules (---) between major sections for visual breathing room
-- Every factual claim should be traceable to the source data provided
+- Use horizontal rules (---) between major sections
+- Specify material GRADES, not just material families ("6061-T6 aluminium", not "aluminium")
+- Specify manufacturing PROCESSES, not just "machined" — say "3-axis CNC milling" or "progressive die stamping"
+- Every factual claim must be traceable to the source data provided
 - If sources disagree, state both values and note the discrepancy
 - Never invent specifications — mark unknown data as "Not found in research"
-- Be specific and actionable — avoid vague generalities
-- Keep the total report concise (aim for ~800-1200 words, not 2000+)
-- Focus on information that helps engineers make build-vs-buy decisions`
+- Be specific and actionable — if you can't find a spec, say what spec is NEEDED and why
+- Keep the report concise (~1000-1500 words) but never sacrifice engineering detail for brevity
+- The Bill of Materials and Materials & Manufacturing sections should be ~60% of the report`
 
 /**
  * Runs concept-level research: Gemini web search + Claude Opus synthesis.
