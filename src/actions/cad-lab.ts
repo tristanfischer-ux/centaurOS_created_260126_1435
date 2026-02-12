@@ -78,6 +78,73 @@ Motor-to-motor diagonal: ~302mm (for 5" props with clearance)
 Key constraint: motor-to-motor diagonal MUST be approximately 302mm.
 Arm length from body pivot to motor centre: ~140mm.`
 
+const SMARTPHONE_REFERENCE = `=== SMARTPHONE REFERENCE DIMENSIONS (validated) ===
+
+Overall: 146.7×71.5×7.9mm (iPhone 14 Pro-like)
+Display glass: 146.7×71.5×0.55mm (curved edges with 2.5D glass)
+Display panel: 144×70×0.45mm OLED with Dynamic Island cutout (26×8mm pill + 6mm circle)
+Face ID module: 26×8×5.4mm housing + front camera (Ø5mm) + dot projector (Ø3mm)
+Midframe: 146.7×71.5×7.9mm outer, hollow cavity (wall=1.5mm), 14× screw bosses (Ø4mm boss, Ø2.5mm hole)
+  - USB-C cutout: 9×3mm at bottom centre
+  - Speaker grille: 6× Ø1mm holes
+  - Power button: 3×10mm cutout, right edge at 50mm from top
+  - Volume buttons: 2× (3×8mm cutouts), left edge at 40mm and 52mm from top
+Main PCB: L-shaped, 60×40mm + 20×30mm extension, 1.2mm thick, 3× EMI shields (12×8×1.5mm with 0.5mm fillets)
+Battery: 70×35×4.0mm (rounded rect, r=8mm) + flex connector tab (5×3×0.2mm)
+MagSafe coil: Ø60×0.3mm at back centre, z offset 1mm from battery
+Taptic engine: 30×10×4mm at bottom
+Camera module: Bump 36×36×4mm, 2× lens rings (Ø14mm outer, Ø12mm inner, hollow), 2× lens barrels (Ø11×8mm protruding into body), flash (Ø5mm)
+Rear glass: 146.7×71.5×0.8mm with camera cutout (38×38mm square, centred at top-left 20mm from edges)
+
+Key constraints:
+- Z-stack sums to 7.9±0.2mm (back glass 0.55 + battery 4.0 + PCB 1.2 + display 0.45 + front glass 0.55 + gaps)
+- Camera bump protrudes 3mm above rear glass (total 3.8mm from back surface)
+- Button cutouts must align with internal switches on midframe
+- Screw boss positions: 4× corners (10mm from edges) + 10× perimeter (evenly spaced)
+
+For exploded view variant:
+- Explode gap: 18mm between layers
+- Layer order (bottom to top): rear_glass → camera_module → taptic_engine → magsafe_coil → battery → pcb → midframe → faceid_module → display_panel → display_glass
+- Each layer offset by cumulative (layer_thickness + explode_gap)`
+
+const VERTICAL_FARM_REFERENCE = `=== VERTICAL FARM TOWER REFERENCE DIMENSIONS (validated) ===
+
+Overall: 1100×1100×2400mm 4-level hydroponic NFT rack
+Structural frame: 4× corner posts (40×40mm square tube), height 2200mm
+  - Feet: 100×100×50mm pads with 4× M8 mounting holes (Ø9mm, 60mm square pattern)
+  - Cross-braces: 40×20mm rectangular tube at each level
+Growing level spacing: 500mm between tray centres (allows 400mm vertical clearance for plants)
+  - First level Z: 250mm from ground (after 50mm feet + 200mm clearance)
+  - Subsequent levels: Z = 250 + (level_num × 500), so [250, 750, 1250, 1750]mm
+
+NFT Trays (per level): 1000×200×80mm
+  - Wall thickness: 3mm (hollow, not solid)
+  - Lip height: 10mm above tray floor
+  - 5× NFT channels inside: each 180×40mm, hollow Ø6mm pipe, spaced 200mm apart
+  - Drain outlet: Ø10mm at low end (2% slope = 20mm drop over 1000mm length)
+  - Mounting tabs: 4× (20×20×3mm) with Ø4mm holes for M3 bolts
+
+LED arrays (per level): 4× bars, each 900×30×15mm
+  - Mounting brackets: 2× per bar (30×30×3mm L-brackets with Ø3.5mm holes)
+  - LED strip cavity: 900×28×10mm channel (hollow)
+  - Heat sink fins: 5mm tall, 2mm spacing (NOT modeled — too complex for CadQuery, just note in comments)
+
+Reservoir: 400×400×500mm beside rack (not underneath)
+  - Wall thickness: 5mm (hollow tank)
+  - Lid: 400×400×3mm with 2× access ports (Ø50mm for fill, Ø20mm for sensor)
+  - Pump mount: Internal boss 80×80×20mm at bottom with Ø60mm cutout for pump body
+  - Outlet: Ø16mm at top (15mm below lid) for riser pipe connection
+
+Water flow path (complete loop):
+  Reservoir → Pump (submersible) → Riser pipe (Ø16mm, height to top level) → Distribution headers (Ø12mm, one per level) → Drip emitters (Ø4mm, 10× per tray) → NFT channels → Tray gutters → Drain pipes (Ø10mm) → Return manifold (Ø20mm) → Reservoir inlet
+
+Key constraints:
+- Motor-to-motor diagonal: N/A (no motors in corners — this is structural)
+- Post positions: (±500, ±500, 0) from centre — forms 1000×1000mm square
+- Reservoir offset: (800, 0, 0) — beside rack, not underneath
+- Total BBox: ~1500×1100×2250mm (includes reservoir beside rack, posts, and top clearance)
+- Fill ratio: 5-8% (hollow trays, pipes, and reservoir — NOT solid blocks)`
+
 /** Target constraints for post-execution validation */
 const DRONE_TARGET = {
   motorDiagonalMm: 302,
@@ -89,6 +156,25 @@ const DRONE_TARGET = {
   maxBBoxZ: 200,
 }
 
+const SMARTPHONE_TARGET = {
+  thicknessMm: 7.9,
+  minBBoxX: 140,
+  maxBBoxX: 150,
+  minBBoxY: 68,
+  maxBBoxY: 75,
+  minBBoxZ: 7.5,  // Normal (non-exploded)
+  maxBBoxZ: 200,  // Exploded view
+}
+
+const VERTICAL_FARM_TARGET = {
+  minBBoxX: 1400,
+  maxBBoxX: 1600,
+  minBBoxY: 1000,
+  maxBBoxY: 1200,
+  minBBoxZ: 2100,
+  maxBBoxZ: 2500,
+}
+
 // ─── Pass 1: Interface Definition Prompt ─────────────────────────────
 
 /**
@@ -97,43 +183,54 @@ const DRONE_TARGET = {
  */
 const INTERFACE_SYSTEM_PROMPT = `You are an engineering planner for parametric CAD models. You are NOT writing code.
 
-Your job is to produce a text-only interface definition that will be used to generate CadQuery component functions. Every dimension must be a specific number in millimetres. The numbers must sum correctly — show the arithmetic.
+Your job is to produce a text-only interface definition that will be used to generate CadQuery component functions. Every dimension must be a specific number in millimetres. The numbers must sum correctly — show ALL arithmetic step-by-step.
+
+QUALITY STANDARD: Your interface definition should match the quality of these reference examples:
+- Vertical Farm Tower v2: 4-level hydroponic rack with space budget (foot_lift + first_level_z + i*level_spacing), component placement table (posts, trays, LEDs, reservoir), connection map (complete water loop), and derived constraints (level_z array calculated from spacing)
+- Smartphone Exploded View: 10-layer stack with explode_gap = 18mm, layer_z dictionary for each layer (display glass → panel → faceid → midframe → pcb → battery → magsafe → taptic → camera → rear glass), component placement with Z offsets
 
 Output EXACTLY this format:
 
 === SPACE BUDGET ===
 [Vertical/horizontal stack showing how components fit within the target envelope. Show dimensions and how they add up.]
+[SHOW ALL ARITHMETIC: If components stack vertically, show: base_z + component1_h + gap + component2_h + ... = total_h]
+[Example from Vertical Farm: foot_lift (50mm) + first_level_z (200mm) + 4 × level_spacing (500mm) = 2250mm total height]
 
 === COMPONENT PLACEMENT TABLE ===
-| Component | Qty | Size (mm) | Position (x,y,z) | Notes |
-|-----------|-----|-----------|-------------------|-------|
+| Component | Qty | Size (mm) | Position (x,y,z) | Sub-Features | Notes |
+|-----------|-----|-----------|-------------------|--------------|-------|
 [One row per unique component type. Position is the centre point.]
-[For each component, include functional sub-features if applicable:
- - Screw bosses / mounting points
- - Cutouts (ports, buttons, vents, grilles)
- - Hollow sections (wall thickness for shells/containers)
- - Sub-assemblies (shields, connectors, brackets, tabs)]
+[Sub-Features column is MANDATORY for these component types:
+ - Containers (trays, reservoirs, cases): Wall thickness, hollow cavity, drain outlets
+ - Electronics (PCB, battery): EMI shields, flex connector tabs, mounting holes
+ - Structural (frames, mounts): Screw bosses (dia + hole dia), cross-braces, ribs
+ - Functional (motors, cameras): Lens barrels, mounting flanges, connector cutouts
+ - Enclosures (body shells, covers): Button cutouts, port openings, speaker grille holes, screw boss locations]
+[Example from Smartphone: Midframe → Sub-Features: "14× screw bosses (Ø4mm boss, Ø2.5mm hole), USB-C cutout (9×3mm), speaker grille (6× Ø1mm holes), power/volume button cutouts"]
 
 === CONNECTION MAP ===
-[For assemblies with flows (water, air, electrical, structural loads), trace complete paths]
-Example:
-- Water: Reservoir → Pump → Riser → Headers → Drips → Trays → Drains → Return → Reservoir
-- Power: Battery → PCB → Components
-- Structure: Frame posts → Rails → Cross-braces → Mounting points
-[If no flows apply, write "N/A"]
+[For assemblies with flows (water, air, electrical, structural loads), trace COMPLETE paths from start to end]
+[MANDATORY: Show the path returns to the start (complete loop) OR terminates at a defined endpoint]
+Example from Vertical Farm:
+- Water (complete loop): Reservoir → Pump → Riser pipe → Distribution headers → Drip emitters → NFT trays → Gutter drains → Return pipe → Reservoir
+- Power: Battery → Main PCB → Distribution to: motors (4×), LEDs (16×), sensors (3×)
+- Structure: Corner posts (4×) → Horizontal rails → Cross-braces → Mounting plates
+[If no flows apply, write "N/A — Static assembly with no flow paths"]
 
 === DERIVED CONSTRAINTS ===
-- Target BBox: W×D×H mm
-- Motor-to-motor diagonal: N mm (calculated from positions)
-- Arm length: N mm
+- Target BBox: W×D×H mm (calculated from component positions, not guessed)
+- Critical dimensions: [Motor-to-motor diagonal, wheelbase, exploded spacing, etc.] = N mm (show calculation)
 - Total unique component types: N
+- Total component instances: N (sum of all qty values)
 
 === VALIDATION ARITHMETIC ===
-- BBox X: [calculation showing max_x - min_x]
-- BBox Y: [calculation showing max_y - min_y]
-- BBox Z: [calculation showing max_z - min_z]
-- Motor diagonal: sqrt((x2-x1)² + (y2-y1)²) = N mm
-- Conflicts: [list any overlapping components, or "None"]
+[SHOW ALL CALCULATIONS step-by-step — do not skip steps]
+- BBox X: max(all x + w/2) - min(all x - w/2) = [show calculation] mm
+- BBox Y: max(all y + d/2) - min(all y - d/2) = [show calculation] mm
+- BBox Z: max(all z + h/2) - min(all z - h/2) = [show calculation] mm
+- Critical dimension check: sqrt((x2-x1)² + (y2-y1)²) = N mm [if applicable]
+- Spatial conflicts: [Check each pair of components for overlap, list conflicts OR "None found"]
+[Example: Component A at (0,0,10) size 50×50×20 (bounds: x[-25,25] y[-25,25] z[0,20]) vs Component B at (30,0,10) size 40×40×20 (bounds: x[10,50] y[-20,20] z[0,20]) → X overlap [10,25] → CONFLICT]
 
 === STRUCTURED DATA (JSON) ===
 \`\`\`json
@@ -141,18 +238,20 @@ Example:
   "target_bbox": {"x": NUMBER, "y": NUMBER, "z": NUMBER},
   "motor_diagonal_mm": NUMBER,
   "components": [
-    {"name": "snake_case_name", "description": "Brief description", "w_mm": NUMBER, "d_mm": NUMBER, "h_mm": NUMBER, "qty": NUMBER},
+    {"name": "snake_case_name", "description": "Brief description with sub-features", "w_mm": NUMBER, "d_mm": NUMBER, "h_mm": NUMBER, "qty": NUMBER},
     ...
   ]
 }
 \`\`\`
 
 CRITICAL RULES:
+- SHOW ALL ARITHMETIC step-by-step (no "the calculation gives..." — show actual numbers and operations)
 - Every position must be calculated from named quantities, not eyeballed
-- The motor-to-motor diagonal MUST match the reference target (within 5mm)
-- Components must not overlap spatially
+- Sub-Features column is MANDATORY for containers, electronics, structural, functional, and enclosure components
+- Connection maps must show COMPLETE paths (loop back to start OR terminate at endpoint)
+- Components must not overlap spatially — check each pair and list conflicts
 - The JSON component list must match the placement table exactly
-- DO NOT WRITE ANY CODE`
+- DO NOT WRITE ANY CODE — this is pure engineering planning`
 
 // ─── Pass 2-N: Component Function Prompt ─────────────────────────────
 
@@ -162,6 +261,12 @@ CRITICAL RULES:
  */
 const COMPONENT_SYSTEM_PROMPT = `You are generating a single CadQuery component function. Follow the template exactly.
 
+QUALITY STANDARD: Your component should match the detail level of these reference examples:
+- Vertical Farm Tray: Hollow NFT tray (wall=3mm) with lip, drain outlet (Ø10mm), mounting tabs
+- Smartphone Midframe: Outer frame with hollow cavity, 14× screw bosses (Ø4mm boss + Ø2.5mm hole), USB-C cutout (9×3mm), speaker grille (6× Ø1mm holes), power/volume button cutouts, cross ribs for rigidity
+- Smartphone Camera Module: Camera bump, 2× lens rings (hollow), 2× lens barrels protruding into body, flash (Ø5mm)
+- Smartphone Main PCB: L-shaped board + 3× EMI shields (small boxes with 0.5mm fillets)
+
 TEMPLATE:
 \`\`\`python
 import cadquery as cq
@@ -170,7 +275,16 @@ import math
 def make_{component_name}(x=0, y=0, z=0):
     """
     {component_name}: {W}×{D}×{H} mm
+
+    Sub-features from interface definition:
+    {list sub-features here from interface table}
     """
+    # Parameters (from interface definition)
+    w = {W}
+    d = {D}
+    h = {H}
+    wall = 2  # Wall thickness for hollow sections
+
     result = (
         cq.Workplane("XY")
         .workplane(offset=z)
@@ -188,23 +302,25 @@ RULES:
 - Return a cq.Workplane object
 - Use .transformed(offset=..., rotate=...) for positioning and orientation
   — NEVER use .rotate() or .translate() on an existing body
+- **CRITICAL**: Containers (trays, reservoirs, cases, shells) MUST be hollow with wall thickness, NOT solid blocks
 - Fillets: allowed, but only on THIS component (before it gets unioned
   with anything else), maximum 3mm radius, use simple edge selectors
   like .edges(">Z") or .edges("|Z")
-- Use .box(centered=True), .circle().extrude(), .rect().extrude(), .cut(), .union()
+- Use .box(), .circle().extrude(), .rect().extrude(), .cut(), .union()
 - For angled features, use .transformed(rotate=(rx, ry, rz)) to set up
   the workplane before creating geometry
 - ALL derived dimensions must be calculated from named parameters at the top
 - Keep it under 80 lines
 - The function may accept extra parameters beyond (x, y, z) if the component
   needs them (e.g. angle for arms). Declare defaults for all extra params.
+- **Include sub-features** listed in the interface definition (screw bosses, cutouts, shields, tabs, etc.)
 
 SAFE PATTERNS (use these):
 
 1. Positioning:
    cq.Workplane("XY").workplane(offset=z).transformed(offset=(x, y, 0))
 
-2. Hollow containers (trays, reservoirs, frames):
+2. Hollow containers (trays, reservoirs, frames) — MANDATORY for container types:
    outer = wp.box(100, 50, 30)
    inner = wp.workplane(offset=wall).box(100 - wall*2, 50 - wall*2, 30)
    result = outer.cut(inner)
@@ -219,10 +335,37 @@ SAFE PATTERNS (use these):
 5. Sketches for complex 2D profiles:
    wp.sketch().rect(w, d).vertices().fillet(r).finalize().extrude(h)
 
-6. Screw bosses:
+6. Screw bosses (mounting points):
    boss = wp.circle(boss_dia/2).extrude(height)
    hole = wp.circle(screw_dia/2).extrude(height + 1)
    result = result.union(boss).cut(hole)
+
+7. EMI shields (small boxes on PCBs):
+   shield = wp.box(ew, eh, 1.5).edges("|Z").fillet(0.5)
+   result = result.union(shield.translate((ex, ey, ez)))
+
+8. Flex connector tabs (thin extrusions):
+   tab = wp.rect(tab_w, tab_h).extrude(0.2)
+   result = result.union(tab.translate((tab_x, tab_y, tab_z)))
+
+9. Lens barrels (nested cylinders):
+   outer_barrel = wp.circle(barrel_od/2).extrude(barrel_h)
+   inner_barrel = wp.circle(barrel_id/2).extrude(barrel_h + 1)
+   barrel = outer_barrel.cut(inner_barrel)
+   result = result.union(barrel.translate((lens_x, lens_y, lens_z)))
+
+10. Button/port cutouts (small holes or rectangular cuts):
+    cutout = wp.rect(cutout_w, cutout_h).extrude(wall + 1)
+    result = result.cut(cutout.translate((cutout_x, cutout_y, cutout_z)))
+
+11. Speaker grille holes (array of small circles):
+    for gx, gy in grille_positions:
+        hole = wp.circle(hole_dia/2).extrude(wall + 1)
+        result = result.cut(hole.translate((gx, gy, grille_z)))
+
+12. Drain outlets (circular cutouts with optional rim):
+    outlet_hole = wp.circle(outlet_dia/2).extrude(wall + 1)
+    result = result.cut(outlet_hole.translate((outlet_x, outlet_y, outlet_z)))
 
 OPTIONAL HELPER FUNCTIONS:
 If multiple components share a pattern (rounded rectangles, hollow cylinders),
@@ -241,21 +384,32 @@ AVOID (these crash or produce incorrect geometry):
 - cq.Workplane("YZ"), cq.Workplane("XZ") — use .transformed(rotate=...) instead
 - import os, open(), print(), cq.exporters
 
+CONTEXT FOR THIS COMPONENT:
+You have access to the FULL interface definition (not just this component's row) because you need to know:
+- Adjacent components (for correct interfaces and connections)
+- Overall assembly structure (for positioning and clearances)
+- Connection points (for mounting, flow paths, electrical connections)
+
 Output ONLY the Python code. No explanations.`
 
 // ─── Pass N+1: Assembly Prompt ───────────────────────────────────────
 
 const ASSEMBLY_SYSTEM_PROMPT = `You are assembling pre-validated CadQuery component functions into a complete model.
 
+QUALITY STANDARD: Your assembly should match the structure of these reference examples:
+- Vertical Farm Tower: result = make_body_shell() → for each corner: union(make_post(...)) → for each level: union(make_tray(...)), union(make_nft_channels(...)), union(make_led_array(...)) → union(make_reservoir(...))
+- Smartphone Exploded View: result = display_glass → union(display_panel) → union(faceid) → union(midframe) → union(pcb) → union(battery) → union(magsafe) → union(taptic) → union(camera) → union(rear_glass)
+
 RULES:
 - Do NOT modify any component function — paste them exactly as given
-- Assembly is ONLY .union() and .cut() calls — no new geometry creation
-- Positions come from the interface definition placement table
-- For components with qty > 1, call the function multiple times at each position
+- Assembly is ONLY .union() and .cut() calls — **NO NEW GEOMETRY CREATION**
+- Positions come from the interface definition placement table — **NOT INVENTED**
+- For components with qty > 1, call the function multiple times at each position (use loops or explicit calls)
 - The final variable MUST be called "result"
 - Import cadquery and math at the top
 - ALL parameters must be named variables (no magic numbers in union calls)
 - If a component needs position-specific parameters (like arm angle), pass them
+- Each union call should be one line: result = result.union(make_component(...))
 
 TEMPLATE:
 \`\`\`python
@@ -265,15 +419,34 @@ import math
 # === Component functions (pasted exactly as validated) ===
 {functions}
 
-# === Dimensions (from interface definition) ===
+# === Dimensions and positions (from interface definition) ===
 {dimension_variables}
+# Example from interface:
+# post_positions = [(x1, y1), (x2, y2), (x3, y3), (x4, y4)]
+# level_z = [z1, z2, z3, z4]
+# arm_angles = [0, 90, 180, 270]  # degrees
 
 # === Assembly ===
-result = make_body_shell()
+# Start with the first component (usually body/frame/base)
+result = make_body_shell(x=0, y=0, z=0)
+
 # Union each component at its interface-defined position
-result = result.union(make_arm(x=..., y=..., z=...))
+# For qty=1 components:
+result = result.union(make_reservoir(x=res_x, y=res_y, z=res_z))
+
+# For qty>1 components, use loops:
+for i, (px, py) in enumerate(post_positions):
+    result = result.union(make_post(x=px, y=py, z=0))
+
+for level_num, lz in enumerate(level_z):
+    result = result.union(make_tray(x=0, y=0, z=lz))
+    result = result.union(make_nft_channels(x=0, y=0, z=lz))
+    result = result.union(make_led_array(x=0, y=0, z=lz + led_offset))
+
 # ... one call per component instance
 \`\`\`
+
+CRITICAL: The component functions contain ALL geometry creation logic. The assembly script is ONLY responsible for calling those functions at the right positions and unioning the results. Do NOT create any boxes, circles, or geometry in the assembly section.
 
 Output ONLY the complete Python code. No explanations.`
 
@@ -639,7 +812,7 @@ async function searchCadModels(
     }> = data?.hits ?? data ?? []
 
     return hits
-      .filter((h): h is { name: string; public_url: string; description: string } =>
+      .filter((h): h is { name: string; public_url: string; description: string; preview_image?: string } =>
         Boolean(h.name && h.public_url),
       )
       .slice(0, 5)
@@ -661,11 +834,55 @@ async function searchCadModels(
 // ─── Pass 0: Build Reference Context ─────────────────────────────────
 
 /**
+ * Determines which hardcoded reference to use based on product description.
+ *
+ * @description Keyword matching to select the most relevant reference library.
+ * Falls back to drone reference if no match.
+ */
+function selectProductReference(description: string): string {
+  const lowerDesc = description.toLowerCase()
+
+  if (
+    lowerDesc.includes("phone") ||
+    lowerDesc.includes("smartphone") ||
+    lowerDesc.includes("iphone") ||
+    lowerDesc.includes("android") ||
+    lowerDesc.includes("mobile device") ||
+    lowerDesc.includes("exploded") && (lowerDesc.includes("electronics") || lowerDesc.includes("device"))
+  ) {
+    return SMARTPHONE_REFERENCE
+  }
+
+  if (
+    lowerDesc.includes("farm") ||
+    lowerDesc.includes("hydroponic") ||
+    lowerDesc.includes("nft") ||
+    lowerDesc.includes("vertical grow") ||
+    lowerDesc.includes("greenhouse")
+  ) {
+    return VERTICAL_FARM_REFERENCE
+  }
+
+  if (
+    lowerDesc.includes("drone") ||
+    lowerDesc.includes("quadcopter") ||
+    lowerDesc.includes("multirotor") ||
+    lowerDesc.includes("uav") ||
+    lowerDesc.includes("fpv")
+  ) {
+    return DRONE_REFERENCE
+  }
+
+  // Default fallback
+  return DRONE_REFERENCE
+}
+
+/**
  * Merges all reference sources into a single context string for Pass 1.
  *
  * @description Concatenates hardcoded library (safety net), web research
  * results, CAD model references, and user-pasted research. The hardcoded
- * library is always included as a fallback even if web search fails.
+ * library is selected based on product type.
  */
 function buildReferenceContext(
   hardcodedRef: string,
@@ -873,11 +1090,13 @@ async function generateSingleComponent(
   result: ComponentResult
   tokensIn: number
   tokensOut: number
+  safetyNetStrips: number
 }> {
   const MAX_RETRIES = 2
   let lastError = ""
   let totalTokensIn = 0
   let totalTokensOut = 0
+  let totalSafetyNetStrips = 0
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const retryContext =
@@ -907,6 +1126,7 @@ Generate ONLY the Python function following the template exactly. The function m
 
     const code = extractCode(text)
     const validation = validateComponentLocally(code, component.name)
+    totalSafetyNetStrips += validation.stripCount
 
     if (validation.valid) {
       return {
@@ -919,6 +1139,7 @@ Generate ONLY the Python function following the template exactly. The function m
         },
         tokensIn: totalTokensIn,
         tokensOut: totalTokensOut,
+        safetyNetStrips: totalSafetyNetStrips,
       }
     }
 
@@ -943,6 +1164,7 @@ Generate ONLY the Python function following the template exactly. The function m
     },
     tokensIn: totalTokensIn,
     tokensOut: totalTokensOut,
+    safetyNetStrips: totalSafetyNetStrips,
   }
 }
 
@@ -963,20 +1185,20 @@ Generate ONLY the Python function following the template exactly. The function m
 function validateComponentLocally(
   code: string,
   componentName: string,
-): { valid: boolean; code: string; error?: string; stripped: boolean } {
+): { valid: boolean; code: string; error?: string; stripped: boolean; stripCount: number } {
   // 1. Must contain a make_ function
   if (!code.includes("def make_")) {
-    return { valid: false, code, error: "No make_ function found", stripped: false }
+    return { valid: false, code, error: "No make_ function found", stripped: false, stripCount: 0 }
   }
 
   // 2. Must use cq.Workplane("XY")
   if (!code.includes('cq.Workplane("XY")')) {
-    return { valid: false, code, error: 'Must use cq.Workplane("XY")', stripped: false }
+    return { valid: false, code, error: 'Must use cq.Workplane("XY")', stripped: false, stripCount: 0 }
   }
 
   // 3. Must end with result = make_...()
   if (!code.match(/result\s*=\s*make_/)) {
-    return { valid: false, code, error: "Must assign result = make_...()", stripped: false }
+    return { valid: false, code, error: "Must assign result = make_...()", stripped: false, stripCount: 0 }
   }
 
   // 4. Check for banned patterns (hard failures)
@@ -995,13 +1217,14 @@ function validateComponentLocally(
 
   for (const { pattern, label } of hardBanned) {
     if (code.includes(pattern)) {
-      return { valid: false, code, error: `Contains banned pattern: ${label}`, stripped: false }
+      return { valid: false, code, error: `Contains banned pattern: ${label}`, stripped: false, stripCount: 0 }
     }
   }
 
   // 5. Safety net: strip soft-banned patterns (.rotate, .translate, .mirror, .moved)
   //    LOG when this fires — if it fires often, the prompt is broken
   let stripped = false
+  let stripCount = 0
   let cleaned = code
   const softBanned = [
     /\s*\.rotate\([^)]*\)/g,
@@ -1011,8 +1234,11 @@ function validateComponentLocally(
   ]
 
   for (const regex of softBanned) {
-    if (regex.test(cleaned)) {
-      console.warn(`[CAD-LAB] Safety net stripped banned operation from "${componentName}": ${regex.source}`)
+    const matches = cleaned.match(regex)
+    if (matches) {
+      const count = matches.length
+      stripCount += count
+      console.warn(`[CAD-LAB] Safety net stripped ${count} banned operation(s) from "${componentName}": ${regex.source}`)
       stripped = true
       cleaned = cleaned.replace(regex, "")
     }
@@ -1024,7 +1250,7 @@ function validateComponentLocally(
     .filter((line: string) => !/^\s*print\s*\(/.test(line))
     .join("\n")
 
-  return { valid: true, code: cleaned, stripped }
+  return { valid: true, code: cleaned, stripped, stripCount }
 }
 
 // ─── Pass N+1: Generate Assembly Script ──────────────────────────────
@@ -1120,7 +1346,8 @@ For components with qty > 1 in the interface (like arms, motors, propellers), ca
  * Validates Modal execution results against dimensional targets.
  *
  * @description Checks BBox within 10% of target, fill ratio < 15%,
- * STEP size > 500KB. Logs warnings but does NOT block the result —
+ * STEP size > 500KB, and validates orientation/geometry quality.
+ * Logs warnings but does NOT block the result —
  * a slightly wrong model is more useful than no model.
  *
  * @param bbox - Bounding box from Modal execution
@@ -1168,16 +1395,44 @@ function postExecutionValidation(
         warnings.push(`BBox Z=${bbox.zLen}mm outside expected ${DRONE_TARGET.minBBoxZ}-${DRONE_TARGET.maxBBoxZ}mm`)
       }
     }
+
+    // Check for degenerate or suspicious dimensions
+    if (bbox.xLen < 1 || bbox.yLen < 1 || bbox.zLen < 1) {
+      warnings.push(`BBox has degenerate dimension(s): ${bbox.xLen}×${bbox.yLen}×${bbox.zLen}mm — model may be empty or malformed`)
+    }
+
+    // Check aspect ratio for unrealistic proportions
+    const maxDim = Math.max(bbox.xLen, bbox.yLen, bbox.zLen)
+    const minDim = Math.min(bbox.xLen, bbox.yLen, bbox.zLen)
+    const aspectRatio = maxDim / minDim
+    if (aspectRatio > 50) {
+      warnings.push(`Extreme aspect ratio ${aspectRatio.toFixed(1)}:1 (max:min ${maxDim}mm:${minDim}mm) — may indicate missing components or thin extrusion errors`)
+    }
   } else {
-    warnings.push("No bounding box returned from Modal")
+    warnings.push("No bounding box returned from Modal — model may have failed to generate")
   }
 
-  if (fillRatio != null && fillRatio > 15) {
-    warnings.push(`Fill ratio ${fillRatio}% is too high (expected <15% for hollow shell)`)
+  // Fill ratio validation (hollow vs solid check)
+  if (fillRatio != null) {
+    if (fillRatio > 15) {
+      warnings.push(`Fill ratio ${fillRatio}% is too high (expected <15% for hollow shell) — components may be solid blocks instead of hollow`)
+    } else if (fillRatio < 1) {
+      warnings.push(`Fill ratio ${fillRatio}% is extremely low (<1%) — model may have too many voids or missing geometry`)
+    }
+  } else {
+    warnings.push("No fill ratio calculated — volume or BBox data missing")
   }
 
-  if (stepSizeKb != null && stepSizeKb < 500) {
-    warnings.push(`STEP size ${stepSizeKb}KB is small (expected >500KB for detailed model)`)
+  // STEP file size validation (quality proxy)
+  if (stepSizeKb != null) {
+    if (stepSizeKb < 50) {
+      warnings.push(`STEP size ${stepSizeKb}KB is very small (<50KB) — model likely has minimal geometry or failed to export properly`)
+    } else if (stepSizeKb < 500) {
+      warnings.push(`STEP size ${stepSizeKb}KB is small (expected >500KB for detailed model) — may lack sub-component detail`)
+    }
+    // No upper bound warning — large files are fine (more detail is good)
+  } else {
+    warnings.push("No STEP file size available — export may have failed")
   }
 
   if (warnings.length > 0) {
@@ -1285,8 +1540,9 @@ export async function runCadLabResearch(
       rawDataSections.push(`=== RAW WEB SEARCH RESULTS ===\n${webSpecs}`)
     }
 
-    // Always include hardcoded reference as baseline
-    rawDataSections.push(`=== HARDCODED REFERENCE LIBRARY ===\n${DRONE_REFERENCE}`)
+    // Always include hardcoded reference as baseline (select based on product type)
+    const selectedReference = selectProductReference(description)
+    rawDataSections.push(`=== HARDCODED REFERENCE LIBRARY ===\n${selectedReference}`)
 
     if (cadModels.length > 0) {
       const modelList = cadModels
@@ -1364,6 +1620,7 @@ export async function generateCadLabModel(
   const pipelineStart = Date.now()
   let totalTokensIn = 0
   let totalTokensOut = 0
+  let safetyNetStripsCount = 0  // Track how many times safety net strips operations
 
   try {
     // ── Pass 0: Reference data ──
@@ -1373,10 +1630,13 @@ export async function generateCadLabModel(
     let referenceModels: ThingiverseResult[] = []
     let referenceData: string
 
+    // Select appropriate hardcoded reference based on product type
+    const selectedReference = selectProductReference(description)
+
     if (researchContext && researchContext.trim().length > 100) {
       // Research report already provided — use it + hardcoded fallback
       console.info("[CAD-LAB] Pass 0: Using provided research report")
-      referenceData = buildReferenceContext(DRONE_REFERENCE, "", [], researchContext)
+      referenceData = buildReferenceContext(selectedReference, "", [], researchContext)
     } else {
       // No research report — run web search as fallback
       console.info("[CAD-LAB] Pass 0: No research report, running web search...")
@@ -1397,7 +1657,7 @@ export async function generateCadLabModel(
       }
 
       referenceData = buildReferenceContext(
-        DRONE_REFERENCE,
+        selectedReference,
         webSpecs,
         referenceModels,
         researchContext ?? "",
@@ -1502,6 +1762,7 @@ export async function generateCadLabModel(
       if (settled.status === "fulfilled") {
         totalTokensIn += settled.value.tokensIn
         totalTokensOut += settled.value.tokensOut
+        safetyNetStripsCount += settled.value.safetyNetStrips
 
         if (settled.value.result.valid) {
           validatedComponents.push(settled.value.result)
@@ -1517,6 +1778,13 @@ export async function generateCadLabModel(
     console.info(
       `[CAD-LAB] Components: ${validatedComponents.length} validated, ${skippedComponents.length} skipped`,
     )
+
+    // Safety net activation check: if >3 strips, alert user that prompt needs tuning
+    if (safetyNetStripsCount > 3) {
+      console.warn(
+        `[CAD-LAB] ⚠️  SAFETY NET ALERT: ${safetyNetStripsCount} banned operations were stripped during component generation. This indicates the COMPONENT_SYSTEM_PROMPT may need refinement. Review console warnings for details.`,
+      )
+    }
 
     if (validatedComponents.length === 0) {
       return {
