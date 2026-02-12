@@ -431,7 +431,7 @@ export async function generateCode(
   try {
     // Fetch available library components to include in the prompt
     const librarySummary = await fetchLibrarySummary()
-    const libraryPromptSection = formatLibraryForPrompt(librarySummary)
+    const libraryPromptSection = await formatLibraryForPrompt(librarySummary)
 
     const systemPrompt = `You are an expert CadQuery engineer generating production-quality parametric CAD models. Follow the methodology in this document EXACTLY — every rule was learned from real failures:
 

@@ -146,9 +146,9 @@ export async function fetchLibraryCode(
  * @param components - Array of library component summaries
  * @returns Formatted text block listing all available components
  */
-export function formatLibraryForPrompt(
+export async function formatLibraryForPrompt(
   components: LibraryComponentSummary[],
-): string {
+): Promise<string> {
   if (components.length === 0) return ""
 
   const lines = components.map((c) => {
@@ -192,7 +192,7 @@ LIBRARY USAGE RULES:
  * @param code - Generated CadQuery Python code
  * @returns Array of library slugs that appear as function calls in the code
  */
-export function detectLibraryUsage(code: string): string[] {
+export async function detectLibraryUsage(code: string): Promise<string[]> {
   const used: string[] = []
 
   for (const slug of LIBRARY_FUNCTION_SLUGS) {
@@ -220,7 +220,7 @@ export async function prepareCodeWithLibrary(
   code: string,
 ): Promise<{ combinedCode: string; libraryComponents: string[] }> {
   // Detect which library functions the code calls
-  const usedSlugs = detectLibraryUsage(code)
+  const usedSlugs = await detectLibraryUsage(code)
 
   if (usedSlugs.length === 0) {
     return { combinedCode: code, libraryComponents: [] }
