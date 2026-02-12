@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * @file page.tsx — Hidden CAD Lab for testing CadQuery generation (V2)
+ * @file page.tsx — Hidden CAD Lab for testing CadQuery generation (V3)
  *
  * @description Two-step flow:
  *   Step 1: Research — web search + Thingiverse + Claude synthesis → editable report
@@ -32,8 +32,6 @@ import {
   Copy,
   Check,
   Maximize2,
-  X,
-  Cube,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -41,12 +39,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import { runCadLabResearch, generateCadLabModel } from "@/actions/cad-lab"
 import { GEMINI_MODELS } from "@/lib/cad-lab-types"
 import { STLViewer } from "@/components/cad/stl-viewer"
+import { Markdown } from "@/components/ui/markdown"
 
 import type { CadLabResult, CadLabResearchResult, GeminiModelId } from "@/lib/cad-lab-types"
 
@@ -142,11 +140,14 @@ export default function CadLabPage(): React.ReactNode {
           <div className="h-8 w-1 rounded-full bg-international-orange" />
           <h1 className="text-2xl font-bold text-foreground">CAD Lab</h1>
           <span className="text-xs font-mono bg-muted text-muted-foreground px-2 py-1 rounded">
-            V2 / COMPONENT PIPELINE
+            V3 / COMPONENT PIPELINE
+          </span>
+          <span className="text-xs font-mono text-muted-foreground/60">
+            Updated 2026-02-12 @ 19:45 AEST
           </span>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Step 1: Research (Claude + web search) → Step 2: Generate (component pipeline + Modal).
+          Research → Generate → 3D Model. Component-decomposed pipeline with 6+ detailed parts.
         </p>
       </div>
 
@@ -231,52 +232,17 @@ export default function CadLabPage(): React.ReactNode {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Formatted markdown display */}
-            <div className="prose prose-sm max-w-none border rounded-md p-4 bg-muted/30">
-              {editableReport.split('\n').map((line, idx) => {
-                // Render markdown-style formatting
-                if (line.startsWith('# ')) {
-                  return <h1 key={idx} className="text-2xl font-bold mt-6 mb-3 text-foreground">{line.slice(2)}</h1>
-                }
-                if (line.startsWith('## ')) {
-                  return <h2 key={idx} className="text-xl font-semibold mt-5 mb-2 text-foreground">{line.slice(3)}</h2>
-                }
-                if (line.startsWith('### ')) {
-                  return <h3 key={idx} className="text-lg font-medium mt-4 mb-2 text-foreground">{line.slice(4)}</h3>
-                }
-                if (line.startsWith('- **')) {
-                  // Bold list items
-                  const match = line.match(/- \*\*(.*?)\*\*:?(.*)/)
-                  if (match) {
-                    return (
-                      <div key={idx} className="flex items-start gap-2 ml-4 my-1">
-                        <span className="text-muted-foreground">•</span>
-                        <div>
-                          <span className="font-semibold text-foreground">{match[1]}</span>
-                          {match[2] && <span className="text-muted-foreground">{match[2]}</span>}
-                        </div>
-                      </div>
-                    )
-                  }
-                }
-                if (line.startsWith('- ')) {
-                  return (
-                    <div key={idx} className="flex items-start gap-2 ml-4 my-1">
-                      <span className="text-muted-foreground">•</span>
-                      <span className="text-foreground">{line.slice(2)}</span>
-                    </div>
-                  )
-                }
-                if (line.trim() === '') {
-                  return <div key={idx} className="h-2" />
-                }
-                return <p key={idx} className="text-sm text-foreground leading-relaxed my-1">{line}</p>
-              })}
+            <div className="border rounded-md p-4 bg-muted/30">
+              <Markdown content={editableReport} className="text-sm text-foreground" />
             </div>
 
             {/* Editable textarea (collapsible) */}
+            <p className="text-xs text-muted-foreground">
+              {editableReport.length.toLocaleString()} characters — review and edit dimensions before generating.
+            </p>
             <details className="border rounded-md">
               <summary className="cursor-pointer p-3 text-sm font-medium hover:bg-muted/50 transition-colors">
-                Edit raw markdown ({editableReport.length.toLocaleString()} characters)
+                Edit raw markdown
               </summary>
               <div className="p-3 border-t">
                 <Textarea
@@ -547,7 +513,7 @@ export default function CadLabPage(): React.ReactNode {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Cube className="h-4 w-4" />
+                    <Box className="h-4 w-4" />
                     Views
                   </CardTitle>
                   <Button
