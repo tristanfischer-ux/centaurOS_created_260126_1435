@@ -96,6 +96,8 @@ interface ModuleExplorerProps {
   onOpenInterview?: (m: ModuleSpec) => void
   /** Callback to open the edit module dialog for a module */
   onEditModule?: (m: ModuleSpec) => void
+  /** Module ID to expand on mount (from deep-link navigation) */
+  defaultExpandedId?: string
 }
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -114,10 +116,36 @@ export function ModuleExplorer({
   onGenerateCadModel,
   onOpenInterview,
   onEditModule,
+  defaultExpandedId,
 }: ModuleExplorerProps): React.ReactNode {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(defaultExpandedId ?? null)
 
   const modules = spec.modules || []
+
+  // SYNC: When defaultExpandedId changes (e.g. useSearchParams hydrates after
+  // SSR), update the expanded state so the deep-linked module actually opens.
+  React.useEffect(() => {
+    if (defaultExpandedId) {
+      setExpandedId(defaultExpandedId)
+    }
+  }, [defaultExpandedId])
+
+  // AUTO-SCROLL: When deep-linked from concept page, scroll to the target module
+  const scrolledRef = React.useRef(false)
+  React.useEffect(() => {
+    if (defaultExpandedId && !scrolledRef.current) {
+      scrolledRef.current = true
+      // Brief delay to let the accordion expand and DOM settle
+      const timer = setTimeout(() => {
+        document.getElementById(`module-v2-${defaultExpandedId}`)?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        })
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [defaultExpandedId])
+
   if (modules.length === 0) return null
 
   return (
