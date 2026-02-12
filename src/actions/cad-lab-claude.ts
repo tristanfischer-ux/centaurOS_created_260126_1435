@@ -390,7 +390,7 @@ CRITICAL RULES:
     const result = await callClaude(
       systemPrompt,
       `Product: ${description}\n\nResearch Report (use these dimensions — do not invent new ones):\n${researchReport}\n\nGenerate the complete interface definition.`,
-      "claude-opus-4-6",
+      "claude-sonnet-4-20250514",
       8192,
     )
 
