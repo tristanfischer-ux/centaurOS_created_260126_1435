@@ -32,9 +32,11 @@ import {
     Zap,
     ExternalLink,
     CheckCircle2,
+    FlaskConical,
 } from 'lucide-react'
 import Link from 'next/link'
 import { ActOnThisButton } from '@/components/smart/act-on-this-button'
+import { InviteToCompanyButton } from '@/components/marketplace/invite-to-company-button'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
 interface MarketplaceDetailDialogProps {
@@ -108,6 +110,12 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                                             <Badge variant="secondary" className="gap-1 text-status-success bg-status-success-light border-0 text-xs">
                                                 <ShieldCheck className="w-3 h-3" aria-hidden="true" />
                                                 Verified
+                                            </Badge>
+                                        )}
+                                        {listing.is_demo && (
+                                            <Badge variant="secondary" className="gap-1 text-muted-foreground bg-muted border-0 text-xs">
+                                                <FlaskConical className="w-3 h-3" aria-hidden="true" />
+                                                Sample
                                             </Badge>
                                         )}
                                     </div>
@@ -226,6 +234,9 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                             </div>
 
                             <div className="flex flex-col sm:flex-row gap-3">
+                                {/* Invite to Company — shown to Founders for real People listings */}
+                                <InviteToCompanyButton listing={listing} />
+
                                 <Button className="flex-1 gap-2 h-12" asChild>
                                     <Link href={`/marketplace/${listing.id}/book`}>
                                         <CalendarDays className="w-4 h-4" />

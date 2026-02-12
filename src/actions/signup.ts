@@ -240,6 +240,29 @@ export async function signup(formData: FormData) {
     }
   }
 
+  // 3c. Auto-create provider profile for Executives/Apprentices so they can
+  // create marketplace listings without the provider-portal application flow.
+  // This is essential for the trial: they sign up, create a listing, get discovered.
+  if ((role === 'executive' || role === 'apprentice') && authData.user) {
+    const roleLabel = role === 'executive' ? 'Fractional Executive' : 'Apprentice';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: providerError } = await (supabase as any)
+      .from('provider_profiles')
+      .insert({
+        user_id: authData.user.id,
+        headline: roleLabel,
+        bio: null,
+        tier: 'approved', // Auto-approve for trial — skip application flow
+        is_active: true,
+        is_public: true,
+      });
+
+    if (providerError) {
+      // Non-critical — don't fail signup if provider profile creation fails
+      console.warn('[Signup] Failed to create provider profile:', providerError);
+    }
+  }
+
   // 3a. For suppliers, store their business info in onboarding_data for later use
   if (role === 'supplier' && businessName) {
     await supabase.from("profiles").update({

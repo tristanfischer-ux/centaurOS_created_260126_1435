@@ -50,6 +50,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import { getCategoryBadgeClasses, type MarketplaceCategory } from '@/lib/marketplace-colors'
+import { InviteToCompanyButton } from '@/components/marketplace/invite-to-company-button'
 import Link from 'next/link'
 
 /**
@@ -254,6 +255,8 @@ export function MarketplaceListingDialog({
                     <Button variant="outline" onClick={() => setOpen(false)}>
                         Close
                     </Button>
+                    {/* Invite to Company — Founders only, real People listings only */}
+                    <InviteToCompanyButton listing={listing} variant="compact" />
                     <Button asChild variant="secondary">
                         <Link href={`/marketplace/${listing.id}/book`}>
                             <Calendar className="h-4 w-4 mr-2" />

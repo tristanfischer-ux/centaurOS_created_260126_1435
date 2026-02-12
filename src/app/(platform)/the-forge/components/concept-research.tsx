@@ -163,23 +163,9 @@ export function ConceptResearch({
     }
   }, [idea, scanId, onResearchComplete])
 
-  // ── Auto-trigger research when idea exists but no report yet ──
-  // This removes the need for a separate "Research Product" button click.
-  // Runs once when the component mounts with a valid idea and no existing report.
-  const hasAutoTriggered = React.useRef(false)
-  useEffect(() => {
-    if (
-      idea.trim() &&
-      !hasReport &&
-      !isResearching &&
-      !isScanning &&
-      !savedResearch?.report &&
-      !hasAutoTriggered.current
-    ) {
-      hasAutoTriggered.current = true
-      handleResearch()
-    }
-  }, [idea, hasReport, isResearching, isScanning, savedResearch, handleResearch])
+  // NOTE: Auto-trigger removed. Research now runs BEFORE the scan in
+  // NewScanView, so by the time the user reaches the concept page the
+  // report is already saved. The "Re-research" button remains for manual use.
 
   // ── Save edited report ──
   const handleSaveEdits = useCallback(async (): Promise<void> => {

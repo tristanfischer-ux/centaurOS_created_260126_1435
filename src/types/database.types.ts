@@ -4687,6 +4687,7 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          is_demo: boolean
           is_self_created: boolean | null
           is_verified: boolean | null
           search_vector: unknown
@@ -4705,6 +4706,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_demo?: boolean
           is_self_created?: boolean | null
           is_verified?: boolean | null
           search_vector?: unknown
@@ -4723,6 +4725,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_demo?: boolean
           is_self_created?: boolean | null
           is_verified?: boolean | null
           search_vector?: unknown

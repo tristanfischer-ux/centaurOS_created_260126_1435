@@ -61,12 +61,18 @@ export async function GET(request: Request) {
         .eq('id', user.id)
         .single()
 
-      // Redirect based on account type first, then role
+      // Redirect based on account type and role
       let redirectPath = next
       
       // Suppliers go to supplier portal
       if (profile?.account_type === 'supplier') {
         redirectPath = '/supplier-portal'
+      } else if (profile?.role === 'Founder') {
+        // Founders go straight to their workspace
+        redirectPath = '/updates'
+      } else if (profile?.role === 'Executive' || profile?.role === 'Apprentice') {
+        // Executives/Apprentices create their marketplace listing first
+        redirectPath = '/marketplace-setup'
       } else {
         // Check if user has marketplace orders (buyer)
         const { count: orderCount } = await supabase
@@ -78,7 +84,7 @@ export async function GET(request: Request) {
           // User is a buyer with orders, redirect to buyer dashboard
           redirectPath = '/buyer'
         } else {
-          // All other users go to objectives page to see "Discover ForgeOS" objective
+          // All other users go to objectives page
           redirectPath = '/new-objectives'
         }
       }

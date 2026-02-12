@@ -11,10 +11,11 @@ import { getCategoryBadgeClasses, getAvatarGradient, type MarketplaceCategory } 
 import { 
     ShieldCheck, MapPin, Clock, Briefcase,
     GitCompareArrows, Mail, Eye, ChevronDown, ChevronUp,
-    Star, Calendar, Award, Globe, Wrench, Heart
+    Star, Calendar, Award, Globe, Wrench, Heart, FlaskConical
 } from "lucide-react"
 import { toast } from "sonner"
 import { MarketplaceListingDialog } from "./marketplace-listing-dialog"
+import { InviteToCompanyButton } from "./invite-to-company-button"
 
 export type CardSize = 'small' | 'medium' | 'full'
 
@@ -222,6 +223,12 @@ export const MarketCard = memo(function MarketCard({
                                     {listing.is_verified && (
                                         <ShieldCheck className="w-3.5 h-3.5 text-status-success shrink-0" />
                                     )}
+                                    {listing.is_demo && (
+                                        <span className="inline-flex items-center gap-0.5 text-[9px] text-muted-foreground bg-muted rounded px-1 py-0 shrink-0">
+                                            <FlaskConical className="w-2.5 h-2.5" />
+                                            Sample
+                                        </span>
+                                    )}
                                 </div>
                                 <h3 className="text-sm font-bold tracking-tight text-foreground truncate">
                                     {listing.title}
@@ -270,6 +277,12 @@ export const MarketCard = memo(function MarketCard({
                                     </Badge>
                                     {listing.is_verified && (
                                         <ShieldCheck className="w-4 h-4 text-status-success shrink-0" />
+                                    )}
+                                    {listing.is_demo && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0">
+                                            <FlaskConical className="w-3 h-3" />
+                                            Sample
+                                        </span>
                                     )}
                                 </div>
                                 <h3 className="text-base font-bold tracking-tight text-foreground truncate">
@@ -342,19 +355,24 @@ export const MarketCard = memo(function MarketCard({
                                 </button>
                             </div>
                             
-                            <MarketplaceListingDialog
-                                listing={listing}
-                                trigger={
-                                    <Button 
-                                        size="sm" 
-                                        variant="default"
-                                        className="h-8 text-xs shadow-sm"
-                                    >
-                                        <Eye className="w-3 h-3 mr-1" />
-                                        View
-                                    </Button>
-                                }
-                            />
+                            <div className="flex items-center gap-2">
+                                {/* Invite to Company — Founders only, real People listings only */}
+                                <InviteToCompanyButton listing={listing} variant="compact" />
+
+                                <MarketplaceListingDialog
+                                    listing={listing}
+                                    trigger={
+                                        <Button 
+                                            size="sm" 
+                                            variant="default"
+                                            className="h-8 text-xs shadow-sm"
+                                        >
+                                            <Eye className="w-3 h-3 mr-1" />
+                                            View
+                                        </Button>
+                                    }
+                                />
+                            </div>
                         </div>
                     </>
                 )}
@@ -378,6 +396,12 @@ export const MarketCard = memo(function MarketCard({
                                     </Badge>
                                     {listing.is_verified && (
                                         <ShieldCheck className="w-4 h-4 text-status-success shrink-0" />
+                                    )}
+                                    {listing.is_demo && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0">
+                                            <FlaskConical className="w-3 h-3" />
+                                            Sample
+                                        </span>
                                     )}
                                 </div>
                                 <h3 className="text-lg font-bold tracking-tight text-foreground">
@@ -494,6 +518,9 @@ export const MarketCard = memo(function MarketCard({
                             </div>
                             
                             <div className="flex items-center gap-2">
+                                {/* Invite to Company — Founders only, real People listings only */}
+                                <InviteToCompanyButton listing={listing} variant="compact" />
+                                
                                 <button
                                     onClick={handleSizeToggle}
                                     className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"

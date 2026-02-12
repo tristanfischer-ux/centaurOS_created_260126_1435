@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getActivityFeed } from '@/actions/activity'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { UpdatesLayout } from './updates-layout'
+import { FounderRecruitsBanner } from './founder-recruits-banner'
 
 export const revalidate = 60
 
@@ -38,11 +39,23 @@ export default async function UpdatesPage() {
 
   const initialItems = result.success && result.data ? result.data : []
 
+  // Fetch user role to conditionally show Founder recruits banner
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const isFounder = profile?.role === 'Founder'
+
   return (
-    <UpdatesLayout
-      initialItems={initialItems}
-      userId={user.id}
-      foundryId={foundryId}
-    />
+    <div>
+      {isFounder && <FounderRecruitsBanner />}
+      <UpdatesLayout
+        initialItems={initialItems}
+        userId={user.id}
+        foundryId={foundryId}
+      />
+    </div>
   )
 }

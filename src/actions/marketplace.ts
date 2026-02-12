@@ -172,6 +172,10 @@ export interface MarketplaceListing {
     attributes: Record<string, any>
     image_url: string | null
     is_verified: boolean
+    /** Whether this listing is demo/sample data vs a real user's listing */
+    is_demo: boolean
+    /** Provider profile ID linking to the real user who created this listing */
+    created_by_provider_id: string | null
 }
 
 /**

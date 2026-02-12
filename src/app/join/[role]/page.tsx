@@ -7,9 +7,15 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, ArrowRight, ArrowLeft, TestTube2 } from "lucide-react";
+import { Check, ArrowRight, ArrowLeft, TestTube2, Clock, Rocket } from "lucide-react";
 import { signup, submitApplication } from "@/actions/signup";
 import { getDemoAccountData, type DemoAccountData } from "@/actions/demo-accounts";
+
+/**
+ * Roles available during the trial period.
+ * All other roles render a "Coming Soon" page instead of the signup form.
+ */
+const TRIAL_ROLES = ['founder', 'executive', 'apprentice'] as const;
 
 // Error message component for displaying form errors
 function ErrorMessage() {
@@ -201,6 +207,71 @@ const roleConfigs: Record<string, RoleConfig> = {
     }
 };
 
+/**
+ * "Coming Soon" page for roles not included in the current trial.
+ * Shows a welcoming message and links to the available trial roles.
+ */
+function ComingSoonPage({ roleTitle }: { roleTitle: string }) {
+    return (
+        <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+            {/* Navigation */}
+            <nav className="px-4 sm:px-6 py-4 sm:py-6">
+                <div className="max-w-7xl mx-auto flex items-center justify-between">
+                    <Link href="/" className="text-white/80 hover:text-white text-sm font-mono uppercase tracking-widest flex items-center gap-2">
+                        <ArrowLeft className="w-4 h-4" />
+                        Back
+                    </Link>
+                    <Link href="/login" className="text-white/60 hover:text-white text-sm font-mono uppercase tracking-widest">
+                        Already a member? Login
+                    </Link>
+                </div>
+            </nav>
+
+            {/* Content */}
+            <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 text-center">
+                <div className="max-w-2xl mx-auto space-y-8">
+                    {/* Badge */}
+                    <div className="inline-flex items-center gap-2 px-4 py-2 border border-international-orange/30 bg-international-orange/10 rounded-full">
+                        <Clock className="w-4 h-4 text-international-orange" />
+                        <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
+                            Coming Soon
+                        </span>
+                    </div>
+
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight">
+                        {roleTitle} Access Is Coming
+                    </h1>
+                    <p className="text-lg text-white/60 leading-relaxed max-w-lg mx-auto">
+                        We&apos;re building something special for {roleTitle.toLowerCase()}s. 
+                        In the meantime, you can join ForgeOS as one of our core roles:
+                    </p>
+
+                    {/* Available roles */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+                        {[
+                            { role: 'founder', label: 'Founder', desc: 'Build your venture', icon: Rocket },
+                            { role: 'executive', label: 'Executive', desc: 'Deploy your expertise', icon: ArrowRight },
+                            { role: 'apprentice', label: 'Apprentice', desc: '10x your output', icon: ArrowRight },
+                        ].map(({ role, label, desc, icon: Icon }) => (
+                            <Link
+                                key={role}
+                                href={`/join/${role}`}
+                                className="group border border-white/10 hover:border-international-orange/50 rounded-xl p-6 text-left transition-all duration-200 hover:bg-white/5"
+                            >
+                                <Icon className="w-5 h-5 text-international-orange mb-3" />
+                                <h3 className="font-bold text-white group-hover:text-international-orange transition-colors">
+                                    {label}
+                                </h3>
+                                <p className="text-sm text-white/50 mt-1">{desc}</p>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function JoinPage({ params }: { params: Promise<{ role: string }> }) {
     const resolvedParams = use(params);
     const roleKey = resolvedParams.role.toLowerCase();
@@ -213,6 +284,12 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
     // Demo mode state
     const isDemoMode = searchParams.get('demo') === 'true';
     const [demoData, setDemoData] = useState<DemoAccountData | null>(null);
+
+    // Gate non-trial roles to "Coming Soon" page
+    const isTrialRole = (TRIAL_ROLES as readonly string[]).includes(roleKey);
+    if (!isTrialRole) {
+        return <ComingSoonPage roleTitle={config.title} />;
+    }
 
     // Check if this role has a video (currently only founder)
     const hasVideo = roleKey === "founder";

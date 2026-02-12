@@ -59,7 +59,7 @@ import type { Json } from "@/types/database.types"
  * @security Requires authenticated user with foundry context
  * @audit Logs scan creation with scanId, foundryId, userId
  */
-export async function scanIdeaAction(idea: string): Promise<
+export async function scanIdeaAction(idea: string, researchReport?: string): Promise<
   { scanId: string; spec: XRaySpec } | { error: string }
 > {
   return withAuth(async ({ supabase, user, foundryId }) => {
@@ -98,8 +98,8 @@ export async function scanIdeaAction(idea: string): Promise<
       return { error: `Failed to save scan: ${insertError.message}` }
     }
 
-    // AI scan
-    const spec = await scanIdeaService(idea.trim())
+    // AI scan — pass research report for grounded module decomposition
+    const spec = await scanIdeaService(idea.trim(), researchReport)
 
     // Update the row with the completed spec and mark as complete
     const { error: updateError } = await supabase
@@ -151,6 +151,7 @@ export async function refineScanAction(
   scanId: string,
   updatedIdea: string,
   currentSpec: XRaySpec,
+  researchReport?: string,
 ): Promise<{ scanId: string; spec: XRaySpec } | { error: string }> {
   return withAuth(async ({ supabase, user, foundryId }) => {
     // VALIDATION: Ensure idea is non-empty
@@ -167,8 +168,8 @@ export async function refineScanAction(
       .update({ scan_status: "scanning" })
       .eq("id", scanId)
 
-    // AI refine scan
-    const refinedSpec = await refineScanAI(updatedIdea.trim(), currentSpec)
+    // AI refine scan — pass research report for grounded refinement
+    const refinedSpec = await refineScanAI(updatedIdea.trim(), currentSpec, researchReport)
 
     // Persist refined spec and mark scan as complete
     const { error: updateError } = await supabase

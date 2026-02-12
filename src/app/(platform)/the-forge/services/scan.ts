@@ -83,11 +83,13 @@ Return a JSON object matching the provided schema exactly. Every module's IO sho
  * Calls the AI to reverse engineer a product idea into a structured machine spec.
  *
  * @param idea - The raw product/machine idea text
+ * @param researchReport - Optional product research report (from Gemini + Claude)
+ *   to provide grounded real-world data for better module generation
  * @returns The AI-generated XRaySpec (without runtime fields)
  *
  * @throws Error if AI call fails or response doesn't match schema
  */
-async function callScanAI(idea: string): Promise<AIScanOutput> {
+async function callScanAI(idea: string, researchReport?: string): Promise<AIScanOutput> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
     throw new Error("[XRayScan] OPENAI_API_KEY is not configured")
@@ -95,13 +97,23 @@ async function callScanAI(idea: string): Promise<AIScanOutput> {
 
   const openai = new OpenAI({ apiKey })
 
-  console.info("[XRayScan] Starting AI scan for idea:", { ideaLength: idea.length })
+  console.info("[XRayScan] Starting AI scan for idea:", {
+    ideaLength: idea.length,
+    hasResearch: !!researchReport,
+  })
+
+  // Build user message — include research report when available so GPT-4o
+  // can ground its module decomposition in real-world specs and standards
+  let userMessage = `Product idea to reverse engineer:\n\n${idea}`
+  if (researchReport?.trim()) {
+    userMessage += `\n\n--- PRODUCT RESEARCH (from web search) ---\n\n${researchReport.trim()}`
+  }
 
   const completion = await openai.chat.completions.parse({
     model: "gpt-4o-2024-08-06",
     messages: [
       { role: "system", content: SCAN_SYSTEM_PROMPT },
-      { role: "user", content: `Product idea to reverse engineer:\n\n${idea}` },
+      { role: "user", content: userMessage },
     ],
     response_format: zodResponseFormat(AIScanOutputSchema, "xray_scan"),
     max_tokens: 8192,
@@ -132,14 +144,14 @@ async function callScanAI(idea: string): Promise<AIScanOutput> {
  * @description Uses AI for reverse engineering, or mock data if XRAY_USE_MOCK=true.
  * The AI generates domain-specific diagnostic questions for the gating module.
  */
-export async function scanIdea(idea: string): Promise<XRaySpec> {
+export async function scanIdea(idea: string, researchReport?: string): Promise<XRaySpec> {
   // Mock mode for development
   if (USE_MOCK) {
     console.info("[XRayScan] Using mock mode")
     return mockScanIdea(idea)
   }
 
-  const aiOutput = await callScanAI(idea)
+  const aiOutput = await callScanAI(idea, researchReport)
 
   // Convert AI output to full XRaySpec
   const spec: XRaySpec = {
@@ -281,6 +293,7 @@ Follow the same output format and quality requirements as a fresh scan.`
 export async function refineScanAI(
   updatedIdea: string,
   currentSpec: XRaySpec,
+  researchReport?: string,
 ): Promise<XRaySpec> {
   if (USE_MOCK) {
     console.info("[XRayScan] Mock mode — returning fresh mock scan for refine")
@@ -300,16 +313,20 @@ export async function refineScanAI(
   console.info("[XRayScan] Starting AI refine scan:", {
     ideaLength: updatedIdea.length,
     existingModuleCount: currentSpec.modules.length,
+    hasResearch: !!researchReport,
   })
+
+  // Build user message — include research report when available
+  let userContent = `UPDATED IDEA:\n${updatedIdea}\n\nCURRENT SPECIFICATION:\n${currentSpecSummary}\n\nPlease produce an improved specification that incorporates the updated idea. Keep module IDs stable where the concept hasn't changed.`
+  if (researchReport?.trim()) {
+    userContent += `\n\n--- PRODUCT RESEARCH (from web search) ---\n\n${researchReport.trim()}`
+  }
 
   const completion = await openai.chat.completions.parse({
     model: "gpt-4o-2024-08-06",
     messages: [
       { role: "system", content: REFINE_SCAN_SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `UPDATED IDEA:\n${updatedIdea}\n\nCURRENT SPECIFICATION:\n${currentSpecSummary}\n\nPlease produce an improved specification that incorporates the updated idea. Keep module IDs stable where the concept hasn't changed.`,
-      },
+      { role: "user", content: userContent },
     ],
     response_format: zodResponseFormat(AIScanOutputSchema, "xray_scan"),
     max_tokens: 8192,

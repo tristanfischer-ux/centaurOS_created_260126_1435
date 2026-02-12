@@ -45,6 +45,7 @@ import {
   Diff,
   CheckCircle2,
   Puzzle,
+  Globe,
 } from "lucide-react"
 
 // ─── Educational Progress Steps ─────────────────────────────────────
@@ -58,19 +59,35 @@ interface InsightStep {
   description: string
 }
 
-/** Steps shown during a fresh scan — explains the full reverse-engineering process */
-const SCAN_INSIGHTS: InsightStep[] = [
+/** Steps shown during the research phase — explains the web search + synthesis */
+const RESEARCH_INSIGHTS: InsightStep[] = [
   {
     icon: Search,
-    title: "Analysing your concept",
+    title: "Searching the web",
     description:
-      "Breaking down your idea into its core engineering challenge — what physical transformation needs to happen?",
+      "Finding existing products, specifications, competitors, and engineering standards related to your concept.",
   },
   {
-    icon: Layers,
-    title: "Identifying subsystems",
+    icon: Globe,
+    title: "Gathering real-world data",
     description:
-      "Every machine is a collection of modules. We're mapping the distinct physical sub-assemblies your product needs.",
+      "Collecting materials, dimensions, pricing, and manufacturer details from multiple sources across the web.",
+  },
+  {
+    icon: ClipboardList,
+    title: "Synthesizing findings",
+    description:
+      "Turning raw web research into a structured engineering brief — specs, challenges, standards, and market context.",
+  },
+]
+
+/** Steps shown during the module creation phase — explains the AI decomposition */
+const SCAN_INSIGHTS: InsightStep[] = [
+  {
+    icon: Layers,
+    title: "Creating your modules",
+    description:
+      "Using the research data to identify the distinct physical sub-assemblies your product needs — grounded in real specs.",
   },
   {
     icon: GitBranch,
@@ -145,9 +162,13 @@ const INSIGHT_CYCLE_MS = 4500
 
 // ─── ScanProgressExplainer ──────────────────────────────────────────
 
+type CreatePhase = "idle" | "researching" | "creating"
+
 interface ScanProgressExplainerProps {
   /** Whether this is a refine (true) or fresh scan (false) */
   isRefine: boolean
+  /** Current creation phase — drives which insight set to show */
+  createPhase?: CreatePhase
 }
 
 /**
@@ -157,11 +178,25 @@ interface ScanProgressExplainerProps {
  * reverse-engineering process, plus a "what happens next" preview. Turns
  * wait time into a learning moment about how product engineering works.
  *
+ * For fresh scans, shows two sequential phases:
+ * 1. "Researching your product..." — web search + synthesis insights
+ * 2. "Creating your modules..." — AI decomposition insights
+ *
  * @param props.isRefine - Shows refine-specific messages when true
+ * @param props.createPhase - Current phase of the creation flow
  */
-function ScanProgressExplainer({ isRefine }: ScanProgressExplainerProps): React.ReactNode {
-  const insights = isRefine ? REFINE_INSIGHTS : SCAN_INSIGHTS
+function ScanProgressExplainer({ isRefine, createPhase }: ScanProgressExplainerProps): React.ReactNode {
+  const insights = isRefine
+    ? REFINE_INSIGHTS
+    : createPhase === "researching"
+      ? RESEARCH_INSIGHTS
+      : SCAN_INSIGHTS
   const [currentIndex, setCurrentIndex] = useState(0)
+
+  // Reset index when the phase (and therefore the insights set) changes
+  useEffect(() => {
+    setCurrentIndex(0)
+  }, [createPhase])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -242,6 +277,8 @@ interface ScanHeroProps {
   functionStatement: string
   /** Whether concept creation is in progress */
   isScanning: boolean
+  /** Current phase of the creation flow (for progress UI) */
+  createPhase?: CreatePhase
   /** Whether a completed spec already exists (modules.length > 0) */
   hasExistingSpec: boolean
   /** Called when user clicks create (fresh, from-scratch creation) */
@@ -269,6 +306,7 @@ export function ScanHero({
   idea,
   functionStatement,
   isScanning,
+  createPhase,
   hasExistingSpec,
   onScan,
   onRefine,
@@ -377,7 +415,9 @@ export function ScanHero({
               {isScanning ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Creating your concept...
+                  {createPhase === "researching"
+                    ? "Researching your product..."
+                    : "Creating your modules..."}
                 </>
               ) : (
                 <>
@@ -390,7 +430,10 @@ export function ScanHero({
 
           {/* Educational progress explainer — shown while scanning */}
           {isScanning && (
-            <ScanProgressExplainer isRefine={lastActionWasRefine && hasExistingSpec} />
+            <ScanProgressExplainer
+              isRefine={lastActionWasRefine && hasExistingSpec}
+              createPhase={createPhase}
+            />
           )}
 
           {functionStatement && !isScanning && (

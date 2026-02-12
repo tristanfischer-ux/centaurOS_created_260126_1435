@@ -375,10 +375,13 @@ export function ForgeProjectProvider({
     setScanStatus("scanning")
     toast.info("Creating concept — you can navigate away and come back.", { duration: 5000 })
 
+    // Pass existing research report so the refine benefits from grounded data
+    const existingResearch = project.researchReport?.report
+
     // Fire the scan — Realtime subscription will also update the UI,
     // but we still handle the direct response for the common case
     // where the user stays on the page.
-    refineScanAction(scanId, trimmed, specRef.current)
+    refineScanAction(scanId, trimmed, specRef.current, existingResearch)
       .then((result) => {
         if ("error" in result) {
           toast.error(result.error)
@@ -404,7 +407,7 @@ export function ForgeProjectProvider({
         setIsScanning(false)
         setScanStatus("idle")
       })
-  }, [scanId, handleGenerateImages])
+  }, [scanId, handleGenerateImages, project.researchReport])
 
   // ── Refine module ──
   const handleRefineModule = useCallback(async (editedModule: ModuleSpec): Promise<ModuleSpec> => {
