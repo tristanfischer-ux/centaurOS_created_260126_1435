@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
@@ -64,6 +64,11 @@ export function TasksCommandCenter({
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // Refs for keyboard handler to avoid stale closures
+  const filteredTasksRef = useRef<TaskWithData[]>([])
+  const showSearchRef = useRef(showSearch)
+  const selectedIdRef = useRef(selectedId)
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -74,14 +79,14 @@ export function TasksCommandCenter({
         setShowSearch(true)
       }
       if (e.key === 'Escape') {
-        if (showSearch) { setShowSearch(false); setSearchQuery('') }
-        else if (selectedId) setSelectedId(null)
+        if (showSearchRef.current) { setShowSearch(false); setSearchQuery('') }
+        else if (selectedIdRef.current) setSelectedId(null)
       }
-      // J/K navigation
+      // J/K navigation — uses ref to always have fresh filtered list
       if ((e.key === 'j' || e.key === 'k') && !e.metaKey && !e.ctrlKey) {
-        const filtered = getFilteredTasks()
+        const filtered = filteredTasksRef.current
         if (filtered.length === 0) return
-        const currentIdx = filtered.findIndex(t => t.id === selectedId)
+        const currentIdx = filtered.findIndex(t => t.id === selectedIdRef.current)
         if (e.key === 'j') {
           const next = currentIdx < filtered.length - 1 ? currentIdx + 1 : 0
           setSelectedId(filtered[next].id)
@@ -93,8 +98,7 @@ export function TasksCommandCenter({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSearch, selectedId])
+  }, [])
 
   // Compute summary stats
   const stats = useMemo(() => {
@@ -174,6 +178,11 @@ export function TasksCommandCenter({
   }, [tasks, quickFilter, searchQuery, currentUserId])
 
   const filteredTasks = useMemo(() => getFilteredTasks(), [getFilteredTasks])
+
+  // Keep refs in sync for keyboard handler (avoids stale closures)
+  filteredTasksRef.current = filteredTasks
+  showSearchRef.current = showSearch
+  selectedIdRef.current = selectedId
 
   const selectedTask = useMemo(
     () => tasks.find(t => t.id === selectedId) || null,

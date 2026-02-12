@@ -101,10 +101,12 @@ export async function createObjectiveFromInput(input: ObjectiveInput) {
     let aiAgentId: string | null = null
     const needsAIAgent = input.tasks.some(t => t.assignee_id === 'ai_agent')
     if (needsAIAgent) {
+        // SECURITY: Scope to foundry (RLS disabled on profiles)
         const { data: aiAgents } = await supabase
             .from('profiles')
             .select('id')
             .eq('role', 'AI_Agent')
+            .eq('foundry_id', foundry_id)
             .limit(1)
         aiAgentId = aiAgents?.[0]?.id || null
     }

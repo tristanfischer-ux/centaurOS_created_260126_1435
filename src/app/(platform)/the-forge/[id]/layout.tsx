@@ -61,6 +61,7 @@ export default async function ForgeProjectLayout({
     status: result.status,
     scanStatus: (result.scanStatus as "idle" | "scanning" | "complete") || "idle",
     thumbnailUrl: result.thumbnailUrl,
+    researchReport: result.researchReport ?? null,
     createdAt: result.createdAt,
     updatedAt: result.updatedAt,
   }

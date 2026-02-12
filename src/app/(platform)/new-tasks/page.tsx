@@ -64,20 +64,25 @@ export default async function NewTasksPage({ searchParams }: NewTasksPageProps) 
     )
   }
 
-  // Fetch message counts
-  const tasksWithMessageCounts = await Promise.all(
-    (tasks || []).map(async (task) => {
-      const { count } = await supabase
+  // Fetch message counts in a single aggregate query instead of N+1
+  const taskIds = (tasks || []).map((t) => t.id)
+  const { data: messageCounts } = taskIds.length > 0
+    ? await supabase
         .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('task_id', task.id)
+        .select('task_id')
+        .in('task_id', taskIds)
+    : { data: [] as { task_id: string }[] }
 
-      return {
-        ...task,
-        message_count: count || 0,
-      }
-    })
-  )
+  // Build a lookup map: task_id -> count
+  const messageCountMap = new Map<string, number>()
+  for (const row of messageCounts || []) {
+    messageCountMap.set(row.task_id, (messageCountMap.get(row.task_id) || 0) + 1)
+  }
+
+  const tasksWithMessageCounts = (tasks || []).map((task) => ({
+    ...task,
+    message_count: messageCountMap.get(task.id) || 0,
+  }))
 
   // Fetch related data
   const [{ data: objectives }, { data: membersData }, { data: teamsData }] = await Promise.all([

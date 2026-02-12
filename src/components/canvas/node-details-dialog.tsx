@@ -219,7 +219,7 @@ export function NodeDetailsDialog({
     (field: string, value: string) => {
       if (!details) return
       setDetails((prev) => (prev ? { ...prev, [field]: value } : prev))
-      pendingChangesRef.current[field] = value || null
+      pendingChangesRef.current[field] = value || undefined
       setIsDirty(true)
     },
     [details]

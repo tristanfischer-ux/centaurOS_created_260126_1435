@@ -2,6 +2,22 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 /**
+ * Validates redirect path to prevent open redirect attacks.
+ * Only allows relative paths (starting with /) that don't redirect to external domains.
+ * 
+ * @security Prevents open redirect via crafted next= parameter
+ */
+function sanitizeRedirectPath(path: string | null): string {
+  const defaultPath = '/new-objectives'
+  if (!path) return defaultPath
+  // SECURITY: Must be a relative path, not an absolute URL or protocol-relative URL
+  if (!path.startsWith('/') || path.startsWith('//') || path.includes('://')) {
+    return defaultPath
+  }
+  return path
+}
+
+/**
  * Auth callback handler for email confirmation and magic links.
  * When users click the verification link in their email, they are redirected here.
  * This route exchanges the code for a session and redirects to the dashboard.
@@ -9,7 +25,7 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-  const next = requestUrl.searchParams.get('next') || '/objectives'
+  const next = sanitizeRedirectPath(requestUrl.searchParams.get('next'))
   const error = requestUrl.searchParams.get('error')
   const errorDescription = requestUrl.searchParams.get('error_description')
 
@@ -63,7 +79,7 @@ export async function GET(request: Request) {
           redirectPath = '/buyer'
         } else {
           // All other users go to objectives page to see "Discover ForgeOS" objective
-          redirectPath = '/objectives'
+          redirectPath = '/new-objectives'
         }
       }
 

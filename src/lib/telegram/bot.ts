@@ -467,7 +467,7 @@ export function createTasksListKeyboard(tasks: TaskForDisplay[]): InlineKeyboard
     // Navigation
     buttons.push([
         { text: '🔄 Refresh', callback_data: 'tasks_refresh' },
-        { text: '📱 Open App', url: getBaseUrl() + '/tasks' },
+        { text: '📱 Open App', url: getBaseUrl() + '/new-tasks' },
     ])
 
     return { inline_keyboard: buttons }

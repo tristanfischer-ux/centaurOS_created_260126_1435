@@ -194,15 +194,27 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
         const { data: { user } } = await supabase.auth.getUser()
         if (user) setCurrentUserId(user.id)
 
+        // SECURITY: Get user's foundry_id to scope queries (RLS disabled on profiles)
+        const { data: userProfile } = user ? await supabase
+            .from('profiles')
+            .select('foundry_id')
+            .eq('id', user.id)
+            .single() : { data: null }
+
+        const foundryId = userProfile?.foundry_id
+        if (!foundryId) return
+
         const { data: profiles } = await supabase
             .from('profiles')
             .select('id, full_name, role')
+            .eq('foundry_id', foundryId)
 
         if (profiles) setDialogMembers(profiles)
 
         const { data: teams } = await supabase
             .from('teams')
             .select('id, name')
+            .eq('foundry_id', foundryId)
 
         if (teams) setDialogTeams(teams)
     }, [])
@@ -321,11 +333,14 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
         }
     }
 
-    const handleCreate = async () => {
+    const handleCreate = async (extendedDescriptionOverride?: string) => {
         // Reset errors
         setTitleError(null)
         setDescriptionError(null)
         setExtendedDescriptionError(null)
+
+        // Use override if provided (e.g., from guided wizard where setState is async)
+        const effectiveExtendedDescription = extendedDescriptionOverride ?? extendedDescription
 
         // Validate title
         if (!title.trim()) {
@@ -348,7 +363,7 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
         }
 
         // Validate extended description
-        if (extendedDescription && extendedDescription.trim().length > 50000) {
+        if (effectiveExtendedDescription && effectiveExtendedDescription.trim().length > 50000) {
             setExtendedDescriptionError("Extended description must be 50,000 characters or less")
             toast.error("Extended description must be 50,000 characters or less")
             return
@@ -358,7 +373,7 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
         const formData = new FormData()
         formData.append('title', title)
         formData.append('description', description)
-        formData.append('extendedDescription', extendedDescription)
+        formData.append('extendedDescription', effectiveExtendedDescription)
         formData.append('is_private', String(isPrivate))
         if (isPrivate && sharedWith.length > 0) {
             formData.append('share_with', JSON.stringify(sharedWith))
@@ -1361,12 +1376,13 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                                 <Button
                                     onClick={() => {
                                         // Build extended description from measurable + timeframe
+                                        // Pass directly to handleCreate to avoid async setState race condition
                                         const extDesc = [
                                             measurable && `## Success Criteria\n${measurable}`,
                                             suggestedTimeframe && `## Timeframe\n${suggestedTimeframe}`,
                                         ].filter(Boolean).join('\n\n')
                                         setExtendedDescription(extDesc)
-                                        handleCreate()
+                                        handleCreate(extDesc)
                                     }}
                                     disabled={isLoading || !title.trim()}
                                     className="min-w-[160px]"
@@ -1455,7 +1471,7 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                             </Button>
 
                             <Button
-                                onClick={handleCreate}
+                                onClick={() => handleCreate()}
                                 variant="default"
                                 disabled={isLoading || (mode === 'pack' && !selectedPack) || (mode === 'import' && selectedAnalysisIndex === null) || !title.trim()}
                                 className="min-w-[140px] shadow-sm"

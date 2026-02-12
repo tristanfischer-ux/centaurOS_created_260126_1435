@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import type { SectorSkill, RFQTemplate } from '@/types/review-gates'
 
@@ -105,11 +106,16 @@ export async function getExpertsForSector(
     const skillNames = (sectorSkills || []).map((s) => s.skill_name)
     if (skillNames.length === 0) return { data: [], error: null }
 
+    // SECURITY: Scope to foundry (RLS disabled on profiles)
+    const foundryId = await getFoundryIdCached()
+
     // Get team members with their skills
-    const { data: profiles, error: profilesError } = await supabase
+    let profilesQuery = supabase
       .from('profiles')
       .select('id, full_name, role, skills')
       .not('skills', 'is', null)
+    if (foundryId) profilesQuery = profilesQuery.eq('foundry_id', foundryId)
+    const { data: profiles, error: profilesError } = await profilesQuery
 
     if (profilesError) {
       console.error('Error fetching profiles:', profilesError)

@@ -261,7 +261,9 @@ export async function createObjective(formData: FormData) {
         }
 
         revalidatePath('/objectives')
+        revalidatePath('/new-objectives')
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -371,6 +373,7 @@ export async function updateObjective(
         })
 
         revalidatePath('/objectives')
+        revalidatePath('/new-objectives')
         revalidatePath(`/objectives/${objectiveId}`)
         return { success: true }
     })
@@ -474,6 +477,7 @@ export async function deleteObjective(id: string, childAction: 'keep' | 'cascade
         }
 
         revalidatePath('/objectives')
+        revalidatePath('/new-objectives')
         return { success: true }
     })
 }
@@ -530,6 +534,7 @@ export async function deleteObjectives(ids: string[], childAction: 'keep' | 'cas
         }
 
         revalidatePath('/objectives')
+        revalidatePath('/new-objectives')
         return { success: true }
     })
 }
@@ -659,6 +664,7 @@ export async function createObjectiveFromSubsystem(input: {
             })
 
             revalidatePath('/objectives')
+            revalidatePath('/new-objectives')
             return { objectiveId: objective.id }
 
         } catch (error) {
@@ -682,12 +688,13 @@ export async function updateObjectivePrivacy(
     isPrivate: boolean,
     shareTargets: { type: string; id: string }[]
 ) {
-    return withAuth(async ({ supabase, user }) => {
-        // AUTH: Verify user is the objective creator
+    return withAuth(async ({ supabase, user, foundryId }) => {
+        // AUTH: Verify user is the objective creator and objective belongs to foundry
         const { data: objective, error: fetchError } = await supabase
             .from('objectives')
             .select('id, creator_id')
             .eq('id', objectiveId)
+            .eq('foundry_id', foundryId)
             .single()
 
         if (fetchError || !objective) return { error: 'Objective not found' }
@@ -698,6 +705,7 @@ export async function updateObjectivePrivacy(
             .from('objectives')
             .update({ is_private: isPrivate })
             .eq('id', objectiveId)
+            .eq('foundry_id', foundryId)
 
         if (updateError) return { error: 'Failed to update privacy setting' }
 
@@ -726,6 +734,7 @@ export async function updateObjectivePrivacy(
         }
 
         revalidatePath('/objectives')
+        revalidatePath('/new-objectives')
         return {}
     })
 }
@@ -737,7 +746,17 @@ export async function updateObjectivePrivacy(
  * @returns Array of share targets with names for display
  */
 export async function getObjectiveShares(objectiveId: string) {
-    return withAuth(async ({ supabase }) => {
+    return withAuth(async ({ supabase, foundryId }) => {
+        // AUTH: Verify objective belongs to user's foundry before returning shares
+        const { data: objective, error: objError } = await supabase
+            .from('objectives')
+            .select('id')
+            .eq('id', objectiveId)
+            .eq('foundry_id', foundryId)
+            .single()
+
+        if (objError || !objective) return { data: [], error: 'Objective not found or access denied' }
+
         const { data: shares, error } = await supabase
             .from('objective_shares')
             .select(`

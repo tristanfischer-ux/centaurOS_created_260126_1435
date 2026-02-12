@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { confirmPayment } from '@/lib/payments/flow'
 import { sendNotification } from '@/lib/notifications'
 import { handleSubscriptionEvent } from '@/lib/billing/subscriptions'
+import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
 
 // Disable body parsing, we need raw body for webhook signature verification
 export const dynamic = 'force-dynamic'
@@ -773,6 +774,13 @@ async function handlePayoutPaid(payout: Stripe.Payout): Promise<void> {
  * SECURITY: Uses atomic idempotency check to prevent race conditions
  */
 export async function POST(request: NextRequest) {
+  // SECURITY: IP-based rate limit on webhook endpoint
+  const ip = getClientIP(request.headers)
+  const ipLimit = await rateLimit('webhook', `webhook:${ip}`)
+  if (!ipLimit.success) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+  }
+
   // Verify webhook signature
   const verification = await verifyWebhookSignature(request)
   if (verification.error || !verification.event) {

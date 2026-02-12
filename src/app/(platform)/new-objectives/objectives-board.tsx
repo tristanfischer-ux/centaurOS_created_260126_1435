@@ -285,7 +285,11 @@ export function ObjectivesBoard({
             <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90 focus:ring-destructive"
-              onClick={handleDelete}
+              onClick={async (e) => {
+                // Prevent dialog from closing until async delete completes
+                e.preventDefault()
+                await handleDelete()
+              }}
               disabled={isDeleting}
             >
               {isDeleting ? (

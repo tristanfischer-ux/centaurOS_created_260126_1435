@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
 import { TelegramUpdate, TelegramMessage, TelegramCallbackQuery, ParsedObjective } from '@/lib/telegram/types'
 import {
     sendMessage,
@@ -101,6 +102,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: false }, { status: 403 })
         }
 
+        // SECURITY: IP-based rate limit on webhook endpoint
+        const ip = getClientIP(req.headers)
+        const ipLimit = await rateLimit('webhook', `webhook:${ip}`)
+        if (!ipLimit.success) {
+            return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+        }
+
         const update: TelegramUpdate = await req.json()
         // SENSITIVE: Redacted PII from Telegram webhook logging
         console.log('[TelegramWebhook] Received update:', {
@@ -170,6 +178,16 @@ async function handleMessage(message: TelegramMessage) {
         await sendMessage({
             chat_id: chatId,
             text: `⚠️ Your Telegram isn't linked to ForgeOS yet.\n\nUse /start to get linking instructions, or enter your verification code with:\n/link YOUR_CODE`,
+        })
+        return
+    }
+
+    // SECURITY: Per-user rate limit on Telegram bot commands
+    const userRateLimit = await rateLimit('telegram', `telegram:${link.profile_id}`)
+    if (!userRateLimit.success) {
+        await sendMessage({
+            chat_id: chatId,
+            text: '⏳ You\'re sending commands too quickly. Please wait a bit and try again.',
         })
         return
     }

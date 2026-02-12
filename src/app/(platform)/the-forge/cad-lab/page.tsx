@@ -3,8 +3,10 @@
 /**
  * @file page.tsx — Hidden CAD Lab for testing CadQuery generation (V2)
  *
- * @description Component-decomposed pipeline: Interface Definition →
- * Component Functions → Assembly → Modal.
+ * @description Two-step flow:
+ *   Step 1: Research — web search + Thingiverse + Claude synthesis → editable report
+ *   Step 2: Generate — component-decomposed pipeline with the research report
+ *
  * Not linked from navigation. Access via /the-forge/cad-lab (behind platform auth).
  */
 
@@ -22,6 +24,11 @@ import {
   ChevronDown,
   ChevronRight,
   Layers,
+  Globe,
+  ExternalLink,
+  Search,
+  ArrowRight,
+  RotateCcw,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -30,25 +37,58 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 
-import { generateCadLabModel } from "@/actions/cad-lab"
+import { runCadLabResearch, generateCadLabModel } from "@/actions/cad-lab"
 import { GEMINI_MODELS } from "@/lib/cad-lab-types"
 
-import type { CadLabResult, GeminiModelId } from "@/lib/cad-lab-types"
+import type { CadLabResult, CadLabResearchResult, GeminiModelId } from "@/lib/cad-lab-types"
 
 export default function CadLabPage(): React.ReactNode {
+  // ── Input state ──
   const [subject, setSubject] = useState("DJI Mavic Air 2 quadcopter drone")
-  const [research, setResearch] = useState(DEFAULT_RESEARCH)
   const [modelId, setModelId] = useState<GeminiModelId>("gemini-2.5-pro")
-  const [isRunning, setIsRunning] = useState(false)
+
+  // ── Step 1: Research state ──
+  const [isResearching, setIsResearching] = useState(false)
+  const [researchResult, setResearchResult] = useState<CadLabResearchResult | null>(null)
+  const [editableReport, setEditableReport] = useState("")
+  const [showSources, setShowSources] = useState(false)
+
+  // ── Step 2: Generation state ──
+  const [isGenerating, setIsGenerating] = useState(false)
   const [result, setResult] = useState<CadLabResult | null>(null)
   const [showCode, setShowCode] = useState(false)
   const [showInterface, setShowInterface] = useState(false)
 
+  // ── Step 1: Research ──
+  const handleResearch = useCallback(async () => {
+    setIsResearching(true)
+    setResearchResult(null)
+    setResult(null)
+    setEditableReport("")
+    try {
+      const res = await runCadLabResearch(subject)
+      setResearchResult(res)
+      setEditableReport(res.report)
+    } catch (err) {
+      setResearchResult({
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+        report: "",
+        sources: [],
+        referenceModels: [],
+        researchTime: 0,
+      })
+    } finally {
+      setIsResearching(false)
+    }
+  }, [subject])
+
+  // ── Step 2: Generate ──
   const handleGenerate = useCallback(async () => {
-    setIsRunning(true)
+    setIsGenerating(true)
     setResult(null)
     try {
-      const res = await generateCadLabModel(subject, research || undefined, modelId)
+      const res = await generateCadLabModel(subject, editableReport || undefined, modelId)
       setResult(res)
     } catch (err) {
       setResult({
@@ -56,9 +96,18 @@ export default function CadLabPage(): React.ReactNode {
         error: err instanceof Error ? err.message : "Unknown error",
       })
     } finally {
-      setIsRunning(false)
+      setIsGenerating(false)
     }
-  }, [subject, research, modelId])
+  }, [subject, editableReport, modelId])
+
+  // ── Reset to start over ──
+  const handleReset = useCallback(() => {
+    setResearchResult(null)
+    setEditableReport("")
+    setResult(null)
+  }, [])
+
+  const hasResearch = researchResult?.success && editableReport.trim().length > 0
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -72,15 +121,25 @@ export default function CadLabPage(): React.ReactNode {
           </span>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Interface Definition → Component Functions → Assembly → Modal.
-          Decomposed pipeline with local validation.
+          Step 1: Research (Claude + web search) → Step 2: Generate (component pipeline + Modal).
         </p>
       </div>
 
-      {/* Input */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* STEP 1: RESEARCH                                               */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Generate</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Search className="h-4 w-4" />
+            Step 1: Research
+            {researchResult?.success && (
+              <span className="text-xs font-normal text-status-success flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                Complete ({(researchResult.researchTime / 1000).toFixed(1)}s)
+              </span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -90,53 +149,205 @@ export default function CadLabPage(): React.ReactNode {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="e.g., DJI Mavic Air 2 quadcopter drone"
+              disabled={isResearching || isGenerating}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="model">Model</Label>
-            <select
-              id="model"
-              value={modelId}
-              onChange={(e) => setModelId(e.target.value as GeminiModelId)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleResearch}
+              disabled={isResearching || isGenerating || !subject.trim()}
+              variant={hasResearch ? "secondary" : "default"}
             >
-              {GEMINI_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="research">
-              Research Context{" "}
-              <span className="text-muted-foreground font-normal">(real dimensions, components)</span>
-            </Label>
-            <Textarea
-              id="research"
-              value={research}
-              onChange={(e) => setResearch(e.target.value)}
-              className="font-mono text-xs min-h-[200px]"
-              placeholder="Paste real-world specs, dimensions, component details..."
-            />
-          </div>
-          <Button onClick={handleGenerate} disabled={isRunning || !subject.trim()}>
-            {isRunning ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Pipeline running (~35-40s)...
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4 mr-2" />
-                Generate CAD Model
-              </>
+              {isResearching ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Researching...
+                </>
+              ) : hasResearch ? (
+                <>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Re-Research
+                </>
+              ) : (
+                <>
+                  <Search className="h-4 w-4 mr-2" />
+                  Research Product
+                </>
+              )}
+            </Button>
+            {hasResearch && (
+              <Button variant="ghost" size="sm" onClick={handleReset}>
+                Start Over
+              </Button>
             )}
-          </Button>
+          </div>
+
+          {/* Research error */}
+          {researchResult && !researchResult.success && researchResult.error && (
+            <div className="p-3 bg-status-error-light rounded text-sm text-destructive font-mono">
+              {researchResult.error}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Results */}
+      {/* ── Research Report (editable) ── */}
+      {hasResearch && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Research Report
+              <span className="text-xs font-normal text-muted-foreground">
+                (synthesized by Claude — edit before generating)
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Textarea
+              value={editableReport}
+              onChange={(e) => setEditableReport(e.target.value)}
+              className="font-mono text-xs min-h-[400px]"
+              disabled={isGenerating}
+            />
+            <p className="text-xs text-muted-foreground">
+              {editableReport.length.toLocaleString()} characters — review and edit dimensions before generating.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Research Sources (expandable) ── */}
+      {researchResult?.success &&
+        ((researchResult.sources.length > 0) || (researchResult.referenceModels.length > 0)) && (
+        <Card>
+          <CardHeader>
+            <button
+              onClick={() => setShowSources(!showSources)}
+              className="flex items-center justify-between w-full text-left"
+            >
+              <CardTitle className="text-base flex items-center gap-2">
+                <Globe className="h-4 w-4" />
+                Research Sources
+                <span className="text-xs font-normal text-muted-foreground">
+                  ({researchResult.sources.length} web + {researchResult.referenceModels.length} CAD refs)
+                </span>
+              </CardTitle>
+              {showSources ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+          </CardHeader>
+          {showSources && (
+            <CardContent className="space-y-4">
+              {researchResult.sources.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Web Sources (Gemini + Google Search)
+                  </p>
+                  <ul className="space-y-1">
+                    {researchResult.sources.map((source, i) => (
+                      <li key={i} className="text-xs font-mono flex items-start gap-1.5">
+                        <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <a
+                            href={source.uri}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-electric-blue hover:underline truncate block"
+                          >
+                            {source.title || source.uri}
+                          </a>
+                          {source.title && (
+                            <span className="text-muted-foreground truncate block">{source.uri}</span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {researchResult.referenceModels.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Thingiverse Reference Models
+                  </p>
+                  <ul className="space-y-1">
+                    {researchResult.referenceModels.map((model, i) => (
+                      <li key={i} className="text-xs font-mono flex items-center gap-1.5">
+                        <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                        <a
+                          href={model.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-electric-blue hover:underline"
+                        >
+                          {model.name}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* STEP 2: GENERATE                                               */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {hasResearch && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Play className="h-4 w-4" />
+              Step 2: Generate CAD Model
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="model">Gemini Model</Label>
+              <select
+                id="model"
+                value={modelId}
+                onChange={(e) => setModelId(e.target.value as GeminiModelId)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                disabled={isGenerating}
+              >
+                {GEMINI_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button
+              onClick={handleGenerate}
+              disabled={isGenerating || !hasResearch}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Pipeline running (~35-40s)...
+                </>
+              ) : (
+                <>
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Generate from Research
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* GENERATION RESULTS                                             */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
       {result && (
         <div className="space-y-6">
           {/* Status */}
@@ -160,6 +371,8 @@ export default function CadLabPage(): React.ReactNode {
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2 flex-wrap">
+                <PipelineStage label="Research" status="done" />
+                <ChevronRight className="h-3 w-3 text-muted-foreground" />
                 <PipelineStage
                   label="Interface"
                   status={result.interfaceDefinition ? "done" : "fail"}
@@ -428,54 +641,3 @@ function PipelineStage({
     </div>
   )
 }
-
-// ─── Default Research (DJI Mavic Air 2) ──────────────────────────────
-
-const DEFAULT_RESEARCH = `=== DJI MAVIC AIR 2 — REAL SPECIFICATIONS ===
-
-OVERALL DIMENSIONS (folded): 180 × 97 × 84 mm
-OVERALL DIMENSIONS (unfolded): 183 × 253 × 77 mm
-WEIGHT: 570 g (with battery)
-
-MAIN BODY:
-- Dimensions: ~180 × 85 × 48 mm (central fuselage)
-- Material: ABS + PC composite, wall thickness 1.8mm
-- Front: camera gimbal mount, obstacle avoidance sensors
-- Rear: battery bay (~110 × 63 × 30 mm), exhaust vents
-- Top: GPS module dome, status LED array
-- Bottom: vision positioning sensors (2x), ultrasonic sensor, battery latch
-
-ARMS (4x):
-- Front arms fold forward, rear arms fold backward
-- Arm dimensions: ~100 × 22 × 15 mm each
-- Arm cross-section: oval/rectangular with rounded edges
-- Front arm offset: ~±65mm from center X, ~45mm forward of body center
-- Rear arm offset: ~±65mm from center X, ~55mm rearward of body center
-
-PROPULSION (4x):
-- Motor: brushless, 15mm diameter × 12mm height
-- Motor mount: circular platform ~30mm diameter, 5mm thick
-- Propeller: 7.4" (188mm) diameter, 2-blade folding
-- Motor-to-motor diagonal: ~302mm (12 inch class)
-
-CAMERA/GIMBAL (front):
-- 3-axis stabilized gimbal
-- Camera housing: ~25 × 20 × 20 mm
-- Gimbal base: ~35 × 30 × 15 mm
-- Lens diameter: ~12mm
-- Position: front-center of body, bottom-mounted
-
-BATTERY (rear):
-- Dimensions: ~110 × 63 × 30 mm
-- Weight: ~198g
-- Capacity: 3500 mAh, 11.55V (3S LiPo)
-- Slides in from rear
-
-GPS MODULE (top):
-- Dome shape: ~25mm diameter, 10mm height
-- Position: top-center, slightly rearward
-
-LANDING GEAR:
-- Integrated into bottom of body
-- Rubber feet/pads at corners
-- Ground clearance: ~25mm`

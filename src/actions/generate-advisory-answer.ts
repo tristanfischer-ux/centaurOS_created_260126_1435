@@ -9,6 +9,8 @@ import {
     AdvisoryCategory
 } from '@/types/advisory'
 import { buildAIContext } from '@/lib/ai-context/builder'
+import { withAuth } from '@/lib/server-action-utils'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
@@ -22,16 +24,21 @@ const openai = new OpenAI({
 export async function generateAdvisoryAnswer(
     input: GenerateAnswerInput
 ): Promise<{ result?: GenerateAnswerResult; error?: string }> {
-    try {
-        if (!input.question_title || input.question_title.trim().length < 5) {
-            return { error: 'Please provide a question title (at least 5 characters)' }
-        }
+    return withAuth(async ({ user, foundryId }) => {
+        // SECURITY: Rate limit AI calls to prevent cost abuse
+        const rateLimitError = await checkRateLimit('aiAdvisory', `ai:${user.id}`)
+        if (rateLimitError) return { error: rateLimitError }
 
-        if (!input.question_body || input.question_body.trim().length < 10) {
-            return { error: 'Please provide more details about your question (at least 10 characters)' }
-        }
+        try {
+            if (!input.question_title || input.question_title.trim().length < 5) {
+                return { error: 'Please provide a question title (at least 5 characters)' }
+            }
 
-        const systemPrompt = `You are an expert advisor for startup founders and operators of fractional/distributed businesses. Your role is to provide helpful, accurate, and actionable guidance.
+            if (!input.question_body || input.question_body.trim().length < 10) {
+                return { error: 'Please provide more details about your question (at least 10 characters)' }
+            }
+
+            const systemPrompt = `You are an expert advisor for startup founders and operators of fractional/distributed businesses. Your role is to provide helpful, accurate, and actionable guidance.
 
 Guidelines:
 1. Be direct and practical - founders are time-constrained
@@ -66,29 +73,29 @@ Return ONLY a raw JSON object (no markdown formatting) with this structure:
     ]
 }`
 
-        // Build rich company context from the AI Context Builder
-        let contextSection = ''
-        if (input.foundry_context?.foundry_id && input.foundry_context?.user_id) {
-            contextSection = await buildAIContext(
-                input.foundry_context.foundry_id,
-                input.foundry_context.user_id,
-                { includeActivity: true, includeObjectives: true }
-            )
-        } else if (input.foundry_context) {
-            // Fallback to legacy manual context if no foundry_id provided
-            contextSection = `
+            // SECURITY: Use authenticated foundryId/userId instead of client-provided values
+            let contextSection = ''
+            if (foundryId) {
+                contextSection = await buildAIContext(
+                    foundryId,
+                    user.id,
+                    { includeActivity: true, includeObjectives: true }
+                )
+            } else if (input.foundry_context) {
+                // Fallback to legacy manual context if no foundry_id provided
+                contextSection = `
 Context about the business:
 - Industry: ${input.foundry_context.industry || 'Not specified'}
 - Stage: ${input.foundry_context.stage || 'Not specified'}
 - Team Size: ${input.foundry_context.team_size || 'Not specified'}
 - Location: ${input.foundry_context.location || 'Not specified'}`
-        }
+            }
 
-        const previousContext = input.previous_answers?.length 
-            ? `\nPrevious answers in this conversation:\n${input.previous_answers.join('\n---\n')}`
-            : ''
+            const previousContext = input.previous_answers?.length 
+                ? `\nPrevious answers in this conversation:\n${input.previous_answers.join('\n---\n')}`
+                : ''
 
-        const userPrompt = `Question Title: ${input.question_title}
+            const userPrompt = `Question Title: ${input.question_title}
 
 Question Details:
 ${input.question_body}
@@ -99,68 +106,69 @@ ${previousContext}
 
 Please provide a helpful, practical answer for a startup founder.`
 
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt }
-            ],
-            temperature: 0.7,
-        })
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ],
+                temperature: 0.7,
+            })
 
-        if (!completion.choices || completion.choices.length === 0) {
-            return { error: 'AI returned no response' }
-        }
-
-        const content = completion.choices[0].message.content
-        if (!content) {
-            return { error: 'AI returned empty content' }
-        }
-
-        // Clean up potential markdown formatting
-        const cleanedContent = content.replace(/```json/g, '').replace(/```/g, '').trim()
-
-        try {
-            const parsed = JSON.parse(cleanedContent)
-
-            // Validate and type the response
-            const result: GenerateAnswerResult = {
-                answer: String(parsed.answer || 'Unable to generate an answer'),
-                confidence: validateConfidence(parsed.confidence),
-                reasoning: String(parsed.reasoning || ''),
-                caveats: Array.isArray(parsed.caveats) 
-                    ? parsed.caveats.map((c: unknown) => String(c))
-                    : undefined,
-                follow_up_questions: Array.isArray(parsed.follow_up_questions)
-                    ? parsed.follow_up_questions.map((q: unknown) => String(q))
-                    : undefined,
-                suggested_category: validateCategory(parsed.suggested_category),
-                extracted_tags: Array.isArray(parsed.extracted_tags)
-                    ? parsed.extracted_tags.map((t: unknown) => String(t))
-                    : undefined,
-                needs_expert_review: Boolean(parsed.needs_expert_review),
-                expert_review_reason: parsed.expert_review_reason 
-                    ? String(parsed.expert_review_reason)
-                    : undefined,
-                marketplace_suggestions: Array.isArray(parsed.marketplace_suggestions)
-                    ? parsed.marketplace_suggestions.map((s: Record<string, unknown>) => ({
-                        category: String(s.category || 'Services'),
-                        subcategory: s.subcategory ? String(s.subcategory) : undefined,
-                        search_term: String(s.search_term || '')
-                    }))
-                    : undefined
+            if (!completion.choices || completion.choices.length === 0) {
+                return { error: 'AI returned no response' }
             }
 
-            return { result }
-        } catch (parseError) {
-            console.error('[AdvisoryService] Failed to parse AI response:', { error: parseError instanceof Error ? parseError.message : 'Unknown error' })
-            return { error: 'Failed to parse AI response. Please try again.' }
-        }
+            const content = completion.choices[0].message.content
+            if (!content) {
+                return { error: 'AI returned empty content' }
+            }
 
-    } catch (error) {
-        console.error('[AdvisoryService] Advisory answer generation failed:', { error: error instanceof Error ? error.message : 'Unknown error' })
-        return { error: 'Failed to generate answer. Please try again.' }
-    }
+            // Clean up potential markdown formatting
+            const cleanedContent = content.replace(/```json/g, '').replace(/```/g, '').trim()
+
+            try {
+                const parsed = JSON.parse(cleanedContent)
+
+                // Validate and type the response
+                const result: GenerateAnswerResult = {
+                    answer: String(parsed.answer || 'Unable to generate an answer'),
+                    confidence: validateConfidence(parsed.confidence),
+                    reasoning: String(parsed.reasoning || ''),
+                    caveats: Array.isArray(parsed.caveats) 
+                        ? parsed.caveats.map((c: unknown) => String(c))
+                        : undefined,
+                    follow_up_questions: Array.isArray(parsed.follow_up_questions)
+                        ? parsed.follow_up_questions.map((q: unknown) => String(q))
+                        : undefined,
+                    suggested_category: validateCategory(parsed.suggested_category),
+                    extracted_tags: Array.isArray(parsed.extracted_tags)
+                        ? parsed.extracted_tags.map((t: unknown) => String(t))
+                        : undefined,
+                    needs_expert_review: Boolean(parsed.needs_expert_review),
+                    expert_review_reason: parsed.expert_review_reason 
+                        ? String(parsed.expert_review_reason)
+                        : undefined,
+                    marketplace_suggestions: Array.isArray(parsed.marketplace_suggestions)
+                        ? parsed.marketplace_suggestions.map((s: Record<string, unknown>) => ({
+                            category: String(s.category || 'Services'),
+                            subcategory: s.subcategory ? String(s.subcategory) : undefined,
+                            search_term: String(s.search_term || '')
+                        }))
+                        : undefined
+                }
+
+                return { result }
+            } catch (parseError) {
+                console.error('[AdvisoryService] Failed to parse AI response:', { error: parseError instanceof Error ? parseError.message : 'Unknown error' })
+                return { error: 'Failed to parse AI response. Please try again.' }
+            }
+
+        } catch (error) {
+            console.error('[AdvisoryService] Advisory answer generation failed:', { error: error instanceof Error ? error.message : 'Unknown error' })
+            return { error: 'Failed to generate answer. Please try again.' }
+        }
+    })
 }
 
 /**
@@ -169,12 +177,17 @@ Please provide a helpful, practical answer for a startup founder.`
 export async function generateStructuredAnswer(
     input: GenerateAnswerInput
 ): Promise<{ result?: StructuredAnswer; error?: string }> {
-    try {
-        if (!input.question_title || !input.question_body) {
-            return { error: 'Question title and body are required' }
-        }
+    return withAuth(async ({ user }) => {
+        // SECURITY: Rate limit AI calls to prevent cost abuse
+        const rateLimitError = await checkRateLimit('aiAdvisory', `ai:${user.id}`)
+        if (rateLimitError) return { error: rateLimitError }
 
-        const systemPrompt = `You are an expert advisor for startup founders. Provide a well-structured answer with clear sections.
+        try {
+            if (!input.question_title || !input.question_body) {
+                return { error: 'Question title and body are required' }
+            }
+
+            const systemPrompt = `You are an expert advisor for startup founders. Provide a well-structured answer with clear sections.
 
 Return ONLY a raw JSON object with this structure:
 {
@@ -192,47 +205,48 @@ Return ONLY a raw JSON object with this structure:
     "disclaimer": "Any legal/professional disclaimer if needed"
 }`
 
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: `Question: ${input.question_title}\n\nDetails: ${input.question_body}` }
-            ],
-            temperature: 0.7,
-        })
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: `Question: ${input.question_title}\n\nDetails: ${input.question_body}` }
+                ],
+                temperature: 0.7,
+            })
 
-        const content = completion.choices[0]?.message?.content
-        if (!content) {
-            return { error: 'No response from AI' }
+            const content = completion.choices[0]?.message?.content
+            if (!content) {
+                return { error: 'No response from AI' }
+            }
+
+            const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim()
+            const parsed = JSON.parse(cleaned)
+
+            const result: StructuredAnswer = {
+                summary: String(parsed.summary || ''),
+                detailed_answer: String(parsed.detailed_answer || ''),
+                action_items: Array.isArray(parsed.action_items)
+                    ? parsed.action_items.map((i: unknown) => String(i))
+                    : undefined,
+                considerations: Array.isArray(parsed.considerations)
+                    ? parsed.considerations.map((c: unknown) => String(c))
+                    : undefined,
+                resources: Array.isArray(parsed.resources)
+                    ? parsed.resources.map((r: Record<string, unknown>) => ({
+                        title: String(r.title || ''),
+                        url: r.url ? String(r.url) : undefined,
+                        description: String(r.description || '')
+                    }))
+                    : undefined,
+                disclaimer: parsed.disclaimer ? String(parsed.disclaimer) : undefined
+            }
+
+            return { result }
+        } catch (error) {
+            console.error('[AdvisoryService] Structured answer generation failed:', { error: error instanceof Error ? error.message : 'Unknown error' })
+            return { error: 'Failed to generate structured answer' }
         }
-
-        const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim()
-        const parsed = JSON.parse(cleaned)
-
-        const result: StructuredAnswer = {
-            summary: String(parsed.summary || ''),
-            detailed_answer: String(parsed.detailed_answer || ''),
-            action_items: Array.isArray(parsed.action_items)
-                ? parsed.action_items.map((i: unknown) => String(i))
-                : undefined,
-            considerations: Array.isArray(parsed.considerations)
-                ? parsed.considerations.map((c: unknown) => String(c))
-                : undefined,
-            resources: Array.isArray(parsed.resources)
-                ? parsed.resources.map((r: Record<string, unknown>) => ({
-                    title: String(r.title || ''),
-                    url: r.url ? String(r.url) : undefined,
-                    description: String(r.description || '')
-                }))
-                : undefined,
-            disclaimer: parsed.disclaimer ? String(parsed.disclaimer) : undefined
-        }
-
-        return { result }
-    } catch (error) {
-        console.error('[AdvisoryService] Structured answer generation failed:', { error: error instanceof Error ? error.message : 'Unknown error' })
-        return { error: 'Failed to generate structured answer' }
-    }
+    })
 }
 
 /**
@@ -242,39 +256,45 @@ export async function suggestQuestionCategory(
     title: string,
     body: string
 ): Promise<{ category?: AdvisoryCategory; tags?: string[]; error?: string }> {
-    try {
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                { 
-                    role: "system", 
-                    content: `Categorize this question into one of: Legal, Finance, HR, Operations, Strategy, Fundraising, Product, Marketing, Sales, Technical, General.
+    return withAuth(async ({ user }) => {
+        // SECURITY: Rate limit AI calls to prevent cost abuse
+        const rateLimitError = await checkRateLimit('aiAdvisory', `ai:${user.id}`)
+        if (rateLimitError) return { error: rateLimitError }
+
+        try {
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { 
+                        role: "system", 
+                        content: `Categorize this question into one of: Legal, Finance, HR, Operations, Strategy, Fundraising, Product, Marketing, Sales, Technical, General.
 Also extract 2-4 relevant tags.
 Return JSON only: { "category": "...", "tags": ["...", "..."] }` 
-                },
-                { role: "user", content: `Title: ${title}\n\nBody: ${body}` }
-            ],
-            temperature: 0.3,
-        })
+                    },
+                    { role: "user", content: `Title: ${title}\n\nBody: ${body}` }
+                ],
+                temperature: 0.3,
+            })
 
-        const content = completion.choices[0]?.message?.content
-        if (!content) {
+            const content = completion.choices[0]?.message?.content
+            if (!content) {
+                return { category: 'General', tags: [] }
+            }
+
+            const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim()
+            const parsed = JSON.parse(cleaned)
+
+            return {
+                category: validateCategory(parsed.category),
+                tags: Array.isArray(parsed.tags) ? parsed.tags.map((t: unknown) => String(t)) : []
+            }
+        } catch (error) {
+            console.error('[Advisory] Failed to suggest question category:', {
+                error: error instanceof Error ? error.message : 'Unknown error',
+            })
             return { category: 'General', tags: [] }
         }
-
-        const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim()
-        const parsed = JSON.parse(cleaned)
-
-        return {
-            category: validateCategory(parsed.category),
-            tags: Array.isArray(parsed.tags) ? parsed.tags.map((t: unknown) => String(t)) : []
-        }
-    } catch (error) {
-        console.error('[Advisory] Failed to suggest question category:', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-        })
-        return { category: 'General', tags: [] }
-    }
+    })
 }
 
 // Helper to validate confidence level

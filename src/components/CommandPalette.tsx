@@ -127,11 +127,16 @@ export function CommandPalette() {
       const { data: { user }, error: userError } = await supabase.auth.getUser()
       if (userError) throw userError
       
+      // SECURITY: Get user's foundry_id to scope queries (RLS disabled on profiles)
+      let foundryId: string | null = null
       if (user && isMounted()) {
-        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        const { data: profile, error: profileError } = await supabase.from('profiles').select('role, foundry_id').eq('id', user.id).single()
         if (profileError && profileError.code !== 'PGRST116') throw profileError
         if (isMounted()) setUserRole(profile?.role || null)
+        foundryId = profile?.foundry_id || null
       }
+      
+      if (!foundryId) return
       
       // Fetch tasks
       const { data: tasksData, error: tasksError } = await supabase
@@ -139,6 +144,7 @@ export function CommandPalette() {
         .select('id, title, status')
         .eq('is_ghost', false)
         .is('deleted_at', null)
+        .eq('foundry_id', foundryId)
         .order('updated_at', { ascending: false })
         .limit(50)
       if (tasksError) throw tasksError
@@ -150,6 +156,7 @@ export function CommandPalette() {
         .select('id')
         .eq('is_ghost', false)
         .is('deleted_at', null)
+        .eq('foundry_id', foundryId)
         .in('status', ['Pending_Executive_Approval', 'Amended_Pending_Approval'])
       if (pendingError) throw pendingError
       if (isMounted()) setPendingApprovalCount(pendingData?.length || 0)
@@ -160,15 +167,18 @@ export function CommandPalette() {
         .select('id, title')
         .eq('is_ghost', false)
         .is('deleted_at', null)
+        .eq('foundry_id', foundryId)
         .order('updated_at', { ascending: false })
         .limit(20)
       if (objectivesError) throw objectivesError
       if (isMounted()) setObjectives(objectivesData || [])
       
       // Fetch team members
+      // SECURITY: Scope to foundry (RLS disabled on profiles)
       const { data: membersData, error: membersError } = await supabase
         .from('profiles')
         .select('id, full_name, email, role')
+        .eq('foundry_id', foundryId)
         .limit(50)
       if (membersError) throw membersError
       if (isMounted()) setTeamMembers(membersData || [])

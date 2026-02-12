@@ -88,6 +88,19 @@ export default defineConfig({
       testMatch: /(?<!qa-.*|auth\.setup|updates)\.spec\.ts$/,
       use: { ...devices['Pixel 5'] },
     },
+    // Smoke tests — lightweight page render checks used by npm run verify
+    {
+      name: 'smoke',
+      testMatch: /smoke\.spec\.ts$/,
+      dependencies: ['auth-setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: path.join(authDir, 'founder.json'),
+        video: 'off',
+        screenshot: 'only-on-failure',
+        trace: 'off',
+      },
+    },
   ],
   webServer: process.env.CI ? undefined : {
     command: 'npm run dev',

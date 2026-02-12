@@ -21,7 +21,9 @@
 // Shared types/constants live in @/lib/cad-lab-types.ts (not "use server")
 // so client components can import them as plain values.
 
-import type { GeminiModelId, CadLabResult } from "@/lib/cad-lab-types"
+import type { GeminiModelId, CadLabResult, CadLabResearchResult } from "@/lib/cad-lab-types"
+import { checkRateLimit } from "@/lib/security/rate-limit"
+import { createClient } from "@/lib/supabase/server"
 
 /** Structured component definition from interface definition */
 interface ComponentDef {
@@ -281,6 +283,129 @@ async function callGemini(
   }
 }
 
+// ─── Gemini API Call with Google Search Grounding ────────────────────
+
+/**
+ * Calls Gemini with Google Search grounding enabled.
+ *
+ * @description Uses the same GOOGLE_AI_API_KEY. The google_search tool
+ * lets Gemini automatically search the web for real-time information
+ * and return citations. Used for Pass 0 product research.
+ *
+ * @param prompt - User prompt (no system instruction — search tool handles context)
+ * @param modelId - Gemini model to use (Flash recommended for cost)
+ * @returns Response text, source URLs, and token counts
+ */
+async function callGeminiWithSearch(
+  prompt: string,
+  modelId: GeminiModelId = "gemini-2.5-flash",
+): Promise<{
+  text: string
+  sources: Array<{ uri: string; title: string }>
+  tokensIn: number
+  tokensOut: number
+}> {
+  const apiKey = process.env.GOOGLE_AI_API_KEY
+  if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      tools: [{ google_search: {} }],
+      generationConfig: {
+        maxOutputTokens: 8192,
+        temperature: 0.2,
+      },
+    }),
+    signal: AbortSignal.timeout(60_000),
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`Gemini Search API error (${response.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await response.json()
+  const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
+  const usage = data.usageMetadata ?? {}
+
+  // Extract grounding sources from metadata
+  const groundingMeta = data.candidates?.[0]?.groundingMetadata
+  const chunks: Array<{ web?: { uri?: string; title?: string } }> =
+    groundingMeta?.groundingChunks ?? []
+  const sources = chunks
+    .filter((c): c is { web: { uri: string; title: string } } =>
+      Boolean(c.web?.uri && c.web?.title),
+    )
+    .map((c) => ({ uri: c.web.uri, title: c.web.title }))
+
+  return {
+    text,
+    sources,
+    tokensIn: usage.promptTokenCount ?? 0,
+    tokensOut: usage.candidatesTokenCount ?? 0,
+  }
+}
+
+// ─── Claude API Call (for research synthesis) ────────────────────────
+
+/**
+ * Calls Claude Opus 4.6 to synthesize a research report.
+ *
+ * @description Used in Pass 0 to produce a comprehensive, structured
+ * engineering research report from raw web search data and CAD references.
+ * Claude excels at synthesizing disparate sources into coherent analysis.
+ *
+ * @param systemPrompt - System instruction for Claude
+ * @param userPrompt - User message content
+ * @returns Synthesized text response
+ */
+async function callClaude(
+  systemPrompt: string,
+  userPrompt: string,
+): Promise<{
+  text: string
+  tokensIn: number
+  tokensOut: number
+}> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-opus-4-20250514",
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+    signal: AbortSignal.timeout(120_000),
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await response.json()
+  const text: string = data.content?.[0]?.text ?? ""
+
+  return {
+    text,
+    tokensIn: data.usage?.input_tokens ?? 0,
+    tokensOut: data.usage?.output_tokens ?? 0,
+  }
+}
+
 // ─── Code Extraction ─────────────────────────────────────────────────
 
 /**
@@ -348,6 +473,183 @@ async function executeOnModal(code: string): Promise<ModalResponse> {
   return (await response.json()) as ModalResponse
 }
 
+// ─── Pass 0: Product Research ────────────────────────────────────────
+
+/**
+ * Researches real-world product specifications using Gemini + Google Search.
+ *
+ * @description Uses Google Search grounding to find actual dimensions,
+ * component specs, and reference data for the product. Returns structured
+ * specs text and source URLs.
+ *
+ * @param description - Product description (e.g., "DJI Mavic Air 2 drone")
+ * @param modelId - Gemini model to use (Flash recommended for cost)
+ * @returns Structured specs text and source URLs
+ */
+async function researchProductSpecs(
+  description: string,
+  modelId: GeminiModelId = "gemini-2.5-flash",
+): Promise<{
+  specs: string
+  sources: Array<{ uri: string; title: string }>
+  tokensIn: number
+  tokensOut: number
+}> {
+  const prompt = `Find the real-world specifications for: ${description}
+
+I need precise engineering dimensions for 3D CAD modelling. Search for:
+
+1. OVERALL DIMENSIONS — length, width, height in mm (folded and unfolded if applicable)
+2. WEIGHT — total weight and breakdown if available
+3. MOTOR/ACTUATOR SPECS — diameter, height, mounting hole pattern (if it has motors)
+4. KEY COMPONENT DIMENSIONS — battery, camera, electronics, frame, arms
+5. CRITICAL CONSTRAINTS — motor-to-motor diagonal, wheelbase, prop clearance
+6. MATERIAL — primary materials and wall thicknesses
+7. STANDARD PARTS — propeller size, bolt sizes, mounting standards
+
+Format your response as a structured specification sheet with exact numbers in millimetres. If a dimension is approximate, say so. If you find conflicting specs from different sources, list both.
+
+Do NOT guess dimensions. Only include measurements you found from real sources.`
+
+  try {
+    const result = await callGeminiWithSearch(prompt, modelId)
+    return {
+      specs: result.text,
+      sources: result.sources,
+      tokensIn: result.tokensIn,
+      tokensOut: result.tokensOut,
+    }
+  } catch (error) {
+    console.warn(
+      "[CAD-LAB] Web research failed, falling back to hardcoded reference:",
+      error instanceof Error ? error.message : "Unknown error",
+    )
+    return { specs: "", sources: [], tokensIn: 0, tokensOut: 0 }
+  }
+}
+
+// ─── Pass 0: Thingiverse CAD Model Search ────────────────────────────
+
+/** Search result from Thingiverse API */
+interface ThingiverseResult {
+  name: string
+  url: string
+  description: string
+}
+
+/**
+ * Searches Thingiverse for existing CAD models as dimensional references.
+ *
+ * @description Informational only — does not download files. Gives the LLM
+ * awareness of existing reference geometry. Requires THINGIVERSE_API_TOKEN
+ * env var (free at thingiverse.com/apps/create). Skips gracefully if not set.
+ *
+ * @param description - Product description to search for
+ * @returns Top matching models with name, URL, and description
+ */
+async function searchCadModels(
+  description: string,
+): Promise<ThingiverseResult[]> {
+  const token = process.env.THINGIVERSE_API_TOKEN
+  if (!token) {
+    console.info("[CAD-LAB] THINGIVERSE_API_TOKEN not set, skipping CAD model search")
+    return []
+  }
+
+  try {
+    // Extract a short search term from the description
+    const searchTerm = description
+      .replace(/quadcopter|drone|3d model|cad/gi, "")
+      .trim()
+      .split(/\s+/)
+      .slice(0, 4)
+      .join(" ")
+      .trim() || description.slice(0, 30)
+
+    const url = `https://api.thingiverse.com/search/${encodeURIComponent(searchTerm)}?type=things&per_page=5&sort=relevant`
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(10_000),
+    })
+
+    if (!response.ok) {
+      console.warn(`[CAD-LAB] Thingiverse API error (${response.status})`)
+      return []
+    }
+
+    const data = await response.json()
+    const hits: Array<{
+      name?: string
+      public_url?: string
+      description?: string
+    }> = data?.hits ?? data ?? []
+
+    return hits
+      .filter((h): h is { name: string; public_url: string; description: string } =>
+        Boolean(h.name && h.public_url),
+      )
+      .slice(0, 5)
+      .map((h) => ({
+        name: h.name,
+        url: h.public_url,
+        description: (h.description ?? "").slice(0, 200),
+      }))
+  } catch (error) {
+    console.warn(
+      "[CAD-LAB] Thingiverse search failed:",
+      error instanceof Error ? error.message : "Unknown error",
+    )
+    return []
+  }
+}
+
+// ─── Pass 0: Build Reference Context ─────────────────────────────────
+
+/**
+ * Merges all reference sources into a single context string for Pass 1.
+ *
+ * @description Concatenates hardcoded library (safety net), web research
+ * results, CAD model references, and user-pasted research. The hardcoded
+ * library is always included as a fallback even if web search fails.
+ */
+function buildReferenceContext(
+  hardcodedRef: string,
+  webSpecs: string,
+  cadModels: ThingiverseResult[],
+  userResearch: string,
+): string {
+  const sections: string[] = []
+
+  // Always include hardcoded reference as baseline
+  sections.push(hardcodedRef)
+
+  // Web research (if available)
+  if (webSpecs.trim()) {
+    sections.push(`=== WEB RESEARCH (live search results) ===\n${webSpecs}`)
+  }
+
+  // CAD model references (if found)
+  if (cadModels.length > 0) {
+    const modelList = cadModels
+      .map((m) => `- ${m.name}: ${m.url}\n  ${m.description}`)
+      .join("\n")
+    sections.push(
+      `=== EXISTING CAD MODELS (Thingiverse references) ===\n${modelList}\n\nNote: These are existing community models for dimensional reference only.`,
+    )
+  }
+
+  // User-pasted research (highest priority — most specific)
+  if (userResearch.trim()) {
+    sections.push(`=== USER-PROVIDED RESEARCH ===\n${userResearch}`)
+  }
+
+  return sections.join("\n\n")
+}
+
 // ─── Pass 1: Generate Interface Definition ───────────────────────────
 
 /**
@@ -358,14 +660,12 @@ async function executeOnModal(code: string): Promise<ModalResponse> {
  * dimensional validation arithmetic.
  *
  * @param description - Product description (e.g., "DJI Mavic Air 2 drone")
- * @param researchContext - Real-world specs and dimensions
- * @param referenceData - Hardcoded reference dimensions for product type
+ * @param referenceData - All reference data (hardcoded + web research + user input, merged by buildReferenceContext)
  * @param modelId - Gemini model to use
  * @returns Interface definition text and parsed structured data
  */
 async function generateInterfaceDefinition(
   description: string,
-  researchContext: string,
   referenceData: string,
   modelId: GeminiModelId,
 ): Promise<{
@@ -376,11 +676,8 @@ async function generateInterfaceDefinition(
 }> {
   const userPrompt = `Product brief: ${description}
 
-Reference dimensions:
+Reference dimensions and research:
 ${referenceData}
-
-User-provided research context:
-${researchContext}
 
 Generate the complete interface definition following the exact format specified. Make sure the motor-to-motor diagonal matches the reference target (~302mm for this drone). Calculate ALL positions from named quantities.`
 
@@ -811,20 +1108,163 @@ function postExecutionValidation(
   return { warnings }
 }
 
+// ─── Research Report Synthesis Prompt ─────────────────────────────────
+
+const RESEARCH_SYNTHESIS_PROMPT = `You are a senior mechanical engineer preparing a research brief for a 3D CAD modelling project. Your job is to synthesize raw research data into a precise, structured engineering specification.
+
+Your report will be used by a CAD pipeline to generate an accurate 3D model, so dimensional precision is critical. Every number must come from the source data — never invent dimensions.
+
+Output format (follow exactly):
+
+# Engineering Research Report: {Product Name}
+
+## Executive Summary
+One paragraph: what this product is, its primary function, and its defining physical characteristics.
+
+## Overall Dimensions
+- Folded: W × D × H mm (if applicable)
+- Unfolded/Deployed: W × D × H mm
+- Weight: X g
+
+## Primary Structure
+Describe the main body/frame with precise dimensions. Include wall thickness, material if known.
+
+## Components
+For each major component, list:
+- **Name**: exact dimensions (W × D × H mm or Ø × H mm)
+- Position relative to body center
+- Mounting/attachment method if known
+- Quantity
+
+## Critical Constraints
+- Motor-to-motor diagonal (or equivalent key dimension): X mm
+- Prop/blade/appendage clearance: X mm
+- Any symmetry axes or alignment requirements
+
+## Material & Manufacturing Notes
+Primary materials, wall thicknesses, manufacturing method if known.
+
+## Dimensional Confidence
+Rate each major dimension:
+- ✅ Confirmed (from official specs or multiple sources)
+- ⚠️ Approximate (single source or estimated)
+- ❓ Unknown (not found in research)
+
+RULES:
+- Use millimetres for all dimensions
+- Round to nearest 0.5mm for sub-mm precision
+- If two sources disagree, state both and note the discrepancy
+- Never invent a dimension — mark it as Unknown
+- Include source attribution for key numbers`
+
+// ─── Standalone Research Step (Pass 0) ───────────────────────────────
+
+/**
+ * Runs standalone research for a product: web search + CAD model search + Claude synthesis.
+ *
+ * @description This is the user-facing research step. It:
+ *   1. Runs Gemini + Google Search to find real-world specs
+ *   2. Searches Thingiverse for existing CAD reference models
+ *   3. Sends all raw data to Claude to synthesize a structured engineering report
+ *
+ * The user reviews the report before proceeding to CAD generation.
+ *
+ * @param description - Product to research (e.g., "DJI Mavic Air 2 drone")
+ * @returns Research report, sources, and reference models
+ */
+export async function runCadLabResearch(
+  description: string,
+): Promise<CadLabResearchResult> {
+  // AUTH: Verify user is authenticated
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' } as unknown as CadLabResearchResult
+
+  // SECURITY: Rate limit AI calls to prevent cost abuse
+  const rateLimitError = await checkRateLimit('aiCadLab', `ai:${user.id}`)
+  if (rateLimitError) return { error: rateLimitError } as unknown as CadLabResearchResult
+
+  const start = Date.now()
+
+  try {
+    console.info("[CAD-LAB] Research: Starting web search + CAD model search...")
+
+    // 1. Run Gemini + Google Search and Thingiverse in parallel
+    const [webResult, cadResult] = await Promise.allSettled([
+      researchProductSpecs(description, "gemini-2.5-flash"),
+      searchCadModels(description),
+    ])
+
+    const webSpecs = webResult.status === "fulfilled" ? webResult.value.specs : ""
+    const webSources = webResult.status === "fulfilled" ? webResult.value.sources : []
+    const cadModels = cadResult.status === "fulfilled" ? cadResult.value : []
+
+    // 2. Build raw data context for Claude
+    const rawDataSections: string[] = []
+
+    if (webSpecs.trim()) {
+      rawDataSections.push(`=== RAW WEB SEARCH RESULTS ===\n${webSpecs}`)
+    }
+
+    // Always include hardcoded reference as baseline
+    rawDataSections.push(`=== HARDCODED REFERENCE LIBRARY ===\n${DRONE_REFERENCE}`)
+
+    if (cadModels.length > 0) {
+      const modelList = cadModels
+        .map((m) => `- ${m.name}: ${m.url}\n  ${m.description}`)
+        .join("\n")
+      rawDataSections.push(`=== THINGIVERSE CAD MODELS ===\n${modelList}`)
+    }
+
+    const rawContext = rawDataSections.join("\n\n")
+
+    // 3. Send to Claude for synthesis
+    console.info("[CAD-LAB] Research: Synthesizing report with Claude...")
+    const claudeResult = await callClaude(
+      RESEARCH_SYNTHESIS_PROMPT,
+      `Product to research: ${description}\n\n${rawContext}`,
+    )
+
+    const referenceModels = cadModels.map((m) => ({ name: m.name, url: m.url }))
+
+    console.info(
+      `[CAD-LAB] Research complete: ${webSources.length} web sources, ${referenceModels.length} CAD refs, ${(Date.now() - start)}ms`,
+    )
+
+    return {
+      success: true,
+      report: claudeResult.text,
+      sources: webSources,
+      referenceModels,
+      researchTime: Date.now() - start,
+    }
+  } catch (error) {
+    console.error("[CAD-LAB] Research failed:", error instanceof Error ? error.message : error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Research failed",
+      report: "",
+      sources: [],
+      referenceModels: [],
+      researchTime: Date.now() - start,
+    }
+  }
+}
+
 // ─── Main Pipeline Orchestrator ──────────────────────────────────────
 
 /**
  * Generates a CAD model using the component-decomposed pipeline.
  *
  * @description Implements Claude Code's corrected architecture:
- *   Pass 0: Reference dimensions (hardcoded)
+ *   Pass 0: Reference dimensions (from research report or hardcoded)
  *   Pass 1: Interface definition (text only)
  *   Pass 2-N: Component functions (parallelized, locally validated)
  *   Pass N+1: Assembly script (union calls only)
  *   Pass N+2: Modal execution (single call)
  *
  * @param description - What to model (e.g., "DJI Mavic Air 2 drone")
- * @param researchContext - Optional real-world specs
+ * @param researchContext - Research report from runCadLabResearch() or user-pasted specs
  * @param modelId - Gemini model for interface + assembly (Pro recommended)
  * @returns Generation result with SVGs, metrics, and pipeline diagnostics
  */
@@ -833,14 +1273,57 @@ export async function generateCadLabModel(
   researchContext?: string,
   modelId: GeminiModelId = "gemini-2.5-pro",
 ): Promise<CadLabResult> {
+  // AUTH: Verify user is authenticated
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' } as unknown as CadLabResult
+
+  // SECURITY: Rate limit AI calls to prevent cost abuse
+  const rateLimitError = await checkRateLimit('aiCadLab', `ai:${user.id}`)
+  if (rateLimitError) return { error: rateLimitError } as unknown as CadLabResult
+
   const pipelineStart = Date.now()
   let totalTokensIn = 0
   let totalTokensOut = 0
 
   try {
-    // ── Pass 0: Reference dimensions ──
-    const referenceData = DRONE_REFERENCE
-    const research = researchContext ?? ""
+    // ── Pass 0: Reference data ──
+    // If a research report is provided (from Step 1), use it directly.
+    // Otherwise fall back to hardcoded reference + optional web search.
+    let researchSources: Array<{ uri: string; title: string }> = []
+    let referenceModels: ThingiverseResult[] = []
+    let referenceData: string
+
+    if (researchContext && researchContext.trim().length > 100) {
+      // Research report already provided — use it + hardcoded fallback
+      console.info("[CAD-LAB] Pass 0: Using provided research report")
+      referenceData = buildReferenceContext(DRONE_REFERENCE, "", [], researchContext)
+    } else {
+      // No research report — run web search as fallback
+      console.info("[CAD-LAB] Pass 0: No research report, running web search...")
+      const [webResult, cadResult] = await Promise.allSettled([
+        researchProductSpecs(description, "gemini-2.5-flash"),
+        searchCadModels(description),
+      ])
+
+      let webSpecs = ""
+      if (webResult.status === "fulfilled") {
+        webSpecs = webResult.value.specs
+        researchSources = webResult.value.sources
+        totalTokensIn += webResult.value.tokensIn
+        totalTokensOut += webResult.value.tokensOut
+      }
+      if (cadResult.status === "fulfilled") {
+        referenceModels = cadResult.value
+      }
+
+      referenceData = buildReferenceContext(
+        DRONE_REFERENCE,
+        webSpecs,
+        referenceModels,
+        researchContext ?? "",
+      )
+    }
 
     // ── Pass 1: Interface definition ──
     console.info("[CAD-LAB] Pass 1: Generating interface definition...")
@@ -869,7 +1352,7 @@ export async function generateCadLabModel(
       }
 
       if (feedbackPrefix) {
-        const retryPrompt = `${feedbackPrefix}Product brief: ${description}\n\nReference dimensions:\n${referenceData}\n\nUser-provided research context:\n${research}`
+        const retryPrompt = `${feedbackPrefix}Product brief: ${description}\n\nReference dimensions and research:\n${referenceData}`
         const geminiResult = await callGemini(INTERFACE_SYSTEM_PROMPT, retryPrompt, modelId)
         ifaceResult = {
           text: geminiResult.text,
@@ -878,7 +1361,7 @@ export async function generateCadLabModel(
           tokensOut: geminiResult.tokensOut,
         }
       } else {
-        ifaceResult = await generateInterfaceDefinition(description, research, referenceData, modelId)
+        ifaceResult = await generateInterfaceDefinition(description, referenceData, modelId)
       }
 
       totalTokensIn += ifaceResult.tokensIn
@@ -908,6 +1391,8 @@ export async function generateCadLabModel(
         success: false,
         error: "Failed to generate a valid interface definition after retries. No components found.",
         interfaceDefinition: interfaceText,
+        researchSources: researchSources.map((s) => s.uri),
+        referenceModels: referenceModels.map((m) => ({ name: m.name, url: m.url })),
         tokensIn: totalTokensIn,
         tokensOut: totalTokensOut,
         generationTime: Date.now() - pipelineStart,
@@ -962,6 +1447,8 @@ export async function generateCadLabModel(
         componentCount: interfaceParsed.components.length,
         validatedCount: 0,
         skippedComponents,
+        researchSources: researchSources.map((s) => s.uri),
+        referenceModels: referenceModels.map((m) => ({ name: m.name, url: m.url })),
         tokensIn: totalTokensIn,
         tokensOut: totalTokensOut,
         generationTime: Date.now() - pipelineStart,
@@ -1001,6 +1488,8 @@ export async function generateCadLabModel(
         componentCount: interfaceParsed.components.length,
         validatedCount: validatedComponents.length,
         skippedComponents,
+        researchSources: researchSources.map((s) => s.uri),
+        referenceModels: referenceModels.map((m) => ({ name: m.name, url: m.url })),
         tokensIn: totalTokensIn,
         tokensOut: totalTokensOut,
         modelUsed: modelId,
@@ -1046,6 +1535,10 @@ export async function generateCadLabModel(
       validatedCount: validatedComponents.length,
       skippedComponents: skippedComponents.length > 0 ? skippedComponents : undefined,
       validationWarnings: warnings.length > 0 ? warnings : undefined,
+      researchSources: researchSources.length > 0 ? researchSources.map((s) => s.uri) : undefined,
+      referenceModels: referenceModels.length > 0
+        ? referenceModels.map((m) => ({ name: m.name, url: m.url }))
+        : undefined,
       error: modalResult.error ?? undefined,
     }
   } catch (err) {

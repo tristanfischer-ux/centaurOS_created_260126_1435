@@ -248,7 +248,7 @@ export function generateWeeklyInsights(
             description: 'Consider aligning tasks with strategic objectives',
             action: {
                 label: 'View objectives',
-                href: '/objectives'
+                href: '/new-objectives'
             }
         })
     }

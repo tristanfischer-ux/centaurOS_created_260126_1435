@@ -8,5 +8,5 @@ import { redirect } from 'next/navigation'
  * This redirect ensures any existing links or bookmarks still work.
  */
 export default async function ObjectiveDetailPage() {
-    redirect('/objectives')
+    redirect('/new-objectives')
 }

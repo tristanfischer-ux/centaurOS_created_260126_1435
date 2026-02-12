@@ -145,30 +145,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: true, task: taskData, transcript: transcriptText });
         }
 
-        // 3. Resolve Assignee ID
-        let assigneeId = null; // Default unassigned
-
-
-        if (taskData.assignee_type === "Self") {
-            assigneeId = user.id;
-        } else if (taskData.assignee_type === "Legal_AI" || taskData.assignee_type === "General_AI") {
-            // Look up AI agent profile
-            // Helper: in a real app, cache these IDs or queries.
-            // For MVP, we query profiles by partial email pattern we seeded.
-            const rolePattern = taskData.assignee_type === "Legal_AI" ? "ai.legal%" : "ai.general%";
-            const { data: aiProfile } = await supabase
-                .from('profiles')
-                .select('id')
-                .ilike('email', rolePattern)
-                .limit(1)
-                .single();
-
-            if (aiProfile) {
-                assigneeId = aiProfile.id;
-            }
-        }
-
-        // 4. Get user's foundry_id from database (NOT from user_metadata which is client-writable)
+        // 3. Get user's foundry_id from database (NOT from user_metadata which is client-writable)
         const { data: profile } = await supabase
             .from('profiles')
             .select('foundry_id')
@@ -179,7 +156,31 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'User not associated with a foundry' }, { status: 403 });
         }
 
-        // 5. Create Task in DB
+        // 4. Resolve Assignee ID
+        let assigneeId = null; // Default unassigned
+
+        if (taskData.assignee_type === "Self") {
+            assigneeId = user.id;
+        } else if (taskData.assignee_type === "Legal_AI" || taskData.assignee_type === "General_AI") {
+            // Look up AI agent profile
+            // Helper: in a real app, cache these IDs or queries.
+            // For MVP, we query profiles by partial email pattern we seeded.
+            const rolePattern = taskData.assignee_type === "Legal_AI" ? "ai.legal%" : "ai.general%";
+            // SECURITY: Scope to foundry (RLS disabled on profiles)
+            const { data: aiProfile } = await supabase
+                .from('profiles')
+                .select('id')
+                .ilike('email', rolePattern)
+                .eq('foundry_id', profile.foundry_id)
+                .limit(1)
+                .single();
+
+            if (aiProfile) {
+                assigneeId = aiProfile.id;
+            }
+        }
+
+        // 5. Create Task in DB (foundry_id from step 3)
         const { data: newTask, error } = await supabase
             .from("tasks")
             .insert({

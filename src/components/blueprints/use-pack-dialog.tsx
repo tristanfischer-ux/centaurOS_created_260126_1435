@@ -110,7 +110,7 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
       } else {
         toast.success('Objective created with tasks!')
         setOpen(false)
-        router.push('/objectives')
+        router.push('/new-objectives')
       }
     } catch (error) {
       toast.error('Failed to create objective')

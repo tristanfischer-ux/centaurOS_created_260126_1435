@@ -27,6 +27,25 @@ This file contains meta-agent behavior directives that influence HOW work is app
 - For API changes: test the endpoint manually
 - For database changes: verify data integrity
 
+### Automated Verification Gate
+
+**After completing any bug fix or UI change, run `npm run verify` before reporting the task as done.**
+
+This runs two tiers of checks:
+1. **Tier 1 (Static):** `tsc --noEmit` + ESLint — catches broken imports, type mismatches, syntax errors
+2. **Tier 2 (Smoke):** Playwright navigates to every affected page and checks it renders — catches runtime crashes
+
+If any tier fails, fix the issue and re-run. Never tell the user "done" until verify passes. If the dev server isn't running, Tier 2 is skipped gracefully and Tier 1 still provides protection.
+
+For static-only checks (no browser needed): `npm run verify -- --static`
+
+### Commit-Per-Page Discipline
+
+When fixing bugs across multiple pages, **commit after each page's fixes are verified** — not in a single batch. This ensures:
+- Rolling back one page's fix is a clean `git revert <commit>`
+- Other verified page fixes are preserved
+- Each commit has a focused, descriptive message
+
 ## 4. Bug Fixing Strategy
 
 1. **First attempt:** Analyze the bug and try a direct fix

@@ -786,6 +786,7 @@ export async function acceptGhost(
   return withAuth(async ({ supabase, foundryId }) => {
     const table = itemType === 'objective' ? 'objectives' : 'tasks'
 
+    // SECURITY: Only allow accepting items that are actually ghosts
     const { error } = await supabase
       .from(table)
       .update({
@@ -795,6 +796,7 @@ export async function acceptGhost(
       })
       .eq('id', itemId)
       .eq('foundry_id', foundryId)
+      .eq('is_ghost', true)
       .is('deleted_at', null)
 
     if (error) {
@@ -833,11 +835,13 @@ export async function rejectGhost(
     const now = new Date().toISOString()
 
     if (itemType === 'task') {
+      // SECURITY: Only allow rejecting items that are actually ghosts
       const { error } = await supabase
         .from('tasks')
         .update({ deleted_at: now })
         .eq('id', itemId)
         .eq('foundry_id', foundryId)
+        .eq('is_ghost', true)
         .is('deleted_at', null)
 
       if (error) {
@@ -848,12 +852,13 @@ export async function rejectGhost(
         return { error: error.message }
       }
     } else {
-      // Soft-delete the objective
+      // SECURITY: Only allow rejecting objectives that are actually ghosts
       const { error: objError } = await supabase
         .from('objectives')
         .update({ deleted_at: now })
         .eq('id', itemId)
         .eq('foundry_id', foundryId)
+        .eq('is_ghost', true)
         .is('deleted_at', null)
 
       if (objError) {
@@ -915,11 +920,11 @@ export async function updateCanvasItem(
     if (itemType === 'objective') {
       // Build update object with only provided fields
       const updateData: Record<string, unknown> = {}
-      if (patch.title !== undefined) updateData.title = patch.title.trim()
-      if (patch.description !== undefined) updateData.description = patch.description.trim() || null
+      if (patch.title !== undefined) updateData.title = (patch.title ?? '').trim()
+      if (patch.description !== undefined) updateData.description = (patch.description ?? '').trim() || null
       if (patch.status !== undefined) updateData.status = patch.status
       if (patch.milestone_date !== undefined) updateData.milestone_date = patch.milestone_date || null
-      if (patch.workstream !== undefined) updateData.workstream = patch.workstream || null
+      if (patch.workstream !== undefined) updateData.workstream = (patch.workstream ?? '').trim() || null
       if (patch.creator_id !== undefined) updateData.creator_id = patch.creator_id
 
       if (Object.keys(updateData).length === 0) {
@@ -943,10 +948,10 @@ export async function updateCanvasItem(
     } else {
       // Task update
       const updateData: Record<string, unknown> = {}
-      if (patch.title !== undefined) updateData.title = patch.title.trim()
-      if (patch.description !== undefined) updateData.description = patch.description.trim() || null
+      if (patch.title !== undefined) updateData.title = (patch.title ?? '').trim()
+      if (patch.description !== undefined) updateData.description = (patch.description ?? '').trim() || null
       if (patch.status !== undefined) updateData.status = patch.status
-      if (patch.workstream !== undefined) updateData.workstream = patch.workstream || null
+      if (patch.workstream !== undefined) updateData.workstream = (patch.workstream ?? '').trim() || null
       if (patch.assignee_id !== undefined) updateData.assignee_id = patch.assignee_id
       if (patch.start_date !== undefined) updateData.start_date = patch.start_date || null
       if (patch.end_date !== undefined) updateData.end_date = patch.end_date || null
@@ -969,6 +974,22 @@ export async function updateCanvasItem(
           error: error.message,
         })
         return { error: error.message }
+      }
+
+      // Sync task_assignees junction table when assignee_id changes
+      if (patch.assignee_id !== undefined && patch.assignee_id) {
+        // Remove existing assignees and insert the new one
+        await supabase
+          .from('task_assignees')
+          .delete()
+          .eq('task_id', itemId)
+
+        await supabase
+          .from('task_assignees')
+          .upsert(
+            { task_id: itemId, profile_id: patch.assignee_id },
+            { onConflict: 'task_id,profile_id' }
+          )
       }
     }
 

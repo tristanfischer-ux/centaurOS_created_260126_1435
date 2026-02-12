@@ -85,7 +85,7 @@ export function StrategicPlannerView({ objectiveId }: StrategicPlannerViewProps)
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertTriangle className="h-12 w-12 text-status-warning" />
         <p className="text-foreground font-medium">{error || 'Plan not found'}</p>
-        <Button variant="secondary" onClick={() => router.push('/objectives')}>
+        <Button variant="secondary" onClick={() => router.push('/new-objectives')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Objectives
         </Button>
@@ -118,7 +118,7 @@ export function StrategicPlannerView({ objectiveId }: StrategicPlannerViewProps)
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push('/objectives')}
+              onClick={() => router.push('/new-objectives')}
               className="h-8 px-2"
             >
               <ArrowLeft className="h-4 w-4" />

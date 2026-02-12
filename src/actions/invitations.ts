@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sendInvitationEmail } from '@/lib/notifications/channels/email'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 import type { Database } from '@/types/database.types'
 
 type MemberRole = Database['public']['Enums']['member_role']
@@ -40,6 +41,10 @@ export async function createInvitation(
   if (!user) {
     return { success: false, error: 'Unauthorized' }
   }
+
+  // SECURITY: Rate limit invitation emails to prevent spam
+  const rateLimitError = await checkRateLimit('emailInvite', `invite:${user.id}`)
+  if (rateLimitError) return { success: false, error: rateLimitError }
   
   // Get current user's foundry and role
   const { data: profile, error: profileError } = await supabase

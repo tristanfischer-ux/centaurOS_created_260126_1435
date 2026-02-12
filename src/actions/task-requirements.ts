@@ -2,6 +2,7 @@
 
 
 import { createClient } from '@/lib/supabase/server'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { revalidatePath } from 'next/cache'
 
 // Types
@@ -252,10 +253,14 @@ export async function getAvailableSkills(): Promise<{ data: string[]; error: str
     try {
         const supabase = await createClient()
 
-        const { data, error } = await supabase
+        // SECURITY: Scope to foundry (RLS disabled on profiles)
+        const foundryId = await getFoundryIdCached()
+        let query = supabase
             .from('profiles')
             .select('skills')
             .not('skills', 'is', null)
+        if (foundryId) query = query.eq('foundry_id', foundryId)
+        const { data, error } = await query
 
         if (error) {
             console.error('Error fetching available skills:', error)
@@ -287,10 +292,14 @@ export async function getSkillDistribution(): Promise<{
     try {
         const supabase = await createClient()
 
-        const { data, error } = await supabase
+        // SECURITY: Scope to foundry (RLS disabled on profiles)
+        const foundryId = await getFoundryIdCached()
+        let skillQuery = supabase
             .from('profiles')
             .select('skills')
             .not('skills', 'is', null)
+        if (foundryId) skillQuery = skillQuery.eq('foundry_id', foundryId)
+        const { data, error } = await skillQuery
 
         if (error) {
             console.error('Error fetching skill distribution:', error)

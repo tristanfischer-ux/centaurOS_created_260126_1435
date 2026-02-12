@@ -10,6 +10,8 @@ import {
     BusinessFunctionCategory,
     DEFAULT_BUSINESS_FUNCTIONS 
 } from '@/types/org-blueprint'
+import { withAuth } from '@/lib/server-action-utils'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
@@ -23,20 +25,25 @@ const openai = new OpenAI({
 export async function assessCoverage(
     input: GapAssessmentInput
 ): Promise<{ result?: GapAssessmentResult; error?: string }> {
-    try {
-        if (!input.foundry_description || input.foundry_description.trim().length < 20) {
-            return { error: 'Please provide a more detailed business description (at least 20 characters)' }
-        }
+    return withAuth(async ({ user }) => {
+        // SECURITY: Rate limit AI calls to prevent cost abuse
+        const rateLimitError = await checkRateLimit('aiAnalysis', `ai:${user.id}`)
+        if (rateLimitError) return { error: rateLimitError }
 
-        const functionsList = DEFAULT_BUSINESS_FUNCTIONS.map(f => ({
-            id: f.id,
-            name: f.name,
-            category: f.category,
-            description: f.description,
-            typicallyEarlyStage: f.typicallyEarlyStage
-        }))
+        try {
+            if (!input.foundry_description || input.foundry_description.trim().length < 20) {
+                return { error: 'Please provide a more detailed business description (at least 20 characters)' }
+            }
 
-        const systemPrompt = `You are an expert business operations consultant specializing in early-stage startups and fractional businesses.
+            const functionsList = DEFAULT_BUSINESS_FUNCTIONS.map(f => ({
+                id: f.id,
+                name: f.name,
+                category: f.category,
+                description: f.description,
+                typicallyEarlyStage: f.typicallyEarlyStage
+            }))
+
+            const systemPrompt = `You are an expert business operations consultant specializing in early-stage startups and fractional businesses.
 
 Your task is to analyze a business context and determine which business functions are:
 - Critical and need coverage immediately
@@ -75,7 +82,7 @@ Return ONLY a raw JSON object (no markdown) with this structure:
     "recommendations": ["string"] (3-5 actionable recommendations)
 }`
 
-        const userPrompt = `Analyze this business and suggest coverage status for each function:
+            const userPrompt = `Analyze this business and suggest coverage status for each function:
 
 Business Description:
 ${input.foundry_description}
@@ -90,65 +97,66 @@ ${Object.entries(input.current_coverage).map(([id, status]) => `- ${id}: ${statu
 Business Functions to Assess:
 ${JSON.stringify(functionsList, null, 2)}`
 
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt }
-            ],
-            temperature: 0.7,
-        })
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ],
+                temperature: 0.7,
+            })
 
-        if (!completion.choices || completion.choices.length === 0) {
-            return { error: 'AI returned no response' }
-        }
-
-        const content = completion.choices[0].message.content
-        if (!content) {
-            return { error: 'AI returned empty content' }
-        }
-
-        // Clean up potential markdown formatting
-        const cleanedContent = content.replace(/```json/g, '').replace(/```/g, '').trim()
-
-        try {
-            const parsed = JSON.parse(cleanedContent)
-            
-            // Validate and type the response
-            const result: GapAssessmentResult = {
-                assessed_functions: (parsed.assessed_functions || []).map((f: Record<string, unknown>) => ({
-                    function_id: String(f.function_id || ''),
-                    function_name: String(f.function_name || ''),
-                    category: String(f.category || 'Operations') as BusinessFunctionCategory,
-                    suggested_status: validateStatus(f.suggested_status as string),
-                    reasoning: String(f.reasoning || ''),
-                    priority_if_gap: validatePriority(f.priority_if_gap as string),
-                    suggested_coverage_types: Array.isArray(f.suggested_coverage_types) 
-                        ? f.suggested_coverage_types.map((t: unknown) => validateCoverageType(String(t)))
-                        : ['founder'],
-                    marketplace_search_terms: Array.isArray(f.marketplace_search_terms)
-                        ? f.marketplace_search_terms.map((t: unknown) => String(t))
-                        : undefined
-                })),
-                overall_coverage_score: Math.min(100, Math.max(0, Number(parsed.overall_coverage_score) || 50)),
-                critical_gaps: Array.isArray(parsed.critical_gaps) 
-                    ? parsed.critical_gaps.map((g: unknown) => String(g))
-                    : [],
-                recommendations: Array.isArray(parsed.recommendations)
-                    ? parsed.recommendations.map((r: unknown) => String(r))
-                    : []
+            if (!completion.choices || completion.choices.length === 0) {
+                return { error: 'AI returned no response' }
             }
 
-            return { result }
-        } catch (parseError) {
-            console.error('Failed to parse AI response:', parseError)
-            return { error: 'Failed to parse AI assessment. Please try again.' }
-        }
+            const content = completion.choices[0].message.content
+            if (!content) {
+                return { error: 'AI returned empty content' }
+            }
 
-    } catch (error) {
-        console.error('Coverage assessment failed:', error)
-        return { error: 'Failed to assess coverage. Please try again.' }
-    }
+            // Clean up potential markdown formatting
+            const cleanedContent = content.replace(/```json/g, '').replace(/```/g, '').trim()
+
+            try {
+                const parsed = JSON.parse(cleanedContent)
+                
+                // Validate and type the response
+                const result: GapAssessmentResult = {
+                    assessed_functions: (parsed.assessed_functions || []).map((f: Record<string, unknown>) => ({
+                        function_id: String(f.function_id || ''),
+                        function_name: String(f.function_name || ''),
+                        category: String(f.category || 'Operations') as BusinessFunctionCategory,
+                        suggested_status: validateStatus(f.suggested_status as string),
+                        reasoning: String(f.reasoning || ''),
+                        priority_if_gap: validatePriority(f.priority_if_gap as string),
+                        suggested_coverage_types: Array.isArray(f.suggested_coverage_types) 
+                            ? f.suggested_coverage_types.map((t: unknown) => validateCoverageType(String(t)))
+                            : ['founder'],
+                        marketplace_search_terms: Array.isArray(f.marketplace_search_terms)
+                            ? f.marketplace_search_terms.map((t: unknown) => String(t))
+                            : undefined
+                    })),
+                    overall_coverage_score: Math.min(100, Math.max(0, Number(parsed.overall_coverage_score) || 50)),
+                    critical_gaps: Array.isArray(parsed.critical_gaps) 
+                        ? parsed.critical_gaps.map((g: unknown) => String(g))
+                        : [],
+                    recommendations: Array.isArray(parsed.recommendations)
+                        ? parsed.recommendations.map((r: unknown) => String(r))
+                        : []
+                }
+
+                return { result }
+            } catch (parseError) {
+                console.error('Failed to parse AI response:', parseError)
+                return { error: 'Failed to parse AI assessment. Please try again.' }
+            }
+
+        } catch (error) {
+            console.error('Coverage assessment failed:', error)
+            return { error: 'Failed to assess coverage. Please try again.' }
+        }
+    })
 }
 
 // Helper to validate coverage status
@@ -177,8 +185,13 @@ export async function assessSingleFunction(
     functionCategory: string,
     foundryContext: string
 ): Promise<{ suggestion?: { status: CoverageStatus; priority: GapPriority; reasoning: string }; error?: string }> {
-    try {
-        const systemPrompt = `You are a business operations advisor. Given a business context and a specific function, determine if that function is:
+    return withAuth(async ({ user }) => {
+        // SECURITY: Rate limit AI calls to prevent cost abuse
+        const rateLimitError = await checkRateLimit('aiAnalysis', `ai:${user.id}`)
+        if (rateLimitError) return { error: rateLimitError }
+
+        try {
+            const systemPrompt = `You are a business operations advisor. Given a business context and a specific function, determine if that function is:
 - 'covered': Essential and the founder is likely handling it
 - 'partial': Needed but can be done part-time or shared
 - 'gap': Needed but likely not covered properly
@@ -186,32 +199,33 @@ export async function assessSingleFunction(
 
 Return JSON only: { "status": "...", "priority": "critical|high|medium|low", "reasoning": "..." }`
 
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: `Business: ${foundryContext}\n\nFunction: ${functionName} (${functionCategory})` }
-            ],
-            temperature: 0.5,
-        })
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: `Business: ${foundryContext}\n\nFunction: ${functionName} (${functionCategory})` }
+                ],
+                temperature: 0.5,
+            })
 
-        const content = completion.choices[0]?.message?.content
-        if (!content) {
-            return { error: 'No response from AI' }
-        }
-
-        const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim()
-        const parsed = JSON.parse(cleaned)
-
-        return {
-            suggestion: {
-                status: validateStatus(parsed.status),
-                priority: validatePriority(parsed.priority),
-                reasoning: String(parsed.reasoning || '')
+            const content = completion.choices[0]?.message?.content
+            if (!content) {
+                return { error: 'No response from AI' }
             }
+
+            const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim()
+            const parsed = JSON.parse(cleaned)
+
+            return {
+                suggestion: {
+                    status: validateStatus(parsed.status),
+                    priority: validatePriority(parsed.priority),
+                    reasoning: String(parsed.reasoning || '')
+                }
+            }
+        } catch (error) {
+            console.error('Single function assessment failed:', error)
+            return { error: 'Assessment failed' }
         }
-    } catch (error) {
-        console.error('Single function assessment failed:', error)
-        return { error: 'Assessment failed' }
-    }
+    })
 }

@@ -110,8 +110,12 @@ const SVG_W = 1200
 // ─── Geometry ────────────────────────────────────────────────────────────────
 
 const daysBetween = (a: string, b: string): number => (new Date(b).getTime() - new Date(a).getTime()) / 864e5
-const dateToX = (d: string, s: string, e: string, x0: number, x1: number): number =>
-  x0 + (daysBetween(s, d) / daysBetween(s, e)) * (x1 - x0)
+const dateToX = (d: string, s: string, e: string, x0: number, x1: number): number => {
+  const span = daysBetween(s, e)
+  // Guard: if start === end, place everything at the midpoint
+  if (span === 0) return (x0 + x1) / 2
+  return x0 + (daysBetween(s, d) / span) * (x1 - x0)
+}
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
 
 function tributaryPath(endX: number, taskY: number, confX: number, slotY: number): string {
@@ -153,11 +157,13 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
 
   // ── Global timeline bounds ──
   const globalStart = useMemo(() => {
+    if (strategicObjectives.length === 0) return NOW.toISOString().slice(0, 10)
     const dates = strategicObjectives.map((s) => new Date(s.startDate).getTime())
     return new Date(Math.min(...dates)).toISOString().slice(0, 10)
   }, [strategicObjectives])
 
   const globalEnd = useMemo(() => {
+    if (strategicObjectives.length === 0) return NOW.toISOString().slice(0, 10)
     const dates = strategicObjectives.map((s) => new Date(s.targetDate).getTime())
     return new Date(Math.max(...dates)).toISOString().slice(0, 10)
   }, [strategicObjectives])
@@ -479,7 +485,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                   const isH = hovObj === obj.id
                   const past = new Date(obj.dueDate) <= NOW
                   const td = obj.tasks.filter((t) => t.status === 'done').length
-                  const tp = Math.round((td / obj.tasks.length) * 100)
+                  const tp = obj.tasks.length > 0 ? Math.round((td / obj.tasks.length) * 100) : 0
                   const dir = obj.side === 'above' ? 1 : -1
                   const rH = obj.rw / 2
                   const gap = Math.max(rH + 20, 26)

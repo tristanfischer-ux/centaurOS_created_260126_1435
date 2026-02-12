@@ -1,6 +1,8 @@
 "use server"
 
 import OpenAI from 'openai'
+import { withAuth } from '@/lib/server-action-utils'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
@@ -19,33 +21,38 @@ export type AnalyzedObjective = {
 }
 
 export async function analyzeBusinessPlan(formData: FormData): Promise<{ objectives?: AnalyzedObjective[], error?: string }> {
-    try {
-        const file = formData.get('file') as File
-        if (!file) {
-            return { error: 'No file provided' }
-        }
+    return withAuth(async ({ user }) => {
+        // SECURITY: Rate limit AI calls to prevent cost abuse
+        const rateLimitError = await checkRateLimit('aiAnalysis', `ai:${user.id}`)
+        if (rateLimitError) return { error: rateLimitError }
 
-        let text = ''
+        try {
+            const file = formData.get('file') as File
+            if (!file) {
+                return { error: 'No file provided' }
+            }
 
-        if (file.type === 'application/pdf') {
-            const buffer = Buffer.from(await file.arrayBuffer())
-            // Use dynamic require to avoid bundling issues in some environments
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const pdfParse = require('pdf-parse')
-            const data = await pdfParse(buffer)
-            text = data.text
-        } else {
-            text = await file.text()
-        }
+            let text = ''
 
-        if (!text || text.length < 50) {
-            return { error: 'Could not extract enough text from the file.' }
-        }
+            if (file.type === 'application/pdf') {
+                const buffer = Buffer.from(await file.arrayBuffer())
+                // Use dynamic require to avoid bundling issues in some environments
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                const pdfParse = require('pdf-parse')
+                const data = await pdfParse(buffer)
+                text = data.text
+            } else {
+                text = await file.text()
+            }
 
-        // Truncate if too long (approx 100k chars to stay within token limits of generic models, though 4o is generous)
-        const truncatedText = text.slice(0, 100000)
+            if (!text || text.length < 50) {
+                return { error: 'Could not extract enough text from the file.' }
+            }
 
-        const systemPrompt = `You are an expert business consultant and strategic planner.
+            // Truncate if too long (approx 100k chars to stay within token limits of generic models, though 4o is generous)
+            const truncatedText = text.slice(0, 100000)
+
+            const systemPrompt = `You are an expert business consultant and strategic planner.
         Your goal is to analyze a Business Plan and extract clear, actionable Strategic Objectives.
         
         For each Objective, break it down into 3-5 concrete Tasks.
@@ -67,36 +74,37 @@ export async function analyzeBusinessPlan(formData: FormData): Promise<{ objecti
         ]
         Do not include markdown formatting like \`\`\`json. Just the raw JSON string.`
 
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: `Analyze the following business plan:\n\n${truncatedText}` }
-            ]
-        })
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: `Analyze the following business plan:\n\n${truncatedText}` }
+                ]
+            })
 
-        // Check if choices array exists and has elements before accessing
-        if (!completion.choices || completion.choices.length === 0) {
-            return { error: 'AI returned no response choices' }
+            // Check if choices array exists and has elements before accessing
+            if (!completion.choices || completion.choices.length === 0) {
+                return { error: 'AI returned no response choices' }
+            }
+
+            const content = completion.choices[0].message.content
+            if (!content) {
+                return { error: 'AI returned no content' }
+            }
+
+            const cleanedContent = content.replace(/```json/g, '').replace(/```/g, '').trim()
+
+            try {
+                const objectives = JSON.parse(cleanedContent) as AnalyzedObjective[]
+                return { objectives }
+            } catch (e) {
+                console.error("Failed to parse JSON", e)
+                return { error: 'Failed to parse AI response' }
+            }
+
+        } catch (error) {
+            console.error('Analysis failed:', error)
+            return { error: 'Failed to analyze document. Please ensure it is a valid PDF or Text file.' }
         }
-
-        const content = completion.choices[0].message.content
-        if (!content) {
-            return { error: 'AI returned no content' }
-        }
-
-        const cleanedContent = content.replace(/```json/g, '').replace(/```/g, '').trim()
-
-        try {
-            const objectives = JSON.parse(cleanedContent) as AnalyzedObjective[]
-            return { objectives }
-        } catch (e) {
-            console.error("Failed to parse JSON", e)
-            return { error: 'Failed to parse AI response' }
-        }
-
-    } catch (error) {
-        console.error('Analysis failed:', error)
-        return { error: 'Failed to analyze document. Please ensure it is a valid PDF or Text file.' }
-    }
+    })
 }

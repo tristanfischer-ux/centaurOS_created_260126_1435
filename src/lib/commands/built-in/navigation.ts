@@ -155,7 +155,7 @@ export const tasksCommand: SlashCommand = {
   icon: CheckSquare,
   category: 'navigation',
   execute: async (): Promise<CommandResult> => {
-    return navigateResult('/tasks')
+    return navigateResult('/new-tasks')
   }
 }
 
@@ -167,7 +167,7 @@ export const objectivesCommand: SlashCommand = {
   category: 'navigation',
   aliases: ['obj'],
   execute: async (): Promise<CommandResult> => {
-    return navigateResult('/objectives')
+    return navigateResult('/new-objectives')
   }
 }
 

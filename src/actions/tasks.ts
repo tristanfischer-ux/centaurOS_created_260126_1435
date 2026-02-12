@@ -336,6 +336,7 @@ export async function createTask(formData: FormData) {
       }
 
       revalidatePath('/tasks')
+      revalidatePath('/new-tasks')
       return { success: true }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -363,7 +364,7 @@ export async function createTask(formData: FormData) {
  */
 export async function acceptTask(taskId: string) {
     return withAuth(async ({ supabase, user, foundryId }) => {
-        // Verify user is the assignee and task belongs to their foundry
+        // AUTH: Verify user is an assignee (primary or multi-assignee) and task belongs to their foundry
         const { data: task, error: fetchError } = await supabase
             .from('tasks')
             .select('assignee_id, foundry_id')
@@ -373,8 +374,21 @@ export async function acceptTask(taskId: string) {
 
         if (fetchError || !task) return { error: 'Task not found' }
 
-        if (task.assignee_id !== user.id) {
-            return { error: 'Unauthorized: You are not the assignee of this task' }
+        // Check both primary assignee and task_assignees junction table
+        let isAssignee = task.assignee_id === user.id
+        if (!isAssignee) {
+            const { data: assigneeRow } = await supabase
+                .from('task_assignees')
+                .select('id')
+                .eq('task_id', taskId)
+                .eq('profile_id', user.id)
+                .limit(1)
+                .maybeSingle()
+            isAssignee = !!assigneeRow
+        }
+
+        if (!isAssignee) {
+            return { error: 'Unauthorized: You are not an assignee of this task' }
         }
 
         const { error } = await supabase.from('tasks')
@@ -399,6 +413,7 @@ export async function acceptTask(taskId: string) {
             console.error('[TaskService] Failed to log task history:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -449,6 +464,7 @@ export async function rejectTask(taskId: string, reason: string) {
             console.error('[TaskService] Failed to log task history:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -519,6 +535,7 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
                 // "The recipient can send the task to a third user... The task remains Pending but the assignee updates." (User Prompt)
             })
             .eq('id', taskId)
+            .eq('foundry_id', foundryId)
 
         if (error) return { error: sanitizeErrorMessage(error) }
 
@@ -567,6 +584,7 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
         }
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -610,6 +628,7 @@ export async function amendTask(taskId: string, updates: {
                 amendment_notes: updates.amendment_notes
             })
             .eq('id', taskId)
+            .eq('foundry_id', foundryId)
 
         if (error) return { error: sanitizeErrorMessage(error) }
 
@@ -631,6 +650,7 @@ export async function amendTask(taskId: string, updates: {
         }
         
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -659,6 +679,7 @@ export async function approveAmendment(taskId: string) {
         const { error } = await supabase.from('tasks')
             .update({ status: 'Accepted' }) // "Once User A accepts... automatically changes to Accepted"
             .eq('id', taskId)
+            .eq('foundry_id', foundryId)
 
         if (error) return { error: sanitizeErrorMessage(error) }
 
@@ -679,6 +700,7 @@ export async function approveAmendment(taskId: string) {
         }
         
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -782,6 +804,7 @@ export async function addTaskComment(taskId: string, content: string) {
         }
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         revalidatePath('/messages')
         revalidatePath('/updates')
         return { success: true }
@@ -868,6 +891,7 @@ export async function completeTask(taskId: string) {
             console.error('[TaskService] Failed to log task history:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true, newStatus: nextStatus }
     })
 }
@@ -941,6 +965,7 @@ export async function approveTask(taskId: string) {
         }
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -1039,6 +1064,7 @@ export async function batchApproveTasks(taskIds: string[]) {
         }
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         revalidatePath('/dashboard')
         return { success: true, approvedCount: taskIds.length }
     })
@@ -1099,6 +1125,7 @@ export async function batchRejectTasks(taskIds: string[], reason: string) {
         }
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         revalidatePath('/dashboard')
         return { success: true, rejectedCount: taskIds.length }
     })
@@ -1158,6 +1185,7 @@ export async function nudgeTask(taskId: string) {
         await logSystemEvent(supabase, foundryId, taskId, "🔴 CLIENT NUDGE: Client requested an update.", user.id)
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -1253,6 +1281,7 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
                     end_date: validatedEndDate
                 })
                 .eq('id', taskId)
+                .eq('foundry_id', foundryId)
 
             if (error) {
                 console.error('[TaskService] Supabase update failed:', { error: error instanceof Error ? error.message : 'Unknown error' })
@@ -1288,6 +1317,7 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
 
             revalidatePath('/timeline')
             revalidatePath('/tasks')
+            revalidatePath('/new-tasks')
             return { success: true }
         } catch (err) {
             console.error('[TaskService] updateTaskDates unexpected error:', { error: err instanceof Error ? err.message : 'Unknown error' })
@@ -1337,6 +1367,7 @@ export async function triggerAIWorker(taskId: string) {
         }
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -1370,10 +1401,12 @@ export async function updateTaskProgress(taskId: string, progress: number) {
         const { error } = await supabase.from('tasks')
             .update({ progress: clampedProgress })
             .eq('id', taskId)
+            .eq('foundry_id', foundryId)
 
         if (error) return { error: sanitizeErrorMessage(error) }
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         revalidatePath(`/tasks/${taskId}`) // If detailed view exists
         return { success: true, progress: clampedProgress }
     })
@@ -1467,6 +1500,7 @@ export async function duplicateTask(originalTaskId: string) {
             console.error('[TaskService] Failed to log task history:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -1499,6 +1533,7 @@ export async function updateTaskDetails(taskId: string, updates: { title?: strin
         const { error } = await supabase.from('tasks')
             .update(updates)
             .eq('id', taskId)
+            .eq('foundry_id', foundryId)
 
         if (error) return { error: sanitizeErrorMessage(error) }
 
@@ -1516,6 +1551,7 @@ export async function updateTaskDetails(taskId: string, updates: { title?: strin
             console.error('[TaskService] Failed to log task history:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -1596,6 +1632,7 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
         }
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -1650,6 +1687,7 @@ export async function updateTaskStatusAndRisk(
             .from('tasks')
             .update(updateData)
             .eq('id', taskId)
+            .eq('foundry_id', foundryId)
 
         if (error) return { error: sanitizeErrorMessage(error) }
 
@@ -1670,6 +1708,7 @@ export async function updateTaskStatusAndRisk(
         }
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         revalidatePath(`/tasks/${taskId}`)
         return { success: true }
     })
@@ -1733,6 +1772,7 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
             console.error('[TaskService] Failed to log system event:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -1786,6 +1826,7 @@ export async function deleteTaskAttachment(fileId: string, filePath: string, tas
         }
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return { success: true }
     })
 }
@@ -1992,6 +2033,7 @@ export async function deleteTasks(taskIds: string[]) {
         }
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
 
         // Return detailed result for partial failures
         if (failedIds.length > 0) {
@@ -2087,12 +2129,13 @@ export async function updateTaskPrivacy(
     isPrivate: boolean,
     shareTargets: { type: string; id: string }[]
 ) {
-    return withAuth(async ({ supabase, user }) => {
-        // AUTH: Verify user is the task creator
+    return withAuth(async ({ supabase, user, foundryId }) => {
+        // AUTH: Verify user is the task creator and task belongs to user's foundry
         const { data: task, error: fetchError } = await supabase
             .from('tasks')
             .select('id, creator_id')
             .eq('id', taskId)
+            .eq('foundry_id', foundryId)
             .single()
 
         if (fetchError || !task) return { error: 'Task not found' }
@@ -2103,6 +2146,7 @@ export async function updateTaskPrivacy(
             .from('tasks')
             .update({ is_private: isPrivate })
             .eq('id', taskId)
+            .eq('foundry_id', foundryId)
 
         if (updateError) return { error: 'Failed to update privacy setting' }
 
@@ -2131,6 +2175,7 @@ export async function updateTaskPrivacy(
         }
 
         revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
         return {}
     })
 }
@@ -2142,7 +2187,17 @@ export async function updateTaskPrivacy(
  * @returns Array of share targets with names for display
  */
 export async function getTaskShares(taskId: string) {
-    return withAuth(async ({ supabase }) => {
+    return withAuth(async ({ supabase, foundryId }) => {
+        // AUTH: Verify task belongs to user's foundry before returning shares
+        const { data: task, error: taskError } = await supabase
+            .from('tasks')
+            .select('id')
+            .eq('id', taskId)
+            .eq('foundry_id', foundryId)
+            .single()
+
+        if (taskError || !task) return { data: [], error: 'Task not found or access denied' }
+
         const { data: shares, error } = await supabase
             .from('task_shares')
             .select(`

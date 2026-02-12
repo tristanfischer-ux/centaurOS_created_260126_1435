@@ -91,6 +91,22 @@ export const RATE_LIMIT_CONFIGS = {
     // Public endpoints
     health: { limit: 60, window: 60 * 1000 },            // 60 requests per minute
     preview: { limit: 30, window: 60 * 1000 },           // 30 requests per minute
+    
+    // AI server actions — prevent cost abuse
+    aiAdvisory: { limit: 10, window: 60 * 1000 },        // 10 advisory answers per minute
+    aiAnalysis: { limit: 5, window: 60 * 1000 },          // 5 business plan analyses per minute  
+    aiCadLab: { limit: 10, window: 60 * 1000 },           // 10 CAD generations per minute
+    aiSmartGoal: { limit: 10, window: 60 * 1000 },        // 10 SMART goal suggestions per minute
+    aiStrategicPlan: { limit: 5, window: 60 * 1000 },     // 5 strategic plans per minute
+    
+    // Telegram bot
+    telegram: { limit: 20, window: 60 * 60 * 1000 },      // 20 commands per hour
+    
+    // Email/invitations
+    emailInvite: { limit: 10, window: 60 * 60 * 1000 },   // 10 invitations per hour
+    
+    // Webhooks (IP-based)
+    webhook: { limit: 100, window: 60 * 1000 },            // 100 requests per minute per IP
 } as const satisfies Record<string, RateLimitConfig>
 
 export type RateLimitAction = keyof typeof RATE_LIMIT_CONFIGS

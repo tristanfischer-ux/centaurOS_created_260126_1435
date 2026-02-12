@@ -309,7 +309,7 @@ export function BlueprintsView({
                   description="Objective packs are pre-built objectives with tasks. They'll appear here as they become available."
                   action={
                     <Button asChild>
-                      <Link href="/objectives">
+                      <Link href="/new-objectives">
                         Create Custom Objective
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
@@ -645,7 +645,7 @@ export function BlueprintsView({
                 title="Objectives & Tasks"
                 description="Turn gaps into objectives with tasks. Assign to team, advisors, or AI agents."
                 linkText="Objectives"
-                href="/objectives"
+                href="/new-objectives"
               />
               <IntegrationCard
                 icon={LayoutDashboard}
@@ -834,7 +834,7 @@ export function BlueprintsView({
             title="Objectives & Tasks"
             description="Turn any knowledge gap into an objective with actionable tasks. Everything stays connected to your blueprint."
             color="orange"
-            href="/objectives"
+            href="/new-objectives"
           />
         </div>
       </section>

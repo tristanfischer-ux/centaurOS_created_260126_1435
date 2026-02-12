@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { escapeHtml } from '@/lib/security/sanitize'
+import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
 
 const INBOUND_WEBHOOK_SECRET = process.env.EMAIL_INBOUND_WEBHOOK_SECRET
 
@@ -47,6 +48,13 @@ function getAdminClient() {
  * }
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
+    // SECURITY: IP-based rate limit on webhook endpoint
+    const ip = getClientIP(req.headers)
+    const ipLimit = await rateLimit('webhook', `webhook:${ip}`)
+    if (!ipLimit.success) {
+        return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+    }
+
     // SECURITY: Validate webhook secret — reject if not configured or mismatch
     if (!INBOUND_WEBHOOK_SECRET) {
         console.error('[EmailInbound] EMAIL_INBOUND_WEBHOOK_SECRET not configured — rejecting all requests')

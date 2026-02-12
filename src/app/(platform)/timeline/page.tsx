@@ -9,5 +9,5 @@ import { redirect } from "next/navigation"
  * This redirect ensures old bookmarks and links continue to work.
  */
 export default function TimelinePage() {
-    redirect("/tasks")
+    redirect("/new-tasks")
 }

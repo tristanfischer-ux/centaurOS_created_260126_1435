@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { buildAIContext } from '@/lib/ai-context/builder'
 import { escapeHtml } from '@/lib/security/sanitize'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 
 /** Whether AI features are available (API key is set and not the build placeholder) */
 const AI_ENABLED =
@@ -110,6 +111,10 @@ export async function smartifyGoal(
 
   const foundryId = await getFoundryIdCached()
   if (!foundryId) return { error: 'User not in a foundry' }
+
+  // SECURITY: Rate limit AI calls to prevent cost abuse
+  const rateLimitError = await checkRateLimit('aiSmartGoal', `ai:${user.id}`)
+  if (rateLimitError) return { error: rateLimitError }
 
   // VALIDATION: Input bounds
   const rawIdea = input.rawIdea?.trim()
@@ -263,6 +268,10 @@ export async function scoreSmartGoal(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
+
+  // SECURITY: Rate limit AI calls to prevent cost abuse
+  const rateLimitError = await checkRateLimit('aiSmartGoal', `ai:${user.id}`)
+  if (rateLimitError) return { error: rateLimitError }
 
   const sanitizedText = escapeHtml(trimmed)
   const typeLabel = type === 'objective' ? 'objective' : 'task'

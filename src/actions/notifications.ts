@@ -339,7 +339,7 @@ export async function notifyTaskAssigned(data: {
         type: 'task_assigned',
         title: `${data.assignedByName} assigned you: ${data.taskTitle}`,
         message: 'Click to view task details and take action',
-        link: `/tasks?taskId=${data.taskId}`,
+        link: `/new-tasks?taskId=${data.taskId}`,
         metadata: {
             task_id: data.taskId,
             assigner_name: data.assignedByName
@@ -365,7 +365,7 @@ export async function notifyTaskCompleted(data: {
         type: 'task_completed',
         title: `${data.completedByName} completed: ${data.taskTitle}`,
         message: 'Click to review the completed work',
-        link: `/tasks?taskId=${data.taskId}`,
+        link: `/new-tasks?taskId=${data.taskId}`,
         metadata: {
             task_id: data.taskId,
             completer_name: data.completedByName

@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { parseSearchQuery, operatorsToFilters, type SearchFilters } from '@/lib/search/operators'
 
 export interface SearchResult {
@@ -45,6 +46,9 @@ export async function searchMessages(
     if (authError || !user) {
       return { success: false, error: 'Not authenticated' }
     }
+    
+    // SECURITY: Get foundry_id to scope profile queries (RLS disabled on profiles)
+    const foundryId = await getFoundryIdCached()
     
     // Parse search query
     const parsed = parseSearchQuery(searchQuery)
@@ -121,10 +125,13 @@ export async function searchMessages(
       // If starts with @, try to resolve username to user ID
       if (filters.fromUserId.startsWith('@')) {
         const username = filters.fromUserId.slice(1)
-        const { data: userMatch } = await supabase
+        // SECURITY: Scope to foundry (RLS disabled on profiles)
+        let userMatchQuery = supabase
           .from('profiles')
           .select('id')
           .ilike('full_name', `%${username}%`)
+        if (foundryId) userMatchQuery = userMatchQuery.eq('foundry_id', foundryId)
+        const { data: userMatch } = await userMatchQuery
           .limit(1)
           .single()
         
@@ -220,12 +227,18 @@ export async function getSearchSuggestions(
       return { success: false, error: 'Not authenticated' }
     }
     
+    // SECURITY: Get foundry_id to scope profile queries (RLS disabled on profiles)
+    const foundryId = await getFoundryIdCached()
+    
     if (operatorType === 'from') {
       // Autocomplete user names
-      const { data: users, error } = await supabase
+      // SECURITY: Scope to foundry (RLS disabled on profiles)
+      let usersQuery = supabase
         .from('profiles')
         .select('id, full_name')
         .ilike('full_name', `%${query}%`)
+      if (foundryId) usersQuery = usersQuery.eq('foundry_id', foundryId)
+      const { data: users, error } = await usersQuery
         .limit(10)
       
       if (error) {

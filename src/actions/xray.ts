@@ -756,6 +756,7 @@ export async function loadScanAction(scanId: string): Promise<
     stage: string
     idea: string
     thumbnailUrl: string | null
+    researchReport: { report: string; sources: Array<{ uri: string; title: string }>; savedAt: string } | null
     createdAt: string
     updatedAt: string
   } | { error: string }
@@ -763,7 +764,7 @@ export async function loadScanAction(scanId: string): Promise<
   return withAuth(async ({ supabase }) => {
     const { data: scan, error } = await supabase
       .from("xray_scans")
-      .select("id, foundry_id, spec, status, scan_status, name, stage, idea, thumbnail_url, created_at, updated_at")
+      .select("id, foundry_id, spec, status, scan_status, name, stage, idea, thumbnail_url, research_report, created_at, updated_at")
       .eq("id", scanId)
       .single()
 
@@ -781,6 +782,7 @@ export async function loadScanAction(scanId: string): Promise<
       stage: scan.stage,
       idea: scan.idea,
       thumbnailUrl: scan.thumbnail_url,
+      researchReport: scan.research_report as unknown as { report: string; sources: Array<{ uri: string; title: string }>; savedAt: string } | null,
       createdAt: scan.created_at,
       updatedAt: scan.updated_at,
     }
@@ -2278,6 +2280,277 @@ export async function seedDemoConceptAction(
     })
 
     return { demoScanId: data as string }
+  })
+}
+
+// ─── Concept Research (Gemini Search + Claude Opus Synthesis) ────────
+
+/** Result type for concept research */
+export interface ConceptResearchResult {
+  success: boolean
+  error?: string
+  report: string
+  sources: Array<{ uri: string; title: string }>
+  researchTime: number
+}
+
+/**
+ * System prompt for Claude Opus to synthesize a concept research report.
+ *
+ * @description Unlike the CAD Lab's engineering-focused report, this covers
+ * the full product concept: market context, technical feasibility, key components,
+ * manufacturing considerations, competitive landscape, and risk factors.
+ */
+const CONCEPT_RESEARCH_PROMPT = `You are a senior product development engineer preparing a comprehensive research brief for a new product concept. Your job is to synthesize raw web research data into a clear, structured product intelligence report.
+
+This report will be used by engineers and product designers to make informed decisions about how to develop this product. Accuracy and source attribution are critical.
+
+Output format (follow exactly):
+
+# Product Research Report: {Product Name}
+
+## Executive Summary
+2-3 sentences: what this product is, who it's for, and why it matters. Include the primary technical challenge.
+
+## Market Context
+- What category does this fall into?
+- Who are the key players/competitors?
+- What price range is typical?
+- What's the market trend? (growing, mature, emerging)
+
+## Technical Specification
+### Overall Dimensions & Form Factor
+- Physical size (mm), weight (g/kg)
+- Form factor and ergonomics
+
+### Key Components
+For each major subsystem:
+- **Name**: what it does, typical specifications
+- Dimensions if known
+- Common suppliers/standards
+
+### Performance Requirements
+- Key performance metrics for this product category
+- Industry standards or benchmarks to hit
+
+## Engineering Considerations
+### Materials & Manufacturing
+- Primary materials used in this category
+- Manufacturing methods (injection moulding, CNC, 3D printing, PCB assembly, etc.)
+- Key material properties that matter
+
+### Critical Design Constraints
+- Must-hit tolerances or dimensions
+- Regulatory requirements (safety, EMC, etc.)
+- Environmental/durability requirements
+
+## Risk Factors
+- **Technical Risks**: What's hard about building this?
+- **Supply Chain Risks**: Long-lead components, sole-source parts
+- **Regulatory Risks**: Certifications needed
+
+## Competitive Landscape
+List 2-4 comparable products with:
+- Name, manufacturer
+- Key specs (dimensions, weight, price)
+- What they do well / poorly
+
+## Recommended Next Steps
+3-5 specific actions the engineering team should take first.
+
+## Source Confidence
+Rate the reliability of your findings:
+- ✅ High confidence (multiple authoritative sources agree)
+- ⚠️ Medium confidence (single source or extrapolated)
+- ❓ Low confidence (limited data available)
+
+RULES:
+- Use metric units (mm, g, kg, °C)
+- Every factual claim should be traceable to the source data provided
+- If sources disagree, state both values and note the discrepancy
+- Never invent specifications — mark unknown data as "❓ Not found in research"
+- Be specific and actionable — avoid vague generalities
+- Focus on information that helps engineers make build-vs-buy decisions`
+
+/**
+ * Runs concept-level research: Gemini web search + Claude Opus synthesis.
+ *
+ * @description This is the user-facing research step in the Forge concept flow.
+ * It searches the web for real product specifications, competitive intelligence,
+ * and manufacturing context, then synthesizes everything into a comprehensive
+ * product research report using Claude Opus.
+ *
+ * @param idea - The product concept description
+ * @returns Research report, sources, and timing
+ *
+ * @security Requires authenticated user with foundry context
+ * @audit Logs research initiation and completion
+ */
+export async function runConceptResearchAction(
+  idea: string,
+): Promise<ConceptResearchResult | { error: string }> {
+  return withAuth(async () => {
+    const start = Date.now()
+
+    // VALIDATION: Ensure idea is non-empty
+    if (!idea?.trim()) {
+      return { error: "Please enter a product idea to research" }
+    }
+
+    try {
+      console.info("[Forge] Concept research: Starting web search...")
+
+      // 1. Run Gemini + Google Search for real-world product intelligence
+      const apiKey = process.env.GOOGLE_AI_API_KEY
+      if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
+
+      const searchPrompt = `Research this product concept thoroughly: ${idea.trim()}
+
+I need comprehensive product intelligence for an engineering team. Search for:
+
+1. EXISTING PRODUCTS — Find 2-4 comparable products with exact specifications (dimensions, weight, price, key specs)
+2. KEY COMPONENTS — What subsystems/components does this type of product typically use? What are standard sizes and specs?
+3. MATERIALS — What materials are commonly used? What manufacturing methods?
+4. MARKET — Who makes these? What do they cost? What's the market like?
+5. TECHNICAL CHALLENGES — What are the known engineering challenges for this type of product?
+6. STANDARDS & REGULATIONS — Any relevant safety, performance, or compliance standards?
+7. DIMENSIONS — Overall size, weight, and critical dimensions in millimetres
+
+Be thorough and precise. Include specific numbers, model names, and manufacturer details where available. If you find conflicting information from different sources, include both.`
+
+      const searchUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`
+
+      const searchResponse = await fetch(searchUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: searchPrompt }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: {
+            maxOutputTokens: 8192,
+            temperature: 0.2,
+          },
+        }),
+        signal: AbortSignal.timeout(60_000),
+      })
+
+      let webText = ""
+      let sources: Array<{ uri: string; title: string }> = []
+
+      if (searchResponse.ok) {
+        const searchData = await searchResponse.json()
+        webText = searchData.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
+
+        // Extract grounding sources
+        const groundingMeta = searchData.candidates?.[0]?.groundingMetadata
+        const chunks: Array<{ web?: { uri?: string; title?: string } }> =
+          groundingMeta?.groundingChunks ?? []
+        sources = chunks
+          .filter((c): c is { web: { uri: string; title: string } } =>
+            Boolean(c.web?.uri && c.web?.title),
+          )
+          .map((c) => ({ uri: c.web.uri, title: c.web.title }))
+      } else {
+        console.warn("[Forge] Web search failed, continuing with Claude synthesis only")
+      }
+
+      // 2. Send raw data to Claude Opus for synthesis
+      console.info("[Forge] Concept research: Synthesizing report with Claude Opus...")
+      const anthropicKey = process.env.ANTHROPIC_API_KEY
+      if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured")
+
+      const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-opus-4-20250514",
+          max_tokens: 8192,
+          system: CONCEPT_RESEARCH_PROMPT,
+          messages: [{
+            role: "user",
+            content: `Product concept to research: ${idea.trim()}\n\n=== RAW WEB RESEARCH DATA ===\n${webText || "(No web data available — synthesize from your knowledge)"}`,
+          }],
+        }),
+        signal: AbortSignal.timeout(120_000),
+      })
+
+      if (!claudeResponse.ok) {
+        const errText = await claudeResponse.text()
+        throw new Error(`Claude API error (${claudeResponse.status}): ${errText.slice(0, 300)}`)
+      }
+
+      const claudeData = await claudeResponse.json()
+      const report: string = claudeData.content?.[0]?.text ?? ""
+
+      const researchTime = Date.now() - start
+
+      // AUDIT: Log research completion
+      console.info("[Forge] Concept research complete:", {
+        idea: idea.trim().slice(0, 50),
+        sourceCount: sources.length,
+        reportLength: report.length,
+        timeMs: researchTime,
+      })
+
+      return {
+        success: true,
+        report,
+        sources,
+        researchTime,
+      } satisfies ConceptResearchResult
+
+    } catch (error) {
+      console.error(
+        "[Forge] Concept research failed:",
+        error instanceof Error ? error.message : error,
+      )
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Research failed",
+        report: "",
+        sources: [],
+        researchTime: Date.now() - start,
+      } satisfies ConceptResearchResult
+    }
+  })
+}
+
+// ─── Persist Research Report ─────────────────────────────────────────
+
+/**
+ * Saves a research report to the xray_scans table.
+ *
+ * @param scanId - The scan to attach the research to
+ * @param report - The research report text
+ * @param sources - Web sources used in the research
+ * @returns Success or error
+ *
+ * @security Requires authenticated user with foundry context
+ */
+export async function saveConceptResearchAction(
+  scanId: string,
+  report: string,
+  sources: Array<{ uri: string; title: string }>,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    const { error: updateError } = await supabase
+      .from("xray_scans")
+      .update({
+        research_report: { report, sources, savedAt: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", scanId)
+
+    if (updateError) {
+      console.error("[Forge] Failed to save research report:", updateError.message)
+      return { error: `Failed to save research: ${updateError.message}` }
+    }
+
+    return { success: true as const }
   })
 }
 

@@ -15,6 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
 
 /**
  * Google Calendar sends POST notifications when watched resources change.
@@ -22,6 +23,13 @@ import { NextRequest, NextResponse } from 'next/server'
  * can be implemented by querying the changed events and updating ForgeOS.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
+    // SECURITY: IP-based rate limit on webhook endpoint
+    const ip = getClientIP(req.headers)
+    const ipLimit = await rateLimit('webhook', `webhook:${ip}`)
+    if (!ipLimit.success) {
+        return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+    }
+
     // SECURITY: Validate webhook token — reject if secret not configured or mismatch
     const channelToken = req.headers.get('x-goog-channel-token')
     const webhookSecret = process.env.GOOGLE_CALENDAR_WEBHOOK_SECRET

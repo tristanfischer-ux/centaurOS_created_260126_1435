@@ -45,4 +45,22 @@ export interface CadLabResult {
   skippedComponents?: string[]
   /** Post-execution validation warnings */
   validationWarnings?: string[]
+  /** Web research source URLs from Pass 0 (Gemini + Google Search) */
+  researchSources?: string[]
+  /** Thingiverse reference models found in Pass 0 */
+  referenceModels?: Array<{ name: string; url: string }>
+}
+
+/** Result from the standalone research step (Pass 0) */
+export interface CadLabResearchResult {
+  success: boolean
+  error?: string
+  /** The full research report synthesized by Claude */
+  report: string
+  /** Web source URLs from Gemini + Google Search */
+  sources: Array<{ uri: string; title: string }>
+  /** Thingiverse reference models */
+  referenceModels: Array<{ name: string; url: string }>
+  /** Time taken for the research step in ms */
+  researchTime: number
 }
