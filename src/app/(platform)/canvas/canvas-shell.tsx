@@ -14,7 +14,7 @@
  * - cost-of-delay-view.tsx — Cost of Delay calculator
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Waypoints, Pencil, Banknote, Calculator, Link2 } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -25,8 +25,8 @@ import { goalBundlesToRiverData } from '@/lib/canvas/strategy-river-adapter'
 import { NodeDetailsDialog } from '@/components/canvas/node-details-dialog'
 import { MoneyMapClient } from '../money-map/money-map-client'
 import { CostOfDelayView } from '@/components/tools/cost-of-delay/cost-of-delay-view'
-import { StrategicObjectivesManager } from '../new-objectives/strategic-objectives-manager'
 import { StrategyLinkView } from './strategy-link-view'
+import { WhiteboardList } from './components/whiteboard-list'
 import { CompanyPurposeWrapper } from '@/components/objectives/company-purpose-wrapper'
 import { AddToRiverDialog } from '@/components/canvas/add-to-river-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -35,6 +35,7 @@ import type { GoalBundle } from '@/types/canvas'
 import type { MilestoneOption } from '@/types/canvas'
 import type { StrategicObjective } from '../new-objectives/types'
 import type { FoundryPurposeData } from '@/types/foundry'
+import type { WhiteboardRow } from '@/actions/whiteboards'
 
 // ============================================================================
 // TYPES
@@ -58,10 +59,10 @@ interface CanvasShellProps {
   strategicObjectives: StrategicObjective[]
   /** Regular objectives for the link view */
   regularObjectives: RegularObjective[]
-  /** Server-rendered whiteboard list */
-  whiteboardList: React.ReactNode
-  /** Total number of whiteboards (for tab-bar badge) */
-  whiteboardCount: number
+  /** Pre-fetched whiteboard rows */
+  whiteboards: WhiteboardRow[]
+  /** Objectives for whiteboard linking */
+  whiteboardObjectives: { id: string; title: string }[]
   /** Company purpose data for strategic context display */
   purposeData: FoundryPurposeData | null
   /** Whether current user is a founder (can edit purpose) */
@@ -96,8 +97,8 @@ export function CanvasShell({
   initialBundles,
   strategicObjectives,
   regularObjectives,
-  whiteboardList,
-  whiteboardCount,
+  whiteboards,
+  whiteboardObjectives,
   purposeData,
   isFounder,
   foundryId,
@@ -224,8 +225,9 @@ export function CanvasShell({
     }
   }, [activeTab, router])
 
-  // No-op filter for manager on Strategy page (filtering is on the Objectives page)
-  const [_stratFilter, setStratFilter] = useState<string | null>(null)
+  // ── Toolbar slot ref ──
+  // Child tab components portal their action buttons into this element
+  const toolbarSlotRef = useRef<HTMLDivElement>(null)
 
   return (
     <div>
@@ -252,19 +254,7 @@ export function CanvasShell({
         </div>
       </div>
 
-      {/* Strategic Objectives CRUD manager — hidden on Strategy River tab (pills are non-functional there) */}
-      {activeTab !== 'river' && (
-        <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-1">
-          <StrategicObjectivesManager
-            strategicObjectives={strategicObjectives}
-            objectives={regularObjectives}
-            activeFilter={_stratFilter}
-            onFilterChange={setStratFilter}
-          />
-        </div>
-      )}
-
-      {/* Tab bar with status badges */}
+      {/* Tab bar with status badges + action-button slot */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CanvasTab)}>
         <div className="flex items-center px-4 sm:px-6 lg:px-8 py-2 border-b border-slate-100 bg-background">
           <TabsList aria-label="Strategy views">
@@ -279,7 +269,7 @@ export function CanvasShell({
             })}
           </TabsList>
 
-          {/* Status badges — contextual per active tab */}
+          {/* Right side: status badges + action buttons portaled from child tabs */}
           <div className="ml-auto flex items-center gap-2">
             {activeTab === 'river' && riverData.length > 0 && (
               <>
@@ -306,9 +296,11 @@ export function CanvasShell({
             )}
             {activeTab === 'whiteboards' && (
               <StatusBadge status="info" size="sm" dot>
-                {whiteboardCount} {whiteboardCount === 1 ? 'whiteboard' : 'whiteboards'}
+                {whiteboards.length} {whiteboards.length === 1 ? 'whiteboard' : 'whiteboards'}
               </StatusBadge>
             )}
+            {/* Slot where child tab components portal their action buttons */}
+            <div ref={toolbarSlotRef} className="flex items-center gap-2" />
           </div>
         </div>
       </Tabs>
@@ -338,16 +330,26 @@ export function CanvasShell({
         <StrategyLinkView
           strategicObjectives={strategicObjectives}
           regularObjectives={regularObjectives}
+          toolbarPortalRef={activeTab === 'link-objectives' ? toolbarSlotRef : undefined}
         />
       </div>
       <div id="tabpanel-whiteboards" role="tabpanel" aria-labelledby="tab-whiteboards" className={activeTab === 'whiteboards' ? 'block' : 'hidden'}>
-        {whiteboardList}
+        <WhiteboardList
+          whiteboards={whiteboards}
+          objectives={whiteboardObjectives}
+          toolbarPortalRef={activeTab === 'whiteboards' ? toolbarSlotRef : undefined}
+        />
       </div>
       <div id="tabpanel-money-map" role="tabpanel" aria-labelledby="tab-money-map" className={activeTab === 'money-map' ? 'block' : 'hidden'}>
-        <MoneyMapClient hideHeader={true} />
+        <MoneyMapClient
+          hideHeader={true}
+          toolbarPortalRef={activeTab === 'money-map' ? toolbarSlotRef : undefined}
+        />
       </div>
       <div id="tabpanel-cost-of-delay" role="tabpanel" aria-labelledby="tab-cost-of-delay" className={activeTab === 'cost-of-delay' ? 'block' : 'hidden'}>
-        <CostOfDelayView />
+        <CostOfDelayView
+          toolbarPortalRef={activeTab === 'cost-of-delay' ? toolbarSlotRef : undefined}
+        />
       </div>
 
       {/* Node details dialog — shared across all river clicks */}

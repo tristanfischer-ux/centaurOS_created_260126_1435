@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getStrategicGoals, getGoalBundle } from '@/actions/canvas'
 import { CanvasShell } from './canvas-shell'
-import { WhiteboardList } from './components/whiteboard-list'
 import type { WhiteboardRow } from '@/actions/whiteboards'
 import type { StrategicGoal, GoalBundle } from '@/types/canvas'
 import type { FoundryPurposeData } from '@/types/foundry'
@@ -147,13 +146,8 @@ export default async function CanvasPage() {
         initialBundles={bundles}
         strategicObjectives={strategicObjectives}
         regularObjectives={regularObjectives}
-        whiteboardList={
-          <WhiteboardList
-            whiteboards={whiteboards}
-            objectives={objectivesForDialog}
-          />
-        }
-        whiteboardCount={whiteboards.length}
+        whiteboards={whiteboards}
+        whiteboardObjectives={objectivesForDialog}
         purposeData={(foundry as { purpose_data?: FoundryPurposeData | null } | null)?.purpose_data ?? null}
         isFounder={profile.role === 'Founder'}
         foundryId={foundryId}

@@ -1,10 +1,12 @@
 "use client"
 
 import React, { useState, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, Loader2, Calendar } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import { Button } from "@/components/ui/button"
 
 import { createWhiteboard, deleteWhiteboard } from "@/actions/whiteboards"
 import type { WhiteboardRow } from "@/actions/whiteboards"
@@ -17,9 +19,11 @@ import type { WhiteboardRow } from "@/actions/whiteboards"
 interface WhiteboardListProps {
   whiteboards: WhiteboardRow[]
   objectives: { id: string; title: string }[]
+  /** Ref to a DOM element where toolbar buttons should be portaled */
+  toolbarPortalRef?: React.RefObject<HTMLDivElement | null>
 }
 
-export function WhiteboardList({ whiteboards, objectives }: WhiteboardListProps) {
+export function WhiteboardList({ whiteboards, objectives, toolbarPortalRef }: WhiteboardListProps) {
   const router = useRouter()
   const [isCreating, setIsCreating] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -70,29 +74,38 @@ export function WhiteboardList({ whiteboards, objectives }: WhiteboardListProps)
     router.refresh()
   }, [deletingId, router])
 
+  const createButton = (
+    <Button
+      size="sm"
+      onClick={handleCreate}
+      disabled={isCreating}
+    >
+      {isCreating ? (
+        <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+      ) : (
+        <Plus className="w-4 h-4 mr-1.5" />
+      )}
+      New Whiteboard
+    </Button>
+  )
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">Whiteboards</h2>
-          <p className="text-sm text-muted-foreground">
-            Freeform visual brainstorming for your team
-          </p>
-        </div>
-        <button
-          onClick={handleCreate}
-          disabled={isCreating}
-          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-international-orange hover:bg-international-orange-hover rounded-lg transition-colors disabled:opacity-50 shadow-sm"
-        >
-          {isCreating ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Plus className="w-4 h-4" />
-          )}
-          New Whiteboard
-        </button>
-      </div>
+      {/* Create button — portaled to tab bar when slot available, else inline header */}
+      {toolbarPortalRef?.current
+        ? createPortal(createButton, toolbarPortalRef.current)
+        : (
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Whiteboards</h2>
+              <p className="text-sm text-muted-foreground">
+                Freeform visual brainstorming for your team
+              </p>
+            </div>
+            {createButton}
+          </div>
+        )
+      }
 
       {/* Grid */}
       {whiteboards.length === 0 ? (

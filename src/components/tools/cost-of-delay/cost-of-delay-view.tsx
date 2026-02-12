@@ -12,7 +12,8 @@
  * <CostOfDelayView />
  */
 
-import { useState, useMemo, useCallback, useEffect } from "react"
+import React, { useState, useMemo, useCallback, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { useSearchParams, useRouter } from "next/navigation"
 import { CalculatorForm } from "@/components/tools/cost-of-delay/calculator-form"
 import { SummaryCards } from "@/components/tools/cost-of-delay/summary-cards"
@@ -106,7 +107,12 @@ function calculatorParamsMatch(
   )
 }
 
-export function CostOfDelayView(): React.ReactElement {
+interface CostOfDelayViewProps {
+  /** Ref to a DOM element where toolbar buttons should be portaled */
+  toolbarPortalRef?: React.RefObject<HTMLDivElement | null>
+}
+
+export function CostOfDelayView({ toolbarPortalRef }: CostOfDelayViewProps = {}): React.ReactElement {
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -144,19 +150,30 @@ export function CostOfDelayView(): React.ReactElement {
     setInputs(DEFAULT_INPUTS)
   }, [])
 
+  const actionButtons = (
+    <>
+      <Button variant="ghost" size="sm" onClick={handleReset}>
+        <RotateCcw className="h-4 w-4 mr-1.5" />
+        Reset
+      </Button>
+      <Button variant="secondary" size="sm" onClick={handleShare}>
+        <Share2 className="h-4 w-4 mr-1.5" />
+        Share
+      </Button>
+    </>
+  )
+
   return (
     <div className="space-y-8">
-      {/* Action buttons */}
-      <div className="flex items-center justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={handleReset}>
-          <RotateCcw className="h-4 w-4 mr-2" />
-          Reset
-        </Button>
-        <Button variant="secondary" size="sm" onClick={handleShare}>
-          <Share2 className="h-4 w-4 mr-2" />
-          Share
-        </Button>
-      </div>
+      {/* Action buttons — portaled to tab bar when slot available, else inline */}
+      {toolbarPortalRef?.current
+        ? createPortal(actionButtons, toolbarPortalRef.current)
+        : (
+          <div className="flex items-center justify-end gap-2">
+            {actionButtons}
+          </div>
+        )
+      }
 
       {/* Summary Cards */}
       <SummaryCards metrics={metrics} />

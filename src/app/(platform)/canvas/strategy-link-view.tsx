@@ -16,6 +16,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ReactFlow,
   Controls,
@@ -35,6 +36,7 @@ import '@xyflow/react/dist/style.css'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, LayoutGrid } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 import { StrategyNode, type StrategyNodeData } from './strategy-node'
 import { ObjectiveNode, type ObjectiveNodeData } from './objective-node'
@@ -81,6 +83,8 @@ const CANVAS_PADDING = 60
 interface StrategyLinkViewProps {
   strategicObjectives: StrategicObjective[]
   regularObjectives: RegularObjective[]
+  /** Ref to a DOM element where toolbar buttons should be portaled */
+  toolbarPortalRef?: React.RefObject<HTMLDivElement | null>
 }
 
 /**
@@ -390,7 +394,7 @@ function LinkCanvas({ strategicObjectives, regularObjectives, visibleStrategies,
  * @param strategicObjectives - All strategic objectives for the foundry
  * @param regularObjectives - All regular objectives for the foundry
  */
-export function StrategyLinkView({ strategicObjectives, regularObjectives }: StrategyLinkViewProps) {
+export function StrategyLinkView({ strategicObjectives, regularObjectives, toolbarPortalRef }: StrategyLinkViewProps) {
   // All strategies visible by default
   const [visibleStrategies, setVisibleStrategies] = useState<Set<string>>(
     () => new Set(strategicObjectives.map((s) => s.id))
@@ -482,7 +486,7 @@ export function StrategyLinkView({ strategicObjectives, regularObjectives }: Str
         })}
       </div>
 
-      {/* Legend + Tidy button */}
+      {/* Legend */}
       <div className="flex items-center gap-4 mb-3 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-2 rounded-sm bg-international-orange" />
@@ -496,20 +500,19 @@ export function StrategyLinkView({ strategicObjectives, regularObjectives }: Str
           <span className="w-6 h-0.5 bg-international-orange" />
           Linked
         </span>
-        <span className="ml-auto flex items-center gap-3">
-          <span className="text-[10px]">
-            Drag from an objective to a strategy to link &bull; Select edge + Delete/Backspace to unlink &bull; Re-drag to move between strategies
-          </span>
-          <button
-            onClick={handleTidyUp}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-muted"
-            title="Reset layout to tidy columns"
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            Tidy up
-          </button>
+        <span className="ml-auto text-[10px]">
+          Drag from an objective to a strategy to link &bull; Select edge + Delete/Backspace to unlink &bull; Re-drag to move between strategies
         </span>
       </div>
+
+      {/* Tidy up button — portaled to tab bar when slot is available */}
+      {toolbarPortalRef?.current && createPortal(
+        <Button variant="ghost" size="sm" onClick={handleTidyUp} title="Reset layout to tidy columns">
+          <LayoutGrid className="h-4 w-4 mr-1.5" />
+          Tidy up
+        </Button>,
+        toolbarPortalRef.current
+      )}
 
       <ReactFlowProvider>
         <LinkCanvas

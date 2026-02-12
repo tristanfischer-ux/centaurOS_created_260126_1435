@@ -8,7 +8,8 @@
  * on the right (Sankey, summary cards, profitability, cost breakdown).
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import {
   Camera,
@@ -54,9 +55,11 @@ import { parseSnapshotData } from '@/types/money-map'
 interface MoneyMapClientProps {
   /** When true, hides the page header (used when embedded in Financial Tools tab) */
   hideHeader?: boolean
+  /** Ref to a DOM element where toolbar buttons should be portaled */
+  toolbarPortalRef?: React.RefObject<HTMLDivElement | null>
 }
 
-export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): React.ReactElement {
+export function MoneyMapClient({ hideHeader = false, toolbarPortalRef }: MoneyMapClientProps): React.ReactElement {
   // Data state
   const [data, setData] = useState<MoneyMapData | null>(null)
   const [snapshots, setSnapshots] = useState<MoneyMapSnapshot[]>([])
@@ -266,18 +269,34 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
         </div>
       )}
 
-      {/* Action buttons when header is hidden (embedded mode) */}
+      {/* Action buttons when header is hidden (embedded mode) — portaled to tab bar when available */}
       {hideHeader && !isDemo && (
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-1.5" />
-            Refresh
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => setIsSnapshotDialogOpen(true)}>
-            <Camera className="h-4 w-4 mr-1.5" />
-            Snapshot
-          </Button>
-        </div>
+        toolbarPortalRef?.current
+          ? createPortal(
+              <>
+                <Button variant="ghost" size="sm" onClick={handleRefresh}>
+                  <RefreshCw className="h-4 w-4 mr-1.5" />
+                  Refresh
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setIsSnapshotDialogOpen(true)}>
+                  <Camera className="h-4 w-4 mr-1.5" />
+                  Snapshot
+                </Button>
+              </>,
+              toolbarPortalRef.current
+            )
+          : (
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={handleRefresh}>
+                <RefreshCw className="h-4 w-4 mr-1.5" />
+                Refresh
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setIsSnapshotDialogOpen(true)}>
+                <Camera className="h-4 w-4 mr-1.5" />
+                Snapshot
+              </Button>
+            </div>
+          )
       )}
 
       {/* Comparison banner */}
