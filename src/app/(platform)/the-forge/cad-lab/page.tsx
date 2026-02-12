@@ -1,11 +1,12 @@
 "use client"
 
 /**
- * @file page.tsx — Hidden CAD Lab for testing CadQuery generation (V3)
+ * @file page.tsx — CAD Lab: Claude-powered parametric CAD generation.
  *
- * @description Two-step flow:
- *   Step 1: Research — web search + Thingiverse + Claude synthesis → editable report
- *   Step 2: Generate — component-decomposed pipeline with the research report
+ * @description Three-step flow following CLAUDE_CAD_INSTRUCTIONS:
+ *   Step 1: Research — web search + Claude synthesis → editable report
+ *   Step 2: Interface Definition — Claude generates text-only engineering plan
+ *   Step 3: Generate — Claude writes complete CadQuery code → Modal executes
  *
  * Not linked from navigation. Access via /the-forge/cad-lab (behind platform auth).
  */
@@ -13,7 +14,6 @@
 import { useState, useCallback } from "react"
 import {
   Loader2,
-  Play,
   Code2,
   Box,
   Timer,
@@ -23,7 +23,6 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
-  Layers,
   Globe,
   ExternalLink,
   Search,
@@ -32,6 +31,7 @@ import {
   Copy,
   Check,
   Maximize2,
+  Ruler,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -41,17 +41,26 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-import { runCadLabResearch, generateCadLabModel } from "@/actions/cad-lab"
-import { GEMINI_MODELS } from "@/lib/cad-lab-types"
+import {
+  runCadLabResearch,
+  generateCadLabInterface,
+  generateCadLabModel,
+} from "@/actions/cad-lab"
+import { CLAUDE_MODELS } from "@/lib/cad-lab-types"
 import { STLViewer } from "@/components/cad/stl-viewer"
 import { Markdown } from "@/components/ui/markdown"
 
-import type { CadLabResult, CadLabResearchResult, GeminiModelId } from "@/lib/cad-lab-types"
+import type {
+  CadLabResult,
+  CadLabResearchResult,
+  CadLabInterfaceResult,
+  ClaudeModelId,
+} from "@/lib/cad-lab-types"
 
 export default function CadLabPage(): React.ReactNode {
   // ── Input state ──
-  const [subject, setSubject] = useState("DJI Mavic Air 2 quadcopter drone")
-  const [modelId, setModelId] = useState<GeminiModelId>("gemini-2.5-pro")
+  const [subject, setSubject] = useState("")
+  const [modelId, setModelId] = useState<ClaudeModelId>("claude-opus-4-20250514")
 
   // ── Step 1: Research state ──
   const [isResearching, setIsResearching] = useState(false)
@@ -59,11 +68,15 @@ export default function CadLabPage(): React.ReactNode {
   const [editableReport, setEditableReport] = useState("")
   const [showSources, setShowSources] = useState(false)
 
-  // ── Step 2: Generation state ──
+  // ── Step 2: Interface Definition state ──
+  const [isGeneratingInterface, setIsGeneratingInterface] = useState(false)
+  const [interfaceResult, setInterfaceResult] = useState<CadLabInterfaceResult | null>(null)
+  const [editableInterface, setEditableInterface] = useState("")
+
+  // ── Step 3: Generation state ──
   const [isGenerating, setIsGenerating] = useState(false)
   const [result, setResult] = useState<CadLabResult | null>(null)
   const [showCode, setShowCode] = useState(false)
-  const [showInterface, setShowInterface] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
 
   // ── View state ──
@@ -74,8 +87,10 @@ export default function CadLabPage(): React.ReactNode {
   const handleResearch = useCallback(async () => {
     setIsResearching(true)
     setResearchResult(null)
+    setInterfaceResult(null)
     setResult(null)
     setEditableReport("")
+    setEditableInterface("")
     try {
       const res = await runCadLabResearch(subject)
       setResearchResult(res)
@@ -94,6 +109,52 @@ export default function CadLabPage(): React.ReactNode {
     }
   }, [subject])
 
+  // ── Step 2: Interface Definition ──
+  const handleGenerateInterface = useCallback(async () => {
+    setIsGeneratingInterface(true)
+    setInterfaceResult(null)
+    setResult(null)
+    setEditableInterface("")
+    try {
+      const res = await generateCadLabInterface(subject, editableReport, modelId)
+      setInterfaceResult(res)
+      setEditableInterface(res.interfaceDefinition)
+    } catch (err) {
+      setInterfaceResult({
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+        interfaceDefinition: "",
+        generationTime: 0,
+        tokensIn: 0,
+        tokensOut: 0,
+      })
+    } finally {
+      setIsGeneratingInterface(false)
+    }
+  }, [subject, editableReport, modelId])
+
+  // ── Step 3: Generate Code + Execute ──
+  const handleGenerate = useCallback(async () => {
+    setIsGenerating(true)
+    setResult(null)
+    try {
+      const res = await generateCadLabModel(
+        subject,
+        editableReport,
+        editableInterface,
+        modelId,
+      )
+      setResult(res)
+    } catch (err) {
+      setResult({
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [subject, editableReport, editableInterface, modelId])
+
   // ── Copy code to clipboard ──
   const handleCopyCode = useCallback(async () => {
     if (!result?.code) return
@@ -106,31 +167,18 @@ export default function CadLabPage(): React.ReactNode {
     }
   }, [result?.code])
 
-  // ── Step 2: Generate ──
-  const handleGenerate = useCallback(async () => {
-    setIsGenerating(true)
-    setResult(null)
-    try {
-      const res = await generateCadLabModel(subject, editableReport || undefined, modelId)
-      setResult(res)
-    } catch (err) {
-      setResult({
-        success: false,
-        error: err instanceof Error ? err.message : "Unknown error",
-      })
-    } finally {
-      setIsGenerating(false)
-    }
-  }, [subject, editableReport, modelId])
-
-  // ── Reset to start over ──
+  // ── Reset ──
   const handleReset = useCallback(() => {
     setResearchResult(null)
-    setEditableReport("")
+    setInterfaceResult(null)
     setResult(null)
+    setEditableReport("")
+    setEditableInterface("")
   }, [])
 
   const hasResearch = researchResult?.success && editableReport.trim().length > 0
+  const hasInterface = interfaceResult?.success && editableInterface.trim().length > 0
+  const isAnyLoading = isResearching || isGeneratingInterface || isGenerating
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -140,16 +188,47 @@ export default function CadLabPage(): React.ReactNode {
           <div className="h-8 w-1 rounded-full bg-international-orange" />
           <h1 className="text-2xl font-bold text-foreground">CAD Lab</h1>
           <span className="text-xs font-mono bg-muted text-muted-foreground px-2 py-1 rounded">
-            V3 / COMPONENT PIPELINE
-          </span>
-          <span className="text-xs font-mono text-muted-foreground/60">
-            Updated 2026-02-12 @ 19:45 AEST
+            CLAUDE PIPELINE
           </span>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Research → Generate → 3D Model. Component-decomposed pipeline with 6+ detailed parts.
+          Research → Interface Definition → Generate. Following the CadQuery methodology exactly.
         </p>
       </div>
+
+      {/* Model selector */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-4">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="subject">What do you want to model?</Label>
+              <Input
+                id="subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="e.g., Nespresso capsule auto-reloader, DJI Mavic Air 2 drone"
+                disabled={isAnyLoading}
+              />
+            </div>
+            <div className="w-64 space-y-2">
+              <Label htmlFor="model">Claude Model</Label>
+              <select
+                id="model"
+                value={modelId}
+                onChange={(e) => setModelId(e.target.value as ClaudeModelId)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                disabled={isAnyLoading}
+              >
+                {CLAUDE_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* STEP 1: RESEARCH                                               */}
@@ -158,7 +237,7 @@ export default function CadLabPage(): React.ReactNode {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Search className="h-4 w-4" />
-            Step 1: Research
+            Step 1: Research Real Dimensions
             {researchResult?.success && (
               <span className="text-xs font-normal text-status-success flex items-center gap-1">
                 <CheckCircle2 className="h-3 w-3" />
@@ -168,21 +247,13 @@ export default function CadLabPage(): React.ReactNode {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="subject">Subject</Label>
-            <Input
-              id="subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="e.g., DJI Mavic Air 2 quadcopter drone"
-              disabled={isResearching || isGenerating}
-            />
-          </div>
-
+          <p className="text-sm text-muted-foreground">
+            Before anything else, search for real-world reference dimensions. Never invent dimensions.
+          </p>
           <div className="flex items-center gap-2">
             <Button
               onClick={handleResearch}
-              disabled={isResearching || isGenerating || !subject.trim()}
+              disabled={isAnyLoading || !subject.trim()}
               variant={hasResearch ? "secondary" : "default"}
             >
               {isResearching ? (
@@ -226,7 +297,7 @@ export default function CadLabPage(): React.ReactNode {
               <FileText className="h-4 w-4" />
               Research Report
               <span className="text-xs font-normal text-muted-foreground">
-                (synthesized by Claude — edit before generating)
+                (review and edit dimensions before proceeding)
               </span>
             </CardTitle>
           </CardHeader>
@@ -238,7 +309,7 @@ export default function CadLabPage(): React.ReactNode {
 
             {/* Editable textarea (collapsible) */}
             <p className="text-xs text-muted-foreground">
-              {editableReport.length.toLocaleString()} characters — review and edit dimensions before generating.
+              {editableReport.length.toLocaleString()} characters
             </p>
             <details className="border rounded-md">
               <summary className="cursor-pointer p-3 text-sm font-medium hover:bg-muted/50 transition-colors">
@@ -249,7 +320,7 @@ export default function CadLabPage(): React.ReactNode {
                   value={editableReport}
                   onChange={(e) => setEditableReport(e.target.value)}
                   className="font-mono text-xs min-h-[400px]"
-                  disabled={isGenerating}
+                  disabled={isAnyLoading}
                 />
               </div>
             </details>
@@ -285,66 +356,23 @@ export default function CadLabPage(): React.ReactNode {
               {researchResult.sources.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Web Sources (Gemini + Google Search)
+                    Web Sources
                   </p>
                   <ul className="space-y-1">
                     {researchResult.sources.map((source, i) => (
                       <li key={i} className="text-xs font-mono flex items-start gap-1.5">
                         <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0 mt-0.5" />
-                        <div className="min-w-0">
-                          <a
-                            href={source.uri}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-electric-blue hover:underline truncate block"
-                          >
-                            {source.title || source.uri}
-                          </a>
-                          {source.title && (
-                            <span className="text-muted-foreground truncate block">{source.uri}</span>
-                          )}
-                        </div>
+                        <a
+                          href={source.uri}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-electric-blue hover:underline truncate"
+                        >
+                          {source.title || source.uri}
+                        </a>
                       </li>
                     ))}
                   </ul>
-                </div>
-              )}
-              {researchResult.referenceModels.length > 0 && (
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Thingiverse Reference Models
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {researchResult.referenceModels.map((model, i) => (
-                      <a
-                        key={i}
-                        href={model.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group border rounded-lg overflow-hidden hover:border-electric-blue transition-colors"
-                      >
-                        {model.thumbnail && (
-                          <div className="aspect-video bg-muted relative overflow-hidden">
-                            <img
-                              src={model.thumbnail}
-                              alt={model.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                        )}
-                        <div className="p-3 bg-card">
-                          <p className="text-xs font-medium text-foreground line-clamp-2 group-hover:text-electric-blue transition-colors">
-                            {model.name}
-                          </p>
-                          <div className="flex items-center gap-1 mt-1 text-muted-foreground">
-                            <ExternalLink className="h-3 w-3" />
-                            <span className="text-xs">View on Thingiverse</span>
-                          </div>
-                        </div>
-                      </a>
-                    ))}
-                  </div>
                 </div>
               )}
             </CardContent>
@@ -353,46 +381,127 @@ export default function CadLabPage(): React.ReactNode {
       )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* STEP 2: GENERATE                                               */}
+      {/* STEP 2: INTERFACE DEFINITION                                   */}
       {/* ═══════════════════════════════════════════════════════════════ */}
       {hasResearch && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Play className="h-4 w-4" />
-              Step 2: Generate CAD Model
+              <Ruler className="h-4 w-4" />
+              Step 2: Interface Definition
+              {interfaceResult?.success && (
+                <span className="text-xs font-normal text-status-success flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Complete ({(interfaceResult.generationTime / 1000).toFixed(1)}s)
+                </span>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="model">Gemini Model</Label>
-              <select
-                id="model"
-                value={modelId}
-                onChange={(e) => setModelId(e.target.value as GeminiModelId)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                disabled={isGenerating}
-              >
-                {GEMINI_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
+            <p className="text-sm text-muted-foreground">
+              This is the most important step. Text-only engineering plan: space budget, component placement,
+              connection map, and validation checklist. No code yet.
+            </p>
+            <Button
+              onClick={handleGenerateInterface}
+              disabled={isAnyLoading || !hasResearch}
+              variant={hasInterface ? "secondary" : "default"}
+            >
+              {isGeneratingInterface ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Generating Interface Definition...
+                </>
+              ) : hasInterface ? (
+                <>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Regenerate Interface
+                </>
+              ) : (
+                <>
+                  <Ruler className="h-4 w-4 mr-2" />
+                  Generate Interface Definition
+                </>
+              )}
+            </Button>
+
+            {/* Interface error */}
+            {interfaceResult && !interfaceResult.success && interfaceResult.error && (
+              <div className="p-3 bg-status-error-light rounded text-sm text-destructive font-mono">
+                {interfaceResult.error}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Interface Definition (editable) ── */}
+      {hasInterface && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Interface Definition
+              <span className="text-xs font-normal text-muted-foreground">
+                (review — if the numbers don't add up in text, they won't add up in 3D)
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Formatted display */}
+            <div className="border rounded-md p-4 bg-muted/30">
+              <pre className="text-xs font-mono whitespace-pre-wrap text-foreground">
+                {editableInterface}
+              </pre>
             </div>
+
+            {/* Editable (collapsible) */}
+            <details className="border rounded-md">
+              <summary className="cursor-pointer p-3 text-sm font-medium hover:bg-muted/50 transition-colors">
+                Edit interface definition
+              </summary>
+              <div className="p-3 border-t">
+                <Textarea
+                  value={editableInterface}
+                  onChange={(e) => setEditableInterface(e.target.value)}
+                  className="font-mono text-xs min-h-[400px]"
+                  disabled={isAnyLoading}
+                />
+              </div>
+            </details>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* STEP 3: GENERATE                                               */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {hasInterface && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ArrowRight className="h-4 w-4" />
+              Step 3: Generate CadQuery Code
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Claude generates the complete CadQuery script in a single pass, then Modal executes it
+              to produce STEP + STL + SVG exports.
+            </p>
             <Button
               onClick={handleGenerate}
-              disabled={isGenerating || !hasResearch}
+              disabled={isAnyLoading || !hasInterface}
             >
               {isGenerating ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Pipeline running (~35-40s)...
+                  Generating + Executing (~60s)...
                 </>
               ) : (
                 <>
                   <ArrowRight className="h-4 w-4 mr-2" />
-                  Generate from Research
+                  Generate Model
                 </>
               )}
             </Button>
@@ -401,11 +510,11 @@ export default function CadLabPage(): React.ReactNode {
       )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* GENERATION RESULTS                                             */}
+      {/* RESULTS                                                        */}
       {/* ═══════════════════════════════════════════════════════════════ */}
       {result && (
         <div className="space-y-6">
-          {/* Status */}
+          {/* Error */}
           {result.error && (
             <Card className="border-destructive">
               <CardContent className="pt-6">
@@ -416,94 +525,20 @@ export default function CadLabPage(): React.ReactNode {
             </Card>
           )}
 
-          {/* Pipeline Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Layers className="h-4 w-4" />
-                Pipeline Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2 flex-wrap">
-                <PipelineStage label="Research" status="done" />
-                <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                <PipelineStage
-                  label="Interface"
-                  status={result.interfaceDefinition ? "done" : "fail"}
-                />
-                <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                <PipelineStage
-                  label={`Components (${result.validatedCount ?? 0}/${result.componentCount ?? 0})`}
-                  status={
-                    (result.validatedCount ?? 0) > 0
-                      ? (result.skippedComponents?.length ?? 0) > 0
-                        ? "warn"
-                        : "done"
-                      : "fail"
-                  }
-                />
-                <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                <PipelineStage
-                  label="Assembly"
-                  status={result.code ? "done" : "fail"}
-                />
-                <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                <PipelineStage
-                  label="Modal"
-                  status={result.svgIso ? "done" : result.modalTime ? "fail" : "pending"}
-                />
-              </div>
-
-              {/* Skipped components */}
-              {result.skippedComponents && result.skippedComponents.length > 0 && (
-                <div className="mt-3 p-2 bg-status-warning-light rounded text-xs font-mono text-status-warning-dark">
-                  <AlertTriangle className="h-3 w-3 inline mr-1" />
-                  Skipped components: {result.skippedComponents.join(", ")}
-                </div>
-              )}
-
-              {/* Validation warnings */}
-              {result.validationWarnings && result.validationWarnings.length > 0 && (
-                <div className="mt-3 p-2 bg-status-warning-light rounded text-xs font-mono text-status-warning-dark space-y-1">
+          {/* Validation warnings */}
+          {result.validationWarnings && result.validationWarnings.length > 0 && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="p-3 bg-status-warning-light rounded text-xs font-mono text-status-warning-dark space-y-1">
                   <p className="font-semibold flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
                     Post-execution warnings:
                   </p>
                   {result.validationWarnings.map((w, i) => (
-                    <p key={i}>• {w}</p>
+                    <p key={i}>- {w}</p>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Interface Definition (expandable) */}
-          {result.interfaceDefinition && (
-            <Card>
-              <CardHeader>
-                <button
-                  onClick={() => setShowInterface(!showInterface)}
-                  className="flex items-center justify-between w-full text-left"
-                >
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Interface Definition
-                  </CardTitle>
-                  {showInterface ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </button>
-              </CardHeader>
-              {showInterface && (
-                <CardContent>
-                  <pre className="text-xs font-mono bg-muted p-4 rounded-lg overflow-auto max-h-[500px] whitespace-pre-wrap">
-                    {result.interfaceDefinition}
-                  </pre>
-                </CardContent>
-              )}
+              </CardContent>
             </Card>
           )}
 
@@ -634,15 +669,8 @@ export default function CadLabPage(): React.ReactNode {
                     value={`${result.codeLines}`}
                   />
                 )}
-                {result.componentCount != null && (
-                  <Metric
-                    icon={<Layers className="h-3.5 w-3.5" />}
-                    label="Components"
-                    value={`${result.validatedCount ?? 0} / ${result.componentCount}`}
-                  />
-                )}
                 {result.modelUsed && (
-                  <Metric label="Model" value={result.modelUsed} />
+                  <Metric label="Model" value={result.modelUsed.replace("claude-", "").replace(/-\d+$/, "")} />
                 )}
                 {result.generationTime != null && (
                   <Metric
@@ -675,7 +703,10 @@ export default function CadLabPage(): React.ReactNode {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Code2 className="h-4 w-4" />
-                    Generated Code
+                    Generated CadQuery Code
+                    <span className="text-xs font-normal text-muted-foreground">
+                      ({result.codeLines} lines)
+                    </span>
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     <Button
@@ -713,12 +744,47 @@ export default function CadLabPage(): React.ReactNode {
           )}
         </div>
       )}
+
+      {/* ── Fullscreen overlay ── */}
+      {fullscreenView && result && (
+        <div
+          className="fixed inset-0 z-50 bg-background/95 flex items-center justify-center p-8"
+          onClick={() => setFullscreenView(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors text-sm font-mono"
+            onClick={() => setFullscreenView(null)}
+          >
+            ESC to close
+          </button>
+          {fullscreenView === "3d" && result.stlData && (
+            <div className="w-full h-full" onClick={(e) => e.stopPropagation()}>
+              <STLViewer stlData={result.stlData} />
+            </div>
+          )}
+          {fullscreenView === "iso" && result.svgIso && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={result.svgIso} alt="Isometric view" className="max-w-full max-h-full object-contain" />
+          )}
+          {fullscreenView === "front" && result.svgFront && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={result.svgFront} alt="Front view" className="max-w-full max-h-full object-contain" />
+          )}
+          {fullscreenView === "top" && result.svgTop && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={result.svgTop} alt="Top view" className="max-w-full max-h-full object-contain" />
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────
 
+/**
+ * Metric — displays a labeled value in the metrics grid.
+ */
 function Metric({
   icon,
   label,
@@ -735,27 +801,6 @@ function Metric({
         {label}
       </p>
       <p className="text-sm font-semibold text-foreground font-mono">{value}</p>
-    </div>
-  )
-}
-
-/**
- * PipelineStage — visual indicator for a pipeline step.
- */
-function PipelineStage({
-  label,
-  status,
-}: {
-  label: string
-  status: "done" | "warn" | "fail" | "pending"
-}): React.ReactNode {
-  return (
-    <div className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-mono">
-      {status === "done" && <CheckCircle2 className="h-3.5 w-3.5 text-status-success" />}
-      {status === "warn" && <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />}
-      {status === "fail" && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
-      {status === "pending" && <div className="h-3.5 w-3.5 rounded-full bg-muted" />}
-      <span className="text-foreground">{label}</span>
     </div>
   )
 }
