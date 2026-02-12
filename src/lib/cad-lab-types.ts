@@ -48,7 +48,7 @@ export interface CadLabResult {
   /** Web research source URLs from Pass 0 (Gemini + Google Search) */
   researchSources?: string[]
   /** Thingiverse reference models found in Pass 0 */
-  referenceModels?: Array<{ name: string; url: string }>
+  referenceModels?: Array<{ name: string; url: string; thumbnail?: string }>
 }
 
 /** Result from the standalone research step (Pass 0) */
@@ -60,7 +60,7 @@ export interface CadLabResearchResult {
   /** Web source URLs from Gemini + Google Search */
   sources: Array<{ uri: string; title: string }>
   /** Thingiverse reference models */
-  referenceModels: Array<{ name: string; url: string }>
+  referenceModels: Array<{ name: string; url: string; thumbnail?: string }>
   /** Time taken for the research step in ms */
   researchTime: number
 }

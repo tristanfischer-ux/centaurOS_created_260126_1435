@@ -205,15 +205,63 @@ export default function CadLabPage(): React.ReactNode {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Textarea
-              value={editableReport}
-              onChange={(e) => setEditableReport(e.target.value)}
-              className="font-mono text-xs min-h-[400px]"
-              disabled={isGenerating}
-            />
-            <p className="text-xs text-muted-foreground">
-              {editableReport.length.toLocaleString()} characters — review and edit dimensions before generating.
-            </p>
+            {/* Formatted markdown display */}
+            <div className="prose prose-sm max-w-none border rounded-md p-4 bg-muted/30">
+              {editableReport.split('\n').map((line, idx) => {
+                // Render markdown-style formatting
+                if (line.startsWith('# ')) {
+                  return <h1 key={idx} className="text-2xl font-bold mt-6 mb-3 text-foreground">{line.slice(2)}</h1>
+                }
+                if (line.startsWith('## ')) {
+                  return <h2 key={idx} className="text-xl font-semibold mt-5 mb-2 text-foreground">{line.slice(3)}</h2>
+                }
+                if (line.startsWith('### ')) {
+                  return <h3 key={idx} className="text-lg font-medium mt-4 mb-2 text-foreground">{line.slice(4)}</h3>
+                }
+                if (line.startsWith('- **')) {
+                  // Bold list items
+                  const match = line.match(/- \*\*(.*?)\*\*:?(.*)/)
+                  if (match) {
+                    return (
+                      <div key={idx} className="flex items-start gap-2 ml-4 my-1">
+                        <span className="text-muted-foreground">•</span>
+                        <div>
+                          <span className="font-semibold text-foreground">{match[1]}</span>
+                          {match[2] && <span className="text-muted-foreground">{match[2]}</span>}
+                        </div>
+                      </div>
+                    )
+                  }
+                }
+                if (line.startsWith('- ')) {
+                  return (
+                    <div key={idx} className="flex items-start gap-2 ml-4 my-1">
+                      <span className="text-muted-foreground">•</span>
+                      <span className="text-foreground">{line.slice(2)}</span>
+                    </div>
+                  )
+                }
+                if (line.trim() === '') {
+                  return <div key={idx} className="h-2" />
+                }
+                return <p key={idx} className="text-sm text-foreground leading-relaxed my-1">{line}</p>
+              })}
+            </div>
+
+            {/* Editable textarea (collapsible) */}
+            <details className="border rounded-md">
+              <summary className="cursor-pointer p-3 text-sm font-medium hover:bg-muted/50 transition-colors">
+                Edit raw markdown ({editableReport.length.toLocaleString()} characters)
+              </summary>
+              <div className="p-3 border-t">
+                <Textarea
+                  value={editableReport}
+                  onChange={(e) => setEditableReport(e.target.value)}
+                  className="font-mono text-xs min-h-[400px]"
+                  disabled={isGenerating}
+                />
+              </div>
+            </details>
           </CardContent>
         </Card>
       )}
@@ -271,25 +319,41 @@ export default function CadLabPage(): React.ReactNode {
                 </div>
               )}
               {researchResult.referenceModels.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Thingiverse Reference Models
                   </p>
-                  <ul className="space-y-1">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {researchResult.referenceModels.map((model, i) => (
-                      <li key={i} className="text-xs font-mono flex items-center gap-1.5">
-                        <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                        <a
-                          href={model.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-electric-blue hover:underline"
-                        >
-                          {model.name}
-                        </a>
-                      </li>
+                      <a
+                        key={i}
+                        href={model.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group border rounded-lg overflow-hidden hover:border-electric-blue transition-colors"
+                      >
+                        {model.thumbnail && (
+                          <div className="aspect-video bg-muted relative overflow-hidden">
+                            <img
+                              src={model.thumbnail}
+                              alt={model.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        )}
+                        <div className="p-3 bg-card">
+                          <p className="text-xs font-medium text-foreground line-clamp-2 group-hover:text-electric-blue transition-colors">
+                            {model.name}
+                          </p>
+                          <div className="flex items-center gap-1 mt-1 text-muted-foreground">
+                            <ExternalLink className="h-3 w-3" />
+                            <span className="text-xs">View on Thingiverse</span>
+                          </div>
+                        </div>
+                      </a>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               )}
             </CardContent>

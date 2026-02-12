@@ -583,6 +583,7 @@ interface ThingiverseResult {
   name: string
   url: string
   description: string
+  thumbnail?: string  // Thingiverse provides preview_image for thumbnails
 }
 
 /**
@@ -634,6 +635,7 @@ async function searchCadModels(
       name?: string
       public_url?: string
       description?: string
+      preview_image?: string  // Thingiverse provides thumbnail URLs
     }> = data?.hits ?? data ?? []
 
     return hits
@@ -645,6 +647,7 @@ async function searchCadModels(
         name: h.name,
         url: h.public_url,
         description: (h.description ?? "").slice(0, 200),
+        thumbnail: h.preview_image,  // Include thumbnail URL if available
       }))
   } catch (error) {
     console.warn(
