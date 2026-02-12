@@ -14,7 +14,6 @@
  */
 
 import { createClient } from "@/lib/supabase/server"
-import { SECTOR_COMPONENT_DOMAINS } from "@/types/foundry"
 import type { Sector } from "@/types/foundry"
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -178,6 +177,44 @@ const LIBRARY_FUNCTION_SLUGS = [
   "throttle_sensor",
   "speed_sensor_wheel",
   "fuse_box",
+  // ─── Tier 3: UK House / Residential (37) ───
+  "kitchen_base_cabinet",
+  "kitchen_wall_cabinet",
+  "kitchen_tall_cabinet",
+  "kitchen_worktop",
+  "kitchen_sink_belfast",
+  "kitchen_mixer_tap",
+  "induction_hob",
+  "built_in_oven",
+  "extractor_hood",
+  "bath_freestanding",
+  "shower_tray",
+  "shower_screen",
+  "wc_close_coupled",
+  "basin_countertop",
+  "vanity_unit",
+  "towel_radiator",
+  "bed_frame",
+  "wardrobe_hinged",
+  "chest_of_drawers",
+  "dining_table",
+  "desk",
+  "internal_door",
+  "composite_front_door",
+  "bifold_door",
+  "sliding_pocket_door",
+  "casement_window",
+  "sash_window",
+  "roof_window",
+  "light_switch",
+  "double_socket",
+  "downlight",
+  "panel_radiator",
+  "trv_valve",
+  "combi_boiler",
+  "roof_tile",
+  "gutter_profile",
+  "steel_lintel",
 ] as const
 
 export type LibrarySlug = (typeof LIBRARY_FUNCTION_SLUGS)[number]
@@ -188,11 +225,10 @@ export type LibrarySlug = (typeof LIBRARY_FUNCTION_SLUGS)[number]
  * Fetches a compact summary of available component geometry types.
  * Used to inject a "COMPONENT LIBRARY" section into Claude's prompt.
  *
- * When a sector is provided, Tier 1 (universal) and Tier 2 (electromechanical)
- * components are always included, but Tier 3 (domain) components are filtered
- * to only those matching the sector via SECTOR_COMPONENT_DOMAINS.
+ * Returns ALL verified components regardless of sector. Claude decides
+ * which components are relevant to the design task at hand.
  *
- * @param sector - Optional foundry sector to filter Tier 3 domain components
+ * @param sector - Kept for API compatibility but no longer used for filtering
  * @returns Array of component summaries with slug, name, param schema, etc.
  * @throws If Supabase query fails
  */
@@ -216,27 +252,10 @@ export async function fetchLibrarySummary(
     return []
   }
 
-  let rows = data ?? []
+  const rows = data ?? []
 
-  // FILTER: When sector is provided, keep all T1+T2 and only matching T3 domains
-  if (sector && sector !== 'other') {
-    const allowedDomains = SECTOR_COMPONENT_DOMAINS[sector] ?? []
-
-    rows = rows.filter((row) => {
-      // Always include Tier 1 (universal) and Tier 2 (electromechanical)
-      if (row.tier === 'universal' || row.tier === 'electromechanical') return true
-      // For Tier 3 (domain), check if the component's category matches an allowed domain
-      if (allowedDomains.length === 0) return false
-      return allowedDomains.some((domain) => row.category.toLowerCase().includes(domain))
-    })
-
-    console.info("[ComponentLibrary] Sector filter applied:", {
-      sector,
-      allowedDomains,
-      totalBefore: (data ?? []).length,
-      totalAfter: rows.length,
-    })
-  }
+  // All components available to all sectors — Claude decides which are relevant
+  // to the design task. No Tier 3 domain filtering.
 
   return rows.map((row) => ({
     slug: row.slug,
@@ -322,7 +341,7 @@ cq.Workplane centered at origin, base at Z=0.
 The library spans:
 - Tier 1 (universal): fasteners, bearings, springs, shafts, gears, pulleys, lead screws, linear rails, seals, extrusions, connectors, tubes, brackets, hinges, fittings
 - Tier 2 (electromechanical): motors (brushless, stepper, servo, DC geared), solenoids, relays, PCBs, switches, fans, pumps, heatsinks, displays, encoders, battery holders, terminal blocks, LEDs, buzzers
-- Tier 3 (domain): EV/automotive (motors, drivetrain, battery, chassis, brakes, suspension, steering, sensors), drones, CubeSats, vertical farming, BSF breeding, brine mining, EPS architectural
+- Tier 3 (domain): EV/automotive (motors, drivetrain, battery, chassis, brakes, suspension, steering, sensors), drones, CubeSats, vertical farming, BSF breeding, brine mining, EPS architectural, house/residential (kitchen cabinets, worktops, sinks, taps, hobs, ovens, extractors, baths, showers, WCs, basins, vanity units, towel rails, beds, wardrobes, desks, tables, internal/external doors, bifolds, windows, sash windows, roof windows, switches, sockets, downlights, radiators, TRVs, boilers, roof tiles, gutters, lintels)
 
 Available components:
 ${lines.join("\n")}
