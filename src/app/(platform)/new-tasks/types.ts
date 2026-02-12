@@ -26,6 +26,7 @@ export interface TaskWithData {
   objective_id: string | null
   foundry_id: string
   is_private?: boolean
+  is_demo?: boolean
   amendment_notes: string | null
   rejection_reason: string | null
   nudge_count: number | null

@@ -18,6 +18,7 @@ export interface ObjectiveTask {
   objective_id: string | null
   foundry_id: string
   is_private?: boolean
+  is_demo?: boolean
   creator_id: string
   created_at: string
   assignee: TaskAssignee | null
@@ -38,6 +39,7 @@ export interface ObjectiveWithTasks {
   updated_at: string
   is_private?: boolean
   is_strategic_goal?: boolean | null
+  is_demo?: boolean
   tasks: ObjectiveTask[]
   totalTasks: number
   completedTasks: number

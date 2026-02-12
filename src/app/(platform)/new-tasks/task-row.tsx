@@ -37,13 +37,18 @@ export function TaskRow({ task, isSelected, onSelect, showObjective = true }: Ta
       )}
 
       {/* Title */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 flex items-center gap-1.5">
         <span className={cn(
-          'text-sm block truncate',
+          'text-sm truncate',
           task.status === 'Completed' ? 'text-muted-foreground line-through' : 'text-foreground'
         )}>
           {task.title}
         </span>
+        {task.is_demo && (
+          <span className="inline-flex items-center gap-0.5 text-[9px] text-muted-foreground bg-muted rounded px-1.5 py-0 shrink-0 font-medium">
+            Demo
+          </span>
+        )}
       </div>
 
       {/* Objective tag */}

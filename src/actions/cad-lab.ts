@@ -566,8 +566,8 @@ Generate the complete interface definition following the exact 4-section format.
     }
   } catch (error) {
     console.error("[CAD-LAB] Step 2 failed:", error instanceof Error ? error.message : error)
-    return {
-      success: false,
+      return {
+        success: false,
       error: error instanceof Error ? error.message : "Interface definition generation failed",
       interfaceDefinition: "",
       generationTime: Date.now() - start,

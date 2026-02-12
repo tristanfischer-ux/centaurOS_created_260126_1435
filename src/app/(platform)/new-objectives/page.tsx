@@ -26,7 +26,7 @@ export default async function NewObjectivesPage() {
   // Note: is_private may not be in generated types but exists in DB via migration
   const { data: rawObjectives, error } = await supabase
     .from('objectives')
-    .select('id, title, description, extended_description, status, progress, parent_objective_id, is_strategic_goal, creator_id, foundry_id, created_at, updated_at')
+    .select('id, title, description, extended_description, status, progress, parent_objective_id, is_strategic_goal, is_demo, creator_id, foundry_id, created_at, updated_at')
     .eq('foundry_id', profile.foundry_id)
     .eq('is_ghost', false)
     .is('deleted_at', null)
@@ -36,7 +36,7 @@ export default async function NewObjectivesPage() {
     id: string; title: string; description: string | null; extended_description: string | null;
     status: string | null; progress: number | null; parent_objective_id: string | null;
     is_strategic_goal: boolean | null;
-    creator_id: string; foundry_id: string; created_at: string; updated_at: string; is_private?: boolean;
+    creator_id: string; foundry_id: string; created_at: string; updated_at: string; is_private?: boolean; is_demo?: boolean;
   }>
 
   // Separate strategic objectives (high-level pillars) from regular objectives
@@ -82,6 +82,7 @@ export default async function NewObjectivesPage() {
       foundry_id,
       creator_id,
       created_at,
+      is_demo,
       assignee:profiles!tasks_assignee_id_fkey(id, full_name, role),
       task_assignees(profile:profiles(id, full_name, role))
     `)
@@ -96,7 +97,7 @@ export default async function NewObjectivesPage() {
     id: string; title: string; description: string | null; task_number: number | null;
     status: string; assignee_id: string | null; start_date: string | null; end_date: string | null;
     risk_level: string | null; progress: number | null; objective_id: string | null;
-    foundry_id: string; creator_id: string; created_at: string; is_private?: boolean;
+    foundry_id: string; creator_id: string; created_at: string; is_private?: boolean; is_demo?: boolean;
     assignee: TaskAssignee | TaskAssignee[] | null;
     task_assignees: Array<{ profile: TaskAssignee | null }> | null;
   }>

@@ -227,8 +227,9 @@ export async function signup(formData: FormData) {
     joined_at: new Date().toISOString(),
   });
 
-  // 3c. Seed demo forge concept for new founders so they can see what The Forge produces
+  // 3c. Seed demo data for new founders so they can explore the app with sample content
   if (role === "founder" && foundryId && authData.user) {
+    // Seed demo forge concept (CAD lab example)
     try {
       await supabase.rpc("seed_demo_forge_concept", {
         p_foundry_id: foundryId,
@@ -237,6 +238,17 @@ export async function signup(formData: FormData) {
     } catch (demoError) {
       // Non-critical — don't fail signup if demo seeding fails
       console.warn("[Signup] Failed to seed demo forge concept:", demoError)
+    }
+
+    // Seed demo strategic goals, objectives, and tasks for learning the app
+    try {
+      await supabase.rpc("seed_founder_demo_data", {
+        p_foundry_id: foundryId,
+        p_user_id: authData.user.id,
+      })
+    } catch (demoError) {
+      // Non-critical — don't fail signup if demo seeding fails
+      console.warn("[Signup] Failed to seed demo objectives/tasks:", demoError)
     }
   }
 

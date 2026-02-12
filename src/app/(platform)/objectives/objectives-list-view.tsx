@@ -66,6 +66,7 @@ interface Objective {
     creator_id?: string
     is_strategic_goal?: boolean | null
     parent_objective_id?: string | null
+    is_demo?: boolean
 }
 
 interface ObjectivesListViewProps {
@@ -471,12 +472,17 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                                 e.stopPropagation()
                                                 setObjectiveToEdit(objective)
                                             }}
-                                            className="font-semibold text-foreground hover:text-international-orange transition-colors text-left"
+                                            className="font-semibold text-foreground hover:text-international-orange transition-colors text-left inline-flex items-center gap-1.5"
                                         >
                                             {objective.is_private && (
                                                 <Lock className="h-4 w-4 text-status-warning shrink-0" aria-label="Private objective" />
                                             )}
                                             {objective.title}
+                                            {objective.is_demo && (
+                                              <span className="inline-flex items-center gap-0.5 text-[9px] text-muted-foreground bg-muted rounded px-1.5 py-0 shrink-0 font-medium">
+                                                Demo
+                                              </span>
+                                            )}
                                         </button>
                                         {objective.extended_description && (
                                             <Badge variant="secondary" className="ml-1 text-xs gap-1">

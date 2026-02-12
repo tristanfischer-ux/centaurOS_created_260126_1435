@@ -306,6 +306,11 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <span title="Private task"><Lock className="h-4 w-4 text-status-warning shrink-0" /></span>
                             )}
                             {task.title}
+                            {task.is_demo && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] text-muted-foreground bg-muted rounded px-1.5 py-0 shrink-0 font-medium">
+                                Demo
+                              </span>
+                            )}
                         </h3>
 
                         {/* Summary Metadata */}

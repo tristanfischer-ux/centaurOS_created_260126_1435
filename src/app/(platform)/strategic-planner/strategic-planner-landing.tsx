@@ -32,6 +32,7 @@ interface StrategicGoal {
   progress: number | null
   milestone_date: string | null
   created_at: string | null
+  is_demo?: boolean
 }
 
 interface StrategicPlannerLandingProps {
@@ -89,9 +90,16 @@ export function StrategicPlannerLanding({ goals }: StrategicPlannerLandingProps)
                         <div className="w-8 h-8 rounded-lg bg-international-orange/10 flex items-center justify-center flex-shrink-0">
                           <Target className="w-4 h-4 text-international-orange" />
                         </div>
-                        <CardTitle className="text-base font-semibold line-clamp-2 group-hover:text-international-orange transition-colors">
-                          {goal.title}
-                        </CardTitle>
+                        <div className="flex items-center gap-1.5">
+                          <CardTitle className="text-base font-semibold line-clamp-2 group-hover:text-international-orange transition-colors">
+                            {goal.title}
+                          </CardTitle>
+                          {goal.is_demo && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] text-muted-foreground bg-muted rounded px-1.5 py-0 shrink-0 font-medium">
+                              Demo
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-international-orange transition-colors flex-shrink-0 mt-1" />
                     </div>

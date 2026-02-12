@@ -5834,6 +5834,7 @@ export type Database = {
           ghost_source: string | null
           goal_type: string | null
           id: string
+          is_demo: boolean
           is_ghost: boolean
           is_milestone: boolean
           is_private: boolean
@@ -5862,6 +5863,7 @@ export type Database = {
           ghost_source?: string | null
           goal_type?: string | null
           id?: string
+          is_demo?: boolean
           is_ghost?: boolean
           is_milestone?: boolean
           is_private?: boolean
@@ -5890,6 +5892,7 @@ export type Database = {
           ghost_source?: string | null
           goal_type?: string | null
           id?: string
+          is_demo?: boolean
           is_ghost?: boolean
           is_milestone?: boolean
           is_private?: boolean
@@ -10306,6 +10309,7 @@ export type Database = {
           ghost_rationale: string | null
           ghost_source: string | null
           id: string
+          is_demo: boolean
           is_ghost: boolean
           is_private: boolean
           last_nudge_at: string | null
@@ -10338,6 +10342,7 @@ export type Database = {
           ghost_rationale?: string | null
           ghost_source?: string | null
           id?: string
+          is_demo?: boolean
           is_ghost?: boolean
           is_private?: boolean
           last_nudge_at?: string | null
@@ -10370,6 +10375,7 @@ export type Database = {
           ghost_rationale?: string | null
           ghost_source?: string | null
           id?: string
+          is_demo?: boolean
           is_ghost?: boolean
           is_private?: boolean
           last_nudge_at?: string | null
@@ -11608,6 +11614,7 @@ export type Database = {
           ghost_rationale: string | null
           ghost_source: string | null
           id: string
+          is_demo: boolean
           is_ghost: boolean
           is_private: boolean
           last_nudge_at: string | null
@@ -11670,6 +11677,7 @@ export type Database = {
           ghost_rationale: string | null
           ghost_source: string | null
           id: string
+          is_demo: boolean
           is_ghost: boolean
           is_private: boolean
           last_nudge_at: string | null
@@ -11732,6 +11740,7 @@ export type Database = {
           ghost_rationale: string | null
           ghost_source: string | null
           id: string
+          is_demo: boolean
           is_ghost: boolean
           is_private: boolean
           last_nudge_at: string | null
@@ -11962,6 +11971,10 @@ export type Database = {
       seed_demo_forge_concept: {
         Args: { p_foundry_id: string; p_user_id: string }
         Returns: string
+      }
+      seed_founder_demo_data: {
+        Args: { p_foundry_id: string; p_user_id: string }
+        Returns: undefined
       }
       submit_standup: {
         Args: {

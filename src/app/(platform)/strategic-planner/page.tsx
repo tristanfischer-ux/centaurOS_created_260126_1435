@@ -24,7 +24,7 @@ export default async function StrategicPlannerPage() {
   // Fetch strategic goals
   const { data: goals } = await supabase
     .from('objectives')
-    .select('id, title, description, status, progress, milestone_date, created_at')
+    .select('id, title, description, status, progress, milestone_date, created_at, is_demo')
     .eq('foundry_id', foundryId)
     .eq('is_ghost', false)
     .is('deleted_at', null)
