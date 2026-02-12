@@ -8,6 +8,13 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { createMarketplacePresence } from '@/actions/marketplace-setup'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -19,10 +26,28 @@ import {
   CheckCircle2,
   Sparkles,
   SkipForward,
+  Clock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { typography } from '@/lib/design-system'
 import { toast } from 'sonner'
+
+/** Hours-per-week options for Executives and Apprentices. */
+const HOURS_OPTIONS = [
+  { value: '10 hrs/week', label: '10 hrs/week' },
+  { value: '20 hrs/week', label: '20 hrs/week' },
+  { value: '30 hrs/week', label: '30 hrs/week' },
+  { value: '40 hrs/week (full-time)', label: '40 hrs/week (full-time)' },
+  { value: 'Flexible', label: 'Flexible' },
+] as const
+
+/** Start-date options for Executives and Apprentices. */
+const START_DATE_OPTIONS = [
+  { value: 'Immediately', label: 'Immediately' },
+  { value: 'Within 1 week', label: 'Within 1 week' },
+  { value: 'Within 2 weeks', label: 'Within 2 weeks' },
+  { value: 'Within 1 month', label: 'Within 1 month' },
+] as const
 
 /**
  * Step definitions for the marketplace listing wizard.
@@ -36,12 +61,14 @@ const STEPS = [
 type StepId = (typeof STEPS)[number]['id']
 
 /**
- * Marketplace Setup Wizard — shown to Executives and Apprentices after email
- * verification to create their presence in the People marketplace.
+ * Marketplace Setup Wizard — shown to Founders, Executives, and Apprentices
+ * after email verification to create their presence in the People marketplace.
  *
  * @description A 2-step wizard (headline + details) that creates a marketplace
- * listing linked to the user's auto-created provider profile. Includes a skip
- * button for users who want to set this up later.
+ * listing linked to the user's auto-created provider profile. Founders get a
+ * simplified flow (no availability fields); Executives/Apprentices specify
+ * structured availability (hours/week + start date). Includes a skip button
+ * for users who want to set this up later.
  */
 export default function MarketplaceSetupPage(): React.ReactElement {
   const router = useRouter()
@@ -54,7 +81,10 @@ export default function MarketplaceSetupPage(): React.ReactElement {
   const [headline, setHeadline] = useState('')
   const [description, setDescription] = useState('')
   const [skills, setSkills] = useState('')
-  const [availability, setAvailability] = useState('Available')
+  const [hoursPerWeek, setHoursPerWeek] = useState('')
+  const [startDate, setStartDate] = useState('')
+
+  const isFounder = userRole === 'Founder'
 
   // Fetch user role to pre-populate
   useEffect(() => {
@@ -71,10 +101,13 @@ export default function MarketplaceSetupPage(): React.ReactElement {
 
       if (profile?.role) {
         setUserRole(profile.role)
-        const defaultHeadline = profile.role === 'Executive'
-          ? 'Fractional Executive'
-          : 'Apprentice Engineer'
-        setHeadline(defaultHeadline)
+        if (profile.role === 'Founder') {
+          setHeadline('Founder')
+        } else if (profile.role === 'Executive') {
+          setHeadline('Fractional Executive')
+        } else {
+          setHeadline('Apprentice Engineer')
+        }
       }
     }
     fetchRole()
@@ -82,7 +115,6 @@ export default function MarketplaceSetupPage(): React.ReactElement {
 
   const currentStepIndex = STEPS.findIndex((s) => s.id === currentStep)
   const isFirstStep = currentStepIndex === 0
-  const isLastStep = currentStep === 'confirm'
 
   /** Validate the current step before proceeding. */
   function validateCurrentStep(): boolean {
@@ -91,6 +123,17 @@ export default function MarketplaceSetupPage(): React.ReactElement {
       if (!headline.trim()) {
         setError('Please enter a headline for your listing')
         return false
+      }
+      // Executives/Apprentices must specify availability
+      if (!isFounder) {
+        if (!hoursPerWeek) {
+          setError('Please select your hours per week')
+          return false
+        }
+        if (!startDate) {
+          setError('Please select when you can start')
+          return false
+        }
       }
     }
     return true
@@ -124,7 +167,14 @@ export default function MarketplaceSetupPage(): React.ReactElement {
     formData.set('headline', headline)
     formData.set('description', description)
     formData.set('skills', skills)
-    formData.set('availability', availability)
+
+    // Build combined availability string for Executives/Apprentices
+    if (!isFounder && hoursPerWeek) {
+      const availabilityStr = startDate
+        ? `${hoursPerWeek}, starting ${startDate.toLowerCase()}`
+        : hoursPerWeek
+      formData.set('availability', availabilityStr)
+    }
 
     const result = await createMarketplacePresence(formData)
 
@@ -157,8 +207,10 @@ export default function MarketplaceSetupPage(): React.ReactElement {
           <h1 className={typography.h1}>Set Up Your Marketplace Presence</h1>
         </div>
         <p className={typography.pageSubtitle}>
-          Founders browse the Recruits marketplace to find talent. Create your listing
-          so they can discover you and invite you to their company.
+          {isFounder
+            ? 'Make yourself discoverable on the marketplace. Other Founders can find you and connect.'
+            : 'Founders browse the Recruits marketplace to find talent. Create your listing so they can discover you and invite you to their company.'
+          }
         </p>
       </div>
 
@@ -213,14 +265,18 @@ export default function MarketplaceSetupPage(): React.ReactElement {
             </Alert>
           )}
 
-          {/* Step 1: Headline */}
+          {/* Step 1: Headline + Availability */}
           {currentStep === 'headline' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold mb-2">What do you do?</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  {isFounder ? 'How do you describe yourself?' : 'What do you do?'}
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  Think of this as your one-liner. Founders will see this when browsing
-                  the Recruits marketplace.
+                  {isFounder
+                    ? 'A short headline that describes your expertise. Other users will see this on your marketplace profile.'
+                    : 'Think of this as your one-liner. Founders will see this when browsing the Recruits marketplace.'
+                  }
                 </p>
               </div>
 
@@ -232,7 +288,13 @@ export default function MarketplaceSetupPage(): React.ReactElement {
                   id="headline"
                   value={headline}
                   onChange={(e) => setHeadline(e.target.value)}
-                  placeholder={userRole === 'Executive' ? 'e.g. Fractional CTO — Hardware Startups' : 'e.g. CAD Engineer — SolidWorks & Fusion 360'}
+                  placeholder={
+                    isFounder
+                      ? 'e.g. Hardware Founder — Robotics & IoT'
+                      : userRole === 'Executive'
+                        ? 'e.g. Fractional CTO — Hardware Startups'
+                        : 'e.g. CAD Engineer — SolidWorks & Fusion 360'
+                  }
                   maxLength={100}
                   aria-required="true"
                 />
@@ -241,15 +303,53 @@ export default function MarketplaceSetupPage(): React.ReactElement {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="availability">Availability</Label>
-                <Input
-                  id="availability"
-                  value={availability}
-                  onChange={(e) => setAvailability(e.target.value)}
-                  placeholder="e.g. 20 hrs/week, Immediate, Flexible"
-                />
-              </div>
+              {/* Structured availability — only for Executives and Apprentices */}
+              {!isFounder && (
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium text-foreground">Your availability</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="hours-per-week">
+                        Hours per week <span className="text-destructive" aria-label="required">*</span>
+                      </Label>
+                      <Select value={hoursPerWeek} onValueChange={setHoursPerWeek}>
+                        <SelectTrigger id="hours-per-week" aria-required="true">
+                          <SelectValue placeholder="Select hours" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {HOURS_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="start-date">
+                        Can start <span className="text-destructive" aria-label="required">*</span>
+                      </Label>
+                      <Select value={startDate} onValueChange={setStartDate}>
+                        <SelectTrigger id="start-date" aria-required="true">
+                          <SelectValue placeholder="Select start" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {START_DATE_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -257,10 +357,14 @@ export default function MarketplaceSetupPage(): React.ReactElement {
           {currentStep === 'details' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold mb-2">Tell founders about yourself</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  {isFounder ? 'Tell the marketplace about yourself' : 'Tell founders about yourself'}
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  A short bio and your key skills help founders find the right match.
-                  Don&apos;t overthink it — you can update this anytime.
+                  {isFounder
+                    ? 'A short bio and your key skills. This helps others understand what you bring to the table.'
+                    : 'A short bio and your key skills help founders find the right match. Don\u0027t overthink it \u2014 you can update this anytime.'
+                  }
                 </p>
               </div>
 
@@ -270,7 +374,11 @@ export default function MarketplaceSetupPage(): React.ReactElement {
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g. 15 years scaling hardware startups from prototype to production. Previously VP Engineering at..."
+                  placeholder={
+                    isFounder
+                      ? 'e.g. Building the next generation of autonomous drones. 10 years in hardware, previously co-founded...'
+                      : 'e.g. 15 years scaling hardware startups from prototype to production. Previously VP Engineering at...'
+                  }
                   rows={4}
                   maxLength={500}
                 />
@@ -285,7 +393,11 @@ export default function MarketplaceSetupPage(): React.ReactElement {
                   id="skills"
                   value={skills}
                   onChange={(e) => setSkills(e.target.value)}
-                  placeholder="e.g. Product Strategy, CAD, Supply Chain, Fundraising"
+                  placeholder={
+                    isFounder
+                      ? 'e.g. Leadership, Fundraising, Product Strategy, Hardware'
+                      : 'e.g. Product Strategy, CAD, Supply Chain, Fundraising'
+                  }
                 />
                 <p className="text-xs text-muted-foreground">
                   Separate each skill with a comma
@@ -303,8 +415,10 @@ export default function MarketplaceSetupPage(): React.ReactElement {
               <div>
                 <h3 className="text-lg font-semibold mb-2">You&apos;re Live!</h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  Your listing is now visible in the Recruits marketplace.
-                  Founders can discover you and invite you to join their company.
+                  {isFounder
+                    ? 'Your listing is now visible in the marketplace. Other users can discover you and connect.'
+                    : 'Your listing is now visible in the Recruits marketplace. Founders can discover you and invite you to join their company.'
+                  }
                 </p>
               </div>
               <Button onClick={handleFinish} className="min-w-[200px]">

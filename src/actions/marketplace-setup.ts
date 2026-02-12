@@ -4,13 +4,16 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 /**
- * Creates a marketplace listing for an Executive or Apprentice during onboarding.
+ * Creates a marketplace listing for a Founder, Executive, or Apprentice during onboarding.
  *
  * @description Bypasses the standard provider-portal approval flow for trial users.
  * Looks up the user's provider_profiles record (auto-created during signup),
  * creates a People marketplace listing, and links it back to the provider profile.
+ * Founders get a simplified listing (no availability); Executives/Apprentices include
+ * structured availability (hours/week + start date).
  *
- * @param formData - Form data containing headline, description, skills, availability
+ * @param formData - Form data containing headline, description, skills, and
+ *   optionally availability (for Executives/Apprentices)
  * @returns Object with success status and optional error message
  *
  * @security Requires authenticated user with an existing provider profile
@@ -39,9 +42,10 @@ export async function createMarketplacePresence(formData: FormData): Promise<{
     return { success: false, error: 'Failed to load your profile' }
   }
 
-  // VALIDATION: Only Executives and Apprentices use this flow
-  if (profile.role !== 'Executive' && profile.role !== 'Apprentice') {
-    return { success: false, error: 'This setup is for Executives and Apprentices' }
+  // VALIDATION: Only trial roles (Founder, Executive, Apprentice) use this flow
+  const ALLOWED_ROLES = ['Founder', 'Executive', 'Apprentice']
+  if (!ALLOWED_ROLES.includes(profile.role ?? '')) {
+    return { success: false, error: 'This setup is for Founders, Executives, and Apprentices' }
   }
 
   // Get the provider profile (auto-created during signup)
@@ -69,22 +73,28 @@ export async function createMarketplacePresence(formData: FormData): Promise<{
   }
 
   // Determine subcategory based on role
-  const subcategory = profile.role === 'Executive'
-    ? 'Fractional Executive'
-    : 'Apprentice'
+  const subcategory = profile.role === 'Founder'
+    ? 'Founder'
+    : profile.role === 'Executive'
+      ? 'Fractional Executive'
+      : 'Apprentice'
 
   // Parse skills into an array
   const skillsArray = skills
     ? skills.split(',').map((s: string) => s.trim()).filter(Boolean)
     : []
 
-  // Build attributes
+  // Build attributes — availability is optional for Founders
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const attributes: Record<string, any> = {
     role: headline,
-    availability: availability || 'Available',
     skills: skillsArray,
     provider_id: providerProfile.id,
+  }
+
+  // Only include availability for Executives/Apprentices (Founders don't sell their time)
+  if (availability && profile.role !== 'Founder') {
+    attributes.availability = availability
   }
 
   // Create the marketplace listing — auto-approved for trial

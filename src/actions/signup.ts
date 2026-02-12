@@ -252,11 +252,11 @@ export async function signup(formData: FormData) {
     }
   }
 
-  // 3c. Auto-create provider profile for Executives/Apprentices so they can
-  // create marketplace listings without the provider-portal application flow.
-  // This is essential for the trial: they sign up, create a listing, get discovered.
-  if ((role === 'executive' || role === 'apprentice') && authData.user) {
-    const roleLabel = role === 'executive' ? 'Fractional Executive' : 'Apprentice';
+  // 3c. Auto-create provider profile for trial roles (Founder, Executive, Apprentice)
+  // so they can create marketplace listings without the provider-portal application flow.
+  // Founders list themselves to be discoverable; Executives/Apprentices offer their services.
+  if ((role === 'founder' || role === 'executive' || role === 'apprentice') && authData.user) {
+    const roleLabel = role === 'founder' ? 'Founder' : role === 'executive' ? 'Fractional Executive' : 'Apprentice';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: providerError } = await (supabase as any)
       .from('provider_profiles')
