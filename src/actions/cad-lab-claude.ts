@@ -454,7 +454,7 @@ Generate the complete CadQuery Python code. The code must:
 4. Assemble everything with union calls
 5. Assign the final assembly to a variable called "result"`,
       "claude-opus-4-20250514",
-      16000,
+      32000,
     )
 
     let code = extractCode(result.text)

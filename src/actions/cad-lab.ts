@@ -652,7 +652,7 @@ Generate the complete CadQuery Python code following the methodology. The code m
 4. Assemble everything with union calls
 5. Assign the final assembly to a variable called "result"`
 
-    const codeResult = await callClaude(systemPrompt, userPrompt, modelId, 16000)
+    const codeResult = await callClaude(systemPrompt, userPrompt, modelId, 32000)
     totalTokensIn += codeResult.tokensIn
     totalTokensOut += codeResult.tokensOut
 
