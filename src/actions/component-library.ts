@@ -14,6 +14,8 @@
  */
 
 import { createClient } from "@/lib/supabase/server"
+import { SECTOR_COMPONENT_DOMAINS } from "@/types/foundry"
+import type { Sector } from "@/types/foundry"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -152,6 +154,30 @@ const LIBRARY_FUNCTION_SLUGS = [
   "sensor_probe",
   "drip_emitter",
   "vertical_tower_section",
+  // ─── Tier 3: EV / Automotive (23) ───
+  "hub_motor",
+  "mid_drive_motor",
+  "traction_motor",
+  "motor_controller_ev",
+  "reduction_gearbox",
+  "cv_joint",
+  "chain_sprocket",
+  "battery_module_ev",
+  "bms_board",
+  "charging_port",
+  "hv_contactor",
+  "wiring_connector_deutsch",
+  "wheel_hub",
+  "brake_disc",
+  "brake_caliper",
+  "coilover_shock",
+  "wishbone",
+  "tie_rod_end",
+  "steering_rack",
+  "wheel_rim",
+  "throttle_sensor",
+  "speed_sensor_wheel",
+  "fuse_box",
 ] as const
 
 export type LibrarySlug = (typeof LIBRARY_FUNCTION_SLUGS)[number]
@@ -159,13 +185,20 @@ export type LibrarySlug = (typeof LIBRARY_FUNCTION_SLUGS)[number]
 // ─── fetchLibrarySummary ─────────────────────────────────────────────
 
 /**
- * Fetches a compact summary of all available component geometry types.
+ * Fetches a compact summary of available component geometry types.
  * Used to inject a "COMPONENT LIBRARY" section into Claude's prompt.
  *
+ * When a sector is provided, Tier 1 (universal) and Tier 2 (electromechanical)
+ * components are always included, but Tier 3 (domain) components are filtered
+ * to only those matching the sector via SECTOR_COMPONENT_DOMAINS.
+ *
+ * @param sector - Optional foundry sector to filter Tier 3 domain components
  * @returns Array of component summaries with slug, name, param schema, etc.
  * @throws If Supabase query fails
  */
-export async function fetchLibrarySummary(): Promise<LibraryComponentSummary[]> {
+export async function fetchLibrarySummary(
+  sector?: Sector | null,
+): Promise<LibraryComponentSummary[]> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -183,7 +216,29 @@ export async function fetchLibrarySummary(): Promise<LibraryComponentSummary[]> 
     return []
   }
 
-  return (data ?? []).map((row) => ({
+  let rows = data ?? []
+
+  // FILTER: When sector is provided, keep all T1+T2 and only matching T3 domains
+  if (sector && sector !== 'other') {
+    const allowedDomains = SECTOR_COMPONENT_DOMAINS[sector] ?? []
+
+    rows = rows.filter((row) => {
+      // Always include Tier 1 (universal) and Tier 2 (electromechanical)
+      if (row.tier === 'universal' || row.tier === 'electromechanical') return true
+      // For Tier 3 (domain), check if the component's category matches an allowed domain
+      if (allowedDomains.length === 0) return false
+      return allowedDomains.some((domain) => row.category.toLowerCase().includes(domain))
+    })
+
+    console.info("[ComponentLibrary] Sector filter applied:", {
+      sector,
+      allowedDomains,
+      totalBefore: (data ?? []).length,
+      totalAfter: rows.length,
+    })
+  }
+
+  return rows.map((row) => ({
     slug: row.slug,
     name: row.name,
     category: row.category,
@@ -267,7 +322,7 @@ cq.Workplane centered at origin, base at Z=0.
 The library spans:
 - Tier 1 (universal): fasteners, bearings, springs, shafts, gears, pulleys, lead screws, linear rails, seals, extrusions, connectors, tubes, brackets, hinges, fittings
 - Tier 2 (electromechanical): motors (brushless, stepper, servo, DC geared), solenoids, relays, PCBs, switches, fans, pumps, heatsinks, displays, encoders, battery holders, terminal blocks, LEDs, buzzers
-- Tier 3 (domain): drones, CubeSats, vertical farming, BSF breeding, brine mining, EPS architectural
+- Tier 3 (domain): EV/automotive (motors, drivetrain, battery, chassis, brakes, suspension, steering, sensors), drones, CubeSats, vertical farming, BSF breeding, brine mining, EPS architectural
 
 Available components:
 ${lines.join("\n")}

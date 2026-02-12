@@ -2798,12 +2798,15 @@ export type Database = {
           cadquery_code: string
           category: string
           created_at: string | null
+          data_source: string
           default_colour: string | null
           description: string | null
           id: string
           mounting_interfaces: Json
           name: string
           param_schema: Json
+          physical_properties: Json
+          procurement: Json
           slug: string
           tier: string
           updated_at: string | null
@@ -2816,12 +2819,15 @@ export type Database = {
           cadquery_code: string
           category: string
           created_at?: string | null
+          data_source?: string
           default_colour?: string | null
           description?: string | null
           id?: string
           mounting_interfaces?: Json
           name: string
           param_schema?: Json
+          physical_properties?: Json
+          procurement?: Json
           slug: string
           tier: string
           updated_at?: string | null
@@ -2834,12 +2840,15 @@ export type Database = {
           cadquery_code?: string
           category?: string
           created_at?: string | null
+          data_source?: string
           default_colour?: string | null
           description?: string | null
           id?: string
           mounting_interfaces?: Json
           name?: string
           param_schema?: Json
+          physical_properties?: Json
+          procurement?: Json
           slug?: string
           tier?: string
           updated_at?: string | null
@@ -3983,6 +3992,7 @@ export type Database = {
           name: string
           owner_id: string | null
           purpose_data: Json | null
+          sector: string | null
           slug: string | null
           stage: string | null
         }
@@ -3994,6 +4004,7 @@ export type Database = {
           name: string
           owner_id?: string | null
           purpose_data?: Json | null
+          sector?: string | null
           slug?: string | null
           stage?: string | null
         }
@@ -4005,6 +4016,7 @@ export type Database = {
           name?: string
           owner_id?: string | null
           purpose_data?: Json | null
+          sector?: string | null
           slug?: string | null
           stage?: string | null
         }
@@ -12304,6 +12316,10 @@ export type Database = {
             Args: { p_foundry_id: string; p_purpose_data: Json }
             Returns: Json
           }
+      update_foundry_sector: {
+        Args: { p_foundry_id: string; p_sector: string }
+        Returns: undefined
+      }
       update_trending_searches: { Args: never; Returns: undefined }
       upsert_domain_familiarity: {
         Args: {
