@@ -75,6 +75,14 @@ import { SECTOR_LABELS } from "@/types/foundry"
 import type { Sector } from "@/types/foundry"
 
 import { CadLabAnalysisDashboard } from "@/components/cad/cad-lab-analysis-dashboard"
+import { CadLabTimeline } from "@/components/cad/cad-lab-timeline"
+import { CadLabRiskRegister } from "@/components/cad/cad-lab-risk-register"
+import { CadLabDiagnostics } from "@/components/cad/cad-lab-diagnostics"
+import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
+import { CadLabReviewPackage } from "@/components/cad/cad-lab-review-package"
+import { CadLabPeople } from "@/components/cad/cad-lab-people"
+import { CadLabSupplyChain } from "@/components/cad/cad-lab-supply-chain"
+import { CadLabContracting } from "@/components/cad/cad-lab-contracting"
 
 import type {
   CadLabResult,
@@ -155,6 +163,7 @@ export default function CadLabPage(): React.ReactNode {
   const [modules, setModules] = useState<CadLabModule[]>([])
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null)
+  const [diagnosticAnswers, setDiagnosticAnswers] = useState<DiagnosticAnswers>({})
 
   // ── Project List: Load projects on mount ──
   const refreshProjects = useCallback(async () => {
@@ -418,6 +427,7 @@ export default function CadLabPage(): React.ReactNode {
     setModules([])
     setExpandedModuleId(null)
     setActiveModuleId(null)
+    setDiagnosticAnswers({})
   }, [])
 
   // ── Load a saved project ──
@@ -1077,6 +1087,74 @@ export default function CadLabPage(): React.ReactNode {
         <CadLabAnalysisDashboard
           modules={modules}
           projectName={subject}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* PROJECT TIMELINE (Gantt-style lead time visualization)          */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modules.length > 0 && (
+        <CadLabTimeline modules={modules} />
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* RISK REGISTER (failure modes, unknowns, DFM issues)            */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modules.length > 0 && (
+        <CadLabRiskRegister modules={modules} />
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* ENGINEERING DIAGNOSTICS (gating questionnaire per module)       */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modules.length > 0 && (
+        <CadLabDiagnostics
+          modules={modules}
+          answers={diagnosticAnswers}
+          onAnswersChange={setDiagnosticAnswers}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* REVIEW PACKAGE (engineering summary document)                   */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modules.length > 0 && (
+        <CadLabReviewPackage
+          modules={modules}
+          projectName={subject}
+          researchReport={editableReport}
+          diagnosticAnswers={diagnosticAnswers}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* PEOPLE MATCHING (expert disciplines per module)                 */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modules.length > 0 && (
+        <CadLabPeople
+          modules={modules}
+          diagnosticAnswers={diagnosticAnswers}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SUPPLY CHAIN (manufacturing requirements per module)            */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modules.length > 0 && (
+        <CadLabSupplyChain
+          modules={modules}
+          diagnosticAnswers={diagnosticAnswers}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* CONTRACTING (RFQ, SOW, NDA generation)                         */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modules.length > 0 && (
+        <CadLabContracting
+          modules={modules}
+          projectName={subject}
+          diagnosticAnswers={diagnosticAnswers}
         />
       )}
 
