@@ -19,6 +19,7 @@
 import { checkRateLimit } from "@/lib/security/rate-limit"
 import { createClient } from "@/lib/supabase/server"
 import { CAD_INSTRUCTIONS } from "@/lib/cad-instructions"
+import { fetchLibrarySummary, formatLibraryForPrompt, prepareCodeWithLibrary } from "@/actions/component-library"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -74,6 +75,8 @@ export interface ExecutionResult {
   stepSizeKb?: number
   stlSizeKb?: number
   fillRatio?: number
+  /** Library components that were detected and prepended for execution */
+  libraryComponents?: string[]
   timeMs: number
 }
 
@@ -426,9 +429,15 @@ export async function generateCode(
 
   const start = Date.now()
   try {
+    // Fetch available library components to include in the prompt
+    const librarySummary = await fetchLibrarySummary()
+    const libraryPromptSection = formatLibraryForPrompt(librarySummary)
+
     const systemPrompt = `You are an expert CadQuery engineer generating production-quality parametric CAD models. Follow the methodology in this document EXACTLY — every rule was learned from real failures:
 
 ${CAD_INSTRUCTIONS}
+
+${libraryPromptSection}
 
 CRITICAL EXECUTION ENVIRONMENT RULES:
 1. The LAST line of your script MUST be: result = <your_assembly_variable>
@@ -555,13 +564,22 @@ export async function executeCode(code: string): Promise<ExecutionResult> {
 
   const start = Date.now()
   try {
+    // Detect and prepend library component functions before execution
+    const { combinedCode, libraryComponents } = await prepareCodeWithLibrary(code)
+    if (libraryComponents.length > 0) {
+      console.info("[CadLabClaude] Library components prepended:", {
+        count: libraryComponents.length,
+        slugs: libraryComponents,
+      })
+    }
+
     const endpointUrl = process.env.MODAL_CAD_ENDPOINT_URL
     if (!endpointUrl) throw new Error("MODAL_CAD_ENDPOINT_URL not configured")
 
     const response = await fetch(endpointUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, module_id: "cad-lab-claude", material_density: 1240 }),
+      body: JSON.stringify({ code: combinedCode, module_id: "cad-lab-claude", material_density: 1240 }),
       signal: AbortSignal.timeout(300_000),
     })
 
@@ -595,6 +613,7 @@ export async function executeCode(code: string): Promise<ExecutionResult> {
       stepSizeKb: data.step ? Math.round(atob(data.step).length / 1024) : undefined,
       stlSizeKb: data.stl ? Math.round(atob(data.stl).length / 1024) : undefined,
       fillRatio: bbVol > 0 ? Math.round((vol / bbVol) * 1000) / 10 : undefined,
+      libraryComponents: libraryComponents.length > 0 ? libraryComponents : undefined,
       error: data.error ?? undefined,
       timeMs: Date.now() - start,
     }

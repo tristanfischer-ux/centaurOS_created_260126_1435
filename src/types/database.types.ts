@@ -2461,6 +2461,51 @@ export type Database = {
         }
         Relationships: []
       }
+      cad_assemblies: {
+        Row: {
+          assembly_params: Json | null
+          bounding_box: Json | null
+          created_at: string | null
+          creator_id: string | null
+          description: string | null
+          id: string
+          name: string
+          status: string | null
+          step_file_url: string | null
+          stl_file_url: string | null
+          thumbnail_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assembly_params?: Json | null
+          bounding_box?: Json | null
+          created_at?: string | null
+          creator_id?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          status?: string | null
+          step_file_url?: string | null
+          stl_file_url?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assembly_params?: Json | null
+          bounding_box?: Json | null
+          created_at?: string | null
+          creator_id?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string | null
+          step_file_url?: string | null
+          stl_file_url?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       calendar_sync_mappings: {
         Row: {
           created_at: string
@@ -2681,6 +2726,128 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      component_catalogue: {
+        Row: {
+          colour_override: string | null
+          created_at: string | null
+          datasheet_url: string | null
+          geometry_params: Json
+          geometry_type_slug: string
+          id: string
+          manufacturer: string | null
+          material: string | null
+          mounting_points: Json | null
+          name: string
+          part_number: string | null
+          sources: Json | null
+          tags: string[] | null
+          updated_at: string | null
+          verified: boolean | null
+          weight_g: number | null
+        }
+        Insert: {
+          colour_override?: string | null
+          created_at?: string | null
+          datasheet_url?: string | null
+          geometry_params?: Json
+          geometry_type_slug: string
+          id?: string
+          manufacturer?: string | null
+          material?: string | null
+          mounting_points?: Json | null
+          name: string
+          part_number?: string | null
+          sources?: Json | null
+          tags?: string[] | null
+          updated_at?: string | null
+          verified?: boolean | null
+          weight_g?: number | null
+        }
+        Update: {
+          colour_override?: string | null
+          created_at?: string | null
+          datasheet_url?: string | null
+          geometry_params?: Json
+          geometry_type_slug?: string
+          id?: string
+          manufacturer?: string | null
+          material?: string | null
+          mounting_points?: Json | null
+          name?: string
+          part_number?: string | null
+          sources?: Json | null
+          tags?: string[] | null
+          updated_at?: string | null
+          verified?: boolean | null
+          weight_g?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "component_catalogue_geometry_type_slug_fkey"
+            columns: ["geometry_type_slug"]
+            isOneToOne: false
+            referencedRelation: "component_geometry_types"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
+      component_geometry_types: {
+        Row: {
+          bbox_expressions: Json
+          cadquery_code: string
+          category: string
+          created_at: string | null
+          default_colour: string | null
+          description: string | null
+          id: string
+          mounting_interfaces: Json
+          name: string
+          param_schema: Json
+          slug: string
+          tier: string
+          updated_at: string | null
+          verified: boolean | null
+          version: number | null
+          visual_tags: string[] | null
+        }
+        Insert: {
+          bbox_expressions?: Json
+          cadquery_code: string
+          category: string
+          created_at?: string | null
+          default_colour?: string | null
+          description?: string | null
+          id?: string
+          mounting_interfaces?: Json
+          name: string
+          param_schema?: Json
+          slug: string
+          tier: string
+          updated_at?: string | null
+          verified?: boolean | null
+          version?: number | null
+          visual_tags?: string[] | null
+        }
+        Update: {
+          bbox_expressions?: Json
+          cadquery_code?: string
+          category?: string
+          created_at?: string | null
+          default_colour?: string | null
+          description?: string | null
+          id?: string
+          mounting_interfaces?: Json
+          name?: string
+          param_schema?: Json
+          slug?: string
+          tier?: string
+          updated_at?: string | null
+          verified?: boolean | null
+          version?: number | null
+          visual_tags?: string[] | null
+        }
+        Relationships: []
       }
       contract_templates: {
         Row: {
@@ -5421,6 +5588,36 @@ export type Database = {
           },
         ]
       }
+      mounting_standards: {
+        Row: {
+          created_at: string | null
+          id: string
+          interface_type: string
+          mates_with: string[] | null
+          name: string
+          params: Json
+          slug: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          interface_type: string
+          mates_with?: string[] | null
+          name: string
+          params?: Json
+          slug: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          interface_type?: string
+          mates_with?: string[] | null
+          name?: string
+          params?: Json
+          slug?: string
+        }
+        Relationships: []
+      }
       notification_log: {
         Row: {
           action_url: string | null
@@ -7184,6 +7381,70 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "service_providers"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      placed_components: {
+        Row: {
+          assembly_id: string
+          catalogue_id: string | null
+          connections: Json | null
+          created_at: string | null
+          custom_params: Json | null
+          geometry_type_slug: string | null
+          id: string
+          label: string | null
+          position: Json
+          quantity: number | null
+          rotation: Json
+        }
+        Insert: {
+          assembly_id: string
+          catalogue_id?: string | null
+          connections?: Json | null
+          created_at?: string | null
+          custom_params?: Json | null
+          geometry_type_slug?: string | null
+          id?: string
+          label?: string | null
+          position?: Json
+          quantity?: number | null
+          rotation?: Json
+        }
+        Update: {
+          assembly_id?: string
+          catalogue_id?: string | null
+          connections?: Json | null
+          created_at?: string | null
+          custom_params?: Json | null
+          geometry_type_slug?: string | null
+          id?: string
+          label?: string | null
+          position?: Json
+          quantity?: number | null
+          rotation?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "placed_components_assembly_id_fkey"
+            columns: ["assembly_id"]
+            isOneToOne: false
+            referencedRelation: "cad_assemblies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "placed_components_catalogue_id_fkey"
+            columns: ["catalogue_id"]
+            isOneToOne: false
+            referencedRelation: "component_catalogue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "placed_components_geometry_type_slug_fkey"
+            columns: ["geometry_type_slug"]
+            isOneToOne: false
+            referencedRelation: "component_geometry_types"
+            referencedColumns: ["slug"]
           },
         ]
       }

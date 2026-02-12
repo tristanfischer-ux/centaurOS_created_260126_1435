@@ -31,6 +31,7 @@ import {
   Check,
   Maximize2,
   RotateCcw,
+  Library,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -802,6 +803,35 @@ export default function CadLabClaudePage(): React.ReactNode {
                     </TabsContent>
                   )}
                 </Tabs>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Library Components Used */}
+          {execResult.libraryComponents && execResult.libraryComponents.length > 0 && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <Library className="h-4 w-4 text-international-orange mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {execResult.libraryComponents.length} library component{execResult.libraryComponents.length > 1 ? "s" : ""} used
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Pre-built geometry from the component library was injected for recognisable parts:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {execResult.libraryComponents.map((slug) => (
+                        <span
+                          key={slug}
+                          className="text-xs font-mono bg-international-orange/10 text-international-orange px-2 py-0.5 rounded"
+                        >
+                          {slug}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
