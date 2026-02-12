@@ -445,6 +445,14 @@ CRITICAL RULES:
 - Use the research report dimensions exactly — do not invent new numbers
 - ALWAYS check the component library FIRST before planning custom geometry
 - Prefer library components over custom geometry — they produce recognisable, detailed parts
+
+ARCHITECTURAL / BUILDING MODELS (houses, cabins, buildings, shelters):
+If the product is a building or architectural structure, you MUST also plan:
+1. SUB-ASSEMBLY GROUPS: Divide components into 4-6 groups (e.g. Structure, Envelope, Interior, Fixtures, Furniture). Each group will be unioned separately, then groups unioned together. This is critical for CadQuery performance.
+2. COMPONENT COUNT CAP: Maximum 25 unique make_*() functions total. Combine similar elements (e.g. "all interior walls" as one function, not separate functions per wall).
+3. SIMPLIFICATION RULES: No individual balusters (use solid panels), no individual joists/rafters (use representative samples max 6), no decorative elements under 50mm.
+4. GABLE STRATEGY: Plan gable walls as "box + cut" not "wire profile" — note this in the table.
+5. In the Space Budget, show floor plan zones along each axis clearly.
 ${librarySection}`
 
     const result = await callClaude(
@@ -559,6 +567,51 @@ ASSEMBLY CONNECTION RULES (prevent floating/disconnected parts):
 - NEVER rely on two surfaces merely touching at a face — they must volumetrically intersect.
 - Test mentally: "If I pulled this part, would it slide out freely or is it embedded?" Every part must be embedded.
 - Common mistake: positioning a component at coordinates near another component but with a small gap. Always add overlap_margin = 2.0 mm and extend connecting geometry by that amount.
+
+ARCHITECTURAL / BUILDING MODEL RULES (for houses, buildings, structures):
+When building architectural models (houses, cabins, shelters, buildings), follow these additional rules:
+
+WALL CONSTRUCTION:
+- Build ALL walls as simple box extrusions on the XY plane: .box(width, thickness, height)
+- NEVER use wire profiles (.moveTo/.lineTo/.close) for wall shapes
+- Cut window and door openings INTO the walls using .cut() with box shapes
+- Extend cut boxes 20mm wider than the wall thickness to ensure clean boolean operations
+
+GABLE WALLS (triangular sections above eave line):
+- NEVER build gables using wire profiles or .moveTo/.lineTo/.close — this crashes CadQuery
+- Instead, build a rectangular box above the eave line, then CUT away the angled portions:
+  gable_block = box(full_width, wall_thickness, roof_rise)  // rectangular block above eave
+  left_cut = angled box positioned and rotated to remove left triangle
+  right_cut = angled box positioned and rotated to remove right triangle
+  gable = gable_block.cut(left_cut).cut(right_cut)
+- Alternatively, skip gable walls entirely and let the roof panels close the ends
+
+ROOF CONSTRUCTION:
+- Build each roof slope as a single rotated box: .transformed(rotate=(0, pitch_angle, 0)).box(...)
+- Two roof slopes + a ridge cap is sufficient for a pitched roof
+- Flat roofs are just horizontal boxes
+
+SUB-ASSEMBLY STRATEGY (critical for performance):
+- Do NOT union all 30+ building components into one mega-solid sequentially
+- Instead, group components into 4-6 SUB-ASSEMBLIES and union within each group:
+  structure = foundation.union(floor).union(walls).union(roof)
+  interior = partitions.union(doors).union(stairs)
+  fixtures = kitchen.union(bathroom)
+  furniture = sofa.union(table).union(beds)
+  result = structure.union(interior).union(fixtures).union(furniture)
+- This produces the same result but is dramatically faster and less error-prone
+- Within each sub-assembly, keep to MAX 8-10 union operations
+
+FURNITURE AND FIXTURES:
+- Simplify furniture to 2-3 primitive shapes each (a bed = base + mattress + headboard)
+- Do NOT model individual balusters/spindles if there would be more than 10 — use a solid panel instead
+- Skip decorative details (towel rails, light fixtures, switches) that add unions without visual impact
+- Cap any loop that creates repeated elements (balusters, joists, rafters) to MAX 10 items
+
+DIMENSIONAL SANITY:
+- Building dimensions are in mm (a house is typically 3000-12000mm per axis)
+- Always verify your bounding box mentally: a 6m × 12m house = 6000 × 12000 × ~5500mm
+- If any dimension exceeds 25000mm, something is wrong — likely doubled geometry
 
 CODE QUALITY REQUIREMENTS:
 - Every component from the interface definition MUST have its own make_*() function.
