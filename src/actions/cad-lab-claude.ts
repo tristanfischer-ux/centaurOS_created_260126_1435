@@ -1,0 +1,612 @@
+"use server"
+
+/**
+ * @file cad-lab-claude.ts — Clean Claude CAD pipeline.
+ *
+ * @description Each step from CLAUDE_CAD_INSTRUCTIONS is a separate exported
+ * function so the frontend can call them one-by-one and show live progress.
+ *
+ * Step 1a: searchWebDimensions  — Gemini + Google Search for real specs
+ * Step 1b: searchCadReferences  — Thingiverse for existing models
+ * Step 1c: synthesizeResearch   — Claude synthesizes into engineering report
+ * Step 2:  generateInterface    — Claude writes text-only interface definition
+ * Step 3:  generateCode         — Claude writes CadQuery code
+ * Step 4:  executeOnModal       — Run code on Modal, get STEP+STL+SVG
+ *
+ * @security Server-side only. Uses admin API keys.
+ */
+
+import { readFileSync } from "fs"
+import { join } from "path"
+
+import { checkRateLimit } from "@/lib/security/rate-limit"
+import { createClient } from "@/lib/supabase/server"
+
+// ─── Types ───────────────────────────────────────────────────────────
+
+export interface WebSearchResult {
+  success: boolean
+  error?: string
+  specs: string
+  sources: Array<{ uri: string; title: string }>
+  timeMs: number
+}
+
+export interface CadSearchResult {
+  success: boolean
+  error?: string
+  models: Array<{ name: string; url: string; description: string; thumbnail?: string }>
+  timeMs: number
+}
+
+export interface SynthesisResult {
+  success: boolean
+  error?: string
+  report: string
+  timeMs: number
+}
+
+export interface InterfaceResult {
+  success: boolean
+  error?: string
+  definition: string
+  timeMs: number
+}
+
+export interface CodeResult {
+  success: boolean
+  error?: string
+  code: string
+  lines: number
+  timeMs: number
+}
+
+export interface ExecutionResult {
+  success: boolean
+  error?: string
+  svgIso?: string
+  svgTop?: string
+  svgFront?: string
+  svgRight?: string
+  step?: string
+  stl?: string
+  bbox?: { xLen: number; yLen: number; zLen: number }
+  massGrams?: number
+  volumeMm3?: number
+  stepSizeKb?: number
+  stlSizeKb?: number
+  fillRatio?: number
+  timeMs: number
+}
+
+// ─── Auth helper ─────────────────────────────────────────────────────
+
+/**
+ * Checks authentication and rate limiting.
+ *
+ * @returns userId on success, or an error string
+ */
+async function authCheck(): Promise<{ userId: string } | { error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Unauthorized" }
+
+  const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
+  if (rateLimitError) return { error: rateLimitError }
+
+  return { userId: user.id }
+}
+
+// ─── Instructions (read from disk) ───────────────────────────────────
+
+let _cachedInstructions: string | null = null
+
+function getCadInstructions(): string {
+  if (_cachedInstructions) return _cachedInstructions
+  const filePath = join(process.cwd(), "CLAUDE_CAD_INSTRUCTIONS_1214.md")
+  _cachedInstructions = readFileSync(filePath, "utf-8")
+  return _cachedInstructions
+}
+
+// ─── Step 1a: Web Search for Real Dimensions ─────────────────────────
+
+/**
+ * Searches the web for real-world product dimensions using Gemini + Google Search.
+ *
+ * @param description - Product to research
+ * @returns Raw specs text and source URLs
+ */
+export async function searchWebDimensions(
+  description: string,
+): Promise<WebSearchResult> {
+  const auth = await authCheck()
+  if ("error" in auth) return { success: false, error: auth.error, specs: "", sources: [], timeMs: 0 }
+
+  const start = Date.now()
+  try {
+    const apiKey = process.env.GOOGLE_AI_API_KEY
+    if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `Find the real-world specifications for: ${description}
+
+I need precise engineering dimensions for 3D CAD modelling. Search for:
+
+1. OVERALL DIMENSIONS — length, width, height in mm (folded and unfolded if applicable)
+2. WEIGHT — total weight and breakdown if available
+3. MOTOR/ACTUATOR SPECS — diameter, height, mounting hole pattern (if it has motors)
+4. KEY COMPONENT DIMENSIONS — individual part sizes in mm
+5. CRITICAL CONSTRAINTS — key clearances, tolerances, interfaces
+6. MATERIAL — primary materials and wall thicknesses
+7. STANDARD PARTS — bolt sizes, pipe diameters, standards used
+
+Format as a structured specification sheet with exact numbers in millimetres.
+If a dimension is approximate, say so. If sources disagree, list both values.
+Do NOT guess — only include measurements you found.`,
+          }],
+        }],
+        tools: [{ google_search: {} }],
+        generationConfig: { maxOutputTokens: 8192, temperature: 0.2 },
+      }),
+      signal: AbortSignal.timeout(60_000),
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(`Gemini API error (${response.status}): ${errText.slice(0, 300)}`)
+    }
+
+    const data = await response.json()
+    const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
+
+    const groundingMeta = data.candidates?.[0]?.groundingMetadata
+    const chunks: Array<{ web?: { uri?: string; title?: string } }> =
+      groundingMeta?.groundingChunks ?? []
+    const sources = chunks
+      .filter((c): c is { web: { uri: string; title: string } } =>
+        Boolean(c.web?.uri && c.web?.title),
+      )
+      .map((c) => ({ uri: c.web.uri, title: c.web.title }))
+
+    return { success: true, specs: text, sources, timeMs: Date.now() - start }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Web search failed",
+      specs: "",
+      sources: [],
+      timeMs: Date.now() - start,
+    }
+  }
+}
+
+// ─── Step 1b: CAD Model Reference Search ─────────────────────────────
+
+/**
+ * Searches Thingiverse for existing CAD models as dimensional references.
+ *
+ * @param description - Product to search for
+ * @returns Matching models with name, URL, description, thumbnail
+ */
+export async function searchCadReferences(
+  description: string,
+): Promise<CadSearchResult> {
+  const auth = await authCheck()
+  if ("error" in auth) return { success: false, error: auth.error, models: [], timeMs: 0 }
+
+  const start = Date.now()
+  try {
+    const token = process.env.THINGIVERSE_API_TOKEN
+    if (!token) {
+      return { success: true, models: [], timeMs: Date.now() - start }
+    }
+
+    const searchTerm = description
+      .replace(/quadcopter|drone|3d model|cad/gi, "")
+      .trim()
+      .split(/\s+/)
+      .slice(0, 4)
+      .join(" ")
+      .trim() || description.slice(0, 30)
+
+    const url = `https://api.thingiverse.com/search/${encodeURIComponent(searchTerm)}?type=things&per_page=5&sort=relevant`
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    })
+
+    if (!response.ok) {
+      return { success: true, models: [], timeMs: Date.now() - start }
+    }
+
+    const data = await response.json()
+    const hits: Array<{
+      name?: string
+      public_url?: string
+      description?: string
+      preview_image?: string
+    }> = data?.hits ?? data ?? []
+
+    const models = hits
+      .filter((h): h is { name: string; public_url: string; description: string; preview_image?: string } =>
+        Boolean(h.name && h.public_url),
+      )
+      .slice(0, 5)
+      .map((h) => ({
+        name: h.name,
+        url: h.public_url,
+        description: (h.description ?? "").slice(0, 200),
+        thumbnail: h.preview_image,
+      }))
+
+    return { success: true, models, timeMs: Date.now() - start }
+  } catch {
+    return { success: true, models: [], timeMs: Date.now() - start }
+  }
+}
+
+// ─── Step 1c: Synthesize Research Report ─────────────────────────────
+
+/**
+ * Claude synthesizes raw web specs + CAD references into a structured
+ * engineering report with precise dimensions.
+ *
+ * @param description - Product description
+ * @param webSpecs - Raw text from Gemini web search
+ * @param cadModels - Reference models from Thingiverse
+ * @returns Structured engineering research report
+ */
+export async function synthesizeResearch(
+  description: string,
+  webSpecs: string,
+  cadModels: Array<{ name: string; url: string; description: string }>,
+): Promise<SynthesisResult> {
+  const auth = await authCheck()
+  if ("error" in auth) return { success: false, error: auth.error, report: "", timeMs: 0 }
+
+  const start = Date.now()
+  try {
+    const rawSections: string[] = []
+    if (webSpecs.trim()) rawSections.push(`=== WEB SEARCH RESULTS ===\n${webSpecs}`)
+    if (cadModels.length > 0) {
+      const list = cadModels.map((m) => `- ${m.name}: ${m.url}\n  ${m.description}`).join("\n")
+      rawSections.push(`=== THINGIVERSE CAD MODELS ===\n${list}`)
+    }
+
+    const systemPrompt = `You are a senior mechanical engineer preparing a research brief for a 3D CAD modelling project. Synthesize raw research data into a precise, structured engineering specification.
+
+Output format (follow exactly):
+
+# Engineering Research Report: {Product Name}
+
+## Executive Summary
+One paragraph: what this product is, its primary function, and its physical characteristics.
+
+## Overall Dimensions
+- Folded: W x D x H mm (if applicable)
+- Unfolded/Deployed: W x D x H mm
+- Weight: X g
+
+## Primary Structure
+Main body/frame with precise dimensions. Wall thickness, material if known.
+
+## Components
+For each major component:
+- **Name**: exact dimensions (W x D x H mm or dia x H mm)
+- Position relative to body center
+- Mounting/attachment method
+- Quantity
+
+## Critical Constraints
+- Key critical dimensions with values
+- Clearance requirements
+- Symmetry/alignment requirements
+
+## Material & Manufacturing Notes
+Materials, wall thicknesses, manufacturing method.
+
+## Dimensional Confidence
+Rate each major dimension:
+- Confirmed (from official specs or multiple sources)
+- Approximate (single source or estimated)
+- Unknown (not found)
+
+RULES:
+- Use millimetres for all dimensions
+- Round to nearest 0.5mm
+- If sources disagree, state both
+- Never invent a dimension — mark as Unknown
+- Include source attribution for key numbers`
+
+    const result = await callClaude(
+      systemPrompt,
+      `Product: ${description}\n\n${rawSections.join("\n\n")}`,
+    )
+
+    return { success: true, report: result.text, timeMs: Date.now() - start }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Synthesis failed",
+      report: "",
+      timeMs: Date.now() - start,
+    }
+  }
+}
+
+// ─── Step 2: Interface Definition ────────────────────────────────────
+
+/**
+ * Claude generates the text-only interface definition: space budget,
+ * component placement table, connection map, validation checklist.
+ *
+ * @param description - Product description
+ * @param researchReport - Engineering report from Step 1
+ * @returns Interface definition text
+ */
+export async function generateInterface(
+  description: string,
+  researchReport: string,
+): Promise<InterfaceResult> {
+  const auth = await authCheck()
+  if ("error" in auth) return { success: false, error: auth.error, definition: "", timeMs: 0 }
+
+  const start = Date.now()
+  try {
+    const systemPrompt = `You are an engineering planner for parametric CAD models. You are NOT writing code — this is pure engineering planning.
+
+Produce a text-only interface definition. Every dimension must be a specific number in millimetres. Numbers must sum correctly — show ALL arithmetic step-by-step.
+
+Output EXACTLY these 4 sections:
+
+=== a) SPACE BUDGET ===
+How components stack/fit within the overall envelope. Must add up arithmetically.
+Show: base_z + component1_h + gap + component2_h + ... = total_h
+
+Rule: if the numbers don't add up in text, they won't add up in 3D.
+
+=== b) COMPONENT PLACEMENT TABLE ===
+| Component | Qty | Dimensions (mm) | Position (x,y,z) | Notes |
+|-----------|-----|-----------------|-------------------|-------|
+One row per unique component type. Position is centre point.
+Minimum 6 unique component types.
+
+=== c) CONNECTION MAP ===
+For assemblies with flows (water, air, electrical, structural), trace COMPLETE paths.
+If no flows apply: "N/A — Static assembly with no flow paths"
+
+=== d) VALIDATION CHECKLIST ===
+Boolean checks. All must pass before writing geometry.
+Example:
+  - [ ] Magazine ID (39mm) > capsule flange (37mm) — clearance
+  - [ ] 10 capsules x 29mm = 290mm < tube height 315mm — fits
+
+CRITICAL RULES:
+- SHOW ALL ARITHMETIC step-by-step
+- Every position calculated from named quantities, not eyeballed
+- Components must not overlap spatially
+- DO NOT WRITE ANY CODE
+- Use the research report dimensions exactly — do not invent new numbers`
+
+    const result = await callClaude(
+      systemPrompt,
+      `Product: ${description}\n\nResearch Report (use these dimensions — do not invent new ones):\n${researchReport}\n\nGenerate the complete interface definition.`,
+      "claude-opus-4-20250514",
+      8192,
+    )
+
+    return { success: true, definition: result.text, timeMs: Date.now() - start }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Interface generation failed",
+      definition: "",
+      timeMs: Date.now() - start,
+    }
+  }
+}
+
+// ─── Step 3: Generate CadQuery Code ──────────────────────────────────
+
+/**
+ * Claude writes complete CadQuery Python code in a single pass,
+ * following the full CLAUDE_CAD_INSTRUCTIONS methodology.
+ *
+ * @param description - Product description
+ * @param researchReport - Engineering report
+ * @param interfaceDefinition - Interface definition from Step 2
+ * @returns Complete Python code
+ */
+export async function generateCode(
+  description: string,
+  researchReport: string,
+  interfaceDefinition: string,
+): Promise<CodeResult> {
+  const auth = await authCheck()
+  if ("error" in auth) return { success: false, error: auth.error, code: "", lines: 0, timeMs: 0 }
+
+  const start = Date.now()
+  try {
+    const cadInstructions = getCadInstructions()
+
+    const systemPrompt = `You are generating a complete CadQuery parametric CAD model. Follow the methodology in this document EXACTLY:
+
+${cadInstructions}
+
+ADDITIONAL RULES:
+- The final variable MUST be called "result" and be a cq.Workplane object
+- Do NOT include any cq.exporters calls — the execution environment handles export
+- Do NOT include print() statements
+- Do NOT import os or use open()
+- Output ONLY the Python code inside a single \`\`\`python code fence`
+
+    const result = await callClaude(
+      systemPrompt,
+      `Build a parametric CAD model of: ${description}
+
+=== RESEARCH REPORT ===
+${researchReport}
+
+=== INTERFACE DEFINITION ===
+${interfaceDefinition}
+
+Generate the complete CadQuery Python code. The code must:
+1. Define every component as a function (make_componentname)
+2. Put all primary parameters at the top, calculate all derived values
+3. Include validation checks
+4. Assemble everything with union calls
+5. Assign the final assembly to a variable called "result"`,
+      "claude-opus-4-20250514",
+      32768,
+    )
+
+    let code = extractCode(result.text)
+
+    // Safety: strip calls that would break the sandbox
+    code = code
+      .split("\n")
+      .filter((line: string) => {
+        const s = line.trim()
+        if (/^print\s*\(/.test(s)) return false
+        if (s.startsWith("import os") || s.startsWith("from os")) return false
+        if (s.includes("cq.exporters")) return false
+        return true
+      })
+      .join("\n")
+
+    return {
+      success: true,
+      code,
+      lines: code.split("\n").length,
+      timeMs: Date.now() - start,
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Code generation failed",
+      code: "",
+      lines: 0,
+      timeMs: Date.now() - start,
+    }
+  }
+}
+
+// ─── Step 4: Execute on Modal ────────────────────────────────────────
+
+/**
+ * Sends CadQuery code to Modal for execution. Returns STEP, STL, SVG exports.
+ *
+ * @param code - Complete CadQuery Python code
+ * @returns Execution results with exported files and analysis
+ */
+export async function executeCode(code: string): Promise<ExecutionResult> {
+  const auth = await authCheck()
+  if ("error" in auth) return { success: false, error: auth.error, timeMs: 0 }
+
+  const start = Date.now()
+  try {
+    const endpointUrl = process.env.MODAL_CAD_ENDPOINT_URL
+    if (!endpointUrl) throw new Error("MODAL_CAD_ENDPOINT_URL not configured")
+
+    const response = await fetch(endpointUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, module_id: "cad-lab-claude", material_density: 1240 }),
+      signal: AbortSignal.timeout(300_000),
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(`Modal error (${response.status}): ${errText.slice(0, 300)}`)
+    }
+
+    const data = await response.json()
+
+    if (data.error && !data.svg_iso) {
+      return { success: false, error: data.error, timeMs: Date.now() - start }
+    }
+
+    const mp = data.analysis?.mass_properties
+    const bb = mp?.bounding_box
+    const vol = mp?.volume_mm3 ?? 0
+    const bbVol = bb ? bb.xLen * bb.yLen * bb.zLen : 0
+
+    return {
+      success: true,
+      svgIso: data.svg_iso ? `data:image/svg+xml;base64,${data.svg_iso}` : undefined,
+      svgTop: data.svg_top ? `data:image/svg+xml;base64,${data.svg_top}` : undefined,
+      svgFront: data.svg_front ? `data:image/svg+xml;base64,${data.svg_front}` : undefined,
+      svgRight: data.svg_right ? `data:image/svg+xml;base64,${data.svg_right}` : undefined,
+      step: data.step ? "available" : undefined,
+      stl: data.stl ?? undefined,
+      bbox: bb ? { xLen: Math.round(bb.xLen), yLen: Math.round(bb.yLen), zLen: Math.round(bb.zLen) } : undefined,
+      massGrams: mp?.mass_kg ? Math.round(mp.mass_kg * 1000 * 10) / 10 : undefined,
+      volumeMm3: vol ? Math.round(vol) : undefined,
+      stepSizeKb: data.step ? Math.round(atob(data.step).length / 1024) : undefined,
+      stlSizeKb: data.stl ? Math.round(atob(data.stl).length / 1024) : undefined,
+      fillRatio: bbVol > 0 ? Math.round((vol / bbVol) * 1000) / 10 : undefined,
+      error: data.error ?? undefined,
+      timeMs: Date.now() - start,
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Execution failed",
+      timeMs: Date.now() - start,
+    }
+  }
+}
+
+// ─── Internal helpers ────────────────────────────────────────────────
+
+async function callClaude(
+  systemPrompt: string,
+  userPrompt: string,
+  modelId: string = "claude-opus-4-20250514",
+  maxTokens: number = 16384,
+): Promise<{ text: string }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: modelId,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+    signal: AbortSignal.timeout(300_000),
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await response.json()
+  return { text: data.content?.[0]?.text ?? "" }
+}
+
+function extractCode(text: string): string {
+  if (text.includes("```python")) {
+    return text.split("```python")[1]?.split("```")[0]?.trim() ?? text.trim()
+  }
+  if (text.includes("```")) {
+    return text.split("```")[1]?.split("```")[0]?.trim() ?? text.trim()
+  }
+  return text.trim()
+}
