@@ -474,14 +474,14 @@ function ProblemSection() {
       title: "Astronomical Burn Rate",
       stat: "£50–100k/month",
       description:
-        "A full-time engineering team costs £50k–£100k per month in salaries alone. That&apos;s before you factor in tooling, materials, and manufacturing.",
+        "A full-time engineering team costs £50k–£100k per month in salaries alone. That's before you factor in tooling, materials, and manufacturing.",
     },
     {
       icon: TrendingDown,
       title: "Unnecessary Equity Dilution",
       stat: "30–40% given away",
       description:
-        "Raising a £2M seed round to build a team you only need for 6 months means giving away equity you&apos;ll never get back — for capability you don&apos;t permanently need.",
+        "Raising a £2M seed round to build a team you only need for 6 months means giving away equity you'll never get back — for capability you don't permanently need.",
     },
   ] as const;
 
