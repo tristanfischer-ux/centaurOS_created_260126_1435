@@ -1,52 +1,56 @@
 /**
  * @file concept-view.tsx — Stage 1: Concept client component
  *
- * @description Renders the concept definition stage: ScanHero (idea input),
- * ConceptResearch (product research with Gemini + Claude Opus),
- * SystemBlueprint, QuickInsights, and ExecutiveDashboard.
+ * @description Renders the concept definition stage: ScanHero (idea input)
+ * and ConceptResearch (product research with Gemini + Claude Opus).
  *
- * The flow is: Enter idea → Research product → Generate modules
+ * After a successful scan generates modules, the user is auto-navigated
+ * to the Dossier's Summary tab where the System Blueprint, Key Findings,
+ * and Executive Summary live. If the user returns to the Concept page
+ * after scan, a CTA card links them back to the Dossier.
+ *
+ * The flow is: Enter idea → Research product → Generate modules → Dossier
  *
  * @related
  * - Page: src/app/(platform)/the-forge/[id]/concept/page.tsx
  * - Context: src/app/(platform)/the-forge/components/forge-project-context.tsx
  * - Research: src/app/(platform)/the-forge/components/concept-research.tsx
+ * - Dossier Summary: src/app/(platform)/the-forge/components/dossier-view.tsx
  */
 
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
+import React, { useRef, useEffect } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+
+import { CheckCircle2, ArrowRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 
 import { useForgeProject } from "./forge-project-context"
 import { ScanHero } from "./scan-hero"
 import { ConceptResearch } from "./concept-research"
-import { SystemBlueprint } from "./system-blueprint"
-import { ExecutiveDashboard } from "./executive-dashboard"
-import { QuickInsights } from "./quick-insights"
-import { ScanCelebration } from "./scan-celebration"
 
 /**
  * ConceptView — Stage 1 client component.
  *
- * @description Renders the concept flow in order:
+ * @description Renders the concept flow:
  * 1. ScanHero — idea input and refinement
  * 2. ConceptResearch — AI-powered product research (Gemini Search + Claude Opus)
- * 3. SystemBlueprint — generated modules and system image
- * 4. QuickInsights — key findings highlights
- * 5. ExecutiveDashboard — metrics summary
+ * 3. Post-scan CTA — links to Dossier Summary after modules are generated
+ *
+ * Auto-navigates to Dossier Summary tab when a scan completes.
  */
 export function ConceptView(): React.ReactNode {
+  const router = useRouter()
   const {
     project,
     spec,
     scanId,
     isScanning,
     scanStatus,
-    isGeneratingImages,
-    isGeneratingSystemCad,
     handleRefineScan,
-    handleGenerateImages,
-    handleRegenerateSystemCad,
     setSpec,
   } = useForgeProject()
 
@@ -55,17 +59,16 @@ export function ConceptView(): React.ReactNode {
   // (covers the case where user navigated away and came back)
   const effectivelyScanning = isScanning || scanStatus === "scanning"
 
-  // Track scan completion to trigger celebration + stagger animation
+  // Auto-navigate to Dossier Summary when scan completes.
+  // Detects the transition from scanning → not scanning with modules present.
   const wasScanningRef = useRef(false)
-  const [justScanned, setJustScanned] = useState(false)
 
   useEffect(() => {
-    // Detect transition from scanning → not scanning (scan just finished)
     if (wasScanningRef.current && !effectivelyScanning && hasModules) {
-      setJustScanned(true)
+      router.push(`/the-forge/${scanId}/dossier?tab=summary`)
     }
     wasScanningRef.current = effectivelyScanning
-  }, [effectivelyScanning, hasModules])
+  }, [effectivelyScanning, hasModules, router, scanId])
 
   return (
     <div className="space-y-8">
@@ -90,36 +93,31 @@ export function ConceptView(): React.ReactNode {
         />
       )}
 
-      {/* Celebration banner — auto-dismisses after 8 seconds */}
-      {justScanned && (
-        <ScanCelebration
-          moduleCount={spec.modules.length}
-          onDismiss={() => setJustScanned(false)}
-        />
-      )}
-
-      {hasModules && (
-        <>
-          {/* System Blueprint with staggered module reveal */}
-          <SystemBlueprint
-            spec={spec}
-            systemImageUrl={spec.systemImageUrl}
-            systemImageStatus={spec.systemImageStatus}
-            isGeneratingImages={isGeneratingImages}
-            isGeneratingSystemCad={isGeneratingSystemCad}
-            hasImages={spec.modules.some((m) => m.imageStatus === "complete")}
-            onGenerateImages={handleGenerateImages}
-            onRegenerateSystemCad={handleRegenerateSystemCad}
-            canGenerate={!!scanId}
-            justScanned={justScanned}
-          />
-
-          {/* Key findings at a glance */}
-          <QuickInsights spec={spec} justScanned={justScanned} />
-
-          {/* Executive summary dashboard */}
-          <ExecutiveDashboard spec={spec} />
-        </>
+      {/* Post-scan CTA — shown when modules exist and user returns to Concept */}
+      {hasModules && !effectivelyScanning && (
+        <Card className="border-international-orange/20 bg-status-success-light/30">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-status-success-light">
+                <CheckCircle2 className="h-6 w-6 text-status-success" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-semibold text-foreground">
+                  Concept created — {spec.modules.length} module{spec.modules.length !== 1 ? "s" : ""} identified
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  View the engineering dossier for the system blueprint, key findings, and executive summary.
+                </p>
+              </div>
+              <Button asChild className="shrink-0">
+                <Link href={`/the-forge/${scanId}/dossier?tab=summary`}>
+                  View Dossier
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

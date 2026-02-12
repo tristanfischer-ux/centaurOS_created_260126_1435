@@ -2,12 +2,18 @@
  * @file dossier-view.tsx — Stage 2: Engineering Dossier client component
  *
  * @description The heaviest stage, organized with internal tab navigation:
- * Modules | Analysis | Timeline | Risks | Diagnostics. Each tab renders
- * one major component from the original single-page layout.
+ * Summary | Modules | Analysis | Timeline | Risks | Diagnostics | Review Package.
+ *
+ * The Summary tab (default) shows the high-level overview that was previously
+ * on the Concept page: System Blueprint, Key Findings, and Executive Summary.
+ * This follows a top-down information architecture (overview → detail).
+ *
+ * Supports URL-driven tab selection via `?tab=summary|modules|...` query param.
  *
  * @related
  * - Page: src/app/(platform)/the-forge/[id]/dossier/page.tsx
  * - Context: src/app/(platform)/the-forge/components/forge-project-context.tsx
+ * - Concept auto-navigate: src/app/(platform)/the-forge/components/concept-view.tsx
  */
 
 "use client"
@@ -15,13 +21,24 @@
 import React, { useState } from "react"
 import { useSearchParams } from "next/navigation"
 
-import { Boxes, FlaskConical, Clock, AlertTriangle, Stethoscope, FileCheck2 } from "lucide-react"
+import {
+  LayoutDashboard,
+  Boxes,
+  FlaskConical,
+  Clock,
+  AlertTriangle,
+  Stethoscope,
+  FileCheck2,
+} from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { EmptyState } from "@/components/ui/empty-state"
 
 import { toast } from "sonner"
 
 import { useForgeProject } from "./forge-project-context"
+import { SystemBlueprint } from "./system-blueprint"
+import { ExecutiveDashboard } from "./executive-dashboard"
+import { QuickInsights } from "./quick-insights"
 import { ModuleExplorer } from "./module-explorer"
 import { EngineeringSummary } from "./engineering-summary"
 import { TimelineView } from "./timeline-view"
@@ -35,11 +52,19 @@ import { EngineeringReviewPackage } from "./engineering-review-package"
 import type { ModuleSpec } from "../services/xray-schema"
 import type { ChangeReview } from "./design-changes-dialog"
 
+/** Valid tab IDs for the dossier view */
+type DossierTab = "summary" | "modules" | "analysis" | "timeline" | "risks" | "diagnostics" | "review"
+
+const VALID_TABS: DossierTab[] = ["summary", "modules", "analysis", "timeline", "risks", "diagnostics", "review"]
+
 /**
  * DossierView — Stage 2 client component with tabbed navigation.
  *
- * @description Renders 5 tabs: Modules, Analysis, Timeline, Risks, Diagnostics.
- * Default tab is "Modules" as it's the primary reference document.
+ * @description Renders 7 tabs: Summary, Modules, Analysis, Timeline, Risks,
+ * Diagnostics, Review Package. Default tab is "Summary" which provides the
+ * high-level overview (Executive Summary metrics, System Blueprint, Key Findings).
+ *
+ * Supports URL-driven tab selection via `?tab=` query parameter.
  * All tabs share the same spec state via ForgeProjectProvider.
  */
 export function DossierView(): React.ReactNode {
@@ -63,11 +88,21 @@ export function DossierView(): React.ReactNode {
     isRunningStructural,
     isRunningConvergence,
     isRunningPremium,
+    // Summary tab needs these for SystemBlueprint
+    isGeneratingImages,
+    isGeneratingSystemCad,
+    handleGenerateImages,
+    handleRegenerateSystemCad,
   } = useForgeProject()
 
-  // Read ?module= query param to deep-link into a specific module
+  // Read query params for deep-linking
   const searchParams = useSearchParams()
   const focusModuleId = searchParams.get("module")
+  const tabParam = searchParams.get("tab") as DossierTab | null
+  const initialTab: DossierTab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : "summary"
+
+  // Controlled tab state so URL param drives initial selection
+  const [activeTab, setActiveTab] = useState<DossierTab>(initialTab)
 
   // Dialog state for interview and edit panels
   const [interviewModule, setInterviewModule] = useState<ModuleSpec | null>(null)
@@ -86,8 +121,12 @@ export function DossierView(): React.ReactNode {
 
   return (
     <>
-      <Tabs defaultValue="modules">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DossierTab)}>
         <TabsList className="mb-4 border-t border-slate-100 pt-2 rounded-t-none">
+          <TabsTrigger value="summary" className="gap-2">
+            <LayoutDashboard className="h-4 w-4" />
+            Summary
+          </TabsTrigger>
           <TabsTrigger value="modules" className="gap-2">
             <Boxes className="h-4 w-4" />
             Modules
@@ -113,6 +152,30 @@ export function DossierView(): React.ReactNode {
             Review Package
           </TabsTrigger>
         </TabsList>
+
+        {/* Summary tab — high-level overview (moved from Concept page) */}
+        <TabsContent value="summary">
+          <div className="space-y-8">
+            {/* Executive metrics first — "at a glance" numbers */}
+            <ExecutiveDashboard spec={spec} />
+
+            {/* System Blueprint — 3D model, diagram, module status grid */}
+            <SystemBlueprint
+              spec={spec}
+              systemImageUrl={spec.systemImageUrl}
+              systemImageStatus={spec.systemImageStatus}
+              isGeneratingImages={isGeneratingImages}
+              isGeneratingSystemCad={isGeneratingSystemCad}
+              hasImages={spec.modules.some((m) => m.imageStatus === "complete")}
+              onGenerateImages={handleGenerateImages}
+              onRegenerateSystemCad={handleRegenerateSystemCad}
+              canGenerate={!!scanId}
+            />
+
+            {/* Key Findings — gating module, highest risk, longest lead time */}
+            <QuickInsights spec={spec} />
+          </div>
+        </TabsContent>
 
         <TabsContent value="modules">
           <ModuleExplorer
