@@ -451,6 +451,14 @@ GEOMETRY SAFETY RULES (these prevent runtime crashes in CadQuery):
 - Fillet only BEFORE union, only on simple geometry, max 3mm radius.
 - Guard against zero/negative dimensions: use max(value, minimum) for any computed dimension.
 
+ASSEMBLY CONNECTION RULES (prevent floating/disconnected parts):
+- When using .union() to assemble components, the two solids MUST physically overlap by at least 1-2mm. If they don't touch, CadQuery produces disconnected geometry that floats in the STL.
+- For arms/struts connecting to a body: extend the arm geometry 2-3mm INTO the body so the solids overlap. A hinge boss on the body and a boss on the arm end must penetrate each other.
+- For mounted sub-assemblies (gimbal, camera, antenna): add a mounting strut or bracket that physically bridges the gap and overlaps both the mount point and the sub-assembly.
+- NEVER rely on two surfaces merely touching at a face — they must volumetrically intersect.
+- Test mentally: "If I pulled this part, would it slide out freely or is it embedded?" Every part must be embedded.
+- Common mistake: positioning a component at coordinates near another component but with a small gap. Always add overlap_margin = 2.0 mm and extend connecting geometry by that amount.
+
 CODE QUALITY REQUIREMENTS:
 - Every component from the interface definition MUST have its own make_*() function.
 - Each function must contain REAL geometry (circles, extrudes, cuts, lofts) — not stubs or placeholders.
