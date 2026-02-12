@@ -426,33 +426,46 @@ export async function generateCode(
 
   const start = Date.now()
   try {
-    const systemPrompt = `You are generating a complete CadQuery parametric CAD model. Follow the methodology in this document EXACTLY:
+    const systemPrompt = `You are an expert CadQuery engineer generating production-quality parametric CAD models. Follow the methodology in this document EXACTLY — every rule was learned from real failures:
 
 ${CAD_INSTRUCTIONS}
 
-ADDITIONAL RULES:
-- The final variable MUST be called "result" and be a cq.Workplane object
-- Do NOT include any cq.exporters calls — the execution environment handles export
-- Do NOT include print() statements
-- Do NOT import os or use open()
-- Output ONLY the Python code inside a single \`\`\`python code fence`
+CRITICAL EXECUTION ENVIRONMENT RULES:
+1. The LAST line of your script MUST be: result = <your_assembly_variable>
+   where result is a cq.Workplane object. The execution sandbox looks for this variable.
+2. Do NOT call cq.exporters.export() — the sandbox handles all file exports automatically.
+3. Do NOT use print() — stdout is not captured.
+4. Do NOT import os, sys, or use open(). Only import cadquery and math.
+5. Output ONLY the Python code inside a single \`\`\`python code fence.
+
+CODE QUALITY REQUIREMENTS:
+- Every component from the interface definition MUST have its own make_*() function.
+- Each function must contain REAL geometry (circles, extrudes, cuts, lofts) — not stubs or placeholders.
+- Include detailed inline comments explaining what each section builds.
+- Typical complete models are 400-800+ lines. Do NOT generate abbreviated or skeleton code.
+- If the interface definition lists 10 components, you must model all 10 with real geometry.`
 
     const result = await callClaude(
       systemPrompt,
-      `Build a parametric CAD model of: ${description}
+      `Build a COMPLETE, DETAILED parametric CAD model of: ${description}
 
-=== RESEARCH REPORT ===
+=== RESEARCH REPORT (use these real dimensions — do NOT invent dimensions) ===
 ${researchReport}
 
-=== INTERFACE DEFINITION ===
+=== INTERFACE DEFINITION (implement EVERY component listed here) ===
 ${interfaceDefinition}
 
-Generate the complete CadQuery Python code. The code must:
-1. Define every component as a function (make_componentname)
-2. Put all primary parameters at the top, calculate all derived values
-3. Include validation checks
-4. Assemble everything with union calls
-5. Assign the final assembly to a variable called "result"`,
+Generate the FULL CadQuery Python code. Requirements:
+1. Start with "import cadquery as cq" and "import math" (if needed)
+2. Define ALL primary parameters at the top with comments showing source dimensions
+3. Calculate ALL derived values from primary parameters (never hardcode derived values)
+4. Create a make_*() function for EACH component in the interface definition
+5. Each function must build REAL geometry — no empty stubs, no "pass", no TODOs
+6. Use the assembly pattern: assy = None, then add() each component via union
+7. Include validation checks that verify dimensional constraints
+8. The LAST line MUST be exactly: result = assy
+
+This code will be executed in a CadQuery sandbox. The "result" variable must be a cq.Workplane containing the complete assembled model.`,
       "claude-opus-4-6",
       64000,
     )
@@ -470,6 +483,24 @@ Generate the complete CadQuery Python code. The code must:
         return true
       })
       .join("\n")
+
+    // Safety net: ensure the code ends with `result = assy` (or similar)
+    // The Modal worker searches for a cq.Workplane in the namespace
+    const hasResultAssignment = /^result\s*=/m.test(code)
+    if (!hasResultAssignment) {
+      // Check common assembly variable names from the CAD instructions
+      const hasAssy = /^assy\s*=/m.test(code)
+      const hasAssembly = /^assembly\s*=/m.test(code)
+      const hasModel = /^model\s*=/m.test(code)
+      if (hasAssy) {
+        code += "\n\n# Expose assembly to execution sandbox\nresult = assy\n"
+      } else if (hasAssembly) {
+        code += "\n\n# Expose assembly to execution sandbox\nresult = assembly\n"
+      } else if (hasModel) {
+        code += "\n\n# Expose assembly to execution sandbox\nresult = model\n"
+      }
+      // If none found, the Modal worker will still search for any cq.Workplane
+    }
 
     return {
       success: true,
