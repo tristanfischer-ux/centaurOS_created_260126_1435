@@ -45,6 +45,7 @@ import {
   ShoppingCart,
   ClipboardCheck,
   Play,
+  Rocket,
 } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
@@ -97,6 +98,19 @@ import type {
   CadLabModule,
   ClaudeModelId,
 } from "@/lib/cad-lab-types"
+
+import Image from "next/image"
+import { CadLabProgress } from "@/components/cad/cad-lab-progress"
+import { CadLabMilestone } from "@/components/cad/cad-lab-milestone"
+
+const QUICK_START_TEMPLATES = [
+  { id: "drone", label: "Drone Frame", subject: "Quadcopter drone frame with 250mm motor-to-motor distance, carbon fiber arms, and integrated flight controller mount", image: "/cad-lab/templates/drone-frame.png", complexity: "Advanced" },
+  { id: "organizer", label: "Desk Organizer", subject: "Wooden desktop organizer with pen holder, phone stand, and cable management tray", image: "/cad-lab/templates/desk-organizer.png", complexity: "Beginner" },
+  { id: "phone", label: "Phone Stand", subject: "Adjustable phone stand with portrait and landscape positions, rubber grip pads, and cable passthrough", image: "/cad-lab/templates/phone-stand.png", complexity: "Beginner" },
+  { id: "enclosure", label: "Enclosure Box", subject: "Electronics project enclosure with snap-fit lid, ventilation slots, mounting tabs, and USB-C cutout", image: "/cad-lab/templates/enclosure-box.png", complexity: "Intermediate" },
+  { id: "bracket", label: "Bracket Mount", subject: "Universal L-bracket mounting system with adjustable angle, M5 mounting holes, and cable routing channels", image: "/cad-lab/templates/bracket-mount.png", complexity: "Beginner" },
+  { id: "gears", label: "Gear Assembly", subject: "Two-stage spur gear reduction assembly with 4:1 ratio, 1 module teeth, 6mm shaft bores, and integrated housing", image: "/cad-lab/templates/gear-assembly.png", complexity: "Advanced" },
+] as const
 
 export default function CadLabPage(): React.ReactNode {
   // ── Project persistence state ──
@@ -185,6 +199,9 @@ export default function CadLabPage(): React.ReactNode {
   // ── Smart diagnostics pre-fill ──
   const [aiPrefilled, setAiPrefilled] = useState(false)
 
+  // ── Milestone celebrations ──
+  const [milestone, setMilestone] = useState<"research" | "decompose" | "generate" | null>(null)
+
   // ── Project List: Load projects on mount ──
   const refreshProjects = useCallback(async () => {
     setIsLoadingProjects(true)
@@ -230,6 +247,7 @@ export default function CadLabPage(): React.ReactNode {
       const res = await decomposeIntoModules(subject, editableReport, modelId)
       if (res.success && res.modules.length > 0) {
         setModules(res.modules)
+        setMilestone("decompose")
         // Auto-save modules
         if (activeProjectId) {
           await saveCadLabModules(activeProjectId, res.modules)
@@ -466,6 +484,7 @@ export default function CadLabPage(): React.ReactNode {
 
       // Auto-save
       if (res.success) {
+        setMilestone("research")
         const projId = await ensureProject()
         if (projId) {
           setIsSaving(true)
@@ -473,6 +492,13 @@ export default function CadLabPage(): React.ReactNode {
           setLastSaved(new Date().toISOString())
           setIsSaving(false)
           refreshProjects()
+        }
+
+        // Auto-advance: decompose after research
+        if (modules.length === 0) {
+          setTimeout(() => {
+            handleDecompose()
+          }, 2000)
         }
       }
     } catch (err) {
@@ -489,7 +515,7 @@ export default function CadLabPage(): React.ReactNode {
     } finally {
       setIsResearching(false)
     }
-  }, [subject, ensureProject, refreshProjects, addProgressLine])
+  }, [subject, ensureProject, refreshProjects, addProgressLine, modules.length, handleDecompose])
 
   // ── Step 2: Interface Definition ──
   const handleGenerateInterface = useCallback(async () => {
@@ -757,12 +783,8 @@ export default function CadLabPage(): React.ReactNode {
           </div>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Research → Interface Definition → Generate. Following the CadQuery methodology exactly.
+          Turn any product idea into manufacturing-ready parametric CAD in minutes.
         </p>
-        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-          <Info className="h-3.5 w-3.5 flex-shrink-0" />
-          <span>Component properties are engineering estimates from training data. Verify critical values against manufacturer datasheets.</span>
-        </div>
       </div>
 
       {/* Project list panel */}
@@ -849,6 +871,111 @@ export default function CadLabPage(): React.ReactNode {
         </Card>
       )}
 
+      {/* ── Hero landing (before research) ── */}
+      {!hasResearch && !isResearching && (
+        <div className="space-y-8">
+          {/* Hero banner */}
+          <div className="relative rounded-xl overflow-hidden border border-muted">
+            <Image
+              src="/cad-lab/hero.png"
+              alt="From idea to manufacturing-ready CAD"
+              width={1200}
+              height={400}
+              className="w-full h-auto object-cover"
+              priority
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/60 to-transparent flex items-center">
+              <div className="p-8 max-w-lg">
+                <h2 className="text-2xl font-bold text-foreground leading-tight">
+                  From idea to manufacturing-ready CAD in minutes
+                </h2>
+                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                  Describe any physical product. AI researches dimensions, generates parametric 3D models,
+                  and delivers DFM analysis, cost estimates, and supplier specs.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Value pillars */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-start gap-3 p-4 rounded-lg border border-muted bg-card">
+              <Image src="/cad-lab/pillars/research.png" alt="AI Research" width={48} height={48} className="rounded-md flex-shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">AI Research</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Market analysis, dimensional specifications, material recommendations, and reference model discovery.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-4 rounded-lg border border-muted bg-card">
+              <Image src="/cad-lab/pillars/cad.png" alt="Parametric CAD" width={48} height={48} className="rounded-md flex-shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Parametric CAD</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  CadQuery code generation with interactive 3D viewer, orthographic views, and DFM analysis.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-4 rounded-lg border border-muted bg-card">
+              <Image src="/cad-lab/pillars/production.png" alt="Production Ready" width={48} height={48} className="rounded-md flex-shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Production Ready</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Cost estimates, Gantt timelines, supplier specs, risk registers, and contract templates.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick-start templates */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-foreground">Quick Start — pick a template or describe your own</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {QUICK_START_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    setSubject(t.subject)
+                    // Auto-trigger research after a brief delay so user sees what was filled
+                    setTimeout(() => {
+                      const btn = document.getElementById("research-btn")
+                      if (btn) btn.click()
+                    }, 400)
+                  }}
+                  className="group flex flex-col items-center gap-2 p-3 rounded-lg border border-muted bg-card hover:border-international-orange/50 hover:bg-international-orange-light/10 transition-all text-center cursor-pointer"
+                >
+                  <Image
+                    src={t.image}
+                    alt={t.label}
+                    width={80}
+                    height={80}
+                    className="rounded-md group-hover:scale-105 transition-transform"
+                  />
+                  <span className="text-xs font-medium text-foreground">{t.label}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                    t.complexity === "Advanced" ? "bg-status-warning-light text-status-warning" :
+                    t.complexity === "Intermediate" ? "bg-status-info-light text-status-info" :
+                    "bg-status-success-light text-status-success"
+                  }`}>
+                    {t.complexity}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Milestone celebration banner */}
+      {milestone && (
+        <CadLabMilestone
+          type={milestone}
+          moduleCount={modules.length}
+          onDismiss={() => setMilestone(null)}
+        />
+      )}
+
       {/* Model selector */}
       <Card>
         <CardContent className="pt-6">
@@ -905,6 +1032,7 @@ export default function CadLabPage(): React.ReactNode {
           </p>
           <div className="flex items-center gap-2">
             <Button
+              id="research-btn"
               onClick={handleResearch}
               disabled={isAnyLoading || !subject.trim()}
               variant={hasResearch ? "secondary" : "default"}
@@ -1033,30 +1161,12 @@ export default function CadLabPage(): React.ReactNode {
         </Card>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* LIVE PROGRESS STORYTELLING                                      */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {(isResearching || isGenerating) && progressLines.length > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-2">
-              {progressLines.map((line, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 text-sm font-mono text-foreground animate-in fade-in slide-in-from-left-2 duration-300"
-                >
-                  {i === progressLines.length - 1 && (isResearching || isGenerating) ? (
-                    <Loader2 className="h-3 w-3 animate-spin text-international-orange flex-shrink-0" />
-                  ) : (
-                    <CheckCircle2 className="h-3 w-3 text-status-success flex-shrink-0" />
-                  )}
-                  {line}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* ── Live progress ── */}
+      <CadLabProgress
+        lines={progressLines}
+        isActive={isResearching || isGenerating || isDecomposing || isGeneratingInterface}
+        operationType={isResearching ? "research" : isDecomposing ? "decompose" : isBatchRunning ? "batch" : "generate"}
+      />
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* MISSION CONTROL TABS                                           */}

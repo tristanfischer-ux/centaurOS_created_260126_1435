@@ -12,15 +12,13 @@
  */
 
 import { revalidatePath } from 'next/cache'
-import OpenAI from 'openai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { withAuth } from '@/lib/server-action-utils'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { buildAIContext } from '@/lib/ai-context/builder'
 import type { Json } from '@/types/database.types'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'dummy-key-for-build',
-})
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -161,18 +159,20 @@ Rules:
 - Be opinionated about timeline — give a realistic estimate`
 
     try {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: sentence },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
-        max_tokens: 3000,
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 3000,
+          responseMimeType: 'application/json',
+        },
       })
 
-      const content = response.choices[0]?.message?.content
+      const result = await model.generateContent(
+        `${systemPrompt}\n\nUser goal: ${sentence}`
+      )
+
+      const content = result.response.text()
       if (!content) {
         return { error: 'AI returned empty response. Please try again.' }
       }

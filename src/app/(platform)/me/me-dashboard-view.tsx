@@ -16,6 +16,9 @@
 import { useEffect } from 'react'
 import { typography } from '@/lib/design-system'
 import { useSectionNewBadges } from '@/hooks/useSectionNewBadge'
+import { isBefore, isToday as isDateToday } from 'date-fns'
+import { MorningBriefingCard } from '@/components/nudges/MorningBriefing'
+import { PriorityQueue } from '@/components/dashboard/priority-queue'
 import { FocusCards } from './components/focus-cards'
 import { WeekTimeline } from './components/week-timeline'
 import { ObjectivesProgress } from './components/objectives-progress'
@@ -81,8 +84,23 @@ export function MeDashboardView({ data }: MeDashboardViewProps): React.ReactElem
         </p>
       </div>
 
+      {/* ── Morning Briefing (AI-powered daily focus) ────────────────── */}
+      <MorningBriefingCard />
+
       {/* ── Focus Cards ──────────────────────────────────────────────── */}
       <FocusCards focus={data.focus} />
+
+      {/* ── Priority Queue ────────────────────────────────────────────── */}
+      <PriorityQueue
+        myTasks={data.priorityTasks}
+        overdueTasks={data.priorityTasks.filter(t =>
+          t.end_date && isBefore(new Date(t.end_date), new Date()) && !isDateToday(new Date(t.end_date))
+        )}
+        tasksDueToday={data.priorityTasks.filter(t =>
+          t.end_date && isDateToday(new Date(t.end_date))
+        )}
+        userId={data.userId}
+      />
 
       {/* ── Week Timeline ────────────────────────────────────────────── */}
       <WeekTimeline tasks={data.weekTasks} />

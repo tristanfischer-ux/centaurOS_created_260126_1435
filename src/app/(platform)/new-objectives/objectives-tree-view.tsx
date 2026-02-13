@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { ProgressRing, getHealthVariant } from '@/components/ui/progress-ring'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { ChevronRight, ChevronDown, ListChecks, AlertTriangle, Pencil, Trash, Flag } from 'lucide-react'
+import { ChevronRight, ChevronDown, ListChecks, AlertTriangle, Pencil, Trash, Flag, Target, Plus } from 'lucide-react'
 import type { ObjectiveWithTasks, StrategicObjective } from './types'
 import { getStrategyColor, type StrategyColor } from './strategy-colors'
 
@@ -16,6 +16,7 @@ interface ObjectivesTreeViewProps {
   onSelect: (id: string) => void
   onEdit?: (objective: ObjectiveWithTasks) => void
   onDelete?: (objectiveId: string) => void
+  onCreateNew?: () => void
 }
 
 const HEALTH_DOT: Record<string, string> = {
@@ -230,7 +231,7 @@ function StrategyRow({
   )
 }
 
-export function ObjectivesTreeView({ objectives, strategicObjectives = [], selectedId, onSelect, onEdit, onDelete }: ObjectivesTreeViewProps) {
+export function ObjectivesTreeView({ objectives, strategicObjectives = [], selectedId, onSelect, onEdit, onDelete, onCreateNew }: ObjectivesTreeViewProps) {
   const [collapsedStrategies, setCollapsedStrategies] = useState<Set<string>>(new Set())
 
   const toggleStrategy = (strategyId: string) => {
@@ -271,8 +272,20 @@ export function ObjectivesTreeView({ objectives, strategicObjectives = [], selec
 
   if (objectives.length === 0) {
     return (
-      <div className="text-center py-16">
-        <p className="text-sm text-muted-foreground">No objectives yet</p>
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+          <Target className="h-8 w-8 text-muted-foreground/40" />
+        </div>
+        <h3 className="text-base font-semibold text-foreground mb-1">No objectives yet</h3>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Create your first objective to visualize your strategy tree.
+        </p>
+        {onCreateNew && (
+          <Button onClick={onCreateNew} className="mt-4">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Objective
+          </Button>
+        )}
       </div>
     )
   }

@@ -308,7 +308,7 @@ export async function chargeRetainerPayment(
     // Create payment intent
     const { paymentIntent, error: paymentError } = await createPaymentIntent({
       amount: amountInSmallestUnit,
-      currency: timesheet.retainer.currency.toLowerCase(),
+      currency: (timesheet.retainer.currency || 'gbp').toLowerCase(),
       orderId: timesheetId,
       buyerId: timesheet.retainer.buyer_id,
       description: `Retainer payment for week of ${timesheet.week_start}`,

@@ -8,7 +8,7 @@ import { ViewToggle } from '@/components/ui/view-toggle'
 import { Button } from '@/components/ui/button'
 import {
   ChevronLeft, ChevronRight, CalendarDays, GanttChartSquare,
-  ChevronDown, ChevronRight as ChevronRightIcon,
+  ChevronDown, ChevronRight as ChevronRightIcon, Plus,
 } from 'lucide-react'
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns'
 import { Flag } from 'lucide-react'
@@ -289,9 +289,10 @@ interface ObjectivesGanttViewProps {
   selectedId: string | null
   onSelect: (id: string) => void
   onTaskSelect?: (taskId: string) => void
+  onCreateNew?: () => void
 }
 
-export function ObjectivesGanttView({ objectives, strategicObjectives = [], selectedId, onSelect, onTaskSelect }: ObjectivesGanttViewProps) {
+export function ObjectivesGanttView({ objectives, strategicObjectives = [], selectedId, onSelect, onTaskSelect, onCreateNew }: ObjectivesGanttViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week)
   const [dateOffset, setDateOffset] = useState<Date>(new Date())
   const [collapsedObjectives, setCollapsedObjectives] = useState<Set<string>>(new Set())
@@ -505,6 +506,12 @@ export function ObjectivesGanttView({ objectives, strategicObjectives = [], sele
         </div>
         <h3 className="text-base font-semibold text-foreground mb-1">No objectives to display</h3>
         <p className="text-sm text-muted-foreground">Create objectives with tasks to see the Gantt chart.</p>
+        {onCreateNew && (
+          <Button onClick={onCreateNew} className="mt-4">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Objective
+          </Button>
+        )}
       </div>
     )
   }

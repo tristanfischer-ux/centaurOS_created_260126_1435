@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import {
   LayoutGrid, GitBranch, GanttChartSquare, Search, Target, X, Loader2,
-  ChevronRight, ChevronDown, Flag, AlertTriangle,
+  ChevronRight, ChevronDown, Flag, AlertTriangle, Plus,
 } from 'lucide-react'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
@@ -108,6 +108,7 @@ export function ObjectivesBoard({
   const [deleteChildAction, setDeleteChildAction] = useState<'keep' | 'cascade'>('keep')
   const [objectiveToEdit, setObjectiveToEdit] = useState<ObjectiveWithTasks | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
   // Track window width for responsive layout
   useEffect(() => {
@@ -130,6 +131,11 @@ export function ObjectivesBoard({
         if (showSearch) setShowSearch(false)
         else if (selectedTaskId) setSelectedTaskId(null)
         else if (selectedId) setSelectedId(null)
+      }
+      // Cmd+N / Ctrl+N — open create objective dialog
+      if (e.key === 'n' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setCreateDialogOpen(true)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -339,7 +345,7 @@ export function ObjectivesBoard({
         </div>
         <div className="flex items-center gap-2">
           <WeeklyDigestPanel />
-          <CreateObjectiveDialog />
+          <CreateObjectiveDialog externalOpen={createDialogOpen} onExternalOpenChange={setCreateDialogOpen} />
         </div>
       </div>
 
@@ -440,6 +446,7 @@ export function ObjectivesBoard({
               onSelect={handleSelect}
               onEdit={setObjectiveToEdit}
               onDelete={setObjectiveToDelete}
+              onCreateNew={() => setCreateDialogOpen(true)}
             />
           )}
           {viewMode === 'tree' && (
@@ -450,6 +457,7 @@ export function ObjectivesBoard({
               onSelect={handleSelect}
               onEdit={setObjectiveToEdit}
               onDelete={setObjectiveToDelete}
+              onCreateNew={() => setCreateDialogOpen(true)}
             />
           )}
           {viewMode === 'timeline' && (
@@ -459,6 +467,7 @@ export function ObjectivesBoard({
               selectedId={selectedId}
               onSelect={handleSelect}
               onTaskSelect={handleTaskSelect}
+              onCreateNew={() => setCreateDialogOpen(true)}
             />
           )}
         </div>
@@ -475,6 +484,7 @@ export function ObjectivesBoard({
               <ObjectiveDetailPanel
                 objective={selectedObjective}
                 onClose={() => setSelectedId(null)}
+                onTaskSelect={handleTaskSelect}
               />
             ) : null}
           </div>
@@ -495,6 +505,7 @@ export function ObjectivesBoard({
           <ObjectiveDetailPanel
             objective={selectedObjective}
             onClose={() => setSelectedId(null)}
+            onTaskSelect={handleTaskSelect}
           />
         </div>
       )}
@@ -510,6 +521,7 @@ function BoardView({
   onSelect,
   onEdit,
   onDelete,
+  onCreateNew,
 }: {
   objectives: ObjectiveWithTasks[]
   strategicObjectives: StrategicObjective[]
@@ -517,6 +529,7 @@ function BoardView({
   onSelect: (id: string) => void
   onEdit?: (objective: ObjectiveWithTasks) => void
   onDelete?: (objectiveId: string) => void
+  onCreateNew?: () => void
 }) {
   const [collapsedStrategies, setCollapsedStrategies] = useState<Set<string>>(new Set())
 
@@ -566,6 +579,12 @@ function BoardView({
         <p className="text-sm text-muted-foreground max-w-sm">
           Create your first objective to start tracking progress.
         </p>
+        {onCreateNew && (
+          <Button onClick={onCreateNew} className="mt-4">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Objective
+          </Button>
+        )}
       </div>
     )
   }

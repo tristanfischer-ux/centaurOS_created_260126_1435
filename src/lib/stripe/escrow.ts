@@ -329,7 +329,7 @@ async function recordEscrowTransaction(params: {
         type: data.type as EscrowTransactionType,
         amount: data.amount,
         stripeTransferId: data.stripe_transfer_id || undefined,
-        createdAt: data.created_at,
+        createdAt: data.created_at || new Date().toISOString(),
       },
       error: null,
     }

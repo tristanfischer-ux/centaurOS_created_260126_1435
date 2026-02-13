@@ -56,6 +56,7 @@ export function TasksCommandCenter({
   const [groupBy, setGroupBy] = useState<GroupBy>('none')
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1400)
   const [editingTask, setEditingTask] = useState<TaskWithData | null>(null)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
   // Track window width
   useEffect(() => {
@@ -81,6 +82,11 @@ export function TasksCommandCenter({
       if (e.key === 'Escape') {
         if (showSearchRef.current) { setShowSearch(false); setSearchQuery('') }
         else if (selectedIdRef.current) setSelectedId(null)
+      }
+      // Cmd+N / Ctrl+N — open create task dialog
+      if (e.key === 'n' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setCreateDialogOpen(true)
       }
       // J/K navigation — uses ref to always have fresh filtered list
       if ((e.key === 'j' || e.key === 'k') && !e.metaKey && !e.ctrlKey) {
@@ -215,6 +221,8 @@ export function TasksCommandCenter({
             members={members.map(m => ({ ...m, role: m.role || 'Member' }))}
             teams={teams}
             currentUserId={currentUserId}
+            externalOpen={createDialogOpen}
+            onExternalOpenChange={setCreateDialogOpen}
           />
         </div>
       </div>
@@ -335,6 +343,7 @@ export function TasksCommandCenter({
               tasks={filteredTasks}
               selectedId={selectedId}
               onSelect={handleSelect}
+              onCreateNew={() => setCreateDialogOpen(true)}
             />
           )}
           {viewMode === 'board' && (
@@ -357,6 +366,7 @@ export function TasksCommandCenter({
               tasks={filteredTasks}
               selectedId={selectedId}
               onSelect={handleSelect}
+              onCreateNew={() => setCreateDialogOpen(true)}
             />
           )}
         </div>

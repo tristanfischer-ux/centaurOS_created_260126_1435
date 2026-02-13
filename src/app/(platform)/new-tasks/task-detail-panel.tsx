@@ -17,6 +17,7 @@ import {
 import { getStatusBadgeClass } from '@/lib/status-colors'
 import { acceptTask, completeTask } from '@/actions/tasks'
 import { toast } from 'sonner'
+import { useCelebration } from '@/hooks/useCelebration'
 import {
   X, Calendar, Clock, User, Target, FileText, AlertTriangle,
   MessageSquare, Paperclip, Shield, Eye, Pencil,
@@ -57,6 +58,7 @@ function DetailRow({ icon: Icon, label, children }: { icon: React.ComponentType<
 export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const { celebrateTaskComplete } = useCelebration()
   const isOverdue = task.end_date && task.status !== 'Completed' && task.status !== 'Rejected' && new Date(task.end_date) < new Date()
   const statusBadge = getStatusBadgeClass(task.status)
 
@@ -84,7 +86,11 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success(`Task moved to ${newStatus === 'Accepted' ? 'In Progress' : newStatus}`)
+        if (newStatus === 'Completed') {
+          celebrateTaskComplete(task.title)
+        } else {
+          toast.success(`Task moved to ${newStatus === 'Accepted' ? 'In Progress' : newStatus}`)
+        }
         router.refresh()
       }
     })

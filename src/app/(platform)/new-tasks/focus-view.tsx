@@ -2,7 +2,8 @@
 
 import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
-import { AlertTriangle, Calendar, Clock, Sunrise, CheckCircle2 } from 'lucide-react'
+import { AlertTriangle, Calendar, Clock, Sunrise, CheckCircle2, Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { TaskRow } from './task-row'
 import type { TaskWithData } from './types'
 
@@ -10,6 +11,7 @@ interface FocusViewProps {
   tasks: TaskWithData[]
   selectedId: string | null
   onSelect: (id: string) => void
+  onCreateNew?: () => void
 }
 
 interface TaskGroup {
@@ -21,7 +23,7 @@ interface TaskGroup {
   tasks: TaskWithData[]
 }
 
-export function FocusView({ tasks, selectedId, onSelect }: FocusViewProps) {
+export function FocusView({ tasks, selectedId, onSelect, onCreateNew }: FocusViewProps) {
   const groups = useMemo(() => {
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -148,6 +150,12 @@ export function FocusView({ tasks, selectedId, onSelect }: FocusViewProps) {
         <p className="text-sm text-muted-foreground max-w-sm">
           You have no active tasks. Create a new task or enjoy the calm.
         </p>
+        {onCreateNew && (
+          <Button onClick={onCreateNew} className="mt-4">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Task
+          </Button>
+        )}
       </div>
     )
   }

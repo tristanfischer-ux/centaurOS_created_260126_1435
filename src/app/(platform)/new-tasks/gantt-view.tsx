@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { ViewToggle } from '@/components/ui/view-toggle'
 import { Button } from '@/components/ui/button'
 import {
-  ChevronLeft, ChevronRight, CalendarDays, GanttChartSquare,
+  ChevronLeft, ChevronRight, CalendarDays, GanttChartSquare, Plus,
 } from 'lucide-react'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { getStatusHex } from '@/lib/status-colors'
@@ -166,9 +166,10 @@ interface TasksGanttViewProps {
   tasks: TaskWithData[]
   selectedId: string | null
   onSelect: (id: string) => void
+  onCreateNew?: () => void
 }
 
-export function TasksGanttView({ tasks, selectedId, onSelect }: TasksGanttViewProps) {
+export function TasksGanttView({ tasks, selectedId, onSelect, onCreateNew }: TasksGanttViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week)
   const [dateOffset, setDateOffset] = useState<Date>(new Date())
   const [localDateOverrides, setLocalDateOverrides] = useState<Record<string, { start: Date; end: Date }>>({})
@@ -294,6 +295,12 @@ export function TasksGanttView({ tasks, selectedId, onSelect }: TasksGanttViewPr
         </div>
         <h3 className="text-base font-semibold text-foreground mb-1">No tasks to display</h3>
         <p className="text-sm text-muted-foreground">Create tasks with dates to see the Gantt chart.</p>
+        {onCreateNew && (
+          <Button onClick={onCreateNew} className="mt-4">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Task
+          </Button>
+        )}
       </div>
     )
   }

@@ -4,8 +4,9 @@ import { useState, useMemo } from "react"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronRight, AlertCircle, Flag, Target } from "lucide-react"
+import { ChevronDown, ChevronRight, AlertCircle, Flag, Target, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { EmptyState } from "@/components/ui/empty-state"
 import { isPast, isThisWeek, addWeeks, isWithinInterval, startOfWeek, endOfWeek } from "date-fns"
 
 // ─── Types ───────────────────────────────────────
@@ -326,9 +327,11 @@ export function WorkloadBoard({ members, allTasks, onMemberClick, onTaskClick }:
 
     if (sortedMembers.length === 0) {
         return (
-            <div className="text-center py-12 text-muted-foreground">
-                <p className="text-sm">No team members to display.</p>
-            </div>
+            <EmptyState
+                icon={<Users className="h-8 w-8" />}
+                title="No team members to display"
+                description="Add team members to see their workload distribution."
+            />
         )
     }
 

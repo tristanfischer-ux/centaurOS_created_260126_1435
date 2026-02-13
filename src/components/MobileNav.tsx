@@ -35,6 +35,7 @@ import {
     BookOpen,
     ShoppingBag,
     Flame,
+    Boxes,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -74,6 +75,7 @@ const planMoreNavigation = [
 // "More" dropdown — Workshop section
 const workshopMoreNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame },
+    { name: "CAD Lab", href: "/the-forge/cad-lab", icon: Boxes },
     { name: "Team", href: "/team", icon: Users },
     { name: "Agents", href: "/agents", icon: Bot },
 ]

@@ -10,13 +10,11 @@
  * @security All actions require authentication and enforce foundry isolation
  */
 
-import OpenAI from 'openai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { withAuth } from '@/lib/server-action-utils'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'dummy-key-for-build',
-})
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -167,12 +165,16 @@ export async function generateWeeklyDigest(): Promise<{ data?: WeeklyDigest; err
     const concerns: string[] = []
 
     try {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You write concise weekly progress summaries for startup founders. Be direct, factual, and actionable. No fluff.
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        generationConfig: {
+          temperature: 0.5,
+          maxOutputTokens: 500,
+          responseMimeType: 'application/json',
+        },
+      })
+
+      const systemPrompt = `You write concise weekly progress summaries for startup founders. Be direct, factual, and actionable. No fluff.
 
 Given objective progress data, respond with ONLY valid JSON:
 {
@@ -180,24 +182,17 @@ Given objective progress data, respond with ONLY valid JSON:
   "highlights": ["2-3 positive developments"],
   "concerns": ["1-3 items needing attention, or empty array if none"]
 }`
-          },
-          {
-            role: 'user',
-            content: `Week: ${weekAgo.toLocaleDateString()} - ${today.toLocaleDateString()}
+
+      const userPrompt = `Week: ${weekAgo.toLocaleDateString()} - ${today.toLocaleDateString()}
 Tasks completed: ${tasksCompleted || 0}
 Tasks created: ${tasksCreated || 0}
 Health trend: ${overallHealthTrend}
 
 Objectives:
 ${progressSummary || 'No active objectives'}`
-          },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.5,
-        max_tokens: 500,
-      })
 
-      const content = response.choices[0]?.message?.content
+      const result = await model.generateContent(`${systemPrompt}\n\n${userPrompt}`)
+      const content = result.response.text()
       if (content) {
         const parsed = JSON.parse(content)
         summary = parsed.summary || ''

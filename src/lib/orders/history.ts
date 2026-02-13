@@ -177,13 +177,13 @@ export async function buildOrderTimeline(
         order_type: order.order_type,
       },
       actor_id: order.buyer_id || '',
-      created_at: order.created_at,
+      created_at: order.created_at || new Date().toISOString(),
     })
 
     // Add status-based events based on current status
     if (order.status !== 'pending') {
       // We can infer some events from the current status
-      if (['accepted', 'in_progress', 'completed', 'disputed', 'cancelled'].includes(order.status)) {
+      if (['accepted', 'in_progress', 'completed', 'disputed', 'cancelled'].includes(order.status || '')) {
         // We don't have exact timestamps for status changes without events table
         // but we can show current status
       }
@@ -231,7 +231,7 @@ export async function buildOrderTimeline(
           dispute_id: dispute.id,
         },
         actor_id: '', // Unknown without events table
-        created_at: dispute.created_at,
+        created_at: dispute.created_at || new Date().toISOString(),
       })
 
       if (dispute.resolved_at) {

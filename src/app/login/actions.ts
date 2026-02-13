@@ -106,12 +106,12 @@ export async function login(formData: FormData) {
             redirect('/workspace-picker')
         }
 
-        // Single foundry or active foundry set - go to updates
+        // Single foundry or active foundry set - go to personal dashboard
         if (foundryCount >= 1) {
-            redirect('/updates')
+            redirect('/me')
         }
     }
     
     // Default: users without foundry memberships
-    redirect('/updates')
+    redirect('/me')
 }

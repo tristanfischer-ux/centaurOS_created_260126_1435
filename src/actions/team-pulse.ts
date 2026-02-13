@@ -10,13 +10,11 @@
  * @security All actions require authentication and enforce foundry isolation
  */
 
-import OpenAI from 'openai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { withAuth } from '@/lib/server-action-utils'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'dummy-key-for-build',
-})
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -245,20 +243,19 @@ export async function generateDailyStandup(): Promise<{ data?: DailyStandup; err
   Blockers: ${e.blockers.length > 0 ? e.blockers.join(', ') : 'None'}`
       ).join('\n\n')
 
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'Write a 2-3 sentence standup summary highlighting key focus areas and any blockers. Be concise and direct. No markdown, just plain text.',
-          },
-          { role: 'user', content: standupText },
-        ],
-        temperature: 0.5,
-        max_tokens: 200,
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        generationConfig: {
+          temperature: 0.5,
+          maxOutputTokens: 200,
+        },
       })
 
-      summary = response.choices[0]?.message?.content || ''
+      const result = await model.generateContent(
+        `Write a 2-3 sentence standup summary highlighting key focus areas and any blockers. Be concise and direct. No markdown, just plain text.\n\n${standupText}`
+      )
+
+      summary = result.response.text() || ''
     } catch {
       summary = `Team standup for ${todayStr}: ${entries.length} team members, ${entries.reduce((s, e) => s + e.today.length, 0)} active tasks today.`
     }

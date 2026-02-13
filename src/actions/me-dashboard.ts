@@ -61,6 +61,16 @@ export interface MeDashboardData {
   activityHeatmap: Array<{ date: string; count: number }>
   /** Consecutive days with activity (going backwards from today) */
   currentStreak: number
+  /** Active tasks assigned to user for Priority Queue (up to 30) */
+  priorityTasks: Array<{
+    id: string
+    title: string
+    status: string
+    end_date: string | null
+    task_number: number | null
+  }>
+  /** Authenticated user ID */
+  userId: string
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -144,6 +154,7 @@ export async function getMyDashboardData(): Promise<MeDashboardData | null> {
     tasksForObjectivesResult,
     activityResult,
     unreadResult,
+    priorityTasksResult,
   ] = await Promise.all([
     // 1. Profile for greeting
     supabase
@@ -233,6 +244,18 @@ export async function getMyDashboardData(): Promise<MeDashboardData | null> {
 
     // 9. Unread updates count
     getActivityUnreadCount(),
+
+    // 10. Active tasks assigned to user for Priority Queue
+    supabase
+      .from('tasks')
+      .select('id, title, status, end_date, task_number')
+      .eq('foundry_id', foundryId)
+      .eq('assignee_id', user.id)
+      .eq('is_ghost', false)
+      .is('deleted_at', null)
+      .neq('status', 'Completed')
+      .order('end_date', { ascending: true, nullsFirst: false })
+      .limit(30),
   ])
 
   const profile = profileResult.data
@@ -327,6 +350,15 @@ export async function getMyDashboardData(): Promise<MeDashboardData | null> {
     }
   }
 
+  // ── Build priority tasks ───────────────────────────────────────────────
+  const priorityTasks = (priorityTasksResult.data ?? []).map((t) => ({
+    id: t.id,
+    title: t.title || 'Untitled task',
+    status: t.status || 'Pending',
+    end_date: t.end_date,
+    task_number: t.task_number ?? null,
+  }))
+
   return {
     greeting,
     focus,
@@ -334,5 +366,7 @@ export async function getMyDashboardData(): Promise<MeDashboardData | null> {
     topObjectives,
     activityHeatmap,
     currentStreak,
+    priorityTasks,
+    userId: user.id,
   }
 }

@@ -16,14 +16,25 @@ import type { ObjectiveWithTasks, ObjectiveTask } from './types'
 interface ObjectiveDetailPanelProps {
   objective: ObjectiveWithTasks
   onClose: () => void
+  /** Called when a task row is clicked. Navigates to task detail. */
+  onTaskSelect?: (taskId: string) => void
 }
 
-function TaskRow({ task }: { task: ObjectiveTask }) {
+function TaskRow({ task, onClick }: { task: ObjectiveTask; onClick?: () => void }) {
   const isOverdue = task.end_date && task.status !== 'Completed' && new Date(task.end_date) < new Date()
   const statusBadge = getStatusBadgeClass(task.status)
 
   return (
-    <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors group overflow-hidden">
+    <div
+      className={cn(
+        "flex items-center gap-2 py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors group overflow-hidden",
+        onClick && "cursor-pointer"
+      )}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } : undefined}
+    >
       {/* Status indicator */}
       {task.status === 'Completed' ? (
         <CheckCircle2 className="h-4 w-4 text-status-success flex-shrink-0" />
@@ -59,7 +70,7 @@ function TaskRow({ task }: { task: ObjectiveTask }) {
   )
 }
 
-export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPanelProps) {
+export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect }: ObjectiveDetailPanelProps) {
   const variant = getHealthVariant(objective.progress)
 
   // Group tasks by status
@@ -149,7 +160,7 @@ export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPane
                   Active ({activeTasks.length})
                 </div>
                 {activeTasks.map(task => (
-                  <TaskRow key={task.id} task={task} />
+                  <TaskRow key={task.id} task={task} onClick={onTaskSelect ? () => onTaskSelect(task.id) : undefined} />
                 ))}
               </div>
             )}
@@ -161,7 +172,7 @@ export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPane
                   Completed ({completedTasks.length})
                 </div>
                 {completedTasks.map(task => (
-                  <TaskRow key={task.id} task={task} />
+                  <TaskRow key={task.id} task={task} onClick={onTaskSelect ? () => onTaskSelect(task.id) : undefined} />
                 ))}
               </div>
             )}
