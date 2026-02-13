@@ -255,6 +255,12 @@ export interface PromptNodeData {
     imageUrl?: string     // for image outputs
     audioUrl?: string     // for audio outputs
     videoUrl?: string     // for video outputs
+    // Video generation configuration (only used when outputModality is "video")
+    videoConfig?: {
+        duration?: number       // 5 or 6 seconds
+        resolution?: string     // "720P" or "1080P"
+        promptOptimizer?: boolean
+    }
     // Human-task specific fields (only used when node type is "human-task")
     isHumanTask?: boolean
     guidance?: string            // Detailed guidance for the person completing this step

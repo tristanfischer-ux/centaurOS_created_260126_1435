@@ -23,6 +23,51 @@ interface DomainRule {
 
 const DOMAIN_RULES: DomainRule[] = [
   {
+    specialistId: 'cto',
+    specialistName: 'Zara',
+    keywords: [
+      'technology', 'tech stack', 'architecture', 'infrastructure', 'software',
+      'first principles', 'delete', 'optimize', 'scalability', 'platform',
+      'microservices', 'cloud', 'aws', 'azure', 'gcp', 'devops', 'ci cd',
+      'make vs buy', 'buy vs build', 'technical debt', 'refactor', 'system design',
+      'database', 'api', 'backend', 'frontend', 'full stack', 'programming',
+      'code', 'engineering decisions', 'tech strategy', 'digital transformation',
+    ],
+  },
+  {
+    specialistId: 'vp-engineering',
+    specialistName: 'Dev',
+    keywords: [
+      'engineering', 'developer', 'team', 'velocity', 'sprint', 'scrum',
+      'agile', 'deployment', 'deploy', 'ci cd', 'code review', 'quality',
+      'testing', 'unit test', 'integration test', 'technical hiring',
+      'engineering manager', 'tech lead', 'architecture', 'system design',
+      'build', 'ship', 'lead time', 'mttf', 'mttr', 'incident', 'on call',
+    ],
+  },
+  {
+    specialistId: 'vp-manufacturing',
+    specialistName: 'Kai',
+    keywords: [
+      'manufacturing', 'production', 'factory', 'dfm', 'design for manufacturing',
+      'first article', 'pilot', 'scale up', 'yield', 'quality', 'qc', 'qa',
+      'tolerance', 'tooling', 'mold', 'injection', 'casting', 'cnc',
+      'assembly', 'bill of materials', 'bom', 'supplier', 'vendor', 'oem',
+      'contract manufacturer', 'cm', 'production planning', 'capacity',
+    ],
+  },
+  {
+    specialistId: 'vp-supply-chain',
+    specialistName: 'Suki',
+    keywords: [
+      'supply chain', 'procurement', 'sourcing', 'vendor', 'supplier',
+      'logistics', 'lead time', 'inventory', 'stock', 'procure', 'purchase',
+      'negotiate', 'cost', 'pricing', 'dual source', 'backup', 'contingency',
+      'materials', 'raw material', 'component', 'parts', 'fulfillment',
+      'shipping', 'freight', 'import', 'export', 'tariff', 'duty',
+    ],
+  },
+  {
     specialistId: 'product-lead',
     specialistName: 'Priya',
     keywords: [

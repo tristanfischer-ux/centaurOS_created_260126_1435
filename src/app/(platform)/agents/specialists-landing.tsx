@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from "react"
 import { motion } from "framer-motion"
-import { ArrowRight, Layers, Users, MessageSquare } from "lucide-react"
+import { ArrowRight, Layers, Users, MessageSquare, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
 // Design system imported only when needed for inline usage
 import { SPECIALISTS } from "./specialists-data"
 import { SpecialistCard } from "./specialist-card"
@@ -12,6 +13,33 @@ import { getPromptsByCategory } from "./lib/prompt-library"
 import { BriefSpecialistDialog } from "./brief-specialist-dialog"
 import { TeamMeetingDialog } from "./team-meeting-dialog"
 import { MeetingHistory } from "./meeting-history"
+
+/**
+ * Organises specialists into a hierarchical org chart structure.
+ */
+function getOrgChartHierarchy() {
+    const departments = [
+        { id: 'strategy', name: 'Strategy', color: 'bg-violet-500' },
+        { id: 'technology', name: 'Technology', color: 'bg-cyan-500' },
+        { id: 'product', name: 'Product', color: 'bg-pink-500' },
+        { id: 'growth', name: 'Growth', color: 'bg-emerald-500' },
+        { id: 'operations', name: 'Operations', color: 'bg-amber-500' },
+        { id: 'finance', name: 'Finance', color: 'bg-orange-500' },
+        { id: 'people', name: 'People', color: 'bg-teal-500' },
+        { id: 'legal', name: 'Legal', color: 'bg-slate-500' },
+    ]
+
+    // Build hierarchy: direct reports first, then by department
+    const directReports = SPECIALISTS.filter(s => s.reportsTo === null)
+    const byDepartment = SPECIALISTS.filter(s => s.reportsTo !== null).reduce((acc, specialist) => {
+        const dept = departments.find(d => d.id === specialist.department.toLowerCase())?.id || 'other'
+        if (!acc[dept]) acc[dept] = []
+        acc[dept].push(specialist)
+        return acc
+    }, {} as Record<string, typeof SPECIALISTS>)
+
+    return { departments, directReports, byDepartment }
+}
 
 interface SpecialistsLandingProps {
     /** Callback to switch to the workflow builder ("Team Project" mode) */
@@ -32,6 +60,10 @@ export function SpecialistsLanding({
     const [isMeetingOpen, setIsMeetingOpen] = useState(false)
     const [handoffContext, setHandoffContext] = useState<string | null>(null)
     const [referredByName, setReferredByName] = useState<string | null>(null)
+    const [showOrgChart, setShowOrgChart] = useState(false)
+
+    // Pre-compute hierarchy
+    const orgHierarchy = useMemo(() => getOrgChartHierarchy(), [])
 
     // Pre-compute capability counts for each specialist
     const capabilityCounts = useMemo(() => {
@@ -73,13 +105,13 @@ export function SpecialistsLanding({
                         Your team is bigger than you think.
                     </h2>
                     <p className="text-lg text-muted-foreground leading-relaxed">
-                        Nine specialists, ready right now. Brief them on anything &mdash; strategy, sales,
-                        fundraising, legal, hiring, product, and more. No recruiting. No waiting. No payroll.
+                        Thirteen specialists, ready right now. Brief them on anything &mdash; strategy,
+                        technology, product, manufacturing, sales, fundraising, legal, hiring, and more. No recruiting. No waiting. No payroll.
                     </p>
                     <div className="flex flex-wrap items-center gap-3 pt-1">
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-sm text-foreground font-medium">
                             <Users className="h-4 w-4 text-muted-foreground" />
-                            <span>9 specialists</span>
+                            <span>13 specialists</span>
                             <span className="text-muted-foreground">&middot;</span>
                             <span>{totalBriefs} briefs ready</span>
                         </div>
@@ -94,6 +126,93 @@ export function SpecialistsLanding({
                     </div>
                 </div>
             </motion.div>
+
+            {/* ── Org Chart Toggle ──────────────────────────────────────── */}
+            <div className="flex items-center justify-between">
+                <Button
+                    variant="ghost"
+                    onClick={() => setShowOrgChart(!showOrgChart)}
+                    className="text-muted-foreground hover:text-foreground gap-2"
+                >
+                    {showOrgChart ? (
+                        <ChevronDown className="h-4 w-4" />
+                    ) : (
+                        <ChevronRight className="h-4 w-4" />
+                    )}
+                    {showOrgChart ? 'Hide' : 'View'} Org Chart
+                </Button>
+            </div>
+
+            {/* ── Org Chart ─────────────────────────────────────────────── */}
+            {showOrgChart && (
+                <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-4"
+                >
+                    <div className="flex flex-col gap-4">
+                        {/* CEO Row */}
+                        <div className="flex justify-center">
+                            <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-international-orange flex items-center justify-center text-white text-sm font-bold">
+                                    CEO
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Direct Reports Row */}
+                        <div className="flex flex-wrap justify-center gap-3">
+                            {orgHierarchy.directReports.map((specialist) => (
+                                <button
+                                    key={specialist.id}
+                                    onClick={() => handleBrief(specialist.id)}
+                                    className="flex flex-col items-center gap-1 p-3 rounded-lg border bg-card hover:bg-muted hover:shadow-md transition-all min-w-[100px]"
+                                >
+                                    <span className="text-sm font-semibold text-foreground">{specialist.name}</span>
+                                    <span className="text-xs text-muted-foreground">{specialist.title}</span>
+                                    <span className="text-[10px] text-muted-foreground/70">via {specialist.inspiredBy.split(',')[0]}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Department Groups */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                            {orgHierarchy.departments.filter(dept => 
+                                SPECIALISTS.some(s => s.department.toLowerCase() === dept.id)
+                            ).map((dept) => {
+                                const deptSpecialists = SPECIALISTS.filter(s => 
+                                    s.department.toLowerCase() === dept.id && s.reportsTo !== null
+                                )
+                                if (deptSpecialists.length === 0) return null
+                                
+                                return (
+                                    <div key={dept.id} className="p-3 rounded-lg border bg-card">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className={cn("h-2 w-2 rounded-full", dept.color)} />
+                                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                                {dept.name}
+                                            </span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {deptSpecialists.map((specialist) => (
+                                                <button
+                                                    key={specialist.id}
+                                                    onClick={() => handleBrief(specialist.id)}
+                                                    className="w-full text-left p-2 rounded hover:bg-muted transition-colors"
+                                                >
+                                                    <div className="text-sm font-medium text-foreground">{specialist.name}</div>
+                                                    <div className="text-xs text-muted-foreground">{specialist.title}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                </motion.div>
+            )}
 
             {/* ── Specialist Grid ──────────────────────────────────────── */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

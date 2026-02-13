@@ -231,7 +231,16 @@ export default function MarketingPage() {
       <main id="main-content">
         <HeroSection />
         <ProblemSection />
-        <Suspense fallback={null}>
+        <Suspense fallback={
+          <div className="py-16 px-4">
+            <div className="max-w-4xl mx-auto">
+              <div className="animate-pulse space-y-4">
+                <div className="h-8 bg-muted rounded w-1/3 mx-auto"></div>
+                <div className="h-64 bg-muted rounded-xl"></div>
+              </div>
+            </div>
+          </div>
+        }>
           <SavingsCalculatorSection />
         </Suspense>
         <SolutionSection />
@@ -342,13 +351,24 @@ function HeroSection() {
   useEffect(() => {
     async function fetchStats(): Promise<void> {
       try {
-        const res = await fetch("/api/marketing/stats");
+        // Add timeout to prevent hanging on slow/cold API
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5s timeout
+
+        const res = await fetch("/api/marketing/stats", {
+          signal: controller.signal
+        })
+        clearTimeout(timeoutId)
+
         if (res.ok) {
           const data = await res.json();
+          // Show counter for any count (including 0) to create urgency
+          // If API fails/times out, memberCount stays null and we show "Be the first"
           setMemberCount(data.foundingMembers ?? null);
         }
       } catch {
         // Graceful fallback — hide counter if fetch fails
+        // Counter will show "Be the first to join" when memberCount is null
       }
     }
     fetchStats();
@@ -427,7 +447,43 @@ function HeroSection() {
         </motion.div>
 
         {/* Live founding member counter */}
-        {memberCount !== null && memberCount > 0 && (
+        {memberCount !== null ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="mb-6 md:mb-8"
+          >
+            <div className="inline-flex flex-col items-center gap-2">
+              {memberCount > 0 ? (
+                <>
+                  <p className="text-sm text-muted-foreground font-mono">
+                    <span className="text-2xl font-black text-international-orange">
+                      {memberCount}
+                    </span>{" "}
+                    of 100 founding spots claimed
+                  </p>
+                  <div className="w-48 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min((memberCount / 100) * 100, 100)}%` }}
+                      transition={{ delay: 0.6, duration: 1.2, ease: "easeOut" }}
+                      className="h-full bg-international-orange rounded-full"
+                    />
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground font-mono">
+                  <span className="text-2xl font-black text-international-orange">
+                    Be the first
+                  </span>{" "}
+                  founding member
+                </p>
+              )}
+            </div>
+          </motion.div>
+        ) : (
+          // API failed or still loading - show placeholder to create urgency
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -437,18 +493,10 @@ function HeroSection() {
             <div className="inline-flex flex-col items-center gap-2">
               <p className="text-sm text-muted-foreground font-mono">
                 <span className="text-2xl font-black text-international-orange">
-                  {memberCount}
+                  Be the first
                 </span>{" "}
-                of 100 founding spots claimed
+                to join
               </p>
-              <div className="w-48 h-1.5 bg-muted rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.min((memberCount / 100) * 100, 100)}%` }}
-                  transition={{ delay: 0.6, duration: 1.2, ease: "easeOut" }}
-                  className="h-full bg-international-orange rounded-full"
-                />
-              </div>
             </div>
           </motion.div>
         )}

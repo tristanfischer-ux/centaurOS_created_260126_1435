@@ -34,7 +34,7 @@ import type { Specialist } from "./specialists-data"
 // endpoints are deployed, only "text" mode is functional.
 //
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _ENABLE_ADVANCED_MODES = typeof window !== "undefined"
+const ENABLE_ADVANCED_MODES = typeof window !== "undefined"
     && process.env.NEXT_PUBLIC_ENABLE_VOICE_AVATAR === "true"
 
 // ─── Specialist Model Configuration ───────────────────────────────────────────
@@ -49,6 +49,28 @@ const SPECIALIST_MODELS = {
 } as const
 
 const DEEP_THINK_STORAGE_KEY = "forgeOS-specialist-deep-think"
+
+// ─── Video Intro Configuration ────────────────────────────────────────────
+
+/**
+ * Feature flag for specialist video intros.
+ * When enabled, plays a pre-rendered video greeting when the dialog opens.
+ * Videos are generated via MiniMax I2V and stored in /videos/specialists/
+ */
+const ENABLE_VIDEO_INTROS = process.env.NEXT_PUBLIC_ENABLE_VIDEO_INTROS === "true"
+
+/**
+ * Get the video intro URL for a specialist.
+ * Videos are stored at /videos/specialists/{specialist-id}.mp4
+ * Returns undefined if the video doesn't exist or feature is disabled.
+ */
+function getSpecialistIntroVideoUrl(specialistId: string): string | undefined {
+    if (!ENABLE_VIDEO_INTROS) return undefined
+    // In production, these would be real video files
+    // For now, return undefined to disable until videos are generated
+    return undefined
+    // return `/videos/specialists/${specialistId}.mp4`
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -118,6 +140,8 @@ export function BriefSpecialistDialog({
     } | null>(null)
 
     const [isGeneratingGreeting, setIsGeneratingGreeting] = useState(false)
+    const [isPlayingIntroVideo, setIsPlayingIntroVideo] = useState(false)
+    const [introVideoUrl, setIntroVideoUrl] = useState<string | null>(null)
     const [deepThinkEnabled, setDeepThinkEnabled] = useState(() => {
         if (typeof window === "undefined") return false
         try {
@@ -129,8 +153,11 @@ export function BriefSpecialistDialog({
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
+    const videoIntroRef = useRef<HTMLVideoElement>(null)
     /** Tracks whether we've already generated a proactive greeting for this specialist session */
     const greetingGeneratedRef = useRef(false)
+    /** Tracks whether we've already played the intro video for this specialist session */
+    const introVideoPlayedRef = useRef(false)
 
     // ─── Screen Awareness ─────────────────────────────────────────────────
     const { serializeScreenContext, screenContext } = useScreenContext()
@@ -235,12 +262,44 @@ export function BriefSpecialistDialog({
         return () => { cancelled = true }
     }, [open, specialist.id])
 
+    // ─── Video Intro ─────────────────────────────────────────────────────────
+    // Play a pre-rendered video greeting when the dialog opens (if available)
+    // We check historical messages state at initialization time
+    const hasHistoricalMessagesRef = useRef(false)
+    useEffect(() => {
+        hasHistoricalMessagesRef.current = messages.some((m) => m.historical)
+    }, [messages])
+
+    useEffect(() => {
+        // Only play if dialog is open, thread is loaded, and video is available
+        if (!open || isLoadingThread) return
+        if (introVideoPlayedRef.current) return
+
+        const videoUrl = getSpecialistIntroVideoUrl(specialist.id)
+        if (!videoUrl) return
+
+        // Skip if there are historical messages (returning user, not first time)
+        if (hasHistoricalMessagesRef.current) return
+
+        introVideoPlayedRef.current = true
+        setIntroVideoUrl(videoUrl)
+        setIsPlayingIntroVideo(true)
+    }, [open, isLoadingThread, specialist.id])
+
+    // Handle video end
+    const handleIntroVideoEnded = useCallback(() => {
+        setIsPlayingIntroVideo(false)
+    }, [])
+
     // Reset messages and greeting flag when specialist changes
     useEffect(() => {
         setMessages([])
         setHistoryMessages([])
         setShowHistory(false)
         greetingGeneratedRef.current = false
+        introVideoPlayedRef.current = false
+        setIsPlayingIntroVideo(false)
+        setIntroVideoUrl(null)
     }, [specialist.id])
 
     // Focus textarea when ready
@@ -806,6 +865,40 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 {/* Content */}
                 {!isLoadingThread && (
                     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                        {/* Video Intro */}
+                        {introVideoUrl && (
+                            <div className="flex-shrink-0 mb-4">
+                                <div className="relative rounded-lg overflow-hidden border bg-black aspect-video max-h-[200px]">
+                                    <video
+                                        ref={videoIntroRef}
+                                        src={introVideoUrl}
+                                        autoPlay
+                                        muted
+                                        playsInline
+                                        onEnded={handleIntroVideoEnded}
+                                        className="w-full h-full object-contain"
+                                    />
+                                    {isPlayingIntroVideo && (
+                                        <div className="absolute bottom-2 right-2">
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setIsPlayingIntroVideo(false)
+                                                    if (videoIntroRef.current) {
+                                                        videoIntroRef.current.pause()
+                                                    }
+                                                }}
+                                                className="h-7 text-xs bg-black/50 text-white hover:bg-black/70 border-0"
+                                            >
+                                                Skip
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Chat Messages Area */}
                         {(hasConversation || hasHistoricalMessages) && (
                             <div

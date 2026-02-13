@@ -94,6 +94,8 @@ export async function POST(request: Request) {
     let customSystemPromptSuffix: string | undefined
     let specialistId: string | undefined
     let enableThinking: boolean
+    let videoConfig: { duration?: number; resolution?: string; promptOptimizer?: boolean } | undefined
+    let firstFrameImage: string | undefined
 
     try {
         const body = await request.json()
@@ -106,6 +108,8 @@ export async function POST(request: Request) {
         customSystemPromptSuffix = typeof body.customSystemPromptSuffix === "string" ? body.customSystemPromptSuffix : undefined
         specialistId = typeof body.specialistId === "string" ? body.specialistId : undefined
         enableThinking = body.enableThinking === true
+        videoConfig = body.videoConfig ?? undefined
+        firstFrameImage = typeof body.firstFrameImage === "string" ? body.firstFrameImage : undefined
 
         if (!prompt || typeof prompt !== "string") {
             return NextResponse.json({ error: "prompt is required" }, { status: 400 })
@@ -140,6 +144,7 @@ export async function POST(request: Request) {
         stability: process.env.STABILITY_API_KEY ?? "",
         elevenlabs: process.env.ELEVENLABS_API_KEY ?? "",
         replicate: process.env.REPLICATE_API_TOKEN ?? "",
+        minimax: process.env.MINIMAX_API_KEY ?? "",
     }
     apiKey = envMap[providerId] || null
 
@@ -306,7 +311,7 @@ export async function POST(request: Request) {
             return result
         }
         if (modality === "video") {
-            const result = await handleVideoGeneration(apiKey, providerId, modelId, finalPrompt)
+            const result = await handleVideoGeneration(apiKey, providerId, modelId, finalPrompt, videoConfig, firstFrameImage)
             logUsageAfterCompletion(0).catch(() => {})
             return result
         }
@@ -445,11 +450,19 @@ async function handleAudioGeneration(
 
 // ─── Video Generation Handler ────────────────────────────────────────
 
+/**
+ * Handles video generation with optional configuration and first-frame image.
+ *
+ * @param videoConfig - Optional duration, resolution, and prompt optimizer settings
+ * @param firstFrameImage - Optional image URL for Image-to-Video mode (I2V)
+ */
 async function handleVideoGeneration(
     apiKey: string,
     providerId: AIProviderId,
     modelId: string,
-    finalPrompt: string
+    finalPrompt: string,
+    videoConfig?: { duration?: number; resolution?: string; promptOptimizer?: boolean },
+    firstFrameImage?: string,
 ): Promise<Response> {
     const genFn = getVideoProvider(providerId)
     if (!genFn) {
@@ -459,7 +472,15 @@ async function handleVideoGeneration(
         )
     }
 
-    const result = await genFn({ apiKey, modelId, prompt: finalPrompt })
+    const result = await genFn({
+        apiKey,
+        modelId,
+        prompt: finalPrompt,
+        duration: videoConfig?.duration,
+        resolution: videoConfig?.resolution,
+        promptOptimizer: videoConfig?.promptOptimizer,
+        firstFrameImage,
+    })
     return NextResponse.json({ modality: "video", videoUrl: result.videoUrl })
 }
 

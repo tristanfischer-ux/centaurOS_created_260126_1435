@@ -18,6 +18,10 @@ import {
     Scale,
     Sparkles,
     ArrowRight,
+    Cpu,
+    Code2,
+    Factory,
+    Route,
 } from "lucide-react"
 import type { Specialist } from "./specialists-data"
 
@@ -36,6 +40,10 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
     UserPlus,
     Users: UserPlus,
     Scale,
+    Cpu,
+    Code2,
+    Factory,
+    Route,
 }
 
 /**
