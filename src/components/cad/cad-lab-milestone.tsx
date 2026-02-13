@@ -111,7 +111,7 @@ export function CadLabMilestone({ milestone, onDismiss, subject = "" }: CadLabMi
         "animate-in fade-in slide-in-from-top-2 duration-500"
       )}
     >
-      <div className="flex items-start gap-3 w-full">
+      <div className="flex items-start gap-3 w-full col-span-full">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-success/10 flex-shrink-0">
           <Icon className="h-4 w-4 text-status-success" />
         </div>
