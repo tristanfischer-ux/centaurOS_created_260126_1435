@@ -330,7 +330,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setActiveModuleId(null)
   }, [modules, editableReport, modelId, activeProjectId])
 
-  // ── Batch generate all modules ──
+  // ── Batch generate all modules (parallel with concurrency limit) ──
   const handleGenerateAllModules = useCallback(async () => {
     if (modules.length === 0 || isBatchRunning) return
     setIsBatchRunning(true)
@@ -343,74 +343,111 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
     setBatchProgress({ ...progress })
 
+    // Shared mutable module array — each worker updates its own module by id
     let currentModules = [...modules]
+    const CONCURRENCY = 2
 
-    for (const mod of currentModules) {
-      if (mod.status === "generated") continue
+    /**
+     * Generates a single module through its full pipeline (interface + CAD).
+     * Updates shared state and progress as it completes each step.
+     */
+    const generateOneModule = async (mod: CadLabModule): Promise<void> => {
+      let localMod = { ...mod }
 
-      // Interface step
-      if (mod.status === "pending") {
+      // Interface step (if needed)
+      if (localMod.status === "pending") {
         progress[mod.id] = "interface"
         setBatchProgress({ ...progress })
         addProgressLine(`${mod.name}: generating interface definition...`)
 
-        const moduleResearchText = mod.moduleResearch ||
-          `Module: ${mod.name}\nPurpose: ${mod.purpose}\nKey Parts: ${mod.keyParts.join(", ")}\nDescription: ${mod.description}\n\nFrom parent research:\n${editableReport}`
+        const moduleResearchText = localMod.moduleResearch ||
+          `Module: ${localMod.name}\nPurpose: ${localMod.purpose}\nKey Parts: ${localMod.keyParts.join(", ")}\nDescription: ${localMod.description}\n\nFrom parent research:\n${editableReport}`
 
         try {
-          const res = await generateCadLabInterface(`${mod.name} — ${mod.purpose}`, moduleResearchText, modelId)
+          const res = await generateCadLabInterface(`${localMod.name} — ${localMod.purpose}`, moduleResearchText, modelId)
           if (res.success) {
-            currentModules = currentModules.map((m) =>
-              m.id === mod.id ? { ...m, interfaceDefinition: res.interfaceDefinition, status: "interface_ready" as const } : m,
-            )
-            setModules(currentModules)
+            localMod = { ...localMod, interfaceDefinition: res.interfaceDefinition, status: "interface_ready" as const }
+            currentModules = currentModules.map((m) => m.id === mod.id ? localMod : m)
+            setModules([...currentModules])
           } else {
             progress[mod.id] = "error"
             setBatchProgress({ ...progress })
-            continue
+            return
           }
         } catch {
           progress[mod.id] = "error"
           setBatchProgress({ ...progress })
-          continue
+          return
         }
       }
 
       // CAD generation step
-      const updatedMod = currentModules.find((m) => m.id === mod.id)!
       progress[mod.id] = "generating"
       setBatchProgress({ ...progress })
-      addProgressLine(`${updatedMod.name}: generating parametric CAD...`)
+      addProgressLine(`${localMod.name}: generating parametric CAD...`)
 
-      const moduleResearchText = updatedMod.moduleResearch ||
-        `Module: ${updatedMod.name}\nPurpose: ${updatedMod.purpose}\nKey Parts: ${updatedMod.keyParts.join(", ")}\nDescription: ${updatedMod.description}\n\nFrom parent research:\n${editableReport}`
+      const moduleResearchText = localMod.moduleResearch ||
+        `Module: ${localMod.name}\nPurpose: ${localMod.purpose}\nKey Parts: ${localMod.keyParts.join(", ")}\nDescription: ${localMod.description}\n\nFrom parent research:\n${editableReport}`
 
       try {
-        const res = await generateCadLabModel(`${updatedMod.name} — ${updatedMod.purpose}`, moduleResearchText, updatedMod.interfaceDefinition || "", modelId)
+        const res = await generateCadLabModel(`${localMod.name} — ${localMod.purpose}`, moduleResearchText, localMod.interfaceDefinition || "", modelId)
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { stlData, stepData, ...resultWithoutBinary } = res
-        currentModules = currentModules.map((m) =>
-          m.id === mod.id ? { ...m, result: resultWithoutBinary, code: res.code, status: "generated" as const } : m,
-        )
-        setModules(currentModules)
+        localMod = { ...localMod, result: resultWithoutBinary, code: res.code, status: "generated" as const }
+        currentModules = currentModules.map((m) => m.id === mod.id ? localMod : m)
+        setModules([...currentModules])
         progress[mod.id] = "done"
         setBatchProgress({ ...progress })
-        addProgressLine(`${updatedMod.name}: complete — ${res.bbox ? `${res.bbox.xLen}×${res.bbox.yLen}×${res.bbox.zLen}mm` : "done"}`)
+        addProgressLine(`${localMod.name}: complete — ${res.bbox ? `${res.bbox.xLen}×${res.bbox.yLen}×${res.bbox.zLen}mm` : "done"}`)
       } catch {
         progress[mod.id] = "error"
         setBatchProgress({ ...progress })
-        addProgressLine(`${updatedMod.name}: generation failed`)
+        addProgressLine(`${localMod.name}: generation failed`)
+        return
+      }
+
+      // Incremental save — persist after each module so progress survives page navigation
+      if (activeProjectId) {
+        await saveCadLabModules(activeProjectId, currentModules)
+        setLastSaved(new Date().toISOString())
       }
     }
 
-    // Save all after batch
-    if (activeProjectId) {
-      await saveCadLabModules(activeProjectId, currentModules)
-      setLastSaved(new Date().toISOString())
+    // Run modules through a concurrency-limited pool (semaphore pattern)
+    const pending = modules.filter((m) => m.status !== "generated")
+
+    let activeCount = 0
+    let resolveSlot: (() => void) | null = null
+
+    const waitForSlot = (): Promise<void> => {
+      if (activeCount < CONCURRENCY) return Promise.resolve()
+      return new Promise<void>((resolve) => { resolveSlot = resolve })
     }
 
+    const releaseSlot = (): void => {
+      activeCount--
+      if (resolveSlot) {
+        const r = resolveSlot
+        resolveSlot = null
+        r()
+      }
+    }
+
+    const tasks: Promise<void>[] = []
+
+    for (const mod of pending) {
+      await waitForSlot()
+      activeCount++
+      tasks.push(
+        generateOneModule(mod).finally(releaseSlot),
+      )
+    }
+
+    // Wait for all in-flight modules to finish
+    await Promise.allSettled(tasks)
+
     const doneCount = Object.values(progress).filter((s) => s === "done").length
-    if (doneCount === currentModules.length) {
+    if (doneCount === modules.length) {
       setMilestone("batch")
     }
 
