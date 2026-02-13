@@ -20,6 +20,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getInsightsSummary } from '@/lib/activity-intelligence/insights'
+import { ensureFreshProfile, formatProfileForAI } from '@/lib/intelligence/profile-builder'
+import { formatRecentInsightsForPrompt } from '@/lib/intelligence/insight-logger'
 import type { CompanyProfile } from '@/types/foundry'
 import type { FoundryPurposeData } from '@/types/foundry'
 import {
@@ -38,6 +40,10 @@ export interface AIContextOptions {
   includeActivity?: boolean
   /** Include active objectives summary */
   includeObjectives?: boolean
+  /** Include user intelligence profile (productivity patterns, blockers, etc.) */
+  includeUserProfile?: boolean
+  /** Include recent insight log for dedup (prevents repeating AI advice) */
+  includeInsightHistory?: boolean
 }
 
 /**
@@ -51,7 +57,7 @@ export interface AIContextOptions {
 export async function buildAIContext(
   foundryId: string,
   userId: string,
-  options: AIContextOptions = { includeActivity: true, includeObjectives: true }
+  options: AIContextOptions = { includeActivity: true, includeObjectives: true, includeUserProfile: true, includeInsightHistory: true }
 ): Promise<string> {
   // Check per-request cache
   const cacheKey = `${foundryId}:${userId}:${JSON.stringify(options)}`
@@ -129,6 +135,33 @@ export async function buildAIContext(
           (o) => `- ${o.title} (${o.progress ?? 0}% complete, ${o.status})`
         )
         sections.push(`Active objectives:\n${objectiveLines.join('\n')}`)
+      }
+    }
+
+    // 6. User intelligence profile (patterns, productivity, blockers)
+    if (options.includeUserProfile) {
+      try {
+        const profile = await ensureFreshProfile(userId, foundryId)
+        if (profile) {
+          const profileText = formatProfileForAI(profile)
+          if (profileText) {
+            sections.push(profileText.trim())
+          }
+        }
+      } catch (err) {
+        console.debug('[AIContextBuilder] Failed to load user profile:', err)
+      }
+    }
+
+    // 7. Recent insight history (for deduplication)
+    if (options.includeInsightHistory) {
+      try {
+        const insightHistory = await formatRecentInsightsForPrompt(userId, foundryId)
+        if (insightHistory) {
+          sections.push(insightHistory.trim())
+        }
+      } catch (err) {
+        console.debug('[AIContextBuilder] Failed to load insight history:', err)
       }
     }
   } catch (err) {

@@ -299,6 +299,28 @@ export function TodayView(): React.ReactElement {
                             </div>
                         )}
 
+                        {/* Intelligence Signal — shows how long the system has been learning */}
+                        {briefing && briefing.intelligenceDaysOfData > 7 && (
+                            <div className="flex items-center gap-2 mt-4 pt-3 border-t text-xs text-muted-foreground">
+                                <Lightbulb className="h-3.5 w-3.5 shrink-0 text-status-warning" />
+                                <span className="flex-1">
+                                    Based on {briefing.intelligenceDaysOfData} days of activity
+                                    {briefing.bestProductivityDay && (
+                                        <span className="text-foreground/70">
+                                            {' · '}Best day: {briefing.bestProductivityDay}
+                                        </span>
+                                    )}
+                                    {briefing.velocityTrend !== 0 && (
+                                        <span className={cn(
+                                            briefing.velocityTrend > 0 ? "text-status-success" : "text-status-warning"
+                                        )}>
+                                            {' · '}Velocity {briefing.velocityTrend > 0 ? '+' : ''}{briefing.velocityTrend}%
+                                        </span>
+                                    )}
+                                </span>
+                            </div>
+                        )}
+
                         {/* Partial data warning */}
                         {pulseError && !briefingError && (
                             <div className="flex items-center gap-2 mt-4 pt-3 border-t text-xs text-muted-foreground">

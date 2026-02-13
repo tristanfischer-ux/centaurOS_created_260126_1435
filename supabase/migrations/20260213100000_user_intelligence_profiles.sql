@@ -21,7 +21,7 @@
 CREATE TABLE IF NOT EXISTS user_intelligence_profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  foundry_id UUID NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
+  foundry_id TEXT NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
 
   -- Computed patterns (JSONB for flexibility as we learn what's useful)
   productivity_patterns JSONB DEFAULT '{}'::jsonb,

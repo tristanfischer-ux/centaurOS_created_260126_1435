@@ -22,7 +22,7 @@
 CREATE TABLE IF NOT EXISTS insight_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  foundry_id UUID NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
+  foundry_id TEXT NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
 
   -- What was surfaced
   insight_type TEXT NOT NULL CHECK (insight_type IN (

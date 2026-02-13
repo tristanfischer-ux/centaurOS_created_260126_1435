@@ -182,6 +182,66 @@ export function detectAnomalies(
 }
 
 /**
+ * Calculate monthly trends (4-week rolling comparison).
+ * Compares the most recent week against the average of the prior 3 weeks.
+ *
+ * @param weeklyCompletions - Array of 4 weekly completion counts, oldest first
+ * @param weeklyCreated - Array of 4 weekly creation counts, oldest first
+ * @returns TrendData[] with monthly-scoped metrics
+ */
+export function calculateMonthlyTrends(
+    weeklyCompletions: number[],
+    weeklyCreated: number[]
+): TrendData[] {
+    const trends: TrendData[] = []
+
+    if (weeklyCompletions.length >= 4) {
+        const recentWeek = weeklyCompletions[weeklyCompletions.length - 1]
+        const priorWeeks = weeklyCompletions.slice(0, -1)
+        const priorAvg = priorWeeks.reduce((a, b) => a + b, 0) / priorWeeks.length
+
+        trends.push(calculateTrend(
+            'Monthly Completion Trend',
+            recentWeek,
+            Math.round(priorAvg),
+            { threshold: 3, anomalyThreshold: 50 }
+        ))
+    }
+
+    if (weeklyCreated.length >= 4) {
+        const recentWeek = weeklyCreated[weeklyCreated.length - 1]
+        const priorWeeks = weeklyCreated.slice(0, -1)
+        const priorAvg = priorWeeks.reduce((a, b) => a + b, 0) / priorWeeks.length
+
+        trends.push(calculateTrend(
+            'Monthly Creation Trend',
+            recentWeek,
+            Math.round(priorAvg),
+            { threshold: 3, anomalyThreshold: 50 }
+        ))
+    }
+
+    // Overall velocity over the month
+    const totalCompleted = weeklyCompletions.reduce((a, b) => a + b, 0)
+    const totalCreated = weeklyCreated.reduce((a, b) => a + b, 0)
+    if (totalCreated > 0) {
+        const velocity = Math.round((totalCompleted / totalCreated) * 100)
+        trends.push({
+            metric: 'Monthly Velocity',
+            current: velocity,
+            previous: 100, // 100% = breaking even
+            change: velocity - 100,
+            changePercent: velocity - 100,
+            trend: velocity > 105 ? 'up' : velocity < 95 ? 'down' : 'stable',
+            isAnomaly: Math.abs(velocity - 100) > 50,
+            anomalyType: velocity > 150 ? 'spike' : velocity < 50 ? 'drop' : null,
+        })
+    }
+
+    return trends
+}
+
+/**
  * Calculate rolling average
  */
 export function calculateRollingAverage(values: number[], window: number = 7): number {

@@ -14,6 +14,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { withAuth } from '@/lib/server-action-utils'
 import { checkRateLimit } from '@/lib/security/rate-limit'
+import { logInsights } from '@/lib/intelligence/insight-logger'
+import type { InsightEntry } from '@/lib/intelligence/insight-logger'
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
@@ -345,6 +347,24 @@ Overall health trend: ${overallHealthTrend}`
       const topCompleted = completedTaskDetails.slice(0, 3).map((t) => t.title).join(', ')
       summary = `This week: ${tasksCompleted} tasks completed${topCompleted ? ` including ${topCompleted}` : ''} across ${objectiveProgress.length} objectives. ${overdueTaskDetails.length > 0 ? `${overdueTaskDetails.length} tasks are overdue.` : ''} Overall trend: ${overallHealthTrend}.`
     }
+
+    // 10. Log insights for deduplication and feedback tracking
+    const insightsToLog: InsightEntry[] = []
+
+    for (const highlight of highlights) {
+      insightsToLog.push({ insightType: 'weekly_highlight', contentSummary: highlight })
+    }
+    for (const concern of concerns) {
+      insightsToLog.push({ insightType: 'weekly_concern', contentSummary: concern })
+    }
+    for (const priority of nextWeekPriorities) {
+      insightsToLog.push({ insightType: 'weekly_priority', contentSummary: priority })
+    }
+
+    // Non-blocking: log insights
+    logInsights(user.id, foundryId, insightsToLog).catch(() => {
+      // AUDIT: Silently ignore — logging should never break the main flow
+    })
 
     return {
       data: {

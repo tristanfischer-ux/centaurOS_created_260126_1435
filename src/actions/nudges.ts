@@ -12,6 +12,10 @@
 
 import { withAuth } from '@/lib/server-action-utils'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { logInsights, formatRecentInsightsForPrompt } from '@/lib/intelligence/insight-logger'
+import { ensureFreshProfile, formatProfileForAI } from '@/lib/intelligence/profile-builder'
+import { inferInsightFeedback } from '@/lib/intelligence/feedback-tracker'
+import type { InsightEntry } from '@/lib/intelligence/insight-logger'
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -42,6 +46,12 @@ export interface MorningBriefing {
     actionLabel?: string
     actionHref?: string
   }>
+  /** Number of days of activity data the intelligence profile is based on */
+  intelligenceDaysOfData: number
+  /** Productivity pattern: best day of the week */
+  bestProductivityDay: string | null
+  /** Velocity trend as a percentage (positive = accelerating) */
+  velocityTrend: number
 }
 
 // ─── Morning Briefing ─────────────────────────────────────────────
@@ -249,7 +259,31 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
 
     const yesterdayCompletedTitles = (yesterdayTasks || []).map((t) => t.title)
 
-    // 9c. Call Gemini Flash to generate a personalized narrative
+    // 9c. Build user intelligence context for personalized narrative
+    let profileContext = ''
+    let insightHistoryContext = ''
+    let intelligenceDaysOfData = 0
+    let bestProductivityDay: string | null = null
+    let velocityTrend = 0
+    try {
+      const profile = await ensureFreshProfile(user.id, foundryId)
+      if (profile) {
+        profileContext = formatProfileForAI(profile)
+        intelligenceDaysOfData = profile.daysOfData
+        bestProductivityDay = profile.productivityPatterns.bestDay
+        velocityTrend = profile.productivityPatterns.velocityTrend
+      }
+      insightHistoryContext = await formatRecentInsightsForPrompt(user.id, foundryId)
+    } catch {
+      // Non-blocking — intelligence context is optional
+    }
+
+    // 9d. Run implicit feedback inference in background (non-blocking)
+    inferInsightFeedback(user.id, foundryId).catch(() => {
+      // Silently ignore — feedback tracking is best-effort
+    })
+
+    // 9e. Call Gemini Flash to generate a personalized narrative
     let narrative = greeting // Fallback to template greeting if AI call fails
 
     try {
@@ -278,14 +312,16 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
             : 'No at-risk objectives.',
           `Completion streak: ${streak} day${streak !== 1 ? 's' : ''}`,
           `Overdue tasks: ${overdueTasks.length}`,
-        ].join('\n')
+          profileContext,
+          insightHistoryContext,
+        ].filter(Boolean).join('\n')
 
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
           systemInstruction: {
             role: 'system',
             parts: [{
-              text: 'You are a concise executive briefing writer. Write 2-4 sentences summarizing the user\'s day ahead. Reference specific task names and objective names. Be warm but efficient. Use the user\'s first name. Never mention AI or that you are an AI. Never use emojis.',
+              text: 'You are a concise executive briefing writer. Write 2-4 sentences summarizing the user\'s day ahead. Reference specific task names and objective names. Be warm but efficient. Use the user\'s first name. Never mention AI or that you are an AI. Never use emojis. If productivity patterns are provided, reference them naturally (e.g. "You typically do your best work on Wednesdays"). If previous insights are listed, do NOT repeat them — build on them or provide new perspective.',
             }],
           },
           generationConfig: {
@@ -307,6 +343,30 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
       })
     }
 
+    // 10. Log insights for deduplication and feedback tracking
+    const insightsToLog: InsightEntry[] = []
+
+    // Log the narrative briefing
+    if (narrative !== greeting) {
+      insightsToLog.push({
+        insightType: 'briefing_narrative',
+        contentSummary: narrative,
+      })
+    }
+
+    // Log each nudge
+    for (const nudge of nudges) {
+      insightsToLog.push({
+        insightType: 'nudge',
+        contentSummary: nudge.message,
+      })
+    }
+
+    // Non-blocking: log insights
+    logInsights(user.id, foundryId, insightsToLog).catch(() => {
+      // Silently ignore — logging should never break the main flow
+    })
+
     return {
       data: {
         greeting,
@@ -318,6 +378,9 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
         streak,
         completedYesterday: completedYesterday || 0,
         nudges,
+        intelligenceDaysOfData,
+        bestProductivityDay,
+        velocityTrend,
       },
     }
   }) as Promise<{ data?: MorningBriefing; error?: string }>

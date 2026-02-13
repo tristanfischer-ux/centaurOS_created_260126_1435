@@ -26,6 +26,7 @@ import {
   ArrowRight,
   Copy,
   FileText,
+  Lightbulb,
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts"
 import { toast } from "sonner"
@@ -330,6 +331,14 @@ export function WeeklyDigestPanel({ className }: WeeklyDigestPanelProps): React.
                     </ul>
                   </div>
                 )}
+
+                {/* Intelligence Signal */}
+                <div className="flex items-center gap-2 mt-2 pt-3 border-t text-xs text-muted-foreground">
+                  <Lightbulb className="h-3.5 w-3.5 shrink-0 text-status-warning" />
+                  <span>
+                    Insights improve as activity data grows{digest.overallHealthTrend === 'improving' && ' · Trend: improving week over week'}
+                  </span>
+                </div>
 
               </div>
             </ScrollArea>

@@ -4646,6 +4646,53 @@ export type Database = {
           },
         ]
       }
+      insight_log: {
+        Row: {
+          acted_on_at: string | null
+          content_hash: string
+          content_summary: string
+          dismissed: boolean | null
+          foundry_id: string
+          id: string
+          insight_type: string
+          surfaced_at: string
+          user_id: string
+          was_acted_on: boolean | null
+        }
+        Insert: {
+          acted_on_at?: string | null
+          content_hash: string
+          content_summary: string
+          dismissed?: boolean | null
+          foundry_id: string
+          id?: string
+          insight_type: string
+          surfaced_at?: string
+          user_id: string
+          was_acted_on?: boolean | null
+        }
+        Update: {
+          acted_on_at?: string | null
+          content_hash?: string
+          content_summary?: string
+          dismissed?: boolean | null
+          foundry_id?: string
+          id?: string
+          insight_type?: string
+          surfaced_at?: string
+          user_id?: string
+          was_acted_on?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insight_log_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_domains: {
         Row: {
           ai_summary: string | null
@@ -11325,6 +11372,62 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      user_intelligence_profiles: {
+        Row: {
+          communication_style: Json | null
+          created_at: string
+          days_of_data: number | null
+          first_activity_at: string | null
+          focus_areas: Json | null
+          foundry_id: string
+          id: string
+          known_blockers: Json | null
+          productivity_patterns: Json | null
+          recent_wins: Json | null
+          risk_tolerance: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          communication_style?: Json | null
+          created_at?: string
+          days_of_data?: number | null
+          first_activity_at?: string | null
+          focus_areas?: Json | null
+          foundry_id: string
+          id?: string
+          known_blockers?: Json | null
+          productivity_patterns?: Json | null
+          recent_wins?: Json | null
+          risk_tolerance?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          communication_style?: Json | null
+          created_at?: string
+          days_of_data?: number | null
+          first_activity_at?: string | null
+          focus_areas?: Json | null
+          foundry_id?: string
+          id?: string
+          known_blockers?: Json | null
+          productivity_patterns?: Json | null
+          recent_wins?: Json | null
+          risk_tolerance?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_intelligence_profiles_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_preferences: {
         Row: {
