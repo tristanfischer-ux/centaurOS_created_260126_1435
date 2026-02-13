@@ -402,16 +402,28 @@ export function OrbitSVG({
     [functions, teamCoverage, marketplaceCandidates]
   )
 
-  // ── Specialist node positions (evenly distributed around the ring) ──
-  const specPositions = useMemo(
-    () =>
-      specialists.map((spec, i) => {
-        const deg = (360 / specialists.length) * i
-        const pos = polar(SPEC_R, deg)
-        return { spec, ...pos }
-      }),
-    [specialists]
-  )
+  // ── Specialist node positions (aligned to their function slice) ──────
+  const specPositions = useMemo(() => {
+    // Group specialists by their functionId
+    const byFunction: Record<string, SpecialistNode[]> = {}
+    specialists.forEach((spec) => {
+      const fid = spec.functionId
+      if (!byFunction[fid]) byFunction[fid] = []
+      byFunction[fid].push(spec)
+    })
+
+    // Position each group at the mid angle of its function slice
+    const result: { spec: SpecialistNode; x: number; y: number }[] = []
+    sliceData.forEach(({ fn, mid }) => {
+      const group = byFunction[fn.id]
+      if (!group || group.length === 0) return
+      const positions = spreadPos(SPEC_R, mid, group.length, 14)
+      group.forEach((spec, gi) => {
+        result.push({ spec, ...positions[gi] })
+      })
+    })
+    return result
+  }, [specialists, sliceData])
 
   return (
     <svg viewBox="0 0 840 840" style={{ width: '100%', height: '100%' }}>
@@ -440,6 +452,9 @@ export function OrbitSVG({
       <circle cx={CX} cy={CY} r={SPEC_R} fill="none" stroke="#C4B5FD" strokeWidth="1.2" strokeDasharray="3 4" opacity=".4" />
 
       {/* Ring labels */}
+      <rect x={CX - 46} y={CY - SPEC_R - 2} width={92} height={14} rx={7} fill="#F3E8FF" opacity=".85" />
+      <text x={CX} y={CY - SPEC_R + 8} textAnchor="middle" fill="#7C3AED" fontSize="8.5" fontWeight="800" letterSpacing="2.5">SPECIALISTS</text>
+
       <rect x={CX - 42} y={CY - EXEC_R - 2} width={84} height={14} rx={7} fill="white" opacity=".85" />
       <text x={CX} y={CY - EXEC_R + 8} textAnchor="middle" fill="#475569" fontSize="8.5" fontWeight="800" letterSpacing="2.5">EXECUTIVES</text>
 
@@ -607,17 +622,17 @@ export function OrbitSVG({
 
       {/* ── Center Hub ──────────────────────────────────────── */}
       <circle cx={CX} cy={CY} r={HUB_R} fill="url(#cg)" stroke="#D1D5DB" strokeWidth="1.5" filter="url(#cs)" />
-      <text x={CX} y={CY - 24} textAnchor="middle" fill="#94A3B8" fontSize="7.5" fontWeight="700" letterSpacing="2">
+      <text x={CX} y={CY - 20} textAnchor="middle" fill="#94A3B8" fontSize="7" fontWeight="700" letterSpacing="2">
         FOUNDERS
       </text>
 
       {/* Founder avatars — pure SVG circles */}
       {founders.map((f, fi) => {
-        const avatarR = 15
+        const avatarR = 13
         const fg = 5
         const totalW = founders.length * avatarR * 2 + (founders.length - 1) * fg
         const fx = CX - totalW / 2 + fi * (avatarR * 2 + fg) + avatarR
-        const fy = CY - 6
+        const fy = CY - 4
         const rc = SVG_ROLE_COLORS.FOUNDER
         return (
           <g key={f.id}>
@@ -626,7 +641,7 @@ export function OrbitSVG({
             <text
               x={fx} y={fy + 1}
               textAnchor="middle" dominantBaseline="central"
-              fill={rc.text} fontSize="9.5" fontWeight="800"
+              fill={rc.text} fontSize="9" fontWeight="800"
             >
               {f.initials}
             </text>
@@ -635,7 +650,7 @@ export function OrbitSVG({
       })}
 
       {/* Divider */}
-      <line x1={CX - 34} y1={CY + 12} x2={CX + 34} y2={CY + 12} stroke="#E2E8F0" strokeWidth="1" />
+      <line x1={CX - 30} y1={CY + 10} x2={CX + 30} y2={CY + 10} stroke="#E2E8F0" strokeWidth="1" />
 
       {/* Status chips */}
       {(() => {
@@ -646,33 +661,33 @@ export function OrbitSVG({
           { k: 'yellow', n: c.yellow, l: 'YOU', sc: STATUS_COLORS.yellow },
           { k: 'red', n: c.red, l: 'GAPS', sc: STATUS_COLORS.red },
         ] as const
-        const cw = 48
-        const cg = 5
+        const cw = 42
+        const cg = 4
         const tw = 3 * cw + 2 * cg
         const sx = CX - tw / 2
 
         return chips.map((ch, ci) => {
           const cx2 = sx + ci * (cw + cg) + cw / 2
-          const cy2 = CY + 23
+          const cy2 = CY + 21
           return (
             <g key={ch.k}>
               <rect
-                x={cx2 - cw / 2} y={cy2 - 10}
-                width={cw} height={20} rx={10}
+                x={cx2 - cw / 2} y={cy2 - 9}
+                width={cw} height={18} rx={9}
                 fill={ch.sc.fill} stroke={ch.sc.border} strokeWidth="1.5"
               />
-              <circle cx={cx2 - 13} cy={cy2} r={3.5} fill={ch.sc.arc} />
+              <circle cx={cx2 - 11} cy={cy2} r={3} fill={ch.sc.arc} />
               <text
                 x={cx2 + 3} y={cy2 + 1}
                 textAnchor="middle" dominantBaseline="central"
-                fill={ch.sc.text} fontSize="10" fontWeight="800"
+                fill={ch.sc.text} fontSize="9" fontWeight="800"
               >
                 {ch.n}
               </text>
               <text
-                x={cx2} y={cy2 + 19}
+                x={cx2} y={cy2 + 17}
                 textAnchor="middle"
-                fill={ch.sc.text} fontSize="6.5" fontWeight="700" letterSpacing=".5" opacity=".7"
+                fill={ch.sc.text} fontSize="6" fontWeight="700" letterSpacing=".5" opacity=".7"
               >
                 {ch.l}
               </text>

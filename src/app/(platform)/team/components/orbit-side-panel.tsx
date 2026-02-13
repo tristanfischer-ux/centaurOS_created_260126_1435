@@ -4,9 +4,10 @@
  * OrbitSidePanel — detail panel on the right side of the orbital view.
  *
  * @description When no function is selected, shows a Team Capacity overview
- * with workload distribution, busiest/available members, and a compact legend.
- * When a function is selected, shows executives, apprentices, and
- * marketplace candidates for that function with real action links.
+ * with workload distribution bar, a full roster grouped by role (Founders,
+ * Specialists, Executives, Apprentices), and an orbit legend. When a function
+ * is selected, shows executives, apprentices, and marketplace candidates for
+ * that function with real action links.
  *
  * @param props.selected - Currently selected function id (or null)
  * @param props.functions - The 7 business function definitions
@@ -14,7 +15,9 @@
  * @param props.marketplaceCandidates - All marketplace candidates
  * @param props.marketplaceListingMap - id → original listing for link wiring
  * @param props.teamData - Pre-computed team data including all members and stats
+ * @param props.specialists - Specialist advisor nodes for roster display
  * @param props.onViewProfile - Callback to open profile modal for real members
+ * @param props.onSpecialistClick - Callback when a specialist is clicked
  */
 
 import { useMemo } from 'react'
@@ -25,7 +28,7 @@ import {
 import type {
   FunctionId, CoverageStatus, BusinessFunction,
   FunctionCoverage, MarketplaceCandidate, MarketplacePersonListing,
-  TeamMember,
+  TeamMember, SpecialistNode,
 } from '../types'
 import type { TeamDataResult } from '../hooks/use-team-data'
 
@@ -38,8 +41,12 @@ interface OrbitSidePanelProps {
   marketplaceListingMap: Record<string, MarketplacePersonListing>
   /** Pre-computed team data for capacity overview */
   teamData: TeamDataResult
+  /** Specialist advisor nodes for roster display */
+  specialists: SpecialistNode[]
   /** Callback to open the real profile modal for internal team members */
   onViewProfile?: (memberId: string) => void
+  /** Callback when a specialist is clicked in the roster */
+  onSpecialistClick?: (specialistId: string) => void
 }
 
 const STATUS_LABELS: Record<CoverageStatus, string> = {
@@ -68,7 +75,9 @@ export function OrbitSidePanel({
   marketplaceCandidates,
   marketplaceListingMap,
   teamData,
+  specialists,
   onViewProfile,
+  onSpecialistClick,
 }: OrbitSidePanelProps) {
   // ── Capacity data (computed once for default view) ─────────
   const capacityData = useMemo(() => {
@@ -94,24 +103,14 @@ export function OrbitSidePanel({
       }
     })
 
-    // Sort for busiest (highest active first) and most available (lowest active first)
-    const busiest = [...allMembers]
-      .sort((a, b) => b.active - a.active || b.pending - a.pending)
-      .slice(0, 3)
-
-    const available = [...allMembers]
-      .filter((m) => getBandwidthScore(m) <= 40)
-      .sort((a, b) => a.active - b.active || a.pending - b.pending)
-      .slice(0, 3)
-
     const total = allMembers.length
 
-    return { withCapacity, atCapacity, overloaded, busiest, available, total }
+    return { withCapacity, atCapacity, overloaded, total }
   }, [teamData])
 
-  // ── Default state (nothing selected) — Team Capacity ───────
+  // ── Default state (nothing selected) — Team Roster ─────────
   if (!selected) {
-    const { withCapacity, atCapacity, overloaded, busiest, available, total } = capacityData
+    const { withCapacity, atCapacity, overloaded, total } = capacityData
 
     // Bar segment widths as percentages
     const greenPct = total > 0 ? (withCapacity.length / total) * 100 : 0
@@ -174,55 +173,16 @@ export function OrbitSidePanel({
           </div>
         </div>
 
-        {/* Busiest members */}
-        {busiest.length > 0 && (
-          <div>
-            <div className="text-[10px] text-muted-foreground tracking-[1.5px] uppercase font-bold mb-2.5">
-              Busiest
-            </div>
-            <div className="space-y-1.5">
-              {busiest.map((m) => {
-                const score = getBandwidthScore(m)
-                const isOverloaded = score > 70
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => onViewProfile?.(m.id)}
-                    className="flex items-center gap-3 p-2.5 rounded-xl w-full text-left cursor-pointer hover:bg-muted/60 transition-colors"
-                  >
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0"
-                      style={{
-                        background: isOverloaded ? '#FEF2F2' : '#FFFBEB',
-                        border: `2px solid ${isOverloaded ? '#FECACA' : '#FDE68A'}`,
-                        color: isOverloaded ? '#DC2626' : '#D97706',
-                      }}
-                    >
-                      {m.initials}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-bold text-foreground truncate">{m.name}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {m.active} active · {m.pending} pending
-                      </div>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground shrink-0">View →</div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
+        {/* ── Full Roster by Role ──────────────────────────── */}
 
-        {/* Available members */}
-        {available.length > 0 && (
+        {/* Founders */}
+        {teamData.founders.length > 0 && (
           <div>
             <div className="text-[10px] text-muted-foreground tracking-[1.5px] uppercase font-bold mb-2.5">
-              Available
+              Founders ({teamData.founders.length})
             </div>
             <div className="space-y-1.5">
-              {available.map((m) => (
+              {teamData.founders.map((m) => (
                 <button
                   key={m.id}
                   type="button"
@@ -231,22 +191,110 @@ export function OrbitSidePanel({
                 >
                   <div
                     className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0"
-                    style={{
-                      background: '#F0FDF4',
-                      border: '2px solid #BBF7D0',
-                      color: '#16A34A',
-                    }}
+                    style={{ background: '#FFEDD5', border: '2px solid #F97316', color: '#C2410C' }}
                   >
                     {m.initials}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-bold text-foreground truncate">{m.name}</div>
                     <div className="text-[11px] text-muted-foreground">
-                      {m.active === 0 ? 'No active tasks' : `${m.active} active`}
-                      {m.done > 0 ? ` · ${m.done} done` : ''}
+                      {m.active} active · {m.pending} pending
                     </div>
                   </div>
-                  <div className="text-[10px] text-muted-foreground shrink-0">View →</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Specialists */}
+        {specialists.length > 0 && (
+          <div>
+            <div className="text-[10px] text-muted-foreground tracking-[1.5px] uppercase font-bold mb-2.5">
+              Specialists ({specialists.length})
+            </div>
+            <div className="space-y-1.5">
+              {specialists.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => onSpecialistClick?.(s.id)}
+                  className="flex items-center gap-3 p-2.5 rounded-xl w-full text-left cursor-pointer hover:bg-muted/60 transition-colors"
+                >
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0"
+                    style={{ background: '#F3E8FF', border: '2px solid #A78BFA', color: '#7C3AED' }}
+                  >
+                    {s.initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-bold text-foreground truncate">{s.name}</div>
+                    <div className="text-[11px] text-muted-foreground">{s.title}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Executives */}
+        {teamData.allExecs.length > 0 && (
+          <div>
+            <div className="text-[10px] text-muted-foreground tracking-[1.5px] uppercase font-bold mb-2.5">
+              Executives ({teamData.allExecs.length})
+            </div>
+            <div className="space-y-1.5">
+              {teamData.allExecs.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => onViewProfile?.(m.id)}
+                  className="flex items-center gap-3 p-2.5 rounded-xl w-full text-left cursor-pointer hover:bg-muted/60 transition-colors"
+                >
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0"
+                    style={{ background: '#FFF7ED', border: '2px solid #FB923C', color: '#EA580C' }}
+                  >
+                    {m.initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-bold text-foreground truncate">{m.name}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {m.title}{m.functionLabel ? ` · ${m.functionLabel}` : ''}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Apprentices */}
+        {teamData.allApprentices.length > 0 && (
+          <div>
+            <div className="text-[10px] text-muted-foreground tracking-[1.5px] uppercase font-bold mb-2.5">
+              Apprentices ({teamData.allApprentices.length})
+            </div>
+            <div className="space-y-1.5">
+              {teamData.allApprentices.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => onViewProfile?.(m.id)}
+                  className="flex items-center gap-3 p-2.5 rounded-xl w-full text-left cursor-pointer hover:bg-muted/60 transition-colors"
+                >
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0"
+                    style={{ background: '#F1F5F9', border: '2px solid #94A3B8', color: '#64748B' }}
+                  >
+                    {m.initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-bold text-foreground truncate">{m.name}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {m.title}{m.functionLabel ? ` · ${m.functionLabel}` : ''}
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>
@@ -258,7 +306,7 @@ export function OrbitSidePanel({
           <div className="text-[10px] text-muted-foreground tracking-[1.5px] uppercase font-bold mb-2">
             Orbit Legend
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
             {([
               { sc: STATUS_COLORS.green, label: 'Covered' },
               { sc: STATUS_COLORS.yellow, label: 'Founder' },
@@ -272,6 +320,13 @@ export function OrbitSidePanel({
                 <span className="text-[11px] text-muted-foreground font-medium">{s.label}</span>
               </div>
             ))}
+            <div className="flex items-center gap-1.5">
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ background: '#A78BFA' }}
+              />
+              <span className="text-[11px] text-muted-foreground font-medium">Specialist</span>
+            </div>
           </div>
         </div>
       </div>

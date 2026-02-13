@@ -37,9 +37,9 @@ export const GAP_DEG = 4.5
 export const SLICE_DEG = (360 - 7 * GAP_DEG) / 7
 
 /** Center hub radius (founders) */
-export const HUB_R = 58
+export const HUB_R = 50
 /** Specialist advisors ring radius */
-export const SPEC_R = 78
+export const SPEC_R = 88
 /** Function label band inner radius */
 export const FUNC_R1 = 98
 /** Function label band outer radius */

@@ -66,6 +66,8 @@ export interface SpecialistNode {
   initials: string
   /** Functional title (e.g. "Strategy") */
   title: string
+  /** Which business function this specialist advises */
+  functionId: FunctionId
 }
 
 // ─── Marketplace ─────────────────────────────────────────────────────────────

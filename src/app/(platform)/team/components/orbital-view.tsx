@@ -20,6 +20,21 @@ import { SPECIALISTS } from '../../agents/specialists-data'
 import type { FunctionId, BusinessFunction, SpecialistNode } from '../types'
 import type { TeamDataResult } from '../hooks/use-team-data'
 
+// ── Specialist → Function mapping ────────────────────────────────────────────
+// Derived from each specialist's categories in specialists-data.ts.
+// Two functions (product, finance) have two specialists each.
+const SPECIALIST_FUNCTION_MAP: Record<string, FunctionId> = {
+  'strategist':          'product',     // Sam — Strategy
+  'product-lead':        'product',     // Priya — Product Development
+  'chief-of-staff':      'operations',  // Cal — Chief of Staff
+  'growth-marketer':     'marketing',   // Mia — Marketing
+  'sales-lead':          'sales',       // Nate — Sales
+  'fundraising-advisor': 'finance',     // Fiona — Fundraising
+  'finance-lead':        'finance',     // Eli — Finance
+  'hiring-team':         'hr',          // Harper — HR
+  'legal-counsel':       'legal',       // Leo — Legal
+}
+
 interface OrbitalViewProps {
   /** Pre-computed team data from useTeamData */
   teamData: TeamDataResult
@@ -65,6 +80,7 @@ export function OrbitalView({
         name: s.name,
         initials: nameToInitials(s.name),
         title: s.title,
+        functionId: SPECIALIST_FUNCTION_MAP[s.id] ?? 'operations',
       })),
     []
   )
@@ -105,7 +121,9 @@ export function OrbitalView({
           }
           marketplaceListingMap={teamData.marketplaceListingMap}
           teamData={teamData}
+          specialists={specialistNodes}
           onViewProfile={onViewProfile}
+          onSpecialistClick={handleSpecialistClick}
         />
       </div>
     </div>
