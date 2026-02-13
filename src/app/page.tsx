@@ -144,7 +144,7 @@ export default function MarketingPage() {
                 href="/join/founder"
                 className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-5 py-2.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md"
               >
-                Apply Now
+                Get Started
               </Link>
             </motion.div>
           </div>
@@ -219,7 +219,7 @@ export default function MarketingPage() {
                   className="mt-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px] flex items-center justify-center"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Apply for Early Access
+                  Get Started Free
                 </Link>
               </div>
             </motion.div>
@@ -280,7 +280,7 @@ export default function MarketingPage() {
                   href="/join/founder"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Apply for Early Access
+                  Get Started Free
                 </Link>
               </div>
             </div>
@@ -496,7 +496,7 @@ function HeroSection() {
               href="/join/founder"
               className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px]"
             >
-              Apply for Early Access
+              Get Started Free
               <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
@@ -888,7 +888,7 @@ function SavingsCalculatorSection() {
                     href="/join/founder"
                     className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-6 py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px] w-full"
                   >
-                    Apply Now
+                    Get Started
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </motion.div>
@@ -1271,24 +1271,24 @@ function HowItWorksSection() {
     {
       number: "01",
       icon: UserCheck,
-      title: "Apply",
+      title: "Sign Up",
       description:
-        "Tell us about your hardware vision. We review every application to ensure we can genuinely help — and that the fit is right for both sides.",
-      cta: { label: "Start Application", href: "/join/founder" },
+        "Create your free account in under a minute. No application, no waitlist — just pick your role and you're in. Founding members get early access pricing locked in forever.",
+      cta: { label: "Get Started Free", href: "/join/founder" },
     },
     {
       number: "02",
       icon: Users,
-      title: "Get Matched",
+      title: "Set Up Your Forge",
       description:
-        "We assemble your fractional team from our network of seasoned executives and engineers. You meet them, approve them, and set the sprint scope together.",
+        "Define your company purpose, set your first objectives, and invite your team. Browse the marketplace for fractional executives, engineers, and manufacturing partners.",
     },
     {
       number: "03",
       icon: Hammer,
-      title: "Build & Launch",
+      title: "Start Building",
       description:
-        "Your team executes in structured 12-week sprints. ForgeOS keeps everything coordinated — objectives, tasks, suppliers, and milestones — so you ship on time.",
+        "Use The Forge to turn ideas into engineering dossiers, CAD Lab for parametric design, and the supplier marketplace to source manufacturing. ForgeOS keeps everything coordinated — objectives, tasks, team, and suppliers.",
     },
   ];
 
@@ -1303,10 +1303,10 @@ function HowItWorksSection() {
             Getting Started
           </span>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6">
-            Three Steps to Your First Sprint
+            Three Steps to Your First Build
           </h2>
           <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            From application to shipping product — here&apos;s the path.
+            From signup to shipping product — here&apos;s the path.
           </p>
         </AnimatedSection>
 
@@ -1362,7 +1362,7 @@ function PricingPreviewSection() {
       period: "forever",
       description: "Get started and explore the platform",
       features: ["5 orders/month", "20 smart assists/month", "Basic marketplace"],
-      cta: "Apply Free",
+      cta: "Start Free",
       href: "/join/founder",
       highlight: false,
     },
@@ -1377,7 +1377,7 @@ function PricingPreviewSection() {
         "3 team members",
         "1 active retainer",
       ],
-      cta: "Apply Now",
+      cta: "Get Started",
       href: "/join/founder",
       highlight: false,
     },
@@ -1393,7 +1393,7 @@ function PricingPreviewSection() {
         "Unlimited retainers",
         "API access",
       ],
-      cta: "Apply Now",
+      cta: "Get Started",
       href: "/join/founder",
       highlight: true,
     },
@@ -1519,7 +1519,7 @@ function FAQSection() {
     {
       question: "What if I'm not a founder? Can I still join?",
       answer:
-        "Absolutely. We have three roles: Founders (who need things built), Executives (senior engineers who provide fractional expertise), and Apprentices (emerging talent paired with executives for accelerated learning). Each role has its own application path.",
+        "Absolutely. We have three roles: Founders (who need things built), Executives (senior engineers who provide fractional expertise), and Apprentices (emerging talent paired with executives for accelerated learning). Each role has its own signup path.",
     },
     {
       question: "How quickly can I go from idea to prototype?",
@@ -1610,7 +1610,7 @@ function FinalCTASection() {
                 href="/join/founder"
                 className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px]"
               >
-                Apply for Early Access
+                Get Started Free
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </motion.div>
