@@ -7,6 +7,7 @@ import {
   Pencil, Phone, Linkedin, TrendingUp, TrendingDown, Minus,
   Award, Zap, Star, Trophy,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import type { ProfileEnrichment } from '../profile-hub-view'
@@ -251,7 +252,7 @@ function Sparkline({ data }: { data: Array<{ date: string; count: number }> }): 
 function getTrendText(
   thisWeek: number,
   lastWeek: number,
-): { text: string; color: string; icon: React.ElementType } | null {
+): { text: string; color: string; icon: LucideIcon } | null {
   if (thisWeek === 0 && lastWeek === 0) return null
 
   const diff = thisWeek - lastWeek
@@ -281,7 +282,7 @@ function getTrendText(
 interface Milestone {
   label: string
   achieved: boolean
-  icon: React.ElementType
+  icon: LucideIcon
 }
 
 /**
@@ -334,7 +335,7 @@ function StatCard({
   value,
   detail,
 }: {
-  icon: React.ElementType
+  icon: LucideIcon
   label: string
   value: number | string
   detail?: string
@@ -363,7 +364,7 @@ function DetailRow({
   label,
   value,
 }: {
-  icon: React.ElementType
+  icon: LucideIcon
   label: string
   value: string
 }) {
