@@ -33,15 +33,18 @@ export interface ObjectiveProgress {
 
 export interface CompletedTaskDetail {
   title: string
+  description: string | null
   completedBy: string
   objectiveTitle: string
 }
 
 export interface OverdueTaskDetail {
   title: string
+  description: string | null
   objectiveTitle: string
   daysOverdue: number
   assignedTo: string
+  riskLevel: string | null
 }
 
 export interface WeeklyDigest {
@@ -150,7 +153,7 @@ export async function generateWeeklyDigest(): Promise<{ data?: WeeklyDigest; err
     const { data: completedTaskRows } = await supabase
       .from('tasks')
       .select(`
-        id, title, objective_id,
+        id, title, description, objective_id,
         profiles:assigned_to(full_name),
         objectives:objective_id(title)
       `)
@@ -162,6 +165,7 @@ export async function generateWeeklyDigest(): Promise<{ data?: WeeklyDigest; err
 
     const completedTaskDetails: CompletedTaskDetail[] = (completedTaskRows || []).map((t) => ({
       title: t.title || 'Untitled task',
+      description: t.description || null,
       completedBy: (t.profiles as unknown as { full_name: string } | null)?.full_name || 'Unknown',
       objectiveTitle: (t.objectives as unknown as { title: string } | null)?.title || 'No objective',
     }))
@@ -178,7 +182,7 @@ export async function generateWeeklyDigest(): Promise<{ data?: WeeklyDigest; err
     const { data: overdueTaskRows } = await supabase
       .from('tasks')
       .select(`
-        id, title, end_date, objective_id,
+        id, title, description, risk_level, end_date, objective_id,
         profiles:assigned_to(full_name),
         objectives:objective_id(title)
       `)
@@ -193,9 +197,11 @@ export async function generateWeeklyDigest(): Promise<{ data?: WeeklyDigest; err
       const daysOverdue = Math.max(1, Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)))
       return {
         title: t.title || 'Untitled task',
+        description: t.description || null,
         objectiveTitle: (t.objectives as unknown as { title: string } | null)?.title || 'No objective',
         daysOverdue,
         assignedTo: (t.profiles as unknown as { full_name: string } | null)?.full_name || 'Unassigned',
+        riskLevel: t.risk_level || null,
       }
     })
 
@@ -209,6 +215,16 @@ export async function generateWeeklyDigest(): Promise<{ data?: WeeklyDigest; err
       .eq('status', 'Completed')
       .gte('updated_at', twoWeeksAgo.toISOString())
       .lt('updated_at', weekAgoStr)
+
+    // 6b. Fetch recent standup blockers (last 7 days)
+    const { data: recentBlockers } = await supabase
+      .from('standups')
+      .select('user_id, blockers, blocker_severity, profiles!standups_user_id_fkey(full_name)')
+      .eq('foundry_id', foundryId)
+      .gte('submitted_at', weekAgoStr)
+      .not('blockers', 'is', null)
+      .order('submitted_at', { ascending: false })
+      .limit(10)
 
     // 7. Determine overall health trend
     const totalImproved = objectiveProgress.filter(
@@ -224,15 +240,30 @@ export async function generateWeeklyDigest(): Promise<{ data?: WeeklyDigest; err
 
     // 8. Build rich context for AI
     const completedTasksList = completedTaskDetails.length > 0
-      ? completedTaskDetails.map((t) =>
-        `  - "${t.title}" completed by ${t.completedBy} (for: ${t.objectiveTitle})`
-      ).join('\n')
+      ? completedTaskDetails.map((t) => {
+        const descSnippet = t.description
+          ? ` — "${t.description.slice(0, 100)}${t.description.length > 100 ? '...' : ''}"`
+          : ''
+        return `  - "${t.title}" completed by ${t.completedBy} (for: ${t.objectiveTitle})${descSnippet}`
+      }).join('\n')
       : '  None'
 
     const overdueTasksList = overdueTaskDetails.length > 0
-      ? overdueTaskDetails.map((t) =>
-        `  - "${t.title}" — ${t.daysOverdue} day${t.daysOverdue > 1 ? 's' : ''} overdue, assigned to ${t.assignedTo} (for: ${t.objectiveTitle})`
-      ).join('\n')
+      ? overdueTaskDetails.map((t) => {
+        const riskTag = t.riskLevel ? `, risk: ${t.riskLevel}` : ''
+        const descSnippet = t.description
+          ? ` — "${t.description.slice(0, 100)}${t.description.length > 100 ? '...' : ''}"`
+          : ''
+        return `  - "${t.title}" — ${t.daysOverdue} day${t.daysOverdue > 1 ? 's' : ''} overdue, assigned to ${t.assignedTo}${riskTag} (for: ${t.objectiveTitle})${descSnippet}`
+      }).join('\n')
+      : '  None'
+
+    const blockersList = (recentBlockers || []).length > 0
+      ? (recentBlockers || []).map((b) => {
+        const name = (b.profiles as unknown as { full_name: string } | null)?.full_name || 'Unknown'
+        const severity = b.blocker_severity ? ` (severity: ${b.blocker_severity})` : ''
+        return `  - ${name}: "${b.blockers}"${severity}`
+      }).join('\n')
       : '  None'
 
     const objectiveNarratives = objectiveProgress.map((o) => {
@@ -270,6 +301,7 @@ Rules:
 - Next week priorities should be concrete and actionable ("Unblock the API integration by reviewing the vendor contract").
 - If velocity changed week-over-week, mention why (more tasks? fewer? blockers?).
 - Celebrate wins warmly but briefly. Flag risks early and clearly.
+- If blockers were reported in standups, reference them when suggesting concerns and next-week priorities. Connect blockers to specific overdue tasks or at-risk objectives when possible.
 
 Respond with ONLY valid JSON:
 {
@@ -290,6 +322,9 @@ OVERDUE TASKS (${overdueTaskDetails.length}):
 ${overdueTasksList}
 
 ${velocityComparison}
+
+BLOCKERS REPORTED THIS WEEK:
+${blockersList}
 
 OBJECTIVES:
 ${objectiveNarratives || '  No active objectives'}

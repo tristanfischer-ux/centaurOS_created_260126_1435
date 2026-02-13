@@ -32,6 +32,7 @@ import {
   CalendarClock,
   Copy,
   ShieldAlert,
+  Pencil,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -39,6 +40,15 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   generatePlanFromSentence,
   applyGeneratedPlan,
@@ -112,6 +122,9 @@ export function OneSentencePlanner(): React.ReactElement {
   const [plan, setPlan] = useState<GeneratedPlan | null>(null)
   const [isApplying, setIsApplying] = useState(false)
   const [expandedPhase, setExpandedPhase] = useState<number | null>(0)
+  const [showPreview, setShowPreview] = useState(false)
+  const [selectedTasks, setSelectedTasks] = useState<Record<string, boolean>>({})
+  const [editedTitles, setEditedTitles] = useState<Record<string, string>>({})
 
   /**
    * Generates a plan from the user's sentence.
@@ -148,13 +161,62 @@ export function OneSentencePlanner(): React.ReactElement {
   }, [sentence, isGenerating])
 
   /**
-   * Applies the generated plan to the database.
+   * Opens the preview dialog so the user can curate tasks before applying.
+   *
+   * @description Initialises selection (all tasks checked) and title edits,
+   * then shows the PlanPreviewDialog.
+   */
+  const handleOpenPreview = useCallback(() => {
+    if (!plan) return
+
+    const tasks: Record<string, boolean> = {}
+    const titles: Record<string, string> = {}
+
+    plan.phases.forEach((phase, pi) => {
+      phase.tasks.forEach((task, ti) => {
+        const key = `${pi}-${ti}`
+        tasks[key] = true
+        titles[key] = task.title
+      })
+    })
+
+    setSelectedTasks(tasks)
+    setEditedTitles(titles)
+    setShowPreview(true)
+  }, [plan])
+
+  /**
+   * Applies the curated plan to the database.
+   *
+   * @description Filters out unchecked tasks, applies edited titles,
+   * then calls applyGeneratedPlan with the modified plan.
    */
   const handleApply = useCallback(async () => {
     if (!plan || isApplying) return
 
+    // Build a filtered copy of the plan with only selected tasks + edited titles
+    const filteredPhases = plan.phases
+      .map((phase, pi) => ({
+        ...phase,
+        tasks: phase.tasks
+          .map((task, ti) => {
+            const key = `${pi}-${ti}`
+            if (!selectedTasks[key]) return null
+            return { ...task, title: editedTitles[key] ?? task.title }
+          })
+          .filter(Boolean) as typeof phase.tasks,
+      }))
+      .filter((phase) => phase.tasks.length > 0)
+
+    if (filteredPhases.length === 0) {
+      toast.error("Select at least one task to create your plan")
+      return
+    }
+
+    const filteredPlan: GeneratedPlan = { ...plan, phases: filteredPhases }
+
     setIsApplying(true)
-    const result = await applyGeneratedPlan(plan)
+    const result = await applyGeneratedPlan(filteredPlan)
     setIsApplying(false)
 
     if (result.error) {
@@ -162,6 +224,7 @@ export function OneSentencePlanner(): React.ReactElement {
       return
     }
 
+    setShowPreview(false)
     fireConfetti()
     toast.success("Plan created! Redirecting to your objectives...", {
       duration: 3000,
@@ -171,7 +234,7 @@ export function OneSentencePlanner(): React.ReactElement {
     setTimeout(() => {
       router.push("/new-objectives")
     }, 1500)
-  }, [plan, isApplying, fireConfetti, router])
+  }, [plan, isApplying, selectedTasks, editedTitles, fireConfetti, router])
 
   /**
    * Fills the input with an example prompt.
@@ -192,11 +255,14 @@ export function OneSentencePlanner(): React.ReactElement {
   }, [])
 
   /**
-   * Copies a formatted version of the plan to clipboard for sharing.
+   * Copies a Markdown-formatted version of the plan to clipboard for sharing.
+   *
+   * @description Produces clean Markdown with headers, bold text, and bullet
+   * lists — suitable for pasting into docs, Slack, Notion, etc.
    */
   const handleSharePlan = useCallback((planData: GeneratedPlan) => {
-    const sections: string[] = [
-      `🎯 ${planData.title}`,
+    const lines: string[] = [
+      `# ${planData.title}`,
       '',
       planData.description,
       '',
@@ -206,34 +272,41 @@ export function OneSentencePlanner(): React.ReactElement {
       const deadline = new Date(planData.suggestedDeadline).toLocaleDateString("en-US", {
         month: "long", day: "numeric", year: "numeric",
       })
-      sections.push(`📅 Target: ${deadline} (${planData.totalWeeks} weeks)`)
-      sections.push('')
+      lines.push(`**Target:** ${deadline} (${planData.totalWeeks} weeks)`)
+      lines.push('')
     }
 
     if (planData.quickWins.length > 0) {
-      sections.push('⚡ Start right now:')
-      planData.quickWins.forEach((w) => sections.push(`  • ${w}`))
-      sections.push('')
+      lines.push('## Quick Wins')
+      lines.push('')
+      planData.quickWins.forEach((w) => lines.push(`- ${w}`))
+      lines.push('')
     }
 
     planData.phases.forEach((phase, i) => {
-      sections.push(`📋 Phase ${i + 1}: ${phase.title} (Weeks ${phase.startWeek}–${phase.endWeek})`)
-      if (phase.description) sections.push(`   ${phase.description}`)
+      lines.push(`## Phase ${i + 1}: ${phase.title}`)
+      lines.push('')
+      if (phase.description) {
+        lines.push(phase.description)
+        lines.push('')
+      }
+      lines.push(`**Weeks ${phase.startWeek}–${phase.endWeek}**`)
+      lines.push('')
       phase.tasks.forEach((t) => {
-        sections.push(`   ☐ ${t.title} — ${t.durationDays}d, ${t.suggestedRole}${t.riskLevel !== 'Low' ? ` ⚠️ ${t.riskLevel} risk` : ''}`)
+        const risk = t.riskLevel !== 'Low' ? ` — **${t.riskLevel} risk**` : ''
+        lines.push(`- [ ] **${t.title}** — ${t.durationDays}d, ${t.suggestedRole}${risk}`)
       })
-      sections.push('')
+      lines.push('')
     })
 
     if (planData.keyRisks.length > 0) {
-      sections.push('⚠️ Key risks:')
-      planData.keyRisks.forEach((r) => sections.push(`  - ${r}`))
-      sections.push('')
+      lines.push('## Key Risks')
+      lines.push('')
+      planData.keyRisks.forEach((r) => lines.push(`- ${r}`))
+      lines.push('')
     }
 
-    sections.push('— Generated by ForgeOS')
-
-    navigator.clipboard.writeText(sections.join('\n'))
+    navigator.clipboard.writeText(lines.join('\n'))
     toast.success('Plan copied to clipboard')
   }, [])
 
@@ -518,21 +591,11 @@ export function OneSentencePlanner(): React.ReactElement {
                 {/* Action Buttons */}
                 <div className="flex items-center gap-3 pt-2">
                   <Button
-                    onClick={handleApply}
-                    disabled={isApplying}
+                    onClick={handleOpenPreview}
                     className="flex-1 bg-international-orange hover:bg-international-orange/90 text-background"
                   >
-                    {isApplying ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Creating plan...
-                      </>
-                    ) : (
-                      <>
-                        <Rocket className="h-4 w-4 mr-2" />
-                        Create this plan
-                      </>
-                    )}
+                    <Rocket className="h-4 w-4 mr-2" />
+                    Create this plan
                   </Button>
                   <Button
                     variant="outline"
@@ -552,6 +615,21 @@ export function OneSentencePlanner(): React.ReactElement {
           </AnimatePresence>
         </CardContent>
       </Card>
+
+      {/* Preview dialog for curating tasks before applying */}
+      {plan && (
+        <PlanPreviewDialog
+          plan={plan}
+          open={showPreview}
+          onOpenChange={setShowPreview}
+          selectedTasks={selectedTasks}
+          onSelectedTasksChange={setSelectedTasks}
+          editedTitles={editedTitles}
+          onEditedTitlesChange={setEditedTitles}
+          onApply={handleApply}
+          isApplying={isApplying}
+        />
+      )}
     </motion.div>
   )
 }
@@ -679,6 +757,245 @@ function PhasePreviewCard({
         )}
       </AnimatePresence>
     </motion.div>
+  )
+}
+
+// ─── Plan Preview Dialog ─────────────────────────────────────────
+
+interface PlanPreviewDialogProps {
+  /** The generated plan to preview */
+  plan: GeneratedPlan
+  /** Whether the dialog is open */
+  open: boolean
+  /** Callback when open state changes */
+  onOpenChange: (open: boolean) => void
+  /** Map of "phaseIndex-taskIndex" to selected boolean */
+  selectedTasks: Record<string, boolean>
+  /** Callback to update selected tasks */
+  onSelectedTasksChange: (tasks: Record<string, boolean>) => void
+  /** Map of "phaseIndex-taskIndex" to edited title */
+  editedTitles: Record<string, string>
+  /** Callback to update edited titles */
+  onEditedTitlesChange: (titles: Record<string, string>) => void
+  /** Callback to apply the curated plan */
+  onApply: () => void
+  /** Whether the plan is currently being applied */
+  isApplying: boolean
+}
+
+/**
+ * Pre-apply preview dialog with per-task checkboxes and inline title editing.
+ *
+ * @description Lets users curate a generated plan before committing it to
+ * the database. Tasks can be deselected or renamed inline.
+ */
+function PlanPreviewDialog({
+  plan,
+  open,
+  onOpenChange,
+  selectedTasks,
+  onSelectedTasksChange,
+  editedTitles,
+  onEditedTitlesChange,
+  onApply,
+  isApplying,
+}: PlanPreviewDialogProps): React.ReactElement {
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+
+  const totalTasks = plan.phases.reduce((s, p) => s + p.tasks.length, 0)
+  const selectedCount = Object.values(selectedTasks).filter(Boolean).length
+
+  // Count selected objectives (phases that have at least one selected task)
+  const selectedPhaseCount = plan.phases.filter((_, pi) =>
+    plan.phases[pi].tasks.some((_, ti) => selectedTasks[`${pi}-${ti}`])
+  ).length
+
+  /**
+   * Toggles all tasks within a phase on or off.
+   */
+  function handleTogglePhase(phaseIndex: number, checked: boolean): void {
+    const next = { ...selectedTasks }
+    plan.phases[phaseIndex].tasks.forEach((_, ti) => {
+      next[`${phaseIndex}-${ti}`] = checked
+    })
+    onSelectedTasksChange(next)
+  }
+
+  /**
+   * Toggles a single task on or off.
+   */
+  function handleToggleTask(key: string, checked: boolean): void {
+    onSelectedTasksChange({ ...selectedTasks, [key]: checked })
+  }
+
+  /**
+   * Saves an inline title edit and exits edit mode.
+   */
+  function handleTitleSave(key: string, value: string): void {
+    if (value.trim()) {
+      onEditedTitlesChange({ ...editedTitles, [key]: value.trim() })
+    }
+    setEditingKey(null)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Review your plan</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Uncheck tasks you don&apos;t need, or click a title to rename it.
+          </p>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 -mx-6 px-6" style={{ maxHeight: "60vh" }}>
+          <div className="space-y-5 py-2">
+            {plan.phases.map((phase, pi) => {
+              const phaseTaskKeys = phase.tasks.map((_, ti) => `${pi}-${ti}`)
+              const allChecked = phaseTaskKeys.every((k) => selectedTasks[k])
+              const someChecked = phaseTaskKeys.some((k) => selectedTasks[k])
+
+              return (
+                <div key={pi} className="space-y-2">
+                  {/* Phase header with toggle-all checkbox */}
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={allChecked ? true : someChecked ? "indeterminate" : false}
+                      onCheckedChange={(checked) =>
+                        handleTogglePhase(pi, checked === true)
+                      }
+                      aria-label={`Select all tasks in ${phase.title}`}
+                    />
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center justify-center w-5 h-5 rounded-full bg-international-orange/10 text-international-orange text-[10px] font-bold shrink-0">
+                        {pi + 1}
+                      </div>
+                      <span className="text-sm font-semibold text-foreground truncate">
+                        {phase.title}
+                      </span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        Weeks {phase.startWeek}–{phase.endWeek}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Task list */}
+                  <div className="ml-8 space-y-1">
+                    {phase.tasks.map((task, ti) => {
+                      const key = `${pi}-${ti}`
+                      const isEditing = editingKey === key
+                      const isSelected = selectedTasks[key]
+
+                      return (
+                        <div
+                          key={key}
+                          className={cn(
+                            "flex items-center gap-2 rounded-md px-2 py-1.5 -mx-2 transition-colors",
+                            isSelected
+                              ? "hover:bg-muted/50"
+                              : "opacity-50"
+                          )}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) =>
+                              handleToggleTask(key, checked === true)
+                            }
+                            aria-label={`Select task: ${editedTitles[key] ?? task.title}`}
+                          />
+
+                          {isEditing ? (
+                            <input
+                              // eslint-disable-next-line jsx-a11y/no-autofocus
+                              autoFocus
+                              defaultValue={editedTitles[key] ?? task.title}
+                              onBlur={(e) => handleTitleSave(key, e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleTitleSave(key, e.currentTarget.value)
+                                }
+                                if (e.key === "Escape") {
+                                  setEditingKey(null)
+                                }
+                              }}
+                              className="flex-1 text-sm bg-muted rounded px-2 py-0.5 border border-input focus:outline-none focus:ring-1 focus:ring-international-orange/30"
+                              aria-label={`Edit task title: ${editedTitles[key] ?? task.title}`}
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setEditingKey(key)}
+                              className="flex items-center gap-1.5 min-w-0 flex-1 text-left group"
+                            >
+                              <span
+                                className={cn(
+                                  "text-sm truncate",
+                                  isSelected
+                                    ? "text-foreground"
+                                    : "text-muted-foreground line-through"
+                                )}
+                              >
+                                {editedTitles[key] ?? task.title}
+                              </span>
+                              <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                            </button>
+                          )}
+
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {task.durationDays}d
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </ScrollArea>
+
+        {/* Summary */}
+        <p className="text-sm text-muted-foreground border-t pt-3">
+          This will create{" "}
+          <span className="font-semibold text-foreground">
+            {selectedPhaseCount} objective{selectedPhaseCount !== 1 ? "s" : ""}
+          </span>{" "}
+          and{" "}
+          <span className="font-semibold text-foreground">
+            {selectedCount} task{selectedCount !== 1 ? "s" : ""}
+          </span>
+        </p>
+
+        <DialogFooter>
+          <div className="flex w-full items-center justify-between">
+            <Button
+              variant="secondary"
+              onClick={() => onOpenChange(false)}
+              disabled={isApplying}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={onApply}
+              disabled={isApplying || selectedCount === 0}
+              className="bg-international-orange hover:bg-international-orange/90 text-background"
+            >
+              {isApplying ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Rocket className="h-4 w-4 mr-2" />
+                  Apply {selectedCount} of {totalTasks} tasks
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

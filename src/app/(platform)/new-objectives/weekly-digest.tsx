@@ -21,12 +21,13 @@ import {
   AlertTriangle,
   Target,
   Loader2,
-  Sparkles,
   Calendar,
   Plus,
   ArrowRight,
   Copy,
+  FileText,
 } from "lucide-react"
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
@@ -41,10 +42,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import {
   generateWeeklyDigest,
   type WeeklyDigest,
   type ObjectiveProgress,
+  type CompletedTaskDetail,
 } from "@/actions/progress-report"
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -124,10 +127,54 @@ export function WeeklyDigestPanel({ className }: WeeklyDigestPanelProps): React.
       digest.nextWeekPriorities.forEach((p) => sections.push(`  → ${p}`))
     }
 
-    sections.push('', '— Powered by ForgeOS')
-
     navigator.clipboard.writeText(sections.join('\n'))
     toast.success('Report copied to clipboard')
+  }, [digest])
+
+  const handleCopyMarkdown = useCallback(() => {
+    if (!digest) return
+
+    const weekRange = `${new Date(digest.weekStarting).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(digest.weekEnding).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+
+    const lines: string[] = [
+      `# Weekly Progress Report`,
+      `**${weekRange}**`,
+      '',
+      '## Executive Summary',
+      digest.summary,
+      '',
+      '## Key Stats',
+      `- **Tasks Completed:** ${digest.tasksCompleted}`,
+      `- **Tasks Created:** ${digest.tasksCreated}`,
+      `- **Trend:** ${digest.overallHealthTrend}`,
+    ]
+
+    if (digest.objectiveProgress.length > 0) {
+      lines.push('', '## Objectives')
+      digest.objectiveProgress.forEach((o) => {
+        const delta = o.progress - o.previousProgress
+        const deltaStr = delta > 0 ? ` (+${delta}%)` : delta < 0 ? ` (${delta}%)` : ''
+        lines.push(`- **${o.title}:** ${o.progress}%${deltaStr} — ${o.completedTasks}/${o.totalTasks} tasks`)
+      })
+    }
+
+    if (digest.highlights.length > 0) {
+      lines.push('', '## Highlights')
+      digest.highlights.forEach((h) => lines.push(`- ${h}`))
+    }
+
+    if (digest.concerns.length > 0) {
+      lines.push('', '## Needs Attention')
+      digest.concerns.forEach((c) => lines.push(`- ${c}`))
+    }
+
+    if (digest.nextWeekPriorities && digest.nextWeekPriorities.length > 0) {
+      lines.push('', '## Focus Next Week')
+      digest.nextWeekPriorities.forEach((p) => lines.push(`- ${p}`))
+    }
+
+    navigator.clipboard.writeText(lines.join('\n'))
+    toast.success('Markdown report copied to clipboard')
   }, [digest])
 
   return (
@@ -171,8 +218,8 @@ export function WeeklyDigestPanel({ className }: WeeklyDigestPanelProps): React.
 
                 {/* AI Summary */}
                 <div className="bg-muted/30 rounded-lg p-4">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Sparkles className="h-3.5 w-3.5 text-international-orange" />
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-1 h-4 bg-international-orange rounded-full" />
                     <span className="text-xs font-semibold text-foreground">
                       Executive Summary
                     </span>
@@ -210,6 +257,14 @@ export function WeeklyDigestPanel({ className }: WeeklyDigestPanelProps): React.
                     isText
                   />
                 </div>
+
+                {/* Weekly Comparison Chart */}
+                {digest.objectiveProgress.length > 0 && (
+                  <WeeklyComparisonChart objectives={digest.objectiveProgress} />
+                )}
+
+                {/* Top Contributor */}
+                <TopContributorCard completedTasks={digest.completedTaskDetails} />
 
                 {/* Objective Progress */}
                 {digest.objectiveProgress.length > 0 && (
@@ -276,12 +331,6 @@ export function WeeklyDigestPanel({ className }: WeeklyDigestPanelProps): React.
                   </div>
                 )}
 
-                {/* ForgeOS Branding */}
-                <div className="text-center pt-2 border-t border-muted">
-                  <p className="text-[10px] text-muted-foreground">
-                    Powered by ForgeOS &middot; fractionalforge.com
-                  </p>
-                </div>
               </div>
             </ScrollArea>
           ) : null}
@@ -290,6 +339,14 @@ export function WeeklyDigestPanel({ className }: WeeklyDigestPanelProps): React.
             <DialogFooter>
               <Button variant="secondary" onClick={() => setIsOpen(false)}>
                 Close
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleCopyMarkdown}
+                className="gap-1.5"
+              >
+                <FileText className="h-4 w-4" />
+                Copy Markdown
               </Button>
               <Button
                 onClick={handleCopyReport}
@@ -384,9 +441,122 @@ function ObjectiveProgressRow({ objective }: { objective: ObjectiveProgress }): 
         <span className="flex items-center gap-1">
           {objective.progress}%
           {progressDelta > 0 && (
-            <span className="text-status-success">+{progressDelta}%</span>
+            <span className="flex items-center gap-0.5 text-status-success">
+              <TrendingUp className="h-3 w-3" />
+              +{progressDelta}%
+            </span>
+          )}
+          {progressDelta < 0 && (
+            <span className="flex items-center gap-0.5 text-destructive">
+              <TrendingDown className="h-3 w-3" />
+              {progressDelta}%
+            </span>
           )}
         </span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Chart & Contributor Components ──────────────────────────────
+
+/**
+ * Computes the top contributor from completed task details.
+ *
+ * @param details - Array of completed task details with assignee names
+ * @returns The name and count of the person who completed the most tasks, or null
+ */
+function getTopContributor(details: CompletedTaskDetail[]): { name: string; count: number } | null {
+  if (details.length === 0) return null
+  const counts: Record<string, number> = {}
+  details.forEach((d) => {
+    if (d.completedBy && d.completedBy !== 'Unknown') {
+      counts[d.completedBy] = (counts[d.completedBy] || 0) + 1
+    }
+  })
+  const entries = Object.entries(counts)
+  if (entries.length === 0) return null
+  entries.sort((a, b) => b[1] - a[1])
+  return { name: entries[0][0], count: entries[0][1] }
+}
+
+/**
+ * Displays the top contributor for the week with avatar and task count.
+ */
+function TopContributorCard({ completedTasks }: { completedTasks: CompletedTaskDetail[] }): React.ReactElement | null {
+  const top = getTopContributor(completedTasks)
+  if (!top) return null
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border p-3 bg-status-success-light/30">
+      <UserAvatar name={top.name} size="sm" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top contributor</p>
+        <p className="text-sm font-semibold text-foreground truncate">{top.name}</p>
+      </div>
+      <div className="text-right">
+        <p className="text-lg font-bold text-status-success">{top.count}</p>
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">tasks</p>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Horizontal bar chart comparing objective progress: last week vs this week.
+ */
+function WeeklyComparisonChart({ objectives }: { objectives: ObjectiveProgress[] }): React.ReactElement | null {
+  if (objectives.length === 0) return null
+
+  const chartData = objectives.slice(0, 6).map((obj) => ({
+    name: obj.title.length > 16 ? obj.title.slice(0, 16) + '\u2026' : obj.title,
+    'Last Week': obj.previousProgress,
+    'This Week': obj.progress,
+  }))
+
+  return (
+    <div>
+      <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
+        Progress comparison
+      </p>
+      <div className="rounded-lg border p-3">
+        <ResponsiveContainer width="100%" height={chartData.length * 44 + 24}>
+          <BarChart
+            data={chartData}
+            layout="vertical"
+            margin={{ left: 4, right: 12, top: 4, bottom: 4 }}
+          >
+            <XAxis
+              type="number"
+              domain={[0, 100]}
+              tick={{ fontSize: 10 }}
+              tickFormatter={(v: number) => `${v}%`}
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={110}
+              tick={{ fontSize: 11 }}
+            />
+            <RechartsTooltip
+              formatter={(value) => `${value}%`}
+              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            />
+            <Bar
+              dataKey="Last Week"
+              fill="hsl(var(--muted-foreground))"
+              radius={[0, 2, 2, 0]}
+              barSize={10}
+              opacity={0.25}
+            />
+            <Bar
+              dataKey="This Week"
+              fill="hsl(var(--international-orange))"
+              radius={[0, 4, 4, 0]}
+              barSize={10}
+            />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   )

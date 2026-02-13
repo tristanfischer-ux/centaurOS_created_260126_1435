@@ -11,11 +11,14 @@
  */
 
 import { withAuth } from '@/lib/server-action-utils'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // ─── Types ────────────────────────────────────────────────────────
 
 export interface MorningBriefing {
   greeting: string
+  narrative: string
+  userName: string
   topTasks: Array<{
     id: string
     title: string
@@ -223,9 +226,92 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
       ? `${timeGreeting}! You completed ${completedYesterday} task${(completedYesterday || 0) !== 1 ? 's' : ''} yesterday.`
       : `${timeGreeting}! Here is what needs your attention today.`
 
+    // 9. Generate personalized narrative briefing
+
+    // 9a. Fetch user's first name from profiles
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+
+    const userName = profile?.full_name?.split(' ')[0] || 'there'
+
+    // 9b. Fetch yesterday's completed task titles (up to 5)
+    const { data: yesterdayTasks } = await supabase
+      .from('tasks')
+      .select('title')
+      .eq('foundry_id', foundryId)
+      .eq('status', 'Completed')
+      .gte('updated_at', `${yesterdayStr}T00:00:00`)
+      .lt('updated_at', `${yesterdayStr}T23:59:59`)
+      .limit(5)
+
+    const yesterdayCompletedTitles = (yesterdayTasks || []).map((t) => t.title)
+
+    // 9c. Call Gemini Flash to generate a personalized narrative
+    let narrative = greeting // Fallback to template greeting if AI call fails
+
+    try {
+      const apiKey = process.env.GEMINI_API_KEY
+      if (apiKey) {
+        const genAI = new GoogleGenerativeAI(apiKey)
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+
+        const topTaskSummaries = topTasks.map((t) =>
+          `"${t.title}"${t.dueDate ? ` (due ${t.dueDate})` : ''}`
+        )
+        const atRiskSummaries = atRiskObjectives.map((o) =>
+          `"${o.title}" (${o.progress}% complete)`
+        )
+
+        const userPrompt = [
+          `User name: ${userName}`,
+          yesterdayCompletedTitles.length > 0
+            ? `Yesterday completed: ${yesterdayCompletedTitles.join(', ')}`
+            : 'No tasks completed yesterday.',
+          topTaskSummaries.length > 0
+            ? `Top upcoming tasks: ${topTaskSummaries.join(', ')}`
+            : 'No urgent tasks today.',
+          atRiskSummaries.length > 0
+            ? `At-risk objectives: ${atRiskSummaries.join(', ')}`
+            : 'No at-risk objectives.',
+          `Completion streak: ${streak} day${streak !== 1 ? 's' : ''}`,
+          `Overdue tasks: ${overdueTasks.length}`,
+        ].join('\n')
+
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          systemInstruction: {
+            role: 'system',
+            parts: [{
+              text: 'You are a concise executive briefing writer. Write 2-4 sentences summarizing the user\'s day ahead. Reference specific task names and objective names. Be warm but efficient. Use the user\'s first name. Never mention AI or that you are an AI. Never use emojis.',
+            }],
+          },
+          generationConfig: {
+            maxOutputTokens: 200,
+            temperature: 0.7,
+          },
+        })
+
+        const generatedText = result.response.text()?.trim()
+        if (generatedText) {
+          narrative = generatedText
+        }
+      }
+    } catch (error) {
+      // Fallback to template greeting — narrative already set above
+      console.error('[Nudges] Narrative generation failed:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        userId: user.id,
+      })
+    }
+
     return {
       data: {
         greeting,
+        narrative,
+        userName,
         topTasks,
         overdueCount: overdueTasks.length,
         atRiskObjectives,
