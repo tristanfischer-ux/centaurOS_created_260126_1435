@@ -11,7 +11,7 @@
  * is managed here and passed down.
  */
 
-import { useState, useCallback, useTransition, useMemo } from 'react'
+import { useState, useCallback, useTransition, useMemo, useEffect } from 'react'
 import {
     Plus, Search, LayoutGrid, List, Users,
     BarChart3, ShieldCheck, Zap, MoreHorizontal, Loader2,
@@ -38,6 +38,7 @@ import {
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { EmptyState } from '@/components/ui/empty-state'
 import { typography } from '@/lib/design-system'
+import { useRegisterScreenContext } from '@/contexts/screen-context'
 import { cn } from '@/lib/utils'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { RefreshButton } from '@/components/RefreshButton'
@@ -229,6 +230,18 @@ export function TeamPageView({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FullTaskView accepts a broad Task shape from Supabase
     const [fullTaskData, setFullTaskData] = useState<any>(null)
     const [isLoadingTask, setIsLoadingTask] = useState(false)
+
+    // Register screen context so specialists know what the user is viewing
+    const totalMembers = founders.length + executives.length + apprentices.length
+    useRegisterScreenContext(useMemo(() => ({
+        pageTitle: 'Team',
+        summary: `Viewing the team page. ${totalMembers} team members: ${founders.length} founders, ${executives.length} executives, ${apprentices.length} apprentices. ${teams.length} teams.${insights?.overloadedMembers?.length ? ` ${insights.overloadedMembers.length} overloaded members.` : ''}${insights?.overdueTaskCount ? ` ${insights.overdueTaskCount} overdue tasks.` : ''}`,
+        entities: [
+            ...founders.map(m => ({ type: 'founder', title: m.full_name || 'Unknown', status: 'active' })),
+            ...executives.map(m => ({ type: 'executive', title: m.full_name || 'Unknown', status: 'active' })),
+            ...apprentices.map(m => ({ type: 'apprentice', title: m.full_name || 'Unknown', status: 'active' })),
+        ],
+    }), [founders, executives, apprentices, teams, insights, totalMembers]))
 
     // Quick assign
     const [showQuickAssign, setShowQuickAssign] = useState(false)

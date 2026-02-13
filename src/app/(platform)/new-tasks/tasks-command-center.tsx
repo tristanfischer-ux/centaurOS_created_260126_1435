@@ -23,6 +23,7 @@ import { TaskDetailPanel } from './task-detail-panel'
 import { CreateTaskDialog } from '../tasks/create-task-dialog'
 import { EditTaskDialog } from '@/components/tasks/edit-task-dialog'
 import { TasksGanttView } from './gantt-view'
+import { useRegisterScreenContext } from '@/contexts/screen-context'
 import type { TaskWithData, Member, Team } from './types'
 
 const LARGE_BREAKPOINT = 1280
@@ -206,6 +207,26 @@ export function TasksCommandCenter({
   }, [tasks, quickFilter, searchQuery, strategyFilter, currentUserId])
 
   const filteredTasks = useMemo(() => getFilteredTasks(), [getFilteredTasks])
+
+  // Register screen context so specialists know what the user is viewing
+  const taskStats = useMemo(() => {
+    const todo = tasks.filter(t => t.status === 'To Do').length
+    const inProgress = tasks.filter(t => t.status === 'In Progress').length
+    const done = tasks.filter(t => t.status === 'Done').length
+    const blocked = tasks.filter(t => t.status === 'Blocked').length
+    return { total: tasks.length, todo, inProgress, done, blocked }
+  }, [tasks])
+
+  useRegisterScreenContext(useMemo(() => ({
+    pageTitle: 'Tasks',
+    summary: `Viewing ${taskStats.total} tasks. ${taskStats.inProgress} in progress, ${taskStats.todo} to do, ${taskStats.done} done, ${taskStats.blocked} blocked.${selectedId ? ` Currently focused on task "${tasks.find(t => t.id === selectedId)?.title ?? 'Unknown'}".` : ''} ${quickFilter === 'my-tasks' ? 'Filtered to my tasks.' : ''}`,
+    entities: filteredTasks.slice(0, 20).map(t => ({
+      type: 'task',
+      title: t.title,
+      status: t.status,
+      progress: t.progress ?? undefined,
+    })),
+  }), [taskStats, tasks, filteredTasks, selectedId, quickFilter]))
 
   // Keep refs in sync for keyboard handler (avoids stale closures)
   filteredTasksRef.current = filteredTasks

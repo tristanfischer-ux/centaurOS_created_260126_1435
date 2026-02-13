@@ -97,9 +97,21 @@ const DOMAIN_RULES: DomainRule[] = [
     specialistId: 'chief-of-staff',
     specialistName: 'Cal',
     keywords: [
-      'operations', 'process', 'meeting', 'decision', 'priority',
-      'weekly', 'alignment', 'coordination', 'efficiency', 'workflow',
+      'meeting', 'decision', 'priority',
+      'weekly', 'alignment', 'coordination', 'workflow',
       'board meeting', 'stakeholder', 'agenda', 'follow up', 'planning',
+    ],
+  },
+  {
+    specialistId: 'forge-ops',
+    specialistName: 'Owen',
+    keywords: [
+      'operations', 'manufacturing', 'supply chain', 'vendor', 'supplier',
+      'production', 'fulfillment', 'delivery', 'logistics', 'inventory',
+      'quality', 'qc', 'qa', 'process', 'bottleneck', 'throughput',
+      'capacity', 'warehouse', 'shipping', 'procurement', 'efficiency',
+      'sla', 'lead time', 'batch', 'assembly', 'cad', 'component',
+      'forge', 'foundry operations', 'operational',
     ],
   },
 ]

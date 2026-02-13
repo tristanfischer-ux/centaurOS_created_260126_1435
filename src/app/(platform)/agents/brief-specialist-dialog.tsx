@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
-    Loader2, Send, AlertCircle, Copy, Check,
+    Loader2, Send, AlertCircle, Copy, Check, Eye,
     MessageSquareQuote, ArrowRight, Clock,
     History, Mic, MicOff, Volume2, VolumeX, Sparkles, Brain,
 } from "lucide-react"
@@ -23,6 +23,7 @@ import { createArtifact } from "@/actions/agent-artifacts"
 import { getSpecialistById, SPECIALISTS } from "./specialists-data"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
+import { useScreenContext } from "@/contexts/screen-context"
 import type { PromptTemplate } from "./lib/agent-types"
 import type { Specialist } from "./specialists-data"
 
@@ -119,6 +120,9 @@ export function BriefSpecialistDialog({
     const scrollRef = useRef<HTMLDivElement>(null)
     /** Tracks whether we've already generated a proactive greeting for this specialist session */
     const greetingGeneratedRef = useRef(false)
+
+    // ─── Screen Awareness ─────────────────────────────────────────────────
+    const { serializeScreenContext, screenContext } = useScreenContext()
 
     // ─── Voice Hooks ──────────────────────────────────────────────────────
     const tts = useTts()
@@ -401,8 +405,15 @@ ${contextParts.join("\n\n")}
         setError(null)
         setDynamicSuggestion(null)
 
-        // Build the prompt with specialist personality, cross-specialist context, and handoff
+        // Build the prompt with specialist personality, cross-specialist context, screen awareness, and handoff
         const systemExtras: string[] = []
+
+        // Screen awareness: tell the specialist what the user is currently looking at
+        const screenContextStr = serializeScreenContext()
+        if (screenContextStr) {
+            systemExtras.push(`\n\n${screenContextStr}`)
+        }
+
         if (handoffContext && messages.length <= 1) {
             // Only inject handoff on the first exchange
             systemExtras.push(`\n\n## Handoff Context\n${handoffContext}`)
@@ -654,12 +665,17 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             </p>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
-                            {contextLabel && (
+                            {contextLabel ? (
                                 <Badge variant="secondary" className="text-xs gap-1 max-w-[180px] truncate">
                                     <MessageSquareQuote className="h-3 w-3 flex-shrink-0" />
                                     {contextLabel}
                                 </Badge>
-                            )}
+                            ) : screenContext.pageTitle !== "ForgeOS Platform" ? (
+                                <Badge variant="secondary" className="text-[10px] gap-1 max-w-[180px] truncate opacity-70">
+                                    <Eye className="h-3 w-3 flex-shrink-0" />
+                                    Seeing: {screenContext.pageTitle}
+                                </Badge>
+                            ) : null}
                             {referredBy && (
                                 <Badge variant="default" className="text-xs gap-1 bg-international-orange/10 text-international-orange border-international-orange/20">
                                     <ArrowRight className="h-3 w-3" />

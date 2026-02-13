@@ -12,7 +12,7 @@
 
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { motion, useMotionValue, useTransform, animate } from "framer-motion"
 import {
@@ -48,6 +48,7 @@ import { typography } from "@/lib/design-system"
 import { StreakBadge } from "@/components/celebrations/StreakBadge"
 import { useCelebration } from "@/hooks/useCelebration"
 import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
+import { useRegisterScreenContext } from "@/contexts/screen-context"
 
 import type { FormattedReport, DailyPulseData } from "@/lib/reports/types"
 
@@ -133,6 +134,32 @@ export function TodayView(): React.ReactElement {
     useEffect(() => {
         loadData()
     }, [loadData])
+
+    // Register screen context so specialists know what the user is viewing
+    useRegisterScreenContext(useMemo(() => {
+        if (isLoading) return null
+        const pulseData = pulse?.data as DailyPulseData | undefined
+        const parts: string[] = ['Viewing the daily briefing page.']
+        if (briefing?.narrative) parts.push(briefing.narrative)
+        if (pulseData) {
+            parts.push(`${pulseData.personal.tasks_due_today} tasks due today, ${pulseData.blockers.length} blockers, ${pulseData.pending_approvals.length} pending approvals.`)
+        }
+        if (strategyHealth.length > 0) {
+            const atRisk = strategyHealth.filter(s => s.health === 'at-risk').length
+            const offTrack = strategyHealth.filter(s => s.health === 'off-track').length
+            if (atRisk > 0 || offTrack > 0) parts.push(`Strategy: ${atRisk} at risk, ${offTrack} off track.`)
+        }
+        return {
+            pageTitle: 'Today (Daily Briefing)',
+            summary: parts.join(' '),
+            entities: strategyHealth.map(s => ({
+                type: 'strategy-pillar',
+                title: s.title,
+                status: s.health,
+                progress: s.progress,
+            })),
+        }
+    }, [isLoading, briefing, pulse, strategyHealth]))
 
     // ─── Celebration effects ──────────────────────────────────────
 

@@ -12,6 +12,7 @@ import {
   ChevronRight, ChevronDown, Flag, AlertTriangle, Plus, Waypoints, MessageSquare,
 } from 'lucide-react'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
+import { useRegisterScreenContext } from '@/contexts/screen-context'
 import type { SpecialistContext } from '@/components/specialists/types'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
@@ -155,6 +156,18 @@ export function ObjectivesBoard({
     const completed = objectives.filter(o => o.health === 'completed').length
     return { total, onTrack, atRisk, offTrack, completed }
   }, [objectives])
+
+  // Register screen context so specialists know what the user is viewing
+  useRegisterScreenContext(useMemo(() => ({
+    pageTitle: 'Objectives Board',
+    summary: `Viewing ${stats.total} objectives. ${stats.onTrack} on track, ${stats.atRisk} at risk, ${stats.offTrack} off track, ${stats.completed} completed.${selectedId ? ` Currently focused on objective "${objectives.find(o => o.id === selectedId)?.title ?? 'Unknown'}".` : ''}`,
+    entities: objectives.map(o => ({
+      type: 'objective',
+      title: o.title,
+      status: o.health,
+      progress: o.progress ?? undefined,
+    })),
+  }), [objectives, stats, selectedId]))
 
   // Filter objectives
   const filteredObjectives = useMemo(() => {

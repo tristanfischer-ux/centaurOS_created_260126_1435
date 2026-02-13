@@ -15,6 +15,7 @@ import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
 import { ZoomProvider, MobileZoomControl, ZoomableContent } from "@/components/ZoomProvider";
+import { ScreenContextProvider } from "@/contexts/screen-context";
 import { createClient } from "@/lib/supabase/server";
 import { getUserFoundries } from "@/lib/supabase/foundry-context";
 import { redirect } from "next/navigation";
@@ -96,6 +97,7 @@ export default async function PlatformLayout({
         <TooltipProvider>
             <PresenceProvider>
                 <ZoomProvider>
+                  <ScreenContextProvider>
                     <div className="flex h-screen overflow-hidden">
                         <CommandPalette />
                         <KeyboardShortcutsDialog />
@@ -120,6 +122,7 @@ export default async function PlatformLayout({
                             <VerificationSuccessToast />
                         </Suspense>
                     </div>
+                  </ScreenContextProvider>
                 </ZoomProvider>
             </PresenceProvider>
         </TooltipProvider>

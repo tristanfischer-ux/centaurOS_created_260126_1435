@@ -32,6 +32,7 @@ import {
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import { StrategyHealthReview } from '@/components/specialists/strategy-health-review'
 import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
+import { useRegisterScreenContext } from '@/contexts/screen-context'
 import type { SpecialistContext } from '@/components/specialists/types'
 import { getStrategyColor } from '../new-objectives/strategy-colors'
 import type { GoalBundle, MilestoneOption } from '@/types/canvas'
@@ -185,6 +186,19 @@ export function StrategyDashboard({
       : 0
     return { onTrack, atRisk, offTrack, completed, notStarted, totalProgress }
   }, [pillars])
+
+  // Register screen context so specialists know what the user is viewing
+  const purpose = purposeData?.purpose
+  useRegisterScreenContext(useMemo(() => ({
+    pageTitle: 'Strategy Dashboard',
+    summary: `Viewing company strategy with ${pillars.length} strategic pillars. ${stats.totalProgress}% average progress. ${stats.onTrack} on track, ${stats.atRisk} at risk, ${stats.offTrack} off track, ${stats.completed} completed.${purpose ? ` Company purpose: "${purpose}"` : ''}`,
+    entities: pillars.map(p => ({
+      type: 'pillar',
+      title: p.title,
+      status: p.health,
+      progress: p.progress,
+    })),
+  }), [pillars, stats, purpose]))
 
   return (
     <div className="space-y-8">
