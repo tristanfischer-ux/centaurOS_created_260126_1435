@@ -14,6 +14,10 @@ export interface StreamingTextOptions {
     systemPrompt: string
     userPrompt: string
     maxTokens?: number
+    /** Enable Anthropic extended thinking for deeper reasoning. Only applies to Anthropic models. */
+    enableThinking?: boolean
+    /** Token budget for extended thinking (default: 10000). Only used when enableThinking is true. */
+    thinkingBudget?: number
     onChunk: (text: string) => void
     onDone: () => void
     onError: (error: string) => void
@@ -72,15 +76,29 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
     const Anthropic = (await import("@anthropic-ai/sdk")).default
     const client = new Anthropic({ apiKey: opts.apiKey })
 
-    const stream = await client.messages.stream({
+    // Build stream parameters, conditionally enabling extended thinking
+    // Extended thinking adds an internal chain-of-thought step before the
+    // final response, improving reasoning quality for complex analysis.
+    const thinkingBudget = opts.thinkingBudget ?? 10_000
+    const streamParams: Parameters<typeof client.messages.stream>[0] = {
         model: opts.modelId,
         max_tokens: opts.maxTokens ?? 4096,
         system: opts.systemPrompt,
         messages: [{ role: "user", content: opts.userPrompt }],
-    })
+        ...(opts.enableThinking && {
+            thinking: {
+                type: "enabled" as const,
+                budget_tokens: thinkingBudget,
+            },
+        }),
+    }
+
+    const stream = await client.messages.stream(streamParams)
 
     for await (const event of stream) {
         if (opts.signal?.aborted) break
+        // Only stream text deltas to the user -- thinking blocks are internal
+        // reasoning that improves quality silently without exposing raw chain-of-thought.
         if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             opts.onChunk(event.delta.text)
         }

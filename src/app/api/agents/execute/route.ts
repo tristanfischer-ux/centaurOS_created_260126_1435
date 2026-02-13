@@ -93,6 +93,7 @@ export async function POST(request: Request) {
     let threadId: string | undefined
     let customSystemPromptSuffix: string | undefined
     let specialistId: string | undefined
+    let enableThinking: boolean
 
     try {
         const body = await request.json()
@@ -104,6 +105,7 @@ export async function POST(request: Request) {
         threadId = body.threadId ?? undefined
         customSystemPromptSuffix = typeof body.customSystemPromptSuffix === "string" ? body.customSystemPromptSuffix : undefined
         specialistId = typeof body.specialistId === "string" ? body.specialistId : undefined
+        enableThinking = body.enableThinking === true
 
         if (!prompt || typeof prompt !== "string") {
             return NextResponse.json({ error: "prompt is required" }, { status: 400 })
@@ -286,7 +288,7 @@ export async function POST(request: Request) {
 
     try {
         if (modality === "text") {
-            return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, systemPromptWithContext, memoryCallback)
+            return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking)
         }
         if (modality === "slides") {
             // Slides use text generation with a structured output prompt
@@ -319,13 +321,25 @@ export async function POST(request: Request) {
 
 // ─── Text Streaming Handler ──────────────────────────────────────────
 
+/**
+ * Streams a text generation response back to the client via SSE.
+ *
+ * @param apiKey - Resolved API key for the provider
+ * @param providerId - Which AI provider to use
+ * @param modelId - Specific model ID
+ * @param finalPrompt - The user prompt with placeholders resolved
+ * @param customSystemPrompt - System prompt override
+ * @param onComplete - Callback fired after streaming completes (for memory + usage logging)
+ * @param enableThinking - When true, enables Anthropic extended thinking for deeper reasoning
+ */
 async function handleTextStreaming(
     apiKey: string,
     providerId: AIProviderId,
     modelId: string,
     finalPrompt: string,
     customSystemPrompt?: string,
-    onComplete?: (fullOutput: string) => Promise<void>
+    onComplete?: (fullOutput: string) => Promise<void>,
+    enableThinking?: boolean
 ): Promise<Response> {
     const streamFn = getTextProvider(providerId)
     if (!streamFn) {
@@ -334,6 +348,9 @@ async function handleTextStreaming(
             { status: 400 }
         )
     }
+
+    // Extended thinking requires more output headroom for the thinking budget + response
+    const maxTokens = enableThinking ? 32768 : 16384
 
     const encoder = new TextEncoder()
     let fullOutput = ""
@@ -346,7 +363,8 @@ async function handleTextStreaming(
                     modelId,
                     systemPrompt: customSystemPrompt ?? SYSTEM_PROMPT,
                     userPrompt: finalPrompt,
-                    maxTokens: 16384,
+                    maxTokens,
+                    enableThinking: enableThinking && providerId === "anthropic",
                     onChunk(text) {
                         fullOutput += text
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))

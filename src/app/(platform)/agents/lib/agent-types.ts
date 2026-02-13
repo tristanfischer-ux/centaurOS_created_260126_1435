@@ -16,6 +16,9 @@ export const PROMPT_CATEGORIES = [
     "data-analytics",
     "manufacturing",
     "chief-of-staff",
+    "technology",
+    "engineering",
+    "supply-chain",
 ] as const
 
 export type PromptCategory = (typeof PROMPT_CATEGORIES)[number]
@@ -142,6 +145,30 @@ export const CATEGORY_META: Record<PromptCategory, CategoryMeta> = {
         borderColor: "border-amber-400",
         icon: "Crown",
     },
+    technology: {
+        id: "technology",
+        label: "Technology & Architecture",
+        color: "text-violet-600",
+        bgColor: "bg-violet-50",
+        borderColor: "border-violet-300",
+        icon: "Cpu",
+    },
+    engineering: {
+        id: "engineering",
+        label: "Engineering & Velocity",
+        color: "text-sky-600",
+        bgColor: "bg-sky-50",
+        borderColor: "border-sky-300",
+        icon: "Code2",
+    },
+    "supply-chain": {
+        id: "supply-chain",
+        label: "Supply Chain & Procurement",
+        color: "text-teal-600",
+        bgColor: "bg-teal-50",
+        borderColor: "border-teal-300",
+        icon: "Route",
+    },
 }
 
 // Color bars for nodes (left accent)
@@ -160,6 +187,9 @@ export const CATEGORY_ACCENT_COLORS: Record<PromptCategory, string> = {
     "data-analytics": "#4f46e5",
     manufacturing: "#ea580c",
     "chief-of-staff": "#b45309",
+    technology: "#7c3aed",
+    engineering: "#0284c7",
+    "supply-chain": "#0d9488",
 }
 
 // ─── Execution States (HITL pattern) ─────────────────────────────────
