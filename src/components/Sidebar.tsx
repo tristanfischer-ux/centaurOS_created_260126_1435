@@ -1,9 +1,8 @@
 /**
  * @file Sidebar.tsx — Main navigation component with four-section layout.
  *
- * @description Organizes navigation with a top-level "Today" link plus four sections:
- * - "Today": top-level daily focus (always visible, first item after foundry switcher)
- * - "Me": personal pages (My Profile, Updates)
+ * @description Organizes navigation into four sections:
+ * - "Me": personal pages (Today, My Profile, Updates)
  * - "Plan": strategy and execution (Strategy, Objectives, Tasks)
  * - "Workshop": collaboration and building (The Forge, Team, Specialists)
  * - "Marketplace": recruits and supplies (Guild, Apprenticeship, Inspiration, Marketplace, Orders)
@@ -90,9 +89,9 @@ const meNavigation = [
 // Section 2: "Plan" — Strategy and execution
 // ─────────────────────────────────────────────────────────────────────────────
 const planNavigation = [
-    { name: "Strategy", href: "/strategy", icon: Waypoints, tooltip: "Your strategic direction — pillars, progress, and health at a glance", indent: false },
-    { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Milestones that move the strategy forward", indent: true },
-    { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Day-to-day work that delivers on objectives", indent: true },
+    { name: "Strategy", href: "/strategy", icon: Waypoints, tooltip: "Your strategic direction — pillars, progress, and health at a glance" },
+    { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Milestones that move the strategy forward" },
+    { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Day-to-day work that delivers on objectives" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -260,8 +259,8 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 1: "Me" — Personal pages                  */}
                 {/* ══════════════════════════════════════════════════ */}
-                {renderNavItem(todayNavItem)}
                 <SectionHeader label="Me" introRoute="/me" hasNew={badges.me} />
+                {renderNavItem(todayNavItem)}
                 {meNavigation.map(renderNavItem)}
 
                 {/* Unread messages indicator */}
