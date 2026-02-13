@@ -2,9 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
-import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import { useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  AnimatePresence,
+  useMotionValue,
+  useSpring,
+  animate,
+} from "framer-motion";
 import {
   fadeInUp,
   fadeInScale,
@@ -34,6 +42,14 @@ import {
   Factory,
   Quote,
   Star,
+  Calculator,
+  Share2,
+  Copy,
+  Check,
+  Timer,
+  TrendingUp,
+  ExternalLink,
+  Milestone,
 } from "lucide-react";
 import {
   Accordion,
@@ -119,6 +135,12 @@ export default function MarketingPage() {
             >
               FAQ
             </a>
+            <Link
+              href="/techniques"
+              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
+            >
+              Techniques
+            </Link>
             <a
               href={`${APP_DOMAIN}/login`}
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
@@ -180,6 +202,13 @@ export default function MarketingPage() {
                   </a>
                 ))}
                 <Link
+                  href="/techniques"
+                  className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Techniques
+                </Link>
+                <Link
                   href="/pricing"
                   className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
@@ -210,7 +239,11 @@ export default function MarketingPage() {
       <main id="main-content">
         <HeroSection />
         <ProblemSection />
+        <Suspense fallback={null}>
+          <SavingsCalculatorSection />
+        </Suspense>
         <SolutionSection />
+        <CaseStudySection />
         <SocialProofSection />
         <HowItWorksSection />
         <CapabilitiesHighlight />
@@ -312,6 +345,23 @@ function HeroSection() {
   const { scrollY } = useScroll();
   const parallaxY = useTransform(scrollY, [0, 500], [0, 150]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+
+  // Fetch live founding member count
+  useEffect(() => {
+    async function fetchStats(): Promise<void> {
+      try {
+        const res = await fetch("/api/marketing/stats");
+        if (res.ok) {
+          const data = await res.json();
+          setMemberCount(data.foundingMembers ?? null);
+        }
+      } catch {
+        // Graceful fallback — hide counter if fetch fails
+      }
+    }
+    fetchStats();
+  }, []);
 
   const heroImages = [
     {
@@ -384,6 +434,33 @@ function HeroSection() {
             Early Access &mdash; Founding Members Only
           </span>
         </motion.div>
+
+        {/* Live founding member counter */}
+        {memberCount !== null && memberCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="mb-6 md:mb-8"
+          >
+            <div className="inline-flex flex-col items-center gap-2">
+              <p className="text-sm text-muted-foreground font-mono">
+                <span className="text-2xl font-black text-international-orange">
+                  {memberCount}
+                </span>{" "}
+                of 100 founding spots claimed
+              </p>
+              <div className="w-48 h-1.5 bg-muted rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min((memberCount / 100) * 100, 100)}%` }}
+                  transition={{ delay: 0.6, duration: 1.2, ease: "easeOut" }}
+                  className="h-full bg-international-orange rounded-full"
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Main Headline */}
         <motion.h1
@@ -549,6 +626,308 @@ function ProblemSection() {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+ * SECTION 2b — SAVINGS CALCULATOR
+ * Interactive tool that makes the savings tangible and shareable.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+function SavingsCalculatorSection() {
+  const searchParams = useSearchParams();
+  const [copied, setCopied] = useState(false);
+
+  // Initialize from URL params or defaults
+  const calcParam = searchParams.get("calc");
+  const initialValues = useMemo(() => {
+    if (calcParam) {
+      const parts = calcParam.split(",").map(Number);
+      if (parts.length === 3 && parts.every((n) => !isNaN(n))) {
+        return {
+          teamSize: Math.max(2, Math.min(15, parts[0])),
+          monthlyCost: Math.max(4000, Math.min(15000, parts[1])),
+          duration: Math.max(3, Math.min(24, parts[2])),
+        };
+      }
+    }
+    return { teamSize: 5, monthlyCost: 8000, duration: 12 };
+  }, [calcParam]);
+
+  const [teamSize, setTeamSize] = useState(initialValues.teamSize);
+  const [monthlyCost, setMonthlyCost] = useState(initialValues.monthlyCost);
+  const [duration, setDuration] = useState(initialValues.duration);
+
+  // Calculations
+  const traditionalCost = teamSize * monthlyCost * duration;
+  const fractionalMultiplier = duration <= 6 ? 0.35 : duration <= 12 ? 0.3 : 0.25;
+  const fractionalCost = Math.round(traditionalCost * fractionalMultiplier);
+  const savings = traditionalCost - fractionalCost;
+  const savingsPercent = Math.round((1 - fractionalMultiplier) * 100);
+  const traditionalWeeks = duration * 4;
+  const fractionalWeeks = Math.max(6, Math.round(duration * 2.5));
+  const weeksSaved = traditionalWeeks - fractionalWeeks;
+
+  const formatCurrency = (value: number): string => {
+    if (value >= 1000000) return `£${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `£${(value / 1000).toFixed(0)}k`;
+    return `£${value}`;
+  };
+
+  const handleShare = useCallback(async () => {
+    const url = `${window.location.origin}?calc=${teamSize},${monthlyCost},${duration}#calculator`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const input = document.createElement("input");
+      input.value = url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [teamSize, monthlyCost, duration]);
+
+  return (
+    <section
+      id="calculator"
+      className="py-16 md:py-28 bg-muted/30 border-t border-muted"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
+            See Your Savings
+          </span>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
+            How Much Is Your Standing Army
+            <br className="hidden sm:block" />{" "}
+            <span className="text-international-orange">Really Costing You?</span>
+          </h2>
+          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            Drag the sliders to match your situation. Watch the savings add up.
+          </p>
+        </AnimatedSection>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12">
+          {/* Left: Sliders */}
+          <AnimatedSection className="space-y-8">
+            <div className="border bg-card rounded-xl p-6 md:p-8 space-y-8">
+              {/* Team Size */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="team-size"
+                    className="text-sm font-semibold text-foreground"
+                  >
+                    Engineering Team Size
+                  </label>
+                  <span className="text-lg font-black text-international-orange font-mono">
+                    {teamSize}
+                  </span>
+                </div>
+                <input
+                  id="team-size"
+                  type="range"
+                  min={2}
+                  max={15}
+                  value={teamSize}
+                  onChange={(e) => setTeamSize(Number(e.target.value))}
+                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md"
+                  aria-label={`Team size: ${teamSize} engineers`}
+                />
+                <div className="flex justify-between text-xs text-muted-foreground font-mono">
+                  <span>2</span>
+                  <span>15 engineers</span>
+                </div>
+              </div>
+
+              {/* Monthly Cost */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="monthly-cost"
+                    className="text-sm font-semibold text-foreground"
+                  >
+                    Avg. Monthly Cost / Engineer
+                  </label>
+                  <span className="text-lg font-black text-international-orange font-mono">
+                    £{monthlyCost.toLocaleString()}
+                  </span>
+                </div>
+                <input
+                  id="monthly-cost"
+                  type="range"
+                  min={4000}
+                  max={15000}
+                  step={500}
+                  value={monthlyCost}
+                  onChange={(e) => setMonthlyCost(Number(e.target.value))}
+                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md"
+                  aria-label={`Monthly cost per engineer: £${monthlyCost.toLocaleString()}`}
+                />
+                <div className="flex justify-between text-xs text-muted-foreground font-mono">
+                  <span>£4,000</span>
+                  <span>£15,000/mo</span>
+                </div>
+              </div>
+
+              {/* Duration */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="duration"
+                    className="text-sm font-semibold text-foreground"
+                  >
+                    Project Timeline
+                  </label>
+                  <span className="text-lg font-black text-international-orange font-mono">
+                    {duration} months
+                  </span>
+                </div>
+                <input
+                  id="duration"
+                  type="range"
+                  min={3}
+                  max={24}
+                  value={duration}
+                  onChange={(e) => setDuration(Number(e.target.value))}
+                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md"
+                  aria-label={`Project duration: ${duration} months`}
+                />
+                <div className="flex justify-between text-xs text-muted-foreground font-mono">
+                  <span>3</span>
+                  <span>24 months</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Decorative image */}
+            <div className="hidden lg:block relative w-full aspect-[2/1] rounded-xl overflow-hidden">
+              <Image
+                src="/images/calculator-paths.png"
+                alt="Two paths: the long traditional route versus the fast fractional route"
+                fill
+                className="object-cover"
+                sizes="600px"
+              />
+            </div>
+          </AnimatedSection>
+
+          {/* Right: Results */}
+          <AnimatedSection delay={0.15}>
+            <div className="border bg-card rounded-xl p-6 md:p-8 space-y-6 sticky top-24">
+              {/* Traditional vs Fractional comparison */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-xl bg-status-error-light p-5 text-center">
+                  <p className="text-xs font-mono uppercase tracking-widest text-destructive mb-2">
+                    Traditional
+                  </p>
+                  <p className="text-2xl md:text-3xl font-black text-destructive">
+                    {formatCurrency(traditionalCost)}
+                  </p>
+                  <p className="text-xs text-destructive/70 mt-1">
+                    {traditionalWeeks} weeks
+                  </p>
+                </div>
+                <div className="rounded-xl bg-status-success-light p-5 text-center">
+                  <p className="text-xs font-mono uppercase tracking-widest text-status-success mb-2">
+                    Fractional
+                  </p>
+                  <p className="text-2xl md:text-3xl font-black text-status-success">
+                    {formatCurrency(fractionalCost)}
+                  </p>
+                  <p className="text-xs text-status-success/70 mt-1">
+                    ~{fractionalWeeks} weeks
+                  </p>
+                </div>
+              </div>
+
+              {/* Savings highlight */}
+              <div className="rounded-xl border-2 border-international-orange bg-international-orange/5 p-6 text-center">
+                <p className="text-xs font-mono uppercase tracking-widest text-international-orange mb-2">
+                  You Save
+                </p>
+                <p className="text-4xl md:text-5xl font-black text-international-orange">
+                  {formatCurrency(savings)}
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {savingsPercent}% cost reduction &middot; {weeksSaved} weeks
+                  faster
+                </p>
+              </div>
+
+              {/* Breakdown */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Money saved
+                  </span>
+                  <span className="font-bold text-foreground">
+                    {formatCurrency(savings)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <Timer className="h-4 w-4" />
+                    Time saved
+                  </span>
+                  <span className="font-bold text-foreground">
+                    {weeksSaved} weeks
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Equity preserved
+                  </span>
+                  <span className="font-bold text-foreground">100%</span>
+                </div>
+              </div>
+
+              {/* Share + CTA */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <motion.div
+                  whileHover={buttonHover}
+                  whileTap={buttonTap}
+                  className="flex-1"
+                >
+                  <Link
+                    href="/join/founder"
+                    className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-6 py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px] w-full"
+                  >
+                    Apply Now
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </motion.div>
+                <button
+                  onClick={handleShare}
+                  className="flex items-center justify-center gap-2 border rounded-md px-4 py-3 text-xs font-mono font-bold tracking-widest uppercase text-muted-foreground hover:text-foreground hover:bg-muted transition-colors min-h-[44px]"
+                  aria-label="Share your savings calculation"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4 text-status-success" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="h-4 w-4" />
+                      Share
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </AnimatedSection>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
  * SECTION 3 — SOLUTION
  * Presents Fractional Forge as the answer to the pain.
  * ════════════════════════════════════════════════════════════════════════ */
@@ -634,6 +1013,143 @@ function SolutionSection() {
             );
           })}
         </StaggerContainer>
+      </div>
+    </section>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * SECTION 3b — CASE STUDY
+ * A specific, detailed story with real numbers that builds credibility.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+function CaseStudySection() {
+  const MILESTONES = [
+    { week: "Week 1–2", label: "Scope & Team Assembly", done: true },
+    { week: "Week 3–4", label: "Concept Design & Simulation", done: true },
+    { week: "Week 5–6", label: "Rapid Prototyping (3D Print + CNC)", done: true },
+    { week: "Week 7–8", label: "Functional Testing & Iteration", done: true },
+    { week: "Week 9", label: "Production-Ready Prototype Delivered", done: true },
+  ];
+
+  return (
+    <section className="py-16 md:py-28 bg-background border-t border-muted">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
+            Case Study
+          </span>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
+            From Napkin Sketch to Flying Prototype
+            <br className="hidden sm:block" />{" "}
+            <span className="text-international-orange">in 9 Weeks.</span>
+          </h2>
+        </AnimatedSection>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center">
+          {/* Left: Image */}
+          <AnimatedSection>
+            <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden border shadow-lg">
+              <Image
+                src="/images/case-study-drone.png"
+                alt="Production-ready inspection drone prototype built in 9 weeks with Fractional Forge"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 600px"
+              />
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-foreground/80 to-transparent p-6">
+                <p className="text-background text-xs font-mono uppercase tracking-widest mb-1">
+                  Aero Dynamics Ltd
+                </p>
+                <p className="text-background/80 text-sm">
+                  Industrial Inspection Drone
+                </p>
+              </div>
+            </div>
+          </AnimatedSection>
+
+          {/* Right: Story + Timeline */}
+          <AnimatedSection delay={0.15} className="space-y-8">
+            {/* The challenge */}
+            <div>
+              <h3 className="text-lg font-bold mb-3">The Challenge</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Aero Dynamics had a compelling vision for an autonomous inspection
+                drone but faced a familiar problem: traditional consultancies
+                quoted <strong className="text-foreground">14 months</strong> and{" "}
+                <strong className="text-foreground">£180k</strong> with a team of
+                6 full-time engineers. They had runway for 8 months.
+              </p>
+            </div>
+
+            {/* The result */}
+            <div>
+              <h3 className="text-lg font-bold mb-3">The Fractional Result</h3>
+              <StaggerContainer className="grid grid-cols-3 gap-4">
+                <AnimatedCard className="rounded-xl bg-status-success-light p-4 text-center">
+                  <p className="text-2xl font-black text-status-success">9</p>
+                  <p className="text-xs text-status-success font-mono uppercase tracking-wider">
+                    Weeks
+                  </p>
+                </AnimatedCard>
+                <AnimatedCard className="rounded-xl bg-status-success-light p-4 text-center">
+                  <p className="text-2xl font-black text-status-success">£47k</p>
+                  <p className="text-xs text-status-success font-mono uppercase tracking-wider">
+                    Total Cost
+                  </p>
+                </AnimatedCard>
+                <AnimatedCard className="rounded-xl bg-status-success-light p-4 text-center">
+                  <p className="text-2xl font-black text-status-success">3</p>
+                  <p className="text-xs text-status-success font-mono uppercase tracking-wider">
+                    Experts
+                  </p>
+                </AnimatedCard>
+              </StaggerContainer>
+            </div>
+
+            {/* Timeline */}
+            <div>
+              <h3 className="text-lg font-bold mb-4">Sprint Timeline</h3>
+              <div className="space-y-3">
+                {MILESTONES.map((milestone, i) => (
+                  <motion.div
+                    key={milestone.week}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1, duration: 0.4 }}
+                    className="flex items-center gap-3"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-international-orange flex items-center justify-center">
+                      <CheckCircle2 className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="flex-1 flex items-center justify-between border-b border-muted pb-3">
+                      <span className="text-sm font-medium text-foreground">
+                        {milestone.label}
+                      </span>
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {milestone.week}
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* Quote */}
+            <div className="border-l-4 border-international-orange pl-4">
+              <p className="text-sm text-foreground italic leading-relaxed">
+                &ldquo;We got a production-ready prototype in 9 weeks for a
+                quarter of what the traditional route would have cost. The
+                fractional team felt like our own — but better, because every
+                person was a senior specialist.&rdquo;
+              </p>
+              <p className="text-xs text-muted-foreground mt-2 font-semibold">
+                — Aero Dynamics Founder
+              </p>
+            </div>
+          </AnimatedSection>
+        </div>
       </div>
     </section>
   );
@@ -880,10 +1396,18 @@ function CapabilitiesHighlight() {
             ))}
           </div>
 
-          <p className="text-xs text-muted-foreground font-mono tracking-wider">
+          <p className="text-xs text-muted-foreground font-mono tracking-wider mb-6">
             + Welding, Brazing, Carbon Fibre, Nano-Imprint, Bio-Printing, and
             dozens more.
           </p>
+
+          <Link
+            href="/techniques"
+            className="inline-flex items-center gap-2 text-electric-blue hover:text-electric-blue-hover text-sm font-mono uppercase tracking-wider transition-colors"
+          >
+            Explore All 78+ Techniques
+            <ExternalLink className="h-4 w-4" />
+          </Link>
         </AnimatedSection>
       </div>
     </section>
