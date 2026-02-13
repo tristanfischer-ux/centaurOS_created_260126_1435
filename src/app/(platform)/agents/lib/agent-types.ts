@@ -15,6 +15,7 @@ export const PROMPT_CATEGORIES = [
     "creative",
     "data-analytics",
     "manufacturing",
+    "chief-of-staff",
 ] as const
 
 export type PromptCategory = (typeof PROMPT_CATEGORIES)[number]
@@ -133,6 +134,14 @@ export const CATEGORY_META: Record<PromptCategory, CategoryMeta> = {
         borderColor: "border-orange-300",
         icon: "Factory",
     },
+    "chief-of-staff": {
+        id: "chief-of-staff",
+        label: "Chief of Staff",
+        color: "text-amber-700",
+        bgColor: "bg-amber-50",
+        borderColor: "border-amber-400",
+        icon: "Crown",
+    },
 }
 
 // Color bars for nodes (left accent)
@@ -150,6 +159,7 @@ export const CATEGORY_ACCENT_COLORS: Record<PromptCategory, string> = {
     creative: "#c026d3",
     "data-analytics": "#4f46e5",
     manufacturing: "#ea580c",
+    "chief-of-staff": "#b45309",
 }
 
 // ─── Execution States (HITL pattern) ─────────────────────────────────

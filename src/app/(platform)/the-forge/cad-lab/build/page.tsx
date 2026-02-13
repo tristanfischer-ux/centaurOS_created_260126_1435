@@ -45,6 +45,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { STLViewer } from "@/components/cad/stl-viewer"
+import { CadLabWhileYouWait } from "@/components/cad/cad-lab-while-you-wait"
 import type { CadLabResult } from "@/lib/cad-lab-types"
 
 import { useCadLab } from "../cad-lab-context"
@@ -67,6 +68,7 @@ export default function CadLabBuildPage(): React.ReactNode {
     handleModuleGenerate, handleGenerateAllModules,
     isBatchRunning, batchProgress,
     generatedModuleCount,
+    diagCompletedCount,
     handleDownload,
     setMilestone,
   } = useCadLab()
@@ -192,11 +194,11 @@ export default function CadLabBuildPage(): React.ReactNode {
           {/* Batch progress grid */}
           {isBatchRunning && Object.keys(batchProgress).length > 0 && (
             <div className="border rounded-md overflow-hidden">
-              <div className="grid grid-cols-[1fr,auto,auto,auto] gap-px bg-muted text-xs">
+              <div className="grid grid-cols-[1fr_6rem_6rem_5rem] gap-px bg-muted text-xs">
                 <div className="bg-background p-2 font-semibold text-muted-foreground">Module</div>
-                <div className="bg-background p-2 font-semibold text-muted-foreground text-center w-24">Dimensions</div>
-                <div className="bg-background p-2 font-semibold text-muted-foreground text-center w-24">CAD</div>
-                <div className="bg-background p-2 font-semibold text-muted-foreground text-center w-20">Status</div>
+                <div className="bg-background p-2 font-semibold text-muted-foreground text-center">Interface</div>
+                <div className="bg-background p-2 font-semibold text-muted-foreground text-center">CAD</div>
+                <div className="bg-background p-2 font-semibold text-muted-foreground text-center">Status</div>
                 {modules.map((mod) => {
                   const status = batchProgress[mod.id] || "queued"
                   return (
@@ -224,6 +226,15 @@ export default function CadLabBuildPage(): React.ReactNode {
                 })}
               </div>
             </div>
+          )}
+
+          {/* While You Wait — productive activities during batch generation */}
+          {isBatchRunning && modules.length > 0 && (
+            <CadLabWhileYouWait
+              modules={modules}
+              diagCompletedCount={diagCompletedCount}
+              hasResearch={hasResearch}
+            />
           )}
 
           {/* Module list */}

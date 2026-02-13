@@ -191,7 +191,7 @@ export function WorkflowToolbar({
                             New
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent>New blank workflow</TooltipContent>
+                    <TooltipContent>New blank project</TooltipContent>
                 </Tooltip>
 
                 <Tooltip>
@@ -210,7 +210,7 @@ export function WorkflowToolbar({
                             </span>
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Browse 28 pre-built workflows</TooltipContent>
+                    <TooltipContent>Browse pre-built projects</TooltipContent>
                 </Tooltip>
 
                 {/* My Workflows dropdown — always visible so users know where saved workflows live */}
@@ -224,7 +224,7 @@ export function WorkflowToolbar({
                                     className="gap-1.5 text-xs"
                                 >
                                     <FolderOpen className="w-3.5 h-3.5" />
-                                    My Workflows
+                                    My Projects
                                     {savedWorkflows.length > 0 && (
                                         <span className="text-[10px] font-medium bg-international-orange text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
                                             {savedWorkflows.length}
@@ -234,17 +234,17 @@ export function WorkflowToolbar({
                                 </Button>
                             </PopoverTrigger>
                         </TooltipTrigger>
-                        <TooltipContent>Open a saved workflow</TooltipContent>
+                        <TooltipContent>Open a saved project</TooltipContent>
                     </Tooltip>
                     <PopoverContent align="end" className="w-72 p-0">
                         <div className="px-3 py-2.5 border-b">
                             <p className="text-xs font-semibold text-foreground">
-                                Saved Workflows
+                                Saved Projects
                             </p>
                             <p className="text-[10px] text-muted-foreground">
                                 {savedWorkflows.length > 0
                                     ? `${savedWorkflows.length} workflow${savedWorkflows.length !== 1 ? "s" : ""}`
-                                    : "No saved workflows yet"
+                                    : "No saved projects yet"
                                 }
                             </p>
                         </div>
@@ -252,10 +252,10 @@ export function WorkflowToolbar({
                             <div className="px-4 py-6 text-center">
                                 <FolderOpen className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
                                 <p className="text-xs text-muted-foreground mb-1">
-                                    No workflows saved yet
+                                    No projects saved yet
                                 </p>
                                 <p className="text-[10px] text-muted-foreground/70">
-                                    Build a workflow on the canvas and hit Save to keep it here.
+                                    Build a project on the canvas and hit Save to keep it here.
                                 </p>
                             </div>
                         ) : (
@@ -386,7 +386,7 @@ export function WorkflowToolbar({
                     <TooltipContent>
                         {isChainRunning
                             ? "Stop chain execution"
-                            : "Run all prompts in order (with human review at each step)"}
+                            : "Run all briefs in order (with human review at each step)"}
                     </TooltipContent>
                 </Tooltip>
 
@@ -419,12 +419,12 @@ export function WorkflowToolbar({
                                 className="gap-1.5 text-xs"
                             >
                                 <FileOutput className="w-3.5 h-3.5" />
-                                Saved Outputs
+                                Deliverables
                             </Button>
                         </Link>
                     </TooltipTrigger>
                     <TooltipContent>
-                        Browse all saved workflow outputs
+                        Browse all deliverables
                     </TooltipContent>
                 </Tooltip>
 
@@ -496,7 +496,7 @@ export function WorkflowToolbar({
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                        Copy all prompts as a chained text
+                        Copy all briefs as a chained text
                     </TooltipContent>
                 </Tooltip>
 

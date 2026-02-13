@@ -271,7 +271,7 @@ function ResultStep({
                                 <ActOnThisButton
                                     context={{
                                         source: 'agents',
-                                        entityTitle: data.label || 'Agent Output',
+                                        entityTitle: data.label || 'Specialist Output',
                                         entityDescription: (data.output || '').slice(0, 500),
                                     }}
                                     variant="subtle"

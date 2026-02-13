@@ -124,11 +124,11 @@ export function WorkflowTemplatesDialog({
             <DialogContent size="lg" className="max-h-[80vh] p-0">
                 <DialogHeader className="p-6 pb-4">
                     <DialogTitle className="font-display text-xl">
-                        Workflow Templates
+                        Project Templates
                     </DialogTitle>
                     <DialogDescription className="text-sm text-muted-foreground">
-                        Start with a pre-built workflow. Each template is a
-                        daisy-chain of prompts designed to work together.
+                        Start with a pre-built project. Each template is a
+                        daisy-chain of briefs designed to work together.
                     </DialogDescription>
                 </DialogHeader>
 

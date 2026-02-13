@@ -94,7 +94,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
             <div className="p-4 border-b">
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-semibold text-foreground">
-                        Prompt Library
+                        Brief Library
                     </h2>
                     <div className="flex items-center gap-1">
                         <Button
@@ -119,7 +119,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                        placeholder="Search prompts..."
+                        placeholder="Search briefs..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-9 h-9 text-sm"
@@ -151,7 +151,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                                     : "bg-orange-50 text-orange-600 hover:bg-orange-100"
                             )}
                         >
-                            My Prompts ({customPrompts.length})
+                            My Briefs ({customPrompts.length})
                         </button>
                     )}
                     {PROMPT_CATEGORIES.map((cat) => {
@@ -198,7 +198,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                                         <>
                                             <User className="w-3 h-3 text-orange-500" />
                                             <span className="text-[11px] font-semibold text-orange-600 uppercase tracking-wider">
-                                                My Prompts
+                                                My Briefs
                                             </span>
                                         </>
                                     ) : meta ? (
@@ -280,7 +280,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                     {filteredPrompts.length === 0 && (
                         <div className="text-center py-8">
                             <p className="text-sm text-muted-foreground">
-                                No prompts found
+                                No briefs found
                             </p>
                             {activeCategory === "custom" && (
                                 <Button
@@ -290,7 +290,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                                     className="mt-2 gap-1.5 text-xs"
                                 >
                                     <Plus className="w-3.5 h-3.5" />
-                                    Create your first prompt
+                                    Create your first brief
                                 </Button>
                             )}
                         </div>
@@ -301,7 +301,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
             {/* Footer */}
             <div className="p-3 border-t bg-muted/30">
                 <p className="text-[10px] text-muted-foreground text-center">
-                    Drag prompts onto the canvas to build workflows
+                    Drag briefs onto the canvas to build projects
                 </p>
             </div>
         </div>

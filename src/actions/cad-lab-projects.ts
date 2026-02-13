@@ -374,6 +374,97 @@ export async function saveCadLabModules(
   })
 }
 
+// ─── Update Batch Status ─────────────────────────────────────────────
+
+/**
+ * Updates the batch generation status for a project.
+ *
+ * @description Used by the client to set batch_status when initiating
+ * background generation or when resetting after an error.
+ *
+ * @param projectId - Project to update
+ * @param batchStatus - New batch status
+ * @returns Success or error
+ */
+export async function updateCadLabBatchStatus(
+  projectId: string,
+  batchStatus: "idle" | "running" | "done" | "error",
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const updateData: Record<string, unknown> = { batch_status: batchStatus }
+    if (batchStatus === "running") {
+      updateData.batch_started_at = new Date().toISOString()
+    }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update(updateData)
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[CAD-LAB-PROJECTS] Failed to update batch status:", error.message)
+      return { error: `Failed to update batch status: ${error.message}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Load Batch Status ───────────────────────────────────────────────
+
+/**
+ * Loads the batch status and module states for a project.
+ *
+ * @description Used by the client to detect an in-progress batch when
+ * returning to the page. Returns just the batch metadata and module
+ * statuses, not the full project data.
+ *
+ * @param projectId - Project to check
+ * @returns Batch status, module statuses, and counts
+ */
+export async function loadCadLabBatchStatus(
+  projectId: string,
+): Promise<
+  | {
+      batchStatus: string
+      batchStartedAt: string | null
+      moduleStatuses: Record<string, string>
+      generatedCount: number
+      totalCount: number
+    }
+  | { error: string }
+> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { data: project, error } = await supabase
+      .from("cad_lab_projects")
+      .select("batch_status, batch_started_at, modules")
+      .eq("id", projectId)
+      .single()
+
+    if (error || !project) {
+      return { error: "Project not found" }
+    }
+
+    const modules = (project.modules as CadLabModule[] | null) ?? []
+    const moduleStatuses: Record<string, string> = {}
+    for (const mod of modules) {
+      moduleStatuses[mod.id] = mod.status
+    }
+
+    return {
+      batchStatus: project.batch_status,
+      batchStartedAt: project.batch_started_at,
+      moduleStatuses,
+      generatedCount: modules.filter((m) => m.status === "generated").length,
+      totalCount: modules.length,
+    }
+  })
+}
+
 // ─── Rename Project ──────────────────────────────────────────────────
 
 /**

@@ -2508,6 +2508,8 @@ export type Database = {
       }
       cad_lab_projects: {
         Row: {
+          batch_started_at: string | null
+          batch_status: string
           created_at: string
           created_by: string
           foundry_id: string
@@ -2526,6 +2528,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          batch_started_at?: string | null
+          batch_status?: string
           created_at?: string
           created_by: string
           foundry_id: string
@@ -2544,6 +2548,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          batch_started_at?: string | null
+          batch_status?: string
           created_at?: string
           created_by?: string
           foundry_id?: string

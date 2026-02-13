@@ -36,7 +36,7 @@ export function AgentsHelpDialog({ open, onOpenChange }: AgentsHelpDialogProps) 
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent size="md" className="max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>How to use the Workflow Builder</DialogTitle>
+                    <DialogTitle>How to use the Project Builder</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-6 pt-2">
@@ -49,8 +49,8 @@ export function AgentsHelpDialog({ open, onOpenChange }: AgentsHelpDialogProps) 
                             <Step
                                 number={1}
                                 icon={<GripVertical className="w-4 h-4" />}
-                                title="Drag prompts onto the canvas"
-                                description="Browse the Prompt Library on the left. Drag any prompt onto the canvas to add it to your workflow. You can also drop files directly."
+                                title="Drag briefs onto the canvas"
+                                description="Browse the Brief Library on the left. Drag any brief onto the canvas to add it to your project. You can also drop files directly."
                             />
                             <Step
                                 number={2}
@@ -114,7 +114,7 @@ export function AgentsHelpDialog({ open, onOpenChange }: AgentsHelpDialogProps) 
                             <Shortcut keys={["Delete", "Backspace"]} label="Delete selected node(s)" />
                             <Shortcut keys={["Cmd", "Enter"]} label="Run selected node" />
                             <Shortcut keys={["Cmd", "Shift", "Enter"]} label="Run entire chain" />
-                            <Shortcut keys={["Cmd", "S"]} label="Save workflow" />
+                            <Shortcut keys={["Cmd", "S"]} label="Save project" />
                         </div>
                     </section>
 

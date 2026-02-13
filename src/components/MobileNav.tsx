@@ -25,7 +25,7 @@ import {
     MoreHorizontal,
     Lightbulb,
     Bell,
-    Bot,
+    UsersRound,
     UserCircle,
     UserSearch,
     LogOut,
@@ -76,7 +76,7 @@ const planMoreNavigation = [
 const workshopMoreNavigation = [
     { name: "The Forge", href: "/the-forge/cad-lab", icon: Flame },
     { name: "Team", href: "/team", icon: Users },
-    { name: "Agents", href: "/agents", icon: Bot },
+    { name: "Specialists", href: "/agents", icon: UsersRound },
 ]
 
 // "More" dropdown — Marketplace section

@@ -476,7 +476,7 @@ export function NodeInspector({
             <div className="p-4 border-b">
                 <div className="flex items-center justify-between mb-3">
                     <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color }}>
-                        {meta?.label ?? "Prompt"}
+                        {meta?.label ?? "Brief"}
                     </span>
                     <button
                         onClick={onClose}
@@ -495,7 +495,7 @@ export function NodeInspector({
                     </div>
                     <div>
                         <h3 className="text-sm font-semibold text-foreground">
-                            {data.label || "Prompt"}
+                            {data.label || "Brief"}
                         </h3>
                         {data.description && (
                             <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
@@ -586,7 +586,7 @@ export function NodeInspector({
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <label className="text-xs font-semibold text-foreground">
-                                Prompt
+                                Brief
                             </label>
                             <div className="flex items-center gap-1">
                                 {prompt && (
@@ -605,7 +605,7 @@ export function NodeInspector({
                             value={promptText}
                             onChange={(e) => handlePromptChange(e.target.value)}
                             className="min-h-[200px] font-mono text-xs leading-relaxed resize-y"
-                            placeholder="Enter your prompt..."
+                            placeholder="Enter your brief..."
                         />
                         <p className="text-[10px] text-muted-foreground mt-1.5">
                             Use <code className="bg-muted px-1 rounded text-[10px]">{"{{input}}"}</code> to reference the input data or previous step&apos;s output.
@@ -893,7 +893,7 @@ export function NodeInspector({
                         style={{ backgroundColor: "#3b82f6" }}
                     >
                         <Play className="w-4 h-4" />
-                        Run Prompt
+                        Run Brief
                     </Button>
                 )}
 
@@ -915,7 +915,7 @@ export function NodeInspector({
                         </>
                     ) : (
                         <>
-                            <Copy className="w-4 h-4" /> Copy Prompt
+                            <Copy className="w-4 h-4" /> Copy Brief
                         </>
                     )}
                 </Button>
@@ -925,7 +925,7 @@ export function NodeInspector({
                     <ActOnThisButton
                         context={{
                             source: 'agents',
-                            entityTitle: data.label || 'Agent Output',
+                            entityTitle: data.label || 'Specialist Output',
                             entityDescription: data.output.slice(0, 500),
                         }}
                         variant="subtle"
@@ -939,7 +939,7 @@ export function NodeInspector({
                     variant="ghost"
                     className="w-full gap-2 text-muted-foreground hover:text-destructive"
                 >
-                    <Trash2 className="w-4 h-4" /> Remove from workflow
+                    <Trash2 className="w-4 h-4" /> Remove from project
                 </Button>
             </div>
         </div>
@@ -1163,7 +1163,7 @@ function HumanTaskInspector({
                     variant="ghost"
                     className="w-full gap-2 text-muted-foreground hover:text-destructive"
                 >
-                    <Trash2 className="w-4 h-4" /> Remove from workflow
+                    <Trash2 className="w-4 h-4" /> Remove from project
                 </Button>
             </div>
         </div>

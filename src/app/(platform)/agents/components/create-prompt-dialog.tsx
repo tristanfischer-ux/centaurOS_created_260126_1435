@@ -108,7 +108,7 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent size="md" className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle className="text-base font-semibold">Create Custom Prompt</DialogTitle>
+                    <DialogTitle className="text-base font-semibold">Create Custom Brief</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-4 mt-2">
@@ -193,12 +193,12 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
                     {/* Prompt text */}
                     <div>
                         <label className="text-xs font-semibold text-foreground mb-1.5 block">
-                            Prompt <span className="text-destructive">*</span>
+                            Brief <span className="text-destructive">*</span>
                         </label>
                         <Textarea
                             value={promptText}
                             onChange={(e) => setPromptText(e.target.value)}
-                            placeholder={"Write your prompt here...\n\nUse {{input}} to reference data from the previous step."}
+                            placeholder={"Write your brief here...\n\nUse {{input}} to reference data from the previous step."}
                             className="min-h-[160px] font-mono text-xs leading-relaxed resize-y"
                         />
                         <p className="text-[10px] text-muted-foreground mt-1">
@@ -264,7 +264,7 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
                         disabled={!isValid}
                         className={isValid ? "bg-international-orange hover:bg-international-orange-hover" : ""}
                     >
-                        Create Prompt
+                        Create Brief
                     </Button>
                 </div>
             </DialogContent>

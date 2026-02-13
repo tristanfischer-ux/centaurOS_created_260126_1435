@@ -235,7 +235,7 @@ export function WorkflowTemplateIntroDialog({
                             onClick={() => onConfirm(template)}
                             className="gap-2"
                         >
-                            Load Workflow
+                            Load Project
                             <ArrowRight className="w-4 h-4" />
                         </Button>
                     </div>
