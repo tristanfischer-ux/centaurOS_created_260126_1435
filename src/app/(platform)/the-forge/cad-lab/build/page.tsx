@@ -36,6 +36,9 @@ import {
   BarChart3,
   ShoppingCart,
   ClipboardCheck,
+  Layers,
+  Clock,
+  Puzzle,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -45,7 +48,7 @@ import { STLViewer } from "@/components/cad/stl-viewer"
 import type { CadLabResult } from "@/lib/cad-lab-types"
 
 import { useCadLab } from "../cad-lab-context"
-import { Metric, SvgView, FullscreenOverlay } from "../cad-lab-utils"
+import { Metric, SvgView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
 
 // ─── View Tab Type ───────────────────────────────────────────────────
 
@@ -57,6 +60,7 @@ export default function CadLabBuildPage(): React.ReactNode {
   const router = useRouter()
   const {
     hasResearch, isAnyLoading,
+    subject, editableReport,
     modules, setModules, expandedModuleId, setExpandedModuleId,
     activeModuleId,
     isDecomposing, handleDecompose,
@@ -129,6 +133,19 @@ export default function CadLabBuildPage(): React.ReactNode {
         </div>
       )}
 
+      {/* ── Product Overview ── */}
+      {modules.length > 0 && (
+        <ProductOverview
+          subject={subject}
+          report={editableReport}
+          moduleCount={modules.length}
+          totalComponents={modules.reduce((s, m) => s + m.keyParts.length, 0)}
+          criticalPathWeeks={Math.max(...modules.map((m) => m.leadWeeks))}
+          totalRisks={modules.reduce((s, m) => s + m.failureModes.length, 0)}
+          totalUnknowns={modules.reduce((s, m) => s + m.unknowns.length, 0)}
+        />
+      )}
+
       {/* ── Module Decomposition ── */}
       <Card>
         <CardHeader>
@@ -145,7 +162,7 @@ export default function CadLabBuildPage(): React.ReactNode {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Map your product into manufacturable sub-assemblies. Each module gets its own parametric CAD pipeline with interface definitions and DFM analysis.
+            Map your product into manufacturable sub-assemblies. Each module gets its own parametric CAD pipeline with dimension planning and DFM analysis.
           </p>
           <div className="flex items-center gap-2">
             <Button
@@ -177,7 +194,7 @@ export default function CadLabBuildPage(): React.ReactNode {
             <div className="border rounded-md overflow-hidden">
               <div className="grid grid-cols-[1fr,auto,auto,auto] gap-px bg-muted text-xs">
                 <div className="bg-background p-2 font-semibold text-muted-foreground">Module</div>
-                <div className="bg-background p-2 font-semibold text-muted-foreground text-center w-24">Interface</div>
+                <div className="bg-background p-2 font-semibold text-muted-foreground text-center w-24">Dimensions</div>
                 <div className="bg-background p-2 font-semibold text-muted-foreground text-center w-24">CAD</div>
                 <div className="bg-background p-2 font-semibold text-muted-foreground text-center w-20">Status</div>
                 {modules.map((mod) => {
@@ -311,14 +328,14 @@ export default function CadLabBuildPage(): React.ReactNode {
                         {mod.status === "pending" && (
                           <Button size="sm" variant="outline" onClick={() => handleModuleGenerate(mod.id, "interface")} disabled={activeModuleId !== null}>
                             {activeModuleId === mod.id
-                              ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Generating Interface...</>
-                              : <><Ruler className="h-3.5 w-3.5 mr-1.5" /> Generate Interface</>
+                              ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Planning Dimensions...</>
+                              : <><Ruler className="h-3.5 w-3.5 mr-1.5" /> Plan Dimensions</>
                             }
                           </Button>
                         )}
                         {mod.status === "interface_ready" && (
                           <>
-                            <span className="text-xs text-status-success flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Interface ready</span>
+                            <span className="text-xs text-status-success flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Dimensions planned</span>
                             <Button size="sm" variant="outline" onClick={() => handleModuleGenerate(mod.id, "generate")} disabled={activeModuleId !== null}>
                               {activeModuleId === mod.id
                                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Generating CAD...</>
@@ -339,11 +356,11 @@ export default function CadLabBuildPage(): React.ReactNode {
                         )}
                       </div>
 
-                      {/* Interface definition */}
+                      {/* Dimension plan */}
                       {mod.interfaceDefinition && (
                         <details className="border rounded-md">
                           <summary className="cursor-pointer p-2 text-xs font-medium hover:bg-muted/50 transition-colors">
-                            View interface definition
+                            View dimension plan
                           </summary>
                           <div className="p-3 border-t">
                             <pre className="text-xs font-mono whitespace-pre-wrap text-foreground">{mod.interfaceDefinition}</pre>
@@ -397,6 +414,89 @@ export default function CadLabBuildPage(): React.ReactNode {
         />
       )}
     </div>
+  )
+}
+
+// ─── Product Overview ────────────────────────────────────────────────
+
+/**
+ * ProductOverview — Summarises the main product before listing its modules.
+ *
+ * @description Shows the product name, a brief excerpt from the research
+ * report, and aggregate stats so the user understands the whole before
+ * diving into individual sub-assemblies.
+ */
+function ProductOverview({
+  subject,
+  report,
+  moduleCount,
+  totalComponents,
+  criticalPathWeeks,
+  totalRisks,
+  totalUnknowns,
+}: {
+  subject: string
+  report: string
+  moduleCount: number
+  totalComponents: number
+  criticalPathWeeks: number
+  totalRisks: number
+  totalUnknowns: number
+}): React.ReactNode {
+  const summary = extractProductSummary(report)
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Layers className="h-4 w-4" />
+          Product Overview
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Product name */}
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">{subject}</h3>
+          {summary && (
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{summary}</p>
+          )}
+        </div>
+
+        {/* Aggregate stats */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3 border rounded-md bg-muted/20">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Puzzle className="h-3 w-3" /> Sub-Assemblies
+            </p>
+            <p className="text-sm font-semibold text-foreground font-mono">{moduleCount}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Box className="h-3 w-3" /> Components
+            </p>
+            <p className="text-sm font-semibold text-foreground font-mono">{totalComponents}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3 w-3" /> Critical Path
+            </p>
+            <p className="text-sm font-semibold text-foreground font-mono">{criticalPathWeeks}w</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" /> Failure Modes
+            </p>
+            <p className="text-sm font-semibold text-foreground font-mono">{totalRisks}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Info className="h-3 w-3" /> Open Questions
+            </p>
+            <p className="text-sm font-semibold text-foreground font-mono">{totalUnknowns}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

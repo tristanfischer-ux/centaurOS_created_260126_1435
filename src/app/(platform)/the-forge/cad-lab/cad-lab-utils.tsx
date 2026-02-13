@@ -213,6 +213,74 @@ export function FullscreenOverlay({
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 /**
+ * Extracts a concise product summary from the research report.
+ *
+ * @description Pulls the first meaningful paragraph(s) from the research
+ * report, skipping markdown headers and short lines. Returns up to
+ * `maxLength` characters of prose that describes the overall product.
+ *
+ * @param report - The full research report text
+ * @param maxLength - Maximum character length (default 500)
+ * @returns A trimmed summary string, or empty string if no content
+ */
+export function extractProductSummary(report: string, maxLength: number = 500): string {
+  if (!report.trim()) return ""
+
+  const lines = report.split("\n")
+  const paragraphs: string[] = []
+  let currentParagraph = ""
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+
+    // Skip markdown headers and empty lines
+    if (trimmed.startsWith("#") || trimmed.startsWith("---")) {
+      if (currentParagraph.trim()) {
+        paragraphs.push(currentParagraph.trim())
+        currentParagraph = ""
+      }
+      continue
+    }
+
+    if (trimmed === "") {
+      if (currentParagraph.trim()) {
+        paragraphs.push(currentParagraph.trim())
+        currentParagraph = ""
+      }
+      continue
+    }
+
+    // Skip bullet points and short metadata lines
+    if (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("|")) {
+      continue
+    }
+
+    currentParagraph += (currentParagraph ? " " : "") + trimmed
+  }
+
+  if (currentParagraph.trim()) {
+    paragraphs.push(currentParagraph.trim())
+  }
+
+  // Take paragraphs that are actual prose (30+ chars), not short labels
+  const proseParagraphs = paragraphs.filter((p) => p.length >= 30)
+
+  let summary = ""
+  for (const para of proseParagraphs) {
+    if (summary.length + para.length > maxLength) {
+      if (summary.length === 0) {
+        // First paragraph is already over limit — truncate it
+        summary = para.slice(0, maxLength).replace(/\s+\S*$/, "") + "..."
+      }
+      break
+    }
+    summary += (summary ? "\n\n" : "") + para
+  }
+
+  return summary
+}
+
+/**
  * Formats an ISO timestamp into a human-readable relative time string.
  */
 export function formatRelativeTime(isoDate: string): string {

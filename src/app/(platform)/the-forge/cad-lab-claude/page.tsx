@@ -323,7 +323,7 @@ export default function CadLabClaudePage(): React.ReactNode {
           </span>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Research → Interface Definition → Generate → Execute.
+          Research → Plan Dimensions → Generate → Execute.
           Following the CadQuery methodology exactly.
         </p>
       </div>
@@ -510,7 +510,7 @@ export default function CadLabClaudePage(): React.ReactNode {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <Ruler className="h-4 w-4" />
-                Step 2: Interface Definition
+                Step 2: Plan Dimensions
               </CardTitle>
               {hasInterface && (
                 <span className="text-xs text-status-success flex items-center gap-1">
@@ -521,8 +521,8 @@ export default function CadLabClaudePage(): React.ReactNode {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              This is the most important step. Text-only engineering plan: space budget,
-              component placement, connection map, validation checklist. No code yet.
+              Before generating the 3D model, we plan every dimension and placement in text first.
+              Covers space budget, component positions, connections, and a validation checklist.
             </p>
             <p className="text-sm text-muted-foreground font-medium">
               Rule: if the numbers don&apos;t add up in text, they won&apos;t add up in 3D.
@@ -535,7 +535,7 @@ export default function CadLabClaudePage(): React.ReactNode {
               {ifaceStatus === "running" ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Generating Interface Definition...
+                  Planning Dimensions...
                 </>
               ) : hasInterface ? (
                 <>
@@ -545,7 +545,7 @@ export default function CadLabClaudePage(): React.ReactNode {
               ) : (
                 <>
                   <Ruler className="h-4 w-4 mr-2" />
-                  Generate Interface Definition
+                  Plan Dimensions
                 </>
               )}
             </Button>
@@ -559,13 +559,13 @@ export default function CadLabClaudePage(): React.ReactNode {
         </Card>
       )}
 
-      {/* ── Interface Definition (editable) ── */}
+      {/* ── Dimension Plan (editable) ── */}
       {hasInterface && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              Interface Definition
+              Dimension Plan
               <span className="text-xs font-normal text-muted-foreground">
                 Space Budget + Component Placement + Connection Map + Validation
               </span>
@@ -579,7 +579,7 @@ export default function CadLabClaudePage(): React.ReactNode {
             </div>
             <details className="border rounded-md">
               <summary className="cursor-pointer p-3 text-sm font-medium hover:bg-muted/50 transition-colors">
-                Edit interface definition ({editableInterface.length.toLocaleString()} chars)
+                Edit dimension plan ({editableInterface.length.toLocaleString()} chars)
               </summary>
               <div className="p-3 border-t">
                 <Textarea
