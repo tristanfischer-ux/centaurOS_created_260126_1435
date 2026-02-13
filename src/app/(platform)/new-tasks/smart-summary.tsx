@@ -78,7 +78,7 @@ export function SmartSummary({
               'hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               isActive
                 ? cn(pill.activeBg, 'shadow-sm')
-                : 'bg-white border-slate-100 hover:border-slate-200 text-muted-foreground'
+                : 'bg-card border hover:border-foreground/20 text-muted-foreground'
             )}
           >
             <pill.icon className={cn('h-3.5 w-3.5', isActive ? pill.color : '')} />

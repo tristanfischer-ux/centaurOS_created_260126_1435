@@ -23,12 +23,12 @@ import type { ObjectiveWithTasks, StrategicObjective } from './types'
 // Gray   = Inactive         (Not Started objectives, Pending tasks)
 
 const SEMANTIC_COLORS = {
-  positive: '#22c55e',
-  active:   '#3b82f6',
-  review:   '#a855f7',
-  warning:  '#f59e0b',
-  critical: '#ef4444',
-  inactive: '#9ca3af',
+  positive: 'hsl(var(--status-success))',
+  active:   'hsl(var(--status-info))',
+  review:   'hsl(var(--chart-5))',
+  warning:  'hsl(var(--status-warning))',
+  critical: 'hsl(var(--status-error))',
+  inactive: 'hsl(var(--muted-foreground))',
 } as const
 
 /** Map objective health to a semantic color */
@@ -82,7 +82,7 @@ interface ExtendedGanttTask extends GanttTask {
 function ObjListHeader({ headerHeight }: { headerHeight: number }) {
   return (
     <div
-      className="flex items-center border-b border-slate-100 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider"
+      className="flex items-center border-b text-[11px] font-semibold text-muted-foreground uppercase tracking-wider"
       style={{ height: headerHeight }}
     >
       <div className="flex-1 px-4 min-w-[200px]">Objective / Task</div>
@@ -124,7 +124,7 @@ function ObjListTable({
           return (
             <div
               key={task.id}
-              className="flex items-center text-sm cursor-pointer transition-colors border-b border-slate-100 bg-international-orange/5 hover:bg-international-orange/10 font-semibold"
+              className="flex items-center text-sm cursor-pointer transition-colors border-b bg-international-orange/5 hover:bg-international-orange/10 font-semibold"
               style={{ height: rowHeight }}
               onClick={(e) => {
                 e.stopPropagation()
@@ -160,7 +160,7 @@ function ObjListTable({
           <div
             key={task.id}
             className={cn(
-              'flex items-center text-sm cursor-pointer transition-colors border-b border-slate-50',
+              'flex items-center text-sm cursor-pointer transition-colors border-b border-border/50',
               isObj
                 ? 'bg-muted/20 hover:bg-muted/40 font-medium'
                 : 'hover:bg-muted/30'
@@ -253,35 +253,18 @@ const ObjTooltip = ({ task }: { task: GanttTask; fontSize: string; fontFamily: s
   const progress = ext.progressPct ?? task.progress
 
   return (
-    <div
-      style={{
-        backgroundColor: 'white',
-        padding: '12px 16px',
-        boxShadow: '0 8px 24px -4px rgba(0,0,0,0.12), 0 2px 8px -2px rgba(0,0,0,0.08)',
-        borderRadius: '10px',
-        fontSize: '12px',
-        fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
-        whiteSpace: 'nowrap',
-        transform: 'translateY(-130%)',
-        pointerEvents: 'none',
-        zIndex: 50,
-        color: '#0f172a',
-        border: '1px solid rgba(0,0,0,0.06)',
-      }}
-    >
-      <div style={{ fontWeight: 700, marginBottom: '4px', fontSize: '13px' }}>
+    <div className="bg-background px-4 py-3 shadow-lg rounded-xl text-xs font-sans whitespace-nowrap pointer-events-none z-50 text-foreground border" style={{ transform: 'translateY(-130%)' }}>
+      <div className="font-bold mb-1 text-[13px]">
         {ext.isObjective ? '🎯 ' : ''}{task.name}
       </div>
-      <div style={{ color: '#6b7280', marginBottom: '4px' }}>
+      <div className="text-muted-foreground mb-1">
         {format(task.start, 'MMM d')} &ndash; {format(task.end, 'MMM d, yyyy')}
       </div>
-      <div style={{ display: 'flex', gap: '12px', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #f1f5f9' }}>
-        <span style={{ fontWeight: 600 }}>
-          <span style={{ color: ext.barColor || '#6b7280' }}>{diffDays}d</span>
-        </span>
-        <span style={{ color: '#3b82f6', fontWeight: 600 }}>{progress}%</span>
+      <div className="flex gap-3 mt-1.5 pt-1.5 border-t">
+        <span className="font-semibold" style={{ color: ext.barColor }}>{diffDays}d</span>
+        <span className="text-electric-blue font-semibold">{progress}%</span>
         {ext.isObjective && ext.taskCount !== undefined && (
-          <span style={{ color: '#6b7280' }}>{ext.completedCount}/{ext.taskCount} tasks</span>
+          <span className="text-muted-foreground">{ext.completedCount}/{ext.taskCount} tasks</span>
         )}
       </div>
     </div>
@@ -453,7 +436,7 @@ export function ObjectivesGanttView({ objectives, strategicObjectives = [], sele
         isStrategy: true,
         isObjective: false,
         taskCount: stratObjs.length,
-        barColor: '#ff4500',
+        barColor: 'hsl(var(--international-orange))',
       })
 
       if (!isStratCollapsed) {
@@ -479,7 +462,7 @@ export function ObjectivesGanttView({ objectives, strategicObjectives = [], sele
         isStrategy: true,
         isObjective: false,
         taskCount: unlinked.length,
-        barColor: '#9ca3af',
+        barColor: 'hsl(var(--muted-foreground))',
       })
 
       const isUnlinkedCollapsed = collapsedObjectives.has('strat-unlinked')
@@ -602,7 +585,7 @@ export function ObjectivesGanttView({ objectives, strategicObjectives = [], sele
       </div>
 
       {/* ─── Gantt Chart ─────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+      <div className="bg-background rounded-xl border overflow-hidden shadow-sm">
         <Gantt
           key={ganttKey}
           tasks={ganttTasks}

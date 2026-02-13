@@ -67,9 +67,9 @@ export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPane
   const completedTasks = objective.tasks.filter(t => t.status === 'Completed')
 
   return (
-    <div className="h-full flex flex-col bg-white border-l border-slate-100 w-full max-w-full overflow-hidden">
+    <div className="h-full flex flex-col bg-background border-l border w-full max-w-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 min-w-0">
+      <div className="flex items-center justify-between px-5 py-4 border-b min-w-0">
         <h2 className="text-base font-semibold text-foreground truncate pr-4 min-w-0">
           {objective.title}
         </h2>

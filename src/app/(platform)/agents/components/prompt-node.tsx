@@ -131,10 +131,10 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
     return (
         <div
             className={`
-                group relative bg-white rounded-xl border-2 shadow-sm
+                group relative bg-background rounded-xl border-2 shadow-sm
                 transition-all duration-200 w-[260px]
                 hover:shadow-md hover:-translate-y-0.5
-                ${selected ? "shadow-lg ring-2 ring-blue-400/50 -translate-y-0.5" : "border-slate-200"}
+                ${selected ? "shadow-lg ring-2 ring-blue-400/50 -translate-y-0.5" : "border-border"}
                 ${!selected && statusCfg.border ? statusCfg.border : ""}
                 ${statusCfg.animate ?? ""}
             `}
@@ -204,7 +204,7 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
 
                         {/* Has files indicator */}
                         {hasFiles && status === "idle" && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-100 text-slate-600">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-muted text-muted-foreground">
                                 <Paperclip className="w-2.5 h-2.5" />
                                 {nodeData.attachedFiles!.length}
                             </span>
@@ -223,7 +223,7 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
                 {/* Provider / modality badge */}
                 {nodeData.providerId && nodeData.providerId !== "openai" && (
                     <div className="flex items-center gap-1 mt-1.5">
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-50 text-slate-500 border border-slate-100">
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-muted text-muted-foreground border">
                             {PROVIDER_LABELS[nodeData.providerId] ?? nodeData.providerId}
                         </span>
                         {nodeData.outputModality && nodeData.outputModality !== "text" && (() => {
@@ -231,7 +231,7 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
                             if (!modalityCfg) return null
                             const ModalityIcon = modalityCfg.icon
                             return (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-50 text-slate-500 border border-slate-100">
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-muted text-muted-foreground border">
                                     <ModalityIcon className="w-2.5 h-2.5" style={{ color: modalityCfg.color }} />
                                     {nodeData.outputModality}
                                 </span>
@@ -246,7 +246,7 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
                             if (!modalityCfg) return null
                             const ModalityIcon = modalityCfg.icon
                             return (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-50 text-slate-500 border border-slate-100">
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-muted text-muted-foreground border">
                                     <ModalityIcon className="w-2.5 h-2.5" style={{ color: modalityCfg.color }} />
                                     {nodeData.outputModality}
                                 </span>
@@ -318,7 +318,7 @@ function HumanTaskNodeComponent({ data, selected }: NodeProps) {
     return (
         <div
             className={`
-                group relative bg-white rounded-xl border-2 shadow-sm
+                group relative bg-background rounded-xl border-2 shadow-sm
                 transition-all duration-200 w-[260px]
                 hover:shadow-md hover:-translate-y-0.5
                 ${selected ? "shadow-lg ring-2 ring-blue-400/50 -translate-y-0.5" : "border-blue-200"}

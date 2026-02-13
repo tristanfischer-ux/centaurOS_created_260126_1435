@@ -85,10 +85,10 @@ export default function AdminSettingsPage() {
         <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Offboarding Settings */}
-                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                    <CardHeader className="bg-gradient-to-r from-orange-50/60 to-transparent border-b border-slate-100">
+                <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-international-orange-light/60 to-transparent border-b">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-orange-100 rounded-lg">
+                            <div className="p-2 bg-international-orange-light rounded-lg">
                                 <UserMinus className="h-5 w-5 text-international-orange" />
                             </div>
                             <div>
@@ -134,7 +134,7 @@ export default function AdminSettingsPage() {
                                     </p>
                                 </div>
 
-                                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
+                                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors">
                                     <div className="space-y-0.5">
                                         <Label>Require Task Reassignment</Label>
                                         <p className="text-xs text-muted-foreground">
@@ -169,7 +169,7 @@ export default function AdminSettingsPage() {
                                     </p>
                                 </div>
 
-                                <div className="border-t border-slate-100 pt-4">
+                                <div className="border-t pt-4">
                                     <Button 
                                         onClick={handleSaveOffboarding}
                                         disabled={isPending}
@@ -186,8 +186,8 @@ export default function AdminSettingsPage() {
                             </>
                         ) : (
                             <div className="text-center py-8 text-muted-foreground">
-                                <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <AlertTriangle className="h-6 w-6 text-slate-400" />
+                                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <AlertTriangle className="h-6 w-6 text-muted-foreground" />
                                 </div>
                                 <p>Could not load settings</p>
                             </div>
@@ -196,11 +196,11 @@ export default function AdminSettingsPage() {
                 </Card>
 
                 {/* Sheets Sync Status */}
-                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                    <CardHeader className="bg-gradient-to-r from-emerald-50/60 to-transparent border-b border-slate-100">
+                <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-status-success-light/60 to-transparent border-b">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-emerald-100 rounded-lg">
-                                <Database className="h-5 w-5 text-emerald-600" />
+                            <div className="p-2 bg-status-success-light rounded-lg">
+                                <Database className="h-5 w-5 text-status-success" />
                             </div>
                             <div>
                                 <CardTitle>Google Sheets Sync</CardTitle>
@@ -218,7 +218,7 @@ export default function AdminSettingsPage() {
                         ) : syncStatus ? (
                             <>
                                 {/* Connection Status */}
-                                <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 border border-slate-100">
+                                <div className="flex items-center justify-between p-4 rounded-lg bg-muted border">
                                     <div className="flex items-center gap-3">
                                         <div className="relative">
                                             {syncStatus.is_connected ? (
@@ -293,8 +293,8 @@ export default function AdminSettingsPage() {
                             </>
                         ) : (
                             <div className="text-center py-8 text-muted-foreground">
-                                <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <Database className="h-6 w-6 text-slate-400" />
+                                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <Database className="h-6 w-6 text-muted-foreground" />
                                 </div>
                                 <p className="text-sm">Google Sheets integration not configured</p>
                                 <p className="text-xs mt-1">

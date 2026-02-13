@@ -135,7 +135,7 @@ export function TechTreeBrowser({ templatesWithTrees, foundryId }: TechTreeBrows
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
             <Link href="/blueprints" className="hover:text-foreground transition-colors flex items-center gap-1">
@@ -322,7 +322,7 @@ function DomainTreeList({
               className={cn(
                 "flex items-center gap-2 py-2 px-2 rounded-md transition-colors group",
                 "hover:bg-muted cursor-pointer",
-                matchesSearch && "bg-yellow-50 hover:bg-yellow-100"
+                matchesSearch && "bg-muted"
               )}
             >
               {/* Expand/Collapse button */}

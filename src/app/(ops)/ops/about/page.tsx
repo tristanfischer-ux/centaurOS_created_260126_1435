@@ -178,10 +178,10 @@ export default function AdminAboutPage() {
             
             {/* Stats Overview */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                    <CardHeader className="from-blue-50/60 bg-blue-100">
+                <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="from-status-info-light/60 bg-status-info-light">
                         <CardTitle className="flex items-center gap-2">
-                            <div className="p-2 bg-blue-100 rounded-lg"><Code className="h-4 w-4 text-blue-600" /></div>
+                            <div className="p-2 bg-status-info-light rounded-lg"><Code className="h-4 w-4 text-status-info" /></div>
                             Version
                         </CardTitle>
                     </CardHeader>
@@ -194,10 +194,10 @@ export default function AdminAboutPage() {
                     </CardContent>
                 </Card>
                 
-                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                    <CardHeader className="from-blue-50/60 bg-blue-100">
+                <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="from-status-info-light/60 bg-status-info-light">
                         <CardTitle className="flex items-center gap-2">
-                            <div className="p-2 bg-blue-100 rounded-lg"><Target className="h-4 w-4 text-blue-600" /></div>
+                            <div className="p-2 bg-status-info-light rounded-lg"><Target className="h-4 w-4 text-status-info" /></div>
                             Total Features
                         </CardTitle>
                     </CardHeader>
@@ -210,10 +210,10 @@ export default function AdminAboutPage() {
                     </CardContent>
                 </Card>
                 
-                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                    <CardHeader className="from-blue-50/60 bg-blue-100">
+                <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="from-status-info-light/60 bg-status-info-light">
                         <CardTitle className="flex items-center gap-2">
-                            <div className="p-2 bg-blue-100 rounded-lg"><Sparkles className="h-4 w-4 text-blue-600" /></div>
+                            <div className="p-2 bg-status-info-light rounded-lg"><Sparkles className="h-4 w-4 text-status-info" /></div>
                             New Features
                         </CardTitle>
                     </CardHeader>
@@ -226,10 +226,10 @@ export default function AdminAboutPage() {
                     </CardContent>
                 </Card>
                 
-                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                    <CardHeader className="from-blue-50/60 bg-blue-100">
+                <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="from-status-info-light/60 bg-status-info-light">
                         <CardTitle className="flex items-center gap-2">
-                            <div className="p-2 bg-blue-100 rounded-lg"><EyeOff className="h-4 w-4 text-blue-600" /></div>
+                            <div className="p-2 bg-status-info-light rounded-lg"><EyeOff className="h-4 w-4 text-status-info" /></div>
                             Hidden Features
                         </CardTitle>
                     </CardHeader>
@@ -245,10 +245,10 @@ export default function AdminAboutPage() {
             
             {/* New Features Section */}
             {newFeatures.length > 0 && (
-                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                    <CardHeader className="from-amber-50/60 bg-amber-100">
+                <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="from-status-warning-light/60 bg-status-warning-light">
                         <CardTitle className="flex items-center gap-2">
-                            <div className="p-2 bg-amber-100 rounded-lg"><Sparkles className="h-4 w-4 text-amber-600" /></div>
+                            <div className="p-2 bg-status-warning-light rounded-lg"><Sparkles className="h-4 w-4 text-status-warning" /></div>
                             What&apos;s New
                         </CardTitle>
                         <CardDescription>
@@ -264,10 +264,10 @@ export default function AdminAboutPage() {
             )}
             
             {/* Hidden Features Section */}
-            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                <CardHeader className="from-amber-50/60 bg-amber-100">
+            <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="from-status-warning-light/60 bg-status-warning-light">
                     <CardTitle className="flex items-center gap-2">
-                        <div className="p-2 bg-amber-100 rounded-lg"><EyeOff className="h-4 w-4 text-amber-600" /></div>
+                        <div className="p-2 bg-status-warning-light rounded-lg"><EyeOff className="h-4 w-4 text-status-warning" /></div>
                         Hidden Features
                     </CardTitle>
                     <CardDescription>
@@ -283,10 +283,10 @@ export default function AdminAboutPage() {
             </Card>
             
             {/* Full Changelog */}
-            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                <CardHeader className="from-slate-50/80">
+            <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="from-muted/80">
                     <CardTitle className="flex items-center gap-2">
-                        <div className="p-2 bg-slate-100 rounded-lg"><Clock className="h-4 w-4 text-slate-600" /></div>
+                        <div className="p-2 bg-muted rounded-lg"><Clock className="h-4 w-4 text-muted-foreground" /></div>
                         Full Changelog
                     </CardTitle>
                     <CardDescription>
@@ -311,10 +311,10 @@ export default function AdminAboutPage() {
             </Card>
             
             {/* System Information */}
-            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                <CardHeader className="from-emerald-50/60 bg-emerald-100">
+            <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="from-status-success-light/60 bg-status-success-light">
                     <CardTitle className="flex items-center gap-2">
-                        <div className="p-2 bg-emerald-100 rounded-lg"><Code className="h-4 w-4 text-emerald-600" /></div>
+                        <div className="p-2 bg-status-success-light rounded-lg"><Code className="h-4 w-4 text-status-success" /></div>
                         System Information
                     </CardTitle>
                 </CardHeader>

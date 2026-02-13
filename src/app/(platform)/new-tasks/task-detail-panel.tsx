@@ -21,6 +21,7 @@ import {
   X, Calendar, Clock, User, Target, FileText, AlertTriangle,
   MessageSquare, Paperclip, Shield, Eye, Pencil,
 } from 'lucide-react'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import type { TaskWithData, Member } from './types'
 
 /** Status options a user can move a task to */
@@ -90,9 +91,9 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
   }
 
   return (
-    <div className="h-full flex flex-col bg-white border-l border-slate-100 overflow-hidden">
+    <div className="h-full flex flex-col bg-background border-l border overflow-hidden">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100">
+      <div className="flex items-start justify-between gap-3 px-5 py-4 border-b">
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge className={cn('text-[10px]', statusBadge)}>
@@ -178,19 +179,15 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
               {task.assignees && task.assignees.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                   {task.assignees.map(a => (
-                    <span key={a.id} className="inline-flex items-center gap-1 text-sm">
-                      <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[8px] font-semibold text-muted-foreground">
-                        {(a.full_name || '?')[0].toUpperCase()}
-                      </div>
+                    <span key={a.id} className="inline-flex items-center gap-1.5 text-sm">
+                      <UserAvatar name={a.full_name} role={a.role} size="xs" />
                       {a.full_name}
                     </span>
                   ))}
                 </div>
               ) : task.assignee?.full_name ? (
                 <span className="inline-flex items-center gap-1.5">
-                  <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[8px] font-semibold text-muted-foreground">
-                    {task.assignee.full_name[0].toUpperCase()}
-                  </div>
+                  <UserAvatar name={task.assignee.full_name} role={task.assignee.role} size="xs" />
                   {task.assignee.full_name}
                 </span>
               ) : (

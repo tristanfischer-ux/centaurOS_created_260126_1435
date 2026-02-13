@@ -139,14 +139,14 @@ export function WorkflowToolbar({
     }, [onSave])
 
     return (
-        <div className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-4 gap-4 flex-shrink-0">
+        <div className="h-14 bg-background border-b flex items-center justify-between px-4 gap-4 flex-shrink-0">
             {/* Left: sidebar toggle + title */}
             <div className="flex items-center gap-3 min-w-0">
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <button
                             onClick={onToggleSidebar}
-                            className="p-2 rounded-lg hover:bg-slate-100 text-muted-foreground transition-colors"
+                            className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
                         >
                             {sidebarOpen ? (
                                 <PanelLeftClose className="w-4 h-4" />
@@ -167,10 +167,10 @@ export function WorkflowToolbar({
                     <Input
                         value={workflowName}
                         onChange={(e) => onNameChange(e.target.value)}
-                        className="h-8 text-sm font-semibold border-transparent hover:border-slate-200 focus:border-slate-300 bg-transparent px-2 max-w-[240px]"
+                        className="h-8 text-sm font-semibold border-transparent hover:border-input focus:border-input bg-transparent px-2 max-w-[240px]"
                     />
                     {nodeCount > 0 && (
-                        <span className="text-[10px] text-muted-foreground bg-slate-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                        <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full flex-shrink-0">
                             {nodeCount} {nodeCount === 1 ? "step" : "steps"}
                         </span>
                     )}
@@ -237,7 +237,7 @@ export function WorkflowToolbar({
                         <TooltipContent>Open a saved workflow</TooltipContent>
                     </Tooltip>
                     <PopoverContent align="end" className="w-72 p-0">
-                        <div className="px-3 py-2.5 border-b border-slate-100">
+                        <div className="px-3 py-2.5 border-b">
                             <p className="text-xs font-semibold text-foreground">
                                 Saved Workflows
                             </p>
@@ -270,7 +270,7 @@ export function WorkflowToolbar({
                                                 className={`group flex items-center gap-2 px-2.5 py-2 rounded-md transition-colors cursor-pointer ${
                                                     isActive
                                                         ? "bg-orange-50 border border-orange-200"
-                                                        : "hover:bg-slate-50"
+                                                        : "hover:bg-muted"
                                                 }`}
                                                 onClick={() => {
                                                     if (!isActive && onLoadWorkflow) {
@@ -350,7 +350,7 @@ export function WorkflowToolbar({
                     </>
                 )}
 
-                <div className="h-5 w-px bg-slate-200" />
+                <div className="h-5 w-px bg-border" />
 
                 {/* Run Chain button */}
                 <Tooltip>
@@ -390,7 +390,7 @@ export function WorkflowToolbar({
                     </TooltipContent>
                 </Tooltip>
 
-                <div className="h-5 w-px bg-slate-200" />
+                <div className="h-5 w-px bg-border" />
 
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -504,12 +504,7 @@ export function WorkflowToolbar({
                     size="sm"
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="gap-1.5 text-xs"
-                    style={
-                        saved
-                            ? { backgroundColor: "#059669" }
-                            : { backgroundColor: "#ff4500" }
-                    }
+                    className={`gap-1.5 text-xs text-white ${saved ? "bg-status-success hover:bg-status-success/90" : "bg-international-orange hover:bg-international-orange-hover"}`}
                 >
                     {isSaving ? (
                         <>
@@ -530,7 +525,7 @@ export function WorkflowToolbar({
                     <TooltipTrigger asChild>
                         <button
                             onClick={onOpenHelp}
-                            className="p-2 rounded-lg hover:bg-slate-100 text-muted-foreground transition-colors"
+                            className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
                             aria-label="Help and keyboard shortcuts"
                         >
                             <HelpCircle className="w-4 h-4" />

@@ -155,9 +155,9 @@ export function FocusView({ tasks, selectedId, onSelect }: FocusViewProps) {
   return (
     <div className="space-y-6">
       {groups.map(group => (
-        <div key={group.key} className={cn('bg-white rounded-xl border border-slate-100 border-l-4 overflow-hidden', group.borderColor)}>
+        <div key={group.key} className={cn('bg-background rounded-xl border border-l-4 overflow-hidden', group.borderColor)}>
           {/* Group header */}
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-50 bg-muted/20">
+          <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
             <group.icon className={cn('h-4 w-4', group.color)} />
             <span className={cn('text-xs font-semibold uppercase tracking-wider', group.color)}>
               {group.label}
@@ -168,7 +168,7 @@ export function FocusView({ tasks, selectedId, onSelect }: FocusViewProps) {
           </div>
 
           {/* Tasks */}
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-border/50">
             {group.tasks.map(task => (
               <TaskRow
                 key={task.id}

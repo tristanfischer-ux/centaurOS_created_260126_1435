@@ -44,10 +44,10 @@ function getBarColor(task: { status: string | null; end_date: string | null }): 
   const endDate = task.end_date ? new Date(task.end_date) : null
   const now = new Date()
 
-  if (endDate && endDate < now && task.status !== 'Completed') return '#ef4444'
+  if (endDate && endDate < now && task.status !== 'Completed') return 'hsl(var(--status-error))'
   if (endDate && task.status !== 'Completed') {
     const threeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
-    if (endDate <= threeDays) return '#f59e0b'
+    if (endDate <= threeDays) return 'hsl(var(--status-warning))'
   }
   return getStatusHex(task.status)
 }
@@ -56,7 +56,7 @@ function getBarColor(task: { status: string | null; end_date: string | null }): 
 function TaskListHeader({ headerHeight }: { headerHeight: number }) {
   return (
     <div
-      className="flex items-center border-b border-slate-100 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider"
+      className="flex items-center border-b text-[11px] font-semibold text-muted-foreground uppercase tracking-wider"
       style={{ height: headerHeight }}
     >
       <div className="w-10 px-2 text-center">#</div>
@@ -89,7 +89,7 @@ function TaskListTable({
         return (
           <div
             key={task.id}
-            className="flex items-center hover:bg-muted/40 text-sm cursor-pointer transition-colors border-b border-slate-50"
+            className="flex items-center hover:bg-muted/40 text-sm cursor-pointer transition-colors border-b border-border/50"
             style={{ height: rowHeight }}
             onClick={() => {
               onSelectTask(task.id)
@@ -142,34 +142,19 @@ const GanttTooltip = ({ task }: { task: GanttTask; fontSize: string; fontFamily:
   const progress = ext.taskProgress ?? task.progress
 
   return (
-    <div
-      style={{
-        backgroundColor: 'white',
-        padding: '12px 16px',
-        boxShadow: '0 8px 24px -4px rgba(0,0,0,0.12), 0 2px 8px -2px rgba(0,0,0,0.08)',
-        borderRadius: '10px',
-        fontSize: '12px',
-        fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
-        whiteSpace: 'nowrap',
-        transform: 'translateY(-130%)',
-        pointerEvents: 'none',
-        zIndex: 50,
-        color: '#0f172a',
-        border: '1px solid rgba(0,0,0,0.06)',
-      }}
-    >
-      <div style={{ fontWeight: 700, marginBottom: '4px', fontSize: '13px' }}>{task.name}</div>
+    <div className="bg-background px-4 py-3 shadow-lg rounded-xl text-xs font-sans whitespace-nowrap pointer-events-none z-50 text-foreground border" style={{ transform: 'translateY(-130%)' }}>
+      <div className="font-bold mb-1 text-[13px]">{task.name}</div>
       {ext.objectiveTitle && (
-        <div style={{ color: '#6b7280', marginBottom: '6px', fontSize: '11px' }}>
+        <div className="text-muted-foreground mb-1.5 text-[11px]">
           {ext.objectiveTitle}
         </div>
       )}
-      <div style={{ color: '#6b7280', marginBottom: '4px' }}>
+      <div className="text-muted-foreground mb-1">
         {format(task.start, 'MMM d')} &ndash; {format(task.end, 'MMM d, yyyy')}
       </div>
-      <div style={{ display: 'flex', gap: '12px', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #f1f5f9' }}>
-        <span style={{ color: '#f59e0b', fontWeight: 600 }}>{diffDays} day{diffDays !== 1 ? 's' : ''}</span>
-        <span style={{ color: '#3b82f6', fontWeight: 600 }}>{progress}%</span>
+      <div className="flex gap-3 mt-1.5 pt-1.5 border-t">
+        <span className="text-status-warning font-semibold">{diffDays} day{diffDays !== 1 ? 's' : ''}</span>
+        <span className="text-electric-blue font-semibold">{progress}%</span>
       </div>
     </div>
   )
@@ -321,14 +306,14 @@ export function TasksGanttView({ tasks, selectedId, onSelect }: TasksGanttViewPr
         <div className="flex flex-wrap items-center gap-3 text-[11px]">
           <span className="text-muted-foreground font-medium">Status:</span>
           {[
-            { label: 'Pending', color: '#9ca3af' },
-            { label: 'In Progress', color: '#3b82f6' },
-            { label: 'Completed', color: '#22c55e' },
-            { label: 'Due Soon', color: '#f59e0b' },
-            { label: 'Overdue', color: '#ef4444' },
+            { label: 'Pending', colorClass: 'bg-muted-foreground' },
+            { label: 'In Progress', colorClass: 'bg-status-info' },
+            { label: 'Completed', colorClass: 'bg-status-success' },
+            { label: 'Due Soon', colorClass: 'bg-status-warning' },
+            { label: 'Overdue', colorClass: 'bg-status-error' },
           ].map(s => (
             <span key={s.label} className="flex items-center gap-1.5">
-              <span className="w-3 h-2 rounded-sm" style={{ backgroundColor: s.color }} />
+              <span className={cn('w-3 h-2 rounded-sm', s.colorClass)} />
               <span className="text-muted-foreground">{s.label}</span>
             </span>
           ))}
@@ -382,7 +367,7 @@ export function TasksGanttView({ tasks, selectedId, onSelect }: TasksGanttViewPr
       </div>
 
       {/* ─── Gantt Chart ─────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+      <div className="bg-background rounded-xl border overflow-hidden shadow-sm">
         <Gantt
           key={`gantt-tasks-${dateOffset.getTime()}`}
           tasks={ganttTasks}

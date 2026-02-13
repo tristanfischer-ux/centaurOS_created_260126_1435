@@ -40,7 +40,7 @@ function ObjectiveNodeComponent({ data, selected }: NodeProps) {
         'rounded-lg border bg-background shadow-sm px-4 py-3 min-w-[160px] max-w-[220px] transition-shadow',
         selected
           ? 'border-electric-blue shadow-md ring-2 ring-electric-blue/20'
-          : 'border-slate-200 hover:shadow-md hover:border-slate-300'
+          : 'border hover:shadow-md'
       )}
     >
       {/* Top handle — drag FROM objective TO strategy */}

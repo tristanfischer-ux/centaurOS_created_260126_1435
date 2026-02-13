@@ -566,8 +566,8 @@ export function TeamPageView({
         return (
             <section className="space-y-4">
                 <div className="flex items-center gap-3 border-b border-muted pb-3">
-                    <div className="w-1 h-6 rounded-full bg-indigo-500" />
-                    <Store className="h-5 w-5 text-indigo-500" />
+                    <div className="w-1 h-6 rounded-full bg-electric-blue" />
+                    <Store className="h-5 w-5 text-electric-blue" />
                     <h2 className="text-lg font-display font-semibold text-foreground">Marketplace Candidates</h2>
                     <Badge variant="secondary" className="text-xs font-normal">{filtered.length}</Badge>
                     <span className="text-sm text-muted-foreground">Vetted professionals available for hire</span>
@@ -1074,7 +1074,7 @@ export function TeamPageView({
                     <MemberSection
                         title="Executives"
                         subtitle="Evaluators"
-                        accentColor="bg-orange-400"
+                        accentColor="bg-international-orange/60"
                         members={filteredExecutives}
                     />
                     <MemberSection
@@ -1109,7 +1109,7 @@ export function TeamPageView({
                     <MemberSection
                         title="Executives"
                         subtitle="Evaluators"
-                        accentColor="bg-orange-400"
+                        accentColor="bg-international-orange/60"
                         members={filteredExecutives}
                     />
                     <MemberSection

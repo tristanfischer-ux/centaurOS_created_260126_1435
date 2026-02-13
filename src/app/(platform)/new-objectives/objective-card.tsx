@@ -11,6 +11,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { AlertTriangle, ListChecks, Trash, Pencil, Flag, Link2, Loader2 } from 'lucide-react'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { linkObjectiveToStrategic } from '@/actions/objectives'
 import { toast } from 'sonner'
 import type { ObjectiveWithTasks, StrategicObjective } from './types'
@@ -73,12 +74,12 @@ export function ObjectiveCard({ objective, strategicObjectives = [], isSelected,
   return (
     <div
       className={cn(
-        'w-full text-left rounded-xl border-l-4 border bg-white group relative',
+        'w-full text-left rounded-xl border-l-4 border bg-card group relative',
         'transition-all duration-200 hover:shadow-md hover:-translate-y-0.5',
         HEALTH_BORDER[health] || 'border-l-muted',
         isSelected
-          ? 'ring-2 ring-international-orange/30 shadow-md border-slate-200'
-          : 'border-slate-100 hover:border-slate-200'
+          ? 'ring-2 ring-international-orange/30 shadow-md'
+          : 'hover:border-foreground/10'
       )}
     >
       {/* Action buttons - visible on hover */}
@@ -87,7 +88,7 @@ export function ObjectiveCard({ objective, strategicObjectives = [], isSelected,
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 bg-white hover:bg-muted"
+            className="h-7 w-7 bg-background hover:bg-muted"
             onClick={(e) => {
               e.stopPropagation()
               onEdit(objective)
@@ -101,7 +102,7 @@ export function ObjectiveCard({ objective, strategicObjectives = [], isSelected,
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 bg-white hover:bg-destructive/10 hover:text-destructive"
+            className="h-7 w-7 bg-background hover:bg-destructive/10 hover:text-destructive"
             onClick={(e) => {
               e.stopPropagation()
               onDelete(objective.id)
@@ -113,9 +114,14 @@ export function ObjectiveCard({ objective, strategicObjectives = [], isSelected,
         )}
       </div>
 
-      <button
+      {/* Using div+role instead of <button> to avoid invalid nested <button> 
+           from the Popover trigger inside this clickable area */}
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => onSelect(objective.id)}
-        className="w-full p-4 space-y-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(objective.id) } }}
+        className="w-full p-4 space-y-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl cursor-pointer"
       >
         {/* Header: Title + Health Badge */}
         <div className="flex items-start justify-between gap-2">
@@ -231,23 +237,17 @@ export function ObjectiveCard({ objective, strategicObjectives = [], isSelected,
           {assigneeList.length > 0 && (
             <div className="flex -space-x-1.5">
               {assigneeList.map((a) => (
-                <div
-                  key={a.id}
-                  className="h-6 w-6 rounded-full bg-muted border-2 border-white flex items-center justify-center text-[9px] font-semibold text-muted-foreground"
-                  title={a.full_name || 'Unknown'}
-                >
-                  {(a.full_name || '?')[0].toUpperCase()}
-                </div>
+                <UserAvatar key={a.id} name={a.full_name} size="xs" />
               ))}
               {extraAssignees > 0 && (
-                <div className="h-6 w-6 rounded-full bg-muted border-2 border-white flex items-center justify-center text-[9px] font-medium text-muted-foreground">
+                <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[9px] font-medium text-muted-foreground">
                   +{extraAssignees}
                 </div>
               )}
             </div>
           )}
         </div>
-      </button>
+      </div>
     </div>
   )
 }

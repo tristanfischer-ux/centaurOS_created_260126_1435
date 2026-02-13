@@ -33,6 +33,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { AlertTriangle, MessageSquare, Paperclip, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCelebration } from '@/hooks/useCelebration'
@@ -174,12 +175,7 @@ function SortableBoardCard({ task, isSelected, onSelect, isDragOverlay }: Sortab
           {(() => {
             const primary = task.assignees?.length > 0 ? task.assignees[0] : task.assignee
             return primary?.full_name ? (
-              <div
-                className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[8px] font-semibold text-muted-foreground"
-                title={primary.full_name}
-              >
-                {primary.full_name[0].toUpperCase()}
-              </div>
+              <UserAvatar name={primary.full_name} role={primary.role} size="xs" />
             ) : null
           })()}
 

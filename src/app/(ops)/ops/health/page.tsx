@@ -32,12 +32,12 @@ export default async function PlatformHealthPage() {
             {/* Health Status Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Database Status */}
-                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                    <CardHeader className="bg-gradient-to-r from-blue-50/60 to-transparent border-b border-slate-100">
+                <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-status-info-light/60 to-transparent border-b">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-100 rounded-lg">
-                                    <Database className="h-4 w-4 text-blue-600" />
+                                <div className="p-2 bg-status-info-light rounded-lg">
+                                    <Database className="h-4 w-4 text-status-info" />
                                 </div>
                                 <CardTitle>Database</CardTitle>
                             </div>
@@ -68,8 +68,8 @@ export default async function PlatformHealthPage() {
                 </Card>
                 
                 {/* Stripe Webhooks Status */}
-                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                    <CardHeader className="bg-gradient-to-r from-violet-50/60 to-transparent border-b border-slate-100">
+                <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-violet-50/60 to-transparent border-b">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-violet-100 rounded-lg">
@@ -117,11 +117,11 @@ export default async function PlatformHealthPage() {
             </div>
             
             {/* Metrics Overview */}
-            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-emerald-50/60 to-transparent border-b border-slate-100">
+            <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-status-success-light/60 to-transparent border-b">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-emerald-100 rounded-lg">
-                            <Activity className="h-4 w-4 text-emerald-600" />
+                        <div className="p-2 bg-status-success-light rounded-lg">
+                            <Activity className="h-4 w-4 text-status-success" />
                         </div>
                         <div>
                             <CardTitle>System Metrics</CardTitle>
@@ -131,7 +131,7 @@ export default async function PlatformHealthPage() {
                 </CardHeader>
                 <CardContent className="p-6">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                        <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
+                        <div className="p-4 rounded-lg bg-muted border">
                             <div className="flex items-center gap-2 mb-2">
                                 <RefreshCw className="h-4 w-4 text-muted-foreground" />
                                 <span className="text-sm text-muted-foreground">Failed Payments</span>
@@ -144,7 +144,7 @@ export default async function PlatformHealthPage() {
                             </p>
                         </div>
                         
-                        <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
+                        <div className="p-4 rounded-lg bg-muted border">
                             <div className="flex items-center gap-2 mb-2">
                                 <CreditCard className="h-4 w-4 text-muted-foreground" />
                                 <span className="text-sm text-muted-foreground">Webhook Backlog</span>
@@ -161,7 +161,7 @@ export default async function PlatformHealthPage() {
                             </p>
                         </div>
                         
-                        <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
+                        <div className="p-4 rounded-lg bg-muted border">
                             <div className="flex items-center gap-2 mb-2">
                                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
                                 <span className="text-sm text-muted-foreground">Error Types</span>
@@ -178,11 +178,11 @@ export default async function PlatformHealthPage() {
             </Card>
             
             {/* Recent Errors */}
-            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-red-50/60 to-transparent border-b border-slate-100">
+            <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-status-error-light/60 to-transparent border-b">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-red-100 rounded-lg">
-                            <AlertCircle className="h-4 w-4 text-red-600" />
+                        <div className="p-2 bg-status-error-light rounded-lg">
+                            <AlertCircle className="h-4 w-4 text-status-error" />
                         </div>
                         <div>
                             <CardTitle>Recent Error Log</CardTitle>
@@ -196,7 +196,7 @@ export default async function PlatformHealthPage() {
                             {health.recentErrors.map((error, index) => (
                                 <div 
                                     key={index}
-                                    className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition-colors"
+                                    className="flex items-center justify-between p-3 rounded-lg bg-muted border hover:bg-muted/50 transition-colors"
                                 >
                                     <div className="flex items-center gap-3">
                                         <AlertCircle className={`h-4 w-4 ${error.count > 5 ? 'text-destructive' : 'text-status-warning'}`} />
@@ -226,8 +226,8 @@ export default async function PlatformHealthPage() {
             </Card>
             
             {/* Health Summary */}
-            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-slate-50/80 to-transparent border-b border-slate-100">
+            <Card className="border shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-muted/80 to-transparent border-b">
                     <CardTitle>Health Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">

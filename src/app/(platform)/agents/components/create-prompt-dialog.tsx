@@ -154,7 +154,7 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
                                         className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
                                             category === cat
                                                 ? `${meta.bgColor} ${meta.color} ring-1 ring-current`
-                                                : "bg-slate-100 text-muted-foreground hover:bg-slate-200"
+                                                : "bg-muted text-muted-foreground hover:bg-muted"
                                         }`}
                                     >
                                         {meta.label}
@@ -202,7 +202,7 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
                             className="min-h-[160px] font-mono text-xs leading-relaxed resize-y"
                         />
                         <p className="text-[10px] text-muted-foreground mt-1">
-                            Use <code className="bg-slate-100 px-1 rounded text-[10px]">{"{{input}}"}</code> to reference the previous step&apos;s output.
+                            Use <code className="bg-muted px-1 rounded text-[10px]">{"{{input}}"}</code> to reference the previous step&apos;s output.
                         </p>
                     </div>
 
@@ -240,7 +240,7 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
                                 {tags.map((tag) => (
                                     <span
                                         key={tag}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-[10px] text-muted-foreground"
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-[10px] text-muted-foreground"
                                     >
                                         {tag}
                                         <button onClick={() => handleRemoveTag(tag)} className="hover:text-foreground">
@@ -254,7 +254,7 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
                 </div>
 
                 {/* Actions */}
-                <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100">
+                <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
@@ -262,7 +262,7 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
                         size="sm"
                         onClick={handleCreate}
                         disabled={!isValid}
-                        style={{ backgroundColor: isValid ? "#ff4500" : undefined }}
+                        className={isValid ? "bg-international-orange hover:bg-international-orange-hover" : ""}
                     >
                         Create Prompt
                     </Button>

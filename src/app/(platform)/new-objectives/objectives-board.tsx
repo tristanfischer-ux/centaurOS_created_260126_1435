@@ -465,7 +465,7 @@ export function ObjectivesBoard({
 
         {/* Right: Detail panel */}
         {hasDetailPanel && (
-          <div className="w-[360px] min-w-0 max-w-[360px] flex-shrink-0 rounded-xl border border-slate-100 overflow-hidden h-[calc(100dvh-300px)] sticky top-8">
+          <div className="w-[360px] min-w-0 max-w-[360px] flex-shrink-0 rounded-xl border overflow-hidden h-[calc(100dvh-300px)] sticky top-8">
             {selectedTaskData ? (
               <TaskDetailPanel
                 task={selectedTaskData}
@@ -483,7 +483,7 @@ export function ObjectivesBoard({
 
       {/* Mobile detail: Full-screen overlay */}
       {selectedTaskData && !isLarge && (
-        <div className="fixed inset-0 z-50 bg-white">
+        <div className="fixed inset-0 z-50 bg-background">
           <TaskDetailPanel
             task={selectedTaskData}
             onClose={() => setSelectedTaskId(null)}
@@ -491,7 +491,7 @@ export function ObjectivesBoard({
         </div>
       )}
       {selectedObjective && !selectedTaskData && !isLarge && (
-        <div className="fixed inset-0 z-50 bg-white">
+        <div className="fixed inset-0 z-50 bg-background">
           <ObjectiveDetailPanel
             objective={selectedObjective}
             onClose={() => setSelectedId(null)}

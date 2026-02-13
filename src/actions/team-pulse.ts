@@ -105,7 +105,7 @@ export async function getTeamPulse(): Promise<{ data?: TeamPulseData; error?: st
 
       const memberTasks = allTasks.filter((t) => t.assignee_id === profile.id)
       const activeTasks = memberTasks.filter(
-        (t) => ['Pending', 'In Progress', 'Accepted'].includes(t.status || '')
+        (t) => ['Pending', 'Accepted'].includes(t.status || '')
       )
       const completedThisWeek = memberTasks.filter(
         (t) => t.status === 'Completed' && t.updated_at && t.updated_at >= weekAgoStr
@@ -137,7 +137,7 @@ export async function getTeamPulse(): Promise<{ data?: TeamPulseData; error?: st
 
     // 4. Aggregate stats
     const totalActiveTasks = allTasks.filter(
-      (t) => ['Pending', 'In Progress', 'Accepted'].includes(t.status || '')
+      (t) => ['Pending', 'Accepted'].includes(t.status || '')
     ).length
     const totalCompletedThisWeek = allTasks.filter(
       (t) => t.status === 'Completed' && t.updated_at && t.updated_at >= weekAgoStr

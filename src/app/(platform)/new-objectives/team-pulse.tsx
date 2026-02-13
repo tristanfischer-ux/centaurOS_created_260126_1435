@@ -71,8 +71,13 @@ export function TeamPulseDashboard({ className }: TeamPulseDashboardProps): Reac
   // Load team pulse on mount
   useEffect(() => {
     async function load(): Promise<void> {
-      const result = await getTeamPulse()
-      if (result.data) setPulse(result.data)
+      try {
+        const result = await getTeamPulse()
+        if (result.data) setPulse(result.data)
+        if (result.error) console.warn('[TeamPulse] Failed to load:', result.error)
+      } catch (err) {
+        console.error('[TeamPulse] Unexpected error:', err instanceof Error ? err.message : 'Unknown')
+      }
       setIsLoading(false)
     }
     load()

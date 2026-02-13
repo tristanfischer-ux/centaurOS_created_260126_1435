@@ -1248,14 +1248,14 @@ function AgentsFlowInner({
                             animated: true,
                             style: { stroke: "#3b82f6", strokeWidth: 2 },
                         }}
-                        className="bg-slate-50/50"
+                        className="bg-muted/30"
                     >
                         <Controls
-                            className="!bg-white !border-slate-200 !shadow-sm"
+                            className="!bg-background !border !shadow-sm"
                             showInteractive={false}
                         />
                         <MiniMap
-                            className="!bg-white !border-slate-200 !shadow-sm"
+                            className="!bg-background !border !shadow-sm"
                             maskColor="rgba(248, 250, 252, 0.7)"
                             nodeColor={(n) => {
                                 const status = (n.data as { executionStatus?: string })?.executionStatus
@@ -1320,21 +1320,21 @@ function AgentsFlowInner({
                                 <div className="flex items-start gap-2 mb-6 text-left mx-auto max-w-md">
                                     <div className="flex flex-col items-center gap-1 flex-1">
                                         <div className="w-8 h-8 rounded-full bg-international-orange text-white flex items-center justify-center text-xs font-bold">1</div>
-                                        <div className="h-px w-full bg-slate-200 mt-1 mb-1" />
+                                        <div className="h-px w-full bg-border mt-1 mb-1" />
                                         <p className="text-[11px] font-medium text-foreground text-center">Drag prompts</p>
                                         <p className="text-[10px] text-muted-foreground text-center">From the sidebar onto the canvas</p>
                                     </div>
                                     <div className="text-muted-foreground mt-2 flex-shrink-0">&#8594;</div>
                                     <div className="flex flex-col items-center gap-1 flex-1">
                                         <div className="w-8 h-8 rounded-full bg-international-orange text-white flex items-center justify-center text-xs font-bold">2</div>
-                                        <div className="h-px w-full bg-slate-200 mt-1 mb-1" />
+                                        <div className="h-px w-full bg-border mt-1 mb-1" />
                                         <p className="text-[11px] font-medium text-foreground text-center">Connect & add data</p>
                                         <p className="text-[10px] text-muted-foreground text-center">Link nodes and paste your content</p>
                                     </div>
                                     <div className="text-muted-foreground mt-2 flex-shrink-0">&#8594;</div>
                                     <div className="flex flex-col items-center gap-1 flex-1">
                                         <div className="w-8 h-8 rounded-full bg-international-orange text-white flex items-center justify-center text-xs font-bold">3</div>
-                                        <div className="h-px w-full bg-slate-200 mt-1 mb-1" />
+                                        <div className="h-px w-full bg-border mt-1 mb-1" />
                                         <p className="text-[11px] font-medium text-foreground text-center">Run & review</p>
                                         <p className="text-[10px] text-muted-foreground text-center">Results generated, you review each step</p>
                                     </div>
@@ -1349,7 +1349,7 @@ function AgentsFlowInner({
                                     </button>
                                     <button
                                         onClick={() => setCreatePromptOpen(true)}
-                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors"
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground bg-background border hover:bg-muted rounded-lg transition-colors"
                                     >
                                         Create a prompt
                                     </button>

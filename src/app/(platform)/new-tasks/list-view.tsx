@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { getStatusBadgeClass } from '@/lib/status-colors'
 import {
   ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2, Circle,
@@ -130,9 +131,9 @@ export function ListView({ tasks, selectedId, onSelect, groupBy }: ListViewProps
   }, [sortedTasks, groupBy])
 
   return (
-    <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+    <div className="bg-background rounded-xl border overflow-hidden">
       {/* Table header */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 bg-muted/30">
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b bg-muted/30">
         <div className="w-5" /> {/* Status icon column */}
         <SortHeader label="Title" field="title" currentField={sortField} currentDir={sortDir} onSort={handleSort} className="flex-1" />
         <div className="w-24 hidden md:block">
@@ -147,7 +148,7 @@ export function ListView({ tasks, selectedId, onSelect, groupBy }: ListViewProps
       </div>
 
       {/* Table body */}
-      <div className="divide-y divide-slate-50">
+      <div className="divide-y divide-border/50">
         {groups.map(group => (
           <div key={group.key}>
             {/* Group header */}
@@ -222,9 +223,7 @@ export function ListView({ tasks, selectedId, onSelect, groupBy }: ListViewProps
                       const primary = task.assignees?.length > 0 ? task.assignees[0] : task.assignee
                       return primary?.full_name ? (
                         <>
-                          <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[8px] font-semibold text-muted-foreground flex-shrink-0">
-                            {primary.full_name[0].toUpperCase()}
-                          </div>
+                          <UserAvatar name={primary.full_name} role={primary.role} size="xs" />
                           <span className="text-xs text-muted-foreground truncate">
                             {primary.full_name.split(' ')[0]}
                           </span>

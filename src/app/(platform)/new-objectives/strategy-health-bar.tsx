@@ -89,7 +89,7 @@ export function StrategyHealthBar({
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               isActive
                 ? cn(stat.activeBg, stat.border, 'shadow-sm')
-                : cn('bg-white border-slate-100', 'hover:border-slate-200')
+                : cn('bg-card border', 'hover:border-foreground/10')
             )}
           >
             <stat.icon className={cn('h-4 w-4 flex-shrink-0', stat.color)} />

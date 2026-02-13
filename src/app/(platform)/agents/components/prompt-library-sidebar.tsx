@@ -89,9 +89,9 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
     }
 
     return (
-        <div className="w-80 border-r border-slate-100 bg-white flex flex-col h-full">
+        <div className="w-80 border-r bg-background flex flex-col h-full">
             {/* Header */}
-            <div className="p-4 border-b border-slate-100">
+            <div className="p-4 border-b">
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-semibold text-foreground">
                         Prompt Library
@@ -108,7 +108,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                         </Button>
                         <button
                             onClick={onClose}
-                            className="p-1 rounded-md hover:bg-slate-100 text-muted-foreground"
+                            className="p-1 rounded-md hover:bg-muted text-muted-foreground"
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -128,7 +128,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
             </div>
 
             {/* Category pills */}
-            <div className="px-4 py-3 border-b border-slate-100">
+            <div className="px-4 py-3 border-b">
                 <div className="flex flex-wrap gap-1.5">
                     <button
                         onClick={() => setActiveCategory("all")}
@@ -136,7 +136,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                             "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors",
                             activeCategory === "all"
                                 ? "bg-slate-900 text-white"
-                                : "bg-slate-100 text-muted-foreground hover:bg-slate-200"
+                                : "bg-muted text-muted-foreground hover:bg-muted"
                         )}
                     >
                         All ({allPrompts.length})
@@ -169,7 +169,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                                     "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors",
                                     activeCategory === cat
                                         ? `${meta.bgColor} ${meta.color} ring-1`
-                                        : "bg-slate-100 text-muted-foreground hover:bg-slate-200"
+                                        : "bg-muted text-muted-foreground hover:bg-muted"
                                 )}
                                 style={
                                     activeCategory === cat
@@ -235,9 +235,9 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                                                 onDragStart={(e) =>
                                                     onDragStart(e, prompt.id)
                                                 }
-                                                className="group flex items-center gap-2.5 p-2.5 rounded-lg border border-transparent hover:border-slate-200 hover:bg-slate-50 cursor-grab active:cursor-grabbing transition-all"
+                                                className="group flex items-center gap-2.5 p-2.5 rounded-lg border border-transparent hover:border hover:bg-muted cursor-grab active:cursor-grabbing transition-all"
                                             >
-                                                <GripVertical className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                                <GripVertical className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                                                 <div
                                                     className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
                                                     style={{
@@ -264,7 +264,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                                                             e.preventDefault()
                                                             handleDeleteCustom(prompt.id)
                                                         }}
-                                                        className="p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                                                        className="p-1 rounded hover:bg-status-error-light text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
                                                     >
                                                         <Trash2 className="w-3 h-3" />
                                                     </button>
@@ -299,7 +299,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
             </ScrollArea>
 
             {/* Footer */}
-            <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+            <div className="p-3 border-t bg-muted/30">
                 <p className="text-[10px] text-muted-foreground text-center">
                     Drag prompts onto the canvas to build workflows
                 </p>

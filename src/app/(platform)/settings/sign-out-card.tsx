@@ -7,7 +7,7 @@ import { signOut } from '@/actions/auth'
 
 export function SignOutCard() {
     return (
-        <Card className="border-slate-200 bg-slate-50/50">
+        <Card className="border bg-muted/30">
             <CardContent className="p-4 flex items-center justify-between">
                 <div>
                     <p className="text-sm font-medium text-foreground">Sign Out</p>

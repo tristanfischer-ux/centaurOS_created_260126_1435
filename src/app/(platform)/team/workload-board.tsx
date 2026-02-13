@@ -74,16 +74,16 @@ function getTimeBucket(task: ExtendedTask): TimeBucket {
 // ─── Status Colors ───────────────────────────────
 
 const statusColors: Record<string, string> = {
-    Accepted: 'bg-electric-blue',
-    Pending: 'bg-amber-400',
-    Completed: 'bg-emerald-500',
-    Rejected: 'bg-red-500',
+    Accepted: 'bg-status-info',
+    Pending: 'bg-status-warning',
+    Completed: 'bg-status-success',
+    Rejected: 'bg-status-error',
 }
 
 const riskColors: Record<string, string> = {
-    high: 'text-red-500',
-    medium: 'text-amber-500',
-    low: 'text-emerald-500',
+    high: 'text-status-error',
+    medium: 'text-status-warning',
+    low: 'text-status-success',
 }
 
 // ─── Task Card ───────────────────────────────────
@@ -134,10 +134,10 @@ function TaskCard({ task, onTaskClick }: { task: ExtendedTask; onTaskClick?: (id
 function CapacityBar({ active, pending }: { active: number; pending: number }) {
     const score = Math.min(100, (active * 20) + (pending * 10))
     const color = score <= 40
-        ? 'bg-emerald-500'
+        ? 'bg-status-success'
         : score <= 70
-            ? 'bg-amber-400'
-            : 'bg-red-500'
+            ? 'bg-status-warning'
+            : 'bg-status-error'
     const bgColor = score <= 40
         ? 'bg-status-success-light'
         : score <= 70

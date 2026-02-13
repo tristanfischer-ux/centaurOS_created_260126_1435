@@ -82,7 +82,7 @@ function TreeItem({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 bg-white hover:bg-muted"
+            className="h-7 w-7 bg-background hover:bg-muted"
             onClick={(e) => {
               e.stopPropagation()
               onEdit(objective)
@@ -96,7 +96,7 @@ function TreeItem({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 bg-white hover:bg-destructive/10 hover:text-destructive"
+            className="h-7 w-7 bg-background hover:bg-destructive/10 hover:text-destructive"
             onClick={(e) => {
               e.stopPropagation()
               onDelete(objective.id)
@@ -175,7 +175,7 @@ function TreeItem({
         <div className="relative">
           {/* Vertical alignment line */}
           <div
-            className="absolute top-0 bottom-0 w-px bg-slate-200"
+            className="absolute top-0 bottom-0 w-px bg-border"
             style={{ left: `${depth * 24 + 24}px` }}
           />
           {node.children.map(child => (
@@ -317,7 +317,7 @@ export function ObjectivesTreeView({ objectives, strategicObjectives = [], selec
         </div>
       )}
 
-      <div className="space-y-0.5 bg-background rounded-xl border border-slate-100 p-2">
+      <div className="space-y-0.5 bg-background rounded-xl border p-2">
         <TreeHeader />
         <Separator />
 

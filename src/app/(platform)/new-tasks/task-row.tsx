@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { getStatusBadgeClass } from '@/lib/status-colors'
 import { CheckCircle2, Circle, AlertTriangle, MessageSquare, Paperclip } from 'lucide-react'
 import type { TaskWithData } from './types'
@@ -77,12 +78,7 @@ export function TaskRow({ task, isSelected, onSelect, showObjective = true }: Ta
       {(() => {
         const primary = task.assignees?.length > 0 ? task.assignees[0] : task.assignee
         return primary?.full_name ? (
-          <div
-            className="h-6 w-6 rounded-full bg-muted border border-slate-200 flex items-center justify-center text-[9px] font-semibold text-muted-foreground flex-shrink-0"
-            title={primary.full_name}
-          >
-            {primary.full_name[0].toUpperCase()}
-          </div>
+          <UserAvatar name={primary.full_name} role={primary.role} size="xs" />
         ) : null
       })()}
 

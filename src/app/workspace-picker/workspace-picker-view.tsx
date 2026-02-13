@@ -54,10 +54,10 @@ export function WorkspacePickerView({ foundries }: { foundries: Foundry[] }) {
               key={foundry.foundryId}
               onClick={() => handleSelect(foundry.foundryId)}
               disabled={isPending}
-              className="w-full group flex items-center gap-4 p-5 rounded-lg border border-slate-200 bg-white hover:border-international-orange/40 hover:shadow-md transition-all duration-200 text-left disabled:opacity-50 disabled:pointer-events-none"
+              className="w-full group flex items-center gap-4 p-5 rounded-lg border bg-card hover:border-international-orange/40 hover:shadow-md transition-all duration-200 text-left disabled:opacity-50 disabled:pointer-events-none"
             >
               {/* Icon */}
-              <div className="h-12 w-12 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center flex-shrink-0">
+              <div className="h-12 w-12 rounded-lg bg-international-orange-light border border-international-orange/20 flex items-center justify-center flex-shrink-0">
                 <Building2 className="h-6 w-6 text-international-orange" />
               </div>
 
@@ -72,7 +72,7 @@ export function WorkspacePickerView({ foundries }: { foundries: Foundry[] }) {
                   )}
                 </div>
                 <div className="flex items-center gap-3 mt-1">
-                  <span className="text-[10px] text-international-orange font-mono uppercase px-1.5 py-0.5 bg-orange-50 border border-orange-200 font-semibold tracking-wide">
+                  <span className="text-[10px] text-international-orange font-mono uppercase px-1.5 py-0.5 bg-international-orange-light border border-international-orange/20 font-semibold tracking-wide">
                     {foundry.role}
                   </span>
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">

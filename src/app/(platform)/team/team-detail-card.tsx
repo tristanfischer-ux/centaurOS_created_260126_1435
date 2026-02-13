@@ -74,10 +74,10 @@ interface TeamDetailCardProps {
 function MiniCapacityBar({ active, pending, name }: { active: number; pending: number; name: string | null }) {
     const score = Math.min(100, (active * 20) + (pending * 10))
     const color = score <= 40
-        ? 'bg-emerald-500'
+        ? 'bg-status-success'
         : score <= 70
-            ? 'bg-amber-400'
-            : 'bg-red-500'
+            ? 'bg-status-warning'
+            : 'bg-status-error'
 
     return (
         <div className="flex items-center gap-2">
@@ -241,16 +241,16 @@ export function TeamDetailCard({
                         <span className="h-1.5 w-1.5 rounded-full bg-electric-blue" />
                         {teamStats.active} active
                     </span>
-                    <span className="flex items-center gap-1 text-amber-500 font-medium">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                    <span className="flex items-center gap-1 text-status-warning font-medium">
+                        <span className="h-1.5 w-1.5 rounded-full bg-status-warning" />
                         {teamStats.pending} pending
                     </span>
-                    <span className="flex items-center gap-1 text-emerald-500 font-medium">
+                    <span className="flex items-center gap-1 text-status-success font-medium">
                         <CheckCircle className="h-3 w-3" />
                         {teamStats.completed} done
                     </span>
                     {teamStats.overdue > 0 && (
-                        <span className="flex items-center gap-1 text-red-500 font-medium">
+                        <span className="flex items-center gap-1 text-status-error font-medium">
                             <AlertCircle className="h-3 w-3" />
                             {teamStats.overdue} overdue
                         </span>

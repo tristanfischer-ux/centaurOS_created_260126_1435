@@ -96,7 +96,7 @@ function ProviderModelSelector({
                             className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                                 modality === m
                                     ? "bg-blue-100 text-blue-700 border border-blue-200"
-                                    : "bg-slate-50 text-muted-foreground hover:bg-slate-100 border border-transparent"
+                                    : "bg-muted text-muted-foreground hover:bg-muted border border-transparent"
                             }`}
                         >
                             {MODALITY_LABELS[m]}
@@ -112,7 +112,7 @@ function ProviderModelSelector({
                     <select
                         value={providerId}
                         onChange={(e) => handleProviderChange(e.target.value)}
-                        className="w-full h-8 rounded-md border border-slate-200 bg-white px-2 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
+                        className="w-full h-8 rounded-md border bg-background px-2 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
                     >
                         {availableProviders.map((p) => (
                             <option key={p.id} value={p.id}>{p.name}</option>
@@ -124,7 +124,7 @@ function ProviderModelSelector({
                     <select
                         value={modelId}
                         onChange={(e) => handleModelChange(e.target.value)}
-                        className="w-full h-8 rounded-md border border-slate-200 bg-white px-2 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
+                        className="w-full h-8 rounded-md border bg-background px-2 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
                     >
                         {availableModels.map((m) => (
                             <option key={m.id} value={m.id}>{m.name}</option>
@@ -134,7 +134,7 @@ function ProviderModelSelector({
             </div>
 
             {/* Active provider badge */}
-            <div className="flex items-center gap-1.5 p-1.5 rounded-md bg-slate-50 border border-slate-100">
+            <div className="flex items-center gap-1.5 p-1.5 rounded-md bg-muted border">
                 <ProviderIcon className="h-3.5 w-3.5" style={{ color: providerMeta?.color }} />
                 <span className="text-[10px] text-muted-foreground">
                     {providerMeta?.name} · {availableModels.find(m => m.id === modelId)?.name ?? modelId}
@@ -160,7 +160,7 @@ function MediaOutput({ data }: {
         return (
             <div className="space-y-2">
                 <label className="text-xs font-semibold text-foreground">Generated Image</label>
-                <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                <div className="rounded-lg overflow-hidden border bg-muted">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                         src={data.imageUrl}
@@ -223,7 +223,7 @@ function MediaOutput({ data }: {
         return (
             <div className="space-y-2">
                 <label className="text-xs font-semibold text-foreground">Generated Video</label>
-                <div className="rounded-lg overflow-hidden border border-slate-200 bg-black">
+                <div className="rounded-lg overflow-hidden border bg-black">
                     <video controls className="w-full" src={data.videoUrl}>
                         <track kind="captions" />
                     </video>
@@ -471,16 +471,16 @@ export function NodeInspector({
     const isReview = status === "review"
 
     return (
-        <div className="w-96 border-l border-slate-100 bg-white flex flex-col h-full">
+        <div className="w-96 border-l bg-background flex flex-col h-full">
             {/* Header */}
-            <div className="p-4 border-b border-slate-100">
+            <div className="p-4 border-b">
                 <div className="flex items-center justify-between mb-3">
                     <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color }}>
                         {meta?.label ?? "Prompt"}
                     </span>
                     <button
                         onClick={onClose}
-                        className="p-1 rounded-md hover:bg-slate-100 text-muted-foreground"
+                        className="p-1 rounded-md hover:bg-muted text-muted-foreground"
                     >
                         <X className="w-4 h-4" />
                     </button>
@@ -520,7 +520,7 @@ export function NodeInspector({
                                     {prompt.inputLabel}
                                 </p>
                             </div>
-                            <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-100">
+                            <div className="p-2.5 rounded-lg bg-status-success-light border border-status-success/20">
                                 <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mb-0.5">
                                     Output
                                 </p>
@@ -567,7 +567,7 @@ export function NodeInspector({
                                     onRemoveFile={handleRemoveFile}
                                 />
                                 <p className="text-[10px] text-muted-foreground">
-                                    This data replaces <code className="bg-slate-100 px-1 rounded text-[10px]">{"{{input}}"}</code> in the prompt. For chained nodes, the previous node&apos;s output is used if no manual input is provided.
+                                    This data replaces <code className="bg-muted px-1 rounded text-[10px]">{"{{input}}"}</code> in the prompt. For chained nodes, the previous node&apos;s output is used if no manual input is provided.
                                 </p>
                             </div>
                         )}
@@ -608,7 +608,7 @@ export function NodeInspector({
                             placeholder="Enter your prompt..."
                         />
                         <p className="text-[10px] text-muted-foreground mt-1.5">
-                            Use <code className="bg-slate-100 px-1 rounded text-[10px]">{"{{input}}"}</code> to reference the input data or previous step&apos;s output.
+                            Use <code className="bg-muted px-1 rounded text-[10px]">{"{{input}}"}</code> to reference the input data or previous step&apos;s output.
                         </p>
                     </div>
 
@@ -633,7 +633,7 @@ export function NodeInspector({
                                     </span>
                                 )}
                                 {status === "review" && (
-                                    <span className="ml-auto text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                                    <span className="ml-auto text-[10px] text-status-warning bg-status-warning-light px-1.5 py-0.5 rounded-full">
                                         Needs review
                                     </span>
                                 )}
@@ -642,7 +642,7 @@ export function NodeInspector({
                             {outputExpanded && (
                                 <div className="space-y-2">
                                     {data.error && (
-                                        <div className="p-2.5 rounded-lg bg-red-50 border border-red-100">
+                                        <div className="p-2.5 rounded-lg bg-status-error-light border border-destructive/20">
                                             <p className="text-[11px] text-red-700">{data.error}</p>
                                         </div>
                                     )}
@@ -663,7 +663,7 @@ export function NodeInspector({
                                         <div className={`rounded-lg border p-3 max-h-[400px] overflow-y-auto text-xs leading-relaxed ${
                                             isReview ? "border-amber-200 bg-amber-50/30" : "bg-muted/30"
                                         }`}>
-                                            <Markdown content={data.output} className="text-xs [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-xs [&_table]:text-[11px] [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 [&_table]:border-collapse [&_th]:border [&_th]:border-slate-200 [&_td]:border [&_td]:border-slate-200 [&_th]:bg-muted [&_th]:font-semibold" />
+                                            <Markdown content={data.output} className="text-xs [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-xs [&_table]:text-[11px] [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 [&_table]:border-collapse [&_th]:border [&_td]:border [&_th]:bg-muted [&_th]:font-semibold" />
                                         </div>
                                     ) : (
                                         <p className="text-xs text-muted-foreground italic p-3">
@@ -672,7 +672,7 @@ export function NodeInspector({
                                     )}
 
                                     {isReview && (
-                                        <p className="text-[10px] text-amber-600">
+                                        <p className="text-[10px] text-status-warning">
                                             Review the output above. You can edit it before approving. This output will feed into the next connected node.
                                         </p>
                                     )}
@@ -815,7 +815,7 @@ export function NodeInspector({
                                 {prompt.tags.map((tag) => (
                                     <span
                                         key={tag}
-                                        className="px-2 py-0.5 rounded-full bg-slate-100 text-[10px] text-muted-foreground"
+                                        className="px-2 py-0.5 rounded-full bg-muted text-[10px] text-muted-foreground"
                                     >
                                         {tag}
                                     </span>
@@ -837,7 +837,7 @@ export function NodeInspector({
                                     .map((p) => (
                                         <div
                                             key={p!.id}
-                                            className="flex items-center gap-2 p-2 rounded-md bg-slate-50 text-xs"
+                                            className="flex items-center gap-2 p-2 rounded-md bg-muted text-xs"
                                         >
                                             <span className="text-muted-foreground">→</span>
                                             <span className="font-medium text-foreground">
@@ -852,7 +852,7 @@ export function NodeInspector({
             </ScrollArea>
 
             {/* Footer actions */}
-            <div className="p-4 border-t border-slate-100 space-y-2">
+            <div className="p-4 border-t space-y-2">
                 {/* HITL Review actions */}
                 {isReview && (
                     <div className="space-y-2 mb-2">
@@ -1004,16 +1004,16 @@ function HumanTaskInspector({
     const isDone = status === "approved"
 
     return (
-        <div className="w-96 border-l border-slate-100 bg-white flex flex-col h-full">
+        <div className="w-96 border-l bg-background flex flex-col h-full">
             {/* Header */}
-            <div className="p-4 border-b border-slate-100">
+            <div className="p-4 border-b">
                 <div className="flex items-center justify-between mb-3">
                     <span className="text-[11px] font-medium uppercase tracking-wider text-blue-600">
                         People
                     </span>
                     <button
                         onClick={onClose}
-                        className="p-1 rounded-md hover:bg-slate-100 text-muted-foreground"
+                        className="p-1 rounded-md hover:bg-muted text-muted-foreground"
                     >
                         <X className="w-4 h-4" />
                     </button>
@@ -1064,8 +1064,8 @@ function HumanTaskInspector({
                                         onClick={() => toggleItem(i)}
                                         className={`flex items-start gap-2.5 w-full text-left p-2 rounded-lg transition-colors ${
                                             completed[i]
-                                                ? "bg-emerald-50 border border-emerald-100"
-                                                : "bg-slate-50 border border-slate-100 hover:bg-slate-100"
+                                                ? "bg-status-success-light border border-status-success/20"
+                                                : "bg-muted border hover:bg-muted"
                                         }`}
                                     >
                                         {completed[i] ? (
@@ -1089,7 +1089,7 @@ function HumanTaskInspector({
 
                     {/* Data flow hint — helps users understand what happens next */}
                     {!isDone && (
-                        <div className="p-3 rounded-lg bg-amber-50/60 border border-amber-100">
+                        <div className="p-3 rounded-lg bg-status-warning-light/60 border border-status-warning/20">
                             <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider mb-1.5">
                                 What happens next
                             </p>
@@ -1112,7 +1112,7 @@ function HumanTaskInspector({
 
                     {/* Done state */}
                     {isDone && (
-                        <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100 text-center">
+                        <div className="p-3 rounded-lg bg-status-success-light border border-status-success/20 text-center">
                             <CheckCircle className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
                             <p className="text-xs font-medium text-emerald-700">Step completed</p>
                         </div>
@@ -1121,7 +1121,7 @@ function HumanTaskInspector({
             </ScrollArea>
 
             {/* Footer actions */}
-            <div className="p-4 border-t border-slate-100 space-y-2">
+            <div className="p-4 border-t space-y-2">
                 {isReview && (
                     <div className="space-y-2 mb-2">
                         <Button
