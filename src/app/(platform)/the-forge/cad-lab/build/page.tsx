@@ -248,8 +248,14 @@ export default function CadLabBuildPage(): React.ReactNode {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs text-muted-foreground">{mod.leadWeeks}w lead</span>
-                      <span className="text-xs font-mono text-muted-foreground">{mod.keyParts.length} parts</span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1" title={`Estimated procurement lead time: ${mod.leadWeeks} weeks`}>
+                        <Clock className="h-3 w-3" />
+                        {mod.leadWeeks} wk lead time
+                      </span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1" title={`${mod.keyParts.length} key physical components in this sub-assembly`}>
+                        <Puzzle className="h-3 w-3" />
+                        {mod.keyParts.length} parts
+                      </span>
                       {expandedModuleId === mod.id
                         ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
                         : <ChevronRight className="h-4 w-4 text-muted-foreground" />
