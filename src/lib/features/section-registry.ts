@@ -226,8 +226,8 @@ export const SECTIONS: Section[] = [
         features: [
             {
                 name: "The Forge",
-                description: "Scan an idea into a buildable engineering dossier with 3D CAD models",
-                route: "/the-forge",
+                description: "Turn any product idea into manufacturing-ready parametric CAD in minutes",
+                route: "/the-forge/cad-lab",
                 icon: Flame,
                 addedAt: new Date("2026-02-11"),
             },
