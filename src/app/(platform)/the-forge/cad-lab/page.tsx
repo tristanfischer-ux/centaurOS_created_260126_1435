@@ -104,12 +104,12 @@ import { CadLabProgress } from "@/components/cad/cad-lab-progress"
 import { CadLabMilestone } from "@/components/cad/cad-lab-milestone"
 
 const QUICK_START_TEMPLATES = [
-  { id: "drone", label: "Drone Frame", subject: "Quadcopter drone frame with 250mm motor-to-motor distance, carbon fiber arms, and integrated flight controller mount", image: "/cad-lab/templates/drone-frame.jpg", complexity: "Advanced" },
-  { id: "organizer", label: "Desk Organizer", subject: "Wooden desktop organizer with pen holder, phone stand, and cable management tray", image: "/cad-lab/templates/desk-organizer.jpg", complexity: "Beginner" },
-  { id: "phone", label: "Phone Stand", subject: "Adjustable phone stand with portrait and landscape positions, rubber grip pads, and cable passthrough", image: "/cad-lab/templates/phone-stand.jpg", complexity: "Beginner" },
-  { id: "enclosure", label: "Enclosure Box", subject: "Electronics project enclosure with snap-fit lid, ventilation slots, mounting tabs, and USB-C cutout", image: "/cad-lab/templates/enclosure-box.jpg", complexity: "Intermediate" },
-  { id: "bracket", label: "Bracket Mount", subject: "Universal L-bracket mounting system with adjustable angle, M5 mounting holes, and cable routing channels", image: "/cad-lab/templates/bracket-mount.jpg", complexity: "Beginner" },
-  { id: "gears", label: "Gear Assembly", subject: "Two-stage spur gear reduction assembly with 4:1 ratio, 1 module teeth, 6mm shaft bores, and integrated housing", image: "/cad-lab/templates/gear-assembly.jpg", complexity: "Advanced" },
+  { id: "drone", label: "Drone Frame", subject: "Quadcopter drone frame with 250mm motor-to-motor distance, carbon fiber arms, and integrated flight controller mount", image: "/cad-lab/templates/drone-frame.png", complexity: "Advanced" },
+  { id: "organizer", label: "Desk Organizer", subject: "Wooden desktop organizer with pen holder, phone stand, and cable management tray", image: "/cad-lab/templates/desk-organizer.png", complexity: "Beginner" },
+  { id: "phone", label: "Phone Stand", subject: "Adjustable phone stand with portrait and landscape positions, rubber grip pads, and cable passthrough", image: "/cad-lab/templates/phone-stand.png", complexity: "Beginner" },
+  { id: "enclosure", label: "Enclosure Box", subject: "Electronics project enclosure with snap-fit lid, ventilation slots, mounting tabs, and USB-C cutout", image: "/cad-lab/templates/enclosure-box.png", complexity: "Intermediate" },
+  { id: "bracket", label: "Bracket Mount", subject: "Universal L-bracket mounting system with adjustable angle, M5 mounting holes, and cable routing channels", image: "/cad-lab/templates/bracket-mount.png", complexity: "Beginner" },
+  { id: "gears", label: "Gear Assembly", subject: "Two-stage spur gear reduction assembly with 4:1 ratio, 1 module teeth, 6mm shaft bores, and integrated housing", image: "/cad-lab/templates/gear-assembly.png", complexity: "Advanced" },
 ] as const
 
 export default function CadLabPage(): React.ReactNode {
@@ -877,7 +877,7 @@ export default function CadLabPage(): React.ReactNode {
           {/* Hero banner */}
           <div className="relative rounded-xl overflow-hidden border border-muted">
             <Image
-              src="/cad-lab/hero.jpg"
+              src="/cad-lab/hero.png"
               alt="From idea to manufacturing-ready CAD"
               width={1200}
               height={400}
@@ -900,7 +900,7 @@ export default function CadLabPage(): React.ReactNode {
           {/* Value pillars */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-start gap-3 p-4 rounded-lg border border-muted bg-card">
-              <Image src="/cad-lab/pillars/research.jpg" alt="AI Research" width={48} height={48} className="rounded-md flex-shrink-0" />
+              <Image src="/cad-lab/pillars/research.png" alt="AI Research" width={48} height={48} className="rounded-md flex-shrink-0" />
               <div>
                 <h3 className="text-sm font-semibold text-foreground">AI Research</h3>
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
@@ -909,7 +909,7 @@ export default function CadLabPage(): React.ReactNode {
               </div>
             </div>
             <div className="flex items-start gap-3 p-4 rounded-lg border border-muted bg-card">
-              <Image src="/cad-lab/pillars/cad.jpg" alt="Parametric CAD" width={48} height={48} className="rounded-md flex-shrink-0" />
+              <Image src="/cad-lab/pillars/cad.png" alt="Parametric CAD" width={48} height={48} className="rounded-md flex-shrink-0" />
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Parametric CAD</h3>
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
@@ -918,7 +918,7 @@ export default function CadLabPage(): React.ReactNode {
               </div>
             </div>
             <div className="flex items-start gap-3 p-4 rounded-lg border border-muted bg-card">
-              <Image src="/cad-lab/pillars/production.jpg" alt="Production Ready" width={48} height={48} className="rounded-md flex-shrink-0" />
+              <Image src="/cad-lab/pillars/production.png" alt="Production Ready" width={48} height={48} className="rounded-md flex-shrink-0" />
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Production Ready</h3>
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
