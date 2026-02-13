@@ -5,7 +5,13 @@
  * The roster is organized into 3 rows that tell the founder's journey:
  *   Row 1 (KNOW): Strategist, Product Lead, Chief of Staff
  *   Row 2 (GROW): Growth Marketer, Sales Lead, Fundraising Advisor
- *   Row 3 (RUN):  Finance Lead, People & Culture, Legal Counsel
+ *   Row 3 (RUN):  Finance Lead, Hiring & Team, Legal Counsel
+ *
+ * Each specialist has:
+ * - A first-person tagline with real personality
+ * - A workingStyle that sets expectations ("I'll be direct..." / "I'll ask a lot of questions...")
+ * - A recommended flag for stage-appropriate "start here" guidance
+ * - An optional avatar image path for visual identity
  *
  * @related
  * - Prompt library: src/app/(platform)/agents/lib/prompt-library.ts
@@ -43,7 +49,7 @@ export const SPECIALIST_ROWS: RowMeta[] = [
     {
         id: "run",
         label: "RUN",
-        subtitle: "Don't crash",
+        subtitle: "Keep the lights on",
         accentColor: "bg-status-success",
     },
 ]
@@ -59,6 +65,8 @@ export interface Specialist {
     tagline: string
     /** Longer description of what this specialist does */
     description: string
+    /** How this specialist works — sets tone expectations in the Brief dialog */
+    workingStyle: string
     /** Which row this specialist belongs to */
     row: SpecialistRow
     /** Which prompt categories this specialist covers */
@@ -67,6 +75,12 @@ export interface Specialist {
     icon: string
     /** Key capabilities shown on the card (human-readable) */
     highlights: string[]
+    /** Whether this specialist is recommended for early-stage founders */
+    recommended: boolean
+    /** Path to a generated avatar image (relative to /public) */
+    avatarImage?: string
+    /** IDs of specialists to suggest after this one completes a brief */
+    suggestedNext?: string[]
 }
 
 export const SPECIALISTS: Specialist[] = [
@@ -74,159 +88,204 @@ export const SPECIALISTS: Specialist[] = [
     {
         id: "strategist",
         name: "Strategist",
-        tagline: "I see the big picture so you can focus on what matters.",
+        tagline: "You have instincts. I'll turn them into a plan with teeth.",
         description:
-            "Market research, competitive analysis, business model design, go-to-market strategy, market sizing, and scenario planning. The person who turns messy ideas into clear, actionable plans.",
+            "Market sizing, competitive landscapes, positioning, go-to-market playbooks, scenario planning, and business model stress tests. Not the person who gives you a 50-page report — the person who gives you the 3 things that actually matter.",
+        workingStyle: "I'll be direct and opinionated. I'd rather give you one strong recommendation than five weak options. Push back if you disagree — that's how we sharpen the strategy.",
         row: "know",
         categories: ["startup-strategy", "strategy", "data-analytics"],
         icon: "Compass",
         highlights: [
-            "Market research & sizing",
-            "Competitive analysis",
-            "Go-to-market strategy",
-            "Business model design",
-            "OKRs & planning",
+            "Market sizing & research",
+            "Competitive landscapes",
+            "Go-to-market playbooks",
+            "Business model stress tests",
+            "Scenario planning",
+            "OKR frameworks",
         ],
+        recommended: true,
+        avatarImage: "/images/specialists/strategist.png",
+        suggestedNext: ["product-lead", "finance-lead"],
     },
     {
         id: "product-lead",
         name: "Product Lead",
-        tagline: "I turn your vision into something engineers can build.",
+        tagline: "Ideas are cheap. Shipped products change the world. Let's ship.",
         description:
-            "PRDs, user stories, roadmaps, feature prioritization, technical specs, and user personas. Translates what you want into what your team can actually deliver.",
+            "PRDs that engineers actually read, user stories with real acceptance criteria, prioritization frameworks that survive contact with stakeholders, technical specs, user research synthesis, and roadmaps that don't lie. The translator between what you dream and what gets built.",
+        workingStyle: "I'll ask a lot of questions before I write anything. The PRD is only as good as the understanding behind it. Expect me to challenge scope — I'm allergic to feature creep.",
         row: "know",
-        categories: ["product"],
+        categories: ["product", "data-analytics"],
         icon: "Package",
         highlights: [
-            "Product requirements",
-            "User stories",
-            "Feature prioritization",
-            "Roadmaps",
-            "Technical specs",
+            "Product requirements (PRDs)",
+            "User stories & acceptance criteria",
+            "Prioritization frameworks",
+            "Roadmaps & sprint planning",
+            "User research synthesis",
+            "Technical specifications",
         ],
+        recommended: true,
+        avatarImage: "/images/specialists/product-lead.png",
+        suggestedNext: ["growth-marketer", "hiring-team"],
     },
     {
         id: "chief-of-staff",
         name: "Chief of Staff",
         tagline: "I keep the wheels turning while you change the world.",
         description:
-            "Meeting prep, decision frameworks, priority management, weekly synthesis, communication drafts, and blind spot scanning. Your right hand who makes sure nothing falls through the cracks.",
+            "Meeting prep that makes you look prepared, decision frameworks that cut through analysis paralysis, priority management for the chronically overcommitted, weekly synthesis that tells you what you missed, and blind spot scanning before the blind spots find you.",
+        workingStyle: "I'm your strategic right hand. I'll be honest about what's falling through the cracks, even when you don't want to hear it. My job is to protect your time and attention.",
         row: "know",
         categories: ["chief-of-staff"],
         icon: "Crown",
         highlights: [
             "Meeting prep & briefs",
             "Decision frameworks",
-            "Priority management",
-            "Weekly summaries",
-            "Communication drafts",
+            "Priority stack-ranking",
+            "Weekly executive summaries",
+            "Blind spot scanning",
+            "Board meeting prep",
         ],
+        recommended: true,
+        avatarImage: "/images/specialists/chief-of-staff.png",
+        suggestedNext: ["strategist", "finance-lead"],
     },
 
     // ─── Row 2: GROW — Revenue and reach ─────────────────────────────────
     {
         id: "growth-marketer",
         name: "Growth Marketer",
-        tagline: "I make sure the right people know your name.",
+        tagline: "Nobody buys what nobody's heard of. Let's fix that.",
         description:
-            "Content calendars, SEO strategy, email campaigns, social media, brand voice, landing page copy, ad copy, and PR. Fills the top of your funnel and builds your brand.",
+            "Content that ranks, emails that convert, social that doesn't feel like social, landing pages that actually land, brand voice that sounds like a human wrote it, and SEO strategy that compounds. Not vanity metrics — pipeline-building marketing.",
+        workingStyle: "I think in funnels and feedback loops. I'll always tie creative work back to a measurable outcome. If we can't track it, we shouldn't do it.",
         row: "grow",
         categories: ["marketing", "creative"],
         icon: "Megaphone",
         highlights: [
             "Content & SEO strategy",
-            "Email campaigns",
-            "Brand & messaging",
-            "Social media",
+            "Email sequences that convert",
+            "Brand voice & messaging",
             "Landing page copy",
+            "Social media calendars",
+            "Ad copy & campaign briefs",
         ],
+        recommended: false,
+        avatarImage: "/images/specialists/growth-marketer.png",
+        suggestedNext: ["sales-lead", "product-lead"],
     },
     {
         id: "sales-lead",
         name: "Sales Lead",
-        tagline: "Every great product needs someone who can close. That's me.",
+        tagline: "Pipeline doesn't fill itself. Let's build a machine.",
         description:
-            "Cold outreach, proposals, pricing strategy, objection handling, pipeline management, battle cards, and demo scripts. Turns conversations into revenue.",
+            "Cold outreach that gets replies, proposals that close, pricing strategy that doesn't leave money on the table, objection handling scripts, pipeline architecture, battle cards against competitors, and demo scripts that tell a story. Revenue is oxygen — this is the person who keeps you breathing.",
+        workingStyle: "I'm numbers-driven and process-obsessed. Every conversation should move toward a close or a clear 'no.' I'll push you to track everything and follow up relentlessly.",
         row: "grow",
         categories: ["sales", "customer-success"],
         icon: "Handshake",
         highlights: [
-            "Outreach sequences",
-            "Proposals & pricing",
-            "Objection handling",
-            "Pipeline strategy",
-            "Customer retention",
+            "Cold outreach sequences",
+            "Proposals & pricing strategy",
+            "Objection handling scripts",
+            "Pipeline architecture",
+            "Competitor battle cards",
+            "Customer retention playbooks",
         ],
+        recommended: false,
+        avatarImage: "/images/specialists/sales-lead.png",
+        suggestedNext: ["growth-marketer", "finance-lead"],
     },
     {
         id: "fundraising-advisor",
         name: "Fundraising Advisor",
-        tagline: "Investors don't fund decks. They fund stories. Let me help tell yours.",
+        tagline: "Investors don't fund decks. They fund conviction. Let's build yours.",
         description:
-            "Pitch decks, financial projections, investor targeting, cap table management, term sheet analysis, due diligence prep, and investor updates. Gets you funded.",
+            "Pitch narratives that make investors lean forward, financial models that survive due diligence, investor targeting that matches your stage and sector, term sheet analysis that protects your upside, cap table modeling, and investor update templates that keep your backers engaged and helpful.",
+        workingStyle: "I've seen what works and what doesn't in the room. I'll be blunt about weak spots in your story — better to hear it from me than from the partner who passes.",
         row: "grow",
         categories: ["fundraising"],
         icon: "TrendingUp",
         highlights: [
-            "Pitch deck narrative",
-            "Financial projections",
-            "Investor targeting",
-            "Due diligence prep",
+            "Pitch narrative & deck structure",
+            "Financial models & projections",
+            "Investor targeting & outreach",
             "Term sheet analysis",
+            "Cap table modeling",
+            "Investor update templates",
         ],
+        recommended: false,
+        avatarImage: "/images/specialists/fundraising-advisor.png",
+        suggestedNext: ["finance-lead", "legal-counsel"],
     },
 
-    // ─── Row 3: RUN — Don't crash ───────────────────────────────────────
+    // ─── Row 3: RUN — Keep the lights on ─────────────────────────────────
     {
         id: "finance-lead",
         name: "Finance Lead",
-        tagline: "I run the numbers so you can run the business.",
+        tagline: "You're building a rocket. I'll make sure it has enough fuel.",
         description:
-            "Cash flow forecasts, budgets, unit economics, financial models, expense analysis, KPI dashboards, and burn rate tracking. The person who tells you how much runway you have left.",
+            "Cash flow forecasts that don't lie, burn rate tracking, unit economics that tell you if the business model actually works, budget templates, scenario modeling for different growth paths, KPI dashboards, and the uncomfortable question: how many months of runway do you have left?",
+        workingStyle: "I deal in reality, not optimism. Expect conservative assumptions and honest numbers. I'd rather scare you into action at 9 months of runway than comfort you into a wall at 3.",
         row: "run",
         categories: ["finance"],
         icon: "Calculator",
         highlights: [
-            "Cash flow & burn rate",
-            "Budgets & forecasts",
-            "Unit economics",
-            "Financial models",
-            "KPI dashboards",
+            "Cash flow & runway tracking",
+            "Unit economics analysis",
+            "Budget templates & forecasts",
+            "Scenario modeling",
+            "KPI dashboard design",
+            "Expense optimization",
         ],
+        recommended: true,
+        avatarImage: "/images/specialists/finance-lead.png",
+        suggestedNext: ["fundraising-advisor", "strategist"],
     },
     {
-        id: "people-culture",
-        name: "People & Culture",
-        tagline: "Great companies are built by great teams. Let's build yours.",
+        id: "hiring-team",
+        name: "Hiring & Team",
+        tagline: "Your first ten hires will make or break the company. No pressure.",
         description:
-            "Job descriptions, interview guides, onboarding checklists, culture playbooks, compensation benchmarking, and performance reviews. Builds the team that replaces the specialists.",
+            "Job descriptions that attract the right people (not just any people), interview scorecards that remove gut-feel bias, offer letters, onboarding checklists that get new hires productive in week one, compensation benchmarking so you don't overpay or lose candidates, and the culture foundations that scale beyond the founding team.",
+        workingStyle: "I'll be practical, not corporate. You don't need an HR department — you need to hire well, onboard fast, and not get sued. That's what I focus on.",
         row: "run",
         categories: ["hr"],
-        icon: "Users",
+        icon: "UserPlus",
         highlights: [
-            "Job descriptions",
-            "Interview guides",
-            "Onboarding plans",
-            "Culture playbooks",
-            "Compensation benchmarks",
+            "Job descriptions that attract",
+            "Interview scorecards",
+            "Offer letters & comp benchmarks",
+            "Onboarding checklists",
+            "Team structure planning",
+            "Performance review templates",
         ],
+        recommended: false,
+        avatarImage: "/images/specialists/hiring-team.png",
+        suggestedNext: ["legal-counsel", "chief-of-staff"],
     },
     {
         id: "legal-counsel",
         name: "Legal Counsel",
-        tagline: "I protect what you're building so you can focus on building it.",
+        tagline: "The expensive stuff you keep putting off? That's my Tuesday.",
         description:
-            "Contract reviews, terms of service, privacy policies, IP protection, NDAs, compliance checklists, and regulatory assessment. The expensive stuff you keep putting off.",
+            "Contract reviews before you sign something you'll regret, terms of service and privacy policies that actually protect you, IP strategy before someone copies your work, NDA templates, compliance checklists for your industry, employment law basics, and the regulatory landscape you're pretending doesn't apply to you.",
+        workingStyle: "I'll flag what's urgent vs. what can wait. Not every legal question needs a lawyer today — but some absolutely do. I'll tell you which is which.",
         row: "run",
         categories: ["legal"],
         icon: "Scale",
         highlights: [
-            "Contract reviews",
-            "Terms & privacy",
-            "IP protection",
+            "Contract review & redlining",
+            "Terms of service & privacy",
+            "IP & trademark strategy",
+            "Employment law basics",
             "Compliance checklists",
-            "NDA summaries",
+            "Regulatory assessment",
         ],
+        recommended: false,
+        avatarImage: "/images/specialists/legal-counsel.png",
+        suggestedNext: ["hiring-team", "finance-lead"],
     },
 ]
 
@@ -250,4 +309,11 @@ export function getSpecialistById(id: string): Specialist | undefined {
 export function getSpecialistCategories(specialistId: string): PromptCategory[] {
     const specialist = getSpecialistById(specialistId)
     return specialist?.categories ?? []
+}
+
+/**
+ * Get recommended specialists (for "Start here" badges).
+ */
+export function getRecommendedSpecialists(): Specialist[] {
+    return SPECIALISTS.filter((s) => s.recommended)
 }

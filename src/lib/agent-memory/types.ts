@@ -8,7 +8,7 @@
 // ─── Memory Thread ──────────────────────────────────────────────────
 
 /** The context in which a memory thread operates */
-export type MemoryContextType = 'workflow_run' | 'foundry' | 'ghost_worker' | 'chat'
+export type MemoryContextType = 'workflow_run' | 'foundry' | 'ghost_worker' | 'chat' | 'specialist'
 
 /** A conversation/context thread that groups messages and observations */
 export interface MemoryThread {

@@ -2,12 +2,11 @@
 
 import { useState, useMemo } from "react"
 import { motion } from "framer-motion"
-import { ArrowRight, Layers } from "lucide-react"
+import { ArrowRight, Layers, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { typography } from "@/lib/design-system"
+// Design system imported only when needed for inline usage
 import { SPECIALISTS, SPECIALIST_ROWS, getSpecialistsByRow } from "./specialists-data"
-import type { Specialist, SpecialistRow } from "./specialists-data"
 import { SpecialistCard } from "./specialist-card"
 import { getPromptsByCategory } from "./lib/prompt-library"
 import { BriefSpecialistDialog } from "./brief-specialist-dialog"
@@ -17,8 +16,6 @@ interface SpecialistsLandingProps {
     hasApiKey: boolean
     /** Callback to switch to the workflow builder ("Team Project" mode) */
     onOpenProjectBuilder: () => void
-    /** Number of real team members (for the "Your team" line) */
-    teamMemberCount?: number
 }
 
 /**
@@ -31,7 +28,6 @@ interface SpecialistsLandingProps {
 export function SpecialistsLanding({
     hasApiKey,
     onOpenProjectBuilder,
-    teamMemberCount,
 }: SpecialistsLandingProps) {
     const [briefSpecialistId, setBriefSpecialistId] = useState<string | null>(null)
 
@@ -47,6 +43,10 @@ export function SpecialistsLanding({
         }
         return counts
     }, [])
+
+    const totalBriefs = useMemo(() => {
+        return Object.values(capabilityCounts).reduce((sum, count) => sum + count, 0)
+    }, [capabilityCounts])
 
     const selectedSpecialist = SPECIALISTS.find((s) => s.id === briefSpecialistId)
 
@@ -64,23 +64,24 @@ export function SpecialistsLanding({
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="space-y-4"
+                className="space-y-5"
             >
-                {/* Team count line */}
-                {typeof teamMemberCount === "number" && teamMemberCount > 0 && (
-                    <p className="text-sm text-muted-foreground font-medium">
-                        Your team: {teamMemberCount} {teamMemberCount === 1 ? "person" : "people"} + 9 specialists
-                    </p>
-                )}
-
-                <div className="max-w-3xl space-y-3">
+                <div className="max-w-3xl space-y-4">
                     <h2 className="text-2xl sm:text-3xl lg:text-4xl font-display font-bold text-foreground tracking-tight leading-tight">
                         Your team is bigger than you think.
                     </h2>
                     <p className="text-lg text-muted-foreground leading-relaxed">
-                        Nine specialists, ready now. Brief them on anything &mdash; strategy, sales,
-                        finance, legal, product, and more. No hiring. No waiting. Start executing today.
+                        Nine specialists, ready right now. Brief them on anything &mdash; strategy, sales,
+                        fundraising, legal, hiring, product, and more. No recruiting. No waiting. No payroll.
                     </p>
+                    <div className="flex items-center gap-3 pt-1">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-sm text-foreground font-medium">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <span>9 specialists</span>
+                            <span className="text-muted-foreground">&middot;</span>
+                            <span>{totalBriefs} briefs ready</span>
+                        </div>
+                    </div>
                 </div>
             </motion.div>
 
@@ -172,6 +173,7 @@ export function SpecialistsLanding({
                         if (!open) setBriefSpecialistId(null)
                     }}
                     hasApiKey={hasApiKey}
+                    onSwitchSpecialist={(id) => setBriefSpecialistId(id)}
                 />
             )}
         </div>

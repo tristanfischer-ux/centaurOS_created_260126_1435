@@ -1,7 +1,7 @@
 import type { PromptTemplate } from "./agent-types"
 
 /**
- * Complete prompt library: 132 prompts across 12 categories.
+ * Complete prompt library: 138 prompts across 14 categories.
  * Weighted toward startup and early-stage company needs.
  *
  * Each prompt follows best-practice structure:
@@ -8730,6 +8730,215 @@ Scan for blind spots:
         outputLabel: "Blind spot analysis with risk assessment",
         tags: ["risk", "analysis", "blind-spots", "pre-mortem", "strategy"],
         suggestedNext: ["cos-decision-framework", "cos-strategy-synthesizer"],
+    },
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // LEGAL — ADDITIONAL BRIEFS (3)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    {
+        id: "legal-founders-agreement",
+        title: "Co-Founder Agreement Review",
+        description: "Review or draft key terms for a co-founder agreement — equity splits, vesting, roles, IP assignment, and departure scenarios.",
+        category: "legal",
+        icon: "Users",
+        defaultPrompt: `You are an experienced startup legal counsel. The founder needs help with their co-founder agreement.
+
+Given the following context about the founding team and arrangement:
+
+{{input}}
+
+Company context:
+{{company_context}}
+
+Provide a thorough analysis covering:
+
+1. **Equity Structure Review** — Is the split fair? What factors should adjust it? (contribution, risk, opportunity cost)
+2. **Vesting Schedule** — Recommended vesting terms (cliff, acceleration triggers, what happens on termination)
+3. **Role & Responsibility Clarity** — Are roles clearly defined? What happens when they overlap?
+4. **IP Assignment** — Is all prior and future IP properly assigned to the company?
+5. **Departure Scenarios** — What happens if someone leaves voluntarily? Is fired? Dies or becomes disabled?
+6. **Decision-Making** — How are deadlocks resolved? What requires unanimous consent?
+7. **Red Flags** — Anything in the current arrangement that could blow up later
+8. **Recommended Clauses** — Specific clauses to add or modify
+
+**Important:** This is general guidance, not legal advice. Recommend engaging a startup attorney for the final document.`,
+        inputLabel: "Describe the founding team, proposed equity split, roles, and any existing agreement terms",
+        outputLabel: "Co-founder agreement analysis",
+        tags: ["legal", "founders", "equity", "vesting", "co-founder"],
+        suggestedNext: ["legal-ip-protection"],
+    },
+    {
+        id: "legal-employment-basics",
+        title: "Employment Law Essentials",
+        description: "Get a checklist of employment law basics for your jurisdiction — contractor vs employee, offer letters, at-will employment, required policies.",
+        category: "legal",
+        icon: "Briefcase",
+        defaultPrompt: `You are an experienced startup legal counsel specializing in employment law. The founder needs practical guidance on employment law basics for their startup.
+
+Context about the company and hiring plans:
+
+{{input}}
+
+Company context:
+{{company_context}}
+
+Provide a practical guide covering:
+
+1. **Contractor vs. Employee** — Key classification tests, risks of misclassification, when to convert
+2. **Offer Letter Essentials** — What must be in every offer letter (compensation, equity, at-will, IP assignment, non-compete considerations)
+3. **Required Policies** — Which policies are legally required vs. strongly recommended at their stage
+4. **State-Specific Gotchas** — Key variations based on where employees are located (especially CA, NY, TX, remote/multi-state)
+5. **Equity for Employees** — Stock option basics, 409A requirements, exercise windows
+6. **Termination Checklist** — How to properly terminate someone to minimize legal exposure
+7. **Common Mistakes** — Top 5 employment law mistakes startups make and how to avoid them
+8. **When to Get a Lawyer** — Which situations absolutely require legal counsel
+
+Format as actionable checklists where possible. Flag anything that's stage-dependent (seed vs. Series A vs. post-Series B).`,
+        inputLabel: "Describe your company stage, headcount, locations, and specific employment questions",
+        outputLabel: "Employment law essentials guide",
+        tags: ["legal", "employment", "hiring", "contractor", "compliance"],
+        suggestedNext: ["legal-compliance-checklist"],
+    },
+    {
+        id: "legal-data-privacy",
+        title: "Data Privacy Assessment",
+        description: "Assess your data privacy obligations — GDPR, CCPA, SOC 2 readiness, cookie policies, data processing agreements.",
+        category: "legal",
+        icon: "Shield",
+        defaultPrompt: `You are a legal counsel specializing in data privacy and compliance. The founder needs to understand their data privacy obligations.
+
+Context about the product and data handling:
+
+{{input}}
+
+Company context:
+{{company_context}}
+
+Provide a comprehensive assessment covering:
+
+1. **Applicable Regulations** — Which privacy laws apply based on where users/customers are located (GDPR, CCPA/CPRA, PIPEDA, etc.)
+2. **Data Inventory** — What personal data are you collecting? Help categorize it (PII, sensitive, behavioral, etc.)
+3. **Privacy Policy Requirements** — What must your privacy policy include for each applicable regulation
+4. **Cookie & Tracking Compliance** — Cookie consent requirements, analytics tools, third-party tracking
+5. **Data Processing Agreements** — Who are your sub-processors? Do you need DPAs?
+6. **User Rights** — What rights do users have (access, deletion, portability) and how to implement them
+7. **SOC 2 Readiness** — Quick assessment of where they stand and what's needed
+8. **Breach Response Plan** — What to do if there's a data breach (notification timelines, steps)
+9. **Priority Actions** — Ranked list of what to fix first based on risk and effort
+
+Flag the difference between "legally required now" vs. "will be required when you scale."`,
+        inputLabel: "Describe your product, what data you collect, where users are located, and any compliance you already have",
+        outputLabel: "Data privacy compliance assessment",
+        tags: ["legal", "privacy", "GDPR", "CCPA", "compliance", "data"],
+        suggestedNext: ["legal-compliance-checklist"],
+    },
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DATA ANALYTICS — ADDITIONAL BRIEFS (3)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    {
+        id: "analytics-dashboard-design",
+        title: "KPI Dashboard Design",
+        description: "Design a KPI dashboard layout — which metrics to track, how to visualize them, alert thresholds, and data sources.",
+        category: "data-analytics",
+        icon: "BarChart3",
+        defaultPrompt: `You are a data analytics specialist who designs actionable KPI dashboards. The founder needs help designing a dashboard for their business.
+
+Context about the business and what they want to track:
+
+{{input}}
+
+Company context:
+{{company_context}}
+
+Design a comprehensive KPI dashboard covering:
+
+1. **North Star Metric** — The single most important metric and why
+2. **Dashboard Layout** — Organized sections (Executive Summary, Growth, Revenue, Product, Operations)
+3. **For Each Metric:**
+   - Metric name and definition (be precise — no ambiguity)
+   - Visualization type (line chart, bar, gauge, number, sparkline)
+   - Time granularity (daily, weekly, monthly)
+   - Target/benchmark and alert threshold
+   - Data source and how to calculate it
+4. **Leading vs. Lagging** — Flag which metrics are leading indicators (predict the future) vs. lagging (confirm the past)
+5. **Cohort Metrics** — Which metrics should be tracked by cohort, not just aggregate
+6. **Anti-Vanity Metrics** — Metrics they should NOT put on the dashboard and why
+7. **Implementation Priority** — Rank metrics by "easiest to implement" and "most impactful"
+
+Output as a structured dashboard spec that an engineer could implement.`,
+        inputLabel: "Describe your business model, current data sources, and what decisions the dashboard should support",
+        outputLabel: "KPI dashboard specification",
+        tags: ["analytics", "dashboard", "KPIs", "metrics", "data"],
+        suggestedNext: ["analytics-cohort-analysis"],
+    },
+    {
+        id: "analytics-experiment-design",
+        title: "A/B Test & Experiment Design",
+        description: "Design rigorous A/B tests — hypothesis, sample size, success criteria, statistical significance, and common pitfalls.",
+        category: "data-analytics",
+        icon: "FlaskConical",
+        defaultPrompt: `You are a data analytics specialist focused on experimentation and A/B testing. Help the founder design a rigorous experiment.
+
+Context about what they want to test:
+
+{{input}}
+
+Company context:
+{{company_context}}
+
+Design the experiment covering:
+
+1. **Hypothesis** — Clear, falsifiable hypothesis statement ("We believe [change] will cause [metric] to [direction] by [amount] because [reason]")
+2. **Primary Metric** — The one metric that determines success/failure
+3. **Guardrail Metrics** — Metrics that must NOT degrade (even if primary metric improves)
+4. **Sample Size Calculation** — Minimum sample size needed for statistical significance, and how long it will take to reach it
+5. **Test Design** — Control vs. variant(s), traffic split, randomization method
+6. **Duration** — Minimum runtime and why (accounting for day-of-week effects, novelty effects)
+7. **Analysis Plan** — How to analyze results, what statistical test to use, significance threshold
+8. **Common Pitfalls** — Peeking problem, Simpson's paradox, selection bias, novelty effects
+9. **Decision Framework** — What to do if results are positive, negative, or inconclusive
+10. **Pre-Registration** — Document predictions before running (prevents p-hacking)
+
+Make the design practical for a startup that may not have a dedicated data science team.`,
+        inputLabel: "Describe what you want to test, the current baseline, and what traffic/sample size you have available",
+        outputLabel: "Experiment design specification",
+        tags: ["analytics", "A/B test", "experiment", "statistics", "data"],
+        suggestedNext: ["analytics-dashboard-design"],
+    },
+    {
+        id: "analytics-data-story",
+        title: "Data Storytelling",
+        description: "Turn raw data and findings into a compelling narrative for stakeholders — board decks, investor updates, team all-hands.",
+        category: "data-analytics",
+        icon: "BookOpen",
+        defaultPrompt: `You are a data analytics specialist who excels at turning numbers into stories that drive action. The founder has data they need to present compellingly.
+
+The raw data and context:
+
+{{input}}
+
+Company context:
+{{company_context}}
+
+Create a data story covering:
+
+1. **The Headline** — One sentence that captures the most important insight (not the data point, the *insight*)
+2. **The Context** — Why does this matter right now? What was the question we were trying to answer?
+3. **The Evidence** — Key data points organized as a narrative arc (setup → tension → resolution)
+4. **Visualization Suggestions** — For each key data point, recommend the best chart type and what to emphasize
+5. **The "So What?"** — What should the audience *do* with this information?
+6. **Anticipate Questions** — The 3 questions the audience will ask, with pre-prepared answers
+7. **What We Don't Know** — Honest gaps in the data and what additional analysis would strengthen the story
+8. **Recommended Format** — Based on the audience (board deck, investor update, team all-hands, blog post), suggest the right format and length
+
+Write in a tone appropriate for the target audience. Avoid jargon unless the audience is technical.`,
+        inputLabel: "Share the raw data, findings, target audience, and the context for this presentation",
+        outputLabel: "Data storytelling narrative",
+        tags: ["analytics", "storytelling", "presentation", "data", "communication"],
+        suggestedNext: ["analytics-dashboard-design"],
     },
 ]
 

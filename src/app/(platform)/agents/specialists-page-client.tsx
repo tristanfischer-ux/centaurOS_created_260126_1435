@@ -35,7 +35,6 @@ interface SpecialistsPageClientProps {
     hasApiKey: boolean
     initialWorkflows: AgentWorkflowRow[]
     initialCustomPrompts: AgentCustomPromptRow[]
-    teamMemberCount: number
 }
 
 /**
@@ -46,7 +45,6 @@ export function SpecialistsPageClient({
     hasApiKey,
     initialWorkflows,
     initialCustomPrompts,
-    teamMemberCount,
 }: SpecialistsPageClientProps) {
     const [view, setView] = useState<PageView>("specialists")
 
@@ -87,7 +85,6 @@ export function SpecialistsPageClient({
                         <SpecialistsLanding
                             hasApiKey={hasApiKey}
                             onOpenProjectBuilder={() => setView("project-builder")}
-                            teamMemberCount={teamMemberCount}
                         />
                     </div>
                 </div>

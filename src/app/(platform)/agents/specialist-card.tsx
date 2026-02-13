@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -13,8 +14,10 @@ import {
     Handshake,
     TrendingUp,
     Calculator,
-    Users,
+    UserPlus,
     Scale,
+    Sparkles,
+    ArrowRight,
 } from "lucide-react"
 import type { Specialist } from "./specialists-data"
 
@@ -30,7 +33,8 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
     Handshake,
     TrendingUp,
     Calculator,
-    Users,
+    UserPlus,
+    Users: UserPlus,
     Scale,
 }
 
@@ -41,6 +45,15 @@ const ROW_BORDER_COLORS: Record<string, string> = {
     know: "border-l-electric-blue",
     grow: "border-l-international-orange",
     run: "border-l-status-success",
+}
+
+/**
+ * Row-based accent colors for the "Start here" badge.
+ */
+const ROW_BADGE_COLORS: Record<string, string> = {
+    know: "bg-electric-blue-light text-electric-blue",
+    grow: "bg-international-orange-light text-international-orange",
+    run: "bg-status-success-light text-status-success-dark",
 }
 
 interface SpecialistCardProps {
@@ -57,13 +70,15 @@ interface SpecialistCardProps {
 /**
  * SpecialistCard -- A single specialist in the 3x3 roster grid.
  *
- * @description Displays a specialist as a team member card with avatar,
- * name, tagline, capability count, highlights, and a "Brief" CTA.
+ * @description Displays a specialist as a team member card with avatar image,
+ * name, tagline, working style, capability count, highlights, and a "Brief" CTA.
  * Uses row-themed left border accent (blue=KNOW, orange=GROW, green=RUN).
+ * Recommended specialists get a "Start here" badge.
  */
 export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0 }: SpecialistCardProps) {
     const Icon = ICON_MAP[specialist.icon] ?? Compass
     const borderColor = ROW_BORDER_COLORS[specialist.row] ?? "border-l-muted"
+    const badgeColor = ROW_BADGE_COLORS[specialist.row] ?? "bg-muted text-muted-foreground"
 
     return (
         <motion.div
@@ -74,16 +89,39 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
             <Card
                 className={cn(
                     "border-l-4 rounded-xl shadow-sm bg-card",
-                    "transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5",
-                    "flex flex-col h-full",
+                    "transition-all duration-200 hover:shadow-lg hover:-translate-y-1",
+                    "flex flex-col h-full group cursor-pointer",
                     borderColor
                 )}
+                onClick={() => onBrief(specialist.id)}
             >
                 <CardContent className="pt-6 flex flex-col h-full">
+                    {/* Recommended Badge */}
+                    {specialist.recommended && (
+                        <div className="flex items-center gap-1.5 mb-3">
+                            <Badge className={cn("text-[11px] font-medium gap-1", badgeColor)}>
+                                <Sparkles className="h-3 w-3" />
+                                Start here
+                            </Badge>
+                        </div>
+                    )}
+
                     {/* Avatar + Name */}
-                    <div className="flex items-start gap-4 mb-4">
-                        <div className="flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-muted">
-                            <Icon className="h-6 w-6 text-foreground" />
+                    <div className="flex items-start gap-4 mb-3">
+                        <div className="flex-shrink-0 relative h-14 w-14 rounded-full overflow-hidden bg-muted">
+                            {specialist.avatarImage ? (
+                                <Image
+                                    src={specialist.avatarImage}
+                                    alt={specialist.name}
+                                    fill
+                                    className="object-cover"
+                                    sizes="56px"
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center h-full w-full">
+                                    <Icon className="h-7 w-7 text-foreground" />
+                                </div>
+                            )}
                         </div>
                         <div className="min-w-0 flex-1">
                             <h3 className="font-display font-semibold text-foreground text-lg leading-tight">
@@ -94,6 +132,11 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
                             </p>
                         </div>
                     </div>
+
+                    {/* Working Style */}
+                    <p className="text-xs text-muted-foreground leading-relaxed mb-4 line-clamp-2">
+                        {specialist.workingStyle}
+                    </p>
 
                     {/* Highlights */}
                     <div className="flex flex-wrap gap-1.5 mb-4">
@@ -115,14 +158,18 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
                     {/* CTA Row */}
                     <div className="flex items-center justify-between pt-4 border-t border-muted">
                         <span className="text-xs text-muted-foreground">
-                            {capabilityCount} {capabilityCount === 1 ? "capability" : "capabilities"}
+                            {capabilityCount} {capabilityCount === 1 ? "brief" : "briefs"} ready
                         </span>
                         <Button
                             size="sm"
-                            className="bg-international-orange hover:bg-international-orange-hover text-white"
-                            onClick={() => onBrief(specialist.id)}
+                            className="bg-international-orange hover:bg-international-orange-hover text-white gap-1.5 group-hover:gap-2.5 transition-all"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onBrief(specialist.id)
+                            }}
                         >
                             Brief
+                            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                         </Button>
                     </div>
                 </CardContent>

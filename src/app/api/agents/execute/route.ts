@@ -11,6 +11,7 @@ import {
     addMemoryMessage,
     processMemory,
 } from "@/lib/agent-memory"
+import { buildAIContext } from "@/lib/ai-context/builder"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
     let modelId: string
     let modality: OutputModality
     let threadId: string | undefined
+    let customSystemPromptSuffix: string | undefined
 
     try {
         const body = await request.json()
@@ -97,6 +99,7 @@ export async function POST(request: Request) {
         modelId = body.modelId ?? "claude-opus-4-6"
         modality = body.modality ?? "text"
         threadId = body.threadId ?? undefined
+        customSystemPromptSuffix = typeof body.customSystemPromptSuffix === "string" ? body.customSystemPromptSuffix : undefined
 
         if (!prompt || typeof prompt !== "string") {
             return NextResponse.json({ error: "prompt is required" }, { status: 400 })
@@ -158,42 +161,17 @@ export async function POST(request: Request) {
         )
     }
 
-    // 4. Build company context from foundry data
+    // 4. Build rich company context using the AI Context Builder
+    const foundryId = await resolveFoundryId(supabase, user.id)
     let companyContext = ""
     try {
-        const { data: profile } = await supabase
-            .from("profiles")
-            .select("foundry_id, active_foundry_id")
-            .eq("id", user.id)
-            .single()
-
-        const foundryId = profile?.active_foundry_id || profile?.foundry_id
         if (foundryId) {
-            const { data: foundry } = await supabase
-                .from("foundries")
-                .select("name, industry, stage, purpose_data")
-                .eq("id", foundryId)
-                .single()
-
-            if (foundry) {
-                const parts: string[] = []
-                if (foundry.name) parts.push(`Company: ${foundry.name}`)
-                if (foundry.industry) parts.push(`Industry: ${foundry.industry}`)
-                if (foundry.stage) parts.push(`Stage: ${foundry.stage}`)
-
-                const purposeData = foundry.purpose_data as {
-                    purpose?: string
-                    mission?: string | null
-                    vision?: string | null
-                } | null
-
-                if (purposeData?.purpose) parts.push(`Purpose: ${purposeData.purpose}`)
-                if (purposeData?.mission) parts.push(`Mission: ${purposeData.mission}`)
-
-                if (parts.length > 0) {
-                    companyContext = `[Company Context: ${parts.join(" | ")}]`
-                }
-            }
+            companyContext = await buildAIContext(foundryId, user.id, {
+                includeActivity: true,
+                includeObjectives: true,
+                includeUserProfile: false, // Skip heavy profile for streaming performance
+                includeInsightHistory: false,
+            })
         }
     } catch (err) {
         // Non-critical — proceed without company context
@@ -206,7 +184,6 @@ export async function POST(request: Request) {
 
     // 6. Build system prompt with company context + agent memory
     let memoryBlock = ""
-    const foundryId = await resolveFoundryId(supabase, user.id)
 
     if (threadId && foundryId) {
         try {
@@ -223,10 +200,13 @@ export async function POST(request: Request) {
 
     let systemPromptWithContext = SYSTEM_PROMPT
     if (companyContext) {
-        systemPromptWithContext += `\n\n## Company Context\n${companyContext}`
+        systemPromptWithContext += `\n\n${companyContext}`
     }
     if (memoryBlock) {
         systemPromptWithContext += `\n\n## Agent Memory\n${memoryBlock}`
+    }
+    if (customSystemPromptSuffix) {
+        systemPromptWithContext += customSystemPromptSuffix
     }
 
     // 7. Route to the right provider based on modality

@@ -45,7 +45,6 @@ export default async function SpecialistsPage() {
             hasApiKey={hasApiKey}
             initialWorkflows={savedWorkflows}
             initialCustomPrompts={savedCustomPrompts}
-            teamMemberCount={0}
         />
     )
 }
