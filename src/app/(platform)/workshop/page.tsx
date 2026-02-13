@@ -10,7 +10,7 @@ import { WorkshopSectionIntro } from "./workshop-section-intro"
 
 export const metadata: Metadata = {
     title: "Workshop | ForgeOS",
-    description: "Where the work happens — The Forge, your team, and AI agents",
+    description: "Where ideas become real — The Forge, your team, and prompt workflows",
 }
 
 export default function WorkshopPage(): React.ReactNode {

@@ -2,32 +2,79 @@
  * PlanSectionIntro — Client component for the "Plan" section intro page.
  *
  * @description Wraps the shared SectionIntroPage with the "plan" section data,
- * plus the Morning Briefing, "One Sentence to Full Plan" AI generator,
+ * plus a "How it works" mini-flow, the "One Sentence to Full Plan" AI generator,
  * CAD Lab discovery card, and template gallery.
  */
 
 "use client"
 
 import Link from "next/link"
-import { Boxes, ArrowRight } from "lucide-react"
+import { Boxes, ArrowRight, MessageSquare, ClipboardCheck, Rocket } from "lucide-react"
 
 import { SectionIntroPage } from "@/components/sidebar/SectionIntroPage"
 import { getSectionById } from "@/lib/features/section-registry"
 import { Card, CardContent } from "@/components/ui/card"
 import { OneSentencePlanner } from "./one-sentence-planner"
 import { TemplateGallery } from "./template-gallery"
-import { MorningBriefingCard } from "@/components/nudges/MorningBriefing"
 
 const section = getSectionById("plan")!
+
+const HOW_IT_WORKS_STEPS = [
+    {
+        icon: MessageSquare,
+        title: "Describe your goal",
+        description: "One sentence is all it takes. Tell us what you want to achieve.",
+    },
+    {
+        icon: ClipboardCheck,
+        title: "Review the plan",
+        description: "Get objectives, tasks, deadlines, and milestones — edit anything you like.",
+    },
+    {
+        icon: Rocket,
+        title: "Deploy to your workspace",
+        description: "One click deploys everything. Start executing immediately.",
+    },
+] as const
 
 export function PlanSectionIntro(): React.ReactElement {
     return (
         <div className="space-y-0">
             <SectionIntroPage section={section} />
 
-            {/* Morning Briefing — personalized daily focus */}
-            <div className="px-4 sm:px-6 lg:px-8 -mt-4">
-                <MorningBriefingCard />
+            {/* How it works — 3-step mini-flow */}
+            <div className="px-4 sm:px-6 lg:px-8 pt-2 pb-2">
+                <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-6">
+                    How it works
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {HOW_IT_WORKS_STEPS.map((step, index) => {
+                        const Icon = step.icon
+                        return (
+                            <div key={step.title} className="flex gap-4">
+                                <div className="flex flex-col items-center">
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 text-electric-blue font-semibold text-sm shrink-0">
+                                        {index + 1}
+                                    </div>
+                                    {index < HOW_IT_WORKS_STEPS.length - 1 && (
+                                        <div className="w-0.5 h-full bg-muted mt-2 hidden md:block" />
+                                    )}
+                                </div>
+                                <div className="pb-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Icon className="h-4 w-4 text-electric-blue" />
+                                        <h3 className="text-sm font-semibold text-foreground">
+                                            {step.title}
+                                        </h3>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        {step.description}
+                                    </p>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
             </div>
 
             {/* One Sentence Planner — the "magic moment" */}
@@ -48,7 +95,7 @@ export function PlanSectionIntro(): React.ReactElement {
                                     Design physical products? Try the CAD Lab
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                    Turn any product idea into manufacturing-ready 3D CAD models with AI
+                                    Turn any product idea into manufacturing-ready 3D CAD models
                                 </p>
                             </div>
                             <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-electric-blue transition-colors shrink-0" />
@@ -59,6 +106,9 @@ export function PlanSectionIntro(): React.ReactElement {
 
             {/* Template Gallery — quick-start plans */}
             <div className="px-4 sm:px-6 lg:px-8 pt-8 pb-4">
+                <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-6">
+                    Not sure where to start?
+                </p>
                 <TemplateGallery />
             </div>
         </div>

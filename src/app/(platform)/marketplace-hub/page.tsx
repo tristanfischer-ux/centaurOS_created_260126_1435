@@ -11,7 +11,7 @@ import { MarketplaceSectionIntro } from "./marketplace-section-intro"
 
 export const metadata: Metadata = {
     title: "Marketplace | ForgeOS",
-    description: "Recruits and supplies — find people, services, and inspiration",
+    description: "Everything you need, everyone you need — find talent, products, and services",
 }
 
 export default function MarketplaceHubPage(): React.ReactNode {

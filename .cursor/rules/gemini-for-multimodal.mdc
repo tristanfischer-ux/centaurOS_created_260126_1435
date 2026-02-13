@@ -1,0 +1,36 @@
+# Use Gemini for Image & Video Tasks
+
+When a task requires **analyzing, understanding, or generating content based on images or video**, use a Gemini model via the Task tool.
+
+## When This Applies
+
+- Analyzing screenshots (UI verification, visual regression, design review)
+- Reading content from images (OCR, diagram interpretation, chart reading)
+- Processing video input (screen recordings, demo walkthroughs)
+- Comparing visual output before/after changes
+- Any task where image or video files are provided as input and need to be understood
+
+## How to Do It
+
+Use the `Task` tool with `model: "fast"` isn't sufficient for multimodal — instead, pass image/video file paths via the `attachments` parameter on a Task subagent, which routes to a Gemini-capable model automatically.
+
+```
+Task(
+  subagent_type: "generalPurpose",
+  attachments: ["path/to/screenshot.png"],
+  prompt: "Analyze this screenshot and describe..."
+)
+```
+
+## Key Points
+
+- **Always attach the files** — don't describe what you think is in an image; let the model see it directly
+- **Batch related images** into a single Task call when they need to be compared or reviewed together
+- **Use for verification** — after UI changes, capture a screenshot and have Gemini confirm the change looks correct
+- **Video support** — mp4 and webm formats are supported via attachments on Gemini-capable subagents
+
+## When NOT to Use
+
+- Pure text/code tasks with no visual component — use the default model
+- Generating images from scratch — use the `GenerateImage` tool instead
+- Simple file existence checks — just use `Glob` or `Read`
