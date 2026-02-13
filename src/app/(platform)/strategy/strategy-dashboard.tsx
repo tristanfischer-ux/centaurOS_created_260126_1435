@@ -27,7 +27,12 @@ import { AddToRiverDialog } from '@/components/canvas/add-to-river-dialog'
 import {
   LayoutDashboard, Waypoints, Link2, Flag, Target, CheckCircle2,
   AlertTriangle, TrendingUp, ArrowRight, Plus, XCircle, ChevronRight,
+  MessageSquare,
 } from 'lucide-react'
+import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
+import { StrategyHealthReview } from '@/components/specialists/strategy-health-review'
+import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
+import type { SpecialistContext } from '@/components/specialists/types'
 import { getStrategyColor } from '../new-objectives/strategy-colors'
 import type { GoalBundle, MilestoneOption } from '@/types/canvas'
 import type { StrategicObjective } from '../new-objectives/types'
@@ -201,6 +206,25 @@ export function StrategyDashboard({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <AskSpecialistButton
+            context={{
+              type: 'strategy',
+              title: 'Overall Strategy',
+              description: purposeData?.purpose ?? 'Company strategic direction',
+              metadata: {
+                purposeSummary: purposeData?.purpose,
+                objectives: pillars.map((p) => ({
+                  title: p.title,
+                  health: p.health,
+                  progress: p.progress,
+                })),
+                notes: `${pillars.length} strategic pillars. ${stats.totalProgress}% average progress. ${stats.atRisk} at risk, ${stats.offTrack} off track.`,
+              },
+            }}
+            specialistId="strategist"
+            specialistName="Sam"
+            label="Discuss Strategy"
+          />
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
             <TabsList className="h-9">
               <TabsTrigger value="dashboard" className="text-xs gap-1.5 px-3">
@@ -274,6 +298,17 @@ export function StrategyDashboard({
               />
             </div>
           )}
+
+          {/* Sam's Strategy Health Review */}
+          <StrategyHealthReview
+            pillars={pillars.map(p => ({
+              title: p.title,
+              health: p.health,
+              progress: p.progress,
+              overdueTasks: p.overdueTasks,
+            }))}
+            purposeSummary={purposeData?.purpose}
+          />
 
           {/* Strategic Pillars */}
           {pillars.length === 0 ? (
@@ -438,13 +473,28 @@ function SummaryPill({
 function PillarCard({ pillar, colorIndex }: { pillar: StrategyPillar; colorIndex: number }) {
   const color = getStrategyColor(colorIndex)
   const healthConfig = HEALTH_CONFIG[pillar.health]
+  const { specialistId, specialistName } = useRelevantSpecialist(
+    pillar.title,
+    pillar.description,
+  )
+
+  const pillarContext: SpecialistContext = {
+    type: 'pillar',
+    title: pillar.title,
+    description: pillar.description ?? undefined,
+    metadata: {
+      health: pillar.health,
+      progress: pillar.progress,
+      notes: `${pillar.objectiveCount} objectives, ${pillar.completedTasks}/${pillar.totalTasks} tasks completed, ${pillar.overdueTasks} overdue`,
+    },
+  }
 
   return (
-    <Link href={`/new-objectives?strategy=${pillar.id}`}>
-      <Card className={cn(
-        'rounded-xl border-l-4 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer',
-        color.border,
-      )}>
+    <Card className={cn(
+      'rounded-xl border-l-4 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200',
+      color.border,
+    )}>
+      <Link href={`/new-objectives?strategy=${pillar.id}`}>
         <CardContent className="pt-6 space-y-4">
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
@@ -519,7 +569,23 @@ function PillarCard({ pillar, colorIndex }: { pillar: StrategyPillar; colorIndex
             </div>
           </div>
         </CardContent>
-      </Card>
-    </Link>
+      </Link>
+
+      {/* Specialist chip -- outside the Link to prevent navigation on click */}
+      <div className="px-6 pb-4 pt-0">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation() }}
+          role="presentation"
+        >
+          <AskSpecialistButton
+            context={pillarContext}
+            specialistId={specialistId}
+            specialistName={specialistName}
+            variant="chip"
+          />
+        </div>
+      </div>
+    </Card>
   )
 }

@@ -8,10 +8,13 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import {
   X, ListChecks, AlertTriangle, Clock, CheckCircle2,
-  FileText, Circle, Waypoints, ChevronRight,
+  FileText, Circle, Waypoints, ChevronRight, MessageSquare,
 } from 'lucide-react'
 import Link from 'next/link'
 import { getStatusBadgeClass } from '@/lib/status-colors'
+import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
+import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
+import type { SpecialistContext } from '@/components/specialists/types'
 import type { ObjectiveWithTasks, ObjectiveTask } from './types'
 
 interface ObjectiveDetailPanelProps {
@@ -77,6 +80,26 @@ export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect }: Objec
   // Group tasks by status
   const activeTasks = objective.tasks.filter(t => t.status !== 'Completed' && t.status !== 'Rejected')
   const completedTasks = objective.tasks.filter(t => t.status === 'Completed')
+
+  // Auto-suggest a relevant specialist based on objective and strategy context
+  const { specialistId, specialistName } = useRelevantSpecialist(
+    objective.title,
+    objective.description,
+    objective.strategy?.title,
+  )
+
+  const objectiveContext: SpecialistContext = {
+    type: 'objective',
+    title: objective.title,
+    description: objective.description ?? undefined,
+    metadata: {
+      health: objective.health,
+      progress: objective.progress,
+      pillarTitle: objective.strategy?.title,
+      tasks: objective.tasks.map(t => ({ title: t.title, status: t.status })),
+      notes: `${objective.completedTasks}/${objective.totalTasks} tasks done. ${objective.overdueTasks} overdue.`,
+    },
+  }
 
   return (
     <div className="h-full flex flex-col bg-background border-l border w-full max-w-full overflow-hidden">
@@ -162,6 +185,31 @@ export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect }: Objec
               </p>
             </div>
           )}
+
+          {/* Specialist Input Section */}
+          <Separator />
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <MessageSquare className="h-3.5 w-3.5" />
+              Get Specialist Input
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Discuss this objective&apos;s direction, priorities, or approach
+            </p>
+            <div className="flex items-center gap-2">
+              <AskSpecialistButton
+                context={objectiveContext}
+                specialistId={specialistId}
+                specialistName={specialistName}
+                variant="chip"
+              />
+              <AskSpecialistButton
+                context={objectiveContext}
+                variant="chip"
+                label="Choose Specialist"
+              />
+            </div>
+          </div>
 
           {/* Tasks Section */}
           <Separator />

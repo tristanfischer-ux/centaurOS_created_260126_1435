@@ -69,6 +69,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState } from "@/components/ui/empty-state"
 import { Markdown } from "@/components/ui/markdown"
 import { cn } from "@/lib/utils"
+import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 import { PrivacyShareControl, type ShareTarget } from "@/components/ui/privacy-share-control"
 import { createClient } from "@/lib/supabase/client"
 import { SmartScoreCard, getOverallScore } from "@/components/smart/smart-score-card"
@@ -649,6 +650,24 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                                             <p className="text-xs text-muted-foreground text-right">
                                                 {rawIdea.length} / 2,000 characters
                                             </p>
+                                        </div>
+
+                                        {/* Pre-creation specialist consultation */}
+                                        <div className="flex items-center gap-2 pt-1">
+                                            <AskSpecialistButton
+                                                context={{
+                                                    type: 'objective',
+                                                    title: 'New Objective Planning',
+                                                    description: 'The user is creating a new objective and wants strategic input on what to set.',
+                                                    metadata: {
+                                                        notes: rawIdea ? `Current idea: "${rawIdea}"` : 'No idea captured yet — looking for strategic direction.',
+                                                    },
+                                                }}
+                                                specialistId="strategist"
+                                                specialistName="Sam"
+                                                variant="chip"
+                                                label="Not sure? Talk to Sam first"
+                                            />
                                         </div>
                                     </div>
                                 )}

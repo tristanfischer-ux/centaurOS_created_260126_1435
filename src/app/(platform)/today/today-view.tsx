@@ -47,6 +47,7 @@ import { getStrategyHealthSummary, type StrategyHealthItem } from "@/actions/can
 import { typography } from "@/lib/design-system"
 import { StreakBadge } from "@/components/celebrations/StreakBadge"
 import { useCelebration } from "@/hooks/useCelebration"
+import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 
 import type { FormattedReport, DailyPulseData } from "@/lib/reports/types"
 
@@ -410,6 +411,63 @@ export function TodayView(): React.ReactElement {
                 transition={{ duration: 0.4, delay: 0.3, ease: EASE_CURVE }}
             >
                 <InsightsSection pulse={pulse} />
+            </motion.div>
+
+            {/* Specialist Quick Access */}
+            <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.32, ease: EASE_CURVE }}
+            >
+                <Card className="rounded-xl border bg-muted/30">
+                    <CardContent className="pt-5 pb-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Lightbulb className="h-4 w-4 text-international-orange" />
+                            <span className="text-sm font-semibold text-foreground">Ask a Specialist</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-3">
+                            Get expert input on strategy, objectives, or today&apos;s priorities.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            <AskSpecialistButton
+                                context={{
+                                    type: 'general',
+                                    title: 'Daily Planning',
+                                    description: "Help me prioritize today's work and identify what matters most.",
+                                    metadata: {
+                                        notes: pulse?.data && 'blockers' in pulse.data
+                                            ? `Today: ${(pulse.data as DailyPulseData).personal.tasks_due_today} tasks due, ${(pulse.data as DailyPulseData).blockers.length} blockers, ${(pulse.data as DailyPulseData).pending_approvals.length} pending approvals`
+                                            : 'Starting a new day — help me plan.',
+                                    },
+                                }}
+                                specialistId="chief-of-staff"
+                                specialistName="Cal"
+                                variant="chip"
+                                label="Plan my day with Cal"
+                            />
+                            <AskSpecialistButton
+                                context={{
+                                    type: 'strategy',
+                                    title: 'Strategy Check-in',
+                                    description: 'Quick strategy pulse — where should I focus?',
+                                }}
+                                specialistId="strategist"
+                                specialistName="Sam"
+                                variant="chip"
+                                label="Strategy with Sam"
+                            />
+                            <AskSpecialistButton
+                                context={{
+                                    type: 'general',
+                                    title: 'General Consultation',
+                                    description: 'Open-ended discussion about any business challenge.',
+                                }}
+                                variant="chip"
+                                label="Choose Specialist"
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
             </motion.div>
 
             {/* Quick Actions */}

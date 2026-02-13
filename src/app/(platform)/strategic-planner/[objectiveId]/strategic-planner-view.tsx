@@ -273,6 +273,8 @@ export function StrategicPlannerView({ objectiveId }: StrategicPlannerViewProps)
             <AISuggestionsPanel
               suggestions={goal.ai_suggestions || []}
               objectiveId={objectiveId}
+              goalTitle={goal.title}
+              goalDescription={goal.description ?? undefined}
               onRefresh={loadPlanData}
               onClose={() => setActivePanel(null)}
             />

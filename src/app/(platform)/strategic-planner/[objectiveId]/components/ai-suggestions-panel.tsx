@@ -6,16 +6,21 @@
  */
 
 import { useState } from "react"
-import { Sparkles, X, Check, XCircle, Plus, UserPlus, ShoppingBag, Clock, Link2 } from "lucide-react"
+import { Sparkles, X, Check, XCircle, Plus, UserPlus, ShoppingBag, Clock, Link2, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { updateStrategicGoalMeta } from "@/actions/strategic-planner"
+import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 import type { AISuggestion, SuggestionType } from "@/types/strategic-planner"
 
 interface AISuggestionsPanelProps {
   suggestions: AISuggestion[]
   objectiveId: string
+  /** Title of the strategic goal for specialist context */
+  goalTitle?: string
+  /** Description of the strategic goal for specialist context */
+  goalDescription?: string
   onRefresh: () => void
   onClose: () => void
 }
@@ -39,6 +44,8 @@ const TYPE_LABELS = {
 export function AISuggestionsPanel({
   suggestions,
   objectiveId,
+  goalTitle,
+  goalDescription,
   onRefresh,
   onClose,
 }: AISuggestionsPanelProps) {
@@ -123,6 +130,29 @@ export function AISuggestionsPanel({
           <p className="text-sm text-muted-foreground">All suggestions addressed</p>
         </div>
       )}
+
+      {/* Specialist consultation */}
+      <div className="mt-4 pt-3 border-t">
+        <p className="text-[11px] text-muted-foreground mb-2">
+          Want deeper input? Discuss this strategic goal with a specialist.
+        </p>
+        <AskSpecialistButton
+          context={{
+            type: 'strategy',
+            title: goalTitle ?? 'Strategic Goal',
+            description: goalDescription ?? undefined,
+            metadata: {
+              notes: activeSuggestions.length > 0
+                ? `Current AI suggestions: ${activeSuggestions.map(s => s.message).join('; ')}`
+                : 'All AI suggestions have been addressed.',
+            },
+          }}
+          specialistId="strategist"
+          specialistName="Sam"
+          variant="button"
+          label="Discuss with Sam"
+        />
+      </div>
     </div>
   )
 }

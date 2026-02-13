@@ -9,8 +9,10 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import {
   LayoutGrid, GitBranch, GanttChartSquare, Search, Target, X, Loader2,
-  ChevronRight, ChevronDown, Flag, AlertTriangle, Plus, Waypoints,
+  ChevronRight, ChevronDown, Flag, AlertTriangle, Plus, Waypoints, MessageSquare,
 } from 'lucide-react'
+import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
+import type { SpecialistContext } from '@/components/specialists/types'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import {
@@ -352,6 +354,24 @@ export function ObjectivesBoard({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <AskSpecialistButton
+            context={{
+              type: 'objective',
+              title: 'Objectives Planning',
+              description: 'Discuss which objectives to set, prioritize, or adjust',
+              metadata: {
+                objectives: objectives.map(o => ({
+                  title: o.title,
+                  health: o.health,
+                  progress: o.progress,
+                })),
+                notes: `${stats.total} objectives: ${stats.onTrack} on track, ${stats.atRisk} at risk, ${stats.offTrack} off track, ${stats.completed} completed`,
+              },
+            }}
+            specialistId="strategist"
+            specialistName="Sam"
+            label="Plan with Sam"
+          />
           {strategicObjectives.length > 0 && (
             <Link
               href="/strategy"

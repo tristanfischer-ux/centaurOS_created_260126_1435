@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
     Loader2, Send, AlertCircle, Copy, Check,
     MessageSquareQuote, ArrowRight, Clock,
-    History, Mic, MicOff, Volume2, VolumeX, Sparkles,
+    History, Mic, MicOff, Volume2, VolumeX, Sparkles, Brain,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -25,6 +25,18 @@ import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import type { PromptTemplate } from "./lib/agent-types"
 import type { Specialist } from "./specialists-data"
+
+// ─── Specialist Model Configuration ───────────────────────────────────────────
+// Centralizes model choices so upgrades are a one-line change.
+// Greetings use a lightweight model (short, contextual openers).
+// Conversations use the most capable model for high-stakes business advice.
+
+const SPECIALIST_MODELS = {
+    greeting: { providerId: "anthropic", modelId: "claude-haiku-4-5" },
+    conversation: { providerId: "anthropic", modelId: "claude-opus-4-6" },
+} as const
+
+const DEEP_THINK_STORAGE_KEY = "forgeOS-specialist-deep-think"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,6 +61,8 @@ interface BriefSpecialistDialogProps {
     handoffContext?: string | null
     /** Name of the specialist that referred the user */
     referredBy?: string | null
+    /** Optional label shown as a badge in the header indicating what entity is being discussed */
+    contextLabel?: string | null
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -70,6 +84,7 @@ export function BriefSpecialistDialog({
     onSwitchSpecialist,
     handoffContext,
     referredBy,
+    contextLabel,
 }: BriefSpecialistDialogProps) {
     // ─── State ────────────────────────────────────────────────────────────
     const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(null)
@@ -91,6 +106,14 @@ export function BriefSpecialistDialog({
     } | null>(null)
 
     const [isGeneratingGreeting, setIsGeneratingGreeting] = useState(false)
+    const [deepThinkEnabled, setDeepThinkEnabled] = useState(() => {
+        if (typeof window === "undefined") return false
+        try {
+            return localStorage.getItem(DEEP_THINK_STORAGE_KEY) === "true"
+        } catch {
+            return false
+        }
+    })
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
@@ -275,8 +298,8 @@ ${contextParts.join("\n\n")}
                     body: JSON.stringify({
                         prompt: greetingPrompt,
                         input: "Generate a proactive opening message.",
-                        providerId: "anthropic",
-                        modelId: "claude-sonnet-4-20250514",
+                        providerId: SPECIALIST_MODELS.greeting.providerId,
+                        modelId: SPECIALIST_MODELS.greeting.modelId,
                         threadId: threadId ?? undefined,
                         specialistId: specialist.id,
                     }),
@@ -415,12 +438,13 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 body: JSON.stringify({
                     prompt: promptTemplate,
                     input: userInput,
-                    providerId: "anthropic",
-                    modelId: "claude-sonnet-4-20250514",
+                    providerId: SPECIALIST_MODELS.conversation.providerId,
+                    modelId: SPECIALIST_MODELS.conversation.modelId,
                     modality: "text",
                     threadId: threadId ?? undefined,
                     specialistId: specialist.id,
                     customSystemPromptSuffix: systemExtras.join(""),
+                    enableThinking: deepThinkEnabled,
                 }),
             })
 
@@ -525,7 +549,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             setIsExecuting(false)
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, tts.voiceEnabled, tts.warmUp])
+    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, tts.voiceEnabled, tts.warmUp, deepThinkEnabled])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
@@ -630,6 +654,12 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             </p>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {contextLabel && (
+                                <Badge variant="secondary" className="text-xs gap-1 max-w-[180px] truncate">
+                                    <MessageSquareQuote className="h-3 w-3 flex-shrink-0" />
+                                    {contextLabel}
+                                </Badge>
+                            )}
                             {referredBy && (
                                 <Badge variant="default" className="text-xs gap-1 bg-international-orange/10 text-international-orange border-international-orange/20">
                                     <ArrowRight className="h-3 w-3" />
@@ -855,8 +885,15 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     <div className="flex gap-3 justify-start">
                                         <div className="flex-shrink-0 h-7 w-7 rounded-full bg-muted mt-1" />
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                            {specialist.name} is thinking...
+                                            {deepThinkEnabled ? (
+                                                <Brain className="h-4 w-4 animate-pulse text-international-orange" />
+                                            ) : (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            )}
+                                            {deepThinkEnabled
+                                                ? `${specialist.name} is analyzing deeply...`
+                                                : `${specialist.name} is thinking...`
+                                            }
                                         </div>
                                     </div>
                                 )}
@@ -1044,6 +1081,34 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     disabled={isExecuting}
                                 />
                                 <div className="absolute bottom-2 right-2 flex items-center gap-1">
+                                    {/* Deep Think toggle */}
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => {
+                                            const next = !deepThinkEnabled
+                                            setDeepThinkEnabled(next)
+                                            try {
+                                                localStorage.setItem(DEEP_THINK_STORAGE_KEY, String(next))
+                                            } catch { /* localStorage unavailable */ }
+                                            toast.success(next ? "Deep Think enabled" : "Deep Think disabled", {
+                                                description: next
+                                                    ? "Responses will take longer but use deeper reasoning."
+                                                    : "Standard response speed.",
+                                                duration: 2000,
+                                            })
+                                        }}
+                                        disabled={isExecuting}
+                                        className={cn(
+                                            "h-8 w-8",
+                                            deepThinkEnabled
+                                                ? "text-international-orange"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                        aria-label={deepThinkEnabled ? "Disable deep thinking" : "Enable deep thinking"}
+                                    >
+                                        <Brain className="h-4 w-4" />
+                                    </Button>
                                     {/* Mic button */}
                                     {speechRecognition.isSupported && (
                                         <Button
@@ -1106,9 +1171,17 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 </p>
                             )}
                             <div className="flex items-center justify-between">
-                                <p className="text-xs text-muted-foreground">
-                                    {hasNonHistoricalMessages ? "⌘+Enter to send" : `${briefText.length.toLocaleString()} characters`}
-                                </p>
+                                <div className="flex items-center gap-3">
+                                    <p className="text-xs text-muted-foreground">
+                                        {hasNonHistoricalMessages ? "⌘+Enter to send" : `${briefText.length.toLocaleString()} characters`}
+                                    </p>
+                                    {deepThinkEnabled && (
+                                        <span className="flex items-center gap-1 text-xs text-international-orange">
+                                            <Brain className="h-3 w-3" />
+                                            Deep Think
+                                        </span>
+                                    )}
+                                </div>
                                 {hasNonHistoricalMessages && !isExecuting && lastAssistantMessage && (
                                     <Button
                                         variant="ghost"

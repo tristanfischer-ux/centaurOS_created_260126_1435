@@ -22,7 +22,11 @@ import { useCelebration } from '@/hooks/useCelebration'
 import {
   X, Calendar, Clock, User, Target, FileText, AlertTriangle,
   MessageSquare, Paperclip, Shield, Eye, Pencil, Waypoints, ChevronRight,
+  Sparkles,
 } from 'lucide-react'
+import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
+import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
+import type { SpecialistContext } from '@/components/specialists/types'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import type { TaskWithData, Member } from './types'
 
@@ -62,6 +66,29 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
   const { celebrateTaskComplete } = useCelebration()
   const isOverdue = task.end_date && task.status !== 'Completed' && task.status !== 'Rejected' && new Date(task.end_date) < new Date()
   const statusBadge = getStatusBadgeClass(task.status)
+
+  // Auto-suggest relevant specialist based on task + objective + strategy context
+  const { specialistId, specialistName } = useRelevantSpecialist(
+    task.title,
+    task.description,
+    task.strategy?.title ?? task.objective?.title,
+  )
+
+  const taskContext: SpecialistContext = {
+    type: 'task',
+    title: task.title,
+    description: task.description ?? undefined,
+    metadata: {
+      status: task.status,
+      riskLevel: task.risk_level ?? undefined,
+      pillarTitle: task.strategy?.title,
+      notes: [
+        task.objective ? `Part of objective: ${task.objective.title}` : null,
+        task.end_date ? `Due: ${new Date(task.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : null,
+        isOverdue ? 'OVERDUE' : null,
+      ].filter(Boolean).join('. '),
+    },
+  }
 
   /**
    * @description Handle inline status change from the detail panel.
@@ -301,6 +328,28 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                 </Badge>
               </DetailRow>
             )}
+          </div>
+
+          {/* Specialist Input Section */}
+          <Separator />
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              <Sparkles className="h-3.5 w-3.5" />
+              Get Specialist Input
+            </div>
+            <div className="flex items-center gap-2">
+              <AskSpecialistButton
+                context={taskContext}
+                specialistId={specialistId}
+                specialistName={specialistName}
+                variant="chip"
+              />
+              <AskSpecialistButton
+                context={taskContext}
+                variant="chip"
+                label="Choose Specialist"
+              />
+            </div>
           </div>
 
           {/* Attachments */}
