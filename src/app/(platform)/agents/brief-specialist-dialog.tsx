@@ -39,10 +39,12 @@ interface BriefSpecialistDialogProps {
     open: boolean
     /** Dialog state change handler */
     onOpenChange: (open: boolean) => void
-    /** Whether the user has an API key configured */
-    hasApiKey: boolean
-    /** Callback to open a different specialist's dialog */
-    onSwitchSpecialist?: (specialistId: string) => void
+    /** Callback to open a different specialist's dialog with optional handoff context */
+    onSwitchSpecialist?: (specialistId: string, handoffContext?: string) => void
+    /** Context passed from a referring specialist when switching */
+    handoffContext?: string | null
+    /** Name of the specialist that referred the user */
+    referredBy?: string | null
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -61,8 +63,9 @@ export function BriefSpecialistDialog({
     specialist,
     open,
     onOpenChange,
-    hasApiKey,
     onSwitchSpecialist,
+    handoffContext,
+    referredBy,
 }: BriefSpecialistDialogProps) {
     // ─── State ────────────────────────────────────────────────────────────
     const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(null)
@@ -195,11 +198,6 @@ export function BriefSpecialistDialog({
             return
         }
 
-        if (!hasApiKey) {
-            setError("Please configure an AI provider key in Settings to use specialists.")
-            return
-        }
-
         // Add user message to chat
         const userMessage: ChatMessage = {
             role: "user",
@@ -215,8 +213,12 @@ export function BriefSpecialistDialog({
         setStreamingResponse("")
         setError(null)
 
-        // Build the prompt with specialist personality and cross-specialist context
+        // Build the prompt with specialist personality, cross-specialist context, and handoff
         const systemExtras: string[] = []
+        if (handoffContext && messages.length <= 1) {
+            // Only inject handoff on the first exchange
+            systemExtras.push(`\n\n## Handoff Context\n${handoffContext}`)
+        }
         if (crossSpecialistContext) {
             systemExtras.push(`\n\n## Team Context\n${crossSpecialistContext}`)
         }
@@ -318,7 +320,7 @@ export function BriefSpecialistDialog({
         } finally {
             setIsExecuting(false)
         }
-    }, [briefText, selectedPrompt, hasApiKey, specialist, threadId, crossSpecialistContext])
+    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
@@ -334,10 +336,28 @@ export function BriefSpecialistDialog({
     }, [messages])
 
     const handleSwitchSpecialist = useCallback((id: string) => {
+        // Build handoff context from recent conversation
+        let handoff: string | undefined
+        if (messages.length > 0) {
+            const firstUserMsg = messages.find((m) => m.role === "user")
+            const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
+            const parts: string[] = [
+                `Handoff from ${specialist.name}:`,
+            ]
+            if (firstUserMsg) {
+                parts.push(`The user was discussing: "${firstUserMsg.content.slice(0, 300)}"`)
+            }
+            if (lastAssistant) {
+                parts.push(`Key points covered:\n${lastAssistant.content.slice(0, 500)}`)
+            }
+            parts.push("\nThe user has been referred to you to continue this work. Acknowledge the handoff briefly and build on what was discussed.")
+            handoff = parts.join("\n\n")
+        }
+
         onOpenChange(false)
         // Small delay to let dialog close animation finish
-        setTimeout(() => onSwitchSpecialist?.(id), 200)
-    }, [onOpenChange, onSwitchSpecialist])
+        setTimeout(() => onSwitchSpecialist?.(id, handoff), 200)
+    }, [onOpenChange, onSwitchSpecialist, messages, specialist.name])
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -397,6 +417,12 @@ export function BriefSpecialistDialog({
                             </p>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {referredBy && (
+                                <Badge variant="default" className="text-xs gap-1 bg-international-orange/10 text-international-orange border-international-orange/20">
+                                    <ArrowRight className="h-3 w-3" />
+                                    Referred by {referredBy}
+                                </Badge>
+                            )}
                             {threadId && (
                                 <Badge variant="secondary" className="text-xs gap-1">
                                     <Clock className="h-3 w-3" />

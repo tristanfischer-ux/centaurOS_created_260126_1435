@@ -225,29 +225,53 @@ export async function getRecentSpecialistOutputs(
 
         const results: Array<{ specialistId: string; summary: string }> = []
 
-        // For each thread, get the most recent assistant message
+        // For each thread, get the most recent user + assistant message pair
         for (const thread of threads) {
             if (results.length >= limit) break
 
-            const { data: lastMsg } = await supabase
+            // Fetch last 2 messages (user question + assistant response)
+            const { data: recentMsgs } = await supabase
                 .from('agent_memory_messages')
-                .select('content')
+                .select('role, content, created_at')
                 .eq('thread_id', thread.id)
-                .eq('role', 'assistant')
+                .in('role', ['user', 'assistant'])
                 .order('created_at', { ascending: false })
-                .limit(1)
-                .single()
+                .limit(2)
 
-            if (lastMsg?.content) {
-                // Truncate to first ~300 chars for a summary
-                const summary = (lastMsg.content as string).length > 300
-                    ? (lastMsg.content as string).slice(0, 300) + '...'
-                    : (lastMsg.content as string)
-                results.push({
-                    specialistId: thread.context_id as string,
-                    summary,
-                })
+            if (!recentMsgs || recentMsgs.length === 0) continue
+
+            const lastAssistant = recentMsgs.find((m) => m.role === 'assistant')
+            const lastUser = recentMsgs.find((m) => m.role === 'user')
+
+            if (!lastAssistant?.content) continue
+
+            // Build structured summary with user question, timestamp, and key output
+            const timestamp = lastAssistant.created_at
+                ? new Date(lastAssistant.created_at as string).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                  })
+                : ''
+
+            const parts: string[] = []
+            if (timestamp) parts.push(`(${timestamp})`)
+
+            if (lastUser?.content) {
+                const userQ = (lastUser.content as string).slice(0, 200)
+                parts.push(`Asked about: "${userQ}${(lastUser.content as string).length > 200 ? '...' : ''}"`)
             }
+
+            // Truncate assistant output to 500 chars for richer context
+            const assistantContent = lastAssistant.content as string
+            const truncated = assistantContent.length > 500
+                ? assistantContent.slice(0, 500) + '...'
+                : assistantContent
+            parts.push(`Key output: "${truncated}"`)
+
+            results.push({
+                specialistId: thread.context_id as string,
+                summary: parts.join('\n'),
+            })
         }
 
         return { data: results, error: null }

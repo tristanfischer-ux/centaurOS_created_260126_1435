@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { motion } from "framer-motion"
-import { ArrowRight, Layers, Users } from "lucide-react"
+import { ArrowRight, Layers, Users, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 // Design system imported only when needed for inline usage
@@ -10,10 +10,9 @@ import { SPECIALISTS, SPECIALIST_ROWS, getSpecialistsByRow } from "./specialists
 import { SpecialistCard } from "./specialist-card"
 import { getPromptsByCategory } from "./lib/prompt-library"
 import { BriefSpecialistDialog } from "./brief-specialist-dialog"
+import { TeamMeetingDialog } from "./team-meeting-dialog"
 
 interface SpecialistsLandingProps {
-    /** Whether the user has at least one AI provider key configured */
-    hasApiKey: boolean
     /** Callback to switch to the workflow builder ("Team Project" mode) */
     onOpenProjectBuilder: () => void
 }
@@ -26,10 +25,12 @@ interface SpecialistsLandingProps {
  * "Plan a Team Project" CTA that opens the workflow builder.
  */
 export function SpecialistsLanding({
-    hasApiKey,
     onOpenProjectBuilder,
 }: SpecialistsLandingProps) {
     const [briefSpecialistId, setBriefSpecialistId] = useState<string | null>(null)
+    const [isMeetingOpen, setIsMeetingOpen] = useState(false)
+    const [handoffContext, setHandoffContext] = useState<string | null>(null)
+    const [referredByName, setReferredByName] = useState<string | null>(null)
 
     // Pre-compute capability counts for each specialist
     const capabilityCounts = useMemo(() => {
@@ -51,6 +52,9 @@ export function SpecialistsLanding({
     const selectedSpecialist = SPECIALISTS.find((s) => s.id === briefSpecialistId)
 
     const handleBrief = (specialistId: string) => {
+        // Clear handoff when opening directly (not via switch)
+        setHandoffContext(null)
+        setReferredByName(null)
         setBriefSpecialistId(specialistId)
     }
 
@@ -74,13 +78,21 @@ export function SpecialistsLanding({
                         Nine specialists, ready right now. Brief them on anything &mdash; strategy, sales,
                         fundraising, legal, hiring, product, and more. No recruiting. No waiting. No payroll.
                     </p>
-                    <div className="flex items-center gap-3 pt-1">
+                    <div className="flex flex-wrap items-center gap-3 pt-1">
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-sm text-foreground font-medium">
                             <Users className="h-4 w-4 text-muted-foreground" />
                             <span>9 specialists</span>
                             <span className="text-muted-foreground">&middot;</span>
                             <span>{totalBriefs} briefs ready</span>
                         </div>
+                        <Button
+                            onClick={() => setIsMeetingOpen(true)}
+                            className="bg-international-orange hover:bg-international-orange-hover text-white rounded-full"
+                            size="sm"
+                        >
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                            Call a Team Meeting
+                        </Button>
                     </div>
                 </div>
             </motion.div>
@@ -170,12 +182,29 @@ export function SpecialistsLanding({
                     specialist={selectedSpecialist}
                     open={briefSpecialistId !== null}
                     onOpenChange={(open) => {
-                        if (!open) setBriefSpecialistId(null)
+                        if (!open) {
+                            setBriefSpecialistId(null)
+                            setHandoffContext(null)
+                            setReferredByName(null)
+                        }
                     }}
-                    hasApiKey={hasApiKey}
-                    onSwitchSpecialist={(id) => setBriefSpecialistId(id)}
+                    onSwitchSpecialist={(id, context) => {
+                        // Capture the current specialist's name for the "Referred by" badge
+                        const fromName = selectedSpecialist.name
+                        setHandoffContext(context ?? null)
+                        setReferredByName(context ? fromName : null)
+                        setBriefSpecialistId(id)
+                    }}
+                    handoffContext={handoffContext}
+                    referredBy={referredByName}
                 />
             )}
+
+            {/* ── Team Meeting Dialog ──────────────────────────────────── */}
+            <TeamMeetingDialog
+                open={isMeetingOpen}
+                onOpenChange={setIsMeetingOpen}
+            />
         </div>
     )
 }
