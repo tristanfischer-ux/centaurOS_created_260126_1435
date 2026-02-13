@@ -258,15 +258,9 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 />
 
                 {/* ══════════════════════════════════════════════════ */}
-                {/* Today — Top-level daily focus (always visible)     */}
-                {/* ══════════════════════════════════════════════════ */}
-                {renderNavItem(todayNavItem)}
-
-                <div className="my-2 border-t border-slate-100" />
-
-                {/* ══════════════════════════════════════════════════ */}
                 {/* Section 1: "Me" — Personal pages                  */}
                 {/* ══════════════════════════════════════════════════ */}
+                {renderNavItem(todayNavItem)}
                 <SectionHeader label="Me" introRoute="/me" hasNew={badges.me} />
                 {meNavigation.map(renderNavItem)}
 
