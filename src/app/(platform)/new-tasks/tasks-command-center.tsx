@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
@@ -12,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   Crosshair, LayoutGrid, List, GanttChartSquare, Search,
-  X, Group, Waypoints, Filter,
+  X, Group, Filter, Waypoints, ChevronRight,
 } from 'lucide-react'
 import { SmartSummary } from './smart-summary'
 import { FocusView } from './focus-view'
@@ -143,6 +144,16 @@ export function TasksCommandCenter({
     }
   }, [tasks, currentUserId])
 
+  // Strategic context — how tasks connect to the bigger picture
+  const strategicContext = useMemo(() => {
+    const uniqueObjectives = new Set(tasks.filter(t => t.objective).map(t => t.objective!.id))
+    const uniqueStrategies = new Set(tasks.filter(t => t.strategy).map(t => t.strategy!.id))
+    return {
+      objectiveCount: uniqueObjectives.size,
+      strategyCount: uniqueStrategies.size,
+    }
+  }, [tasks])
+
   // Filter tasks
   const getFilteredTasks = useCallback(() => {
     let result = tasks
@@ -218,6 +229,12 @@ export function TasksCommandCenter({
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0 flex-1">
+          {/* Cascade breadcrumb */}
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+            <Link href="/plan" className="hover:text-foreground transition-colors">Plan</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground font-medium">Tasks</span>
+          </nav>
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
             <h1 className={typography.h1}>Tasks</h1>
@@ -225,8 +242,25 @@ export function TasksCommandCenter({
           <p className={typography.pageSubtitle}>
             Your personal command center for getting things done
           </p>
+          {/* Strategic context — shows how tasks connect to the bigger picture */}
+          {strategicContext.strategyCount > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.totalTasks} task{stats.totalTasks !== 1 ? 's' : ''} across{' '}
+              {strategicContext.objectiveCount} objective{strategicContext.objectiveCount !== 1 ? 's' : ''} supporting{' '}
+              {strategicContext.strategyCount} strateg{strategicContext.strategyCount !== 1 ? 'ies' : 'y'}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          {strategicContext.strategyCount > 0 && (
+            <Link
+              href="/strategy"
+              className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-international-orange transition-colors"
+            >
+              <Waypoints className="h-3.5 w-3.5" />
+              Strategy River
+            </Link>
+          )}
           <CreateTaskDialog
             objectives={objectives}
             members={members.map(m => ({ ...m, role: m.role || 'Member' }))}

@@ -276,9 +276,9 @@ export function ObjectivesTreeView({ objectives, strategicObjectives = [], selec
         <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
           <Target className="h-8 w-8 text-muted-foreground/40" />
         </div>
-        <h3 className="text-base font-semibold text-foreground mb-1">No objectives yet</h3>
+        <h3 className="text-base font-semibold text-foreground mb-1">Your strategy tree starts here</h3>
         <p className="text-sm text-muted-foreground max-w-sm">
-          Create your first objective to visualize your strategy tree.
+          Create objectives to see how they branch from your strategic goals into actionable milestones.
         </p>
         {onCreateNew && (
           <Button onClick={onCreateNew} className="mt-4">

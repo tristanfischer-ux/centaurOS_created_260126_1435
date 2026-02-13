@@ -830,6 +830,216 @@ def analyze_cad_endpoint(item: dict) -> dict:
     }
 
 
+# ─── Grammar-Based CAD Generation ─────────────────────────────────────
+
+
+GRAMMAR_HARNESS_TEMPLATE = '''
+# === Grammar Execution Harness (injected) ===
+import json as _json
+
+_params = _json.loads(__GRAMMAR_PARAMS_JSON__)
+
+# Find DomainGrammar subclass dynamically
+_grammar_cls = None
+for _name, _obj in list(globals().items()):
+    if isinstance(_obj, type) and issubclass(_obj, DomainGrammar) and _obj is not DomainGrammar:
+        _grammar_cls = _obj
+        break
+
+if _grammar_cls is None:
+    raise RuntimeError("No DomainGrammar subclass found in grammar code")
+
+_grammar = _grammar_cls()
+_assembly, _result = _grammar.generate(_params)
+
+if not _result.passed:
+    raise RuntimeError(f"Grammar validation failed: {_result.errors}")
+
+# Convert assembly to workplane for export template
+result = cq.Workplane("XY").newObject([_assembly.toCompound()])
+'''
+
+
+@app.function(
+    image=cadquery_image,
+    timeout=600,   # 10 min — grammar-based models with complex assemblies need extended time
+    memory=8192,   # 8 GB — large assemblies with many boolean ops need headroom
+)
+def generate_from_grammar(
+    core_code: str,
+    grammar_code: str,
+    params: dict,
+    material_density: float = 1240.0,
+) -> dict:
+    """
+    Executes grammar-based CadQuery code and returns exported files as base64,
+    plus mass properties and DFM analysis results.
+
+    The grammar system works by combining:
+    1. A core grammar library (trusted, provides DomainGrammar base class)
+    2. A domain-specific grammar (e.g. building.py) that defines components
+    3. An execution harness that instantiates the grammar and runs generation
+
+    @description Concatenates core library + domain grammar + execution harness,
+    then runs the combined code through exec() with the existing export template
+    for STEP/STL/SVG/analysis output.
+
+    @param core_code: Python source of the core grammar library (grammar.py).
+                      Trusted code — not validated against BLOCKED_PATTERNS.
+    @param grammar_code: Python source of the domain grammar (e.g. building.py).
+                         Validated against BLOCKED_PATTERNS for security.
+    @param params: Dictionary of parameters to pass to the grammar's generate() method.
+    @param material_density: Material density in kg/m³ (default: 1240 for PLA).
+
+    @returns dict with keys: step, stl, svg_iso, svg_top, svg_front, svg_right,
+             svg_back, svg_left, svg_exploded, analysis, error.
+             File values are base64-encoded strings. error is None on success.
+
+    @security Core library code is trusted (not user-generated).
+              Only grammar_code is validated against BLOCKED_PATTERNS.
+    """
+    # SECURITY: Validate only the grammar code (core library is trusted)
+    violations = validate_code(grammar_code)
+    if violations:
+        result = _empty_result()
+        result["error"] = f"Grammar code validation failed: {'; '.join(violations)}"
+        return result
+
+    # Strip `from core.grammar import ...` lines from grammar code
+    # (the core library is concatenated directly, so these imports are unnecessary)
+    modified_grammar = re.sub(
+        r"^from\s+core\.grammar\s+import\s+.*$",
+        "# core library already loaded",
+        grammar_code,
+        flags=re.MULTILINE,
+    )
+
+    # Build the execution harness with injected params
+    params_json = json.dumps(params)
+    harness = GRAMMAR_HARNESS_TEMPLATE.replace(
+        "__GRAMMAR_PARAMS_JSON__", repr(params_json)
+    )
+
+    # Concatenate: core library + grammar + harness
+    combined_code = core_code + "\n\n" + modified_grammar + "\n\n" + harness
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Prepare export wrapper
+        export_code = EXPORT_TEMPLATE.format(
+            output_dir=tmpdir,
+            material_density=material_density,
+        )
+
+        # Phase 1: Execute combined grammar code
+        namespace: dict = {}
+        user_exec_error: str | None = None
+        try:
+            exec(combined_code, namespace)  # noqa: S102 — intentional sandboxed exec
+        except Exception:
+            user_exec_error = traceback.format_exc()[-1500:]
+
+        # Phase 2: Execute export wrapper in the SAME namespace
+        export_exec_error: str | None = None
+        try:
+            exec(export_code, namespace)  # noqa: S102 — intentional sandboxed exec
+        except Exception:
+            export_exec_error = traceback.format_exc()[-1500:]
+
+        # Determine final error state
+        exec_error: str | None = None
+        if export_exec_error:
+            exec_error = f"Grammar CAD export failed: {export_exec_error}"
+        elif user_exec_error:
+            exec_error = f"Grammar CAD execution warning: {user_exec_error}"
+
+        # Post-process SVG viewBoxes so drawings are centered
+        for svg_name in ["iso", "top", "front", "back", "right", "left", "exploded_iso"]:
+            svg_path = os.path.join(tmpdir, f"{svg_name}.svg")
+            if os.path.exists(svg_path):
+                _refit_svg_viewbox(svg_path)
+
+        # Read output files
+        file_map = {
+            "step": "model.step",
+            "stl": "model.stl",
+            "svg_iso": "iso.svg",
+            "svg_top": "top.svg",
+            "svg_front": "front.svg",
+            "svg_back": "back.svg",
+            "svg_right": "right.svg",
+            "svg_left": "left.svg",
+            "svg_exploded": "exploded_iso.svg",
+        }
+
+        result: dict = {"error": exec_error}
+        has_any_file = False
+        for key, filename in file_map.items():
+            filepath = os.path.join(tmpdir, filename)
+            if os.path.exists(filepath):
+                with open(filepath, "rb") as f:  # noqa: SIM115
+                    file_bytes = f.read()
+                    result[key] = base64.b64encode(file_bytes).decode("utf-8")
+                    if filename.endswith(".svg"):
+                        try:
+                            svg_preview = file_bytes.decode("utf-8")[:300]
+                            print(f"SVG {key}: {len(file_bytes)} bytes, preview: {svg_preview}")
+                        except Exception:
+                            pass
+                has_any_file = True
+            else:
+                result[key] = None
+
+        # If we recovered files despite an error, clear the error
+        if exec_error and has_any_file:
+            result["error"] = None
+
+        # Read analysis results
+        analysis_path = os.path.join(tmpdir, "analysis.json")
+        if os.path.exists(analysis_path):
+            with open(analysis_path, "r") as f:
+                result["analysis"] = json.loads(f.read())
+        else:
+            result["analysis"] = None
+
+        return result
+
+
+# ─── Grammar Web Endpoint ─────────────────────────────────────────────
+
+
+@app.function(
+    image=cadquery_image,
+    timeout=600,   # 10 min — grammar-based models with complex assemblies need extended time
+    memory=8192,   # 8 GB — large assemblies with many boolean ops need headroom
+)
+@modal.fastapi_endpoint(method="POST")
+def generate_from_grammar_endpoint(item: dict) -> dict:
+    """
+    HTTP POST endpoint for grammar-based CadQuery generation + analysis.
+
+    Expects JSON body:
+        {
+            "core_code": "...",
+            "grammar_code": "...",
+            "params": {...},
+            "material_density": 1240  // optional, kg/m³
+        }
+    Returns JSON with base64-encoded files and analysis results.
+    """
+    core_code = item.get("core_code", "")
+    grammar_code = item.get("grammar_code", "")
+    params = item.get("params", {})
+    material_density = item.get("material_density", 1240.0)
+
+    if not core_code.strip():
+        return {"error": "No core grammar code provided"}
+
+    if not grammar_code.strip():
+        return {"error": "No grammar code provided"}
+
+    return generate_from_grammar.remote(core_code, grammar_code, params, material_density)
+
+
 # ─── Local Test ───────────────────────────────────────────────────────
 
 

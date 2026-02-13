@@ -1,0 +1,81 @@
+---
+description: North-star principle — every feature should delight users so much they want to tell their friends
+alwaysApply: true
+---
+
+# Delight & Amaze the User
+
+**The single measure of success for every feature, page, and interaction in ForgeOS:**
+
+> Would this make someone pull out their phone to show a friend?
+
+If the answer is "no" or "maybe," the work isn't done yet. Correct and functional is the floor, not the ceiling. We ship things that make people feel something — surprise, relief, confidence, joy.
+
+## Three Pillars of Delight
+
+### 1. Feels Instant
+
+Users should never wonder "did that work?" or stare at a blank screen.
+
+- **Optimistic UI** — reflect the user's action immediately, reconcile with the server in the background.
+- **Skeleton states** — show the shape of content before the data arrives.
+- **Transitions, not jumps** — content should flow in, not pop. Use `duration-200 ease-out` as a baseline.
+- **Progress feedback** — for anything longer than 300ms, show that something is happening.
+
+### 2. Feels Thoughtful
+
+The app should feel like it was built by someone who thought about the user's actual day.
+
+- **Smart defaults** — pre-fill what you can, remember what the user chose last time.
+- **Helpful microcopy** — don't just label fields, guide the user. "What problem are you solving?" beats "Description."
+- **Anticipate the next step** — after creating a task, offer to create another. After completing an objective, celebrate and suggest what's next.
+- **Graceful errors** — tell the user what happened, why, and what they can do about it. Never show raw error codes or empty failure states.
+- **Empty states that inspire action** — a blank page is a missed opportunity to help the user get started.
+
+### 3. Feels Beautiful
+
+Visual craft is not decoration — it's trust. A polished UI signals competence and care.
+
+- **Consistent spacing** — generous whitespace, never cramped.
+- **Smooth interactions** — hover lifts, press feedback, animated state changes.
+- **Purposeful color** — brand accents draw attention to what matters; status colors communicate at a glance.
+- **Typography hierarchy** — the eye should know where to look without thinking.
+
+## The "Show a Friend" Test
+
+Before shipping any feature or page, answer these five questions honestly:
+
+1. **Is it immediately obvious what to do?** — No tutorial needed, no confusion.
+2. **Does it respond to my actions with satisfying feedback?** — Clicks feel confirmed, drags feel physical, saves feel secure.
+3. **Does it look like a product I'd pay for?** — Not a prototype, not a hackathon project — a real product.
+4. **Does it handle the unhappy path gracefully?** — Errors, empty data, slow networks, edge cases.
+5. **Is there a single moment of "oh, that's nice"?** — A smart default, a smooth animation, a helpful suggestion.
+
+If any answer is "no," fix it before calling the work done.
+
+## Delight Killers
+
+These patterns actively destroy the user's trust and enthusiasm. Eliminate them on sight:
+
+| Delight Killer | Why It Hurts | What to Do Instead |
+|---|---|---|
+| Generic empty states ("No data") | Feels abandoned, no guidance | Encouraging copy + clear CTA |
+| Silent failures | User doesn't know something broke | Toast or inline error with next step |
+| Full-page loading spinners | Feels slow even if it's fast | Skeleton matching the page layout |
+| Walls of form fields | Overwhelming, high abandonment | Wizard pattern (one concept per step) |
+| Stale data with no indicator | User loses trust in what they see | Timestamp, refresh hint, or live update |
+| Jargon in UI copy | Makes users feel stupid | Plain language a new employee would understand |
+| Inconsistent interactions | Breaks muscle memory | Follow established patterns in existing rules |
+
+## How This Relates to Other Rules
+
+This rule is the **why**. The other rules are the **how**:
+
+- Visual aesthetic: `design-philosophy.mdc`
+- Specific UI patterns: `elegance-patterns.mdc`
+- Color usage: `color-consistency.mdc`
+- Layout and spacing: `layout-spacing.mdc`
+- Code craftsmanship: `work-quality.mdc`
+- Component standards: `component-patterns.mdc`
+
+When in doubt between two valid approaches, pick the one that would make the user smile.

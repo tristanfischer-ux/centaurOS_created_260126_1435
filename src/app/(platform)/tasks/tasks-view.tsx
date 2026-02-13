@@ -908,10 +908,9 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 priority
                                             />
                                         </div>
-                                        <h3 className="text-2xl font-display font-medium text-foreground mb-3 relative z-10 tracking-tight">System Idle</h3>
-                                        <p className="text-muted-foreground max-w-sm mb-8 relative z-10 font-mono text-xs tracking-wide leading-relaxed">
-                                            NO PROCESSING TASKS IN QUEUE.<br />
-                                            INITIALIZE NEW DIRECTIVES TO BEGIN OPERATIONS.
+                                        <h3 className="text-2xl font-display font-medium text-foreground mb-3 relative z-10 tracking-tight">Ready when you are</h3>
+                                        <p className="text-muted-foreground max-w-sm mb-8 relative z-10 text-sm leading-relaxed">
+                                            No tasks yet. Create your first task to start making progress on your objectives.
                                         </p>
                                         <div className="relative z-10">
                                             {/* We can reproduce the button trigger here if needed, or guide user to the quick add */}

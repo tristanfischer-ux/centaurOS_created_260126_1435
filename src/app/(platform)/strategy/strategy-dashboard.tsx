@@ -26,7 +26,7 @@ import { NodeDetailsDialog } from '@/components/canvas/node-details-dialog'
 import { AddToRiverDialog } from '@/components/canvas/add-to-river-dialog'
 import {
   LayoutDashboard, Waypoints, Link2, Flag, Target, CheckCircle2,
-  AlertTriangle, TrendingUp, ArrowRight, Plus, XCircle,
+  AlertTriangle, TrendingUp, ArrowRight, Plus, XCircle, ChevronRight,
 } from 'lucide-react'
 import { getStrategyColor } from '../new-objectives/strategy-colors'
 import type { GoalBundle, MilestoneOption } from '@/types/canvas'
@@ -97,7 +97,10 @@ export function StrategyDashboard({
   regularObjectives,
 }: StrategyDashboardProps) {
   const router = useRouter()
-  const [viewMode, setViewMode] = useState<ViewMode>('dashboard')
+  // Default to River view when strategic data exists — the River is the showcase
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    initialBundles.length > 0 ? 'river' : 'dashboard'
+  )
 
   // ── Strategy River state ──
   const riverData = useMemo(() => goalBundlesToRiverData(initialBundles), [initialBundles])
@@ -183,6 +186,12 @@ export function StrategyDashboard({
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="min-w-0 flex-1">
+          {/* Cascade breadcrumb */}
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+            <Link href="/plan" className="hover:text-foreground transition-colors">Plan</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground font-medium">Strategy</span>
+          </nav>
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
             <h1 className={typography.h1}>Strategy</h1>
@@ -269,8 +278,17 @@ export function StrategyDashboard({
           {/* Strategic Pillars */}
           {pillars.length === 0 ? (
             <EmptyState
-              title="No strategic pillars defined"
-              description="Create your first strategic pillar to anchor your objectives and tasks around clear strategic direction."
+              icon={<Waypoints className="h-10 w-10" />}
+              title="Your strategic direction starts here"
+              description="Define what matters most. Strategic goals become the pillars that everything else aligns to — objectives, tasks, and progress all cascade from here."
+              action={
+                <Link href="/new-objectives?mode=strategic">
+                  <Button className="bg-international-orange hover:bg-international-orange-hover">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Strategy
+                  </Button>
+                </Link>
+              }
             />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -319,10 +337,21 @@ export function StrategyDashboard({
       {viewMode === 'river' && (
         <div className="-mx-4 sm:-mx-6 lg:-mx-8">
           {riverData.length === 0 ? (
-            <EmptyState
-              title="No strategic objectives yet"
-              description="Create a strategic objective to see your strategy river — a visual timeline of your goals, milestones, and tasks."
-            />
+            <div className="px-4 sm:px-6 lg:px-8">
+              <EmptyState
+                icon={<Waypoints className="h-10 w-10" />}
+                title="Your strategy, visualized as a river"
+                description="Create a strategic goal with milestones and tasks to watch them flow through time. Goals become rivers, milestones become confluences, and tasks become tributaries — all on a single, living timeline."
+                action={
+                  <Link href="/new-objectives?mode=strategic">
+                    <Button className="bg-international-orange hover:bg-international-orange-hover">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Strategic Goal
+                    </Button>
+                  </Link>
+                }
+              />
+            </div>
           ) : (
             <StrategyRiver
               strategicObjectives={riverData}

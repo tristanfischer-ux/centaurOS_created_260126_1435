@@ -504,8 +504,8 @@ export function ObjectivesGanttView({ objectives, strategicObjectives = [], sele
         <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
           <GanttChartSquare className="h-8 w-8 text-muted-foreground/40" />
         </div>
-        <h3 className="text-base font-semibold text-foreground mb-1">No objectives to display</h3>
-        <p className="text-sm text-muted-foreground">Create objectives with tasks to see the Gantt chart.</p>
+        <h3 className="text-base font-semibold text-foreground mb-1">Your timeline awaits</h3>
+        <p className="text-sm text-muted-foreground">Create objectives with tasks and deadlines to see your progress mapped across time.</p>
         {onCreateNew && (
           <Button onClick={onCreateNew} className="mt-4">
             <Plus className="h-4 w-4 mr-2" />

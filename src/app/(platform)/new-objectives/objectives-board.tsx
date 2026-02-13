@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
@@ -8,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import {
   LayoutGrid, GitBranch, GanttChartSquare, Search, Target, X, Loader2,
-  ChevronRight, ChevronDown, Flag, AlertTriangle, Plus,
+  ChevronRight, ChevronDown, Flag, AlertTriangle, Plus, Waypoints,
 } from 'lucide-react'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
@@ -69,6 +70,7 @@ function toTaskWithData(task: ObjectiveTask, parentObjective: ObjectiveWithTasks
     assignee: task.assignee,
     creator: null,
     objective: { id: parentObjective.id, title: parentObjective.title },
+    strategy: parentObjective.strategy ?? null,
     assignees: task.assignees,
     task_files: [],
   }
@@ -335,6 +337,12 @@ export function ObjectivesBoard({
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0 flex-1">
+          {/* Cascade breadcrumb */}
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+            <Link href="/plan" className="hover:text-foreground transition-colors">Plan</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground font-medium">Objectives</span>
+          </nav>
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
             <h1 className={typography.h1}>Objectives</h1>
@@ -344,6 +352,15 @@ export function ObjectivesBoard({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {strategicObjectives.length > 0 && (
+            <Link
+              href="/strategy"
+              className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-international-orange transition-colors"
+            >
+              <Waypoints className="h-3.5 w-3.5" />
+              Strategy River
+            </Link>
+          )}
           <WeeklyDigestPanel />
           <CreateObjectiveDialog externalOpen={createDialogOpen} onExternalOpenChange={setCreateDialogOpen} />
         </div>
@@ -572,15 +589,15 @@ function BoardView({
   if (objectives.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+        <div className="h-16 w-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
           <Target className="h-8 w-8 text-muted-foreground/40" />
         </div>
-        <h3 className="text-base font-semibold text-foreground mb-1">No objectives found</h3>
+        <h3 className="text-base font-semibold text-foreground mb-1">Goals that move the needle</h3>
         <p className="text-sm text-muted-foreground max-w-sm">
-          Create your first objective to start tracking progress.
+          Objectives break your strategy into measurable milestones. Create your first to start tracking real progress toward what matters most.
         </p>
         {onCreateNew && (
-          <Button onClick={onCreateNew} className="mt-4">
+          <Button onClick={onCreateNew} className="mt-4 bg-international-orange hover:bg-international-orange-hover">
             <Plus className="h-4 w-4 mr-2" />
             Create Objective
           </Button>
