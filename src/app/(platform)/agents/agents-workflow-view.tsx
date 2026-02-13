@@ -235,7 +235,7 @@ function AgentsFlowInner({
         initialWorkflows.length > 0 ? initialWorkflows[0].id : null
     )
     const [workflowName, setWorkflowName] = useState(
-        initialWorkflows.length > 0 ? initialWorkflows[0].name : "Untitled Workflow"
+        initialWorkflows.length > 0 ? initialWorkflows[0].name : "Untitled Project"
     )
     const [savedWorkflows, setSavedWorkflows] = useState<AgentWorkflowRow[]>(initialWorkflows)
 
@@ -576,7 +576,7 @@ function AgentsFlowInner({
             })
 
             if (error) {
-                toast.error("Failed to save workflow", { description: error })
+                toast.error("Failed to save project", { description: error })
                 return
             }
 
@@ -592,7 +592,7 @@ function AgentsFlowInner({
             console.error("[AgentsFlow] Save failed:", {
                 error: err instanceof Error ? err.message : "Unknown error",
             })
-            toast.error("Failed to save workflow")
+            toast.error("Failed to save project")
         } finally {
             setIsSaving(false)
         }
@@ -630,7 +630,7 @@ function AgentsFlowInner({
     // ── New workflow ───────────────────────────────────────────────
     const handleNew = useCallback(() => {
         setDbWorkflowId(null)
-        setWorkflowName("Untitled Workflow")
+        setWorkflowName("Untitled Project")
         setNodes([])
         setEdges([])
         setSelectedNodeId(null)
@@ -667,20 +667,20 @@ function AgentsFlowInner({
         async (workflowId: string) => {
             const { error } = await deleteAgentWorkflow(workflowId)
             if (error) {
-                toast.error("Failed to delete workflow", { description: error })
+                toast.error("Failed to delete project", { description: error })
                 return
             }
             setSavedWorkflows((prev) => prev.filter((w) => w.id !== workflowId))
             // If we deleted the currently active workflow, reset to blank canvas
             if (dbWorkflowId === workflowId) {
                 setDbWorkflowId(null)
-                setWorkflowName("Untitled Workflow")
+                setWorkflowName("Untitled Project")
                 setNodes([])
                 setEdges([])
                 setSelectedNodeId(null)
                 setInspectorOpen(false)
             }
-            toast.success("Workflow deleted")
+            toast.success("Project deleted")
         },
         [dbWorkflowId, setNodes, setEdges]
     )
@@ -790,7 +790,7 @@ function AgentsFlowInner({
                 setSelectedNodeId(nodeId)
                 setInspectorOpen(true)
                 toast.error("Add your input data before running this step", {
-                    description: "Paste your data into the Input Data field, then click Run Prompt.",
+                    description: "Paste your data into the Input Data field, then click Run Brief.",
                 })
                 return false
             }
@@ -1000,7 +1000,7 @@ function AgentsFlowInner({
 
                 if (artifact) {
                     toast.success("Output saved", {
-                        description: "View it in Saved Outputs",
+                        description: "View it in Deliverables",
                         action: {
                             label: "Open",
                             onClick: () => window.location.href = "/agents/artifacts",
@@ -1152,7 +1152,7 @@ function AgentsFlowInner({
             if ((e.metaKey || e.ctrlKey) && e.key === "s") {
                 e.preventDefault()
                 handleSave()
-                toast.success("Workflow saved")
+                toast.success("Project saved")
             }
             // ? : Open help (only when not typing)
             if (e.key === "?" && !isTyping) {
@@ -1199,7 +1199,7 @@ function AgentsFlowInner({
                 <div className="flex items-center gap-3 px-4 py-2.5 bg-status-info-light border-b border-status-info/20 flex-shrink-0">
                     <Info className="w-4 h-4 text-status-info flex-shrink-0" />
                     <p className="text-xs text-foreground flex-1">
-                        <strong>Connect a provider</strong> to run workflows.{" "}
+                        <strong>Connect a provider</strong> to run projects.{" "}
                         <Link href="/settings#ai-providers" className="text-status-info hover:underline font-medium">
                             Go to Settings
                         </Link>
@@ -1310,7 +1310,7 @@ function AgentsFlowInner({
                                     </svg>
                                 </div>
                                 <h3 className="font-display text-lg font-semibold text-foreground mb-2">
-                                    Build a workflow for your team
+                                    Build a project for your team
                                 </h3>
                                 <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
                                     Chain steps together so your people can focus on the decisions that matter.
@@ -1321,7 +1321,7 @@ function AgentsFlowInner({
                                     <div className="flex flex-col items-center gap-1 flex-1">
                                         <div className="w-8 h-8 rounded-full bg-international-orange text-white flex items-center justify-center text-xs font-bold">1</div>
                                         <div className="h-px w-full bg-border mt-1 mb-1" />
-                                        <p className="text-[11px] font-medium text-foreground text-center">Drag prompts</p>
+                                        <p className="text-[11px] font-medium text-foreground text-center">Drag briefs</p>
                                         <p className="text-[10px] text-muted-foreground text-center">From the sidebar onto the canvas</p>
                                     </div>
                                     <div className="text-muted-foreground mt-2 flex-shrink-0">&#8594;</div>
@@ -1351,12 +1351,12 @@ function AgentsFlowInner({
                                         onClick={() => setCreatePromptOpen(true)}
                                         className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground bg-background border hover:bg-muted rounded-lg transition-colors"
                                     >
-                                        Create a prompt
+                                        Create a brief
                                     </button>
                                 </div>
 
                                 <p className="text-xs text-muted-foreground mt-3">
-                                    28 pre-built workflows across fundraising, GTM, operations, and more
+                                    28 pre-built projects across fundraising, GTM, operations, and more
                                 </p>
 
                                 <p className="text-[10px] text-muted-foreground mt-2">

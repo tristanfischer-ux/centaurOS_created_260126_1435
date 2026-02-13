@@ -119,7 +119,7 @@ export function WorkflowTemplateIntroDialog({
                             <div className="flex items-center gap-2 mb-3">
                                 <Layers className="w-4 h-4 text-foreground" />
                                 <h3 className="text-sm font-semibold text-foreground">
-                                    What This Workflow Does
+                                    What This Project Does
                                 </h3>
                             </div>
                             <p className="text-sm text-muted-foreground leading-relaxed mb-4">

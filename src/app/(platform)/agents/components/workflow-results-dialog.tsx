@@ -355,7 +355,7 @@ export function WorkflowResultsDialog({
                     <div className="flex items-center justify-between">
                         <div>
                             <DialogTitle className="text-lg font-semibold">
-                                {workflowName || "Workflow"} — Results
+                                {workflowName || "Project"} — Results
                             </DialogTitle>
                             <p className="text-xs text-muted-foreground mt-1">
                                 {orderedNodes.length} step{orderedNodes.length !== 1 ? "s" : ""} · {completedCount} completed
@@ -399,7 +399,7 @@ export function WorkflowResultsDialog({
                                     className="gap-1.5 text-xs h-8"
                                 >
                                     <FileOutput className="w-3.5 h-3.5" />
-                                    View Saved Outputs
+                                    View Deliverables
                                 </Button>
                             </Link>
                         </div>
@@ -413,17 +413,17 @@ export function WorkflowResultsDialog({
                             <div className="py-12 text-center">
                                 <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
                                 <p className="text-sm text-muted-foreground">
-                                    No steps in this workflow yet.
+                                    No steps in this project yet.
                                 </p>
                                 <p className="text-xs text-muted-foreground/70 mt-1">
-                                    Add prompts to the canvas, run the chain, then view results here.
+                                    Add briefs to the canvas, run the chain, then view results here.
                                 </p>
                             </div>
                         ) : !hasAnyOutput ? (
                             <div className="py-12 text-center">
                                 <Loader2 className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
                                 <p className="text-sm text-muted-foreground">
-                                    No results yet — run the workflow first.
+                                    No results yet — run the project first.
                                 </p>
                                 <p className="text-xs text-muted-foreground/70 mt-1">
                                     Hit <strong>Run Chain</strong> in the toolbar, then come back here.

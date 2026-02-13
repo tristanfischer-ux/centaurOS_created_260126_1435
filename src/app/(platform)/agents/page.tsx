@@ -23,18 +23,16 @@ export default async function SpecialistsPage() {
         redirect("/login")
     }
 
-    // Fetch API key status, saved workflows, custom prompts, and team member count in parallel
-    const [hasApiKeyResult, workflowsResult, customPromptsResult, teamCountResult] = await Promise.allSettled([
+    // Fetch API key status, saved workflows, and custom prompts in parallel
+    const [hasApiKeyResult, workflowsResult, customPromptsResult] = await Promise.allSettled([
         checkHasAnyProviderKey(),
         getAgentWorkflows(),
         getAgentCustomPrompts(),
-        supabase.from("foundry_members").select("id", { count: "exact", head: true }),
     ])
 
     const hasApiKey = hasApiKeyResult.status === "fulfilled" ? hasApiKeyResult.value : false
     const savedWorkflows = workflowsResult.status === "fulfilled" ? (workflowsResult.value.data ?? []) : []
     const savedCustomPrompts = customPromptsResult.status === "fulfilled" ? (customPromptsResult.value.data ?? []) : []
-    const teamMemberCount = teamCountResult.status === "fulfilled" ? (teamCountResult.value.count ?? 0) : 0
 
     if (hasApiKeyResult.status === "rejected") {
         console.error("[SpecialistsPage] Failed to check API key status:", {
@@ -47,7 +45,7 @@ export default async function SpecialistsPage() {
             hasApiKey={hasApiKey}
             initialWorkflows={savedWorkflows}
             initialCustomPrompts={savedCustomPrompts}
-            teamMemberCount={teamMemberCount}
+            teamMemberCount={0}
         />
     )
 }

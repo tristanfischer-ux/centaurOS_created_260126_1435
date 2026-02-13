@@ -164,7 +164,7 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate leading-tight">
-                            {nodeData.label || "Prompt"}
+                            {nodeData.label || "Brief"}
                         </p>
                         <p className="text-[10px] font-medium mt-0.5" style={{ color: accentColor }}>
                             {meta?.label ?? category}
