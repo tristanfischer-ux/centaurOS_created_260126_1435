@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
     Loader2, Send, AlertCircle, Copy, Check,
     MessageSquareQuote, ArrowRight, Clock,
-    History,
+    History, Mic, MicOff, Volume2, VolumeX,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -21,6 +21,8 @@ import { getOrCreateSpecialistThread, getRecentSpecialistOutputs, getSpecialistT
 import type { SpecialistHistoryMessage } from "@/actions/agent-memory"
 import { createArtifact } from "@/actions/agent-artifacts"
 import { getSpecialistById } from "./specialists-data"
+import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
+import { useTts } from "@/hooks/use-tts"
 import type { PromptTemplate } from "./lib/agent-types"
 import type { Specialist } from "./specialists-data"
 
@@ -85,6 +87,14 @@ export function BriefSpecialistDialog({
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
 
+    // ─── Voice Hooks ──────────────────────────────────────────────────────
+    const tts = useTts()
+    const speechRecognition = useSpeechRecognition({
+        onResult: (transcript) => {
+            setBriefText((prev) => (prev ? prev + " " + transcript : transcript))
+        },
+    })
+
     // Get all prompts for this specialist's categories
     const capabilities = useMemo(() => {
         const prompts: PromptTemplate[] = []
@@ -104,7 +114,12 @@ export function BriefSpecialistDialog({
 
     // ─── Initialize Thread & Cross-Specialist Context on Open ─────────
     useEffect(() => {
-        if (!open) return
+        if (!open) {
+            // Stop voice when dialog closes
+            tts.stop()
+            if (speechRecognition.isListening) speechRecognition.stop()
+            return
+        }
 
         // Reset transient state
         setSelectedPrompt(null)
@@ -290,6 +305,13 @@ export function BriefSpecialistDialog({
             setMessages((prev) => [...prev, assistantMessage])
             setStreamingResponse("")
 
+            // Auto-play TTS if voice output is enabled
+            if (tts.voiceEnabled && specialist.voice) {
+                tts.play(fullResponse, specialist.voice).catch((err) => {
+                    console.warn("[BriefDialog] TTS playback failed:", err)
+                })
+            }
+
             // Auto-save to deliverables (fire and forget)
             createArtifact({
                 title: `${specialist.name}: ${userMessage.content.slice(0, 80)}`,
@@ -320,7 +342,8 @@ export function BriefSpecialistDialog({
         } finally {
             setIsExecuting(false)
         }
-    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, tts.voiceEnabled])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
@@ -429,6 +452,24 @@ export function BriefSpecialistDialog({
                                     Remembers you
                                 </Badge>
                             )}
+                            {/* Voice output toggle */}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => tts.setVoiceEnabled(!tts.voiceEnabled)}
+                                className={cn(
+                                    "h-7 w-7 p-0",
+                                    tts.voiceEnabled && "text-international-orange",
+                                    tts.isPlaying && "animate-pulse"
+                                )}
+                                aria-label={tts.voiceEnabled ? "Mute voice output" : "Enable voice output"}
+                            >
+                                {tts.voiceEnabled ? (
+                                    <Volume2 className="h-4 w-4" />
+                                ) : (
+                                    <VolumeX className="h-4 w-4" />
+                                )}
+                            </Button>
                             {threadId && (
                                 <Button
                                     variant="ghost"
@@ -520,25 +561,32 @@ export function BriefSpecialistDialog({
                                 className="flex-1 min-h-0 overflow-y-auto space-y-4 mb-4 pr-1"
                                 style={{ maxHeight: "45vh" }}
                             >
-                                {messages.map((msg, i) => (
+                                {messages.map((msg, i) => {
+                                    const isLastAssistant = msg.role === "assistant" && i === messages.length - 1
+                                    return (
                                     <div key={i} className={cn(
                                         "flex gap-3",
                                         msg.role === "user" ? "justify-end" : "justify-start"
                                     )}>
                                         {msg.role === "assistant" && (
-                                            <div className="flex-shrink-0 relative h-7 w-7 rounded-full overflow-hidden bg-muted mt-1">
-                                                {specialist.avatarImage ? (
-                                                    <Image
-                                                        src={specialist.avatarImage}
-                                                        alt={specialist.name}
-                                                        fill
-                                                        className="object-cover"
-                                                        sizes="28px"
-                                                    />
-                                                ) : (
-                                                    <div className="flex items-center justify-center h-full w-full text-xs font-semibold text-foreground">
-                                                        {specialist.name.charAt(0)}
-                                                    </div>
+                                            <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                                                <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted mt-1">
+                                                    {specialist.avatarImage ? (
+                                                        <Image
+                                                            src={specialist.avatarImage}
+                                                            alt={specialist.name}
+                                                            fill
+                                                            className="object-cover"
+                                                            sizes="28px"
+                                                        />
+                                                    ) : (
+                                                        <div className="flex items-center justify-center h-full w-full text-xs font-semibold text-foreground">
+                                                            {specialist.name.charAt(0)}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {isLastAssistant && (tts.isPlaying || tts.isLoading) && (
+                                                    <Volume2 className="h-3 w-3 text-international-orange animate-pulse" />
                                                 )}
                                             </div>
                                         )}
@@ -555,7 +603,8 @@ export function BriefSpecialistDialog({
                                             )}
                                         </div>
                                     </div>
-                                ))}
+                                    )
+                                })}
 
                                 {/* Streaming indicator */}
                                 {isStreaming && (
@@ -688,42 +737,84 @@ export function BriefSpecialistDialog({
                                 <Textarea
                                     ref={textareaRef}
                                     id="brief-text"
-                                    value={briefText}
+                                    value={speechRecognition.isListening
+                                        ? (briefText + (speechRecognition.interimTranscript ? " " + speechRecognition.interimTranscript : ""))
+                                        : briefText
+                                    }
                                     onChange={(e) => {
                                         setBriefText(e.target.value)
                                         if (error) setError(null)
                                     }}
                                     onKeyDown={handleKeyDown}
                                     placeholder={
-                                        hasConversation
-                                            ? `Follow up with your ${specialist.name}...`
-                                            : selectedPrompt
-                                                ? `Paste or type your ${selectedPrompt.inputLabel.toLowerCase()} here...`
-                                                : `What do you need from your ${specialist.name}?`
+                                        speechRecognition.isListening
+                                            ? "Listening..."
+                                            : hasConversation
+                                                ? `Follow up with your ${specialist.name}...`
+                                                : selectedPrompt
+                                                    ? `Paste or type your ${selectedPrompt.inputLabel.toLowerCase()} here...`
+                                                    : `What do you need from your ${specialist.name}?`
                                     }
                                     className={cn(
-                                        "resize-none pr-12",
-                                        hasConversation ? "min-h-[60px]" : "min-h-[100px]"
+                                        "resize-none pr-20",
+                                        hasConversation ? "min-h-[60px]" : "min-h-[100px]",
+                                        speechRecognition.isListening && "border-destructive/50"
                                     )}
                                     aria-required
                                     disabled={isExecuting}
                                 />
-                                {/* Inline send button */}
-                                <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={handleExecute}
-                                    disabled={isExecuting || (!briefText.trim() && !selectedPrompt)}
-                                    className="absolute bottom-2 right-2 h-8 w-8 text-muted-foreground hover:text-international-orange"
-                                    aria-label="Send brief"
-                                >
-                                    {isExecuting ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <Send className="h-4 w-4" />
+                                <div className="absolute bottom-2 right-2 flex items-center gap-1">
+                                    {/* Mic button */}
+                                    {speechRecognition.isSupported && (
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() => {
+                                                if (speechRecognition.isListening) {
+                                                    speechRecognition.stop()
+                                                } else {
+                                                    speechRecognition.start()
+                                                }
+                                            }}
+                                            disabled={isExecuting}
+                                            className={cn(
+                                                "h-8 w-8",
+                                                speechRecognition.isListening
+                                                    ? "text-destructive animate-pulse"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                            aria-label={speechRecognition.isListening ? "Stop listening" : "Start voice input"}
+                                        >
+                                            {speechRecognition.isListening ? (
+                                                <MicOff className="h-4 w-4" />
+                                            ) : (
+                                                <Mic className="h-4 w-4" />
+                                            )}
+                                        </Button>
                                     )}
-                                </Button>
+                                    {/* Send button */}
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={handleExecute}
+                                        disabled={isExecuting || (!briefText.trim() && !selectedPrompt)}
+                                        className="h-8 w-8 text-muted-foreground hover:text-international-orange"
+                                        aria-label="Send brief"
+                                    >
+                                        {isExecuting ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Send className="h-4 w-4" />
+                                        )}
+                                    </Button>
+                                </div>
                             </div>
+                            {/* Voice listening indicator */}
+                            {speechRecognition.isListening && (
+                                <p className="text-xs text-destructive animate-pulse">
+                                    Listening... speak now
+                                </p>
+                            )}
                             <div className="flex items-center justify-between">
                                 <p className="text-xs text-muted-foreground">
                                     {hasConversation ? "⌘+Enter to send" : `${briefText.length.toLocaleString()} characters`}

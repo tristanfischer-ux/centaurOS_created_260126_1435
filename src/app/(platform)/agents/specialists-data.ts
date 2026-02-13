@@ -81,6 +81,8 @@ export interface Specialist {
     avatarImage?: string
     /** IDs of specialists to suggest after this one completes a brief */
     suggestedNext?: string[]
+    /** OpenAI TTS voice ID for spoken output */
+    voice: string
 }
 
 export const SPECIALISTS: Specialist[] = [
@@ -106,6 +108,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: true,
         avatarImage: "/images/specialists/strategist.png",
         suggestedNext: ["product-lead", "finance-lead"],
+        voice: "echo",
     },
     {
         id: "product-lead",
@@ -128,6 +131,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: true,
         avatarImage: "/images/specialists/product-lead.png",
         suggestedNext: ["growth-marketer", "hiring-team"],
+        voice: "alloy",
     },
     {
         id: "chief-of-staff",
@@ -150,6 +154,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: true,
         avatarImage: "/images/specialists/chief-of-staff.png",
         suggestedNext: ["strategist", "finance-lead"],
+        voice: "onyx",
     },
 
     // ─── Row 2: GROW — Revenue and reach ─────────────────────────────────
@@ -174,6 +179,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/growth-marketer.png",
         suggestedNext: ["sales-lead", "product-lead"],
+        voice: "shimmer",
     },
     {
         id: "sales-lead",
@@ -196,6 +202,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/sales-lead.png",
         suggestedNext: ["growth-marketer", "finance-lead"],
+        voice: "ash",
     },
     {
         id: "fundraising-advisor",
@@ -218,6 +225,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/fundraising-advisor.png",
         suggestedNext: ["finance-lead", "legal-counsel"],
+        voice: "coral",
     },
 
     // ─── Row 3: RUN — Keep the lights on ─────────────────────────────────
@@ -242,6 +250,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: true,
         avatarImage: "/images/specialists/finance-lead.png",
         suggestedNext: ["fundraising-advisor", "strategist"],
+        voice: "sage",
     },
     {
         id: "hiring-team",
@@ -264,6 +273,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/hiring-team.png",
         suggestedNext: ["legal-counsel", "chief-of-staff"],
+        voice: "nova",
     },
     {
         id: "legal-counsel",
@@ -286,6 +296,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/legal-counsel.png",
         suggestedNext: ["hiring-team", "finance-lead"],
+        voice: "fable",
     },
 ]
 

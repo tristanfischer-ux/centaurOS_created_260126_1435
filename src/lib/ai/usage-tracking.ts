@@ -33,6 +33,7 @@ export type AIFeature =
   | 'coverage_assessment'
   | 'business_plan_analysis'
   | 'talent_match'
+  | 'specialist_tts'
   | 'other'
 
 /** Parameters for tracking an AI API call */

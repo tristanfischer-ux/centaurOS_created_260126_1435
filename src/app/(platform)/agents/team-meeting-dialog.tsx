@@ -39,11 +39,17 @@ import {
     CheckCircle2,
     Users,
     X,
+    Mic,
+    MicOff,
+    Volume2,
+    VolumeX,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
 import { getOrCreateSpecialistThread } from "@/actions/agent-memory"
 import { SPECIALISTS, getSpecialistById } from "./specialists-data"
+import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
+import { useTts } from "@/hooks/use-tts"
 import { MeetingOutputs } from "./meeting-outputs"
 import type { Specialist } from "./specialists-data"
 
@@ -218,8 +224,22 @@ export function TeamMeetingDialog({
     const [showThoughtsInput, setShowThoughtsInput] = useState(false)
     const [meetingOutputs, setMeetingOutputs] = useState<MeetingOutputData | null>(null)
     const [isGeneratingOutputs, setIsGeneratingOutputs] = useState(false)
+    const [speakingEntryIdx, setSpeakingEntryIdx] = useState<number | null>(null)
 
     const scrollRef = useRef<HTMLDivElement>(null)
+
+    // ─── Voice Hooks ──────────────────────────────────────────────────────
+    const tts = useTts()
+    const topicSpeechRecognition = useSpeechRecognition({
+        onResult: (transcript) => {
+            setTopic((prev) => (prev ? prev + " " + transcript : transcript))
+        },
+    })
+    const thoughtsSpeechRecognition = useSpeechRecognition({
+        onResult: (transcript) => {
+            setUserThoughts((prev) => (prev ? prev + " " + transcript : transcript))
+        },
+    })
 
     // Ordered list of selected specialists
     const selectedSpecialists = useMemo(() => {
@@ -231,6 +251,12 @@ export function TeamMeetingDialog({
     // ─── Reset on close ───────────────────────────────────────────────────
     useEffect(() => {
         if (!open) {
+            // Stop voice when dialog closes
+            tts.stop()
+            if (topicSpeechRecognition.isListening) topicSpeechRecognition.stop()
+            if (thoughtsSpeechRecognition.isListening) thoughtsSpeechRecognition.stop()
+            setSpeakingEntryIdx(null)
+
             // Small delay to let close animation finish
             const timer = setTimeout(() => {
                 setPhase("setup")
@@ -250,6 +276,7 @@ export function TeamMeetingDialog({
             }, 300)
             return () => clearTimeout(timer)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open])
 
     // Auto-scroll during streaming
@@ -408,9 +435,52 @@ export function TeamMeetingDialog({
 
             setCurrentRound(round)
             setPhase("round-complete")
+
+            // TTS sequential playback is handled by the useEffect below
+            // that watches for phase === "round-complete"
         },
         [selectedSpecialists, topic, entries, executeSpecialist]
     )
+
+    // Use a ref to track entries for sequential playback
+    const entriesRef = useRef<MeetingEntry[]>([])
+    useEffect(() => {
+        entriesRef.current = entries
+    }, [entries])
+
+    // Effect: When phase changes to round-complete, play entries sequentially
+    useEffect(() => {
+        if (phase !== "round-complete" || !tts.voiceEnabled) return
+
+        let cancelled = false
+
+        async function playSequentially(): Promise<void> {
+            const roundEntries = entriesRef.current.filter((e) => e.round === currentRound)
+            for (let i = 0; i < roundEntries.length; i++) {
+                if (cancelled) break
+                const entry = roundEntries[i]
+                const specialist = getSpecialistById(entry.specialistId)
+                if (!specialist?.voice) continue
+
+                // Find the global index for this entry
+                const globalIdx = entriesRef.current.indexOf(entry)
+                setSpeakingEntryIdx(globalIdx)
+
+                // Play and wait for it to finish
+                await tts.play(entry.content, specialist.voice)
+
+                // Small pause between specialists
+                if (i < roundEntries.length - 1 && !cancelled) {
+                    await new Promise((r) => setTimeout(r, 1500))
+                }
+            }
+            if (!cancelled) setSpeakingEntryIdx(null)
+        }
+
+        playSequentially()
+        return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase, currentRound])
 
     // ─── Start Meeting ────────────────────────────────────────────────────
     const handleStartMeeting = useCallback(async () => {
@@ -548,9 +618,27 @@ export function TeamMeetingDialog({
                                     </div>
                                 ))}
                             </div>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-muted-foreground flex-1 truncate">
                                 {selectedSpecialists.map((s) => s.name).join(", ")}
                             </span>
+                            {/* Voice mute toggle */}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => tts.setVoiceEnabled(!tts.voiceEnabled)}
+                                className={cn(
+                                    "h-7 w-7 p-0 flex-shrink-0",
+                                    tts.voiceEnabled && "text-international-orange",
+                                    tts.isPlaying && "animate-pulse"
+                                )}
+                                aria-label={tts.voiceEnabled ? "Mute voice output" : "Enable voice output"}
+                            >
+                                {tts.voiceEnabled ? (
+                                    <Volume2 className="h-4 w-4" />
+                                ) : (
+                                    <VolumeX className="h-4 w-4" />
+                                )}
+                            </Button>
                         </div>
                     )}
                 </DialogHeader>
@@ -622,20 +710,64 @@ export function TeamMeetingDialog({
                             >
                                 What do you want the team to discuss?
                             </Label>
-                            <Textarea
-                                id="meeting-topic"
-                                value={topic}
-                                onChange={(e) => {
-                                    setTopic(e.target.value)
-                                    if (error) setError(null)
-                                }}
-                                placeholder="e.g., Should we raise a Series A? What's the best go-to-market strategy for our B2B SaaS product? How do we get our first 100 customers?"
-                                className="min-h-[100px] resize-none"
-                                aria-required
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                {topic.length.toLocaleString()} characters
-                            </p>
+                            <div className="relative">
+                                <Textarea
+                                    id="meeting-topic"
+                                    value={topicSpeechRecognition.isListening
+                                        ? (topic + (topicSpeechRecognition.interimTranscript ? " " + topicSpeechRecognition.interimTranscript : ""))
+                                        : topic
+                                    }
+                                    onChange={(e) => {
+                                        setTopic(e.target.value)
+                                        if (error) setError(null)
+                                    }}
+                                    placeholder={topicSpeechRecognition.isListening
+                                        ? "Listening..."
+                                        : "e.g., Should we raise a Series A? What's the best go-to-market strategy for our B2B SaaS product?"
+                                    }
+                                    className={cn(
+                                        "min-h-[100px] resize-none pr-12",
+                                        topicSpeechRecognition.isListening && "border-destructive/50"
+                                    )}
+                                    aria-required
+                                />
+                                {topicSpeechRecognition.isSupported && (
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => {
+                                            if (topicSpeechRecognition.isListening) {
+                                                topicSpeechRecognition.stop()
+                                            } else {
+                                                topicSpeechRecognition.start()
+                                            }
+                                        }}
+                                        className={cn(
+                                            "absolute bottom-2 right-2 h-8 w-8",
+                                            topicSpeechRecognition.isListening
+                                                ? "text-destructive animate-pulse"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                        aria-label={topicSpeechRecognition.isListening ? "Stop listening" : "Voice input"}
+                                    >
+                                        {topicSpeechRecognition.isListening ? (
+                                            <MicOff className="h-4 w-4" />
+                                        ) : (
+                                            <Mic className="h-4 w-4" />
+                                        )}
+                                    </Button>
+                                )}
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs text-muted-foreground">
+                                    {topic.length.toLocaleString()} characters
+                                </p>
+                                {topicSpeechRecognition.isListening && (
+                                    <p className="text-xs text-destructive animate-pulse">
+                                        Listening... speak now
+                                    </p>
+                                )}
+                            </div>
                         </div>
 
                         {error && (
@@ -761,6 +893,7 @@ export function TeamMeetingDialog({
                         >
                             {entries.map((entry, i) => {
                                 const specialist = getSpecialistById(entry.specialistId)
+                                const isSpeaking = speakingEntryIdx === i
                                 return (
                                     <div key={i} className="space-y-2">
                                         <div className="flex items-center gap-2">
@@ -785,8 +918,16 @@ export function TeamMeetingDialog({
                                             <Badge variant="secondary" className="text-[10px]">
                                                 Round {entry.round}
                                             </Badge>
+                                            {isSpeaking && (
+                                                <Volume2 className="h-3.5 w-3.5 text-international-orange animate-pulse" />
+                                            )}
                                         </div>
-                                        <div className="ml-9 rounded-lg border border-muted bg-muted/30 p-4">
+                                        <div className={cn(
+                                            "ml-9 rounded-lg border p-4",
+                                            isSpeaking
+                                                ? "border-international-orange/30 bg-international-orange/5"
+                                                : "border-muted bg-muted/30"
+                                        )}>
                                             <Markdown content={entry.content} className="text-sm" />
                                         </div>
                                     </div>
@@ -800,12 +941,54 @@ export function TeamMeetingDialog({
                                 <Label className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                                     Your thoughts for the team
                                 </Label>
-                                <Textarea
-                                    value={userThoughts}
-                                    onChange={(e) => setUserThoughts(e.target.value)}
-                                    placeholder="Share your reaction, add context, or steer the discussion..."
-                                    className="min-h-[80px] resize-none"
-                                />
+                                <div className="relative">
+                                    <Textarea
+                                        value={thoughtsSpeechRecognition.isListening
+                                            ? (userThoughts + (thoughtsSpeechRecognition.interimTranscript ? " " + thoughtsSpeechRecognition.interimTranscript : ""))
+                                            : userThoughts
+                                        }
+                                        onChange={(e) => setUserThoughts(e.target.value)}
+                                        placeholder={thoughtsSpeechRecognition.isListening
+                                            ? "Listening..."
+                                            : "Share your reaction, add context, or steer the discussion..."
+                                        }
+                                        className={cn(
+                                            "min-h-[80px] resize-none pr-12",
+                                            thoughtsSpeechRecognition.isListening && "border-destructive/50"
+                                        )}
+                                    />
+                                    {thoughtsSpeechRecognition.isSupported && (
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() => {
+                                                if (thoughtsSpeechRecognition.isListening) {
+                                                    thoughtsSpeechRecognition.stop()
+                                                } else {
+                                                    thoughtsSpeechRecognition.start()
+                                                }
+                                            }}
+                                            className={cn(
+                                                "absolute bottom-2 right-2 h-8 w-8",
+                                                thoughtsSpeechRecognition.isListening
+                                                    ? "text-destructive animate-pulse"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                            aria-label={thoughtsSpeechRecognition.isListening ? "Stop listening" : "Voice input"}
+                                        >
+                                            {thoughtsSpeechRecognition.isListening ? (
+                                                <MicOff className="h-4 w-4" />
+                                            ) : (
+                                                <Mic className="h-4 w-4" />
+                                            )}
+                                        </Button>
+                                    )}
+                                </div>
+                                {thoughtsSpeechRecognition.isListening && (
+                                    <p className="text-xs text-destructive animate-pulse">
+                                        Listening... speak now
+                                    </p>
+                                )}
                             </div>
                         )}
 
