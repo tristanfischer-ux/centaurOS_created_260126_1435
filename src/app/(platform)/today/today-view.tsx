@@ -33,6 +33,7 @@ import {
     ClipboardCheck,
     Calendar,
     Lightbulb,
+    Waypoints,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -42,6 +43,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getMorningBriefing, type MorningBriefing } from "@/actions/nudges"
 import { getMyDailyPulse, type DailyPulseResult } from "@/actions/reports"
+import { getStrategyHealthSummary, type StrategyHealthItem } from "@/actions/canvas"
 import { typography } from "@/lib/design-system"
 import { StreakBadge } from "@/components/celebrations/StreakBadge"
 import { useCelebration } from "@/hooks/useCelebration"
@@ -88,6 +90,7 @@ function getTimeGreeting(name: string): string {
 export function TodayView(): React.ReactElement {
     const [briefing, setBriefing] = useState<MorningBriefing | null>(null)
     const [pulse, setPulse] = useState<FormattedReport | null>(null)
+    const [strategyHealth, setStrategyHealth] = useState<StrategyHealthItem[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [briefingError, setBriefingError] = useState(false)
     const [pulseError, setPulseError] = useState(false)
@@ -101,9 +104,10 @@ export function TodayView(): React.ReactElement {
         setBriefingError(false)
         setPulseError(false)
 
-        const [briefingResult, pulseResult] = await Promise.all([
+        const [briefingResult, pulseResult, strategyResult] = await Promise.all([
             getMorningBriefing().catch(() => ({ data: null, error: "Failed" })),
             getMyDailyPulse().catch(() => ({ success: false, data: undefined, error: "Failed" }) as DailyPulseResult),
+            getStrategyHealthSummary().catch(() => ({ error: "Failed" }) as { error: string }),
         ])
 
         if (briefingResult.data) {
@@ -116,6 +120,10 @@ export function TodayView(): React.ReactElement {
             setPulse(pulseResult.data)
         } else {
             setPulseError(true)
+        }
+
+        if ('data' in strategyResult && strategyResult.data) {
+            setStrategyHealth(strategyResult.data)
         }
 
         setIsLoading(false)
@@ -384,6 +392,17 @@ export function TodayView(): React.ReactElement {
                 <AtRiskObjectivesSection briefing={briefing} />
             </motion.div>
 
+            {/* Strategy Spotlight Section */}
+            {strategyHealth.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.28, ease: EASE_CURVE }}
+                >
+                    <StrategySpotlightSection items={strategyHealth} />
+                </motion.div>
+            )}
+
             {/* Insights Section */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
@@ -401,7 +420,7 @@ export function TodayView(): React.ReactElement {
                 className="flex flex-wrap gap-3 pb-8"
             >
                 <Button variant="outline" size="sm" asChild>
-                    <Link href="/tasks" className="gap-1.5">
+                    <Link href="/new-tasks" className="gap-1.5">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         View all tasks
                     </Link>
@@ -410,6 +429,12 @@ export function TodayView(): React.ReactElement {
                     <Link href="/new-objectives" className="gap-1.5">
                         <Target className="h-3.5 w-3.5" />
                         View objectives
+                    </Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                    <Link href="/strategy" className="gap-1.5">
+                        <Waypoints className="h-3.5 w-3.5" />
+                        View strategy
                     </Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
@@ -629,7 +654,7 @@ function FocusTasksSection({ briefing, overdueCount }: FocusTasksSectionProps): 
                             {overdueCount === 1 ? "item" : "items"}.
                         </p>
                         <Button variant="outline" size="sm" asChild className="shrink-0 ml-auto">
-                            <Link href="/tasks" className="gap-1.5">
+                            <Link href="/new-tasks" className="gap-1.5">
                                 View tasks
                                 <ArrowRight className="h-3 w-3" />
                             </Link>
@@ -647,7 +672,7 @@ function FocusTasksSection({ briefing, overdueCount }: FocusTasksSectionProps): 
                 {briefing.topTasks.map((task) => (
                     <Link
                         key={task.id}
-                        href="/tasks"
+                        href="/new-tasks"
                         className="flex items-center gap-3 p-3 rounded-xl border bg-background shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
                     >
                         {task.isOverdue ? (
@@ -749,7 +774,7 @@ function PendingApprovalsSection({ approvals }: PendingApprovalsSectionProps): R
                 {approvals.map((approval) => (
                     <Link
                         key={approval.task_id}
-                        href="/tasks"
+                        href="/new-tasks"
                         className="flex items-center gap-3 p-3 rounded-xl border bg-background shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
                     >
                         <ClipboardCheck className="h-4 w-4 text-status-warning shrink-0" />
@@ -838,6 +863,101 @@ function AtRiskObjectivesSection({ briefing }: AtRiskObjectivesSectionProps): Re
                     </Link>
                 ))}
             </div>
+        </div>
+    )
+}
+
+// ─── Strategy Spotlight Section ───────────────────────────────────
+
+interface StrategySpotlightSectionProps {
+    items: StrategyHealthItem[]
+}
+
+/**
+ * Compact strategy health overview for the Today page.
+ *
+ * @description Shows each strategic pillar with a colored health dot,
+ * progress bar, and key metric (overdue count or objective count).
+ * Taps link to the strategy dashboard.
+ */
+function StrategySpotlightSection({ items }: StrategySpotlightSectionProps): React.ReactElement {
+    const needsAttention = items.filter(i => i.health === 'off-track' || i.health === 'at-risk')
+    const allHealthy = needsAttention.length === 0
+
+    return (
+        <div>
+            <SectionHeader icon={Waypoints} label="Strategy" color="text-international-orange" />
+            {allHealthy ? (
+                <Card className="rounded-xl border shadow-sm">
+                    <CardContent className="py-6 flex items-center gap-3">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-status-success-light shrink-0">
+                            <Waypoints className="h-4 w-4 text-status-success" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm text-muted-foreground">
+                                All {items.length} strategic {items.length === 1 ? 'pillar' : 'pillars'} on track.
+                            </p>
+                        </div>
+                        <Button variant="ghost" size="sm" asChild className="shrink-0">
+                            <Link href="/strategy" className="gap-1 text-xs">
+                                Details
+                                <ArrowRight className="h-3 w-3" />
+                            </Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="space-y-2">
+                    {items.map((item) => {
+                        const healthColor = {
+                            'on-track': 'bg-status-success',
+                            'at-risk': 'bg-status-warning',
+                            'off-track': 'bg-destructive',
+                            'completed': 'bg-status-success',
+                            'not-started': 'bg-muted-foreground',
+                        }[item.health]
+
+                        return (
+                            <Link
+                                key={item.id}
+                                href="/strategy"
+                                className="flex items-center gap-3 p-3 rounded-xl border bg-background shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
+                            >
+                                {/* Health dot */}
+                                <div className={cn("w-2 h-2 rounded-full shrink-0", healthColor)} />
+                                {/* Title & metadata */}
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium text-foreground group-hover:text-international-orange transition-colors truncate">
+                                        {item.title}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-xs text-muted-foreground">
+                                            {item.objectiveCount} {item.objectiveCount === 1 ? 'objective' : 'objectives'}
+                                        </span>
+                                        {item.overdueTaskCount > 0 && (
+                                            <span className="text-xs text-destructive font-medium">
+                                                {item.overdueTaskCount} overdue
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                {/* Progress */}
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                                        <div
+                                            className={cn("h-full rounded-full transition-all", healthColor)}
+                                            style={{ width: `${item.progress}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-xs font-semibold text-foreground tabular-nums w-8 text-right">
+                                        {item.progress}%
+                                    </span>
+                                </div>
+                            </Link>
+                        )
+                    })}
+                </div>
+            )}
         </div>
     )
 }

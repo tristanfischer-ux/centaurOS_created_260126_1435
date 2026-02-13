@@ -1,186 +1,496 @@
-"use client"
+'use client'
 
 /**
- * @file strategy-dashboard.tsx — Client-side strategy dashboard shell.
+ * @file strategy-dashboard.tsx
  *
- * @description Renders the strategic dashboard with pillar rollups,
- * strategy river visualization, and purpose overview.
+ * @description Strategic dashboard — the top of the cascade.
+ * Shows company purpose, strategic pillars with progress rollup,
+ * and optional Strategy River / Link Objectives visualization views.
  */
 
-import type { GoalBundle } from "@/types/canvas"
-import type { FoundryPurposeData } from "@/types/foundry"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Target, TrendingUp, AlertTriangle, CheckCircle2, Clock } from "lucide-react"
+import { useState, useMemo, useCallback } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { cn } from '@/lib/utils'
+import { typography } from '@/lib/design-system'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { EmptyState } from '@/components/ui/empty-state'
+import { CompanyPurposeWrapper } from '@/components/objectives/company-purpose-wrapper'
+import StrategyRiver, { computeRiverStats } from '@/components/canvas/StrategyRiver'
+import { goalBundlesToRiverData } from '@/lib/canvas/strategy-river-adapter'
+import { StrategyLinkView } from '../canvas/strategy-link-view'
+import { NodeDetailsDialog } from '@/components/canvas/node-details-dialog'
+import { AddToRiverDialog } from '@/components/canvas/add-to-river-dialog'
+import {
+  LayoutDashboard, Waypoints, Link2, Flag, Target, CheckCircle2,
+  AlertTriangle, TrendingUp, ArrowRight, Plus, XCircle,
+} from 'lucide-react'
+import { getStrategyColor } from '../new-objectives/strategy-colors'
+import type { GoalBundle, MilestoneOption } from '@/types/canvas'
+import type { StrategicObjective } from '../new-objectives/types'
+import type { FoundryPurposeData } from '@/types/foundry'
+import type { RegularObjective } from '../canvas/canvas-shell'
 
-interface PillarRollup {
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface StrategyPillar {
   id: string
   title: string
-  createdAt: string
+  description: string | null
   objectiveCount: number
   totalTasks: number
   completedTasks: number
   overdueTasks: number
   progress: number
-  health: "on-track" | "at-risk" | "off-track" | "completed" | "not-started"
+  health: 'on-track' | 'at-risk' | 'off-track' | 'completed' | 'not-started'
+  /** Elapsed time percentage for timeline-aware health (0-100) */
+  elapsedPercent?: number
 }
+
+type ViewMode = 'dashboard' | 'river' | 'link'
 
 interface StrategyDashboardProps {
-  /** Progress rollup data for each strategic pillar */
-  pillarRollups: PillarRollup[]
-  /** Count of objectives not linked to any strategic pillar */
-  unalignedObjectiveCount: number
-  /** Total count of regular (non-strategic) objectives */
-  totalObjectiveCount: number
-  /** Pre-fetched goal bundles for Strategy River */
-  initialBundles: GoalBundle[]
-  /** Strategic objectives (pillars) */
-  strategicObjectives: Array<{ id: string; title: string; created_at: string }>
-  /** Regular objectives for linking */
-  regularObjectives: Array<{
-    id: string
-    title: string
-    parent_objective_id: string | null
-    status: string | null
-    progress: number
-  }>
-  /** Foundry purpose data */
+  pillars: StrategyPillar[]
+  unlinkedObjectiveCount: number
+  totalObjectives: number
   purposeData: FoundryPurposeData | null
-  /** Whether the current user is a Founder */
   isFounder: boolean
-  /** Current foundry ID */
   foundryId: string
-  /** Current user ID */
   userId: string
+  /** For Strategy River view */
+  initialBundles: GoalBundle[]
+  strategicObjectives: StrategicObjective[]
+  regularObjectives: RegularObjective[]
 }
 
-const HEALTH_CONFIG: Record<
-  PillarRollup["health"],
-  { label: string; color: string; icon: React.ComponentType<{ className?: string }> }
-> = {
-  "on-track": { label: "On Track", color: "text-status-success", icon: TrendingUp },
-  "at-risk": { label: "At Risk", color: "text-status-warning", icon: AlertTriangle },
-  "off-track": { label: "Off Track", color: "text-destructive", icon: AlertTriangle },
-  completed: { label: "Completed", color: "text-status-success", icon: CheckCircle2 },
-  "not-started": { label: "Not Started", color: "text-muted-foreground", icon: Clock },
-}
+// ============================================================================
+// CONSTANTS
+// ============================================================================
 
-/**
- * StrategyDashboard — Client shell for the strategy page.
- *
- * @description Displays strategic pillars with progress rollups,
- * health indicators, and key metrics.
- */
+const HEALTH_CONFIG = {
+  'on-track': { label: 'On Track', status: 'success' as const, icon: TrendingUp },
+  'at-risk': { label: 'At Risk', status: 'warning' as const, icon: AlertTriangle },
+  'off-track': { label: 'Off Track', status: 'error' as const, icon: XCircle },
+  'completed': { label: 'Completed', status: 'success' as const, icon: CheckCircle2 },
+  'not-started': { label: 'Not Started', status: 'pending' as const, icon: Target },
+} as const
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
 export function StrategyDashboard({
-  pillarRollups,
-  unalignedObjectiveCount,
-  totalObjectiveCount,
+  pillars,
+  unlinkedObjectiveCount,
+  totalObjectives,
   purposeData,
-}: StrategyDashboardProps): React.ReactNode {
+  isFounder,
+  foundryId,
+  userId,
+  initialBundles,
+  strategicObjectives,
+  regularObjectives,
+}: StrategyDashboardProps) {
+  const router = useRouter()
+  const [viewMode, setViewMode] = useState<ViewMode>('dashboard')
+
+  // ── Strategy River state ──
+  const riverData = useMemo(() => goalBundlesToRiverData(initialBundles), [initialBundles])
+  const [expandedObjectiveIds, setExpandedObjectiveIds] = useState<Set<string>>(() => {
+    if (riverData.length > 0) {
+      return new Set(riverData[0].objectives.map((o) => o.id))
+    }
+    return new Set()
+  })
+
+  // ── Node details dialog ──
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogNodeType, setDialogNodeType] = useState<'goal' | 'milestone' | 'objective' | 'task'>('task')
+  const [dialogNodeId, setDialogNodeId] = useState('')
+  const [addToRiverGoalId, setAddToRiverGoalId] = useState<string | null>(null)
+
+  const milestoneOptions: MilestoneOption[] = useMemo(() =>
+    initialBundles.flatMap((bundle) =>
+      bundle.milestones.map((ms) => ({
+        id: ms.id,
+        title: ms.title,
+        goalTitle: bundle.goal.title,
+        milestone_date: ms.milestone_date,
+      }))
+    ), [initialBundles])
+
+  const handleExpandToggle = useCallback((id: string): void => {
+    const so = riverData.find((s) => s.id === id)
+    if (so) {
+      const msIds = so.objectives.map((o) => o.id)
+      setExpandedObjectiveIds((prev) => {
+        const next = new Set(prev)
+        const anyExpanded = msIds.some((mid) => next.has(mid))
+        if (anyExpanded) {
+          msIds.forEach((mid) => next.delete(mid))
+        } else {
+          msIds.forEach((mid) => next.add(mid))
+        }
+        return next
+      })
+    } else {
+      setExpandedObjectiveIds((prev) => {
+        const next = new Set(prev)
+        if (next.has(id)) next.delete(id); else next.add(id)
+        return next
+      })
+    }
+  }, [riverData])
+
+  const handleExpandAll = useCallback((): void => {
+    setExpandedObjectiveIds(new Set(riverData.flatMap((so) => so.objectives.map((o) => o.id))))
+  }, [riverData])
+
+  const handleCollapseAll = useCallback((): void => {
+    setExpandedObjectiveIds(new Set())
+  }, [])
+
+  const handleNodeClick = useCallback((type: 'goal' | 'milestone' | 'objective' | 'task', id: string): void => {
+    setDialogNodeType(type)
+    setDialogNodeId(id)
+    setDialogOpen(true)
+  }, [])
+
+  const handleDialogUpdate = useCallback((): void => {
+    router.refresh()
+  }, [router])
+
+  // ── Aggregate stats ──
+  const stats = useMemo(() => {
+    const onTrack = pillars.filter((p) => p.health === 'on-track').length
+    const atRisk = pillars.filter((p) => p.health === 'at-risk').length
+    const offTrack = pillars.filter((p) => p.health === 'off-track').length
+    const completed = pillars.filter((p) => p.health === 'completed').length
+    const notStarted = pillars.filter((p) => p.health === 'not-started').length
+    const totalProgress = pillars.length > 0
+      ? Math.round(pillars.reduce((sum, p) => sum + p.progress, 0) / pillars.length)
+      : 0
+    return { onTrack, atRisk, offTrack, completed, notStarted, totalProgress }
+  }, [pillars])
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="pb-4 border-b border-muted">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-1 rounded-full bg-international-orange" />
-          <h1 className="text-2xl font-bold text-foreground">Strategy</h1>
-        </div>
-        <p className="text-sm text-muted-foreground mt-2">
-          {purposeData?.whyExists
-            ? purposeData.whyExists
-            : "Define your company purpose and strategic pillars to see progress here."}
-        </p>
-      </div>
-
-      {/* Summary metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Strategic Pillars</p>
-            <p className="text-2xl font-bold text-foreground">{pillarRollups.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Objectives</p>
-            <p className="text-2xl font-bold text-foreground">{totalObjectiveCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Unaligned</p>
-            <p className="text-2xl font-bold text-foreground">{unalignedObjectiveCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Overall Progress</p>
-            <p className="text-2xl font-bold text-foreground">
-              {pillarRollups.length > 0
-                ? Math.round(
-                    pillarRollups.reduce((sum, p) => sum + p.progress, 0) / pillarRollups.length
-                  )
-                : 0}
-              %
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Pillar cards */}
-      {pillarRollups.length > 0 ? (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">Strategic Pillars</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pillarRollups.map((pillar) => {
-              const health = HEALTH_CONFIG[pillar.health]
-              const HealthIcon = health.icon
-              return (
-                <Card key={pillar.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Target className="h-4 w-4 text-international-orange" />
-                        {pillar.title}
-                      </CardTitle>
-                      <span className={`text-xs font-medium flex items-center gap-1 ${health.color}`}>
-                        <HealthIcon className="h-3 w-3" />
-                        {health.label}
-                      </span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {/* Progress bar */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{pillar.completedTasks} / {pillar.totalTasks} tasks</span>
-                        <span>{pillar.progress}%</span>
-                      </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-international-orange rounded-full transition-all"
-                          style={{ width: `${pillar.progress}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>{pillar.objectiveCount} objectives</span>
-                      {pillar.overdueTasks > 0 && (
-                        <span className="text-destructive">{pillar.overdueTasks} overdue</span>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+    <div className="space-y-8">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className={typography.pageHeader}>
+            <div className={typography.pageHeaderAccent} />
+            <h1 className={typography.h1}>Strategy</h1>
           </div>
+          <p className={typography.pageSubtitle}>
+            Where you're going and how you'll get there
+          </p>
         </div>
-      ) : (
-        <Card>
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No strategic pillars defined yet. Create strategic objectives to see your strategy dashboard.
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-2">
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+            <TabsList className="h-9">
+              <TabsTrigger value="dashboard" className="text-xs gap-1.5 px-3">
+                <LayoutDashboard className="h-3.5 w-3.5" />
+                Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="river" className="text-xs gap-1.5 px-3">
+                <Waypoints className="h-3.5 w-3.5" />
+                River
+              </TabsTrigger>
+              <TabsTrigger value="link" className="text-xs gap-1.5 px-3">
+                <Link2 className="h-3.5 w-3.5" />
+                Link
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      </div>
+
+      {/* ── Dashboard View ── */}
+      {viewMode === 'dashboard' && (
+        <div className="space-y-8">
+          {/* Company Purpose Hero */}
+          <CompanyPurposeWrapper
+            purposeData={purposeData}
+            isFounder={isFounder}
+            foundryId={foundryId}
+            userId={userId}
+            variant="card"
+          />
+
+          {/* Strategy Health Summary */}
+          {pillars.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <SummaryPill
+                label="Overall"
+                value={`${stats.totalProgress}%`}
+                sublabel="avg progress"
+                className="bg-muted/50"
+              />
+              <SummaryPill
+                label="On Track"
+                value={stats.onTrack}
+                className="bg-status-success/5"
+                valueColor="text-status-success"
+              />
+              <SummaryPill
+                label="At Risk"
+                value={stats.atRisk}
+                className="bg-status-warning/5"
+                valueColor="text-status-warning"
+              />
+              <SummaryPill
+                label="Off Track"
+                value={stats.offTrack}
+                className="bg-status-error/5"
+                valueColor="text-status-error"
+              />
+              <SummaryPill
+                label="Completed"
+                value={stats.completed}
+                className="bg-status-success/5"
+                valueColor="text-status-success"
+              />
+              <SummaryPill
+                label="Unaligned"
+                value={unlinkedObjectiveCount}
+                sublabel={`of ${totalObjectives}`}
+                className="bg-muted/50"
+                valueColor="text-muted-foreground"
+              />
+            </div>
+          )}
+
+          {/* Strategic Pillars */}
+          {pillars.length === 0 ? (
+            <EmptyState
+              title="No strategic pillars defined"
+              description="Create your first strategic pillar to anchor your objectives and tasks around clear strategic direction."
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {pillars.map((pillar, index) => (
+                <PillarCard
+                  key={pillar.id}
+                  pillar={pillar}
+                  colorIndex={index}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Unlinked Objectives Warning */}
+          {unlinkedObjectiveCount > 0 && (
+            <Card className="rounded-xl border-dashed border-2 border-status-warning/30 bg-status-warning/5">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-full bg-status-warning/10 p-2">
+                      <AlertTriangle className="h-5 w-5 text-status-warning" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        {unlinkedObjectiveCount} objective{unlinkedObjectiveCount !== 1 ? 's' : ''} not aligned to any strategy
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        These objectives exist but aren't connected to a strategic pillar
+                      </p>
+                    </div>
+                  </div>
+                  <Link href="/new-objectives">
+                    <Button variant="outline" size="sm">
+                      Review
+                      <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ── Strategy River View ── */}
+      {viewMode === 'river' && (
+        <div className="-mx-4 sm:-mx-6 lg:-mx-8">
+          {riverData.length === 0 ? (
+            <EmptyState
+              title="No strategic objectives yet"
+              description="Create a strategic objective to see your strategy river — a visual timeline of your goals, milestones, and tasks."
+            />
+          ) : (
+            <StrategyRiver
+              strategicObjectives={riverData}
+              onTaskClick={(id) => handleNodeClick('task', id)}
+              onMilestoneClick={(id) => handleNodeClick('milestone', id)}
+              onGoalClick={(id) => handleNodeClick('goal', id)}
+              onAddToRiver={(id) => setAddToRiverGoalId(id)}
+              expandedObjectiveIds={expandedObjectiveIds}
+              onExpandToggle={handleExpandToggle}
+              onExpandAll={handleExpandAll}
+              onCollapseAll={handleCollapseAll}
+            />
+          )}
+        </div>
+      )}
+
+      {/* ── Link Objectives View ── */}
+      {viewMode === 'link' && (
+        <div className="-mx-4 sm:-mx-6 lg:-mx-8">
+          <StrategyLinkView
+            strategicObjectives={strategicObjectives}
+            regularObjectives={regularObjectives}
+          />
+        </div>
+      )}
+
+      {/* Node details dialog */}
+      {dialogNodeId && (
+        <NodeDetailsDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          nodeType={dialogNodeType}
+          nodeId={dialogNodeId}
+          isUnlinked={false}
+          milestones={milestoneOptions}
+          onUpdate={handleDialogUpdate}
+        />
+      )}
+
+      {/* Add-to-river dialog */}
+      <AddToRiverDialog
+        open={!!addToRiverGoalId}
+        onOpenChange={(open) => { if (!open) setAddToRiverGoalId(null) }}
+        strategicObjectiveId={addToRiverGoalId ?? ''}
+        strategicObjectiveTitle={
+          strategicObjectives.find((so) => so.id === addToRiverGoalId)?.title ?? ''
+        }
+        onCreated={handleDialogUpdate}
+      />
+    </div>
+  )
+}
+
+// ============================================================================
+// SUB-COMPONENTS
+// ============================================================================
+
+function SummaryPill({
+  label,
+  value,
+  sublabel,
+  className,
+  valueColor,
+}: {
+  label: string
+  value: string | number
+  sublabel?: string
+  className?: string
+  valueColor?: string
+}) {
+  return (
+    <div className={cn('rounded-xl border px-4 py-3 text-center', className)}>
+      <div className={cn('text-2xl font-semibold tabular-nums', valueColor || 'text-foreground')}>
+        {value}
+      </div>
+      <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
+      {sublabel && (
+        <div className="text-[10px] text-muted-foreground/70">{sublabel}</div>
       )}
     </div>
+  )
+}
+
+function PillarCard({ pillar, colorIndex }: { pillar: StrategyPillar; colorIndex: number }) {
+  const color = getStrategyColor(colorIndex)
+  const healthConfig = HEALTH_CONFIG[pillar.health]
+
+  return (
+    <Link href={`/new-objectives?strategy=${pillar.id}`}>
+      <Card className={cn(
+        'rounded-xl border-l-4 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer',
+        color.border,
+      )}>
+        <CardContent className="pt-6 space-y-4">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Flag className={cn('h-4 w-4 flex-shrink-0', color.icon)} />
+              <h3 className="text-base font-semibold text-foreground truncate">
+                {pillar.title}
+              </h3>
+            </div>
+            <StatusBadge status={healthConfig.status} size="sm">
+              {healthConfig.label}
+            </StatusBadge>
+          </div>
+
+          {/* Description */}
+          {pillar.description && (
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              {pillar.description}
+            </p>
+          )}
+
+          {/* Progress Bar (timeline-aware) */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Progress</span>
+              <div className="flex items-center gap-2">
+                {pillar.elapsedPercent != null && pillar.elapsedPercent > 0 && pillar.progress < 100 && (
+                  <span className="text-[10px] text-muted-foreground tabular-nums">
+                    {pillar.elapsedPercent}% time elapsed
+                  </span>
+                )}
+                <span className="font-semibold tabular-nums text-foreground">{pillar.progress}%</span>
+              </div>
+            </div>
+            <div className="relative h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all duration-500',
+                  pillar.progress === 100 ? 'bg-status-success' :
+                  pillar.progress >= 50 ? 'bg-international-orange' :
+                  pillar.progress >= 20 ? 'bg-status-warning' :
+                  'bg-status-error'
+                )}
+                style={{ width: `${pillar.progress}%` }}
+              />
+              {/* Timeline marker: shows where elapsed time is relative to progress */}
+              {pillar.elapsedPercent != null && pillar.elapsedPercent > 0 && pillar.elapsedPercent < 100 && pillar.progress < 100 && (
+                <div
+                  className="absolute top-0 h-full w-0.5 bg-foreground/30"
+                  style={{ left: `${pillar.elapsedPercent}%` }}
+                  title={`${pillar.elapsedPercent}% of timeline elapsed`}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Stats Row */}
+          <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+            <div className="flex items-center gap-1">
+              <Target className="h-3.5 w-3.5" />
+              <span>{pillar.objectiveCount} objective{pillar.objectiveCount !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="tabular-nums">
+                {pillar.completedTasks}/{pillar.totalTasks} tasks
+              </span>
+              {pillar.overdueTasks > 0 && (
+                <span className="text-status-error font-medium">
+                  {pillar.overdueTasks} overdue
+                </span>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }

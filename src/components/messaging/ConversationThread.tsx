@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -156,6 +157,7 @@ export function ConversationThread({
   tasks = [],
   objectives = []
 }: ConversationThreadProps) {
+  const router = useRouter()
   const {
     messages,
     conversation,
@@ -419,7 +421,7 @@ export function ConversationThread({
       <div className={cn('flex flex-col items-center justify-center h-full', className)}>
         <div className="text-center">
           <p className="text-sm text-destructive">{error}</p>
-          <Button variant="secondary" size="sm" className="mt-4" onClick={() => window.location.reload()}>
+          <Button variant="secondary" size="sm" className="mt-4" onClick={() => router.refresh()}>
             Retry
           </Button>
         </div>

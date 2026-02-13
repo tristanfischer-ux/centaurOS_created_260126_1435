@@ -37,6 +37,8 @@ export interface TaskWithData {
   assignee: TaskAssignee | null
   creator: TaskAssignee | null
   objective: { id: string; title: string } | null
+  /** Strategic pillar this task's objective belongs to (for cascade display) */
+  strategy: { id: string; title: string } | null
   assignees: TaskAssignee[]
   task_files: TaskFile[]
 }

@@ -8,8 +8,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import {
   X, ListChecks, AlertTriangle, Clock, CheckCircle2,
-  FileText, Circle,
+  FileText, Circle, Waypoints, ChevronRight,
 } from 'lucide-react'
+import Link from 'next/link'
 import { getStatusBadgeClass } from '@/lib/status-colors'
 import type { ObjectiveWithTasks, ObjectiveTask } from './types'
 
@@ -80,11 +81,30 @@ export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect }: Objec
   return (
     <div className="h-full flex flex-col bg-background border-l border w-full max-w-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b min-w-0">
-        <h2 className="text-base font-semibold text-foreground truncate pr-4 min-w-0">
-          {objective.title}
-        </h2>
-        <Button variant="ghost" size="icon" onClick={onClose} className="flex-shrink-0 h-8 w-8" aria-label="Close panel">
+      <div className="flex items-start justify-between px-5 py-4 border-b min-w-0">
+        <div className="min-w-0 flex-1 space-y-1.5">
+          {/* Strategic cascade breadcrumb: Strategy > This Objective */}
+          {objective.strategy && (
+            <nav aria-label="Strategic context" className="flex items-center gap-1 text-[11px]">
+              <Waypoints className="h-3 w-3 text-international-orange flex-shrink-0" />
+              <Link
+                href="/strategy"
+                className="font-medium text-international-orange hover:underline truncate max-w-[180px]"
+                title={objective.strategy.title}
+              >
+                {objective.strategy.title}
+              </Link>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
+              <span className="text-muted-foreground truncate max-w-[120px]" title={objective.title}>
+                {objective.title}
+              </span>
+            </nav>
+          )}
+          <h2 className="text-base font-semibold text-foreground truncate pr-4 min-w-0">
+            {objective.title}
+          </h2>
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose} className="flex-shrink-0 h-8 w-8 mt-1" aria-label="Close panel">
           <X className="h-4 w-4" />
         </Button>
       </div>

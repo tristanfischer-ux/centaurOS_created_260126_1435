@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { getStatusBadgeClass } from '@/lib/status-colors'
-import { CheckCircle2, Circle, AlertTriangle, MessageSquare, Paperclip } from 'lucide-react'
+import { CheckCircle2, Circle, AlertTriangle, MessageSquare, Paperclip, Waypoints } from 'lucide-react'
 import type { TaskWithData } from './types'
 
 interface TaskRowProps {
@@ -51,6 +51,16 @@ export function TaskRow({ task, isSelected, onSelect, showObjective = true }: Ta
           </span>
         )}
       </div>
+
+      {/* Strategy indicator (small orange badge when task has strategic context) */}
+      {task.strategy && (
+        <span
+          className="inline-flex items-center gap-0.5 text-[9px] text-international-orange bg-international-orange/10 rounded-full px-1.5 py-0.5 flex-shrink-0"
+          title={`Strategy: ${task.strategy.title}`}
+        >
+          <Waypoints className="h-2.5 w-2.5" />
+        </span>
+      )}
 
       {/* Objective tag */}
       {showObjective && task.objective && (

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
     UserPlus, 
     Shield, 
@@ -61,6 +62,7 @@ interface Member {
 }
 
 export function UserManagementTab({ foundryId, isFounder }: UserManagementTabProps) {
+    const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const [showInviteDialog, setShowInviteDialog] = useState(false)
     const [showOffboardingDialog, setShowOffboardingDialog] = useState(false)
@@ -385,7 +387,7 @@ export function UserManagementTab({ foundryId, isFounder }: UserManagementTabPro
                     foundryId={foundryId}
                     onComplete={() => {
                         setSelectedMember(null)
-                        window.location.reload()
+                        router.refresh()
                     }}
                 />
             )}

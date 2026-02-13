@@ -84,11 +84,12 @@ export default async function NewTasksPage({ searchParams }: NewTasksPageProps) 
     message_count: messageCountMap.get(task.id) || 0,
   }))
 
-  // Fetch related data
-  const [{ data: objectives }, { data: membersData }, { data: teamsData }] = await Promise.all([
-    supabase.from('objectives').select('id, title').eq('foundry_id', foundry_id).eq('is_ghost', false).is('deleted_at', null),
+  // Fetch related data (objectives include parent_objective_id for strategic context)
+  const [{ data: objectives }, { data: membersData }, { data: teamsData }, { data: strategicGoals }] = await Promise.all([
+    supabase.from('objectives').select('id, title, parent_objective_id').eq('foundry_id', foundry_id).eq('is_ghost', false).is('deleted_at', null),
     supabase.from('profiles').select('id, full_name, role, email').eq('foundry_id', foundry_id),
     supabase.from('teams').select('id, name').eq('foundry_id', foundry_id),
+    supabase.from('objectives').select('id, title').eq('foundry_id', foundry_id).eq('is_strategic_goal', true).is('deleted_at', null),
   ])
 
   const objectivesList = objectives || []
@@ -100,20 +101,41 @@ export default async function NewTasksPage({ searchParams }: NewTasksPageProps) 
   }))
   const teams = teamsData || []
 
+  // Build strategic context lookup: objective_id -> { strategy id, title }
+  const strategicGoalMap = new Map<string, { id: string; title: string }>()
+  for (const sg of strategicGoals || []) {
+    strategicGoalMap.set(sg.id, { id: sg.id, title: sg.title })
+  }
+  const objectiveToStrategy = new Map<string, { id: string; title: string }>()
+  for (const obj of objectivesList) {
+    const parentId = (obj as { parent_objective_id?: string | null }).parent_objective_id
+    if (parentId && strategicGoalMap.has(parentId)) {
+      objectiveToStrategy.set(obj.id, strategicGoalMap.get(parentId)!)
+    }
+  }
+
   // Join tasks with related data and cast to expected shape
-  const tasksWithData = tasksWithMessageCounts.map(task => ({
-    ...task,
-    assignee: Array.isArray(task.assignee) ? task.assignee[0] : task.assignee,
-    creator: Array.isArray(task.creator) ? task.creator[0] : task.creator,
-    objective: Array.isArray(task.objective) ? task.objective[0] : task.objective,
-    assignees: task.task_assignees?.map((ta: { profile: unknown }) => ta.profile).filter(Boolean) || [],
-    task_files: task.task_files || [],
-  })) as unknown as import('./types').TaskWithData[]
+  const tasksWithData = tasksWithMessageCounts.map(task => {
+    const objectiveData = Array.isArray(task.objective) ? task.objective[0] : task.objective
+    const strategyData = objectiveData?.id ? objectiveToStrategy.get(objectiveData.id) ?? null : null
+    return {
+      ...task,
+      assignee: Array.isArray(task.assignee) ? task.assignee[0] : task.assignee,
+      creator: Array.isArray(task.creator) ? task.creator[0] : task.creator,
+      objective: objectiveData,
+      strategy: strategyData,
+      assignees: task.task_assignees?.map((ta: { profile: unknown }) => ta.profile).filter(Boolean) || [],
+      task_files: task.task_files || [],
+    }
+  }) as unknown as import('./types').TaskWithData[]
+
+  const strategicObjectivesList = (strategicGoals || []).map(sg => ({ id: sg.id, title: sg.title }))
 
   return (
     <TasksCommandCenter
       tasks={tasksWithData}
       objectives={objectivesList}
+      strategicObjectives={strategicObjectivesList}
       members={members}
       teams={teams}
       currentUserId={user.id}

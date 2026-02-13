@@ -15,7 +15,7 @@ interface ListViewProps {
   tasks: TaskWithData[]
   selectedId: string | null
   onSelect: (id: string) => void
-  groupBy: 'none' | 'objective' | 'status' | 'assignee'
+  groupBy: 'none' | 'objective' | 'status' | 'assignee' | 'strategy'
 }
 
 type SortField = 'title' | 'status' | 'end_date' | 'created_at' | 'risk_level'
@@ -119,6 +119,9 @@ export function ListView({ tasks, selectedId, onSelect, groupBy }: ListViewProps
           break
         case 'assignee':
           key = (task.assignees?.length > 0 ? task.assignees[0].full_name : task.assignee?.full_name) || 'Unassigned'
+          break
+        case 'strategy':
+          key = task.strategy?.title || 'Unlinked'
           break
         default:
           key = 'all'

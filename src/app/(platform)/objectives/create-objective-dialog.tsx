@@ -50,6 +50,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -153,6 +160,10 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
     const [packSearchQuery, setPackSearchQuery] = useState('')
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
+    // Strategic Pillar linking (pre-link during creation)
+    const [strategicPillarId, setStrategicPillarId] = useState<string | null>(null)
+    const [strategicPillars, setStrategicPillars] = useState<{ id: string; title: string }[]>([])
+
     // Privacy & Sharing
     const [isPrivate, setIsPrivate] = useState(false)
     const [sharedWith, setSharedWith] = useState<ShareTarget[]>([])
@@ -217,6 +228,17 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
             .eq('foundry_id', foundryId)
 
         if (teams) setDialogTeams(teams)
+
+        // Fetch strategic pillars for the "Link to Strategy" dropdown
+        const { data: pillars } = await supabase
+            .from('objectives')
+            .select('id, title')
+            .eq('foundry_id', foundryId)
+            .eq('is_strategic_goal', true)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: true })
+
+        if (pillars) setStrategicPillars(pillars)
     }, [])
 
     // Load packs + members/teams on open; handle prefill
@@ -248,6 +270,7 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                 setShowAdvanced(false)
                 setIsPrivate(false)
                 setSharedWith([])
+                setStrategicPillarId(null)
                 // Reset guided state
                 setGuidedStep('capture')
                 setRawIdea("")
@@ -375,6 +398,9 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
         formData.append('description', description)
         formData.append('extendedDescription', effectiveExtendedDescription)
         formData.append('is_private', String(isPrivate))
+        if (strategicPillarId) {
+            formData.append('parent_objective_id', strategicPillarId)
+        }
         if (isPrivate && sharedWith.length > 0) {
             formData.append('share_with', JSON.stringify(sharedWith))
         }
@@ -777,6 +803,32 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                                             </CardContent>
                                         </Card>
 
+                                        {/* Strategic Pillar Dropdown */}
+                                        {strategicPillars.length > 0 && (
+                                            <div className="space-y-2">
+                                                <Label htmlFor="guided-strategic-pillar">Link to Strategy (optional)</Label>
+                                                <Select
+                                                    value={strategicPillarId || 'none'}
+                                                    onValueChange={(v) => setStrategicPillarId(v === 'none' ? null : v)}
+                                                >
+                                                    <SelectTrigger id="guided-strategic-pillar" className="w-full">
+                                                        <SelectValue placeholder="No strategy selected" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">No strategy</SelectItem>
+                                                        {strategicPillars.map((p) => (
+                                                            <SelectItem key={p.id} value={p.id}>
+                                                                {p.title}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Connect this objective to a strategic pillar for alignment tracking
+                                                </p>
+                                            </div>
+                                        )}
+
                                         {/* Privacy & Sharing */}
                                         <PrivacyShareControl
                                             isPrivate={isPrivate}
@@ -824,6 +876,32 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                                     )}
                                 </div>
                                 
+                                {/* Strategic Pillar Dropdown */}
+                                {strategicPillars.length > 0 && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="strategic-pillar">Link to Strategy (optional)</Label>
+                                        <Select
+                                            value={strategicPillarId || 'none'}
+                                            onValueChange={(v) => setStrategicPillarId(v === 'none' ? null : v)}
+                                        >
+                                            <SelectTrigger id="strategic-pillar" className="w-full">
+                                                <SelectValue placeholder="No strategy selected" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">No strategy</SelectItem>
+                                                {strategicPillars.map((p) => (
+                                                    <SelectItem key={p.id} value={p.id}>
+                                                        {p.title}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-muted-foreground">
+                                            Connect this objective to a strategic pillar for alignment tracking
+                                        </p>
+                                    </div>
+                                )}
+
                                 {/* Toggle Button */}
                                 <div className="pt-2">
                                     <Button

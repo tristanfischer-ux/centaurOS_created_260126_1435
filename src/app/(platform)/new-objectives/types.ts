@@ -45,6 +45,8 @@ export interface ObjectiveWithTasks {
   completedTasks: number
   overdueTasks: number
   health: 'on-track' | 'at-risk' | 'off-track' | 'completed' | 'not-started'
+  /** Strategic pillar this objective belongs to (for cascade breadcrumbs) */
+  strategy?: { id: string; title: string } | null
 }
 
 /** A high-level strategic objective pillar that regular objectives can be linked to */

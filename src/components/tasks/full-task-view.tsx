@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { formatDistanceToNow, format } from "date-fns"
 import {
@@ -135,6 +136,7 @@ interface FullTaskViewProps {
 }
 
 export function FullTaskView({ open, onOpenChange, task, members, currentUserId, teams = [] }: FullTaskViewProps) {
+    const router = useRouter()
     const [comments, setComments] = useState<Comment[]>([])
     const [history, setHistory] = useState<TaskHistoryItem[]>([])
     const [attachments, setAttachments] = useState<any[]>([])
@@ -399,8 +401,8 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
             toast.success("Task updated successfully")
             setIsEditing(false)
             
-            // Reload the page to reflect changes
-            window.location.reload()
+            // Refresh server components to reflect changes
+            router.refresh()
         } catch (error) {
             toast.error("Failed to save changes")
         } finally {

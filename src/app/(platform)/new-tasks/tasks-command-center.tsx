@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   Crosshair, LayoutGrid, List, GanttChartSquare, Search,
-  X, Group,
+  X, Group, Waypoints, Filter,
 } from 'lucide-react'
 import { SmartSummary } from './smart-summary'
 import { FocusView } from './focus-view'
@@ -29,6 +29,8 @@ const LARGE_BREAKPOINT = 1280
 interface TasksCommandCenterProps {
   tasks: TaskWithData[]
   objectives: { id: string; title: string }[]
+  /** Strategic objectives (pillars) for the strategy filter */
+  strategicObjectives?: { id: string; title: string }[]
   members: Member[]
   teams: Team[]
   currentUserId: string
@@ -37,11 +39,12 @@ interface TasksCommandCenterProps {
 }
 
 type ViewMode = 'focus' | 'board' | 'list' | 'timeline'
-type GroupBy = 'none' | 'objective' | 'status' | 'assignee'
+type GroupBy = 'none' | 'objective' | 'status' | 'assignee' | 'strategy'
 
 export function TasksCommandCenter({
   tasks,
   objectives,
+  strategicObjectives = [],
   members,
   teams,
   currentUserId,
@@ -54,6 +57,7 @@ export function TasksCommandCenter({
   const [showSearch, setShowSearch] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(initialTaskId || null)
   const [groupBy, setGroupBy] = useState<GroupBy>('none')
+  const [strategyFilter, setStrategyFilter] = useState<string | null>(null)
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1400)
   const [editingTask, setEditingTask] = useState<TaskWithData | null>(null)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -170,6 +174,13 @@ export function TasksCommandCenter({
       )
     }
 
+    // Strategy filter
+    if (strategyFilter === '__unlinked__') {
+      result = result.filter(t => !t.strategy)
+    } else if (strategyFilter) {
+      result = result.filter(t => t.strategy?.id === strategyFilter)
+    }
+
     // Search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
@@ -181,7 +192,7 @@ export function TasksCommandCenter({
     }
 
     return result
-  }, [tasks, quickFilter, searchQuery, currentUserId])
+  }, [tasks, quickFilter, searchQuery, strategyFilter, currentUserId])
 
   const filteredTasks = useMemo(() => getFilteredTasks(), [getFilteredTasks])
 
@@ -262,6 +273,47 @@ export function TasksCommandCenter({
         </Tabs>
 
         <div className="flex items-center gap-2">
+          {/* Strategy filter */}
+          {strategicObjectives.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground">
+                  <Waypoints className="h-3.5 w-3.5 mr-1.5" />
+                  Strategy
+                  {strategyFilter && (
+                    <span className="ml-1 text-international-orange">
+                      : {strategyFilter === '__unlinked__' ? 'Unlinked' : strategicObjectives.find(s => s.id === strategyFilter)?.title?.slice(0, 16) || ''}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel className="text-[11px]">Filter by Strategy</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setStrategyFilter(null)} className={!strategyFilter ? 'font-semibold' : ''}>
+                  All Strategies
+                </DropdownMenuItem>
+                {strategicObjectives.map(so => (
+                  <DropdownMenuItem
+                    key={so.id}
+                    onClick={() => setStrategyFilter(so.id)}
+                    className={strategyFilter === so.id ? 'font-semibold' : ''}
+                  >
+                    {so.title}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setStrategyFilter('__unlinked__')}
+                  className={strategyFilter === '__unlinked__' ? 'font-semibold' : ''}
+                >
+                  <Filter className="h-3.5 w-3.5 mr-1.5 text-status-warning" />
+                  Unlinked Tasks
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {/* Group by (list view only) */}
           {viewMode === 'list' && (
             <DropdownMenu>
@@ -288,6 +340,9 @@ export function TasksCommandCenter({
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setGroupBy('assignee')} className={groupBy === 'assignee' ? 'font-semibold' : ''}>
                   Assignee
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setGroupBy('strategy')} className={groupBy === 'strategy' ? 'font-semibold' : ''}>
+                  Strategy
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -331,6 +386,10 @@ export function TasksCommandCenter({
       {/* Results count */}
       <div className="text-xs text-muted-foreground">
         Showing {filteredTasks.length} of {tasks.length} tasks
+        {strategyFilter && strategyFilter !== '__unlinked__' && (
+          <span> in <span className="text-international-orange font-medium">{strategicObjectives.find(s => s.id === strategyFilter)?.title}</span></span>
+        )}
+        {strategyFilter === '__unlinked__' && <span> with <span className="text-status-warning font-medium">no strategic link</span></span>}
         {searchQuery && <span> matching &quot;{searchQuery}&quot;</span>}
       </div>
 

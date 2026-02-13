@@ -103,6 +103,59 @@ async function logSystemEvent(supabase: Awaited<ReturnType<typeof createClient>>
 }
 
 /**
+ * Recalculates an objective's progress based on its tasks' completion ratio.
+ * Called after task status changes to keep progress in sync.
+ *
+ * @description Counts completed vs total active tasks for the objective and
+ * updates the objective's progress field. This enables the progress rollup
+ * chain: Tasks -> Objectives -> Strategy.
+ *
+ * @param supabase - Supabase client
+ * @param taskId - The task whose status just changed (used to find its objective)
+ * @param foundryId - Foundry scope for security
+ */
+async function recalculateObjectiveProgress(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    taskId: string,
+    foundryId: string
+): Promise<void> {
+    // Find the task's objective_id
+    const { data: task } = await supabase
+        .from('tasks')
+        .select('objective_id')
+        .eq('id', taskId)
+        .eq('foundry_id', foundryId)
+        .single()
+
+    if (!task?.objective_id) return
+
+    // Count tasks for this objective
+    const { data: tasks, error } = await supabase
+        .from('tasks')
+        .select('id, status')
+        .eq('objective_id', task.objective_id)
+        .eq('foundry_id', foundryId)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
+
+    if (error || !tasks) return
+
+    const total = tasks.length
+    const completed = tasks.filter(t => t.status === 'Completed').length
+    const progress = total > 0 ? Math.round((completed / total) * 100) : 0
+
+    // Update objective progress
+    await supabase
+        .from('objectives')
+        .update({ progress })
+        .eq('id', task.objective_id)
+        .eq('foundry_id', foundryId)
+
+    // Revalidate strategy page to reflect new rollup
+    revalidatePath('/strategy')
+}
+
+/**
  * Creates a new task with assignees, file uploads, privacy settings, and calendar sync.
  *
  * @description Validates input via Zod schema, creates the task record with a primary
@@ -414,6 +467,7 @@ export async function acceptTask(taskId: string) {
         }
         revalidatePath('/tasks')
         revalidatePath('/new-tasks')
+        revalidatePath('/strategy')
         return { success: true }
     })
 }
@@ -890,8 +944,17 @@ export async function completeTask(taskId: string) {
         } catch (logError) {
             console.error('[TaskService] Failed to log task history:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
+
+        // Recalculate objective progress (rollup chain: Task -> Objective -> Strategy)
+        try {
+            await recalculateObjectiveProgress(supabase, taskId, foundryId)
+        } catch (rollupError) {
+            console.error('[TaskService] Failed to recalculate objective progress:', { error: rollupError instanceof Error ? rollupError.message : 'Unknown error' })
+        }
+
         revalidatePath('/tasks')
         revalidatePath('/new-tasks')
+        revalidatePath('/strategy')
         return { success: true, newStatus: nextStatus }
     })
 }
@@ -964,8 +1027,16 @@ export async function approveTask(taskId: string) {
             console.error('[TaskService] Failed to log task history:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
 
+        // Recalculate objective progress (rollup chain: Task -> Objective -> Strategy)
+        try {
+            await recalculateObjectiveProgress(supabase, taskId, foundryId)
+        } catch (rollupError) {
+            console.error('[TaskService] Failed to recalculate objective progress:', { error: rollupError instanceof Error ? rollupError.message : 'Unknown error' })
+        }
+
         revalidatePath('/tasks')
         revalidatePath('/new-tasks')
+        revalidatePath('/strategy')
         return { success: true }
     })
 }

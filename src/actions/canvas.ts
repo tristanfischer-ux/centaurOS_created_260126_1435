@@ -89,6 +89,97 @@ export async function getStrategicGoals(): Promise<
   })
 }
 
+/** Strategy health summary item for Today page spotlight */
+export interface StrategyHealthItem {
+  id: string
+  title: string
+  health: 'on-track' | 'at-risk' | 'off-track' | 'completed' | 'not-started'
+  progress: number
+  objectiveCount: number
+  overdueTaskCount: number
+}
+
+/**
+ * Returns a lightweight health summary for all strategic pillars.
+ *
+ * @description Used by the Today page to show a "Strategy Spotlight" —
+ * which strategies need attention today. Computes progress rollup
+ * from tasks through objectives to pillars.
+ *
+ * @returns Array of strategy health items, or error
+ * @security Scoped to user's foundry via withAuth
+ */
+export async function getStrategyHealthSummary(): Promise<
+  { data: StrategyHealthItem[] } | ActionError
+> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    // Fetch strategic goals, objectives, and tasks in parallel
+    const [goalsRes, objectivesRes, tasksRes] = await Promise.all([
+      supabase
+        .from('objectives')
+        .select('id, title')
+        .eq('foundry_id', foundryId)
+        .eq('is_strategic_goal', true)
+        .is('deleted_at', null),
+      supabase
+        .from('objectives')
+        .select('id, parent_objective_id')
+        .eq('foundry_id', foundryId)
+        .eq('is_ghost', false)
+        .eq('is_strategic_goal', false)
+        .is('deleted_at', null),
+      supabase
+        .from('tasks')
+        .select('id, status, end_date, objective_id')
+        .eq('foundry_id', foundryId)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
+        .not('objective_id', 'is', null),
+    ])
+
+    if (goalsRes.error || objectivesRes.error || tasksRes.error) {
+      return { error: 'Failed to compute strategy health' }
+    }
+
+    const goals = goalsRes.data ?? []
+    const objectives = objectivesRes.data ?? []
+    const tasks = tasksRes.data ?? []
+
+    const items: StrategyHealthItem[] = goals.map(goal => {
+      const linkedObjIds = new Set(
+        objectives.filter(o => o.parent_objective_id === goal.id).map(o => o.id)
+      )
+      const linkedTasks = tasks.filter(t => t.objective_id && linkedObjIds.has(t.objective_id))
+      const total = linkedTasks.length
+      const completed = linkedTasks.filter(t => t.status === 'Completed').length
+      const overdue = linkedTasks.filter(t => {
+        if (!t.end_date || t.status === 'Completed') return false
+        return new Date(t.end_date) < new Date()
+      }).length
+
+      const progress = total > 0 ? Math.round((completed / total) * 100) : 0
+      let health: StrategyHealthItem['health']
+      if (linkedObjIds.size === 0) health = 'not-started'
+      else if (progress === 100) health = 'completed'
+      else if (overdue > 0) health = 'off-track'
+      else if (progress >= 50) health = 'on-track'
+      else if (progress >= 20) health = 'at-risk'
+      else health = 'off-track'
+
+      return {
+        id: goal.id,
+        title: goal.title,
+        health,
+        progress,
+        objectiveCount: linkedObjIds.size,
+        overdueTaskCount: overdue,
+      }
+    })
+
+    return { data: items }
+  })
+}
+
 /**
  * Fetches the complete data bundle for a strategic goal.
  *

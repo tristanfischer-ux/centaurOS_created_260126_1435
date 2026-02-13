@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,7 +21,7 @@ import { toast } from 'sonner'
 import { useCelebration } from '@/hooks/useCelebration'
 import {
   X, Calendar, Clock, User, Target, FileText, AlertTriangle,
-  MessageSquare, Paperclip, Shield, Eye, Pencil,
+  MessageSquare, Paperclip, Shield, Eye, Pencil, Waypoints, ChevronRight,
 } from 'lucide-react'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import type { TaskWithData, Member } from './types'
@@ -119,6 +120,38 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
               </span>
             )}
           </div>
+          {/* Strategic cascade breadcrumb: Strategy > Objective > Task */}
+          {(task.strategy || task.objective) && (
+            <nav aria-label="Strategic context" className="flex items-center gap-1 text-[11px] text-muted-foreground flex-wrap">
+              {task.strategy && (
+                <>
+                  <Waypoints className="h-3 w-3 text-international-orange flex-shrink-0" />
+                  <Link
+                    href="/strategy"
+                    className="font-medium text-international-orange hover:underline truncate max-w-[140px]"
+                    title={task.strategy.title}
+                  >
+                    {task.strategy.title}
+                  </Link>
+                </>
+              )}
+              {task.strategy && task.objective && (
+                <ChevronRight className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
+              )}
+              {task.objective && (
+                <>
+                  <Target className="h-3 w-3 flex-shrink-0" />
+                  <Link
+                    href={`/new-objectives?selected=${task.objective.id}`}
+                    className="hover:underline truncate max-w-[140px]"
+                    title={task.objective.title}
+                  >
+                    {task.objective.title}
+                  </Link>
+                </>
+              )}
+            </nav>
+          )}
           <h2 className="text-base font-semibold text-foreground leading-snug break-words">
             {task.title}
           </h2>

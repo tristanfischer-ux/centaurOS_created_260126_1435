@@ -116,6 +116,12 @@ export default async function NewObjectivesPage() {
   }))
   const teams = teamsData || []
 
+  // Build strategy lookup: parent_objective_id -> { id, title }
+  const strategyLookup = new Map<string, { id: string; title: string }>()
+  for (const so of strategicObjectives) {
+    strategyLookup.set(so.id, { id: so.id, title: so.title })
+  }
+
   // Group tasks by objective and calculate health
   const objectivesWithTasks = (objectives || []).map(obj => {
     const objTasks = (tasks || [])
@@ -148,6 +154,11 @@ export default async function NewObjectivesPage() {
       health = 'at-risk'
     }
 
+    // Resolve strategic parent for cascade breadcrumbs
+    const strategy = obj.parent_objective_id
+      ? strategyLookup.get(obj.parent_objective_id) ?? null
+      : null
+
     return {
       ...obj,
       tasks: objTasks,
@@ -156,6 +167,7 @@ export default async function NewObjectivesPage() {
       overdueTasks,
       progress,
       health,
+      strategy,
     }
   })
 
