@@ -45,7 +45,6 @@ import {
   ShoppingCart,
   ClipboardCheck,
   Play,
-  Rocket,
 } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
@@ -104,12 +103,12 @@ import { CadLabProgress } from "@/components/cad/cad-lab-progress"
 import { CadLabMilestone } from "@/components/cad/cad-lab-milestone"
 
 const QUICK_START_TEMPLATES = [
-  { id: "drone", label: "Drone Frame", subject: "Quadcopter drone frame with 250mm motor-to-motor distance, carbon fiber arms, and integrated flight controller mount", image: "/cad-lab/templates/drone-frame.jpg", complexity: "Advanced" },
-  { id: "organizer", label: "Desk Organizer", subject: "Wooden desktop organizer with pen holder, phone stand, and cable management tray", image: "/cad-lab/templates/desk-organizer.jpg", complexity: "Beginner" },
-  { id: "phone", label: "Phone Stand", subject: "Adjustable phone stand with portrait and landscape positions, rubber grip pads, and cable passthrough", image: "/cad-lab/templates/phone-stand.jpg", complexity: "Beginner" },
-  { id: "enclosure", label: "Enclosure Box", subject: "Electronics project enclosure with snap-fit lid, ventilation slots, mounting tabs, and USB-C cutout", image: "/cad-lab/templates/enclosure-box.jpg", complexity: "Intermediate" },
-  { id: "bracket", label: "Bracket Mount", subject: "Universal L-bracket mounting system with adjustable angle, M5 mounting holes, and cable routing channels", image: "/cad-lab/templates/bracket-mount.jpg", complexity: "Beginner" },
-  { id: "gears", label: "Gear Assembly", subject: "Two-stage spur gear reduction assembly with 4:1 ratio, 1 module teeth, 6mm shaft bores, and integrated housing", image: "/cad-lab/templates/gear-assembly.jpg", complexity: "Advanced" },
+  { id: "cubesat", label: "CubeSat Bus", subject: "1U CubeSat structural bus frame (100×100×100mm) with PC-104 avionics stack mounting, solar panel rail interfaces, and deployment switch cutout per CDS rev 14", image: "/cad-lab/templates/cubesat.png", complexity: "Aerospace" },
+  { id: "rocket", label: "Rocket Thrust Mount", subject: "Bipropellant rocket engine thrust structure with gimbal bearing attachment points, regenerative cooling channel interfaces, and propellant feed-through ports for 5kN class engine", image: "/cad-lab/templates/rocket-mount.png", complexity: "Aerospace" },
+  { id: "ev-battery", label: "EV Battery Module", subject: "Prismatic cell battery module enclosure with liquid cooling channels, BMS mounting plate, thermal runaway vent ports, and HV busbar connectors for 400V architecture", image: "/cad-lab/templates/ev-battery.png", complexity: "Automotive" },
+  { id: "robotic-arm", label: "Robotic Arm Joint", subject: "6-DOF robotic arm wrist joint with harmonic drive gear housing, precision encoder mount, cable passthrough channels, and force-torque sensor interface", image: "/cad-lab/templates/robotic-arm.png", complexity: "Robotics" },
+  { id: "reaction-wheel", label: "Reaction Wheel", subject: "Satellite reaction wheel assembly with precision flywheel housing, BLDC motor mount, optical encoder interface, and vibration-isolated mounting flange", image: "/cad-lab/templates/reaction-wheel.png", complexity: "Aerospace" },
+  { id: "heavy-drone", label: "Heavy-Lift Drone", subject: "Octocopter heavy-lift drone frame with coaxial motor mounts, central payload bay with 3-axis gimbal interface, retractable landing gear, and folding arm hinges in carbon fiber", image: "/cad-lab/templates/heavy-drone.png", complexity: "UAV" },
 ] as const
 
 export default function CadLabPage(): React.ReactNode {
@@ -200,7 +199,7 @@ export default function CadLabPage(): React.ReactNode {
   const [aiPrefilled, setAiPrefilled] = useState(false)
 
   // ── Milestone celebrations ──
-  const [milestone, setMilestone] = useState<"research" | "decompose" | "generate" | null>(null)
+  const [milestone, setMilestone] = useState<"research" | "breakdown" | "generate" | null>(null)
 
   // ── Project List: Load projects on mount ──
   const refreshProjects = useCallback(async () => {
@@ -247,7 +246,7 @@ export default function CadLabPage(): React.ReactNode {
       const res = await decomposeIntoModules(subject, editableReport, modelId)
       if (res.success && res.modules.length > 0) {
         setModules(res.modules)
-        setMilestone("decompose")
+        setMilestone("breakdown")
         // Auto-save modules
         if (activeProjectId) {
           await saveCadLabModules(activeProjectId, res.modules)
@@ -783,7 +782,7 @@ export default function CadLabPage(): React.ReactNode {
           </div>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          Turn any product idea into manufacturing-ready parametric CAD in minutes.
+          AI-powered parametric CAD generation with 256 components across 15 industry sectors.
         </p>
       </div>
 
@@ -877,7 +876,7 @@ export default function CadLabPage(): React.ReactNode {
           {/* Hero banner */}
           <div className="relative rounded-xl overflow-hidden border border-muted">
             <Image
-              src="/cad-lab/hero.jpg"
+              src="/cad-lab/hero.png"
               alt="From idea to manufacturing-ready CAD"
               width={1200}
               height={400}
@@ -887,50 +886,70 @@ export default function CadLabPage(): React.ReactNode {
             <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/60 to-transparent flex items-center">
               <div className="p-8 max-w-lg">
                 <h2 className="text-2xl font-bold text-foreground leading-tight">
-                  From idea to manufacturing-ready CAD in minutes
+                  Parametric CAD from a single sentence
                 </h2>
                 <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                  Describe any physical product. AI researches dimensions, generates parametric 3D models,
-                  and delivers DFM analysis, cost estimates, and supplier specs.
+                  Describe any physical product. The system researches real-world specifications, generates
+                  parametric CadQuery models with 7 orthographic projections, runs DFM analysis, and
+                  delivers STEP + STL exports with center-of-gravity data.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Value pillars */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-start gap-3 p-4 rounded-lg border border-muted bg-card">
-              <Image src="/cad-lab/pillars/research.jpg" alt="AI Research" width={48} height={48} className="rounded-md flex-shrink-0" />
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">AI Research</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  Market analysis, dimensional specifications, material recommendations, and reference model discovery.
-                </p>
+          {/* Credibility stats bar */}
+          <div className="flex items-center justify-center gap-6 py-3 px-4 rounded-lg bg-muted/50 border border-muted text-xs text-muted-foreground">
+            <span className="font-mono font-semibold text-foreground">256</span> Parametric Components
+            <span className="text-muted">|</span>
+            <span className="font-mono font-semibold text-foreground">15</span> Industry Sectors
+            <span className="text-muted">|</span>
+            <span className="font-mono font-semibold text-foreground">7</span> Projection Views
+            <span className="text-muted">|</span>
+            <span className="font-mono font-semibold text-foreground">STEP + STL</span> Export
+          </div>
+
+          {/* 5 Capability cards */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="flex flex-col items-center gap-2 p-4 rounded-lg border border-muted bg-card text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-international-orange-light">
+                <Search className="h-5 w-5 text-international-orange" />
               </div>
+              <h3 className="text-xs font-semibold text-foreground">AI Research</h3>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">Real-world specs from datasheets, reference designs, and engineering databases</p>
             </div>
-            <div className="flex items-start gap-3 p-4 rounded-lg border border-muted bg-card">
-              <Image src="/cad-lab/pillars/cad.jpg" alt="Parametric CAD" width={48} height={48} className="rounded-md flex-shrink-0" />
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Parametric CAD</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  CadQuery code generation with interactive 3D viewer, orthographic views, and DFM analysis.
-                </p>
+            <div className="flex flex-col items-center gap-2 p-4 rounded-lg border border-muted bg-card text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-international-orange-light">
+                <Box className="h-5 w-5 text-international-orange" />
               </div>
+              <h3 className="text-xs font-semibold text-foreground">256 Components</h3>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">Parametric library spanning CubeSats, EVs, drones, robotics, and more</p>
             </div>
-            <div className="flex items-start gap-3 p-4 rounded-lg border border-muted bg-card">
-              <Image src="/cad-lab/pillars/production.jpg" alt="Production Ready" width={48} height={48} className="rounded-md flex-shrink-0" />
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Production Ready</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  Cost estimates, Gantt timelines, supplier specs, risk registers, and contract templates.
-                </p>
+            <div className="flex flex-col items-center gap-2 p-4 rounded-lg border border-muted bg-card text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-international-orange-light">
+                <Printer className="h-5 w-5 text-international-orange" />
               </div>
+              <h3 className="text-xs font-semibold text-foreground">DFM Analysis</h3>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">Printability, support volume, material usage, and compatible printers</p>
+            </div>
+            <div className="flex flex-col items-center gap-2 p-4 rounded-lg border border-muted bg-card text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-international-orange-light">
+                <Ruler className="h-5 w-5 text-international-orange" />
+              </div>
+              <h3 className="text-xs font-semibold text-foreground">Mass Properties</h3>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">Bounding box, mass, volume, surface area, and center-of-gravity coordinates</p>
+            </div>
+            <div className="flex flex-col items-center gap-2 p-4 rounded-lg border border-muted bg-card text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-international-orange-light">
+                <Download className="h-5 w-5 text-international-orange" />
+              </div>
+              <h3 className="text-xs font-semibold text-foreground">STEP + STL</h3>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">Industry-standard exports compatible with SolidWorks, Fusion 360, and any slicer</p>
             </div>
           </div>
 
           {/* Quick-start templates */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">Quick Start — pick a template or describe your own</h3>
+            <h3 className="text-sm font-semibold text-foreground">Quick Start — select an engineering template or describe your own product</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {QUICK_START_TEMPLATES.map((t) => (
                 <button
@@ -953,11 +972,7 @@ export default function CadLabPage(): React.ReactNode {
                     className="rounded-md group-hover:scale-105 transition-transform"
                   />
                   <span className="text-xs font-medium text-foreground">{t.label}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                    t.complexity === "Advanced" ? "bg-status-warning-light text-status-warning" :
-                    t.complexity === "Intermediate" ? "bg-status-info-light text-status-info" :
-                    "bg-status-success-light text-status-success"
-                  }`}>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
                     {t.complexity}
                   </span>
                 </button>
@@ -970,9 +985,9 @@ export default function CadLabPage(): React.ReactNode {
       {/* Milestone celebration banner */}
       {milestone && (
         <CadLabMilestone
-          type={milestone}
-          moduleCount={modules.length}
+          milestone={milestone}
           onDismiss={() => setMilestone(null)}
+          subject={subject}
         />
       )}
 
@@ -981,12 +996,12 @@ export default function CadLabPage(): React.ReactNode {
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
             <div className="flex-1 space-y-2">
-              <Label htmlFor="subject">What do you want to model?</Label>
+              <Label htmlFor="subject">Product or sub-assembly to engineer</Label>
               <Input
                 id="subject"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder="e.g., Nespresso capsule auto-reloader, DJI Mavic Air 2 drone"
+                placeholder="e.g., 1U CubeSat bus structure, EV battery module enclosure, 6-DOF robotic arm joint"
                 disabled={isAnyLoading}
               />
             </div>
@@ -1165,7 +1180,8 @@ export default function CadLabPage(): React.ReactNode {
       <CadLabProgress
         lines={progressLines}
         isActive={isResearching || isGenerating || isDecomposing || isGeneratingInterface}
-        operationType={isResearching ? "research" : isDecomposing ? "decompose" : isBatchRunning ? "batch" : "generate"}
+        operationType={isResearching ? "research" : isDecomposing ? "breakdown" : isBatchRunning ? "batch" : "generate"}
+        subject={subject}
       />
 
       {/* ═══════════════════════════════════════════════════════════════ */}
@@ -1263,7 +1279,7 @@ export default function CadLabPage(): React.ReactNode {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Box className="h-4 w-4" />
-              Module Decomposition
+              Module Breakdown
               {modules.length > 0 && (
                 <span className="text-xs font-normal text-status-success flex items-center gap-1">
                   <CheckCircle2 className="h-3 w-3" />
@@ -1274,7 +1290,7 @@ export default function CadLabPage(): React.ReactNode {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Break this product into physical sub-assemblies. Each module can then be modelled separately with its own CAD pipeline.
+              Map your product into manufacturable sub-assemblies. Each module gets its own parametric CAD pipeline with interface definitions and DFM analysis.
             </p>
             <div className="flex items-center gap-2">
               <Button
@@ -1283,11 +1299,11 @@ export default function CadLabPage(): React.ReactNode {
                 variant={modules.length > 0 ? "secondary" : "outline"}
               >
                 {isDecomposing ? (
-                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Decomposing...</>
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Mapping sub-assemblies...</>
                 ) : modules.length > 0 ? (
-                  <><RotateCcw className="h-4 w-4 mr-2" />Re-decompose</>
+                  <><RotateCcw className="h-4 w-4 mr-2" />Re-map Modules</>
                 ) : (
-                  <><Box className="h-4 w-4 mr-2" />Decompose into Modules</>
+                  <><Box className="h-4 w-4 mr-2" />Map Sub-Assemblies</>
                 )}
               </Button>
               {modules.length > 0 && modules.some((m) => m.status !== "generated") && (
@@ -2017,7 +2033,7 @@ export default function CadLabPage(): React.ReactNode {
           ) : (
             <Card>
               <CardContent className="pt-6 text-center text-sm text-muted-foreground py-12">
-                Decompose your product into modules to see engineering analysis, timeline, and risk register.
+                Map your product into modules to see engineering analysis, timeline, and risk register.
               </CardContent>
             </Card>
           )}
@@ -2040,7 +2056,7 @@ export default function CadLabPage(): React.ReactNode {
           ) : (
             <Card>
               <CardContent className="pt-6 text-center text-sm text-muted-foreground py-12">
-                Decompose your product into modules to access diagnostics, supply chain, cost estimation, and contracting.
+                Map your product into modules to access diagnostics, supply chain, cost estimation, and contracting.
               </CardContent>
             </Card>
           )}
@@ -2056,7 +2072,7 @@ export default function CadLabPage(): React.ReactNode {
           ) : (
             <Card>
               <CardContent className="pt-6 text-center text-sm text-muted-foreground py-12">
-                Decompose your product into modules to generate a review package and expert discipline matching.
+                Map your product into modules to generate a review package and expert discipline matching.
               </CardContent>
             </Card>
           )}
