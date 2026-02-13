@@ -29,8 +29,12 @@ const eslintConfig = defineConfig([
     "test-cad-pipeline.js",
     "test-team-page-v2.js",
     "test-team-page.js",
+    "check-pages-with-auth.js",
+    "check-plan-page.js",
     "test-cad-lab-improvements.ts",
     "src/actions/__tests__/activity.test.ts",
+    // Auto-generated Supabase types
+    "src/types/database.types.ts",
     // Generated Playwright report/trace artifacts
     "playwright-report/**",
     "playwright-report */**",

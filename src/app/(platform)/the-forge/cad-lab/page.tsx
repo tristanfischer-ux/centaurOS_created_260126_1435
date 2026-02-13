@@ -41,6 +41,10 @@ import {
   Plus,
   Trash2,
   Clock,
+  BarChart3,
+  ShoppingCart,
+  ClipboardCheck,
+  Play,
 } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
@@ -56,6 +60,7 @@ import {
   generateCadLabInterface,
   generateCadLabModel,
   decomposeIntoModules,
+  prefillDiagnostics,
 } from "@/actions/cad-lab"
 import {
   listCadLabProjects,
@@ -83,6 +88,7 @@ import { CadLabReviewPackage } from "@/components/cad/cad-lab-review-package"
 import { CadLabPeople } from "@/components/cad/cad-lab-people"
 import { CadLabSupplyChain } from "@/components/cad/cad-lab-supply-chain"
 import { CadLabContracting } from "@/components/cad/cad-lab-contracting"
+import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 
 import type {
   CadLabResult,
@@ -165,6 +171,20 @@ export default function CadLabPage(): React.ReactNode {
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null)
   const [diagnosticAnswers, setDiagnosticAnswers] = useState<DiagnosticAnswers>({})
 
+  // ── Mission Control tabs ──
+  type MissionTab = "build" | "analysis" | "procurement" | "review"
+  const [missionTab, setMissionTab] = useState<MissionTab>("build")
+
+  // ── Live progress storytelling ──
+  const [progressLines, setProgressLines] = useState<string[]>([])
+
+  // ── Batch module pipeline ──
+  const [isBatchRunning, setIsBatchRunning] = useState(false)
+  const [batchProgress, setBatchProgress] = useState<Record<string, "queued" | "interface" | "generating" | "done" | "error">>({})
+
+  // ── Smart diagnostics pre-fill ──
+  const [aiPrefilled, setAiPrefilled] = useState(false)
+
   // ── Project List: Load projects on mount ──
   const refreshProjects = useCallback(async () => {
     setIsLoadingProjects(true)
@@ -202,7 +222,7 @@ export default function CadLabPage(): React.ReactNode {
     return null
   }, [activeProjectId, subject, modelId])
 
-  // ── Decompose into modules ──
+  // ── Decompose into modules (+ auto-prefill diagnostics) ──
   const handleDecompose = useCallback(async () => {
     if (!editableReport.trim()) return
     setIsDecomposing(true)
@@ -216,6 +236,25 @@ export default function CadLabPage(): React.ReactNode {
           setLastSaved(new Date().toISOString())
           refreshProjects()
         }
+
+        // Smart diagnostics: AI pre-fill answers in the background
+        prefillDiagnostics(res.modules, editableReport, modelId)
+          .then((prefillRes) => {
+            if (prefillRes.success && Object.keys(prefillRes.answers).length > 0) {
+              setDiagnosticAnswers((prev) => {
+                // Merge AI answers with any existing manual answers (manual takes priority)
+                const merged = { ...prefillRes.answers }
+                for (const [moduleId, existing] of Object.entries(prev)) {
+                  merged[moduleId] = { ...(merged[moduleId] || {}), ...existing }
+                }
+                return merged
+              })
+              setAiPrefilled(true)
+            }
+          })
+          .catch(() => {
+            // Non-critical — diagnostics just won't be pre-filled
+          })
       }
     } catch (err) {
       console.error("[CAD-LAB] Decomposition failed:", err)
@@ -302,7 +341,99 @@ export default function CadLabPage(): React.ReactNode {
     setActiveModuleId(null)
   }, [modules, editableReport, modelId, activeProjectId])
 
-  // ── Step 1: Research ──
+  // ── Progress storytelling helper ──
+  const addProgressLine = useCallback((line: string) => {
+    setProgressLines((prev) => [...prev, line])
+  }, [])
+
+  // ── Batch generate all modules (interface → CAD for each) ──
+  const handleGenerateAllModules = useCallback(async () => {
+    if (modules.length === 0 || isBatchRunning) return
+
+    setIsBatchRunning(true)
+    const progress: Record<string, "queued" | "interface" | "generating" | "done" | "error"> = {}
+    for (const mod of modules) {
+      progress[mod.id] = mod.status === "generated" ? "done" : "queued"
+    }
+    setBatchProgress({ ...progress })
+
+    let currentModules = [...modules]
+
+    for (const mod of currentModules) {
+      if (mod.status === "generated") continue
+
+      // Step 1: Generate interface
+      if (mod.status === "pending") {
+        progress[mod.id] = "interface"
+        setBatchProgress({ ...progress })
+
+        const moduleResearchText = mod.moduleResearch || `Module: ${mod.name}\nPurpose: ${mod.purpose}\nKey Parts: ${mod.keyParts.join(", ")}\nDescription: ${mod.description}\n\nFrom parent research:\n${editableReport}`
+
+        try {
+          const res = await generateCadLabInterface(
+            `${mod.name} — ${mod.purpose}`,
+            moduleResearchText,
+            modelId,
+          )
+          if (res.success) {
+            currentModules = currentModules.map((m) =>
+              m.id === mod.id
+                ? { ...m, interfaceDefinition: res.interfaceDefinition, status: "interface_ready" as const }
+                : m,
+            )
+            setModules(currentModules)
+          } else {
+            progress[mod.id] = "error"
+            setBatchProgress({ ...progress })
+            continue
+          }
+        } catch {
+          progress[mod.id] = "error"
+          setBatchProgress({ ...progress })
+          continue
+        }
+      }
+
+      // Step 2: Generate CAD
+      const updatedMod = currentModules.find((m) => m.id === mod.id)!
+      progress[mod.id] = "generating"
+      setBatchProgress({ ...progress })
+
+      const moduleResearchText = updatedMod.moduleResearch || `Module: ${updatedMod.name}\nPurpose: ${updatedMod.purpose}\nKey Parts: ${updatedMod.keyParts.join(", ")}\nDescription: ${updatedMod.description}\n\nFrom parent research:\n${editableReport}`
+
+      try {
+        const res = await generateCadLabModel(
+          `${updatedMod.name} — ${updatedMod.purpose}`,
+          moduleResearchText,
+          updatedMod.interfaceDefinition || "",
+          modelId,
+        )
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { stlData, stepData, ...resultWithoutBinary } = res
+        currentModules = currentModules.map((m) =>
+          m.id === mod.id
+            ? { ...m, result: resultWithoutBinary, code: res.code, status: "generated" as const }
+            : m,
+        )
+        setModules(currentModules)
+        progress[mod.id] = "done"
+        setBatchProgress({ ...progress })
+      } catch {
+        progress[mod.id] = "error"
+        setBatchProgress({ ...progress })
+      }
+    }
+
+    // Auto-save all modules after batch
+    if (activeProjectId) {
+      await saveCadLabModules(activeProjectId, currentModules)
+      setLastSaved(new Date().toISOString())
+    }
+
+    setIsBatchRunning(false)
+  }, [modules, isBatchRunning, editableReport, modelId, activeProjectId])
+
+  // ── Step 1: Research (with live progress) ──
   const handleResearch = useCallback(async () => {
     setIsResearching(true)
     setResearchResult(null)
@@ -310,12 +441,30 @@ export default function CadLabPage(): React.ReactNode {
     setResult(null)
     setEditableReport("")
     setEditableInterface("")
+    setProgressLines([])
+
+    // Live progress storytelling
+    addProgressLine("Searching for dimensional specifications...")
+    const t1 = setTimeout(() => addProgressLine("Querying Thingiverse for reference CAD models..."), 3000)
+    const t2 = setTimeout(() => addProgressLine("Cross-referencing engineering datasheets..."), 6000)
+    const t3 = setTimeout(() => addProgressLine("Synthesising engineering report with Claude..."), 10000)
+    const t4 = setTimeout(() => addProgressLine("Extracting key dimensions and constraints..."), 15000)
+
     try {
       const res = await runCadLabResearch(subject)
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4)
+
+      setProgressLines([
+        `Found ${res.sources.length} web sources with engineering data`,
+        `Found ${res.referenceModels.length} reference CAD models`,
+        `Report complete — ${res.report.length.toLocaleString()} characters`,
+        `Research time: ${(res.researchTime / 1000).toFixed(1)}s`,
+      ])
+
       setResearchResult(res)
       setEditableReport(res.report)
 
-      // Auto-save: create project if needed, then save research
+      // Auto-save
       if (res.success) {
         const projId = await ensureProject()
         if (projId) {
@@ -327,6 +476,8 @@ export default function CadLabPage(): React.ReactNode {
         }
       }
     } catch (err) {
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4)
+      setProgressLines(["Research failed — see error below"])
       setResearchResult({
         success: false,
         error: err instanceof Error ? err.message : "Unknown error",
@@ -338,7 +489,7 @@ export default function CadLabPage(): React.ReactNode {
     } finally {
       setIsResearching(false)
     }
-  }, [subject, ensureProject, refreshProjects])
+  }, [subject, ensureProject, refreshProjects, addProgressLine])
 
   // ── Step 2: Interface Definition ──
   const handleGenerateInterface = useCallback(async () => {
@@ -372,10 +523,18 @@ export default function CadLabPage(): React.ReactNode {
     }
   }, [subject, editableReport, modelId, activeProjectId])
 
-  // ── Step 3: Generate Code + Execute ──
+  // ── Step 3: Generate Code + Execute (with live progress) ──
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true)
     setResult(null)
+    setProgressLines([])
+
+    addProgressLine("Claude is writing CadQuery code...")
+    const t1 = setTimeout(() => addProgressLine("Generating component geometry..."), 8000)
+    const t2 = setTimeout(() => addProgressLine("Sending to Modal for execution..."), 20000)
+    const t3 = setTimeout(() => addProgressLine("Compiling geometry and running DFM analysis..."), 30000)
+    const t4 = setTimeout(() => addProgressLine("Rendering orthographic views..."), 45000)
+
     try {
       const res = await generateCadLabModel(
         subject,
@@ -383,6 +542,15 @@ export default function CadLabPage(): React.ReactNode {
         editableInterface,
         modelId,
       )
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4)
+
+      setProgressLines([
+        `Code complete — ${res.codeLines ?? 0} lines`,
+        res.modalTime ? `Modal execution: ${(res.modalTime / 1000).toFixed(1)}s` : "",
+        res.bbox ? `Envelope: ${res.bbox.xLen}×${res.bbox.yLen}×${res.bbox.zLen} mm` : "",
+        `Total pipeline: ${res.generationTime ? (res.generationTime / 1000).toFixed(1) + "s" : "done"}`,
+      ].filter(Boolean))
+
       setResult(res)
 
       // Auto-save generation result
@@ -394,6 +562,8 @@ export default function CadLabPage(): React.ReactNode {
         refreshProjects()
       }
     } catch (err) {
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4)
+      setProgressLines(["Generation failed — see error below"])
       setResult({
         success: false,
         error: err instanceof Error ? err.message : "Unknown error",
@@ -401,7 +571,7 @@ export default function CadLabPage(): React.ReactNode {
     } finally {
       setIsGenerating(false)
     }
-  }, [subject, editableReport, editableInterface, modelId, activeProjectId, refreshProjects])
+  }, [subject, editableReport, editableInterface, modelId, activeProjectId, refreshProjects, addProgressLine])
 
   // ── Copy code to clipboard ──
   const handleCopyCode = useCallback(async () => {
@@ -428,6 +598,10 @@ export default function CadLabPage(): React.ReactNode {
     setExpandedModuleId(null)
     setActiveModuleId(null)
     setDiagnosticAnswers({})
+    setMissionTab("build")
+    setProgressLines([])
+    setBatchProgress({})
+    setAiPrefilled(false)
   }, [])
 
   // ── Load a saved project ──
@@ -529,7 +703,15 @@ export default function CadLabPage(): React.ReactNode {
 
   const hasResearch = researchResult?.success && editableReport.trim().length > 0
   const hasInterface = interfaceResult?.success && editableInterface.trim().length > 0
-  const isAnyLoading = isResearching || isGeneratingInterface || isGenerating || isDecomposing
+  const isAnyLoading = isResearching || isGeneratingInterface || isGenerating || isDecomposing || isBatchRunning
+
+  // ── Computed badge counts for mission tabs ──
+  const riskCount = modules.reduce((sum, m) => sum + m.failureModes.length + m.unknowns.length + (m.result?.dfm?.issues?.length ?? 0), 0)
+  const generatedModuleCount = modules.filter((m) => m.status === "generated").length
+  const diagCompletedCount = modules.filter((m) => {
+    const answers = diagnosticAnswers[m.id]
+    return answers && Object.keys(answers).length >= 6
+  }).length
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -852,9 +1034,72 @@ export default function CadLabPage(): React.ReactNode {
       )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* MODULE DECOMPOSITION (optional, after research)                */}
+      {/* LIVE PROGRESS STORYTELLING                                      */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {(isResearching || isGenerating) && progressLines.length > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-2">
+              {progressLines.map((line, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 text-sm font-mono text-foreground animate-in fade-in slide-in-from-left-2 duration-300"
+                >
+                  {i === progressLines.length - 1 && (isResearching || isGenerating) ? (
+                    <Loader2 className="h-3 w-3 animate-spin text-international-orange flex-shrink-0" />
+                  ) : (
+                    <CheckCircle2 className="h-3 w-3 text-status-success flex-shrink-0" />
+                  )}
+                  {line}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MISSION CONTROL TABS                                           */}
       {/* ═══════════════════════════════════════════════════════════════ */}
       {hasResearch && (
+      <Tabs value={missionTab} onValueChange={(v) => setMissionTab(v as MissionTab)}>
+        <TabsList className="w-full grid grid-cols-4">
+          <TabsTrigger value="build" className="gap-1.5">
+            <Box className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Build</span>
+            {modules.length > 0 && (
+              <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded-full">
+                {generatedModuleCount}/{modules.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="analysis" className="gap-1.5" disabled={modules.length === 0}>
+            <BarChart3 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Analysis</span>
+            {riskCount > 0 && (
+              <span className="text-[10px] font-mono bg-status-warning-light text-status-warning px-1.5 py-0.5 rounded-full">
+                {riskCount}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="procurement" className="gap-1.5" disabled={modules.length === 0}>
+            <ShoppingCart className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Procurement</span>
+            {diagCompletedCount > 0 && (
+              <span className="text-[10px] font-mono bg-status-success-light text-status-success px-1.5 py-0.5 rounded-full">
+                {diagCompletedCount}/{modules.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="review" className="gap-1.5" disabled={modules.length === 0}>
+            <ClipboardCheck className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Review</span>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ── BUILD TAB ── */}
+        <TabsContent value="build" className="space-y-6 mt-6">
+          {/* Module Decomposition */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -872,31 +1117,70 @@ export default function CadLabPage(): React.ReactNode {
             <p className="text-sm text-muted-foreground">
               Break this product into physical sub-assemblies. Each module can then be modelled separately with its own CAD pipeline.
             </p>
-            <Button
-              onClick={handleDecompose}
-              disabled={isAnyLoading || isDecomposing || !hasResearch}
-              variant={modules.length > 0 ? "secondary" : "outline"}
-            >
-              {isDecomposing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Decomposing...
-                </>
-              ) : modules.length > 0 ? (
-                <>
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Re-decompose
-                </>
-              ) : (
-                <>
-                  <Box className="h-4 w-4 mr-2" />
-                  Decompose into Modules
-                </>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleDecompose}
+                disabled={isAnyLoading || isDecomposing || !hasResearch}
+                variant={modules.length > 0 ? "secondary" : "outline"}
+              >
+                {isDecomposing ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Decomposing...</>
+                ) : modules.length > 0 ? (
+                  <><RotateCcw className="h-4 w-4 mr-2" />Re-decompose</>
+                ) : (
+                  <><Box className="h-4 w-4 mr-2" />Decompose into Modules</>
+                )}
+              </Button>
+              {modules.length > 0 && modules.some((m) => m.status !== "generated") && (
+                <Button onClick={handleGenerateAllModules} disabled={isAnyLoading} variant="default">
+                  {isBatchRunning ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-2" />Generating All...</>
+                  ) : (
+                    <><Play className="h-4 w-4 mr-2" />Generate All Modules</>
+                  )}
+                </Button>
               )}
-            </Button>
+            </div>
+
+            {/* Batch progress grid */}
+            {isBatchRunning && Object.keys(batchProgress).length > 0 && (
+              <div className="border rounded-md overflow-hidden">
+                <div className="grid grid-cols-[1fr,auto,auto,auto] gap-px bg-muted text-xs">
+                  <div className="bg-background p-2 font-semibold text-muted-foreground">Module</div>
+                  <div className="bg-background p-2 font-semibold text-muted-foreground text-center w-24">Interface</div>
+                  <div className="bg-background p-2 font-semibold text-muted-foreground text-center w-24">CAD</div>
+                  <div className="bg-background p-2 font-semibold text-muted-foreground text-center w-20">Status</div>
+                  {modules.map((mod) => {
+                    const status = batchProgress[mod.id] || "queued"
+                    return (
+                      <div key={mod.id} className="contents">
+                        <div className="bg-background p-2 font-medium text-foreground">{mod.name}</div>
+                        <div className="bg-background p-2 text-center">
+                          {status === "interface" ? <Loader2 className="h-3 w-3 animate-spin text-international-orange mx-auto" />
+                            : status === "generating" || status === "done" ? <CheckCircle2 className="h-3 w-3 text-status-success mx-auto" />
+                            : status === "error" ? <AlertTriangle className="h-3 w-3 text-destructive mx-auto" />
+                            : <span className="text-muted-foreground">&mdash;</span>}
+                        </div>
+                        <div className="bg-background p-2 text-center">
+                          {status === "generating" ? <Loader2 className="h-3 w-3 animate-spin text-international-orange mx-auto" />
+                            : status === "done" ? <CheckCircle2 className="h-3 w-3 text-status-success mx-auto" />
+                            : status === "error" ? <AlertTriangle className="h-3 w-3 text-destructive mx-auto" />
+                            : <span className="text-muted-foreground">&mdash;</span>}
+                        </div>
+                        <div className="bg-background p-2 text-center">
+                          <span className={`font-mono ${status === "done" ? "text-status-success" : status === "error" ? "text-destructive" : status === "queued" ? "text-muted-foreground" : "text-international-orange"}`}>
+                            {status}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Module list */}
-            {modules.length > 0 && (
+            {modules.length > 0 && !isBatchRunning && (
               <div className="space-y-2 mt-4">
                 {modules.map((mod) => (
                   <div
@@ -1078,85 +1362,6 @@ export default function CadLabPage(): React.ReactNode {
             )}
           </CardContent>
         </Card>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* ENGINEERING ANALYSIS (after modules, shows generated metrics)   */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {modules.length > 0 && (
-        <CadLabAnalysisDashboard
-          modules={modules}
-          projectName={subject}
-        />
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* PROJECT TIMELINE (Gantt-style lead time visualization)          */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {modules.length > 0 && (
-        <CadLabTimeline modules={modules} />
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* RISK REGISTER (failure modes, unknowns, DFM issues)            */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {modules.length > 0 && (
-        <CadLabRiskRegister modules={modules} />
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* ENGINEERING DIAGNOSTICS (gating questionnaire per module)       */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {modules.length > 0 && (
-        <CadLabDiagnostics
-          modules={modules}
-          answers={diagnosticAnswers}
-          onAnswersChange={setDiagnosticAnswers}
-        />
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* REVIEW PACKAGE (engineering summary document)                   */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {modules.length > 0 && (
-        <CadLabReviewPackage
-          modules={modules}
-          projectName={subject}
-          researchReport={editableReport}
-          diagnosticAnswers={diagnosticAnswers}
-        />
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* PEOPLE MATCHING (expert disciplines per module)                 */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {modules.length > 0 && (
-        <CadLabPeople
-          modules={modules}
-          diagnosticAnswers={diagnosticAnswers}
-        />
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* SUPPLY CHAIN (manufacturing requirements per module)            */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {modules.length > 0 && (
-        <CadLabSupplyChain
-          modules={modules}
-          diagnosticAnswers={diagnosticAnswers}
-        />
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* CONTRACTING (RFQ, SOW, NDA generation)                         */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {modules.length > 0 && (
-        <CadLabContracting
-          modules={modules}
-          projectName={subject}
-          diagnosticAnswers={diagnosticAnswers}
-        />
-      )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* STEP 2: INTERFACE DEFINITION                                   */}
@@ -1638,6 +1843,66 @@ export default function CadLabPage(): React.ReactNode {
             </Card>
           )}
         </div>
+      )}
+
+        </TabsContent>
+
+        {/* ── ANALYSIS TAB ── */}
+        <TabsContent value="analysis" className="space-y-6 mt-6">
+          {modules.length > 0 ? (
+            <>
+              <CadLabAnalysisDashboard modules={modules} projectName={subject} />
+              <CadLabTimeline modules={modules} />
+              <CadLabRiskRegister modules={modules} />
+            </>
+          ) : (
+            <Card>
+              <CardContent className="pt-6 text-center text-sm text-muted-foreground py-12">
+                Decompose your product into modules to see engineering analysis, timeline, and risk register.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ── PROCUREMENT TAB ── */}
+        <TabsContent value="procurement" className="space-y-6 mt-6">
+          {modules.length > 0 ? (
+            <>
+              <CadLabDiagnostics
+                modules={modules}
+                answers={diagnosticAnswers}
+                onAnswersChange={setDiagnosticAnswers}
+                aiPrefilled={aiPrefilled}
+              />
+              <CadLabSupplyChain modules={modules} diagnosticAnswers={diagnosticAnswers} />
+              <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
+              <CadLabContracting modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
+            </>
+          ) : (
+            <Card>
+              <CardContent className="pt-6 text-center text-sm text-muted-foreground py-12">
+                Decompose your product into modules to access diagnostics, supply chain, cost estimation, and contracting.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ── REVIEW TAB ── */}
+        <TabsContent value="review" className="space-y-6 mt-6">
+          {modules.length > 0 ? (
+            <>
+              <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
+              <CadLabPeople modules={modules} diagnosticAnswers={diagnosticAnswers} />
+            </>
+          ) : (
+            <Card>
+              <CardContent className="pt-6 text-center text-sm text-muted-foreground py-12">
+                Decompose your product into modules to generate a review package and expert discipline matching.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
       )}
 
       {/* ── Fullscreen overlay ── */}

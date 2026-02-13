@@ -1,25 +1,28 @@
 /**
- * @file Recruits page — People-focused marketplace view.
+ * @file Recruits page — People-focused marketplace with AI talent matching.
  *
- * @description Shows marketplace listings filtered to the "People" category
- * only. Lives under the People navigation section alongside Guild and
- * Apprenticeship. Shares all marketplace components with the main
- * Marketplace page via the `allowedCategories` prop.
+ * @description Shows People marketplace listings enriched with trust signals,
+ * social proof, and an AI-powered "Describe Who You Need" talent finder.
+ * Lives under the People navigation section alongside Guild and Apprenticeship.
  *
  * @related
  * - Marketplace page (Products & Services): src/app/(platform)/marketplace/page.tsx
  * - Browse component: src/app/(platform)/marketplace-v2/components/MarketplaceBrowse.tsx
- * - Actions: src/actions/marketplace.ts
+ * - People actions: src/actions/people-marketplace.ts
+ * - Talent finder: src/components/marketplace/talent-finder.tsx
  */
 
 import { Suspense } from 'react'
 import { getMarketplaceListings, getSavedMarketplaceListings } from '@/actions/marketplace'
+import { getEnrichedPeopleListings } from '@/actions/people-marketplace'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getFoundryContext } from '@/actions/foundry-context'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
 import { Skeleton } from '@/components/ui/skeleton'
+import { TalentFinderWrapper } from './talent-finder-wrapper'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
+import type { EnrichedPersonListing } from '@/actions/people-marketplace'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,10 +33,11 @@ function RecruitsLoading(): React.ReactElement {
     return (
         <div className="space-y-6">
             <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-32 w-full rounded-xl" />
             <Skeleton className="h-12 w-full max-w-lg" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <Skeleton key={i} className="h-72 w-full rounded-xl" />
+                    <Skeleton key={i} className="h-80 w-full rounded-xl" />
                 ))}
             </div>
         </div>
@@ -43,27 +47,33 @@ function RecruitsLoading(): React.ReactElement {
 /**
  * Server component for the Recruits page.
  *
- * @description Fetches People marketplace listings, recommendations, and saved
- * state, then renders MarketplaceBrowse restricted to the People category.
+ * @description Fetches enriched People marketplace listings with trust signals,
+ * recommendations, and saved state. Renders the AI Talent Finder above the
+ * standard MarketplaceBrowse grid.
  *
- * @returns Recruits page with people-only marketplace view
+ * @returns Recruits page with AI talent finder and enriched people cards
  */
 export default async function RecruitsPage(): Promise<React.ReactElement> {
     let listings: MarketplaceListing[] = []
+    let enrichedListings: EnrichedPersonListing[] = []
     let recommendations: MarketplaceRecommendation[] = []
     let savedIds: string[] = []
     let savedListings: MarketplaceListing[] = []
 
-    // Fetch People listings and foundry context in parallel
-    const [listingsResult, foundryContext] = await Promise.allSettled([
+    // Fetch enriched People listings and foundry context in parallel
+    const [enrichedResult, plainListingsResult, foundryContext] = await Promise.allSettled([
+        getEnrichedPeopleListings(),
         getMarketplaceListings('People'),
         getFoundryContext(),
     ])
 
-    if (listingsResult.status === 'fulfilled') {
-        listings = listingsResult.value
-    } else {
-        console.error('[Recruits] Failed to fetch listings:', listingsResult.reason)
+    if (enrichedResult.status === 'fulfilled') {
+        enrichedListings = enrichedResult.value
+        // Use enriched listings as the main listings for the grid
+        listings = enrichedResult.value
+    } else if (plainListingsResult.status === 'fulfilled') {
+        // Fallback to plain listings if enrichment fails
+        listings = plainListingsResult.value
     }
 
     const ctx = foundryContext.status === 'fulfilled' ? foundryContext.value : null
@@ -115,16 +125,22 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
 
     return (
         <Suspense fallback={<RecruitsLoading />}>
-            <MarketplaceBrowse
-                initialListings={listings}
-                recommendations={recommendations}
-                initialSavedIds={savedIds}
-                initialSavedListings={savedListings}
-                foundryContext={ctx || undefined}
-                allowedCategories={['People']}
-                pageTitle="Recruits"
-                pageSubtitle="Find expert talent to grow your team"
-            />
+            <div className="space-y-6">
+                {/* AI Talent Finder - the "aha moment" */}
+                <TalentFinderWrapper />
+
+                {/* Standard marketplace browse with enriched People cards */}
+                <MarketplaceBrowse
+                    initialListings={listings}
+                    recommendations={recommendations}
+                    initialSavedIds={savedIds}
+                    initialSavedListings={savedListings}
+                    foundryContext={ctx || undefined}
+                    allowedCategories={['People']}
+                    pageTitle="Recruits"
+                    pageSubtitle="Find expert talent to grow your team"
+                />
+            </div>
         </Suspense>
     )
 }

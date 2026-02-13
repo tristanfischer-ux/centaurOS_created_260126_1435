@@ -21,21 +21,42 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     }
     
     const name = profile.user_name || 'Executive'
-    const description = profile.headline || profile.bio?.slice(0, 160) || `View ${name}'s profile on ForgeOS`
+    const headline = profile.headline || 'Fractional Executive'
+    const description = profile.bio?.slice(0, 160) || `View ${name}'s profile on ForgeOS`
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://forgeos.com'
+    
+    // Build dynamic OG image URL with profile data
+    const ogParams = new URLSearchParams({
+        name,
+        headline,
+        ...(profile.average_rating ? { rating: profile.average_rating.toString() } : {}),
+        ...(profile.total_reviews ? { reviews: profile.total_reviews.toString() } : {}),
+        ...(profile.specializations?.length ? { skills: profile.specializations.slice(0, 4).join(',') } : {}),
+        ...(profile.location ? { location: profile.location } : {}),
+        ...(profile.is_verified ? { verified: 'true' } : {}),
+    })
+    const ogImageUrl = `${appUrl}/api/og/profile?${ogParams.toString()}`
     
     return {
-        title: `${name} | ForgeOS`,
+        title: `${name} - ${headline} | ForgeOS`,
         description,
         openGraph: {
-            title: `${name} - ${profile.headline || 'Fractional Executive'}`,
-            description,
+            title: `${name} - ${headline}`,
+            description: `${description} | Find experts like this on ForgeOS.`,
             type: 'profile',
-            images: profile.user_avatar ? [profile.user_avatar] : [],
+            images: [{
+                url: ogImageUrl,
+                width: 1200,
+                height: 630,
+                alt: `${name} - ${headline} on ForgeOS`,
+            }],
+            siteName: 'ForgeOS',
         },
         twitter: {
             card: 'summary_large_image',
-            title: `${name} - ${profile.headline || 'Fractional Executive'}`,
-            description,
+            title: `${name} - ${headline}`,
+            description: `${description} | Find experts like this on ForgeOS.`,
+            images: [ogImageUrl],
         },
     }
 }

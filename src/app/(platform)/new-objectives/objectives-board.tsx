@@ -33,6 +33,8 @@ import { ObjectivesGanttView } from './gantt-view'
 import { TaskDetailPanel } from '../new-tasks/task-detail-panel'
 import { deleteObjective } from '@/actions/objectives'
 import { toast } from 'sonner'
+import { WeeklyDigestPanel } from './weekly-digest'
+import { TeamPulseDashboard } from './team-pulse'
 import type { ObjectiveWithTasks, ObjectiveTask, Member, Team, StrategicObjective } from './types'
 import type { TaskWithData } from '../new-tasks/types'
 
@@ -336,9 +338,13 @@ export function ObjectivesBoard({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <WeeklyDigestPanel />
           <CreateObjectiveDialog />
         </div>
       </div>
+
+      {/* Team Pulse */}
+      <TeamPulseDashboard />
 
       {/* Strategy Health Bar */}
       <StrategyHealthBar

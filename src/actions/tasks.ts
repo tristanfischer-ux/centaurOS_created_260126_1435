@@ -1715,6 +1715,61 @@ export async function updateTaskStatusAndRisk(
 }
 
 /**
+ * Updates a task's status directly via drag-and-drop on the board view.
+ *
+ * @description Simple status update used by the DnD board view. Accepts PascalCase
+ * status values as stored in the database (Pending, Accepted, Completed, etc.).
+ *
+ * @param {string} taskId - The task to update
+ * @param {string} newStatus - The new status value (PascalCase)
+ * @returns Success or error
+ *
+ * @security Requires task modify permission via canModifyTask
+ * @audit Logs status change to task_history
+ */
+export async function updateTaskStatus(
+    taskId: string,
+    newStatus: string
+) {
+    return withAuth(async ({ supabase, user, foundryId }) => {
+        // AUTH: Verify user has permission to modify this task
+        const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
+        if (!authCheck.allowed) {
+            return { error: authCheck.error || 'Unauthorized' }
+        }
+
+        // VALIDATION: Status must be non-empty
+        if (!newStatus?.trim()) {
+            return { error: 'Status is required' }
+        }
+
+        const { error } = await supabase
+            .from('tasks')
+            .update({ status: newStatus })
+            .eq('id', taskId)
+            .eq('foundry_id', foundryId)
+
+        if (error) return { error: sanitizeErrorMessage(error) }
+
+        // AUDIT: Log the status change
+        try {
+            await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
+                new_status: newStatus,
+            })
+        } catch (logError) {
+            console.error('[TaskService] Failed to log status change:', {
+                error: logError instanceof Error ? logError.message : 'Unknown error',
+            })
+        }
+
+        revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
+        revalidatePath(`/tasks/${taskId}`)
+        return { success: true }
+    })
+}
+
+/**
  * Uploads a file attachment to a task.
  *
  * @description Verifies modify permissions, validates file size (max 25MB), sanitizes

@@ -29,6 +29,7 @@ import {
   ChevronDown,
   ChevronRight,
   Box,
+  Zap,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -158,6 +159,8 @@ interface CadLabDiagnosticsProps {
   answers: DiagnosticAnswers
   /** Called when answers change */
   onAnswersChange: (answers: DiagnosticAnswers) => void
+  /** Whether AI pre-filled answers are present */
+  aiPrefilled?: boolean
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -174,6 +177,7 @@ export function CadLabDiagnostics({
   modules,
   answers,
   onAnswersChange,
+  aiPrefilled = false,
 }: CadLabDiagnosticsProps): React.ReactNode {
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
 
@@ -240,6 +244,12 @@ export function CadLabDiagnostics({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
+        {aiPrefilled && (
+          <div className="flex items-center gap-2 p-2.5 bg-status-info-light rounded text-xs text-status-info-dark">
+            <Zap className="h-3.5 w-3.5 flex-shrink-0" />
+            <span>AI pre-filled answers based on your research. Review and override any that need adjustment.</span>
+          </div>
+        )}
         <p className="text-sm text-muted-foreground">
           Answer these manufacturing questions per module to unlock accurate
           supplier matching and contracting. Each module needs{" "}

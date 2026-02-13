@@ -1,18 +1,36 @@
 /**
- * @file page.tsx — "Me" section intro page
+ * @file page.tsx — "Me" personal command centre dashboard
  *
- * @description High-impact visual overview of personal pages: profile, updates.
- * Users visit this to understand the scope of the "Me" section and see what's new.
+ * @description Server component that fetches personalized dashboard data
+ * and renders the user's command centre with focus metrics, weekly tasks,
+ * objective progress, activity heatmap, and quick actions.
+ *
+ * @security Requires authenticated user. Redirects to /login if not authenticated.
+ *
+ * @related
+ * - Server action: src/actions/me-dashboard.ts
+ * - View component: src/app/(platform)/me/me-dashboard-view.tsx
  */
 
-import type { Metadata } from "next"
-import { MeSectionIntro } from "./me-section-intro"
+import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { getMyDashboardData } from '@/actions/me-dashboard'
+import { MeDashboardView } from './me-dashboard-view'
 
 export const metadata: Metadata = {
-    title: "Me | ForgeOS",
-    description: "Your personal command centre — profile, activity feed, and settings",
+  title: 'Me | ForgeOS',
+  description: 'Your personal command centre — focus, progress, and activity',
 }
 
-export default function MePage(): React.ReactNode {
-    return <MeSectionIntro />
+export default async function MePage(): Promise<React.ReactNode> {
+  // AUTH: Verify user is authenticated
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const data = await getMyDashboardData()
+  if (!data) redirect('/login')
+
+  return <MeDashboardView data={data} />
 }

@@ -1087,3 +1087,106 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     }
   }
 }
+
+// ─── Smart Diagnostics Pre-Fill ─────────────────────────────────────
+
+/**
+ * Uses Claude to pre-fill diagnostic answers based on research + modules.
+ *
+ * @description Analyses the research report and each module's context to
+ * recommend manufacturing process, material, tolerance, surface finish,
+ * batch size, and operating environment. Returns a DiagnosticAnswers-shaped
+ * object that can be merged into client state.
+ *
+ * @param modules - Decomposed modules
+ * @param researchReport - The full research report text
+ * @param modelId - Claude model to use
+ * @returns Mapping of moduleId → { questionId → answer }
+ *
+ * @security Requires authenticated user.
+ * @audit None (advisory data, not persisted directly).
+ */
+export async function prefillDiagnostics(
+  modules: CadLabModule[],
+  researchReport: string,
+  modelId: ClaudeModelId = "claude-opus-4-6",
+): Promise<{ success: boolean; answers: Record<string, Record<string, string>>; error?: string }> {
+  // AUTH: Verify user is authenticated
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, answers: {}, error: "Unauthorized" }
+
+  // SECURITY: Rate limit
+  const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
+  if (rateLimitError) return { success: false, answers: {}, error: rateLimitError }
+
+  try {
+    const moduleSummaries = modules.map((m) =>
+      `Module "${m.name}" (${m.id}): ${m.purpose}. Key parts: ${m.keyParts.join(", ")}. Description: ${m.description.slice(0, 200)}`
+    ).join("\n")
+
+    const systemPrompt = `You are an expert manufacturing engineer. Given a research report and module list, recommend diagnostic answers for each module.
+
+For each module, output exactly these 6 fields:
+- mfg_process: One of: FDM 3D Print, SLA/Resin Print, SLS/Powder Print, CNC Machining, Sheet Metal, Injection Molding, Casting, Manual/Assembly, Other
+- material: One of: PLA/PETG, ABS/Nylon, Aluminium, Steel/Iron, Stainless Steel, Copper/Brass, Titanium, Carbon Fiber Composite, CFRP/GFRP, Wood/Plywood, Silicone/Rubber, Glass/Ceramic, PCB/Electronic, Other
+- tolerance: One of: ±1mm (hobby), ±0.5mm (standard), ±0.1mm (precision), ±0.01mm (ultra-precision)
+- surface_finish: One of: As-printed (rough), Sanded/Deburred, Painted/Coated, Anodised/Plated, Polished (mirror), Textured (mold)
+- batch_size: One of: 1-10 (prototyping), 10-100 (small batch), 100-1000 (pilot), 1000-10000 (production), 10000+ (mass production)
+- environment: One of: Indoor (office/home), Indoor (industrial), Outdoor (sheltered), Outdoor (exposed), High-temp (>80°C), Wet/Submerged, Food-safe, Medical/Cleanroom
+
+Return a JSON object mapping module IDs to their answers. Example:
+{
+  "motor_assembly": {
+    "mfg_process": "CNC Machining",
+    "material": "Aluminium",
+    "tolerance": "±0.1mm (precision)",
+    "surface_finish": "Anodised/Plated",
+    "batch_size": "10-100 (small batch)",
+    "environment": "Indoor (industrial)"
+  }
+}
+
+Only output valid JSON. No explanation.`
+
+    const userPrompt = `Research Report:
+${researchReport.slice(0, 3000)}
+
+Modules:
+${moduleSummaries}
+
+Recommend diagnostic answers for each module. Output JSON only.`
+
+    const { text } = await callClaude(systemPrompt, userPrompt, modelId, 4096)
+
+    // Parse JSON
+    let jsonText = text.trim()
+    if (jsonText.startsWith("```")) {
+      jsonText = jsonText.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "")
+    }
+
+    const parsed = JSON.parse(jsonText) as Record<string, Record<string, string>>
+
+    // VALIDATION: Only keep valid module IDs and valid question IDs
+    const validModuleIds = new Set(modules.map((m) => m.id))
+    const validQuestionIds = new Set(["mfg_process", "material", "tolerance", "surface_finish", "batch_size", "environment"])
+    const cleanAnswers: Record<string, Record<string, string>> = {}
+
+    for (const [moduleId, answers] of Object.entries(parsed)) {
+      if (!validModuleIds.has(moduleId)) continue
+      cleanAnswers[moduleId] = {}
+      for (const [qId, answer] of Object.entries(answers)) {
+        if (validQuestionIds.has(qId) && typeof answer === "string") {
+          cleanAnswers[moduleId][qId] = answer
+        }
+      }
+    }
+
+    console.info(`[CAD-LAB] Pre-filled diagnostics for ${Object.keys(cleanAnswers).length} modules`)
+
+    return { success: true, answers: cleanAnswers }
+  } catch (error) {
+    console.error("[CAD-LAB] Diagnostic pre-fill failed:", error instanceof Error ? error.message : error)
+    return { success: false, answers: {}, error: "Failed to pre-fill diagnostics" }
+  }
+}

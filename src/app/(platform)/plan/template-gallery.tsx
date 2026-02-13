@@ -78,7 +78,7 @@ interface PlanTemplate {
   title: string
   description: string
   category: TemplateCategory
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   totalWeeks: number
   phases: TemplatePhase[]
   quickWins: string[]

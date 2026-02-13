@@ -28,6 +28,16 @@ interface FoundryInfo {
   joinedAt: string
 }
 
+/** Enrichment data for the overview tab (sparkline, trends). */
+export interface ProfileEnrichment {
+  /** Daily task completion counts for sparkline (last 30 days) */
+  sparklineData: Array<{ date: string; count: number }>
+  /** Tasks completed this week */
+  completedThisWeek: number
+  /** Tasks completed last week (for comparison) */
+  completedLastWeek: number
+}
+
 interface ProfileHubViewProps {
   data: ProfileHubData
   foundries: FoundryInfo[]
@@ -39,6 +49,8 @@ interface ProfileHubViewProps {
   } | null
   /** Telegram bot username for generating link */
   botUsername: string
+  /** Optional enrichment data for activity sparkline + trends */
+  enrichment?: ProfileEnrichment
 }
 
 /**
@@ -53,7 +65,7 @@ interface ProfileHubViewProps {
  * @example
  * <ProfileHubView data={profileHubData} foundries={foundries} telegramLink={null} botUsername="ForgeOSBot" />
  */
-export function ProfileHubView({ data, foundries, telegramLink, botUsername }: ProfileHubViewProps) {
+export function ProfileHubView({ data, foundries, telegramLink, botUsername, enrichment }: ProfileHubViewProps) {
   const { profile, providerProfile, listing, strength, isProvider, foundryName, stats } = data
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
@@ -149,6 +161,7 @@ export function ProfileHubView({ data, foundries, telegramLink, botUsername }: P
             phoneNumber={profile?.phone_number ?? null}
             linkedinUrl={linkedinUrl}
             stats={stats}
+            enrichment={enrichment}
             onEditClick={() => setIsEditProfileOpen(true)}
           />
         </TabsContent>

@@ -39,9 +39,21 @@ export default async function MyProfilePage() {
   
   if (!user) redirect('/login')
 
-  // Fetch profile data, foundries, and telegram link in parallel
+  // Date boundaries for enrichment data
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  const now = new Date()
+  const day = now.getDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  const thisMonday = new Date(now)
+  thisMonday.setDate(now.getDate() + mondayOffset)
+  thisMonday.setHours(0, 0, 0, 0)
+  const lastMonday = new Date(thisMonday)
+  lastMonday.setDate(lastMonday.getDate() - 7)
+
+  // Fetch profile data, foundries, telegram link, and enrichment data in parallel
   const admin = getAdminClient()
-  const [data, foundries, telegramResult] = await Promise.all([
+  const [data, foundries, telegramResult, completionHistoryResult] = await Promise.all([
     getProfileHubData(),
     getUserFoundries(),
     admin
@@ -52,6 +64,14 @@ export default async function MyProfilePage() {
           .eq('platform', 'telegram')
           .single()
       : Promise.resolve({ data: null }),
+    // Task completion history for sparkline (last 30 days)
+    supabase
+      .from('task_history')
+      .select('created_at')
+      .eq('user_id', user.id)
+      .eq('action_type', 'COMPLETED')
+      .gte('created_at', thirtyDaysAgo.toISOString())
+      .order('created_at', { ascending: true }),
   ])
 
   if (!data) redirect('/login')
@@ -63,12 +83,46 @@ export default async function MyProfilePage() {
   } | null
   const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'ForgeOSBot'
 
+  // Build enrichment data: sparkline, weekly trends
+  const completionsByDate = new Map<string, number>()
+  for (const event of completionHistoryResult.data ?? []) {
+    if (!event.created_at) continue
+    const dateStr = event.created_at.split('T')[0]
+    completionsByDate.set(dateStr, (completionsByDate.get(dateStr) ?? 0) + 1)
+  }
+
+  // Generate 30-day sparkline data (fill missing days with 0)
+  const sparklineData: Array<{ date: string; count: number }> = []
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now)
+    d.setDate(d.getDate() - i)
+    const dateStr = d.toISOString().split('T')[0]
+    sparklineData.push({ date: dateStr, count: completionsByDate.get(dateStr) ?? 0 })
+  }
+
+  // Weekly comparison
+  const thisMondayStr = thisMonday.toISOString().split('T')[0]
+  const lastMondayStr = lastMonday.toISOString().split('T')[0]
+  let completedThisWeek = 0
+  let completedLastWeek = 0
+  for (const [dateStr, count] of completionsByDate) {
+    if (dateStr >= thisMondayStr) completedThisWeek += count
+    else if (dateStr >= lastMondayStr && dateStr < thisMondayStr) completedLastWeek += count
+  }
+
+  const enrichment = {
+    sparklineData,
+    completedThisWeek,
+    completedLastWeek,
+  }
+
   return (
     <ProfileHubView
       data={data}
       foundries={foundries}
       telegramLink={telegramLink}
       botUsername={botUsername}
+      enrichment={enrichment}
     />
   )
 }
