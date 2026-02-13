@@ -69,6 +69,12 @@ export function MeDashboardView({ data }: MeDashboardViewProps): React.ReactElem
 
   const firstName = data.greeting.name.split(' ')[0]
 
+  // Map priority tasks to PriorityQueue's expected shape (task_number: optional, not null)
+  const pqTasks = data.priorityTasks.map(t => ({
+    ...t,
+    task_number: t.task_number ?? undefined,
+  }))
+
   return (
     <div className="space-y-8">
       {/* ── Greeting Header ──────────────────────────────────────────── */}
@@ -92,11 +98,11 @@ export function MeDashboardView({ data }: MeDashboardViewProps): React.ReactElem
 
       {/* ── Priority Queue ────────────────────────────────────────────── */}
       <PriorityQueue
-        myTasks={data.priorityTasks}
-        overdueTasks={data.priorityTasks.filter(t =>
+        myTasks={pqTasks}
+        overdueTasks={pqTasks.filter(t =>
           t.end_date && isBefore(new Date(t.end_date), new Date()) && !isDateToday(new Date(t.end_date))
         )}
-        tasksDueToday={data.priorityTasks.filter(t =>
+        tasksDueToday={pqTasks.filter(t =>
           t.end_date && isDateToday(new Date(t.end_date))
         )}
         userId={data.userId}
