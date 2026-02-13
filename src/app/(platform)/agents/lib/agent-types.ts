@@ -190,6 +190,10 @@ export interface PromptTemplate {
     outputLabel: string
     tags: string[]
     suggestedNext: string[] // IDs of prompts that chain well after this one
+    /** Bullet-point guidance on what information to include in the input */
+    inputHint?: string
+    /** A concrete example of good input to show users what to write */
+    exampleInput?: string
 }
 
 // ─── Custom Prompt (user-created) ────────────────────────────────────

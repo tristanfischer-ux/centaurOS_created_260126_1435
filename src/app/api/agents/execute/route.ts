@@ -121,9 +121,23 @@ export async function POST(request: Request) {
     }
 
     // 3. Resolve API key
-    // First try user's own key from DB, then fall back to env vars
+    // Platform provides AI — use env vars by default.
+    // Users can optionally bring their own key (BYOK) to override.
     let apiKey: string | null = null
+    let keySource: "platform" | "user" = "platform"
 
+    // Check for platform keys first (this is the standard path)
+    const envMap: Partial<Record<AIProviderId, string>> = {
+        openai: process.env.OPENAI_API_KEY ?? "",
+        anthropic: process.env.ANTHROPIC_API_KEY ?? "",
+        google: process.env.GOOGLE_AI_API_KEY ?? "",
+        stability: process.env.STABILITY_API_KEY ?? "",
+        elevenlabs: process.env.ELEVENLABS_API_KEY ?? "",
+        replicate: process.env.REPLICATE_API_TOKEN ?? "",
+    }
+    apiKey = envMap[providerId] || null
+
+    // Allow user's own key to override (BYOK), if configured
     const { data: keyRow } = await supabase
         .from("ai_provider_keys")
         .select("encrypted_key")
@@ -133,30 +147,21 @@ export async function POST(request: Request) {
 
     if (keyRow?.encrypted_key) {
         try {
-            apiKey = decryptApiKey(keyRow.encrypted_key)
+            const userKey = decryptApiKey(keyRow.encrypted_key)
+            if (userKey) {
+                apiKey = userKey
+                keySource = "user"
+            }
         } catch (err) {
-            console.error("[agents/execute] Failed to decrypt user key:", err)
+            // Non-critical — fall back to platform key
+            console.warn("[agents/execute] User key decrypt failed, using platform key:", err)
         }
     }
 
-    // Fall back to platform keys from env
     if (!apiKey) {
-        const envMap: Partial<Record<AIProviderId, string>> = {
-            openai: process.env.OPENAI_API_KEY ?? "",
-            anthropic: process.env.ANTHROPIC_API_KEY ?? "",
-            google: process.env.GOOGLE_AI_API_KEY ?? "",
-            stability: process.env.STABILITY_API_KEY ?? "",
-            elevenlabs: process.env.ELEVENLABS_API_KEY ?? "",
-            replicate: process.env.REPLICATE_API_TOKEN ?? "",
-        }
-        apiKey = envMap[providerId] || null
-    }
-
-    if (!apiKey) {
+        console.error("[agents/execute] No API key configured for provider:", { providerId })
         return NextResponse.json(
-            {
-                error: `No API key for ${PROVIDER_REGISTRY[providerId].name}. Add your key in Settings → AI Providers.`,
-            },
+            { error: "This feature is temporarily unavailable. Please try again later." },
             { status: 503 }
         )
     }
@@ -210,6 +215,34 @@ export async function POST(request: Request) {
     }
 
     // 7. Route to the right provider based on modality
+    // AUDIT: Log usage for metered billing and track AI costs
+    const logUsageAfterCompletion = async (outputLength: number): Promise<void> => {
+        if (!foundryId) return // Can't log without a foundry
+
+        try {
+            // Estimate token counts: ~4 chars per token is a reasonable approximation
+            const estimatedInputTokens = Math.ceil((finalPrompt.length + systemPromptWithContext.length) / 4)
+            const estimatedOutputTokens = Math.ceil(outputLength / 4)
+            const totalTokens = estimatedInputTokens + estimatedOutputTokens
+
+            await supabase.from("ai_usage_log").insert({
+                user_id: user.id,
+                foundry_id: foundryId,
+                feature: `specialist-${modality}`,
+                model: `${providerId}/${modelId}`,
+                prompt_tokens: estimatedInputTokens,
+                completion_tokens: estimatedOutputTokens,
+                total_tokens: totalTokens,
+                estimated_cost_usd: 0, // Will be calculated by billing system
+                key_source: keySource,
+                metadata: { modality, providerId, modelId },
+            })
+        } catch (err) {
+            // Non-critical — don't fail the request over usage logging
+            console.warn("[agents/execute] Failed to log usage:", err)
+        }
+    }
+
     // Memory callback: record assistant response and process memory after streaming
     const memoryCallback = threadId && foundryId
         ? async (fullOutput: string) => {
@@ -223,8 +256,13 @@ export async function POST(request: Request) {
             } catch (err) {
                 console.warn("[agents/execute] Failed to record assistant message:", err)
             }
+            // AUDIT: Log usage after successful completion
+            await logUsageAfterCompletion(fullOutput.length)
         }
-        : undefined
+        : async (fullOutput: string) => {
+            // Even without memory thread, log usage for billing
+            await logUsageAfterCompletion(fullOutput.length)
+        }
 
     try {
         if (modality === "text") {
@@ -235,13 +273,20 @@ export async function POST(request: Request) {
             return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback)
         }
         if (modality === "image") {
-            return await handleImageGeneration(apiKey, providerId, modelId, finalPrompt)
+            const result = await handleImageGeneration(apiKey, providerId, modelId, finalPrompt)
+            // Log usage for non-streaming modalities
+            logUsageAfterCompletion(0).catch(() => {})
+            return result
         }
         if (modality === "audio") {
-            return await handleAudioGeneration(apiKey, providerId, modelId, finalPrompt)
+            const result = await handleAudioGeneration(apiKey, providerId, modelId, finalPrompt)
+            logUsageAfterCompletion(0).catch(() => {})
+            return result
         }
         if (modality === "video") {
-            return await handleVideoGeneration(apiKey, providerId, modelId, finalPrompt)
+            const result = await handleVideoGeneration(apiKey, providerId, modelId, finalPrompt)
+            logUsageAfterCompletion(0).catch(() => {})
+            return result
         }
 
         return NextResponse.json({ error: `Unsupported modality: ${modality}` }, { status: 400 })

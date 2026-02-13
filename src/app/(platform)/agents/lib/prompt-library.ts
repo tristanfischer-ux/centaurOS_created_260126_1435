@@ -2206,6 +2206,8 @@ Subject: "Quick question about [prospect's recent initiative]"
         inputLabel: "Product, ICP & prospect details",
         outputLabel: "3-email outreach sequence",
         tags: ["cold-email", "outreach", "sales", "prospecting"],
+        inputHint: "• Your product/service and what it does\n• Target prospect's role, industry, and company size\n• The specific problem you solve for them\n• Any social proof (customers, metrics, awards)",
+        exampleInput: "We sell an AI-powered inventory tool for mid-size e-commerce brands. Targeting ops managers at companies doing £2-10M/year. We helped BrandX reduce stockouts by 40%. Prospect: Jane Smith, Ops Director at FashionCo (DTC fashion, 50 employees).",
         suggestedNext: ["outreach-prospect-research", "outreach-email-sequence"],
     },
 
@@ -2272,6 +2274,8 @@ Format: Use headers and bullet points. Be concise — this brief will be consume
         inputLabel: "Prospect name, company, role, and any known details",
         outputLabel: "Prospect research brief",
         tags: ["research", "prospect", "enrichment", "outreach", "cold-email"],
+        inputHint: "• Prospect's full name and job title\n• Their company name\n• Your product/service (so research is relevant)\n• Any known details (met at event, mutual connection, etc.)",
+        exampleInput: "Research Sarah Chen, VP of Engineering at DataFlow Inc. They're a Series B data pipeline company, ~200 employees. We sell developer productivity tools. I saw her speak at DevCon about CI/CD bottlenecks.",
         suggestedNext: ["outreach-lead-scoring"],
     },
     {
@@ -2321,6 +2325,8 @@ If the score is below 5, explain specifically what would need to change for this
         inputLabel: "Research brief + ICP criteria (industry, size, pain points, product fit)",
         outputLabel: "Lead score report with triggers",
         tags: ["scoring", "qualification", "signals", "outreach", "cold-email"],
+        inputHint: "• The prospect research brief (paste from earlier step)\n• Your Ideal Customer Profile criteria (industry, size, pain points)\n• Your product context and key differentiators",
+        exampleInput: "Research brief: [paste from Prospect Deep Research]. ICP: Series A-C SaaS, 50-500 employees, struggling with manual QA. We sell automated testing tools. Key differentiator: 10-minute setup vs weeks for competitors.",
         suggestedNext: ["outreach-personalization-strategy"],
     },
     {
@@ -2377,6 +2383,8 @@ This strategy will be fed directly into the email generation agent. Be specific 
         inputLabel: "Research brief + lead score + product context & case studies",
         outputLabel: "Personalization strategy document",
         tags: ["personalization", "strategy", "persona", "outreach", "cold-email"],
+        inputHint: "• The research brief and lead score (paste from earlier steps)\n• Your product's key value propositions\n• Relevant case studies or proof points\n• The prospect's likely communication style",
+        exampleInput: "Research brief: [paste]. Lead score: 8/10. Our product saves engineering teams 20 hours/week on testing. Case study: WidgetCorp reduced QA from 3 days to 4 hours. This prospect is a VP-level technical leader.",
         suggestedNext: ["outreach-email-sequence"],
     },
     {
@@ -2461,6 +2469,8 @@ Using the personalization strategy above, generate a **4-Email Outreach Sequence
         inputLabel: "Personalization strategy + product context",
         outputLabel: "4-email outreach sequence",
         tags: ["email-sequence", "copywriting", "outreach", "cold-email", "cadence"],
+        inputHint: "• The personalization strategy (paste from earlier step)\n• Your product details and key benefits\n• Prospect and company details\n• Any specific offers or CTAs (demo, trial, content piece)",
+        exampleInput: "Personalization strategy: [paste]. Product: AutoTest Pro — automated testing for CI/CD. Prospect: Sarah Chen, VP Eng at DataFlow. She spoke about CI/CD bottlenecks. Offer: 14-day free trial, no credit card.",
         suggestedNext: ["outreach-subject-lines"],
     },
     {
@@ -2528,6 +2538,8 @@ Flag any subject lines that fail QA and provide a corrected version.
         inputLabel: "4-email sequence + prospect/company details",
         outputLabel: "12 subject line variants with recommendations",
         tags: ["subject-lines", "open-rates", "ab-testing", "outreach", "cold-email"],
+        inputHint: "• The complete email sequence (paste all emails)\n• Target prospect's role and industry\n• Any A/B testing insights from previous campaigns",
+        exampleInput: "Email sequence: [paste all 4 emails]. Target: VP Engineering at mid-size SaaS companies. Previous best performers: question-based subject lines with specific numbers.",
         suggestedNext: ["outreach-qa-compliance"],
     },
     {
@@ -2605,6 +2617,8 @@ Flag any statement that CANNOT be verified from the provided research brief as *
         inputLabel: "Complete email sequence with subject lines + research brief",
         outputLabel: "QA and compliance report",
         tags: ["qa", "compliance", "deliverability", "spam-check", "outreach", "cold-email"],
+        inputHint: "• The complete email sequence with subject lines\n• Your sending domain and email setup\n• Your region/jurisdiction (for CAN-SPAM, GDPR, etc.)\n• Company compliance requirements",
+        exampleInput: "Email sequence: [paste all 4 emails with subject lines]. Sending from @ourcompany.io via Google Workspace. Targeting UK and EU prospects. Need GDPR compliance. Unsubscribe handled by email tool.",
         suggestedNext: ["sales-objection-handler", "sales-proposal"],
     },
 
@@ -2696,6 +2710,8 @@ First, analyze: What is this prospect's #1 business priority right now? What's t
         inputLabel: "Product, prospect & deal details",
         outputLabel: "Sales deck outline",
         tags: ["sales-deck", "presentation", "pitch", "deal"],
+        inputHint: "• Your product and its key features\n• Target buyer's role and pain points\n• Deal size and sales cycle length\n• Key competitors and your differentiators\n• Social proof (logos, metrics, testimonials)",
+        exampleInput: "Product: AutoTest Pro, automated testing platform. Buyer: VP Engineering at mid-market SaaS. Pain: QA is their bottleneck, 3-day cycles. Deal size: £30-80K/year. Competitors: Selenium (manual), Cypress (limited). We cut QA time by 80%.",
         suggestedNext: ["sales-proposal", "sales-objection-handler"],
     },
     {
@@ -2738,6 +2754,8 @@ For each: the response + a follow-up question that advances the deal.
         inputLabel: "Product details & competitive context",
         outputLabel: "Objection handling playbook",
         tags: ["objections", "sales", "negotiation", "closing"],
+        inputHint: "• Your product and its pricing model\n• Your target buyer persona\n• Common objections you actually hear\n• Your key differentiators vs alternatives\n• Typical deal size and sales cycle",
+        exampleInput: "Product: AutoTest Pro, £500-5000/month SaaS. Buyer: VP Engineering. Common objections: 'We already use Selenium', 'Our devs don't want another tool', 'Budget is frozen', 'Security concerns with cloud testing'. Differentiator: 10-min setup, no code changes.",
         suggestedNext: ["sales-proposal", "sales-case-study"],
     },
     {
@@ -2770,6 +2788,8 @@ Tone: professional, confident, focused on THEIR outcomes, not your features.
         inputLabel: "Prospect needs, product details & pricing",
         outputLabel: "Sales proposal",
         tags: ["proposal", "sales", "deal", "closing"],
+        inputHint: "• Prospect's company, pain points, and goals\n• What was discussed in discovery calls\n• Your proposed solution and pricing\n• Implementation timeline\n• Relevant case studies",
+        exampleInput: "Prospect: DataFlow Inc, 200 employees, QA bottleneck slowing releases. In discovery they said releases take 2 weeks, want daily. Proposing AutoTest Pro Enterprise at £60K/year. 2-week implementation. Case study: WidgetCorp went from weekly to daily releases.",
         suggestedNext: ["sales-follow-up"],
     },
     {
@@ -2843,6 +2863,8 @@ First, assess: What stage is this deal in? (Discovery → Demo → Proposal → 
         inputLabel: "Meeting context & deal details",
         outputLabel: "Follow-up sequence",
         tags: ["follow-up", "email", "sales", "nurturing"],
+        inputHint: "• What happened in the last meeting/call\n• Where the deal stands (stage, next steps)\n• Objections or concerns raised\n• Who else is involved in the decision\n• Agreed timeline",
+        exampleInput: "Had a demo with Sarah (VP Eng) and Mike (CTO) at DataFlow. They loved the CI/CD integration but need security team approval. Budget needs CFO sign-off. Agreed to reconnect in 2 weeks. Also evaluating Cypress.",
         suggestedNext: ["sales-proposal"],
     },
     {
@@ -2929,6 +2951,8 @@ First, identify: What is the core VALUE this product delivers? (Time saved, reve
         inputLabel: "Product, costs, competitors & current pricing",
         outputLabel: "Pricing strategy analysis",
         tags: ["pricing", "strategy", "revenue", "monetization"],
+        inputHint: "• Your current pricing model and tiers\n• Target customer segments\n• Competitor pricing (if known)\n• Your unit economics (CAC, LTV, margins)\n• What value your product delivers (quantified)",
+        exampleInput: "Current pricing: Starter £99/mo, Pro £299/mo, Enterprise custom. Targeting mid-market SaaS (50-500 employees). Competitors: Tool A £200-500/mo, Tool B is open source. CAC: £3000, LTV: £18K. We save teams ~20 hours/week on testing.",
         suggestedNext: ["sales-proposal", "startup-unit-economics"],
     },
     {
@@ -2965,6 +2989,8 @@ Keep it to one page. Sales reps should be able to scan it in 2 minutes.
         inputLabel: "Your product vs competitor details",
         outputLabel: "Competitive battlecard",
         tags: ["competitive", "battlecard", "sales", "positioning"],
+        inputHint: "• Your product's key features and strengths\n• The specific competitor to compare against\n• Known weaknesses of the competitor\n• Common switching triggers and objections\n• Win/loss anecdotes if available",
+        exampleInput: "Our product: AutoTest Pro (automated testing). Competitor: Cypress. Cypress is popular for frontend testing but weak on API testing, requires JS knowledge, no built-in CI/CD. We win when buyers need full-stack testing. We lose when they only need frontend and want free.",
         suggestedNext: ["sales-objection-handler"],
     },
     {
@@ -2997,6 +3023,8 @@ Also provide:
         inputLabel: "Customer story & results data",
         outputLabel: "Case study",
         tags: ["case-study", "customer", "social-proof", "success"],
+        inputHint: "• Customer name and industry\n• The problem they had before your product\n• How they use your product\n• Specific results with numbers (%, £, time saved)\n• A quote from the customer (if available)",
+        exampleInput: "Customer: WidgetCorp (e-commerce SaaS, 150 employees). Problem: QA took 3 days per release, causing monthly delays. Solution: Adopted AutoTest Pro across 12 dev teams. Results: QA cycle down from 3 days to 4 hours, releases went from monthly to daily. CTO quote: 'It paid for itself in month one.'",
         suggestedNext: ["marketing-social-media", "marketing-blog-post"],
     },
     {
@@ -3073,6 +3101,8 @@ First, analyze: What are this prospect's top 2-3 pain points? What will make the
         inputLabel: "Product features & prospect context",
         outputLabel: "Demo script",
         tags: ["demo", "script", "presentation", "sales"],
+        inputHint: "• Your product's key features to demo\n• Prospect's specific pain points and use case\n• Their technical sophistication level\n• Demo length (15, 30, or 60 minutes)\n• Key objections to preempt during the demo",
+        exampleInput: "Product: AutoTest Pro. Prospect: Sarah Chen, VP Eng at DataFlow. Pain: 3-day QA cycles, Selenium tests breaking constantly. Tech-savvy audience. 30-minute demo. Likely objection: 'How does it handle our custom test frameworks?'",
         suggestedNext: ["sales-proposal", "sales-follow-up"],
     },
     {
@@ -3109,6 +3139,8 @@ Score this lead using multiple frameworks:
         inputLabel: "Lead information & discovery notes",
         outputLabel: "Lead qualification score",
         tags: ["qualification", "lead-scoring", "bant", "meddic"],
+        inputHint: "• Lead's name, title, and company\n• How they found you (inbound, outbound, referral)\n• What they said in initial contact\n• Company size, industry, and stage\n• Any signals of urgency or budget",
+        exampleInput: "Lead: Mike Torres, CTO at LogiFlow (logistics SaaS, Series A, 80 employees). Inbound — downloaded our whitepaper and attended a webinar. Asked about enterprise pricing on website chat. Company just raised £8M. Currently using manual QA with 3 testers.",
         suggestedNext: ["outreach-prospect-research", "sales-cold-outreach", "sales-demo-script"],
     },
 
@@ -5124,6 +5156,8 @@ First, classify the customer's email: What is the core issue? What is the custom
         inputLabel: "Customer email & context",
         outputLabel: "Response email",
         tags: ["customer-support", "email", "response", "service"],
+        inputHint: "• The customer's email or message (paste it in full)\n• Your product/service context\n• Relevant policies (refund, SLA, warranty)\n• Customer history (tenure, plan tier, past issues)\n• Desired tone (formal, warm, apologetic)",
+        exampleInput: "Customer email: 'I've been trying to export my reports for 2 days and keep getting an error. I pay for the Pro plan and this is a basic feature. If this isn't fixed by Friday I'm switching to CompetitorX.' They've been a customer for 14 months, Pro plan at £299/mo. Export bug was logged by engineering yesterday.",
         suggestedNext: [],
     },
     {
@@ -5168,6 +5202,8 @@ For each question:
         inputLabel: "Product details & common support tickets",
         outputLabel: "FAQ document",
         tags: ["faq", "help", "documentation", "support"],
+        inputHint: "• Your product description and key features\n• Common support tickets or questions you receive\n• Your pricing model and plans\n• Known pain points or confusing areas\n• Target audience (technical, non-technical, mixed)",
+        exampleInput: "Product: AutoTest Pro, automated testing for CI/CD pipelines. Plans: Starter £99/mo, Pro £299/mo, Enterprise custom. Common questions: setup time, supported languages, CI/CD integrations, data security. Most confusion around: Starter vs Pro differences, GitHub Actions integration setup.",
         suggestedNext: ["cs-onboarding-emails"],
     },
     {
@@ -5219,6 +5255,8 @@ For EACH email, provide:
         inputLabel: "Product details & user journey",
         outputLabel: "Onboarding email sequence",
         tags: ["onboarding", "email", "sequence", "activation"],
+        inputHint: "• Your product and its key activation milestones\n• Target user persona and their goals\n• Trial length or onboarding period\n• Key features to highlight early\n• Common drop-off points",
+        exampleInput: "Product: AutoTest Pro. Trial: 14 days. Milestones: (1) Connect repo, (2) Run first test, (3) Set up CI/CD, (4) Invite team member. Target: Dev leads who care about speed. Drop-off: 40% never connect their repo. Goal: first test results within 24 hours.",
         suggestedNext: ["cs-health-scorer"],
     },
     {
@@ -5284,6 +5322,8 @@ For each high-risk segment: specific retention strategy
         inputLabel: "Churn data & customer feedback",
         outputLabel: "Churn analysis & prevention plan",
         tags: ["churn", "retention", "analysis", "prevention"],
+        inputHint: "• Your current churn rate (monthly/annual)\n• Customer segments and their churn rates\n• Known reasons customers leave\n• Product usage data patterns\n• Pricing and contract structure",
+        exampleInput: "Monthly churn: 4.5% (logo), 3.2% (revenue). SMB churns at 6%, mid-market at 3%, enterprise at 1%. Top reasons: 'not using it enough' (35%), 'switched to competitor' (25%), 'budget cuts' (20%). Low-usage accounts (< 5 tests/week) churn at 8x the rate. Monthly contracts, no annual lock-in.",
         suggestedNext: ["cs-health-scorer"],
     },
     {
@@ -5338,6 +5378,8 @@ First, classify each response: What is the customer's core sentiment? What speci
         inputLabel: "NPS scores & comments",
         outputLabel: "NPS responses",
         tags: ["nps", "feedback", "response", "satisfaction"],
+        inputHint: "• NPS scores and verbatim feedback to respond to\n• Your product name and context\n• Customer account details (plan, tenure)\n• Any known issues or requests they've raised\n• Your team's tone/style guide",
+        exampleInput: "NPS responses to write: (1) Score 9: 'Love the product, wish you had Jira integration' — Enterprise customer, 2 years. (2) Score 3: 'Support is slow and docs are outdated' — Pro customer, 6 months. (3) Score 7: 'Good but expensive' — Starter, 4 months. Jira integration is on roadmap for Q2.",
         suggestedNext: ["cs-churn-analyzer"],
     },
     {
@@ -5393,6 +5435,8 @@ For each account (or top 10 if many):
         inputLabel: "Customer data & usage metrics",
         outputLabel: "Health scores & recommendations",
         tags: ["health-score", "customer-success", "risk", "expansion"],
+        inputHint: "• Customer data to score (or product description to build framework)\n• Usage metrics you track (DAU, feature adoption, etc.)\n• Support ticket data\n• Contract and billing details\n• Engagement signals (events, NPS responses)",
+        exampleInput: "Score these accounts: (1) DataFlow: Pro plan, 18 months, 85% DAU, 2 tickets resolved, NPS 9, using 8/10 features, renews in 60 days. (2) LogiFlow: Starter, 4 months, 20% DAU, 8 tickets (3 unresolved), no NPS, using 3/10 features. (3) WidgetCorp: Enterprise, 24 months, 60% DAU, NPS 7.",
         suggestedNext: ["cs-churn-analyzer"],
     },
     {
@@ -5454,6 +5498,8 @@ First, calculate: What is the total value this customer has received? (Time save
         inputLabel: "Customer usage data & contract details",
         outputLabel: "Renewal proposal",
         tags: ["renewal", "proposal", "retention", "value"],
+        inputHint: "• Customer name, plan, and contract details\n• Value delivered during the contract (with metrics)\n• Usage highlights and adoption data\n• Any expansion opportunities\n• Proposed pricing (same or change)",
+        exampleInput: "Customer: DataFlow, Pro plan £299/mo, renewing after 12 months. Usage: 45,000 tests run, 230 bugs caught pre-production, 85% team adoption (17/20 devs active). Saved ~£120K in QA labour. Expansion: new team of 10 devs wants access. Proposing upgrade to Enterprise at £800/mo.",
         suggestedNext: [],
     },
     {
@@ -5522,6 +5568,8 @@ First, assess the escalation severity: Is this a service outage affecting their 
         inputLabel: "Escalation details & customer history",
         outputLabel: "Escalation response",
         tags: ["escalation", "response", "crisis", "customer"],
+        inputHint: "• The escalation details (what happened, customer impact)\n• Customer account info (plan, tenure, revenue)\n• What's been tried so far\n• Root cause (if known)\n• Desired resolution and timeline",
+        exampleInput: "Escalation: DataFlow's CEO emailed our CEO. Their test pipeline has been failing intermittently for 2 weeks. Support provided workarounds but no root cause fix. Enterprise tier (£60K/year), 2 years with us. CTO threatened to switch. Engineering found the bug yesterday — fix deploys tomorrow.",
         suggestedNext: ["cs-email-responder"],
     },
 

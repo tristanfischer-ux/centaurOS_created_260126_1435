@@ -30,8 +30,6 @@ const AgentsWorkflowView = dynamic(
 )
 
 interface AgentsWorkflowViewLoaderProps {
-    /** Whether the user has configured an AI provider key */
-    hasApiKey: boolean
     /** Workflows pre-fetched from the database on the server */
     initialWorkflows: AgentWorkflowRow[]
     /** Custom prompts pre-fetched from the database on the server */
@@ -42,13 +40,11 @@ interface AgentsWorkflowViewLoaderProps {
  * Wrapper that passes props through to the dynamically loaded view.
  */
 export function AgentsWorkflowViewLoader({
-    hasApiKey,
     initialWorkflows,
     initialCustomPrompts,
 }: AgentsWorkflowViewLoaderProps) {
     return (
         <AgentsWorkflowView
-            hasApiKey={hasApiKey}
             initialWorkflows={initialWorkflows}
             initialCustomPrompts={initialCustomPrompts}
         />

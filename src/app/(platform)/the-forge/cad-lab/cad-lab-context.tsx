@@ -188,7 +188,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Batch pipeline state ──
   const [isBatchRunning, setIsBatchRunning] = useState(false)
   const [batchProgress, setBatchProgress] = useState<Record<string, "queued" | "interface" | "generating" | "done" | "error">>({})
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Track how many modules are actively running (for concurrency limiting)
+  const activeModuleCountRef = useRef(0)
 
   // ── Progress storytelling ──
   const [progressLines, setProgressLines] = useState<string[]>([])
@@ -333,85 +334,74 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setActiveModuleId(null)
   }, [modules, editableReport, modelId, activeProjectId])
 
-  // ── Stop polling helper ──
-  const stopPolling = useCallback(() => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current)
-      pollIntervalRef.current = null
-    }
-  }, [])
-
-  // ── Poll batch status from DB ──
-  const pollBatchStatus = useCallback(async (projId: string) => {
-    try {
-      const res = await loadCadLabBatchStatus(projId)
-      if ("error" in res) return
-
-      // Build progress map from module statuses
-      const progress: Record<string, "queued" | "interface" | "generating" | "done" | "error"> = {}
-      for (const [modId, status] of Object.entries(res.moduleStatuses)) {
-        if (status === "generated") {
-          progress[modId] = "done"
-        } else if (status === "interface_ready") {
-          progress[modId] = "generating"
-        } else {
-          progress[modId] = "queued"
-        }
-      }
-      setBatchProgress(progress)
-
-      // Batch finished — stop polling, reload modules, update state
-      if (res.batchStatus === "done" || res.batchStatus === "error") {
-        stopPolling()
-        // Reload full modules from DB to get generation results
-        const projRes = await loadCadLabProject(projId)
-        if (!("error" in projRes) && projRes.project.modules) {
-          setModules(projRes.project.modules)
-        }
-        setLastSaved(new Date().toISOString())
-        if (res.batchStatus === "done" && res.generatedCount === res.totalCount) {
-          setMilestone("batch")
-        }
-        setIsBatchRunning(false)
-        addProgressLine(
-          res.batchStatus === "done"
-            ? `All ${res.generatedCount} modules generated successfully.`
-            : `Batch finished with errors. ${res.generatedCount}/${res.totalCount} modules ready.`,
-        )
-      }
-    } catch {
-      // Non-critical — next poll will retry
-    }
-  }, [stopPolling, addProgressLine])
-
-  // ── Start polling for batch progress ──
-  const startPolling = useCallback((projId: string) => {
-    stopPolling()
-    // Poll immediately once, then every 5 seconds
-    pollBatchStatus(projId)
-    pollIntervalRef.current = setInterval(() => pollBatchStatus(projId), 5000)
-  }, [stopPolling, pollBatchStatus])
-
-  // ── Cleanup polling on unmount ──
-  useEffect(() => {
-    return () => stopPolling()
-  }, [stopPolling])
-
   // ── Detect running batch on project load ──
+  // If user reloads while modules were generating, check DB for any
+  // modules that are still in progress and start polling to catch completions.
   useEffect(() => {
     if (!activeProjectId || modules.length === 0) return
+
+    let pollInterval: ReturnType<typeof setInterval> | null = null
+    let cancelled = false
 
     const checkBatchStatus = async (): Promise<void> => {
       try {
         const res = await loadCadLabBatchStatus(activeProjectId)
-        if ("error" in res) return
+        if ("error" in res || cancelled) return
 
         if (res.batchStatus === "running") {
-          // Resume polling — batch is running server-side
+          // Batch was started but page was reloaded — mark as running
           setIsBatchRunning(true)
-          setProgressLines(["Reconnected — batch generation in progress..."])
-          addProgressLine(`${res.generatedCount}/${res.totalCount} modules complete so far.`)
-          startPolling(activeProjectId)
+          const progress: Record<string, "queued" | "interface" | "generating" | "done" | "error"> = {}
+          for (const [modId, status] of Object.entries(res.moduleStatuses)) {
+            if (status === "generated") progress[modId] = "done"
+            else if (status === "interface_ready") progress[modId] = "generating"
+            else progress[modId] = "queued"
+          }
+          setBatchProgress(progress)
+          setProgressLines([
+            `Reconnected — ${res.generatedCount}/${res.totalCount} modules complete so far.`,
+            "Waiting for remaining modules to finish...",
+          ])
+
+          // Start lightweight polling to detect completions from in-flight requests
+          pollInterval = setInterval(async () => {
+            if (cancelled) { if (pollInterval) clearInterval(pollInterval); return }
+            try {
+              const pollRes = await loadCadLabBatchStatus(activeProjectId)
+              if ("error" in pollRes || cancelled) return
+
+              const newProgress: Record<string, "queued" | "interface" | "generating" | "done" | "error"> = {}
+              for (const [modId, st] of Object.entries(pollRes.moduleStatuses)) {
+                if (st === "generated") newProgress[modId] = "done"
+                else if (st === "interface_ready") newProgress[modId] = "generating"
+                else newProgress[modId] = "queued"
+              }
+              setBatchProgress(newProgress)
+
+              // Check if all modules are done
+              const allDone = Object.values(pollRes.moduleStatuses).every(
+                (s) => s === "generated",
+              )
+              const noneQueued = !Object.values(newProgress).some(
+                (s) => s === "queued" || s === "interface" || s === "generating",
+              )
+
+              if (allDone || noneQueued || pollRes.batchStatus === "done" || pollRes.batchStatus === "error") {
+                if (pollInterval) clearInterval(pollInterval)
+                pollInterval = null
+                // Reload full modules from DB
+                const projRes = await loadCadLabProject(activeProjectId)
+                if (!("error" in projRes) && projRes.project.modules) {
+                  setModules(projRes.project.modules)
+                }
+                setLastSaved(new Date().toISOString())
+                setIsBatchRunning(false)
+                if (allDone) setMilestone("batch")
+              }
+            } catch {
+              // Non-critical — next poll will retry
+            }
+          }, 5000)
         }
       } catch {
         // Non-critical
@@ -419,15 +409,37 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
 
     checkBatchStatus()
-  }, [activeProjectId, modules.length, startPolling, addProgressLine])
 
-  // ── Batch generate all modules (via background API route) ──
+    // Cleanup: stop polling on unmount or dependency change
+    return () => {
+      cancelled = true
+      if (pollInterval) clearInterval(pollInterval)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProjectId, modules.length])
+
+  // ── Per-module generation with client-side concurrency limit ──
+
+  /** Maximum number of concurrent module generation requests */
+  const MAX_CONCURRENCY = 3
+
+  /**
+   * Generates all pending modules by firing independent API requests.
+   *
+   * @description Each module gets its own serverless function invocation with
+   * a full 5-minute timeout. A client-side concurrency limit of 3 prevents
+   * overloading. As each module completes, the UI updates immediately — no
+   * polling required. This replaces the monolithic batch endpoint.
+   */
   const handleGenerateAllModules = useCallback(async () => {
     if (modules.length === 0 || isBatchRunning || !activeProjectId) return
 
+    const pending = modules.filter((m) => m.status !== "generated")
+    if (pending.length === 0) return
+
     setIsBatchRunning(true)
     setProgressLines([])
-    addProgressLine("Starting full pipeline across all modules...")
+    addProgressLine(`Starting pipeline for ${pending.length} modules...`)
 
     // Initialize progress UI — mark all non-generated as queued
     const progress: Record<string, "queued" | "interface" | "generating" | "done" | "error"> = {}
@@ -436,38 +448,110 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
     setBatchProgress({ ...progress })
 
+    // Mark batch as running in DB (for reconnection detection)
     try {
-      // Fire the background API route — don't await the full response
-      // (it takes minutes), just verify it started successfully
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout for initial handshake
-
-      fetch("/api/cad-lab/generate-batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: activeProjectId }),
-        signal: controller.signal,
-      })
-        .then((res) => {
-          clearTimeout(timeoutId)
-          if (!res.ok) {
-            // If the API route reports an error, we'll pick it up via polling
-            console.warn("[CAD-LAB] Batch API responded with:", res.status)
-          }
+      const supabase = createClient()
+      await supabase
+        .from("cad_lab_projects")
+        .update({
+          batch_status: "running",
+          batch_started_at: new Date().toISOString(),
         })
-        .catch(() => {
-          clearTimeout(timeoutId)
-          // Connection was aborted or failed — that's fine, the server continues
-        })
-
-      // Start polling for progress regardless
-      addProgressLine("Generation running on server — you can safely leave this page.")
-      startPolling(activeProjectId)
-    } catch (err) {
-      console.error("[CAD-LAB] Failed to start batch:", err)
-      setIsBatchRunning(false)
+        .eq("id", activeProjectId)
+    } catch {
+      // Non-critical — batch status is mainly for reconnection
     }
-  }, [modules, isBatchRunning, activeProjectId, addProgressLine, startPolling])
+
+    addProgressLine("Each module runs independently — results appear as they complete.")
+
+    // Client-side concurrency limiter
+    let completedCount = modules.filter((m) => m.status === "generated").length
+    let errorCount = 0
+    activeModuleCountRef.current = 0
+
+    const waitForSlot = (): Promise<void> => {
+      if (activeModuleCountRef.current < MAX_CONCURRENCY) return Promise.resolve()
+      return new Promise<void>((resolve) => {
+        const check = setInterval(() => {
+          if (activeModuleCountRef.current < MAX_CONCURRENCY) {
+            clearInterval(check)
+            resolve()
+          }
+        }, 200)
+      })
+    }
+
+    const generateOne = async (mod: CadLabModule): Promise<void> => {
+      await waitForSlot()
+      activeModuleCountRef.current++
+
+      // Mark as generating in UI
+      setBatchProgress((prev) => ({ ...prev, [mod.id]: "generating" }))
+
+      try {
+        const res = await fetch("/api/cad-lab/generate-module", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: activeProjectId,
+            moduleId: mod.id,
+          }),
+        })
+
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({ error: "Unknown error" })) as { error?: string }
+          throw new Error(errBody.error || `HTTP ${res.status}`)
+        }
+
+        const data = await res.json() as { done: boolean; module: CadLabModule; elapsedMs: number }
+
+        // Update module in local state immediately
+        setModules((prev) =>
+          prev.map((m) => (m.id === mod.id ? data.module : m)),
+        )
+        setBatchProgress((prev) => ({ ...prev, [mod.id]: "done" }))
+        completedCount++
+        addProgressLine(
+          `${mod.name} complete (${(data.elapsedMs / 1000).toFixed(0)}s) — ${completedCount}/${modules.length} done`,
+        )
+      } catch (err) {
+        console.error("[CAD-LAB] Module generation failed:", mod.name, err instanceof Error ? err.message : err)
+        setBatchProgress((prev) => ({ ...prev, [mod.id]: "error" }))
+        errorCount++
+        addProgressLine(`${mod.name} failed: ${err instanceof Error ? err.message : "Unknown error"}`)
+      } finally {
+        activeModuleCountRef.current--
+      }
+    }
+
+    // Fire all module generations (concurrency limited by waitForSlot)
+    try {
+      await Promise.allSettled(pending.map((mod) => generateOne(mod)))
+    } finally {
+      // Mark batch as complete in DB
+      try {
+        const supabase = createClient()
+        await supabase
+          .from("cad_lab_projects")
+          .update({ batch_status: errorCount === pending.length ? "error" : "done" })
+          .eq("id", activeProjectId)
+      } catch {
+        // Non-critical
+      }
+
+      setLastSaved(new Date().toISOString())
+      setIsBatchRunning(false)
+
+      if (errorCount === 0) {
+        setMilestone("batch")
+        addProgressLine(`All ${pending.length} modules generated successfully.`)
+      } else {
+        addProgressLine(
+          `Batch finished — ${completedCount - (modules.length - pending.length)}/${pending.length} modules generated, ${errorCount} failed.`,
+        )
+      }
+    }
+  }, [modules, isBatchRunning, activeProjectId, addProgressLine])
 
   // ── Research ──
   const handleResearch = useCallback(async () => {

@@ -32,7 +32,6 @@ const AgentsWorkflowView = dynamic(
 type PageView = "specialists" | "project-builder"
 
 interface SpecialistsPageClientProps {
-    hasApiKey: boolean
     initialWorkflows: AgentWorkflowRow[]
     initialCustomPrompts: AgentCustomPromptRow[]
 }
@@ -42,7 +41,6 @@ interface SpecialistsPageClientProps {
  * Specialist Roster (default) and the Project Builder (workflow editor).
  */
 export function SpecialistsPageClient({
-    hasApiKey,
     initialWorkflows,
     initialCustomPrompts,
 }: SpecialistsPageClientProps) {
@@ -83,7 +81,6 @@ export function SpecialistsPageClient({
                 <div className="flex-1 min-h-0 overflow-y-auto">
                     <div className="px-4 sm:px-6 lg:px-8 pt-6">
                         <SpecialistsLanding
-                            hasApiKey={hasApiKey}
                             onOpenProjectBuilder={() => setView("project-builder")}
                         />
                     </div>
@@ -91,7 +88,6 @@ export function SpecialistsPageClient({
             ) : (
                 <div className="flex-1 min-h-0">
                     <AgentsWorkflowView
-                        hasApiKey={hasApiKey}
                         initialWorkflows={initialWorkflows}
                         initialCustomPrompts={initialCustomPrompts}
                     />

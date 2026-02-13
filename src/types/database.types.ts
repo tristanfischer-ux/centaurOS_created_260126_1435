@@ -1176,6 +1176,7 @@ export type Database = {
           feature: string
           foundry_id: string
           id: string
+          key_source: string
           metadata: Json | null
           model: string
           prompt_tokens: number
@@ -1189,6 +1190,7 @@ export type Database = {
           feature: string
           foundry_id: string
           id?: string
+          key_source?: string
           metadata?: Json | null
           model?: string
           prompt_tokens?: number
@@ -1202,6 +1204,7 @@ export type Database = {
           feature?: string
           foundry_id?: string
           id?: string
+          key_source?: string
           metadata?: Json | null
           model?: string
           prompt_tokens?: number
@@ -12471,6 +12474,10 @@ export type Database = {
       }
       update_blueprint_metrics: {
         Args: { p_blueprint_id: string }
+        Returns: undefined
+      }
+      update_cad_lab_module: {
+        Args: { p_module_data: Json; p_module_id: string; p_project_id: string }
         Returns: undefined
       }
       update_foundry_purpose:

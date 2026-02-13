@@ -198,6 +198,9 @@ export function CadLabProgress({ lines, isActive, operationType, subject = "" }:
 
   if (!isActive && lines.length === 0) return null
 
+  // For non-batch operations, show a time-based progress estimate.
+  // Batch operations show real per-module progress in the batch grid instead.
+  const isBatch = operationType === "batch"
   const estimatedSeconds = operationType === "research" ? 60
     : operationType === "breakdown" ? 30
     : operationType === "generate" ? 45
@@ -208,16 +211,15 @@ export function CadLabProgress({ lines, isActive, operationType, subject = "" }:
   return (
     <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/20 to-background overflow-hidden">
       <CardContent className="pt-6 space-y-4">
-        {/* Progress bar */}
-        {isActive && (
+        {/* Progress bar — hidden for batch (batch grid shows real progress) */}
+        {isActive && !isBatch && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Loader2 className="h-3 w-3 animate-spin text-international-orange" />
                 {operationType === "research" ? "Researching your product..." :
                  operationType === "breakdown" ? "Mapping sub-assemblies..." :
-                 operationType === "generate" ? "Generating parametric CAD..." :
-                 "Running full pipeline..."}
+                 "Generating parametric CAD..."}
               </span>
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />

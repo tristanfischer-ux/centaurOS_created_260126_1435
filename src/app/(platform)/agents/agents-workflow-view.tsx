@@ -18,8 +18,6 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { toast } from "sonner"
-import Link from "next/link"
-import { Info, X as XIcon } from "lucide-react"
 
 import { PromptNode, HumanTaskNode } from "./components/prompt-node"
 import { PromptLibrarySidebar } from "./components/prompt-library-sidebar"
@@ -207,11 +205,9 @@ function getLayoutedElements(
 
 // ─── Inner flow (needs ReactFlowProvider) ─────────────────────────
 function AgentsFlowInner({
-    hasApiKey,
     initialWorkflows,
     initialCustomPrompts,
 }: {
-    hasApiKey: boolean
     initialWorkflows: AgentWorkflowRow[]
     initialCustomPrompts: AgentCustomPromptRow[]
 }) {
@@ -228,7 +224,6 @@ function AgentsFlowInner({
     const [createPromptOpen, setCreatePromptOpen] = useState(false)
     const [helpOpen, setHelpOpen] = useState(false)
     const [resultsOpen, setResultsOpen] = useState(false)
-    const [apiBannerDismissed, setApiBannerDismissed] = useState(false)
 
     // Workflow metadata — initialised from server-fetched data
     const [dbWorkflowId, setDbWorkflowId] = useState<string | null>(
@@ -1194,25 +1189,7 @@ function AgentsFlowInner({
                 onExportAll={handleExportAll}
             />
 
-            {/* API key banner — shown when user has no keys configured */}
-            {!hasApiKey && !apiBannerDismissed && (
-                <div className="flex items-center gap-3 px-4 py-2.5 bg-status-info-light border-b border-status-info/20 flex-shrink-0">
-                    <Info className="w-4 h-4 text-status-info flex-shrink-0" />
-                    <p className="text-xs text-foreground flex-1">
-                        <strong>Connect a provider</strong> to run projects.{" "}
-                        <Link href="/settings#ai-providers" className="text-status-info hover:underline font-medium">
-                            Go to Settings
-                        </Link>
-                    </p>
-                    <button
-                        onClick={() => setApiBannerDismissed(true)}
-                        className="p-1 rounded hover:bg-white/50 text-muted-foreground"
-                        aria-label="Dismiss"
-                    >
-                        <XIcon className="w-3.5 h-3.5" />
-                    </button>
-                </div>
-            )}
+            {/* AI is provided by the platform -- no key configuration needed */}
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar */}
@@ -1423,18 +1400,15 @@ function AgentsFlowInner({
 
 // ─── Exported wrapper with provider ───────────────────────────────
 export function AgentsWorkflowView({
-    hasApiKey,
     initialWorkflows,
     initialCustomPrompts,
 }: {
-    hasApiKey: boolean
     initialWorkflows: AgentWorkflowRow[]
     initialCustomPrompts: AgentCustomPromptRow[]
 }) {
     return (
         <ReactFlowProvider>
             <AgentsFlowInner
-                hasApiKey={hasApiKey}
                 initialWorkflows={initialWorkflows}
                 initialCustomPrompts={initialCustomPrompts}
             />

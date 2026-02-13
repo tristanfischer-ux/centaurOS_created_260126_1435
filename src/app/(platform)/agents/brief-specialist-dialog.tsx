@@ -618,9 +618,29 @@ export function BriefSpecialistDialog({
                                     ))}
                                 </div>
                                 {selectedPrompt && (
-                                    <p className="text-xs text-muted-foreground">
-                                        {selectedPrompt.description}
-                                    </p>
+                                    <div className="p-3 rounded-lg bg-international-orange/5 border border-international-orange/15 space-y-2">
+                                        <p className="text-sm text-foreground font-medium">
+                                            {selectedPrompt.description}
+                                        </p>
+                                        {selectedPrompt.inputHint && (
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-semibold text-muted-foreground">What to include:</p>
+                                                <div className="text-xs text-muted-foreground leading-relaxed space-y-0.5">
+                                                    {selectedPrompt.inputHint.split("\n").map((line, i) => (
+                                                        <p key={i}>{line}</p>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {selectedPrompt.exampleInput && (
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-semibold text-muted-foreground">Example:</p>
+                                                <p className="text-xs text-muted-foreground/70 italic leading-relaxed">
+                                                    &ldquo;{selectedPrompt.exampleInput}&rdquo;
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         )}
@@ -678,7 +698,7 @@ export function BriefSpecialistDialog({
                                         hasConversation
                                             ? `Follow up with your ${specialist.name}...`
                                             : selectedPrompt
-                                                ? `Tell your ${specialist.name} the details...`
+                                                ? `Paste or type your ${selectedPrompt.inputLabel.toLowerCase()} here...`
                                                 : `What do you need from your ${specialist.name}?`
                                     }
                                     className={cn(

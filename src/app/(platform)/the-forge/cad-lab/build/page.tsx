@@ -191,9 +191,46 @@ export default function CadLabBuildPage(): React.ReactNode {
             )}
           </div>
 
-          {/* Batch progress grid — rich per-module pipeline view */}
-          {isBatchRunning && Object.keys(batchProgress).length > 0 && (
-            <div className="space-y-2">
+          {/* Batch progress grid — real per-module pipeline tracking */}
+          {Object.keys(batchProgress).length > 0 && (
+            <div className="space-y-3">
+              {/* Completion counter */}
+              {(() => {
+                const doneCount = Object.values(batchProgress).filter((s) => s === "done").length
+                const totalCount = Object.keys(batchProgress).length
+                const activeCount = Object.values(batchProgress).filter((s) => s === "generating" || s === "interface").length
+                const errorCount = Object.values(batchProgress).filter((s) => s === "error").length
+                return (
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-foreground">
+                        {doneCount} of {totalCount} modules complete
+                      </span>
+                      {activeCount > 0 && (
+                        <span className="text-xs text-international-orange flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          {activeCount} generating...
+                        </span>
+                      )}
+                      {errorCount > 0 && (
+                        <span className="text-xs text-destructive flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          {errorCount} failed
+                        </span>
+                      )}
+                    </div>
+                    {/* Overall progress bar */}
+                    <div className="w-32 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-status-success rounded-full transition-all duration-500"
+                        style={{ width: `${(doneCount / totalCount) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* Per-module status rows */}
               {modules.map((mod, idx) => {
                 const status = batchProgress[mod.id] || "queued"
                 const stepIndex = status === "queued" ? 0 : status === "interface" ? 1 : status === "generating" ? 2 : status === "done" ? 3 : -1
@@ -206,10 +243,13 @@ export default function CadLabBuildPage(): React.ReactNode {
                     key={mod.id}
                     className={`border rounded-lg p-3 transition-all duration-300 ${
                       isActive ? "border-international-orange/40 bg-gradient-to-r from-international-orange-light/10 to-background shadow-sm" :
-                      isDone ? "border-status-success/30 bg-status-success-light/10" :
+                      isDone ? "border-status-success/30 bg-status-success-light/10 cursor-pointer hover:shadow-sm" :
                       isError ? "border-destructive/30 bg-status-error-light/10" :
                       "border-muted bg-muted/10"
                     }`}
+                    onClick={isDone ? () => setExpandedModuleId(expandedModuleId === mod.id ? null : mod.id) : undefined}
+                    role={isDone ? "button" : undefined}
+                    tabIndex={isDone ? 0 : undefined}
                   >
                     <div className="flex items-center justify-between gap-4">
                       {/* Module info */}
@@ -300,15 +340,15 @@ export default function CadLabBuildPage(): React.ReactNode {
                         </div>
                       </div>
 
-                      {/* Status label */}
-                      <div className="flex-shrink-0 w-28 text-right">
+                      {/* Status label + expand hint for completed */}
+                      <div className="flex-shrink-0 w-32 text-right">
                         <span className={`text-xs font-medium ${
                           isDone ? "text-status-success" :
                           isActive ? "text-international-orange" :
                           isError ? "text-destructive" :
                           "text-muted-foreground"
                         }`}>
-                          {isDone ? "Complete" :
+                          {isDone ? "Complete — click to view" :
                            status === "interface" ? "Planning dims..." :
                            status === "generating" ? "Building CAD..." :
                            isError ? "Failed" :
