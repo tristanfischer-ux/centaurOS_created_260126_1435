@@ -1054,9 +1054,6 @@ function HowAProjectWorksSection() {
                 sizes="(max-width: 768px) 100vw, 600px"
               />
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-foreground/80 to-transparent p-6">
-                <p className="text-background text-xs font-mono uppercase tracking-widest mb-1">
-                  Illustrative Example
-                </p>
                 <p className="text-background/80 text-sm">
                   Inspection Drone Prototype
                 </p>
