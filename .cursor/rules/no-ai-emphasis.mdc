@@ -1,0 +1,49 @@
+# No AI Emphasis
+
+ForgeOS is a **human-first** product. AI capabilities exist to support humans, not to be showcased. Never emphasize, highlight, or draw attention to AI in the interface.
+
+## Rules
+
+1. **No AI-centric labels.** Don't label things as "AI-powered", "AI-generated", "Smart", or "Intelligent". If AI does the work, present the result -- not the mechanism.
+2. **No AI agent counts or stats.** Don't show "3 AI agents working" or "AI tasks completed" in dashboards or summaries.
+3. **No AI branding in navigation.** No "AI Hub", "AI Assistant", "AI Insights" as nav items or page titles.
+4. **No robot/brain iconography.** Don't use Bot, BrainCircuit, Sparkles, Wand, or similar icons to signal "this is AI." Present features by what they do, not how they work.
+5. **Subtle AI attribution only when necessary.** If attribution is required (e.g., "generated summary"), use small muted text -- never badges, banners, or highlighted callouts.
+6. **No AI onboarding emphasis.** Don't make "meet your AI agents" a step in onboarding or a hero section on landing pages.
+
+## The Test
+
+Before adding any AI-related UI element, ask: **"Would this feature description make sense without mentioning AI?"** If yes, don't mention AI. Present the value, not the technology.
+
+## Examples
+
+```tsx
+// ❌ WRONG - Emphasizes AI
+<h2>AI-Powered Task Suggestions</h2>
+<Badge>AI Generated</Badge>
+<p>Our AI agent analyzed your objectives and recommends...</p>
+<Bot className="h-5 w-5" /> {/* Robot icon */}
+
+// ✅ CORRECT - Presents value, not mechanism
+<h2>Suggested Tasks</h2>
+<p className="text-sm text-muted-foreground">Based on your objectives</p>
+```
+
+```tsx
+// ❌ WRONG - AI stats on dashboard
+<Card>
+  <CardTitle>AI Activity</CardTitle>
+  <p>3 agents active</p>
+  <p>47 AI tasks completed today</p>
+</Card>
+
+// ✅ CORRECT - Show outcomes, not AI activity
+<Card>
+  <CardTitle>Today's Progress</CardTitle>
+  <p>47 tasks completed</p>
+</Card>
+```
+
+## Exception
+
+The only place AI may be referenced explicitly is in **technical documentation** or **developer-facing settings** (e.g., model selection for a specific feature). User-facing surfaces should always lead with the human outcome.

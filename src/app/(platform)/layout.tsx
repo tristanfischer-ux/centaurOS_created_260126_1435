@@ -8,6 +8,7 @@ import { KeyboardShortcutsDialog } from "@/components/KeyboardShortcutsDialog";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { OnboardingModal } from "@/components/OnboardingModal";
+import { WelcomeBackBanner } from "@/components/WelcomeBackBanner";
 import { ExecutiveProfilePrompt, VerificationSuccessToast } from "@/components/onboarding";
 import { ActivityTracker } from "@/components/ActivityTracker";
 import { Suspense } from "react";
@@ -102,6 +103,7 @@ export default async function PlatformLayout({
                         <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} />
                         <ZoomableContent className="flex-1 overflow-y-auto bg-background">
                             <main className="p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
+                                <WelcomeBackBanner userName={profile?.full_name || user.email || "builder"} />
                                 <ErrorBoundary>
                                     {children}
                                 </ErrorBoundary>

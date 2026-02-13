@@ -113,7 +113,7 @@ export default function MarketingPage() {
               href="#how-it-works"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
-              How It Works
+              Getting Started
             </a>
             <Link
               href="/pricing"
@@ -181,7 +181,7 @@ export default function MarketingPage() {
                 {[
                   { href: "#problem", label: "Why Us" },
                   { href: "#solution", label: "Solution" },
-                  { href: "#how-it-works", label: "How It Works" },
+                  { href: "#how-it-works", label: "Getting Started" },
                   { href: "#faq", label: "FAQ" },
                 ].map((item) => (
                   <a
@@ -235,10 +235,9 @@ export default function MarketingPage() {
           <SavingsCalculatorSection />
         </Suspense>
         <SolutionSection />
+        <HowItWorksSection />
         <HowAProjectWorksSection />
         <PlatformCapabilitiesSection />
-        <HowItWorksSection />
-        <CapabilitiesHighlight />
         <PricingPreviewSection />
         <FAQSection />
         <FinalCTASection />
@@ -517,7 +516,7 @@ function HeroSection() {
           transition={{ delay: 1.2, duration: 0.6 }}
           className="mt-8 md:mt-12 text-xs text-muted-foreground font-mono tracking-wider"
         >
-          v0.9 &mdash; Shipping weekly. Shaped by founding members.
+          Shipping weekly. Shaped by founding members.
         </motion.p>
       </div>
     </section>
@@ -692,7 +691,7 @@ function SavingsCalculatorSection() {
             See Your Savings
           </span>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
-            How Much Is Your Standing Army
+            How Much Is Your Full-Time Team
             <br className="hidden sm:block" />{" "}
             <span className="text-international-orange">Really Costing You?</span>
           </h2>
@@ -954,7 +953,7 @@ function SolutionSection() {
       icon: Factory,
       title: "Manufacturing Network",
       description:
-        "Access 80+ manufacturing techniques through our vetted supplier network. From 3D printing to injection moulding — one platform, every process.",
+        "Access 78+ manufacturing techniques through our vetted supplier network. From 3D printing to injection moulding — one platform, every process.",
     },
     {
       icon: Wrench,
@@ -1029,7 +1028,7 @@ function HowAProjectWorksSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <AnimatedSection className="text-center mb-12 md:mb-16">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
-            How a Project Works
+            A Typical Sprint
           </span>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
             From Concept to Prototype.
@@ -1136,9 +1135,9 @@ function HowAProjectWorksSection() {
 
 function PlatformCapabilitiesSection() {
   const METRICS = [
-    { value: "80+", label: "Manufacturing Techniques" },
+    { value: "78+", label: "Manufacturing Techniques" },
     { value: "100", label: "Founding Member Spots" },
-    { value: "10", label: "Engineering Categories" },
+    { value: "12", label: "Week Sprints" },
     { value: "£0", label: "Equity Given Up" },
   ] as const;
 
@@ -1159,7 +1158,7 @@ function PlatformCapabilitiesSection() {
       icon: Factory,
       title: "Full Manufacturing Stack",
       description:
-        "From 3D printing to CNC to injection moulding — access 80+ manufacturing techniques through one platform.",
+        "From 3D printing to CNC to injection moulding — access 78+ manufacturing techniques through one platform.",
     },
   ] as const;
 
@@ -1214,6 +1213,41 @@ function PlatformCapabilitiesSection() {
             );
           })}
         </StaggerContainer>
+
+        {/* Manufacturing capabilities — merged from former CapabilitiesHighlight */}
+        <AnimatedSection className="text-center mt-16 md:mt-24">
+          <div className="flex flex-wrap justify-center gap-3 mb-6">
+            {[
+              "Additive Manufacturing",
+              "CNC Machining",
+              "Sheet Metal",
+              "Injection Moulding",
+              "Casting",
+              "Composites",
+              "PCB Assembly",
+              "Surface Treatment",
+            ].map((cap) => (
+              <span
+                key={cap}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border bg-card text-sm font-medium text-foreground"
+              >
+                <CheckCircle2 className="h-4 w-4 text-status-success" />
+                {cap}
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground font-mono tracking-wider mb-6">
+            + Welding, Brazing, Carbon Fibre, Nano-Imprint, Bio-Printing, and
+            dozens more.
+          </p>
+          <Link
+            href="/techniques"
+            className="inline-flex items-center gap-2 text-electric-blue hover:text-electric-blue-hover text-sm font-mono uppercase tracking-wider transition-colors"
+          >
+            Explore All 78+ Techniques
+            <ExternalLink className="h-4 w-4" />
+          </Link>
+        </AnimatedSection>
       </div>
     </section>
   );
@@ -1266,10 +1300,10 @@ function HowItWorksSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <AnimatedSection className="text-center mb-12 md:mb-20">
           <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-4 block">
-            Three Steps
+            Getting Started
           </span>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6">
-            How It Works
+            Three Steps to Your First Sprint
           </h2>
           <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
             From application to shipping product — here&apos;s the path.
@@ -1316,70 +1350,6 @@ function HowItWorksSection() {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
- * SECTION 6 — CAPABILITIES HIGHLIGHT
- * Condensed view of manufacturing breadth (not the full 8-card grid).
- * ════════════════════════════════════════════════════════════════════════ */
-
-function CapabilitiesHighlight() {
-  const CAPABILITIES = [
-    "Additive Manufacturing",
-    "CNC Machining",
-    "Sheet Metal",
-    "Injection Moulding",
-    "Casting",
-    "Composites",
-    "PCB Assembly",
-    "Surface Treatment",
-  ] as const;
-
-  return (
-    <section className="py-16 md:py-24 bg-background border-t border-muted">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
-            Manufacturing Network
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-black mb-6">
-            80+ Techniques. One Platform.
-          </h2>
-          <p className="text-muted-foreground text-base max-w-2xl mx-auto leading-relaxed mb-10">
-            From rapid prototyping to full-scale production — access every
-            manufacturing process, material, and finish you need to ship
-            hardware.
-          </p>
-
-          {/* Capability tags */}
-          <div className="flex flex-wrap justify-center gap-3 mb-8">
-            {CAPABILITIES.map((cap) => (
-              <span
-                key={cap}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border bg-card text-sm font-medium text-foreground"
-              >
-                <CheckCircle2 className="h-4 w-4 text-status-success" />
-                {cap}
-              </span>
-            ))}
-          </div>
-
-          <p className="text-xs text-muted-foreground font-mono tracking-wider mb-6">
-            + Welding, Brazing, Carbon Fibre, Nano-Imprint, Bio-Printing, and
-            dozens more.
-          </p>
-
-          <Link
-            href="/techniques"
-            className="inline-flex items-center gap-2 text-electric-blue hover:text-electric-blue-hover text-sm font-mono uppercase tracking-wider transition-colors"
-          >
-            Explore All 78+ Techniques
-            <ExternalLink className="h-4 w-4" />
-          </Link>
-        </AnimatedSection>
-      </div>
-    </section>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════════════════
  * SECTION 7 — PRICING PREVIEW
  * Shows tiers at a glance with link to full pricing page.
  * ════════════════════════════════════════════════════════════════════════ */
@@ -1391,8 +1361,8 @@ function PricingPreviewSection() {
       price: "£0",
       period: "forever",
       description: "Get started and explore the platform",
-      features: ["5 orders/month", "20 AI tasks/month", "Basic marketplace"],
-      cta: "Get Started Free",
+      features: ["5 orders/month", "20 smart assists/month", "Basic marketplace"],
+      cta: "Apply Free",
       href: "/join/founder",
       highlight: false,
     },
@@ -1403,11 +1373,11 @@ function PricingPreviewSection() {
       description: "For growing hardware ventures",
       features: [
         "25 orders/month",
-        "100 AI tasks/month",
+        "100 smart assists/month",
         "3 team members",
         "1 active retainer",
       ],
-      cta: "Start Building",
+      cta: "Apply Now",
       href: "/join/founder",
       highlight: false,
     },
@@ -1418,12 +1388,12 @@ function PricingPreviewSection() {
       description: "For serious hardware companies",
       features: [
         "Unlimited orders",
-        "500 AI tasks/month",
+        "500 smart assists/month",
         "10 team members",
         "Unlimited retainers",
         "API access",
       ],
-      cta: "Go Professional",
+      cta: "Apply Now",
       href: "/join/founder",
       highlight: true,
     },
@@ -1460,7 +1430,7 @@ function PricingPreviewSection() {
             >
               {tier.highlight && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-international-orange text-white text-xs font-mono font-bold tracking-widest uppercase px-4 py-1 rounded-full">
-                  Most Popular
+                  Recommended
                 </span>
               )}
               <h3 className="text-xl font-bold mb-1">{tier.name}</h3>

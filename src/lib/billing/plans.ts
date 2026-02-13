@@ -66,7 +66,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     features: [
       'Up to 5 orders per month',
       'Basic marketplace access',
-      '20 AI tasks per month',
+      '20 smart assists per month',
       'Standard support',
     ],
     limits: {
@@ -90,7 +90,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       'Full marketplace access',
       'Up to 3 team members',
       '1 active retainer',
-      '100 AI tasks per month',
+      '100 smart assists per month',
       'Email support',
     ],
     limits: {
@@ -116,7 +116,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       'Full marketplace access',
       'Up to 10 team members',
       'Unlimited retainers',
-      '500 AI tasks per month',
+      '500 smart assists per month',
       'API access',
       'Priority support',
     ],
@@ -141,7 +141,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     features: [
       'Everything in Professional',
       'Unlimited team members',
-      'Unlimited AI tasks',
+      'Unlimited smart assists',
       'Dedicated account manager',
       'Custom integrations',
       'SLA guarantees',

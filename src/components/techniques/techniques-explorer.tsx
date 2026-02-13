@@ -4,7 +4,7 @@
  * TechniquesExplorer — Main component for the Manufacturing Techniques
  * tab in the Inspiration page.
  *
- * @description Interactive encyclopedia of 80+ modern manufacturing
+ * @description Interactive encyclopedia of 78+ modern manufacturing
  * techniques. Lets users browse by category, search, filter by cost/
  * batch size, click through to detailed technique info with CTAs,
  * compare techniques side by side, and save favourites.

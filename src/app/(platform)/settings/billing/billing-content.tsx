@@ -201,7 +201,7 @@ export function BillingContent({
                   {subscription?.cancel_at_period_end
                     ? 'Cancels at end of period'
                     : currentTier === 'free'
-                      ? 'Free tier — upgrade for more AI tasks and features'
+                      ? 'Free tier — upgrade for more smart assists and features'
                       : `Renews ${subscription?.current_period_end
                           ? new Date(subscription.current_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
                           : 'monthly'
@@ -255,9 +255,9 @@ export function BillingContent({
               <Sparkles className="h-5 w-5 text-electric-blue" />
             </div>
             <div>
-              <CardTitle className="text-lg">AI Usage This Month</CardTitle>
+              <CardTitle className="text-lg">Smart Assists This Month</CardTitle>
               <p className="text-sm text-muted-foreground">
-                {aiUsage.totalAiTasks} of {aiLimit} AI tasks used
+                {aiUsage.totalAiTasks} of {aiLimit} smart assists used
               </p>
             </div>
           </div>
@@ -286,7 +286,7 @@ export function BillingContent({
               <p className="text-sm text-status-warning flex items-center gap-1.5">
                 <AlertCircle className="h-3.5 w-3.5" />
                 {aiUsagePercent >= 100
-                  ? 'Limit reached — upgrade for more AI tasks'
+                  ? 'Limit reached — upgrade for more smart assists'
                   : 'Approaching limit — consider upgrading'
                 }
               </p>
@@ -408,7 +408,7 @@ export function BillingContent({
                 <div>
                   <p className="font-semibold text-foreground">Enterprise</p>
                   <p className="text-sm text-muted-foreground">
-                    Unlimited AI tasks, SSO, dedicated support, custom integrations
+                    Unlimited smart assists, SSO, dedicated support, custom integrations
                   </p>
                 </div>
               </div>

@@ -116,15 +116,15 @@ export const SECTIONS: Section[] = [
         id: "me",
         label: "Me",
         introRoute: "/me",
-        tagline: "Your personal command centre",
-        description: "Everything about you — your profile, activity feed, and personal settings. This is your home base inside ForgeOS.",
+        tagline: "Everything you need, one glance",
+        description: "Start your day here. Due tasks, live updates, and your momentum — all in one view. No digging through emails. No switching between apps.",
         valueProps: [
-            { title: "Own your identity", text: "Your profile is your presence across the entire platform — companies, marketplace, and team." },
-            { title: "Stay in the loop", text: "One feed for everything: task updates, comments, mentions, and changes that matter to you." },
+            { title: "Start every day informed", text: "See what's due, what's overdue, and what changed — the moment you open ForgeOS." },
+            { title: "Track your momentum", text: "Your activity heatmap and streak show real progress. Watch your productivity compound over time." },
         ],
         visual: {
             heroImage: "/images/sections/me-hero.png",
-            heroAlt: "Personal dashboard on an ultrawide curved monitor",
+            heroAlt: "Clean desk with ultrawide monitor showing a personal dashboard in morning light",
             accentGradient: "from-orange-500 to-amber-400",
             accentBg: "bg-orange-50",
             accentText: "text-international-orange",
@@ -132,7 +132,7 @@ export const SECTIONS: Section[] = [
             journeyLabel: "You",
         },
         connections: [
-            { targetId: "plan", relationship: "feeds into", description: "Your profile and updates keep you informed as you plan what to build next." },
+            { targetId: "plan", relationship: "feeds into", description: "Your dashboard keeps you informed, so when you sit down to plan, you know exactly where things stand." },
         ],
         features: [
             {
@@ -155,16 +155,16 @@ export const SECTIONS: Section[] = [
         id: "plan",
         label: "Plan",
         introRoute: "/plan",
-        tagline: "From vision to action",
-        description: "Map your strategy, set objectives, and break them into tasks. This is where you decide what to build and when.",
+        tagline: "Idea to plan in seconds",
+        description: "Describe what you want in one sentence. ForgeOS generates objectives, tasks, timelines, and milestones. Or pick a template and deploy a full plan instantly. No spreadsheets. No consultants. No wasted days.",
         valueProps: [
-            { title: "Strategy first", text: "Start with the big picture — map where you're going before deciding how to get there." },
-            { title: "Cascading goals", text: "Objectives break into tasks automatically. Every piece of work traces back to a strategic goal." },
-            { title: "Clear priorities", text: "See what matters most and allocate your team's time to the highest-impact work." },
+            { title: "One sentence, full plan", text: "Type what you want to accomplish. Get back a structured plan with phases, tasks, and deadlines — ready to execute." },
+            { title: "Templates for every scenario", text: "Launching a startup? Running a fundraise? Hiring a team? Pick a template and start in seconds, not weeks." },
+            { title: "Strategy that cascades", text: "Every task traces back to a strategic objective. Always know why you're doing what you're doing." },
         ],
         visual: {
             heroImage: "/images/sections/plan-hero.png",
-            heroAlt: "Strategic roadmap on a conference room display",
+            heroAlt: "Bright office with a structured plan and timeline on a large display",
             accentGradient: "from-orange-500 to-blue-500",
             accentBg: "bg-blue-50",
             accentText: "text-electric-blue",
@@ -172,8 +172,8 @@ export const SECTIONS: Section[] = [
             journeyLabel: "Plan",
         },
         connections: [
-            { targetId: "me", relationship: "informed by", description: "Your updates and profile context help shape what you plan." },
-            { targetId: "workshop", relationship: "drives", description: "Plans become real work in the Workshop — tasks flow to your team and forge." },
+            { targetId: "me", relationship: "informed by", description: "Your dashboard keeps you informed, so when you sit down to plan, you know exactly where things stand." },
+            { targetId: "workshop", relationship: "drives", description: "Once you've planned it, build it. Tasks and objectives flow straight to your team and The Forge." },
         ],
         features: [
             {
@@ -203,16 +203,16 @@ export const SECTIONS: Section[] = [
         id: "workshop",
         label: "Workshop",
         introRoute: "/workshop",
-        tagline: "Where the work happens",
-        description: "Your team, your AI agents, and The Forge — the tools you need to turn plans into reality.",
+        tagline: "Where ideas become real",
+        description: "Turn plans into products. Scan any product idea into a full engineering dossier. Coordinate your team. Go from concept to prototype at a speed that wasn't possible before.",
         valueProps: [
-            { title: "The Forge", text: "Scan any product idea and get a full engineering dossier — 3D CAD models, specs, and build plans." },
-            { title: "Human + AI teams", text: "Your people and AI agents work side by side. Assign tasks, track capacity, and move fast." },
-            { title: "Prompt engineering", text: "Build, chain, and reuse prompt workflows that make your AI agents more effective over time." },
+            { title: "Idea to engineering spec — in minutes", text: "Describe a product. Get a complete dossier: 3D CAD models, material specs, and build plans. What used to take weeks takes minutes." },
+            { title: "Your team, at a glance", text: "People and roles in one view. Assign work, track capacity, and keep everyone moving in the same direction." },
+            { title: "Build your playbook", text: "Create and reuse prompt workflows. The more you build, the faster everything gets." },
         ],
         visual: {
             heroImage: "/images/sections/workshop-hero.png",
-            heroAlt: "Engineer and robotic arm in a modern manufacturing workshop",
+            heroAlt: "Modern makerspace with prototypes, 3D printer, and engineer reviewing CAD designs",
             accentGradient: "from-orange-600 to-amber-500",
             accentBg: "bg-orange-50",
             accentText: "text-international-orange",
@@ -220,8 +220,8 @@ export const SECTIONS: Section[] = [
             journeyLabel: "Build",
         },
         connections: [
-            { targetId: "plan", relationship: "executes", description: "Workshop is where planned tasks get done — by your team, your agents, or The Forge." },
-            { targetId: "marketplace", relationship: "sources from", description: "Need more people or supplies? The Marketplace plugs directly into your workshop." },
+            { targetId: "plan", relationship: "executes", description: "Once you've planned it, build it. Tasks and objectives flow straight to your team and The Forge." },
+            { targetId: "marketplace", relationship: "sources from", description: "Need more hands? More materials? The Marketplace plugs directly into your workshop." },
         ],
         features: [
             {
@@ -251,16 +251,16 @@ export const SECTIONS: Section[] = [
         id: "marketplace",
         label: "Marketplace",
         introRoute: "/marketplace-hub",
-        tagline: "Recruits and supplies",
-        description: "Find people, services, and inspiration. The Guild connects you with talent; the Marketplace connects you with suppliers.",
+        tagline: "Everything you need, everyone you need",
+        description: "Don't do it all yourself. Find expert talent, source products and services, and fill gaps fast. No recruiters. No agencies. No long procurement cycles.",
         valueProps: [
-            { title: "Find talent", text: "The Guild is where engineers, designers, and specialists come together. Find your next hire or apprentice." },
-            { title: "Source supplies", text: "Browse products, services, and expert consultants. Place orders and track delivery." },
-            { title: "Get inspired", text: "Discover what others are building and find ideas for your next project." },
+            { title: "Find experts in minutes", text: "Fractional executives, consultants, and specialists — browse, compare, and engage. No recruiter fees, no 6-week searches." },
+            { title: "Source products and services", text: "Materials, components, professional services. Compare options, check ratings, place orders — all in one place." },
+            { title: "Discover what's possible", text: "See what others are building. Find techniques, trends, and inspiration for your next move." },
         ],
         visual: {
             heroImage: "/images/sections/marketplace-hero.png",
-            heroAlt: "People collaborating in a modern coworking space",
+            heroAlt: "Bright marketplace with diverse professionals networking and browsing product displays",
             accentGradient: "from-orange-500 to-teal-400",
             accentBg: "bg-teal-50",
             accentText: "text-teal-600",
@@ -268,8 +268,8 @@ export const SECTIONS: Section[] = [
             journeyLabel: "Scale",
         },
         connections: [
-            { targetId: "workshop", relationship: "supplies", description: "People and products from the Marketplace flow into your Workshop to get things built." },
-            { targetId: "me", relationship: "grows", description: "Your marketplace activity, reputation, and orders all feed back to your profile." },
+            { targetId: "workshop", relationship: "supplies", description: "Need more hands? More materials? The Marketplace plugs directly into your workshop." },
+            { targetId: "me", relationship: "grows", description: "Your reputation, orders, and marketplace activity all flow back to your profile." },
         ],
         features: [
             // ── People ──

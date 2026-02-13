@@ -92,7 +92,7 @@ export const FEATURE_REGISTRY: Feature[] = [
     {
         id: 'manufacturing-techniques',
         name: 'Manufacturing Techniques Explorer',
-        description: 'Browse 80+ manufacturing techniques with detailed specs, pros/cons, and direct links to find suppliers or start an RFQ',
+        description: 'Browse 78+ manufacturing techniques with detailed specs, pros/cons, and direct links to find suppliers or start an RFQ',
         route: '/inspiration',
         releasedAt: new Date('2026-02-07'),
         category: 'core',

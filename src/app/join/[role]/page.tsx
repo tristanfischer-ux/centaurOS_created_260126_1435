@@ -4,10 +4,11 @@ import { use, useState, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, ArrowRight, ArrowLeft, TestTube2, Clock, Rocket } from "lucide-react";
+import { Check, ArrowRight, ArrowLeft, TestTube2, Clock, Rocket, Sparkles } from "lucide-react";
 import { signup, submitApplication } from "@/actions/signup";
 import { getDemoAccountData, type DemoAccountData } from "@/actions/demo-accounts";
 
@@ -17,7 +18,14 @@ import { getDemoAccountData, type DemoAccountData } from "@/actions/demo-account
  */
 const TRIAL_ROLES = ['founder', 'executive', 'apprentice'] as const;
 
-// Error message component for displaying form errors
+/** Total founding member spots available */
+const TOTAL_FOUNDING_SPOTS = 100;
+/** Spots already claimed (update periodically or fetch from API) */
+const SPOTS_CLAIMED = 53;
+
+/**
+ * ErrorMessage — Displays form errors from URL search params.
+ */
 function ErrorMessage() {
     const searchParams = useSearchParams();
     const error = searchParams.get('error');
@@ -25,14 +33,16 @@ function ErrorMessage() {
     if (!error) return null;
     
     return (
-        <div 
+        <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
             role="alert" 
             aria-live="polite"
             className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-lg flex items-center gap-3"
         >
             <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" aria-hidden="true" />
             {decodeURIComponent(error)}
-        </div>
+        </motion.div>
     );
 }
 
@@ -53,14 +63,14 @@ const roleConfigs: Record<string, RoleConfig> = {
         title: "FOUNDER",
         headline: "YOUR VISION. OUR OPERATING SYSTEM.",
         subheadline: "Start with an idea. Launch with an army. Keep your equity.",
-        description: "Don't burn seed capital on a standing army. Your fractional team—Executives who've built before and Apprentices with 10x output—activates in hours, not months.",
+        description: "Don't burn seed capital on a standing army. Your fractional team\u2014Executives who've built before and Apprentices with 10x output\u2014activates in hours, not months.",
         benefits: [
             "Fractional Execs + high-output Apprentices",
             "Your team scales up and down on demand",
             "Global manufacturing at your fingertips",
             "Legal and IP fortress included"
         ],
-        heroImage: "/images/founder-hologram.png",
+        heroImage: "/images/join/join-founder-hero.png",
         ctaText: "Begin Induction",
         isApplication: false,
         additionalFields: [
@@ -80,7 +90,7 @@ const roleConfigs: Record<string, RoleConfig> = {
             "No politics, no bureaucracy",
             "Choose your engagement level"
         ],
-        heroImage: "/images/executive-pilot.png",
+        heroImage: "/images/join/join-executive-hero.png",
         ctaText: "Join the Cadre",
         isApplication: false
     },
@@ -95,41 +105,41 @@ const roleConfigs: Record<string, RoleConfig> = {
             "Direct mentorship from fractional execs",
             "Fast-track to the Founder track"
         ],
-        heroImage: "/images/apprentice-engineer.png",
+        heroImage: "/images/join/join-apprentice-hero.png",
         ctaText: "Enter the Guild",
         isApplication: false
     },
     vc: {
         title: "VENTURE CAPITAL",
-        headline: "12 MONTHS → 12 WEEKS.",
+        headline: "12 MONTHS \u2192 12 WEEKS.",
         subheadline: "Hardware at software speed. More bets. Better returns.",
-        description: "Hardware typically has long validation cycles. We're building infrastructure to compress that timeline—helping founders validate faster and VCs deploy capital more efficiently.",
+        description: "Hardware typically has long validation cycles. We're building infrastructure to compress that timeline\u2014helping founders validate faster and VCs deploy capital more efficiently.",
         benefits: [
             "Access to hardware startups moving faster",
             "Transparent milestone tracking system",
             "Infrastructure to reduce validation time",
             "Network of fractional executives and makers"
         ],
-        heroImage: "/images/vc-dashboard.png",
+        heroImage: "/images/join/join-founder-hero.png",
         ctaText: "Apply for Access",
         isApplication: true,
         additionalFields: [
             { id: "firm", label: "Firm Name", placeholder: "Acme Ventures" },
-            { id: "aum", label: "AUM Range", placeholder: "£10M - £50M" }
+            { id: "aum", label: "AUM Range", placeholder: "\u00a310M - \u00a350M" }
         ]
     },
     factory: {
         title: "MANUFACTURING",
         headline: "CAPACITY IS CURRENCY.",
         subheadline: "Pre-funded orders. Guaranteed payment. Zero invoicing friction.",
-        description: "Connect to hardware startups with money already in escrow. Every order is pre-funded—you get paid automatically when you ship. No quotes. No invoicing. No payment risk.",
+        description: "Connect to hardware startups with money already in escrow. Every order is pre-funded\u2014you get paid automatically when you ship. No quotes. No invoicing. No payment risk.",
         benefits: [
             "Every order is pre-funded in escrow",
             "Automatic payment on delivery confirmation",
             "Zero payment risk - money held before you start",
             "No invoicing, no chasing payments"
         ],
-        heroImage: "/images/3d-printed-part.png",
+        heroImage: "/images/join/join-founder-hero.png",
         ctaText: "Connect Facility",
         isApplication: true,
         additionalFields: [
@@ -141,14 +151,14 @@ const roleConfigs: Record<string, RoleConfig> = {
         title: "SUPPLIER",
         headline: "SELL ON THE MARKETPLACE.",
         subheadline: "List your products. Get discovered. Grow your business.",
-        description: "Join our marketplace to reach hardware startups and builders. List your products, services, or capacity. Respond to RFQs, manage orders, and get paid—all from your dedicated Supplier Portal.",
+        description: "Join our marketplace to reach hardware startups and builders. List your products, services, or capacity. Respond to RFQs, manage orders, and get paid\u2014all from your dedicated Supplier Portal.",
         benefits: [
             "List unlimited products and services",
             "Respond to qualified RFQ opportunities",
             "Manage orders from one dashboard",
             "Get paid through secure escrow"
         ],
-        heroImage: "/images/3d-printed-part.png",
+        heroImage: "/images/join/join-founder-hero.png",
         ctaText: "Start Selling",
         isApplication: false,
         additionalFields: [
@@ -160,18 +170,18 @@ const roleConfigs: Record<string, RoleConfig> = {
         title: "ACADEMIA",
         headline: "FROM PAPER TO PRODUCT.",
         subheadline: "Professors become founders. Students become Apprentices. Research becomes revenue.",
-        description: "We provide the commercialization pathway for academic research. Professors can lead their own ventures. Students gain real startup experience or launch companies. Your institution gets the infrastructure to turn IP into thriving businesses.",
+        description: "We provide the commercialisation pathway for academic research. Professors can lead their own ventures. Students gain real startup experience or launch companies. Your institution gets the infrastructure to turn IP into thriving businesses.",
         benefits: [
             "Professors lead their own venture-backed companies",
             "Students become Apprentices or post-grad founders",
             "Turn research IP into commercial products",
             "Infrastructure for university venture units"
         ],
-        heroImage: "/images/university-lab.png",
+        heroImage: "/images/join/join-founder-hero.png",
         ctaText: "Partner With Us",
         isApplication: true,
         additionalFields: [
-            { id: "institution", label: "Institution", placeholder: "MIT, Stanford...", required: true },
+            { id: "institution", label: "Institution", placeholder: "Imperial, Cambridge, UCL...", required: true },
             { id: "department", label: "Department/School", placeholder: "Engineering, Business...", required: false }
         ]
     },
@@ -179,14 +189,14 @@ const roleConfigs: Record<string, RoleConfig> = {
         title: "NETWORK PARTNER",
         headline: "JOIN THE GRID.",
         subheadline: "Connect your resources to ForgeOS.",
-        description: "Manufacturing, logistics, communications—connect your physical or digital infrastructure to the network. Consistent deal flow. Automated everything.",
+        description: "Manufacturing, logistics, communications\u2014connect your physical or digital infrastructure to the network. Consistent deal flow. Automated everything.",
         benefits: [
             "Consistent deal flow",
             "Automated contracting",
             "Global reach",
-            "Standardized integration"
+            "Standardised integration"
         ],
-        heroImage: "/images/centaur-os-core.png",
+        heroImage: "/images/join/join-founder-hero.png",
         ctaText: "Apply to Network",
         isApplication: true
     },
@@ -201,27 +211,64 @@ const roleConfigs: Record<string, RoleConfig> = {
             "Distributed industrial complex",
             "Scale from Day 1"
         ],
-        heroImage: "/images/hero-centaur-main.png",
+        heroImage: "/images/join/join-founder-hero.png",
         ctaText: "Get Started",
         isApplication: false
     }
 };
 
 /**
+ * FoundingMemberCounter -- Animated progress bar showing remaining spots.
+ */
+function FoundingMemberCounter() {
+    const spotsRemaining = TOTAL_FOUNDING_SPOTS - SPOTS_CLAIMED;
+    const percentClaimed = (SPOTS_CLAIMED / TOTAL_FOUNDING_SPOTS) * 100;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
+            className="mt-8 p-4 rounded-xl bg-muted/50 border"
+        >
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-international-orange" />
+                    <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                        Founding Members
+                    </span>
+                </div>
+                <span className="text-xs font-bold text-international-orange">
+                    {spotsRemaining} of {TOTAL_FOUNDING_SPOTS} spots left
+                </span>
+            </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${percentClaimed}%` }}
+                    transition={{ duration: 1.2, delay: 1.0, ease: 'easeOut' }}
+                    className="h-full bg-international-orange rounded-full"
+                />
+            </div>
+        </motion.div>
+    );
+}
+
+/**
  * "Coming Soon" page for roles not included in the current trial.
- * Shows a welcoming message and links to the available trial roles.
+ * Light-first design matching brand aesthetic.
  */
 function ComingSoonPage({ roleTitle }: { roleTitle: string }) {
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+        <div className="min-h-screen bg-background text-foreground flex flex-col">
             {/* Navigation */}
             <nav className="px-4 sm:px-6 py-4 sm:py-6">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/" className="text-white/80 hover:text-white text-sm font-mono uppercase tracking-widest flex items-center gap-2">
+                    <Link href="/" className="text-muted-foreground hover:text-foreground text-sm font-mono uppercase tracking-widest flex items-center gap-2 transition-colors">
                         <ArrowLeft className="w-4 h-4" />
                         Back
                     </Link>
-                    <Link href="/login" className="text-white/60 hover:text-white text-sm font-mono uppercase tracking-widest">
+                    <Link href="/login" className="text-muted-foreground hover:text-international-orange text-sm font-mono uppercase tracking-widest transition-colors">
                         Already a member? Login
                     </Link>
                 </div>
@@ -229,19 +276,24 @@ function ComingSoonPage({ roleTitle }: { roleTitle: string }) {
 
             {/* Content */}
             <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 text-center">
-                <div className="max-w-2xl mx-auto space-y-8">
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
+                    className="max-w-2xl mx-auto space-y-8"
+                >
                     {/* Badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-2 border border-international-orange/30 bg-international-orange/10 rounded-full">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 border border-international-orange/30 bg-status-warning-light rounded-full">
                         <Clock className="w-4 h-4 text-international-orange" />
                         <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
                             Coming Soon
                         </span>
                     </div>
 
-                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight text-foreground">
                         {roleTitle} Access Is Coming
                     </h1>
-                    <p className="text-lg text-white/60 leading-relaxed max-w-lg mx-auto">
+                    <p className="text-lg text-muted-foreground leading-relaxed max-w-lg mx-auto">
                         We&apos;re building something special for {roleTitle.toLowerCase()}s. 
                         In the meantime, you can join ForgeOS as one of our core roles:
                     </p>
@@ -256,22 +308,26 @@ function ComingSoonPage({ roleTitle }: { roleTitle: string }) {
                             <Link
                                 key={role}
                                 href={`/join/${role}`}
-                                className="group border border-white/10 hover:border-international-orange/50 rounded-xl p-6 text-left transition-all duration-200 hover:bg-white/5"
+                                className="group border hover:border-international-orange rounded-xl p-6 text-left transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 bg-card"
                             >
                                 <Icon className="w-5 h-5 text-international-orange mb-3" />
-                                <h3 className="font-bold text-white group-hover:text-international-orange transition-colors">
+                                <h3 className="font-bold text-foreground group-hover:text-international-orange transition-colors">
                                     {label}
                                 </h3>
-                                <p className="text-sm text-white/50 mt-1">{desc}</p>
+                                <p className="text-sm text-muted-foreground mt-1">{desc}</p>
                             </Link>
                         ))}
                     </div>
-                </div>
+                </motion.div>
             </div>
         </div>
     );
 }
 
+/**
+ * JoinPage -- Role-specific signup with light-first design, cinematic hook,
+ * and founding member countdown.
+ */
 export default function JoinPage({ params }: { params: Promise<{ role: string }> }) {
     const resolvedParams = use(params);
     const roleKey = resolvedParams.role.toLowerCase();
@@ -299,12 +355,12 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
         if (hasVideo) {
             setStage("transitioning");
             
-            // After video expands (1s), fade to black
+            // After video expands (1s), fade to white
             setTimeout(() => {
                 setFadeToBlack(true);
             }, 1000);
             
-            // After fade to black completes (1s more), show form
+            // After fade completes (1s more), show form
             setTimeout(() => {
                 setStage("form");
                 setFadeToBlack(false);
@@ -333,8 +389,8 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
     }, [hasVideo]);
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white overflow-hidden">
-            {/* Video Transition Overlay - Shows during transition */}
+        <div className="min-h-screen bg-background text-foreground overflow-hidden">
+            {/* Video Transition Overlay - Fades to white instead of black */}
             {hasVideo && stage === "transitioning" && (
                 <div className="fixed inset-0 z-[100]">
                     <video
@@ -346,41 +402,41 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                     >
                         <source src="/videos/founder-intro.mp4" type="video/mp4" />
                     </video>
-                    {/* Fade to black overlay */}
+                    {/* Fade to white overlay (light-first) */}
                     <div 
-                        className={`absolute inset-0 bg-black transition-opacity duration-1000 ${
+                        className={`absolute inset-0 bg-background transition-opacity duration-1000 ${
                             fadeToBlack ? "opacity-100" : "opacity-0"
                         }`}
                     />
                 </div>
             )}
 
-            {/* Navigation - hide during transition */}
+            {/* Navigation */}
             <nav className={`absolute top-0 left-0 right-0 z-50 px-4 sm:px-6 py-4 sm:py-6 transition-opacity duration-500 ${
                 stage === "transitioning" ? "opacity-0" : "opacity-100"
             }`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/" className="text-white/80 hover:text-white text-sm font-mono uppercase tracking-widest flex items-center gap-2">
+                    <Link href="/" className="text-muted-foreground hover:text-foreground text-sm font-mono uppercase tracking-widest flex items-center gap-2 transition-colors">
                         <ArrowLeft className="w-4 h-4" />
                         Back
                     </Link>
-                    <Link href="/login" className="text-white/60 hover:text-white text-sm font-mono uppercase tracking-widest">
+                    <Link href="/login" className="text-muted-foreground hover:text-international-orange text-sm font-mono uppercase tracking-widest transition-colors">
                         Already a member? Login
                     </Link>
                 </div>
             </nav>
 
             {stage === "hook" || stage === "transitioning" ? (
-                /* Stage 1: The Hook */
+                /* Stage 1: The Hook -- Light theme with hero image */
                 <div className={`min-h-screen flex flex-col justify-center transition-opacity duration-500 ${
                     stage === "transitioning" ? "opacity-0" : "opacity-100"
                 }`}>
-                    {/* Hero Video/Image Background */}
+                    {/* Hero Background */}
                     <div className="absolute inset-0 z-0">
                         {hasVideo ? (
                             <video
                                 ref={videoRef}
-                                className="absolute inset-0 w-full h-full object-cover opacity-40"
+                                className="absolute inset-0 w-full h-full object-cover opacity-30"
                                 autoPlay
                                 loop
                                 muted
@@ -397,63 +453,112 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                 priority
                             />
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-slate-900/60" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/85 to-background/50" />
                     </div>
 
                     {/* Content */}
                     <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 text-center pt-20 pb-8">
                         {/* Protocol Badge */}
-                        <div className="inline-flex items-center gap-2 mb-4 sm:mb-6 px-3 sm:px-4 py-2 border border-blue-500/30 bg-blue-500/10 backdrop-blur-sm">
-                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                            <span className="text-blue-400 text-xs font-mono uppercase tracking-widest">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.5 }}
+                            className="inline-flex items-center gap-2 mb-4 sm:mb-6 px-3 sm:px-4 py-2 border border-international-orange/30 bg-status-warning-light rounded-full"
+                        >
+                            <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
+                            <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
                                 Induction Protocol: {config.title}
                             </span>
-                        </div>
+                        </motion.div>
 
                         {/* Main Headline */}
-                        <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-black leading-tight mb-3 sm:mb-4 max-w-4xl">
+                        <motion.h1
+                            initial={{ opacity: 0, y: 30 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.8, delay: 0.2 }}
+                            className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-black leading-tight mb-3 sm:mb-4 max-w-4xl text-foreground"
+                        >
                             {config.headline}
-                        </h1>
+                        </motion.h1>
 
                         {/* Subheadline */}
-                        <p className="text-lg sm:text-xl md:text-2xl text-white/70 mb-6 sm:mb-8 max-w-2xl leading-relaxed">
+                        <motion.p
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.6, delay: 0.4 }}
+                            className="text-lg sm:text-xl md:text-2xl text-muted-foreground mb-6 sm:mb-8 max-w-2xl leading-relaxed"
+                        >
                             {config.subheadline}
-                        </p>
+                        </motion.p>
 
                         {/* CTA Button */}
-                        <Button
-                            onClick={handleBeginInduction}
-                            disabled={stage === "transitioning"}
-                            className="group bg-background text-foreground px-8 sm:px-12 py-4 sm:py-5 h-auto text-sm sm:text-base font-bold tracking-widest uppercase hover:bg-international-orange hover:text-white transition-all duration-300 flex items-center gap-3 mb-8 sm:mb-10 disabled:opacity-50"
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.6, delay: 0.6 }}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.97 }}
                         >
-                            {config.ctaText}
-                            <ArrowRight className="w-4 sm:w-5 h-4 sm:h-5 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
-                        </Button>
+                            <Button
+                                onClick={handleBeginInduction}
+                                disabled={stage === "transitioning"}
+                                className="group bg-international-orange text-white px-8 sm:px-12 py-4 sm:py-5 h-auto text-sm sm:text-base font-bold tracking-widest uppercase hover:bg-international-orange/90 transition-all duration-300 flex items-center gap-3 mb-8 sm:mb-10 disabled:opacity-50 shadow-lg hover:shadow-xl"
+                            >
+                                {config.ctaText}
+                                <ArrowRight className="w-4 sm:w-5 h-4 sm:h-5 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
+                            </Button>
+                        </motion.div>
 
-                        {/* What You Become - Inline */}
-                        <div className="w-full max-w-4xl border-t border-white/10 pt-6 sm:pt-8">
-                            <h2 className="text-xs font-mono uppercase tracking-widest text-white/40 mb-4 text-center">What You Become</h2>
+                        {/* Founding Member Counter */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.8 }}
+                            className="w-full max-w-md"
+                        >
+                            <FoundingMemberCounter />
+                        </motion.div>
+
+                        {/* Benefits */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.6, delay: 1.0 }}
+                            className="w-full max-w-4xl border-t mt-8 pt-6 sm:pt-8"
+                        >
+                            <h2 className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-4 text-center">What You Become</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 md:gap-12 max-w-3xl mx-auto">
                                 {config.benefits.map((benefit, index) => (
-                                    <div key={index} className="flex items-start gap-3 justify-center sm:justify-start">
-                                        <div className="mt-0.5 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0" aria-hidden="true">
-                                            <Check className="w-3 h-3 text-primary" />
+                                    <motion.div
+                                        key={index}
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: 1.1 + index * 0.1 }}
+                                        className="flex items-start gap-3 justify-center sm:justify-start"
+                                    >
+                                        <div className="mt-0.5 w-5 h-5 rounded-full bg-international-orange/10 flex items-center justify-center shrink-0" aria-hidden="true">
+                                            <Check className="w-3 h-3 text-international-orange" />
                                         </div>
-                                        <span className="text-white/80 text-sm">{benefit}</span>
-                                    </div>
+                                        <span className="text-muted-foreground text-sm">{benefit}</span>
+                                    </motion.div>
                                 ))}
                             </div>
-                        </div>
+                        </motion.div>
                     </div>
                 </div>
             ) : (
-                /* Stage 2: The Form */
-                <div className="min-h-screen flex flex-col md:flex-row animate-in fade-in duration-1000">
-                    {/* Left: Context with Video Background */}
-                    <div className="w-full md:w-1/2 relative overflow-hidden bg-card">
+                /* Stage 2: The Form -- Light split-screen */
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.8 }}
+                    className="min-h-screen flex flex-col md:flex-row"
+                >
+                    {/* Left: Context with Hero Image */}
+                    <div className="w-full md:w-1/2 relative overflow-hidden bg-muted">
                         {hasVideo ? (
                             <video
-                                className="absolute inset-0 w-full h-full object-cover opacity-50"
+                                className="absolute inset-0 w-full h-full object-cover opacity-40"
                                 autoPlay
                                 loop
                                 muted
@@ -469,31 +574,39 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                 className="object-cover opacity-30"
                             />
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-r from-card via-card/90 to-card/70" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/60" />
                         <div className="relative z-10 p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center min-h-[40vh] md:min-h-screen">
                             <Button
                                 variant="ghost"
                                 onClick={() => setStage("hook")}
-                                className="text-white/60 hover:text-white hover:bg-transparent text-sm font-mono uppercase tracking-widest flex items-center gap-2 mb-6 sm:mb-8 w-fit p-0 h-auto"
+                                className="text-muted-foreground hover:text-foreground hover:bg-transparent text-sm font-mono uppercase tracking-widest flex items-center gap-2 mb-6 sm:mb-8 w-fit p-0 h-auto"
                             >
                                 <ArrowLeft className="w-4 h-4" aria-hidden="true" />
                                 Back
                             </Button>
-                            <span className="text-xs font-mono text-primary tracking-widest mb-3 sm:mb-4 block uppercase">
+                            <span className="text-xs font-mono text-international-orange tracking-widest mb-3 sm:mb-4 block uppercase">
                                 {config.isApplication ? "Application" : "Induction"}: {config.title}
                             </span>
-                            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 leading-tight text-white">
+                            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 leading-tight text-foreground">
                                 {config.headline}
                             </h2>
-                            <p className="text-white/60 text-sm sm:text-base leading-relaxed max-w-md">
+                            <p className="text-muted-foreground text-sm sm:text-base leading-relaxed max-w-md">
                                 {config.description}
                             </p>
+
+                            {/* Founding member counter on form stage too */}
+                            <FoundingMemberCounter />
                         </div>
                     </div>
 
                     {/* Right: Form */}
                     <div className="w-full md:w-1/2 bg-background text-foreground p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center">
-                        <div className="w-full max-w-md mx-auto space-y-6 sm:space-y-8">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.6, delay: 0.3 }}
+                            className="w-full max-w-md mx-auto space-y-6 sm:space-y-8"
+                        >
                             {/* Error Message */}
                             <Suspense fallback={null}>
                                 <ErrorMessage />
@@ -506,7 +619,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                     <div>
                                         <h3 className="text-sm font-semibold text-foreground mb-1">Demo Mode Active</h3>
                                         <p className="text-xs text-muted-foreground">
-                                            All fields are pre-populated with demo data. Just click "{config.ctaText}" to test the flow!
+                                            All fields are pre-populated with demo data. Just click &quot;{config.ctaText}&quot; to test the flow!
                                         </p>
                                     </div>
                                 </div>
@@ -536,7 +649,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                         name="name"
                                         placeholder="John Doe"
                                         defaultValue={demoData?.fullName || ""}
-                                        className="bg-background border-input focus:border-ring focus:ring-ring"
+                                        className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                                         required
                                         aria-required="true"
                                     />
@@ -553,15 +666,14 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                         type="email"
                                         placeholder="you@example.com"
                                         defaultValue={demoData?.email || ""}
-                                        className="bg-background border-input focus:border-ring focus:ring-ring"
+                                        className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                                         required
                                         aria-required="true"
                                     />
                                 </div>
 
-                                {/* Additional fields for applications and founder details */}
+                                {/* Additional fields */}
                                 {config.additionalFields?.map((field) => {
-                                    // Map demo data to field IDs
                                     const demoValue = demoData ? (() => {
                                         switch(field.id) {
                                             case 'company_name': return demoData.companyName;
@@ -589,7 +701,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                                 type={field.type || "text"}
                                                 placeholder={field.placeholder}
                                                 defaultValue={demoValue}
-                                                className="bg-background border-input focus:border-ring focus:ring-ring"
+                                                className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                                                 required={field.required}
                                                 aria-required={field.required}
                                             />
@@ -609,7 +721,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                             type="password"
                                             placeholder="Create a strong password"
                                             defaultValue={demoData?.password || ""}
-                                            className="bg-background border-input focus:border-ring focus:ring-ring"
+                                            className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                                             required
                                             aria-required="true"
                                             minLength={6}
@@ -621,12 +733,14 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                     </div>
                                 )}
 
-                                <Button 
-                                    type="submit"
-                                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
-                                >
-                                    {config.ctaText}
-                                </Button>
+                                <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
+                                    <Button 
+                                        type="submit"
+                                        className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors shadow-lg hover:shadow-xl"
+                                    >
+                                        {config.ctaText}
+                                    </Button>
+                                </motion.div>
                             </form>
 
                             <p className="text-xs text-center text-muted-foreground">
@@ -635,9 +749,9 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                 and{" "}
                                 <Link href="#" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
                             </p>
-                        </div>
+                        </motion.div>
                     </div>
-                </div>
+                </motion.div>
             )}
         </div>
     );

@@ -2,7 +2,7 @@
  * @file xray-to-inspiration.ts — Bridge from X-Ray modules to Inspiration content
  *
  * @description Links X-Ray module characteristics to existing Inspiration content:
- * - Module key parts → ManufacturingTechniques (80+ techniques with materials, cost tiers)
+ * - Module key parts → ManufacturingTechniques (78+ techniques with materials, cost tiers)
  * - Module purpose → KnowledgeDomains (hierarchical expertise areas)
  * - Full spec → BlueprintTemplates (industry-specific patterns)
  * - Module disciplines → ObjectivePacks (business/subsystem starter packs)

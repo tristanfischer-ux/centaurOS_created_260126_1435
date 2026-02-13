@@ -71,7 +71,7 @@ export function PricingContent() {
             Simple, transparent pricing
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Start free. Upgrade when you need more AI tasks, team members, and marketplace features.
+            Start free. Upgrade when you need more smart assists, team members, and marketplace features.
             All plans include a 10% platform fee on transactions.
           </p>
         </div>
@@ -153,7 +153,7 @@ export function PricingContent() {
                   <div className="space-y-3">
                     <LimitRow
                       icon={Bot}
-                      label="AI tasks/month"
+                      label="Smart assists/month"
                       value={plan.limits.maxAiTasksPerMonth >= 10000
                         ? 'Unlimited'
                         : plan.limits.maxAiTasksPerMonth.toLocaleString()
@@ -316,7 +316,7 @@ function ComparisonCell({ value }: { value: boolean | string }) {
 
 /** Feature comparison data */
 const COMPARISON_FEATURES = [
-  { name: 'AI tasks per month', free: '20', starter: '100', professional: '500' },
+  { name: 'Smart assists per month', free: '20', starter: '100', professional: '500' },
   { name: 'Team members', free: '1', starter: '3', professional: '10' },
   { name: 'Orders per month', free: '5', starter: '25', professional: 'Unlimited' },
   { name: 'Active retainers', free: false as boolean | string, starter: '1', professional: 'Unlimited' },
