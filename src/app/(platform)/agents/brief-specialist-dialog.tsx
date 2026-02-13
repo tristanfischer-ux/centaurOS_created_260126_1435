@@ -1018,19 +1018,18 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 <Textarea
                                     ref={textareaRef}
                                     id="brief-text"
-                                    value={speechRecognition.isListening
-                                        ? (briefText + (speechRecognition.interimTranscript ? " " + speechRecognition.interimTranscript : ""))
-                                        : briefText
-                                    }
+                                    value={briefText}
                                     onChange={(e) => {
                                         setBriefText(e.target.value)
                                         if (error) setError(null)
                                     }}
                                     onKeyDown={handleKeyDown}
                                     placeholder={
-                                        speechRecognition.isListening
-                                            ? "Listening..."
-                                            : hasNonHistoricalMessages
+                                        speechRecognition.isProcessing
+                                            ? "Transcribing..."
+                                            : speechRecognition.isListening
+                                                ? "Listening... speak now"
+                                                : hasNonHistoricalMessages
                                                 ? `Follow up with ${specialist.name}...`
                                                 : selectedPrompt
                                                     ? `Paste or type your ${selectedPrompt.inputLabel.toLowerCase()} here...`
@@ -1039,7 +1038,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     className={cn(
                                         "resize-none pr-20",
                                         hasNonHistoricalMessages ? "min-h-[60px]" : "min-h-[100px]",
-                                        speechRecognition.isListening && "border-destructive/50"
+                                        (speechRecognition.isListening || speechRecognition.isProcessing) && "border-destructive/50"
                                     )}
                                     aria-required
                                     disabled={isExecuting}
@@ -1057,16 +1056,20 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                     speechRecognition.start()
                                                 }
                                             }}
-                                            disabled={isExecuting}
+                                            disabled={isExecuting || speechRecognition.isProcessing}
                                             className={cn(
                                                 "h-8 w-8",
                                                 speechRecognition.isListening
                                                     ? "text-destructive animate-pulse"
-                                                    : "text-muted-foreground hover:text-foreground"
+                                                    : speechRecognition.isProcessing
+                                                        ? "text-muted-foreground"
+                                                        : "text-muted-foreground hover:text-foreground"
                                             )}
-                                            aria-label={speechRecognition.isListening ? "Stop listening" : "Start voice input"}
+                                            aria-label={speechRecognition.isListening ? "Stop listening" : speechRecognition.isProcessing ? "Transcribing audio" : "Start voice input"}
                                         >
-                                            {speechRecognition.isListening ? (
+                                            {speechRecognition.isProcessing ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : speechRecognition.isListening ? (
                                                 <MicOff className="h-4 w-4" />
                                             ) : (
                                                 <Mic className="h-4 w-4" />
@@ -1090,10 +1093,16 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     </Button>
                                 </div>
                             </div>
-                            {/* Voice listening indicator */}
+                            {/* Voice listening / processing indicator */}
                             {speechRecognition.isListening && (
                                 <p className="text-xs text-destructive animate-pulse">
-                                    Listening... speak now
+                                    Listening... speak now (stops on silence)
+                                </p>
+                            )}
+                            {speechRecognition.isProcessing && (
+                                <p className="text-xs text-muted-foreground animate-pulse flex items-center gap-1.5">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Transcribing your voice...
                                 </p>
                             )}
                             <div className="flex items-center justify-between">

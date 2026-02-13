@@ -34,6 +34,7 @@ export type AIFeature =
   | 'business_plan_analysis'
   | 'talent_match'
   | 'specialist_tts'
+  | 'specialist_stt'
   | 'other'
 
 /** Parameters for tracking an AI API call */
