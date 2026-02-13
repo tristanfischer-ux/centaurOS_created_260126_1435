@@ -12,6 +12,7 @@ const PUBLIC_ROUTES = [
     '/invite',
     '/api/health',
     '/api/webhooks',
+    '/api/dev-login',  // Dev-only auto-login for AI agents/tests (returns 404 in production)
     '/access-revoked',  // Access revoked page for deactivated users
     '/workspace-picker', // Multi-foundry workspace selector
 ]
