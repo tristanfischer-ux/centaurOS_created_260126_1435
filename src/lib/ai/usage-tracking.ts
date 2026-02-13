@@ -35,7 +35,12 @@ export type AIFeature =
   | 'talent_match'
   | 'specialist_tts'
   | 'specialist_stt'
+  | 'specialist_voice'    // Tier 2: Real-time voice session
+  | 'specialist_avatar'   // Tier 3/4: Avatar video session
   | 'other'
+
+/** Conversation modes that can be tracked alongside features */
+export type ConversationModeTracking = 'text' | 'voice' | 'avatar'
 
 /** Parameters for tracking an AI API call */
 export interface TrackAIUsageParams {
@@ -46,6 +51,10 @@ export interface TrackAIUsageParams {
   promptTokens?: number
   completionTokens?: number
   estimatedCostUsd?: number
+  /** Duration in seconds (for voice/avatar sessions) */
+  durationSeconds?: number
+  /** Conversation mode used (text, voice, avatar) */
+  conversationMode?: ConversationModeTracking
   metadata?: Record<string, unknown>
 }
 
@@ -75,7 +84,44 @@ const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number 
   'gpt-4o-mini': { input: 0.15, output: 0.60 },
   'gpt-4-turbo': { input: 10.00, output: 30.00 },
   'whisper-1': { input: 0.006, output: 0 }, // per second, approximated
+  'claude-opus-4-6': { input: 15.00, output: 75.00 },
+  'claude-haiku-4-5': { input: 0.80, output: 4.00 },
 } as const
+
+/**
+ * Cost per minute for real-time features (USD).
+ * Used for voice/avatar sessions which are billed by duration, not tokens.
+ */
+const REALTIME_COSTS_PER_MINUTE: Record<string, number> = {
+  // OpenAI Realtime API (audio input + output combined)
+  'gpt-4o-realtime-preview': 0.30,       // ~$0.06 input + $0.24 output
+  'gpt-4o-mini-realtime-preview': 0.10,   // ~$0.02 input + $0.08 output
+  // Avatar providers
+  'heygen-streaming': 0.07,
+  'simli-streaming': 0.03,
+  'tavus-streaming': 0.10,
+} as const
+
+/**
+ * Estimate the cost of a real-time voice or avatar session.
+ *
+ * @param durationSeconds - Session duration in seconds
+ * @param voiceModel - The real-time voice model used
+ * @param avatarProvider - Optional avatar provider name
+ * @returns Estimated cost in USD
+ */
+export function estimateRealtimeCost(
+  durationSeconds: number,
+  voiceModel: string = 'gpt-4o-mini-realtime-preview',
+  avatarProvider?: string
+): number {
+  const minutes = durationSeconds / 60
+  const voiceCost = (REALTIME_COSTS_PER_MINUTE[voiceModel] ?? 0.10) * minutes
+  const avatarCost = avatarProvider
+    ? (REALTIME_COSTS_PER_MINUTE[avatarProvider] ?? 0.07) * minutes
+    : 0
+  return Number((voiceCost + avatarCost).toFixed(6))
+}
 
 /**
  * Estimate the cost of an AI API call based on token counts and model.

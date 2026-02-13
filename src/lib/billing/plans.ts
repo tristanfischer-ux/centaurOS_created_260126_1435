@@ -32,6 +32,12 @@ export interface SubscriptionPlan {
     apiAccess?: boolean
     prioritySupport?: boolean
     dedicatedAccount?: boolean
+    /** Maximum conversation mode available for this tier */
+    maxConversationMode: 'text' | 'voice' | 'avatar'
+    /** Minutes of real-time voice per month (0 = not available) */
+    voiceMinutesPerMonth: number
+    /** Minutes of avatar video per month (0 = not available) */
+    avatarMinutesPerMonth: number
   }
   stripePriceIdMonthly?: string
   stripePriceIdAnnual?: string
@@ -77,6 +83,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       apiAccess: false,
       prioritySupport: false,
       dedicatedAccount: false,
+      maxConversationMode: 'text',
+      voiceMinutesPerMonth: 0,
+      avatarMinutesPerMonth: 0,
     },
   },
   starter: {
@@ -101,6 +110,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       apiAccess: false,
       prioritySupport: false,
       dedicatedAccount: false,
+      maxConversationMode: 'text',
+      voiceMinutesPerMonth: 0,
+      avatarMinutesPerMonth: 0,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_MONTHLY,
     stripePriceIdAnnual: process.env.STRIPE_PRICE_STARTER_ANNUAL,
@@ -119,6 +131,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       '500 smart assists per month',
       'API access',
       'Priority support',
+      '2 hours real-time voice per month',
     ],
     limits: {
       maxOrders: undefined, // unlimited
@@ -128,6 +141,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       apiAccess: true,
       prioritySupport: true,
       dedicatedAccount: false,
+      maxConversationMode: 'voice',
+      voiceMinutesPerMonth: 120, // 2 hours of real-time voice per month
+      avatarMinutesPerMonth: 0,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_PROFESSIONAL_MONTHLY,
     stripePriceIdAnnual: process.env.STRIPE_PRICE_PROFESSIONAL_ANNUAL,
@@ -146,6 +162,8 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       'Custom integrations',
       'SLA guarantees',
       'SSO/SAML',
+      '10 hours real-time voice per month',
+      '1 hour avatar video per month',
     ],
     limits: {
       maxOrders: undefined,
@@ -155,6 +173,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       apiAccess: true,
       prioritySupport: true,
       dedicatedAccount: true,
+      maxConversationMode: 'avatar',
+      voiceMinutesPerMonth: 600, // 10 hours of real-time voice per month
+      avatarMinutesPerMonth: 60, // 1 hour of avatar video per month
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY,
     stripePriceIdAnnual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL,

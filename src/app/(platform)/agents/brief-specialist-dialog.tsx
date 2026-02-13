@@ -24,8 +24,18 @@ import { getSpecialistById, SPECIALISTS } from "./specialists-data"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import { useScreenContext } from "@/contexts/screen-context"
+import { SpecialistChatAvatar } from "@/components/specialists/specialist-presentation"
 import type { PromptTemplate } from "./lib/agent-types"
 import type { Specialist } from "./specialists-data"
+
+// ─── Conversation Mode (Feature Flag) ────────────────────────────────────────
+// When NEXT_PUBLIC_ENABLE_VOICE_AVATAR is set, users with eligible tiers
+// can switch between text, voice, and avatar modes. Until the relay server
+// endpoints are deployed, only "text" mode is functional.
+//
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _ENABLE_ADVANCED_MODES = typeof window !== "undefined"
+    && process.env.NEXT_PUBLIC_ENABLE_VOICE_AVATAR === "true"
 
 // ─── Specialist Model Configuration ───────────────────────────────────────────
 // Centralizes model choices so upgrades are a one-line change.
@@ -834,25 +844,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                             msg.historical && "opacity-60"
                                         )}>
                                             {msg.role === "assistant" && (
-                                                <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                                                    <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted mt-1">
-                                                        {specialist.avatarImage ? (
-                                                            <Image
-                                                                src={specialist.avatarImage}
-                                                                alt={specialist.name}
-                                                                fill
-                                                                className="object-cover"
-                                                                sizes="28px"
-                                                            />
-                                                        ) : (
-                                                            <div className="flex items-center justify-center h-full w-full text-xs font-semibold text-foreground">
-                                                                {specialist.name.charAt(0)}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    {isLastAssistant && (tts.isPlaying || tts.isLoading) && (
-                                                        <Volume2 className="h-3 w-3 text-international-orange animate-pulse" />
-                                                    )}
+                                                <div className="flex flex-col items-center gap-1 flex-shrink-0 mt-1">
+                                                    <SpecialistChatAvatar
+                                                        specialist={specialist}
+                                                        state={isLastAssistant && (tts.isPlaying || tts.isLoading) ? "speaking" : "idle"}
+                                                    />
                                                 </div>
                                             )}
                                             <div className={cn(
@@ -875,20 +871,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 {/* Streaming indicator */}
                                 {isStreaming && (
                                     <div className="flex gap-3 justify-start">
-                                        <div className="flex-shrink-0 relative h-7 w-7 rounded-full overflow-hidden bg-muted mt-1">
-                                            {specialist.avatarImage ? (
-                                                <Image
-                                                    src={specialist.avatarImage}
-                                                    alt={specialist.name}
-                                                    fill
-                                                    className="object-cover"
-                                                    sizes="28px"
-                                                />
-                                            ) : (
-                                                <div className="flex items-center justify-center h-full w-full text-xs font-semibold text-foreground">
-                                                    {specialist.name.charAt(0)}
-                                                </div>
-                                            )}
+                                        <div className="flex-shrink-0 mt-1">
+                                            <SpecialistChatAvatar
+                                                specialist={specialist}
+                                                state="speaking"
+                                            />
                                         </div>
                                         <div className="max-w-[85%] rounded-lg px-4 py-3 bg-muted/50 border border-muted">
                                             <Markdown content={streamingResponse} className="text-sm" />
@@ -917,20 +904,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 {/* Greeting generation indicator */}
                                 {isGeneratingGreeting && !isExecuting && (
                                     <div className="flex gap-3 justify-start">
-                                        <div className="flex-shrink-0 relative h-7 w-7 rounded-full overflow-hidden bg-muted mt-1">
-                                            {specialist.avatarImage ? (
-                                                <Image
-                                                    src={specialist.avatarImage}
-                                                    alt={specialist.name}
-                                                    fill
-                                                    className="object-cover"
-                                                    sizes="28px"
-                                                />
-                                            ) : (
-                                                <div className="flex items-center justify-center h-full w-full text-xs font-semibold text-foreground">
-                                                    {specialist.name.charAt(0)}
-                                                </div>
-                                            )}
+                                        <div className="flex-shrink-0 mt-1">
+                                            <SpecialistChatAvatar
+                                                specialist={specialist}
+                                                state="thinking"
+                                            />
                                         </div>
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
                                             <Loader2 className="h-4 w-4 animate-spin" />
