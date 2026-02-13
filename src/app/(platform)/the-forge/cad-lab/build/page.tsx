@@ -191,40 +191,141 @@ export default function CadLabBuildPage(): React.ReactNode {
             )}
           </div>
 
-          {/* Batch progress grid */}
+          {/* Batch progress grid — rich per-module pipeline view */}
           {isBatchRunning && Object.keys(batchProgress).length > 0 && (
-            <div className="border rounded-md overflow-hidden">
-              <div className="grid grid-cols-[1fr_6rem_6rem_5rem] gap-px bg-muted text-xs">
-                <div className="bg-background p-2 font-semibold text-muted-foreground">Module</div>
-                <div className="bg-background p-2 font-semibold text-muted-foreground text-center">Interface</div>
-                <div className="bg-background p-2 font-semibold text-muted-foreground text-center">CAD</div>
-                <div className="bg-background p-2 font-semibold text-muted-foreground text-center">Status</div>
-                {modules.map((mod) => {
-                  const status = batchProgress[mod.id] || "queued"
-                  return (
-                    <div key={mod.id} className="contents">
-                      <div className="bg-background p-2 font-medium text-foreground">{mod.name}</div>
-                      <div className="bg-background p-2 text-center">
-                        {status === "interface" ? <Loader2 className="h-3 w-3 animate-spin text-international-orange mx-auto" />
-                          : status === "generating" || status === "done" ? <CheckCircle2 className="h-3 w-3 text-status-success mx-auto" />
-                          : status === "error" ? <AlertTriangle className="h-3 w-3 text-destructive mx-auto" />
-                          : <span className="text-muted-foreground">&mdash;</span>}
+            <div className="space-y-2">
+              {modules.map((mod, idx) => {
+                const status = batchProgress[mod.id] || "queued"
+                const stepIndex = status === "queued" ? 0 : status === "interface" ? 1 : status === "generating" ? 2 : status === "done" ? 3 : -1
+                const isError = status === "error"
+                const isActive = status === "interface" || status === "generating"
+                const isDone = status === "done"
+
+                return (
+                  <div
+                    key={mod.id}
+                    className={`border rounded-lg p-3 transition-all duration-300 ${
+                      isActive ? "border-international-orange/40 bg-gradient-to-r from-international-orange-light/10 to-background shadow-sm" :
+                      isDone ? "border-status-success/30 bg-status-success-light/10" :
+                      isError ? "border-destructive/30 bg-status-error-light/10" :
+                      "border-muted bg-muted/10"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      {/* Module info */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className={`flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold flex-shrink-0 ${
+                          isDone ? "bg-status-success text-white" :
+                          isActive ? "bg-international-orange text-white" :
+                          isError ? "bg-destructive text-white" :
+                          "bg-muted text-muted-foreground"
+                        }`}>
+                          {isDone ? (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          ) : isActive ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : isError ? (
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                          ) : (
+                            idx + 1
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className={`text-sm font-medium truncate ${
+                            isActive ? "text-foreground" :
+                            isDone ? "text-status-success" :
+                            isError ? "text-destructive" :
+                            "text-muted-foreground"
+                          }`}>
+                            {mod.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">{mod.purpose}</p>
+                        </div>
                       </div>
-                      <div className="bg-background p-2 text-center">
-                        {status === "generating" ? <Loader2 className="h-3 w-3 animate-spin text-international-orange mx-auto" />
-                          : status === "done" ? <CheckCircle2 className="h-3 w-3 text-status-success mx-auto" />
-                          : status === "error" ? <AlertTriangle className="h-3 w-3 text-destructive mx-auto" />
-                          : <span className="text-muted-foreground">&mdash;</span>}
+
+                      {/* Pipeline steps — Interface → CAD → Done */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {/* Step 1: Interface */}
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${
+                          stepIndex > 1 ? "bg-status-success-light text-status-success" :
+                          stepIndex === 1 ? "bg-international-orange-light text-international-orange" :
+                          isError ? "bg-status-error-light text-destructive" :
+                          "bg-muted text-muted-foreground"
+                        }`}>
+                          {stepIndex > 1 ? (
+                            <CheckCircle2 className="h-3 w-3" />
+                          ) : stepIndex === 1 ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Ruler className="h-3 w-3" />
+                          )}
+                          Interface
+                        </div>
+
+                        <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+
+                        {/* Step 2: CAD */}
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${
+                          stepIndex > 2 ? "bg-status-success-light text-status-success" :
+                          stepIndex === 2 ? "bg-international-orange-light text-international-orange" :
+                          isError && stepIndex >= 2 ? "bg-status-error-light text-destructive" :
+                          "bg-muted text-muted-foreground"
+                        }`}>
+                          {stepIndex > 2 ? (
+                            <CheckCircle2 className="h-3 w-3" />
+                          ) : stepIndex === 2 ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Box className="h-3 w-3" />
+                          )}
+                          CAD
+                        </div>
+
+                        <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+
+                        {/* Step 3: Complete */}
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${
+                          isDone ? "bg-status-success-light text-status-success" :
+                          isError ? "bg-status-error-light text-destructive" :
+                          "bg-muted text-muted-foreground"
+                        }`}>
+                          {isDone ? (
+                            <CheckCircle2 className="h-3 w-3" />
+                          ) : isError ? (
+                            <AlertTriangle className="h-3 w-3" />
+                          ) : (
+                            <Zap className="h-3 w-3" />
+                          )}
+                          {isDone ? "Done" : isError ? "Error" : "Ready"}
+                        </div>
                       </div>
-                      <div className="bg-background p-2 text-center">
-                        <span className={`font-mono ${status === "done" ? "text-status-success" : status === "error" ? "text-destructive" : status === "queued" ? "text-muted-foreground" : "text-international-orange"}`}>
-                          {status}
+
+                      {/* Status label */}
+                      <div className="flex-shrink-0 w-28 text-right">
+                        <span className={`text-xs font-medium ${
+                          isDone ? "text-status-success" :
+                          isActive ? "text-international-orange" :
+                          isError ? "text-destructive" :
+                          "text-muted-foreground"
+                        }`}>
+                          {isDone ? "Complete" :
+                           status === "interface" ? "Planning dims..." :
+                           status === "generating" ? "Building CAD..." :
+                           isError ? "Failed" :
+                           "In queue"}
                         </span>
                       </div>
                     </div>
-                  )
-                })}
-              </div>
+
+                    {/* Progress bar for active modules */}
+                    {isActive && (
+                      <div className="mt-2 h-1 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-international-orange rounded-full animate-pulse" style={{ width: status === "interface" ? "35%" : "70%" }} />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
 
@@ -238,7 +339,7 @@ export default function CadLabBuildPage(): React.ReactNode {
           )}
 
           {/* Module list */}
-          {modules.length > 0 && !isBatchRunning && (
+          {modules.length > 0 && (
             <div className="space-y-2 mt-4">
               {modules.map((mod) => (
                 <div key={mod.id} className="border rounded-md overflow-hidden">
