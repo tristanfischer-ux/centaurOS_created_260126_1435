@@ -39,12 +39,13 @@ const _ENABLE_ADVANCED_MODES = typeof window !== "undefined"
 
 // ─── Specialist Model Configuration ───────────────────────────────────────────
 // Centralizes model choices so upgrades are a one-line change.
-// Greetings use a lightweight model (short, contextual openers).
-// Conversations use the most capable model for high-stakes business advice.
+// MiniMax M2.5 provides frontier-quality reasoning at ~100x lower cost than
+// Claude Opus 4.6. Uses their OpenAI-compatible API at api.minimax.io/v1.
+// Enterprise tier override (Claude) can be added once tier context is available.
 
 const SPECIALIST_MODELS = {
-    greeting: { providerId: "anthropic", modelId: "claude-haiku-4-5" },
-    conversation: { providerId: "anthropic", modelId: "claude-opus-4-6" },
+    greeting: { providerId: "minimax", modelId: "MiniMax-M2.5" },
+    conversation: { providerId: "minimax", modelId: "MiniMax-M2.5" },
 } as const
 
 const DEEP_THINK_STORAGE_KEY = "forgeOS-specialist-deep-think"

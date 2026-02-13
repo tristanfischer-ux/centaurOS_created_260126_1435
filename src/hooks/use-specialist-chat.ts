@@ -66,6 +66,10 @@ export interface UseSpecialistChatOptions {
     threadId: string | null
     /** Desired conversation mode (will fall back if unavailable) */
     preferredMode: ConversationMode
+    /** AI provider ID (e.g., "minimax", "anthropic") */
+    providerId: string
+    /** Model ID (e.g., "MiniMax-M2.5", "claude-opus-4-6") */
+    modelId: string
     /** Pre-built system prompt suffix (screen context, handoff, cross-specialist) */
     systemPromptSuffix: string
     /** Whether deep thinking is enabled */
@@ -107,6 +111,8 @@ export function useSpecialistChat({
     specialist,
     threadId,
     preferredMode,
+    providerId,
+    modelId,
     systemPromptSuffix,
     deepThinkEnabled,
     isOpen,
@@ -221,6 +227,8 @@ export function useSpecialistChat({
             specialistId: specialist.id,
             threadId,
             foundryId: null, // Resolved server-side from auth
+            providerId,
+            modelId,
             systemPromptSuffix,
             voice: specialist.voice,
             deepThinkEnabled,

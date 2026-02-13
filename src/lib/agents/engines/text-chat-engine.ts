@@ -111,7 +111,7 @@ class TextChatEngine implements ConversationEngine {
         this.abortController?.abort()
         this.abortController = new AbortController()
 
-        const { specialistId, threadId, systemPromptSuffix, deepThinkEnabled } = this.config
+        const { specialistId, threadId, providerId, modelId, systemPromptSuffix, deepThinkEnabled } = this.config
 
         try {
             const res = await fetch("/api/agents/execute", {
@@ -120,8 +120,8 @@ class TextChatEngine implements ConversationEngine {
                 body: JSON.stringify({
                     prompt: promptTemplate ?? undefined,
                     input: message,
-                    providerId: "anthropic",
-                    modelId: "claude-opus-4-6",
+                    providerId,
+                    modelId,
                     modality: "text",
                     threadId: threadId ?? undefined,
                     specialistId,
