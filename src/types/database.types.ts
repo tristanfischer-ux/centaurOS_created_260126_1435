@@ -680,6 +680,68 @@ export type Database = {
           },
         ]
       }
+      agent_insights: {
+        Row: {
+          acted_on: boolean
+          acted_on_at: string | null
+          body: string
+          created_at: string
+          domain_data: Json | null
+          expires_at: string | null
+          foundry_id: string
+          id: string
+          insight_type: string
+          is_dismissed: boolean
+          is_read: boolean
+          specialist_id: string
+          suggested_actions: Json | null
+          title: string
+          urgency: string
+        }
+        Insert: {
+          acted_on?: boolean
+          acted_on_at?: string | null
+          body: string
+          created_at?: string
+          domain_data?: Json | null
+          expires_at?: string | null
+          foundry_id: string
+          id?: string
+          insight_type: string
+          is_dismissed?: boolean
+          is_read?: boolean
+          specialist_id: string
+          suggested_actions?: Json | null
+          title: string
+          urgency?: string
+        }
+        Update: {
+          acted_on?: boolean
+          acted_on_at?: string | null
+          body?: string
+          created_at?: string
+          domain_data?: Json | null
+          expires_at?: string | null
+          foundry_id?: string
+          id?: string
+          insight_type?: string
+          is_dismissed?: boolean
+          is_read?: boolean
+          specialist_id?: string
+          suggested_actions?: Json | null
+          title?: string
+          urgency?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_insights_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_memory_messages: {
         Row: {
           content: string
@@ -824,6 +886,59 @@ export type Database = {
           },
           {
             foreignKeyName: "agent_memory_threads_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_sweep_log: {
+        Row: {
+          completed_at: string | null
+          duration_ms: number
+          error_message: string | null
+          estimated_cost_usd: number
+          foundry_id: string
+          id: string
+          insights_generated: number
+          specialist_id: string
+          started_at: string
+          status: string
+          tokens_in: number
+          tokens_out: number
+        }
+        Insert: {
+          completed_at?: string | null
+          duration_ms?: number
+          error_message?: string | null
+          estimated_cost_usd?: number
+          foundry_id: string
+          id?: string
+          insights_generated?: number
+          specialist_id: string
+          started_at?: string
+          status?: string
+          tokens_in?: number
+          tokens_out?: number
+        }
+        Update: {
+          completed_at?: string | null
+          duration_ms?: number
+          error_message?: string | null
+          estimated_cost_usd?: number
+          foundry_id?: string
+          id?: string
+          insights_generated?: number
+          specialist_id?: string
+          started_at?: string
+          status?: string
+          tokens_in?: number
+          tokens_out?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_sweep_log_foundry_id_fkey"
             columns: ["foundry_id"]
             isOneToOne: false
             referencedRelation: "foundries"
@@ -4271,6 +4386,62 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      foundry_agent_preferences: {
+        Row: {
+          created_at: string
+          foundry_id: string
+          id: string
+          monthly_budget_usd: number
+          notify_critical_in_app: boolean
+          notify_critical_telegram: boolean
+          notify_digest_telegram: boolean
+          notify_important_in_app: boolean
+          notify_important_telegram: boolean
+          specialist_overrides: Json | null
+          sweep_interval_minutes: number
+          sweeps_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          foundry_id: string
+          id?: string
+          monthly_budget_usd?: number
+          notify_critical_in_app?: boolean
+          notify_critical_telegram?: boolean
+          notify_digest_telegram?: boolean
+          notify_important_in_app?: boolean
+          notify_important_telegram?: boolean
+          specialist_overrides?: Json | null
+          sweep_interval_minutes?: number
+          sweeps_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          monthly_budget_usd?: number
+          notify_critical_in_app?: boolean
+          notify_critical_telegram?: boolean
+          notify_digest_telegram?: boolean
+          notify_important_in_app?: boolean
+          notify_important_telegram?: boolean
+          specialist_overrides?: Json | null
+          sweep_interval_minutes?: number
+          sweeps_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foundry_agent_preferences_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: true
+            referencedRelation: "foundries"
             referencedColumns: ["id"]
           },
         ]
@@ -12415,6 +12586,20 @@ export type Database = {
         Args: { search_query: string }
         Returns: undefined
       }
+      insert_agent_insight: {
+        Args: {
+          p_body: string
+          p_domain_data?: Json
+          p_expires_at?: string
+          p_foundry_id: string
+          p_insight_type: string
+          p_specialist_id: string
+          p_suggested_actions?: Json
+          p_title: string
+          p_urgency: string
+        }
+        Returns: string
+      }
       insert_security_audit_log: {
         Args: {
           p_action?: string
@@ -12441,6 +12626,20 @@ export type Database = {
         Returns: boolean
       }
       is_otjt_on_track: { Args: { enrollment_id: string }; Returns: boolean }
+      log_agent_sweep: {
+        Args: {
+          p_duration_ms?: number
+          p_error_message?: string
+          p_estimated_cost_usd?: number
+          p_foundry_id: string
+          p_insights_generated?: number
+          p_specialist_id: string
+          p_status?: string
+          p_tokens_in?: number
+          p_tokens_out?: number
+        }
+        Returns: string
+      }
       mark_conversation_read: {
         Args: { conv_id: string; user_id: string }
         Returns: undefined

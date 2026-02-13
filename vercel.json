@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/telegram-briefings",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/agent-sweep",
+      "schedule": "0 */2 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-synthesis",
+      "schedule": "0 8 * * 1"
     }
   ]
 }

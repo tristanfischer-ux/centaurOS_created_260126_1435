@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef } from "react"
-import { X, Copy, Check, Trash2, Play, RotateCcw, ChevronDown, ChevronRight, CheckCircle, ArrowRight, Sparkles, Brain, Globe, Image as ImageIcon, Mic, Cpu, Loader2, UserCheck, Square, CheckSquare, Download, Pencil, Eye, ExternalLink, Braces } from "lucide-react"
+import { X, Copy, Check, Trash2, Play, RotateCcw, ChevronDown, ChevronRight, CheckCircle, ArrowRight, Sparkles, Brain, Globe, Image as ImageIcon, Mic, Cpu, Zap, Loader2, UserCheck, Square, CheckSquare, Download, Pencil, Eye, ExternalLink, Braces } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -23,7 +23,7 @@ import { ActOnThisButton } from "@/components/smart/act-on-this-button"
 import type { Node } from "@xyflow/react"
 
 const PROVIDER_ICON_MAP: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
-    Sparkles, Brain, Globe, Image: ImageIcon, Mic, Cpu,
+    Sparkles, Brain, Globe, Image: ImageIcon, Mic, Cpu, Zap,
 }
 
 const MODALITY_LABELS: Record<OutputModality, string> = {
@@ -140,6 +140,65 @@ function ProviderModelSelector({
                     {providerMeta?.name} · {availableModels.find(m => m.id === modelId)?.name ?? modelId}
                 </span>
             </div>
+        </div>
+    )
+}
+
+// ─── Video Configuration Panel ──────────────────────────────────────
+
+/**
+ * VideoConfigPanel — shown when a node's output modality is "video".
+ * Exposes duration, resolution, and prompt optimizer settings.
+ */
+function VideoConfigPanel({
+    nodeId,
+    videoConfig,
+    onUpdateVideoConfig,
+}: {
+    nodeId: string
+    videoConfig?: { duration?: number; resolution?: string; promptOptimizer?: boolean }
+    onUpdateVideoConfig: (nodeId: string, config: { duration?: number; resolution?: string; promptOptimizer?: boolean }) => void
+}) {
+    const config = videoConfig ?? { duration: 6, resolution: "1080P", promptOptimizer: true }
+
+    return (
+        <div className="space-y-2.5">
+            <label className="text-xs font-semibold text-foreground">Video Settings</label>
+            <div className="grid grid-cols-2 gap-2">
+                <div>
+                    <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Duration</label>
+                    <select
+                        value={config.duration ?? 6}
+                        onChange={(e) => onUpdateVideoConfig(nodeId, { ...config, duration: Number(e.target.value) })}
+                        className="w-full h-8 rounded-md border bg-background px-2 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
+                    >
+                        <option value={5}>5 seconds</option>
+                        <option value={6}>6 seconds</option>
+                    </select>
+                </div>
+                <div>
+                    <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Resolution</label>
+                    <select
+                        value={config.resolution ?? "1080P"}
+                        onChange={(e) => onUpdateVideoConfig(nodeId, { ...config, resolution: e.target.value })}
+                        className="w-full h-8 rounded-md border bg-background px-2 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
+                    >
+                        <option value="720P">720p</option>
+                        <option value="1080P">1080p</option>
+                    </select>
+                </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                    type="checkbox"
+                    checked={config.promptOptimizer !== false}
+                    onChange={(e) => onUpdateVideoConfig(nodeId, { ...config, promptOptimizer: e.target.checked })}
+                    className="rounded border-muted-foreground/40"
+                />
+                <span className="text-[10px] text-muted-foreground">
+                    Prompt optimizer (MiniMax enhances your prompt for better results)
+                </span>
+            </label>
         </div>
     )
 }
@@ -303,6 +362,7 @@ interface NodeInspectorProps {
     onUpdateFiles: (nodeId: string, files: AttachedFile[]) => void
     onUpdateProvider: (nodeId: string, providerId: string, modelId: string, modality: string) => void
     onUpdateChecklist?: (nodeId: string, completed: boolean[]) => void
+    onUpdateVideoConfig?: (nodeId: string, config: { duration?: number; resolution?: string; promptOptimizer?: boolean }) => void
     onDelete: (nodeId: string) => void
     onRunNode: (nodeId: string) => void
     onApproveNode: (nodeId: string) => void
@@ -318,6 +378,7 @@ export function NodeInspector({
     onUpdateFiles,
     onUpdateProvider,
     onUpdateChecklist,
+    onUpdateVideoConfig,
     onDelete,
     onRunNode,
     onApproveNode,
@@ -341,6 +402,7 @@ export function NodeInspector({
         imageUrl?: string
         audioUrl?: string
         videoUrl?: string
+        videoConfig?: { duration?: number; resolution?: string; promptOptimizer?: boolean }
         // Human-task fields
         isHumanTask?: boolean
         guidance?: string
@@ -581,6 +643,15 @@ export function NodeInspector({
                         currentModality={data.outputModality as OutputModality | undefined}
                         onUpdateProvider={onUpdateProvider}
                     />
+
+                    {/* ─── Video Config (when video modality is selected) ──── */}
+                    {data.outputModality === "video" && onUpdateVideoConfig && (
+                        <VideoConfigPanel
+                            nodeId={node.id}
+                            videoConfig={data.videoConfig}
+                            onUpdateVideoConfig={onUpdateVideoConfig}
+                        />
+                    )}
 
                     {/* ─── Prompt Text Section ─────────────────────────────── */}
                     <div>

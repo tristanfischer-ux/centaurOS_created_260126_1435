@@ -10,6 +10,7 @@ export const AI_PROVIDERS = [
     "stability",
     "elevenlabs",
     "replicate",
+    "minimax",
 ] as const
 export type AIProviderId = (typeof AI_PROVIDERS)[number]
 
@@ -132,6 +133,33 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         models: [
             { id: "black-forest-labs/flux-1.1-pro", name: "Flux 1.1 Pro", modality: "image", description: "High quality image generation", default: true },
             { id: "minimax/video-01", name: "MiniMax Video-01", modality: "video", description: "Text-to-video generation", default: true },
+        ],
+    },
+    minimax: {
+        id: "minimax",
+        name: "MiniMax",
+        description: "M2.5 text, Hailuo video, speech, image — high value multi-modal",
+        icon: "Zap",
+        website: "https://platform.minimax.io",
+        capabilities: ["text", "image", "audio", "video"],
+        requiresKey: true,
+        color: "#7c3aed",
+        bgColor: "bg-violet-50",
+        models: [
+            // Text models — OpenAI-compatible API at api.minimax.io/v1
+            { id: "MiniMax-M2.5", name: "MiniMax M2.5", modality: "text", description: "Peak performance, ultimate value — newest flagship", maxTokens: 204800, default: true },
+            { id: "MiniMax-M2.1", name: "MiniMax M2.1", modality: "text", description: "Strong coding and reasoning at ~60 tps", maxTokens: 204800 },
+            { id: "MiniMax-M2.1-lightning", name: "MiniMax M2.1 Lightning", modality: "text", description: "Faster variant at ~100 tps", maxTokens: 204800 },
+            // Video models — Hailuo via native async API
+            { id: "MiniMax-Hailuo-2.3", name: "Hailuo 2.3", modality: "video", description: "Text-to-video, 1080p, camera control", default: true },
+            { id: "MiniMax-Hailuo-2.3-Fast", name: "Hailuo 2.3 Fast", modality: "video", description: "Faster video generation, great value" },
+            // Audio models — T2A speech synthesis, 40 languages
+            { id: "speech-2.8-hd", name: "Speech 2.8 HD", modality: "audio", description: "Highest quality TTS with interjections (laughs, sighs)", default: true },
+            { id: "speech-2.8-turbo", name: "Speech 2.8 Turbo", modality: "audio", description: "Fast TTS with interjections support" },
+            { id: "speech-2.6-hd", name: "Speech 2.6 HD", modality: "audio", description: "Voice agent optimized — sub-250ms latency, smart format handling, Fluent LoRA cloning" },
+            { id: "speech-2.6-turbo", name: "Speech 2.6 Turbo", modality: "audio", description: "Fastest voice agent TTS — sub-250ms, powers ChatGPT voice mode" },
+            // Image model
+            { id: "image-01", name: "Image-01", modality: "image", description: "Text-to-image, multiple aspect ratios ($0.0035/image)", default: true },
         ],
     },
 }

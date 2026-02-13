@@ -48,6 +48,8 @@ import { typography } from "@/lib/design-system"
 import { StreakBadge } from "@/components/celebrations/StreakBadge"
 import { useCelebration } from "@/hooks/useCelebration"
 import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
+import { InsightFeed } from "@/components/insights/insight-feed"
+import { WeeklyBrief } from "@/components/insights/weekly-brief"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 
 import type { FormattedReport, DailyPulseData } from "@/lib/reports/types"
@@ -430,6 +432,19 @@ export function TodayView(): React.ReactElement {
                     <StrategySpotlightSection items={strategyHealth} />
                 </motion.div>
             )}
+
+            {/* Always-On Specialist Intelligence */}
+            <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.28, ease: EASE_CURVE }}
+            >
+                <SectionHeader icon={Waypoints} label="Specialist Intelligence" color="text-international-orange" />
+                <div className="space-y-6">
+                    <WeeklyBrief />
+                    <InsightFeed />
+                </div>
+            </motion.div>
 
             {/* Insights Section */}
             <motion.div

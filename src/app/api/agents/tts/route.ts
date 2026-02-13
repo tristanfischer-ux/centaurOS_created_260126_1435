@@ -1,8 +1,11 @@
 /**
  * @file /api/agents/tts/route.ts
  *
- * @description Text-to-speech proxy for specialist voice output. Accepts text
- * and an OpenAI voice ID, streams back audio/mpeg via OpenAI gpt-4o-mini-tts.
+ * @description Text-to-speech proxy for specialist voice output. Supports both
+ * OpenAI gpt-4o-mini-tts and MiniMax Speech 2.6/2.8 for specialist voice output.
+ *
+ * MiniMax offers 300+ voices with emotion control, 40 languages, and faster latency
+ * compared to OpenAI TTS. Use NEXT_PUBLIC_TTS_PROVIDER=minimax to enable.
  *
  * @security Requires authenticated user. Rate-limited to 20 req/min per user.
  * @audit Tracks usage under the 'specialist_tts' AI feature.
@@ -13,30 +16,138 @@ import { createClient } from "@/lib/supabase/server"
 import OpenAI from "openai"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { aiGuard } from "@/lib/ai/guard"
+import { generateMiniMaxAudio } from "@/lib/ai-providers/registry"
 
-// SECURITY: Fail fast if OpenAI API key is not configured
-const apiKey = process.env.OPENAI_API_KEY
-if (!apiKey && process.env.NODE_ENV === "production") {
-    console.error("[CRITICAL] OPENAI_API_KEY not configured in production!")
+// ─── Configuration ────────────────────────────────────────────────────────────
+
+/** Which TTS provider to use: "openai" (default) or "minimax" */
+const TTS_PROVIDER = process.env.NEXT_PUBLIC_TTS_PROVIDER ?? "openai"
+
+/** Default MiniMax model for TTS */
+const MINIMAX_TTS_MODEL = "speech-2.6-turbo"
+
+// MiniMax API key (lazy-loaded)
+let minimaxApiKey: string | undefined
+function getMiniMaxKey(): string | undefined {
+    if (!minimaxApiKey) {
+        minimaxApiKey = process.env.MINIMAX_API_KEY
+    }
+    return minimaxApiKey
 }
 
-const openai = new OpenAI({
-    apiKey: apiKey || "dummy-key-for-build",
-})
+// OpenAI API key (lazy-loaded)
+let openaiApiKey: string | undefined
+function getOpenAIKey(): string | undefined {
+    if (!openaiApiKey) {
+        openaiApiKey = process.env.OPENAI_API_KEY
+    }
+    return openaiApiKey
+}
+
+// ─── Voice Mapping ────────────────────────────────────────────────────────────
 
 /** Allowed OpenAI TTS voices */
-const ALLOWED_VOICES = new Set([
+const ALLOWED_OPENAI_VOICES = new Set([
     "alloy", "ash", "ballad", "coral", "echo",
     "fable", "nova", "onyx", "sage", "shimmer", "verse",
 ])
 
+/**
+ * Mapping from OpenAI voice IDs to MiniMax voice IDs.
+ * MiniMax has 300+ voices across 40 languages. These are selected to match
+ * the tone and style of the OpenAI voices.
+ *
+ * Each specialist uses an OpenAI voice ID in specialists-data.ts.
+ * This mapping translates to MiniMax equivalents.
+ */
+const OPENAI_TO_MINIMAX_VOICE: Record<string, string> = {
+    // Warm, conversational voices
+    alloy: "male-qn-qingse",
+    echo: "male-qn-jingying",
+    coral: "female-shaonv",
+    
+    // Clear, professional voices
+    ash: "male-qn-badao",
+    nova: "female-yujie",
+    sage: "male-qn-qingse",
+    
+    // Expressive, storytelling voices
+    ballad: "female-yujie",
+    fable: "female-shaonv",
+    shimmer: "female-xingchen",
+    
+    // Deep, authoritative voices
+    onyx: "male-qn-badao",
+    verse: "male-qn-jingying",
+    
+    // Additional mapping for common voices
+    alloy: "male-qn-qingse",
+    coral: "female-shaonv",
+}
+
 /** Maximum text length to send to TTS (chars) */
 const MAX_TEXT_LENGTH = 4000
 
+// ─── OpenAI TTS ─────────────────────────────────────────────────────────────
+
+async function generateOpenAITTS(text: string, voice: string): Promise<ArrayBuffer> {
+    const apiKey = getOpenAIKey()
+    if (!apiKey) {
+        throw new Error("OpenAI API key not configured")
+    }
+
+    const openai = new OpenAI({ apiKey })
+
+    const audioResponse = await openai.audio.speech.create({
+        model: "gpt-4o-mini-tts",
+        voice: voice as "alloy",
+        input: text,
+        response_format: "mp3",
+    })
+
+    return audioResponse.arrayBuffer()
+}
+
+// ─── MiniMax TTS ────────────────────────────────────────────────────────────
+
+async function generateMiniMaxTTS(text: string, voice: string): Promise<ArrayBuffer> {
+    const apiKey = getMiniMaxKey()
+    if (!apiKey) {
+        throw new Error("MiniMax API key not configured")
+    }
+
+    const minimaxVoice = OPENAI_TO_MINIMAX_VOICE[voice] || "male-qn-qingse"
+
+    const result = await generateMiniMaxAudio({
+        apiKey,
+        modelId: MINIMAX_TTS_MODEL,
+        text,
+        voice: minimaxVoice,
+    })
+
+    // Fetch the audio from the returned URL
+    const response = await fetch(result.audioUrl)
+    if (!response.ok) {
+        throw new Error(`Failed to fetch MiniMax audio: ${response.status}`)
+    }
+
+    return response.arrayBuffer()
+}
+
+// ─── Main Handler ────────────────────────────────────────────────────────────
+
 export async function POST(req: NextRequest): Promise<Response> {
     try {
-        // SECURITY: Check if OpenAI is configured
-        if (!process.env.OPENAI_API_KEY) {
+        // SECURITY: Check provider configuration
+        if (TTS_PROVIDER === "minimax" && !getMiniMaxKey()) {
+            console.error("[TTS] MiniMax API key not configured")
+            return NextResponse.json(
+                { error: "TTS provider not configured. Please set MINIMAX_API_KEY." },
+                { status: 503 }
+            )
+        }
+
+        if (TTS_PROVIDER === "openai" && !getOpenAIKey()) {
             console.error("[TTS] OpenAI API key not configured")
             return NextResponse.json(
                 { error: "Service temporarily unavailable" },
@@ -64,7 +175,11 @@ export async function POST(req: NextRequest): Promise<Response> {
 
         // VALIDATION: Parse and validate request body
         const body = await req.json()
-        const { text, voice } = body as { text?: string; voice?: string }
+        const { text, voice, provider } = body as {
+            text?: string
+            voice?: string
+            provider?: string
+        }
 
         if (!text || typeof text !== "string" || text.trim().length === 0) {
             return NextResponse.json(
@@ -73,11 +188,17 @@ export async function POST(req: NextRequest): Promise<Response> {
             )
         }
 
-        if (!voice || !ALLOWED_VOICES.has(voice)) {
-            return NextResponse.json(
-                { error: `Invalid voice. Allowed: ${[...ALLOWED_VOICES].join(", ")}` },
-                { status: 400 }
-            )
+        // Determine which provider to use (allow client override for testing)
+        const activeProvider = provider ?? TTS_PROVIDER
+
+        // Validate voice based on provider
+        if (activeProvider === "openai") {
+            if (!voice || !ALLOWED_OPENAI_VOICES.has(voice)) {
+                return NextResponse.json(
+                    { error: `Invalid OpenAI voice. Allowed: ${[...ALLOWED_OPENAI_VOICES].join(", ")}` },
+                    { status: 400 }
+                )
+            }
         }
 
         // Truncate long text gracefully
@@ -85,24 +206,27 @@ export async function POST(req: NextRequest): Promise<Response> {
             ? text.slice(0, MAX_TEXT_LENGTH) + "..."
             : text
 
-        // Call OpenAI TTS
-        const audioResponse = await openai.audio.speech.create({
-            model: "gpt-4o-mini-tts",
-            voice: voice as "alloy",
-            input: truncatedText,
-            response_format: "mp3",
-        })
+        // Generate audio based on provider
+        let audioBuffer: ArrayBuffer
+        let modelUsed: string
+
+        if (activeProvider === "minimax") {
+            console.info(`[TTS] Using MiniMax TTS with voice: ${voice}`)
+            audioBuffer = await generateMiniMaxTTS(truncatedText, voice ?? "echo")
+            modelUsed = MINIMAX_TTS_MODEL
+        } else {
+            console.info(`[TTS] Using OpenAI TTS with voice: ${voice}`)
+            audioBuffer = await generateOpenAITTS(truncatedText, voice ?? "alloy")
+            modelUsed = "gpt-4o-mini-tts"
+        }
 
         // AUDIT: Track usage (fire and forget)
         guard.trackUsage({
-            model: "gpt-4o-mini-tts",
-            metadata: { voice, textLength: truncatedText.length },
+            model: modelUsed,
+            metadata: { voice, provider: activeProvider, textLength: truncatedText.length },
         }).catch((err: unknown) => {
             console.warn("[TTS] Usage tracking failed:", err)
         })
-
-        // Stream the audio response back to the client
-        const audioBuffer = await audioResponse.arrayBuffer()
 
         return new Response(audioBuffer, {
             status: 200,
@@ -116,8 +240,8 @@ export async function POST(req: NextRequest): Promise<Response> {
         const message = err instanceof Error ? err.message : "Unknown error"
         console.error("[TTS] Failed:", { error: message })
 
-        // Check for OpenAI-specific errors
-        if (message.includes("API key")) {
+        // Check for specific errors
+        if (message.includes("API key") || message.includes("not configured")) {
             return NextResponse.json(
                 { error: "AI service configuration error" },
                 { status: 503 }

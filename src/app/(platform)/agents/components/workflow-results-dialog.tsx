@@ -67,6 +67,11 @@ interface ResultNodeData {
     guidance?: string
     checklist?: string[]
     checklistCompleted?: boolean[]
+    // Media outputs
+    imageUrl?: string
+    audioUrl?: string
+    videoUrl?: string
+    outputModality?: string
 }
 
 interface WorkflowResultsDialogProps {
@@ -139,7 +144,9 @@ function ResultStep({
     const isHuman = node.type === "human-task" || data.isHumanTask
     const [expanded, setExpanded] = useState(true)
     const [copied, setCopied] = useState(false)
-    const hasOutput = !!data.output?.trim()
+    const hasTextOutput = !!data.output?.trim()
+    const hasMediaOutput = !!(data.imageUrl || data.audioUrl || data.videoUrl)
+    const hasOutput = hasTextOutput || hasMediaOutput
     const color = data.category ? CATEGORY_ACCENT_COLORS[data.category] : "#94a3b8"
 
     const handleCopyStep = useCallback(() => {
@@ -246,8 +253,77 @@ function ResultStep({
                                 </details>
                             )}
 
-                            {/* Output */}
-                            {hasOutput ? (
+                            {/* Media output (image/audio/video) */}
+                            {data.imageUrl && (
+                                <div>
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                                        Generated Image
+                                    </p>
+                                    <div className="rounded-lg overflow-hidden border bg-muted">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={data.imageUrl} alt="Generated image" className="w-full h-auto" />
+                                    </div>
+                                    <div className="flex gap-2 mt-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-[10px] h-7"
+                                            onClick={() => {
+                                                const a = document.createElement("a")
+                                                a.href = data.imageUrl!
+                                                a.download = `generated-${Date.now()}.png`
+                                                a.click()
+                                            }}
+                                        >
+                                            <Download className="w-3 h-3 mr-1" />
+                                            Download
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {data.audioUrl && (
+                                <div>
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                                        Generated Audio
+                                    </p>
+                                    <audio controls className="w-full" src={data.audioUrl}>
+                                        <track kind="captions" />
+                                    </audio>
+                                </div>
+                            )}
+
+                            {data.videoUrl && (
+                                <div>
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                                        Generated Video
+                                    </p>
+                                    <div className="rounded-lg overflow-hidden border bg-black">
+                                        <video controls className="w-full" src={data.videoUrl}>
+                                            <track kind="captions" />
+                                        </video>
+                                    </div>
+                                    <div className="flex gap-2 mt-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-[10px] h-7"
+                                            onClick={() => {
+                                                const a = document.createElement("a")
+                                                a.href = data.videoUrl!
+                                                a.download = `generated-${Date.now()}.mp4`
+                                                a.click()
+                                            }}
+                                        >
+                                            <Download className="w-3 h-3 mr-1" />
+                                            Download Video
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Text output */}
+                            {hasTextOutput && !(data.output === "[Image generated]" || data.output === "[Audio generated]" || data.output === "[Video generated]") ? (
                                 <div>
                                     <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
                                         Output
@@ -256,11 +332,11 @@ function ResultStep({
                                         <Markdown content={data.output!} className="text-xs [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-xs [&_table]:text-[11px] [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 [&_table]:border-collapse [&_th]:border [&_th]:border-slate-200 [&_td]:border [&_td]:border-slate-200 [&_th]:bg-muted [&_th]:font-semibold" />
                                     </div>
                                 </div>
-                            ) : (
+                            ) : !hasOutput ? (
                                 <p className="text-xs text-muted-foreground italic">
                                     No output yet — run this step first.
                                 </p>
-                            )}
+                            ) : null}
                         </>
                     )}
 
@@ -327,9 +403,10 @@ export function WorkflowResultsDialog({
     const completedCount = orderedNodes.filter(
         (n) => (n.data as ResultNodeData).executionStatus === "approved"
     ).length
-    const hasAnyOutput = orderedNodes.some(
-        (n) => (n.data as ResultNodeData).output?.trim()
-    )
+    const hasAnyOutput = orderedNodes.some((n) => {
+        const d = n.data as ResultNodeData
+        return d.output?.trim() || d.imageUrl || d.audioUrl || d.videoUrl
+    })
 
     const handleCopyAll = useCallback(() => {
         const md = generateWorkflowMarkdown(workflowName, nodes, edges)

@@ -94,6 +94,19 @@ function getUpstreamOutput(nodeId: string, nodes: Node[], edges: Edge[]): string
     return (sourceNode.data as { output?: string }).output
 }
 
+/**
+ * Gets the image URL from the nearest upstream node that produced one.
+ * Enables Image-to-Video chaining: an upstream image node's output
+ * becomes the first frame of a downstream video node.
+ */
+function getUpstreamImageUrl(nodeId: string, nodes: Node[], edges: Edge[]): string | undefined {
+    const sourceEdge = edges.find((e) => e.target === nodeId)
+    if (!sourceEdge) return undefined
+    const sourceNode = nodes.find((n) => n.id === sourceEdge.source)
+    if (!sourceNode) return undefined
+    return (sourceNode.data as { imageUrl?: string }).imageUrl
+}
+
 // ─── Auto-layout (topological rank-based, no external deps) ──────
 const NODE_WIDTH = 220
 const NODE_HEIGHT = 80
@@ -492,6 +505,12 @@ function AgentsFlowInner({
         [updateNodeData]
     )
 
+    const handleUpdateVideoConfig = useCallback(
+        (nodeId: string, config: { duration?: number; resolution?: string; promptOptimizer?: boolean }) =>
+            updateNodeData(nodeId, { videoConfig: config }),
+        [updateNodeData]
+    )
+
     // ── Delete node ────────────────────────────────────────────────
     const handleDeleteNode = useCallback(
         (nodeId: string) => {
@@ -762,6 +781,7 @@ function AgentsFlowInner({
                 providerId?: string
                 modelId?: string
                 outputModality?: string
+                videoConfig?: { duration?: number; resolution?: string; promptOptimizer?: boolean }
             }
 
             const prompt =
@@ -804,6 +824,12 @@ function AgentsFlowInner({
                 videoUrl: undefined,
             })
 
+            // For video nodes, check if an upstream image node produced an image
+            // that can be used as the first frame (Image-to-Video chaining)
+            const firstFrameImage = modality === "video"
+                ? getUpstreamImageUrl(nodeId, nodes, edges)
+                : undefined
+
             try {
                 const response = await fetch("/api/agents/execute", {
                     method: "POST",
@@ -815,6 +841,9 @@ function AgentsFlowInner({
                         modelId,
                         modality,
                         threadId: activeThreadIdRef.current ?? undefined,
+                        // Video-specific options
+                        ...(modality === "video" && data.videoConfig ? { videoConfig: data.videoConfig } : {}),
+                        ...(firstFrameImage ? { firstFrameImage } : {}),
                     }),
                     signal,
                 })
@@ -1358,6 +1387,7 @@ function AgentsFlowInner({
                         onUpdateFiles={handleUpdateNodeFiles}
                         onUpdateProvider={handleUpdateNodeProvider}
                         onUpdateChecklist={handleUpdateChecklist}
+                        onUpdateVideoConfig={handleUpdateVideoConfig}
                         onDelete={handleDeleteNode}
                         onRunNode={handleRunNode}
                         onApproveNode={handleApproveNode}

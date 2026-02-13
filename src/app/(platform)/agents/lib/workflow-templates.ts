@@ -21,6 +21,8 @@ const DEFAULT_PROVIDER = "anthropic"
 const DEFAULT_MODEL = "claude-opus-4-6"
 const IMAGE_PROVIDER = "google"
 const IMAGE_MODEL = "gemini-3-pro-image-preview"
+const VIDEO_PROVIDER = "minimax"
+const VIDEO_MODEL = "MiniMax-Hailuo-2.3"
 
 // ─── Node definition types ──────────────────────────────────────────
 
@@ -1413,6 +1415,63 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             edges,
             whyItMatters: "Choosing the wrong manufacturing technique costs hardware startups an average of £50K-200K in wasted tooling and 3-6 months of delays. This workflow guides you through technique selection, material choice, cost estimation, and RFQ creation — the same process a £300/hr manufacturing consultant would follow.",
             estimatedTime: "4-8 hours",
+        }
+    })(),
+
+    // ─── Marketing Video Pipeline ────────────────────────────────────
+    (() => {
+        const steps: StepDefinition[] = [
+            {
+                type: "human-task",
+                label: "Brief: product and video goals",
+                guidance: "Before the AI generates anything, define what you want the video to communicate and who it's for.\n\nOnce you've completed the checklist, open the next step (Product Description) and paste your product details, brand voice, and video goals into its Input Data field.",
+                checklist: [
+                    "Write a 2-3 sentence product or campaign description",
+                    "Define the target audience for the video",
+                    "Choose the tone: professional, playful, dramatic, cinematic",
+                    "List 2-3 key messages the video must communicate",
+                ],
+            },
+            { type: "prompt", promptId: "marketing-product-description", label: "Product Description", category: "marketing", icon: "ShoppingBag" },
+            { type: "prompt", promptId: "creative-image-prompt", label: "Scene Description", category: "creative", icon: "Image" },
+            { type: "prompt", promptId: "visual-brand-hero", label: "Hero Image (First Frame)", category: "creative", icon: "Image", providerId: IMAGE_PROVIDER, modelId: IMAGE_MODEL, outputModality: "image" },
+            {
+                type: "human-task",
+                label: "Review image before animating",
+                guidance: "The previous step generated a hero image that will become the first frame of your video. Click the step above to review it.\n\nThis is your last checkpoint before the video is generated. If the image doesn't match your vision, re-run the previous step with a modified prompt.",
+                checklist: [
+                    "Review the generated hero image for brand alignment",
+                    "Confirm the composition works as a video starting frame",
+                    "Verify there are no unwanted artifacts or text",
+                ],
+            },
+            { type: "prompt", promptId: "creative-image-prompt", label: "Video Motion Prompt", category: "creative", icon: "Clapperboard" },
+            { type: "prompt", promptId: "visual-brand-hero", label: "Animated Marketing Video", category: "creative", icon: "Video", providerId: VIDEO_PROVIDER, modelId: VIDEO_MODEL, outputModality: "video" },
+            { type: "prompt", promptId: "marketing-social-media", label: "Social Media Captions", category: "marketing", icon: "Share2" },
+            {
+                type: "human-task",
+                label: "Distribute the video",
+                guidance: "Your Marketing Video and Social Media Captions have been generated. Click each step above to review, download, and share.\n\nThe video is optimised for social media. Download it and upload natively to each platform for best reach.",
+                checklist: [
+                    "Download the video and review on mobile",
+                    "Upload natively to LinkedIn, Instagram, and/or TikTok",
+                    "Add the generated captions to each post",
+                    "Schedule posts for optimal engagement times",
+                ],
+            },
+        ]
+        const { nodes, edges } = buildTemplate(steps)
+        return {
+            id: "marketing-video-pipeline",
+            name: "Marketing Video Pipeline",
+            description: "Create a marketing video from scratch: product brief, scene description, hero image generation, image-to-video animation, and social media distribution — with review checkpoints.",
+            category: "business" as const,
+            icon: "Video",
+            nodeCount: steps.length,
+            nodes,
+            edges,
+            whyItMatters: "Video content gets 2-3x more engagement than static images on every platform. This workflow generates a complete video asset — from product brief through AI image generation, animation with MiniMax Hailuo, and social media captions — in under an hour instead of days with a video editor.",
+            estimatedTime: "1-2 hours",
         }
     })(),
 ]

@@ -300,12 +300,278 @@ async function generateElevenLabsAudio(opts: AudioGenerationOptions): Promise<Au
     return { audioUrl: `data:audio/mpeg;base64,${base64}` }
 }
 
+// ─── MiniMax Text Streaming ──────────────────────────────────────────
+
+/**
+ * Streams text from MiniMax via their OpenAI-compatible API endpoint.
+ *
+ * @description MiniMax exposes an OpenAI-compatible chat completions API
+ * at api.minimax.io/v1. We reuse the OpenAI SDK with a custom baseURL,
+ * keeping the implementation minimal and battle-tested.
+ *
+ * @see https://platform.minimax.io/docs/api-reference/text-openai-api
+ */
+async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
+    const OpenAI = (await import("openai")).default
+    const client = new OpenAI({
+        apiKey: opts.apiKey,
+        baseURL: "https://api.minimax.io/v1",
+    })
+
+    const stream = await client.chat.completions.create({
+        model: opts.modelId,
+        messages: [
+            { role: "system", content: opts.systemPrompt },
+            { role: "user", content: opts.userPrompt },
+        ],
+        stream: true,
+        max_tokens: opts.maxTokens ?? 4096,
+    })
+
+    for await (const chunk of stream) {
+        if (opts.signal?.aborted) break
+        const text = chunk.choices[0]?.delta?.content ?? ""
+        if (text) opts.onChunk(text)
+    }
+    opts.onDone()
+}
+
+// ─── MiniMax Image Generation ────────────────────────────────────────
+
+/**
+ * Generates an image via MiniMax's native image generation API.
+ *
+ * @description POST to /v1/image_generation with model, prompt, and format.
+ * Returns a URL to the generated image (valid 24 hours).
+ *
+ * @see https://platform.minimax.io/docs/api-reference/image-generation-t2i
+ */
+async function generateMiniMaxImage(opts: ImageGenerationOptions): Promise<ImageGenerationResult> {
+    const response = await fetch("https://api.minimax.io/v1/image_generation", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${opts.apiKey}`,
+        },
+        body: JSON.stringify({
+            model: opts.modelId,
+            prompt: opts.prompt,
+            aspect_ratio: "1:1",
+            response_format: "url",
+            n: 1,
+            prompt_optimizer: true,
+        }),
+        signal: opts.signal,
+    })
+
+    if (!response.ok) {
+        const err = await response.text()
+        throw new Error(`MiniMax image error: ${err}`)
+    }
+
+    const data = await response.json()
+
+    if (data.base_resp?.status_code !== 0) {
+        throw new Error(`MiniMax image error: ${data.base_resp?.status_msg || "Unknown error"}`)
+    }
+
+    const imageUrl = data.data?.image_urls?.[0]
+    if (!imageUrl) throw new Error("No image URL returned from MiniMax")
+    return { imageUrl }
+}
+
+// ─── MiniMax Audio Generation (T2A) ─────────────────────────────────
+
+/**
+ * Generates speech audio via MiniMax's T2A (Text-to-Audio) HTTP API.
+ *
+ * @description POST to /v1/t2a_v2 with model, text, and voice settings.
+ * Uses output_format "url" for simplicity — returns a URL valid 24 hours.
+ * Falls back to hex→base64 conversion if a hex response is received.
+ *
+ * @see https://platform.minimax.io/docs/api-reference/speech-t2a-http
+ */
+async function generateMiniMaxAudio(opts: AudioGenerationOptions): Promise<AudioGenerationResult> {
+    const response = await fetch("https://api.minimax.io/v1/t2a_v2", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${opts.apiKey}`,
+        },
+        body: JSON.stringify({
+            model: opts.modelId,
+            text: opts.text,
+            stream: false,
+            output_format: "url",
+            language_boost: "auto",
+            voice_setting: {
+                voice_id: opts.voice || "English_expressive_narrator",
+                speed: 1,
+                vol: 1,
+                pitch: 0,
+            },
+            audio_setting: {
+                sample_rate: 32000,
+                bitrate: 128000,
+                format: "mp3",
+                channel: 1,
+            },
+        }),
+        signal: opts.signal,
+    })
+
+    if (!response.ok) {
+        const err = await response.text()
+        throw new Error(`MiniMax TTS error: ${err}`)
+    }
+
+    const data = await response.json()
+
+    if (data.base_resp?.status_code !== 0) {
+        throw new Error(`MiniMax TTS error: ${data.base_resp?.status_msg || "Unknown error"}`)
+    }
+
+    const audioData = data.data?.audio
+    if (!audioData) throw new Error("No audio data returned from MiniMax")
+
+    // output_format: "url" returns a direct URL; "hex" returns hex-encoded audio
+    if (typeof audioData === "string" && audioData.startsWith("http")) {
+        return { audioUrl: audioData }
+    }
+
+    // Fallback: convert hex-encoded audio to base64 data URI
+    const buffer = Buffer.from(audioData, "hex")
+    const base64 = buffer.toString("base64")
+    return { audioUrl: `data:audio/mpeg;base64,${base64}` }
+}
+
+// ─── MiniMax Video Generation (Hailuo) ──────────────────────────────
+
+/**
+ * Generates video via MiniMax's native async video generation API.
+ *
+ * @description Three-step process:
+ * 1. POST /v1/video_generation to create a task → returns task_id
+ * 2. Poll GET /v1/query/video_generation?task_id=... until Success/Fail
+ * 3. GET /v1/files/retrieve?file_id=... to get the download URL
+ *
+ * @see https://platform.minimax.io/docs/api-reference/video-generation-t2v
+ * @see https://platform.minimax.io/docs/api-reference/video-generation-query
+ */
+async function generateMiniMaxVideo(opts: VideoGenerationOptions): Promise<VideoGenerationResult> {
+    // Build the request body, supporting T2V (text-to-video) and I2V (image-to-video)
+    const requestBody: Record<string, unknown> = {
+        model: opts.modelId,
+        prompt: opts.prompt,
+        duration: opts.duration ?? 6,
+        resolution: opts.resolution ?? "1080P",
+    }
+
+    // Enable prompt optimizer by default — MiniMax enhances the prompt for better video quality
+    if (opts.promptOptimizer !== false) {
+        requestBody.prompt_optimizer = true
+    }
+
+    // Image-to-Video: if a first frame image URL is provided, include it
+    // This enables I2V mode — the video animates from the still image
+    if (opts.firstFrameImage) {
+        requestBody.first_frame_image = opts.firstFrameImage
+    }
+
+    // Step 1: Create video generation task
+    const createRes = await fetch("https://api.minimax.io/v1/video_generation", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${opts.apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+        signal: opts.signal,
+    })
+
+    if (!createRes.ok) {
+        const err = await createRes.text()
+        throw new Error(`MiniMax video error: ${err}`)
+    }
+
+    const createData = await createRes.json()
+
+    if (createData.base_resp?.status_code !== 0) {
+        throw new Error(`MiniMax video error: ${createData.base_resp?.status_msg || "Task creation failed"}`)
+    }
+
+    const taskId = createData.task_id
+    if (!taskId) throw new Error("No task_id returned from MiniMax video generation")
+
+    // Step 2: Poll for completion (max 300s for video)
+    const deadline = Date.now() + 300_000
+    while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 5000))
+        if (opts.signal?.aborted) throw new Error("Aborted")
+
+        const queryRes = await fetch(
+            `https://api.minimax.io/v1/query/video_generation?task_id=${taskId}`,
+            {
+                headers: { Authorization: `Bearer ${opts.apiKey}` },
+                signal: opts.signal,
+            }
+        )
+
+        if (!queryRes.ok) {
+            const err = await queryRes.text()
+            throw new Error(`MiniMax video query error: ${err}`)
+        }
+
+        const queryData = await queryRes.json()
+
+        if (queryData.status === "Success") {
+            const fileId = queryData.file_id
+            if (!fileId) throw new Error("No file_id in completed MiniMax video task")
+
+            // Step 3: Get download URL via file retrieval API
+            const fileRes = await fetch(
+                `https://api.minimax.io/v1/files/retrieve?file_id=${fileId}`,
+                {
+                    headers: { Authorization: `Bearer ${opts.apiKey}` },
+                    signal: opts.signal,
+                }
+            )
+
+            if (!fileRes.ok) {
+                const err = await fileRes.text()
+                throw new Error(`MiniMax file retrieve error: ${err}`)
+            }
+
+            const fileData = await fileRes.json()
+            const downloadUrl = fileData.file?.download_url
+            if (!downloadUrl) throw new Error("No download URL returned for MiniMax video")
+            return { videoUrl: downloadUrl }
+        }
+
+        if (queryData.status === "Fail") {
+            throw new Error(queryData.base_resp?.status_msg || "MiniMax video generation failed")
+        }
+
+        // Still processing (Preparing, Queueing, Processing) — continue polling
+    }
+
+    throw new Error("MiniMax video generation timed out (300s)")
+}
+
 // ─── Video Generation (Replicate) ────────────────────────────────────
 
 export interface VideoGenerationOptions {
     apiKey: string
     modelId: string
     prompt: string
+    /** Video duration in seconds (MiniMax supports 5 or 6, default 6) */
+    duration?: number
+    /** Video resolution (MiniMax supports "720P" or "1080P", default "1080P") */
+    resolution?: string
+    /** URL of an image to use as the first frame (enables Image-to-Video mode) */
+    firstFrameImage?: string
+    /** Whether to use MiniMax's prompt optimizer (default true) */
+    promptOptimizer?: boolean
     signal?: AbortSignal
 }
 
@@ -364,6 +630,7 @@ const TEXT_PROVIDERS: Partial<Record<AIProviderId, TextStreamFn>> = {
     openai: streamOpenAI,
     anthropic: streamAnthropic,
     google: streamGoogle,
+    minimax: streamMiniMax,
 }
 
 const IMAGE_PROVIDERS: Partial<Record<AIProviderId, ImageGenFn>> = {
@@ -371,15 +638,18 @@ const IMAGE_PROVIDERS: Partial<Record<AIProviderId, ImageGenFn>> = {
     google: generateGoogleImage,
     stability: generateStabilityImage,
     replicate: generateReplicateImage,
+    minimax: generateMiniMaxImage,
 }
 
 const AUDIO_PROVIDERS: Partial<Record<AIProviderId, AudioGenFn>> = {
     openai: generateOpenAIAudio,
     elevenlabs: generateElevenLabsAudio,
+    minimax: generateMiniMaxAudio,
 }
 
 const VIDEO_PROVIDERS: Partial<Record<AIProviderId, VideoGenFn>> = {
     replicate: generateReplicateVideo,
+    minimax: generateMiniMaxVideo,
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
