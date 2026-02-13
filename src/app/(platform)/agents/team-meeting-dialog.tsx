@@ -43,11 +43,12 @@ import {
     MicOff,
     Volume2,
     VolumeX,
+    Sparkles,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
 import { getOrCreateSpecialistThread } from "@/actions/agent-memory"
-import { SPECIALISTS, getSpecialistById } from "./specialists-data"
+import { SPECIALISTS, getSpecialistById, getSpecialistDisplayName } from "./specialists-data"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import { MeetingOutputs } from "./meeting-outputs"
@@ -94,6 +95,162 @@ interface TeamMeetingDialogProps {
     onOpenChange: (open: boolean) => void
 }
 
+// ─── Meeting Topic Suggestions ────────────────────────────────────────────────
+
+/** Suggestions for specific specialist pair/triple combinations (sorted key = specialist IDs joined). */
+const COMBINATION_SUGGESTIONS: Record<string, string[]> = {
+    "fundraising-advisor,strategist": [
+        "Should we raise a Series A? What's our fundraising timeline?",
+        "How do we position ourselves for investors given our current traction?",
+    ],
+    "growth-marketer,sales-lead": [
+        "How do we build a go-to-market engine? What's our pipeline strategy?",
+        "How should marketing and sales work together on lead gen?",
+    ],
+    "finance-lead,fundraising-advisor": [
+        "What financial model do investors need to see? How's our burn rate?",
+        "How do we extend runway while preparing for a raise?",
+    ],
+    "hiring-team,legal-counsel": [
+        "What employment contracts and equity agreements do we need?",
+        "How do we structure compensation and stay compliant?",
+    ],
+    "product-lead,strategist": [
+        "What should our product roadmap look like? How do we prioritize?",
+        "How do we validate product-market fit with limited resources?",
+    ],
+    "growth-marketer,product-lead": [
+        "How do we drive adoption for our new feature launch?",
+        "What's the ideal product-led growth strategy for us?",
+    ],
+    "finance-lead,strategist": [
+        "What's our unit economics story? Are we building a sustainable business?",
+        "How should we allocate our budget across the next quarter?",
+    ],
+    "chief-of-staff,strategist": [
+        "What are the top 3 priorities for the company this quarter?",
+        "Where are our biggest blind spots right now?",
+    ],
+    "fundraising-advisor,legal-counsel": [
+        "What should we know about term sheets and investor agreements?",
+        "How do we protect our interests during fundraising?",
+    ],
+    "finance-lead,hiring-team": [
+        "Can we afford to hire right now? What's the cost per new hire?",
+        "How do we plan headcount against our runway?",
+    ],
+    "growth-marketer,fundraising-advisor": [
+        "How do we tell our growth story to investors?",
+        "What marketing metrics do investors care about most?",
+    ],
+    "sales-lead,strategist": [
+        "What pricing model maximizes revenue at our stage?",
+        "How do we break into a new market segment?",
+    ],
+}
+
+/** Per-specialist fallback suggestions when no combination matches. */
+const SPECIALIST_SUGGESTIONS: Record<string, string[]> = {
+    strategist: [
+        "What's the best go-to-market strategy for our product?",
+        "How should we think about competitive positioning?",
+    ],
+    "product-lead": [
+        "What features should we prioritize for the next release?",
+        "How do we write a PRD that engineers actually use?",
+    ],
+    "chief-of-staff": [
+        "What's falling through the cracks that I'm not seeing?",
+        "How should I prepare for our next board meeting?",
+    ],
+    "growth-marketer": [
+        "What's the most effective marketing channel for our stage?",
+        "How do we build a content strategy that drives pipeline?",
+    ],
+    "sales-lead": [
+        "How do we get our first 100 paying customers?",
+        "What does a winning cold outreach sequence look like?",
+    ],
+    "fundraising-advisor": [
+        "Should we raise now or wait? What's our fundraising readiness?",
+        "How do we build a compelling pitch narrative?",
+    ],
+    "finance-lead": [
+        "How many months of runway do we have left?",
+        "What KPIs should we track at our stage?",
+    ],
+    "hiring-team": [
+        "Who should our next hire be?",
+        "How do we attract top talent without big-company budgets?",
+    ],
+    "legal-counsel": [
+        "What legal foundations do we need before we scale?",
+        "How do we protect our IP and avoid early legal pitfalls?",
+    ],
+}
+
+/**
+ * Compute topic suggestions based on which specialists are selected.
+ *
+ * @description Checks combination keys first (pairs of selected specialists),
+ * then falls back to per-specialist suggestions. Returns up to 4 suggestions.
+ */
+function computeSuggestions(selectedIds: Set<string>): string[] {
+    if (selectedIds.size === 0) return []
+
+    const suggestions: string[] = []
+
+    // Check for 3+ selected: show a broad suggestion
+    if (selectedIds.size >= 3) {
+        suggestions.push("What's our 90-day company plan? Where do we focus?")
+    }
+
+    // Check combination matches (all pairs of selected specialists)
+    const ids = Array.from(selectedIds).sort()
+    for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+            const key = `${ids[i]},${ids[j]}`
+            const combos = COMBINATION_SUGGESTIONS[key]
+            if (combos) {
+                suggestions.push(...combos)
+            }
+        }
+    }
+
+    // If we still need more, add per-specialist suggestions
+    if (suggestions.length < 4) {
+        for (const id of selectedIds) {
+            const perSpecialist = SPECIALIST_SUGGESTIONS[id]
+            if (perSpecialist) {
+                suggestions.push(...perSpecialist)
+            }
+            if (suggestions.length >= 6) break
+        }
+    }
+
+    // Deduplicate and cap at 4
+    return [...new Set(suggestions)].slice(0, 4)
+}
+
+/**
+ * Generate a dynamic placeholder based on selected specialists.
+ */
+function getDynamicPlaceholder(selectedIds: Set<string>): string {
+    if (selectedIds.size === 0) {
+        return "Select specialists above, then describe what you'd like to discuss..."
+    }
+    if (selectedIds.size === 1) {
+        const id = Array.from(selectedIds)[0]
+        const s = getSpecialistById(id)
+        return s ? `What do you want to discuss with ${s.name} (${s.title})?` : "What do you want to discuss?"
+    }
+    const names = Array.from(selectedIds)
+        .map((id) => getSpecialistById(id)?.name)
+        .filter(Boolean)
+        .join(", ")
+    return `What should ${names} discuss together?`
+}
+
 // ─── Prompt Templates ─────────────────────────────────────────────────────────
 
 function buildMeetingPrompt(
@@ -110,8 +267,10 @@ function buildMeetingPrompt(
                   .join("\n\n---\n\n")
             : ""
 
+    const displayName = getSpecialistDisplayName(specialist)
+
     if (round === 1) {
-        return `You are the ${specialist.name} in a team meeting.
+        return `You are ${specialist.name}, the ${specialist.title} specialist in a team meeting.
 
 ## Your Role
 ${specialist.description}
@@ -124,15 +283,15 @@ ${specialist.workingStyle}
 
 ${priorBlock ? `## What Your Colleagues Have Said\n\n${priorBlock}\n\n` : ""}## Your Task
 Provide your expert perspective on this topic. Be specific, actionable, and direct.
-${priorBlock ? "Build on or respectfully challenge what your colleagues have said where relevant. Reference them by name." : "You are speaking first. Set the stage with your analysis."}
+${priorBlock ? "Build on or respectfully challenge what your colleagues have said. Reference them by name. If you spot a synergy or conflict between your view and theirs, call it out explicitly." : "You are speaking first. Set the stage with your analysis and flag areas where you'll need input from other specialists."}
 
-Keep your response focused and under 600 words. Use markdown formatting.
+Keep your response focused and under 600 words. Use markdown formatting. Sign off as "${displayName}".
 
 {{company_context}}`
     }
 
     // Discussion rounds
-    return `You are the ${specialist.name} in a team meeting discussion round.
+    return `You are ${specialist.name}, the ${specialist.title} specialist in a team meeting discussion round.
 
 ## Your Role
 ${specialist.description}
@@ -152,6 +311,53 @@ This is the discussion round. You have heard everyone's perspective${userThought
 - Propose concrete next steps from your area of expertise
 
 Be direct and specific. Reference colleagues by name. Under 400 words. Use markdown formatting.
+
+{{company_context}}`
+}
+
+/**
+ * Build a prompt for autonomous specialist-to-specialist debate.
+ * In this mode, specialists respond to EACH OTHER, not the founder.
+ * They build on, challenge, and refine each other's ideas.
+ */
+function buildDebatePrompt(
+    specialist: Specialist,
+    topic: string,
+    allResponses: MeetingEntry[],
+    debateRound: number
+): string {
+    const priorBlock = allResponses
+        .map((r) => `**${r.specialistName}** (Round ${r.round}):\n${r.content}`)
+        .join("\n\n---\n\n")
+
+    return `You are the ${specialist.name} in an active team debate.
+
+## Your Role
+${specialist.description}
+
+## Working Style
+${specialist.workingStyle}
+
+## Meeting Topic
+"${topic}"
+
+## Full Discussion So Far
+
+${priorBlock}
+
+## Your Task (Debate Round ${debateRound})
+The founder is listening but has NOT weighed in yet. You are debating DIRECTLY with your fellow specialists. This is NOT a presentation — it is an active discussion.
+
+You MUST:
+- **Directly address at least one other specialist by name** ("I agree with the Sales Lead's point about...")
+- **Challenge or build on a specific point** — don't just repeat what others said
+- **Propose something concrete** — a decision, a next step, a framework
+- **Ask a direct question to another specialist** if you need their expertise
+- **Be opinionated** — the founder wants to hear real debate, not consensus for consensus's sake
+
+If you disagree with someone, say so clearly and explain why. The founder needs to hear the tensions, not just the agreements.
+
+Keep it punchy. Under 300 words. Use markdown. Be direct.
 
 {{company_context}}`
 }
@@ -247,6 +453,9 @@ export function TeamMeetingDialog({
     }, [selectedIds])
 
     const currentSpecialist = selectedSpecialists[currentSpecialistIdx] ?? null
+
+    // Compute context-aware topic suggestions
+    const suggestions = useMemo(() => computeSuggestions(selectedIds), [selectedIds])
 
     // ─── Reset on close ───────────────────────────────────────────────────
     useEffect(() => {
@@ -381,6 +590,10 @@ export function TeamMeetingDialog({
             setPhase("in-progress")
             setError(null)
 
+            // Local accumulator so each specialist sees what earlier
+            // specialists said in THIS round (not just prior rounds)
+            const roundAccumulator: MeetingEntry[] = [...entries]
+
             for (let i = 0; i < selectedSpecialists.length; i++) {
                 const specialist = selectedSpecialists[i]
                 setCurrentSpecialistIdx(i)
@@ -388,10 +601,11 @@ export function TeamMeetingDialog({
                 setIsStreaming(true)
 
                 try {
+                    // Pass the accumulator (includes earlier responses from this round)
                     const prompt = buildMeetingPrompt(
                         specialist,
                         topic,
-                        entries,
+                        roundAccumulator,
                         round,
                         thoughts
                     )
@@ -406,27 +620,29 @@ export function TeamMeetingDialog({
 
                     const entry: MeetingEntry = {
                         specialistId: specialist.id,
-                        specialistName: specialist.name,
+                        specialistName: getSpecialistDisplayName(specialist),
                         round,
                         content: response,
                     }
 
+                    // Add to both local accumulator and React state
+                    roundAccumulator.push(entry)
                     setEntries((prev) => [...prev, entry])
                 } catch (err) {
                     const message = err instanceof Error ? err.message : "Unknown error"
                     console.error(`[TeamMeeting] ${specialist.name} failed:`, message)
                     setError(`${specialist.name} encountered an error: ${message}`)
 
-                    // Add error entry so the meeting can continue
-                    setEntries((prev) => [
-                        ...prev,
-                        {
-                            specialistId: specialist.id,
-                            specialistName: specialist.name,
-                            round,
-                            content: `*[Error: Could not generate response]*`,
-                        },
-                    ])
+                    const errorEntry: MeetingEntry = {
+                        specialistId: specialist.id,
+                        specialistName: getSpecialistDisplayName(specialist),
+                        round,
+                        content: `*[Error: Could not generate response]*`,
+                    }
+
+                    // Add to both accumulator and state so next specialist sees the gap
+                    roundAccumulator.push(errorEntry)
+                    setEntries((prev) => [...prev, errorEntry])
                 } finally {
                     setIsStreaming(false)
                     setStreamingContent("")
@@ -504,6 +720,74 @@ export function TeamMeetingDialog({
         await runRound(nextRound, threadIds, userThoughts.trim() || undefined)
         setUserThoughts("")
     }, [currentRound, threadIds, userThoughts, runRound])
+
+    // ─── Autonomous Debate: Specialists discuss among themselves ──────
+    const handleAutonomousDebate = useCallback(async () => {
+        setShowThoughtsInput(false)
+        setPhase("in-progress")
+        setError(null)
+
+        // Run 2 autonomous debate rounds where specialists talk to each other
+        const debateAccumulator: MeetingEntry[] = [...entriesRef.current]
+        let roundCounter = currentRound
+
+        for (let debateRound = 1; debateRound <= 2; debateRound++) {
+            roundCounter++
+            const roundLabel = `Debate ${debateRound}`
+
+            for (let i = 0; i < selectedSpecialists.length; i++) {
+                const specialist = selectedSpecialists[i]
+                setCurrentSpecialistIdx(i)
+                setStreamingContent("")
+                setIsStreaming(true)
+
+                try {
+                    const prompt = buildDebatePrompt(
+                        specialist,
+                        topic,
+                        debateAccumulator,
+                        debateRound
+                    )
+
+                    const response = await executeSpecialist(
+                        specialist,
+                        threadIds[specialist.id],
+                        prompt,
+                        topic,
+                        `\n\n## Autonomous Debate\nThe specialists are debating among themselves. The founder is listening. Round: ${roundLabel}`
+                    )
+
+                    const entry: MeetingEntry = {
+                        specialistId: specialist.id,
+                        specialistName: getSpecialistDisplayName(specialist),
+                        round: roundCounter,
+                        content: response,
+                    }
+
+                    debateAccumulator.push(entry)
+                    setEntries((prev) => [...prev, entry])
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : "Unknown error"
+                    console.error(`[TeamMeeting] Debate - ${specialist.name} failed:`, message)
+
+                    const errorEntry: MeetingEntry = {
+                        specialistId: specialist.id,
+                        specialistName: getSpecialistDisplayName(specialist),
+                        round: roundCounter,
+                        content: `*[Error: Could not generate response]*`,
+                    }
+                    debateAccumulator.push(errorEntry)
+                    setEntries((prev) => [...prev, errorEntry])
+                } finally {
+                    setIsStreaming(false)
+                    setStreamingContent("")
+                }
+            }
+        }
+
+        setCurrentRound(roundCounter)
+        setPhase("round-complete")
+    }, [currentRound, selectedSpecialists, topic, threadIds, executeSpecialist])
 
     // ─── Wrap Up (Generate Outputs) ───────────────────────────────────────
     const handleWrapUp = useCallback(async () => {
@@ -619,7 +903,7 @@ export function TeamMeetingDialog({
                                 ))}
                             </div>
                             <span className="text-xs text-muted-foreground flex-1 truncate">
-                                {selectedSpecialists.map((s) => s.name).join(", ")}
+                                {selectedSpecialists.map((s) => `${s.name} (${s.title})`).join(", ")}
                             </span>
                             {/* Voice mute toggle */}
                             <Button
@@ -685,7 +969,7 @@ export function TeamMeetingDialog({
                                                     {s.name}
                                                 </p>
                                                 <p className="text-[10px] text-muted-foreground truncate">
-                                                    {s.row.toUpperCase()}
+                                                    {s.title}
                                                 </p>
                                             </div>
                                             {isSelected && (
@@ -723,7 +1007,7 @@ export function TeamMeetingDialog({
                                     }}
                                     placeholder={topicSpeechRecognition.isListening
                                         ? "Listening..."
-                                        : "e.g., Should we raise a Series A? What's the best go-to-market strategy for our B2B SaaS product?"
+                                        : getDynamicPlaceholder(selectedIds)
                                     }
                                     className={cn(
                                         "min-h-[100px] resize-none pr-12",
@@ -768,6 +1052,35 @@ export function TeamMeetingDialog({
                                     </p>
                                 )}
                             </div>
+
+                            {/* Context-aware suggestion chips */}
+                            {suggestions.length > 0 && !topic.trim() && (
+                                <div className="space-y-1.5">
+                                    <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                                        Suggested topics
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {suggestions.map((suggestion) => (
+                                            <button
+                                                key={suggestion}
+                                                type="button"
+                                                onClick={() => {
+                                                    setTopic(suggestion)
+                                                    if (error) setError(null)
+                                                }}
+                                                className={cn(
+                                                    "text-xs px-3 py-1.5 rounded-full border border-muted",
+                                                    "bg-background text-foreground",
+                                                    "hover:border-international-orange hover:bg-international-orange/5",
+                                                    "transition-colors cursor-pointer text-left"
+                                                )}
+                                            >
+                                                {suggestion}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {error && (
@@ -1074,14 +1387,21 @@ export function TeamMeetingDialog({
                                         onClick={() => setShowThoughtsInput(true)}
                                     >
                                         <MessageCircle className="h-4 w-4 mr-2" />
-                                        Add My Thoughts
+                                        Weigh In
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={handleAutonomousDebate}
+                                    >
+                                        <Sparkles className="h-4 w-4 mr-2" />
+                                        Let Them Discuss
                                     </Button>
                                     <Button
                                         variant="secondary"
                                         onClick={handleDiscussionRound}
                                     >
                                         <Users className="h-4 w-4 mr-2" />
-                                        Open Discussion
+                                        Guided Discussion
                                     </Button>
                                     <Button
                                         onClick={handleWrapUp}

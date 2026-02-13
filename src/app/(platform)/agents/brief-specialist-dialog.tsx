@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
     Loader2, Send, AlertCircle, Copy, Check,
     MessageSquareQuote, ArrowRight, Clock,
-    History, Mic, MicOff, Volume2, VolumeX,
+    History, Mic, MicOff, Volume2, VolumeX, Sparkles,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -20,7 +20,7 @@ import { getPromptsByCategory } from "./lib/prompt-library"
 import { getOrCreateSpecialistThread, getRecentSpecialistOutputs, getSpecialistThreadHistory } from "@/actions/agent-memory"
 import type { SpecialistHistoryMessage } from "@/actions/agent-memory"
 import { createArtifact } from "@/actions/agent-artifacts"
-import { getSpecialistById } from "./specialists-data"
+import { getSpecialistById, SPECIALISTS } from "./specialists-data"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import type { PromptTemplate } from "./lib/agent-types"
@@ -83,6 +83,10 @@ export function BriefSpecialistDialog({
     const [showHistory, setShowHistory] = useState(false)
     const [historyMessages, setHistoryMessages] = useState<SpecialistHistoryMessage[]>([])
     const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+    const [dynamicSuggestion, setDynamicSuggestion] = useState<{
+        specialistId: string
+        reason: string
+    } | null>(null)
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
@@ -227,6 +231,7 @@ export function BriefSpecialistDialog({
         setIsExecuting(true)
         setStreamingResponse("")
         setError(null)
+        setDynamicSuggestion(null)
 
         // Build the prompt with specialist personality, cross-specialist context, and handoff
         const systemExtras: string[] = []
@@ -235,11 +240,28 @@ export function BriefSpecialistDialog({
             systemExtras.push(`\n\n## Handoff Context\n${handoffContext}`)
         }
         if (crossSpecialistContext) {
-            systemExtras.push(`\n\n## Team Context\n${crossSpecialistContext}`)
+            systemExtras.push(`\n\n## Team Context\n${crossSpecialistContext}
+
+IMPORTANT: If you notice overlaps, synergies, or potential conflicts between your advice and what your colleagues have been working on, proactively mention them. For example: "I notice the Sales Lead has been working on pricing — my recommendation here has implications for that discussion..." This helps the founder connect the dots across their team.`)
         }
 
+        // Dynamic specialist recommendation: ask the AI to suggest who to talk to next
+        const otherSpecialists = SPECIALISTS
+            .filter((s) => s.id !== specialist.id)
+            .map((s) => `- ${s.name} (${s.id}): ${s.description.slice(0, 100)}`)
+            .join("\n")
+        systemExtras.push(`\n\n## Specialist Recommendation
+At the very end of your response, add a recommendation for which specialist the founder should talk to next. Use this EXACT format on its own line:
+
+NEXT_SPECIALIST: [specialist_id] | [one-sentence reason why]
+
+Available specialists:
+${otherSpecialists}
+
+Only recommend ONE specialist. Choose based on what gaps or next steps emerged from this conversation. If no follow-up is needed, write: NEXT_SPECIALIST: none | No immediate follow-up needed.`)
+
         const promptTemplate = selectedPrompt?.defaultPrompt ??
-            `You are the ${specialist.name} for this company. ${specialist.workingStyle}\n\n{{input}}\n\n{{company_context}}\n\nProvide a thorough, actionable response that demonstrates deep expertise. Use markdown formatting with headers, tables, and bullet points for clarity.`
+            `You are ${specialist.name}, the ${specialist.title} specialist for this company. ${specialist.workingStyle}\n\n{{input}}\n\n{{company_context}}\n\nProvide a thorough, actionable response that demonstrates deep expertise. Use markdown formatting with headers, tables, and bullet points for clarity.`
 
         try {
             const res = await fetch("/api/agents/execute", {
@@ -296,18 +318,32 @@ export function BriefSpecialistDialog({
                 fullResponse = "No response received. Please try again."
             }
 
-            // Add assistant message to chat
+            // Parse dynamic specialist recommendation from the response
+            const nextMatch = fullResponse.match(/NEXT_SPECIALIST:\s*(\S+)\s*\|\s*(.+)/i)
+            let displayResponse = fullResponse
+            if (nextMatch) {
+                const [fullMatch, specId, reason] = nextMatch
+                // Strip the recommendation line from the displayed response
+                displayResponse = fullResponse.replace(fullMatch, "").trim()
+                if (specId && specId !== "none") {
+                    setDynamicSuggestion({ specialistId: specId.trim(), reason: reason.trim() })
+                } else {
+                    setDynamicSuggestion(null)
+                }
+            }
+
+            // Add assistant message to chat (with recommendation stripped)
             const assistantMessage: ChatMessage = {
                 role: "assistant",
-                content: fullResponse,
+                content: displayResponse,
                 timestamp: new Date(),
             }
             setMessages((prev) => [...prev, assistantMessage])
             setStreamingResponse("")
 
-            // Auto-play TTS if voice output is enabled
+            // Auto-play TTS if voice output is enabled (use clean response)
             if (tts.voiceEnabled && specialist.voice) {
-                tts.play(fullResponse, specialist.voice).catch((err) => {
+                tts.play(displayResponse, specialist.voice).catch((err) => {
                     console.warn("[BriefDialog] TTS playback failed:", err)
                 })
             }
@@ -315,7 +351,7 @@ export function BriefSpecialistDialog({
             // Auto-save to deliverables (fire and forget)
             createArtifact({
                 title: `${specialist.name}: ${userMessage.content.slice(0, 80)}`,
-                content: fullResponse,
+                content: displayResponse,
                 contentType: "document",
                 metadata: {
                     specialistId: specialist.id,
@@ -434,7 +470,12 @@ export function BriefSpecialistDialog({
                             )}
                         </div>
                         <div className="flex-1 min-w-0">
-                            <DialogTitle className="font-display">{specialist.name}</DialogTitle>
+                            <DialogTitle className="font-display">
+                                {specialist.name}
+                                <span className="text-sm font-normal text-muted-foreground ml-2">
+                                    {specialist.title}
+                                </span>
+                            </DialogTitle>
                             <p className="text-sm text-muted-foreground italic mt-0.5">
                                 &ldquo;{specialist.tagline}&rdquo;
                             </p>
@@ -695,7 +736,43 @@ export function BriefSpecialistDialog({
                         )}
 
                         {/* Suggested Next Specialists (after at least one response) */}
-                        {lastAssistantMessage && !isExecuting && suggestedSpecialists.length > 0 && (
+                        {/* AI-Powered Dynamic Recommendation */}
+                        {lastAssistantMessage && !isExecuting && dynamicSuggestion && (() => {
+                            const suggested = getSpecialistById(dynamicSuggestion.specialistId)
+                            if (!suggested) return null
+                            return (
+                                <div className="mb-4 p-3 rounded-lg bg-international-orange/5 border border-international-orange/20">
+                                    <p className="text-xs font-medium text-international-orange mb-2 flex items-center gap-1.5">
+                                        <Sparkles className="h-3 w-3" />
+                                        Recommended Next
+                                    </p>
+                                    <button
+                                        onClick={() => handleSwitchSpecialist(suggested.id)}
+                                        className="flex items-center gap-3 w-full px-3 py-2 rounded-md bg-background border border-international-orange/30 hover:border-international-orange/60 transition-colors text-sm group"
+                                    >
+                                        {suggested.avatarImage && (
+                                            <div className="relative h-6 w-6 rounded-full overflow-hidden flex-shrink-0">
+                                                <Image
+                                                    src={suggested.avatarImage}
+                                                    alt={suggested.name}
+                                                    fill
+                                                    className="object-cover"
+                                                    sizes="24px"
+                                                />
+                                            </div>
+                                        )}
+                                        <div className="flex-1 text-left">
+                                            <span className="font-medium text-foreground">{suggested.name}</span>
+                                            <p className="text-xs text-muted-foreground">{dynamicSuggestion.reason}</p>
+                                        </div>
+                                        <ArrowRight className="h-4 w-4 text-international-orange group-hover:translate-x-0.5 transition-transform" />
+                                    </button>
+                                </div>
+                            )
+                        })()}
+
+                        {/* Static fallback suggestions (only if no dynamic recommendation) */}
+                        {lastAssistantMessage && !isExecuting && !dynamicSuggestion && suggestedSpecialists.length > 0 && (
                             <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-muted/50">
                                 <p className="text-xs font-medium text-muted-foreground mb-2">
                                     Continue with...
@@ -750,10 +827,10 @@ export function BriefSpecialistDialog({
                                         speechRecognition.isListening
                                             ? "Listening..."
                                             : hasConversation
-                                                ? `Follow up with your ${specialist.name}...`
+                                                ? `Follow up with ${specialist.name}...`
                                                 : selectedPrompt
                                                     ? `Paste or type your ${selectedPrompt.inputLabel.toLowerCase()} here...`
-                                                    : `What do you need from your ${specialist.name}?`
+                                                    : `What do you need from ${specialist.name} (${specialist.title})?`
                                     }
                                     className={cn(
                                         "resize-none pr-20",
