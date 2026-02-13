@@ -8,7 +8,7 @@
  *   Step 2: Interface Definition — Claude generates text-only engineering plan
  *   Step 3: Generate — Claude writes complete CadQuery code → Modal executes
  *
- * Not linked from navigation. Access via /the-forge/cad-lab (behind platform auth).
+ * Accessible from sidebar navigation under Workshop > CAD Lab.
  */
 
 import { useState, useCallback, useEffect, useRef } from "react"
@@ -1209,6 +1209,55 @@ export default function CadLabPage(): React.ReactNode {
 
         {/* ── BUILD TAB ── */}
         <TabsContent value="build" className="space-y-6 mt-6">
+
+          {/* Results showcase — appears when all modules are generated */}
+          {generatedModuleCount > 0 && generatedModuleCount === modules.length && (
+            <div className="rounded-xl border border-status-success/30 bg-gradient-to-r from-status-success-light/20 via-background to-status-info-light/10 p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 h-12 w-12 rounded-full bg-status-success-light flex items-center justify-center">
+                  <Zap className="h-6 w-6 text-status-success" />
+                </div>
+                <div className="flex-1 min-w-0 space-y-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-foreground">All {modules.length} Modules Generated</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Your product is manufacturing-ready. Explore the full analysis, procurement details, and review package.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs"
+                      onClick={() => setMissionTab("analysis")}
+                    >
+                      <BarChart3 className="h-3 w-3" />
+                      View Analysis
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs"
+                      onClick={() => setMissionTab("procurement")}
+                    >
+                      <ShoppingCart className="h-3 w-3" />
+                      Procurement & Costs
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs"
+                      onClick={() => setMissionTab("review")}
+                    >
+                      <ClipboardCheck className="h-3 w-3" />
+                      Review Package
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Module Decomposition */}
         <Card>
           <CardHeader>
