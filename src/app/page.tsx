@@ -469,8 +469,8 @@ function HeroSection() {
           variants={heroHeadline}
           className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-[1.1] mb-6 md:mb-8"
         >
-          Stop Burning Runway on
-          <br />
+          Stop Burning Runway on{" "}
+          <br className="hidden sm:block" />
           Hardware That Takes{" "}
           <motion.span
             initial={{ opacity: 0, y: 30 }}
