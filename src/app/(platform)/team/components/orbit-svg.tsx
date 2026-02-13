@@ -14,13 +14,14 @@
 import { useState, useMemo } from 'react'
 import {
   CX, CY, GAP_DEG, SLICE_DEG,
+  HUB_R, SPEC_R,
   FUNC_R1, FUNC_R2, EXEC_R, APPR_R,
   BOUNDARY_R, MKT_R, OUTER_R,
   STATUS_COLORS,
   getCoverageStatus,
 } from '../constants'
 import type {
-  FunctionId, TeamMember, MarketplaceCandidate,
+  FunctionId, TeamMember, MarketplaceCandidate, SpecialistNode,
   StatusColorSet, SliceData, BusinessFunction, FunctionCoverage,
 } from '../types'
 
@@ -70,6 +71,7 @@ const SVG_ROLE_COLORS: Record<string, { bg: string; text: string; stroke: string
   FOUNDER:    { bg: '#FFEDD5', text: '#C2410C', stroke: '#F97316' },
   EXECUTIVE:  { bg: '#FFF7ED', text: '#EA580C', stroke: '#FB923C' },
   APPRENTICE: { bg: '#F1F5F9', text: '#64748B', stroke: '#94A3B8' },
+  SPECIALIST: { bg: '#F3E8FF', text: '#7C3AED', stroke: '#A78BFA' },
 }
 
 function getRoleSvgColors(role: string) {
@@ -275,6 +277,76 @@ function OMktSlot({ x, y, r, person, onClick }: OMktSlotProps) {
   )
 }
 
+// ─── Specialist Slot ─────────────────────────────────────────────────────────
+
+interface OSpecSlotProps {
+  x: number
+  y: number
+  r: number
+  specialist: SpecialistNode
+  onClick: () => void
+}
+
+function OSpecSlot({ x, y, r, specialist, onClick }: OSpecSlotProps) {
+  const [isHovered, setIsHovered] = useState(false)
+  const rc = SVG_ROLE_COLORS.SPECIALIST
+
+  return (
+    <g
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{ cursor: 'pointer' }}
+    >
+      {/* White background ring */}
+      <circle cx={x} cy={y} r={r + 2.5} fill="white" />
+
+      {/* Specialist-colored circle */}
+      <circle
+        cx={x} cy={y} r={r}
+        fill={isHovered ? '#EDE9FE' : rc.bg}
+        stroke={rc.stroke}
+        strokeWidth={isHovered ? 2.2 : 1.8}
+        style={{
+          transition: 'all .15s',
+          filter: isHovered ? `drop-shadow(0 2px 6px ${rc.stroke}44)` : 'none',
+        }}
+      />
+
+      {/* Initials text */}
+      <text
+        x={x} y={y + 1}
+        textAnchor="middle" dominantBaseline="central"
+        fill={rc.text}
+        fontSize="8" fontWeight="800"
+      >
+        {specialist.initials}
+      </text>
+
+      {/* Tooltip on hover */}
+      {isHovered && (
+        <g>
+          <rect x={x - 52} y={y - r - 38} width={104} height={32} rx={7} fill="#1E293B" />
+          <text
+            x={x} y={y - r - 27}
+            textAnchor="middle" dominantBaseline="central"
+            fill="white" fontSize="9.5" fontWeight="700"
+          >
+            {specialist.name}
+          </text>
+          <text
+            x={x} y={y - r - 13}
+            textAnchor="middle" dominantBaseline="central"
+            fill="#C4B5FD" fontSize="8" fontWeight="500"
+          >
+            {specialist.title}
+          </text>
+        </g>
+      )}
+    </g>
+  )
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN SVG
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -290,6 +362,10 @@ interface OrbitSVGProps {
   founders: TeamMember[]
   /** All marketplace candidates */
   marketplaceCandidates: MarketplaceCandidate[]
+  /** Specialist advisors to show on the inner ring */
+  specialists: SpecialistNode[]
+  /** Called when a specialist node is clicked */
+  onSpecialistClick?: (specialistId: string) => void
 }
 
 export function OrbitSVG({
@@ -299,6 +375,8 @@ export function OrbitSVG({
   teamCoverage,
   founders,
   marketplaceCandidates,
+  specialists,
+  onSpecialistClick,
 }: OrbitSVGProps) {
   const [hoveredFn, setHoveredFn] = useState<string | null>(null)
 
@@ -324,6 +402,17 @@ export function OrbitSVG({
     [functions, teamCoverage, marketplaceCandidates]
   )
 
+  // ── Specialist node positions (evenly distributed around the ring) ──
+  const specPositions = useMemo(
+    () =>
+      specialists.map((spec, i) => {
+        const deg = (360 / specialists.length) * i
+        const pos = polar(SPEC_R, deg)
+        return { spec, ...pos }
+      }),
+    [specialists]
+  )
+
   return (
     <svg viewBox="0 0 840 840" style={{ width: '100%', height: '100%' }}>
       <defs>
@@ -342,10 +431,13 @@ export function OrbitSVG({
       <circle cx={CX} cy={CY} r={(EXEC_R + APPR_R) / 2 - 2} fill="#FEFEFE" />
       <circle cx={CX} cy={CY} r={(FUNC_R2 + EXEC_R) / 2} fill="white" />
 
-      {/* Boundary dashed ring */}
+      {/* Boundary dashed rings */}
       <circle cx={CX} cy={CY} r={BOUNDARY_R} fill="none" stroke="#6366F1" strokeWidth="3" strokeDasharray="8 4" opacity=".35" />
       <circle cx={CX} cy={CY} r={(EXEC_R + APPR_R) / 2 - 2} fill="none" stroke="#6366F1" strokeWidth="1.8" strokeDasharray="1 3" opacity=".22" />
       <circle cx={CX} cy={CY} r={(FUNC_R2 + EXEC_R) / 2} fill="none" stroke="#94A3B8" strokeWidth="1.2" strokeDasharray="2 4" opacity=".25" />
+
+      {/* Specialist ring (subtle dashed) */}
+      <circle cx={CX} cy={CY} r={SPEC_R} fill="none" stroke="#C4B5FD" strokeWidth="1.2" strokeDasharray="3 4" opacity=".4" />
 
       {/* Ring labels */}
       <rect x={CX - 42} y={CY - EXEC_R - 2} width={84} height={14} rx={7} fill="white" opacity=".85" />
@@ -503,19 +595,29 @@ export function OrbitSVG({
         )
       })}
 
+      {/* ── Specialist Nodes ─────────────────────────────── */}
+      {specPositions.map(({ spec, x, y }) => (
+        <OSpecSlot
+          key={spec.id}
+          x={x} y={y} r={12}
+          specialist={spec}
+          onClick={() => onSpecialistClick?.(spec.id)}
+        />
+      ))}
+
       {/* ── Center Hub ──────────────────────────────────────── */}
-      <circle cx={CX} cy={CY} r={66} fill="url(#cg)" stroke="#D1D5DB" strokeWidth="1.5" filter="url(#cs)" />
-      <text x={CX} y={CY - 28} textAnchor="middle" fill="#94A3B8" fontSize="8" fontWeight="700" letterSpacing="2">
+      <circle cx={CX} cy={CY} r={HUB_R} fill="url(#cg)" stroke="#D1D5DB" strokeWidth="1.5" filter="url(#cs)" />
+      <text x={CX} y={CY - 24} textAnchor="middle" fill="#94A3B8" fontSize="7.5" fontWeight="700" letterSpacing="2">
         FOUNDERS
       </text>
 
       {/* Founder avatars — pure SVG circles */}
       {founders.map((f, fi) => {
-        const avatarR = 16
-        const fg = 6
+        const avatarR = 15
+        const fg = 5
         const totalW = founders.length * avatarR * 2 + (founders.length - 1) * fg
         const fx = CX - totalW / 2 + fi * (avatarR * 2 + fg) + avatarR
-        const fy = CY - 8
+        const fy = CY - 6
         const rc = SVG_ROLE_COLORS.FOUNDER
         return (
           <g key={f.id}>
@@ -524,7 +626,7 @@ export function OrbitSVG({
             <text
               x={fx} y={fy + 1}
               textAnchor="middle" dominantBaseline="central"
-              fill={rc.text} fontSize="10" fontWeight="800"
+              fill={rc.text} fontSize="9.5" fontWeight="800"
             >
               {f.initials}
             </text>
@@ -533,7 +635,7 @@ export function OrbitSVG({
       })}
 
       {/* Divider */}
-      <line x1={CX - 38} y1={CY + 12} x2={CX + 38} y2={CY + 12} stroke="#E2E8F0" strokeWidth="1" />
+      <line x1={CX - 34} y1={CY + 12} x2={CX + 34} y2={CY + 12} stroke="#E2E8F0" strokeWidth="1" />
 
       {/* Status chips */}
       {(() => {
@@ -544,33 +646,33 @@ export function OrbitSVG({
           { k: 'yellow', n: c.yellow, l: 'YOU', sc: STATUS_COLORS.yellow },
           { k: 'red', n: c.red, l: 'GAPS', sc: STATUS_COLORS.red },
         ] as const
-        const cw = 54
-        const cg = 6
+        const cw = 48
+        const cg = 5
         const tw = 3 * cw + 2 * cg
         const sx = CX - tw / 2
 
         return chips.map((ch, ci) => {
           const cx2 = sx + ci * (cw + cg) + cw / 2
-          const cy2 = CY + 24
+          const cy2 = CY + 23
           return (
             <g key={ch.k}>
               <rect
-                x={cx2 - cw / 2} y={cy2 - 11}
-                width={cw} height={22} rx={11}
+                x={cx2 - cw / 2} y={cy2 - 10}
+                width={cw} height={20} rx={10}
                 fill={ch.sc.fill} stroke={ch.sc.border} strokeWidth="1.5"
               />
-              <circle cx={cx2 - 15} cy={cy2} r={4} fill={ch.sc.arc} />
+              <circle cx={cx2 - 13} cy={cy2} r={3.5} fill={ch.sc.arc} />
               <text
                 x={cx2 + 3} y={cy2 + 1}
                 textAnchor="middle" dominantBaseline="central"
-                fill={ch.sc.text} fontSize="11" fontWeight="800"
+                fill={ch.sc.text} fontSize="10" fontWeight="800"
               >
                 {ch.n}
               </text>
               <text
-                x={cx2} y={cy2 + 22}
+                x={cx2} y={cy2 + 19}
                 textAnchor="middle"
-                fill={ch.sc.text} fontSize="7" fontWeight="700" letterSpacing=".5" opacity=".7"
+                fill={ch.sc.text} fontSize="6.5" fontWeight="700" letterSpacing=".5" opacity=".7"
               >
                 {ch.l}
               </text>

@@ -24,6 +24,7 @@ import type {
   CadLabDecompositionResult,
   CadLabModule,
 } from "@/lib/cad-lab-types"
+import { generateFromGrammar } from "@/actions/cad-grammar"
 import { checkRateLimit } from "@/lib/security/rate-limit"
 import { createClient } from "@/lib/supabase/server"
 import { CAD_INSTRUCTIONS } from "@/lib/cad-instructions"
@@ -1189,4 +1190,57 @@ Recommend diagnostic answers for each module. Output JSON only.`
     console.error("[CAD-LAB] Diagnostic pre-fill failed:", error instanceof Error ? error.message : error)
     return { success: false, answers: {}, error: "Failed to pre-fill diagnostics" }
   }
+}
+
+// ─── Smart Generation (Grammar-First with Fallback) ─────────────────
+
+/**
+ * Smart CAD generation that tries grammar-based generation first,
+ * then falls back to the raw CadQuery pipeline if no grammar matches.
+ *
+ * @description This is the recommended entry point for generating CAD models.
+ * It first attempts to match the product description to a domain grammar
+ * (building, drone, etc.) which produces deterministic, engineering-validated
+ * geometry. If no grammar matches, it falls back to the full research →
+ * interface → CadQuery pipeline.
+ *
+ * @param description - Product description from user
+ * @param researchReport - Research report (used only if fallback needed)
+ * @param interfaceDefinition - Interface definition (used only if fallback needed)
+ * @param modelId - Claude model for fallback pipeline
+ * @returns CadLabResult with grammarUsed field if grammar was used
+ *
+ * @security Requires authenticated user.
+ * @audit Logs which path was used (grammar vs raw CadQuery).
+ */
+export async function generateCadLabModelSmart(
+  description: string,
+  researchReport: string,
+  interfaceDefinition: string,
+  modelId: ClaudeModelId = "claude-opus-4-6",
+): Promise<CadLabResult & { grammarUsed?: string }> {
+  // ── Try grammar-based generation first ──
+  console.info("[CAD-LAB] Smart generation: attempting grammar-based path...")
+  try {
+    const grammarResult = await generateFromGrammar(description)
+
+    if (grammarResult.success) {
+      console.info(`[CAD-LAB] Grammar-based generation succeeded (${grammarResult.grammarUsed})`)
+      return grammarResult
+    }
+
+    if (!grammarResult.shouldFallback) {
+      // Grammar was found but execution failed — return the error
+      console.warn("[CAD-LAB] Grammar found but execution failed:", grammarResult.error)
+      return grammarResult
+    }
+
+    console.info("[CAD-LAB] No grammar matched, falling back to raw CadQuery pipeline...")
+  } catch (err) {
+    // Grammar pipeline threw — fall back gracefully
+    console.warn("[CAD-LAB] Grammar pipeline error, falling back:", err instanceof Error ? err.message : err)
+  }
+
+  // ── Fallback to existing raw CadQuery pipeline ──
+  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId)
 }

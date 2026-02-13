@@ -54,6 +54,20 @@ export interface TeamMember {
   tasksInQueue: number
 }
 
+// ─── Specialist Advisors (AI agents on inner ring) ──────────────────────────
+
+/** A specialist advisor node rendered on the inner orbit ring */
+export interface SpecialistNode {
+  /** Unique specialist ID (matches specialists-data.ts) */
+  id: string
+  /** Human name (e.g. "Sam") */
+  name: string
+  /** Two-letter initials for the avatar circle */
+  initials: string
+  /** Functional title (e.g. "Strategy") */
+  title: string
+}
+
 // ─── Marketplace ─────────────────────────────────────────────────────────────
 
 export type CandidateType = 'exec' | 'apprentice'

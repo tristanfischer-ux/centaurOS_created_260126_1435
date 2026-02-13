@@ -32,6 +32,8 @@ interface ChatMessage {
     role: "user" | "assistant"
     content: string
     timestamp: Date
+    /** Marks messages loaded from previous sessions (shown dimmer with separator) */
+    historical?: boolean
 }
 
 interface BriefSpecialistDialogProps {
@@ -88,8 +90,12 @@ export function BriefSpecialistDialog({
         reason: string
     } | null>(null)
 
+    const [isGeneratingGreeting, setIsGeneratingGreeting] = useState(false)
+
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
+    /** Tracks whether we've already generated a proactive greeting for this specialist session */
+    const greetingGeneratedRef = useRef(false)
 
     // ─── Voice Hooks ──────────────────────────────────────────────────────
     const tts = useTts()
@@ -139,10 +145,11 @@ export function BriefSpecialistDialog({
         async function initialize(): Promise<void> {
             setIsLoadingThread(true)
             try {
-                // Fetch thread and cross-specialist context in parallel
-                const [threadResult, crossResult] = await Promise.all([
+                // Fetch thread, cross-specialist context, AND history in parallel
+                const [threadResult, crossResult, historyResult] = await Promise.all([
                     getOrCreateSpecialistThread(specialist.id),
                     getRecentSpecialistOutputs(specialist.id, 5),
+                    getSpecialistThreadHistory(specialist.id, 20),
                 ])
 
                 if (cancelled) return
@@ -165,6 +172,20 @@ export function BriefSpecialistDialog({
                 } else {
                     setCrossSpecialistContext("")
                 }
+
+                // Pre-populate chat with recent history so users see previous discussion
+                if (historyResult.data && historyResult.data.length > 0) {
+                    setHistoryMessages(historyResult.data)
+                    // Show the last 6 messages (3 exchanges) as inline historical context
+                    const recentHistory = historyResult.data.slice(-6)
+                    const historicalMessages: ChatMessage[] = recentHistory.map((msg) => ({
+                        role: msg.role as "user" | "assistant",
+                        content: msg.content,
+                        timestamp: new Date(msg.createdAt),
+                        historical: true,
+                    }))
+                    setMessages(historicalMessages)
+                }
             } catch (err) {
                 console.error("[BriefDialog] Init failed:", err)
             } finally {
@@ -176,11 +197,12 @@ export function BriefSpecialistDialog({
         return () => { cancelled = true }
     }, [open, specialist.id])
 
-    // Reset messages when specialist changes
+    // Reset messages and greeting flag when specialist changes
     useEffect(() => {
         setMessages([])
         setHistoryMessages([])
         setShowHistory(false)
+        greetingGeneratedRef.current = false
     }, [specialist.id])
 
     // Focus textarea when ready
@@ -196,6 +218,126 @@ export function BriefSpecialistDialog({
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight
         }
     }, [messages, streamingResponse])
+
+    // ─── Proactive Greeting ──────────────────────────────────────────────
+    // After initialization, generate a proactive opening message from the specialist.
+    // Only fires once per specialist session, and only when there's context to reference.
+    useEffect(() => {
+        if (isLoadingThread || !open) return
+        if (greetingGeneratedRef.current) return
+        greetingGeneratedRef.current = true
+
+        const hasHistoricalMessages = messages.some((m) => m.historical)
+        const hasCrossContext = crossSpecialistContext.length > 0
+
+        // Only generate a dynamic greeting if there's context to reference
+        if (!hasHistoricalMessages && !hasCrossContext) return
+
+        let cancelled = false
+
+        async function generateGreeting(): Promise<void> {
+            setIsGeneratingGreeting(true)
+
+            // Build context summary for the greeting prompt
+            const historyContext = messages
+                .filter((m) => m.historical)
+                .slice(-4)
+                .map((m) => `${m.role === "user" ? "User" : specialist.name}: ${m.content.slice(0, 200)}`)
+                .join("\n")
+
+            const contextParts: string[] = []
+            if (historyContext) {
+                contextParts.push(`## Previous Conversation\n${historyContext}`)
+            }
+            if (crossSpecialistContext) {
+                contextParts.push(`## ${crossSpecialistContext}`)
+            }
+
+            const greetingPrompt = `You are ${specialist.name}, the ${specialist.title} specialist. ${specialist.workingStyle}
+
+The founder is opening a conversation with you. Based on the context below, write a brief, proactive opening message (2-4 sentences). Reference specific details from the context. Either:
+- Pick up where you left off and suggest a next step
+- Comment on what other specialists have been working on and connect it to your domain
+- Ask a pointed question that would advance their work
+
+Stay in character as ${specialist.name}. Be concise, direct, and actionable. Jump straight into substance — no "Hi!" or "Welcome back!" greetings.
+
+${contextParts.join("\n\n")}
+
+{{input}}
+
+{{company_context}}`
+
+            try {
+                const res = await fetch("/api/agents/execute", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        prompt: greetingPrompt,
+                        input: "Generate a proactive opening message.",
+                        providerId: "anthropic",
+                        modelId: "claude-sonnet-4-20250514",
+                        threadId: threadId ?? undefined,
+                        specialistId: specialist.id,
+                    }),
+                })
+
+                if (!res.ok || cancelled) return
+
+                // Consume SSE stream
+                const reader = res.body?.getReader()
+                if (!reader) return
+                const decoder = new TextDecoder()
+                let fullResponse = ""
+
+                while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) break
+                    const chunk = decoder.decode(value, { stream: true })
+                    for (const line of chunk.split("\n")) {
+                        if (line.startsWith("data: ")) {
+                            const data = line.slice(6)
+                            if (data === "[DONE]") continue
+                            try {
+                                const parsed = JSON.parse(data)
+                                if (parsed.text) fullResponse += parsed.text
+                            } catch {
+                                fullResponse += data
+                            }
+                        }
+                    }
+                }
+
+                if (cancelled || !fullResponse.trim()) return
+
+                // Strip any NEXT_SPECIALIST recommendation from the greeting
+                const cleaned = fullResponse.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
+
+                const greetingMessage: ChatMessage = {
+                    role: "assistant",
+                    content: cleaned,
+                    timestamp: new Date(),
+                }
+                setMessages((prev) => [...prev, greetingMessage])
+
+                // Auto-play greeting via TTS if voice is enabled
+                if (tts.voiceEnabled && specialist.voice) {
+                    tts.play(cleaned, specialist.voice).catch((err) => {
+                        console.warn("[BriefDialog] Greeting TTS failed:", err)
+                    })
+                }
+            } catch (err) {
+                // Greeting is nice-to-have — don't block the user
+                console.warn("[BriefDialog] Greeting generation failed:", err)
+            } finally {
+                if (!cancelled) setIsGeneratingGreeting(false)
+            }
+        }
+
+        generateGreeting()
+        return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoadingThread, open])
 
     // ─── Handlers ─────────────────────────────────────────────────────────
 
@@ -216,6 +358,9 @@ export function BriefSpecialistDialog({
             setError("Tell your specialist what you need, or pick a capability above.")
             return
         }
+
+        // AUDIO: Unlock AudioContext on user gesture (click "Go") so TTS works later
+        tts.warmUp()
 
         // Add user message to chat
         const userMessage: ChatMessage = {
@@ -380,7 +525,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             setIsExecuting(false)
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, tts.voiceEnabled])
+    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, tts.voiceEnabled, tts.warmUp])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
@@ -432,6 +577,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             return
         }
         setShowHistory(true)
+        // History is already loaded during initialization, but load if somehow empty
         if (historyMessages.length === 0) {
             setIsLoadingHistory(true)
             const result = await getSpecialistThreadHistory(specialist.id, 50)
@@ -443,9 +589,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
     }, [showHistory, historyMessages.length, specialist.id])
 
     // ─── Derived State ────────────────────────────────────────────────────
-    const hasConversation = messages.length > 0
+    const hasNonHistoricalMessages = messages.some((m) => !m.historical)
+    const hasConversation = hasNonHistoricalMessages || isGeneratingGreeting
+    const hasHistoricalMessages = messages.some((m) => m.historical)
     const isStreaming = isExecuting && streamingResponse.length > 0
-    const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant")
+    const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant" && !m.historical)
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -498,7 +646,12 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => tts.setVoiceEnabled(!tts.voiceEnabled)}
+                                onClick={() => {
+                                    const enabling = !tts.voiceEnabled
+                                    tts.setVoiceEnabled(enabling)
+                                    // Unlock AudioContext when enabling voice via this user gesture
+                                    if (enabling) tts.warmUp()
+                                }}
                                 className={cn(
                                     "h-7 w-7 p-0",
                                     tts.voiceEnabled && "text-international-orange",
@@ -528,8 +681,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             )}
                         </div>
                     </div>
-                    {/* Working Style */}
-                    {!hasConversation && (
+                    {/* Working Style (only on first visit — hidden when history or conversation exists) */}
+                    {!hasConversation && !hasHistoricalMessages && (
                         <div className="flex items-start gap-2 mt-3 p-3 rounded-lg bg-muted/50 border border-muted">
                             <MessageSquareQuote className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                             <p className="text-xs text-muted-foreground leading-relaxed">
@@ -597,52 +750,77 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 {!isLoadingThread && (
                     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                         {/* Chat Messages Area */}
-                        {hasConversation && (
+                        {(hasConversation || hasHistoricalMessages) && (
                             <div
                                 ref={scrollRef}
                                 className="flex-1 min-h-0 overflow-y-auto space-y-4 mb-4 pr-1"
                                 style={{ maxHeight: "45vh" }}
                             >
                                 {messages.map((msg, i) => {
-                                    const isLastAssistant = msg.role === "assistant" && i === messages.length - 1
+                                    const isLastAssistant = msg.role === "assistant" && !msg.historical && i === messages.length - 1
+                                    const isFirstHistorical = msg.historical && i === 0
+                                    const isTransitionToNew = !msg.historical && i > 0 && messages[i - 1]?.historical
                                     return (
-                                    <div key={i} className={cn(
-                                        "flex gap-3",
-                                        msg.role === "user" ? "justify-end" : "justify-start"
-                                    )}>
-                                        {msg.role === "assistant" && (
-                                            <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                                                <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted mt-1">
-                                                    {specialist.avatarImage ? (
-                                                        <Image
-                                                            src={specialist.avatarImage}
-                                                            alt={specialist.name}
-                                                            fill
-                                                            className="object-cover"
-                                                            sizes="28px"
-                                                        />
-                                                    ) : (
-                                                        <div className="flex items-center justify-center h-full w-full text-xs font-semibold text-foreground">
-                                                            {specialist.name.charAt(0)}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {isLastAssistant && (tts.isPlaying || tts.isLoading) && (
-                                                    <Volume2 className="h-3 w-3 text-international-orange animate-pulse" />
-                                                )}
+                                    <div key={i}>
+                                        {/* "Previous conversation" separator */}
+                                        {isFirstHistorical && (
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <div className="flex-1 border-t border-muted" />
+                                                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                                                    Previous conversation
+                                                </span>
+                                                <div className="flex-1 border-t border-muted" />
+                                            </div>
+                                        )}
+                                        {/* "Now" separator between historical and new messages */}
+                                        {isTransitionToNew && (
+                                            <div className="flex items-center gap-2 my-4">
+                                                <div className="flex-1 border-t border-international-orange/30" />
+                                                <span className="text-[10px] font-mono uppercase tracking-widest text-international-orange/70">
+                                                    Now
+                                                </span>
+                                                <div className="flex-1 border-t border-international-orange/30" />
                                             </div>
                                         )}
                                         <div className={cn(
-                                            "max-w-[85%] rounded-lg px-4 py-3",
-                                            msg.role === "user"
-                                                ? "bg-international-orange/10 text-foreground"
-                                                : "bg-muted/50 border border-muted"
+                                            "flex gap-3",
+                                            msg.role === "user" ? "justify-end" : "justify-start",
+                                            msg.historical && "opacity-60"
                                         )}>
-                                            {msg.role === "user" ? (
-                                                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                                            ) : (
-                                                <Markdown content={msg.content} className="text-sm" />
+                                            {msg.role === "assistant" && (
+                                                <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                                                    <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted mt-1">
+                                                        {specialist.avatarImage ? (
+                                                            <Image
+                                                                src={specialist.avatarImage}
+                                                                alt={specialist.name}
+                                                                fill
+                                                                className="object-cover"
+                                                                sizes="28px"
+                                                            />
+                                                        ) : (
+                                                            <div className="flex items-center justify-center h-full w-full text-xs font-semibold text-foreground">
+                                                                {specialist.name.charAt(0)}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {isLastAssistant && (tts.isPlaying || tts.isLoading) && (
+                                                        <Volume2 className="h-3 w-3 text-international-orange animate-pulse" />
+                                                    )}
+                                                </div>
                                             )}
+                                            <div className={cn(
+                                                "max-w-[85%] rounded-lg px-4 py-3",
+                                                msg.role === "user"
+                                                    ? "bg-international-orange/10 text-foreground"
+                                                    : "bg-muted/50 border border-muted"
+                                            )}>
+                                                {msg.role === "user" ? (
+                                                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                                ) : (
+                                                    <Markdown content={msg.content} className="text-sm" />
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     )
@@ -673,7 +851,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 )}
 
                                 {/* Typing indicator */}
-                                {isExecuting && !isStreaming && (
+                                {(isExecuting && !isStreaming) && (
                                     <div className="flex gap-3 justify-start">
                                         <div className="flex-shrink-0 h-7 w-7 rounded-full bg-muted mt-1" />
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
@@ -682,11 +860,36 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Greeting generation indicator */}
+                                {isGeneratingGreeting && !isExecuting && (
+                                    <div className="flex gap-3 justify-start">
+                                        <div className="flex-shrink-0 relative h-7 w-7 rounded-full overflow-hidden bg-muted mt-1">
+                                            {specialist.avatarImage ? (
+                                                <Image
+                                                    src={specialist.avatarImage}
+                                                    alt={specialist.name}
+                                                    fill
+                                                    className="object-cover"
+                                                    sizes="28px"
+                                                />
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full w-full text-xs font-semibold text-foreground">
+                                                    {specialist.name.charAt(0)}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            {specialist.name} is reviewing your context...
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
-                        {/* Capability Chips (shown before first message or always accessible) */}
-                        {!hasConversation && (
+                        {/* Capability Chips (shown on first visit only — hidden when history exists) */}
+                        {!hasNonHistoricalMessages && !isGeneratingGreeting && !hasHistoricalMessages && (
                             <div className="space-y-2 mb-4">
                                 <Label className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                                     Quick-select a capability
@@ -806,7 +1009,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
 
                         {/* Text Input (always visible at bottom) */}
                         <div className="space-y-2">
-                            {!hasConversation && (
+                            {!hasNonHistoricalMessages && !isGeneratingGreeting && !hasHistoricalMessages && (
                                 <Label htmlFor="brief-text" className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                                     {selectedPrompt?.inputLabel ?? "Describe what you need"}
                                 </Label>
@@ -827,7 +1030,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     placeholder={
                                         speechRecognition.isListening
                                             ? "Listening..."
-                                            : hasConversation
+                                            : hasNonHistoricalMessages
                                                 ? `Follow up with ${specialist.name}...`
                                                 : selectedPrompt
                                                     ? `Paste or type your ${selectedPrompt.inputLabel.toLowerCase()} here...`
@@ -835,7 +1038,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     }
                                     className={cn(
                                         "resize-none pr-20",
-                                        hasConversation ? "min-h-[60px]" : "min-h-[100px]",
+                                        hasNonHistoricalMessages ? "min-h-[60px]" : "min-h-[100px]",
                                         speechRecognition.isListening && "border-destructive/50"
                                     )}
                                     aria-required
@@ -895,9 +1098,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             )}
                             <div className="flex items-center justify-between">
                                 <p className="text-xs text-muted-foreground">
-                                    {hasConversation ? "⌘+Enter to send" : `${briefText.length.toLocaleString()} characters`}
+                                    {hasNonHistoricalMessages ? "⌘+Enter to send" : `${briefText.length.toLocaleString()} characters`}
                                 </p>
-                                {hasConversation && !isExecuting && lastAssistantMessage && (
+                                {hasNonHistoricalMessages && !isExecuting && lastAssistantMessage && (
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -932,25 +1135,28 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             <Button
                                 variant="secondary"
                                 onClick={() => {
-                                    if (hasConversation && !isExecuting) {
-                                        // Start a new topic (clear messages but keep thread for memory)
-                                        setMessages([])
+                                    const hasUserMessages = messages.some((m) => m.role === "user" && !m.historical)
+                                    if (hasUserMessages && !isExecuting) {
+                                        // Start a new topic (clear non-historical messages but keep thread)
+                                        setMessages((prev) => prev.filter((m) => m.historical))
                                         setSelectedPrompt(null)
                                         setBriefText("")
                                         setError(null)
+                                        setDynamicSuggestion(null)
+                                        greetingGeneratedRef.current = false
                                     } else {
                                         onOpenChange(false)
                                     }
                                 }}
-                                disabled={isExecuting}
+                                disabled={isExecuting || isGeneratingGreeting}
                             >
-                                {hasConversation && !isExecuting ? "New Topic" : "Close"}
+                                {messages.some((m) => m.role === "user" && !m.historical) && !isExecuting ? "New Topic" : "Close"}
                             </Button>
                         </div>
-                        {!hasConversation && (
+                        {!messages.some((m) => m.role === "user" && !m.historical) && (
                             <Button
                                 onClick={handleExecute}
-                                disabled={isExecuting || (!briefText.trim() && !selectedPrompt)}
+                                disabled={isExecuting || isGeneratingGreeting || (!briefText.trim() && !selectedPrompt)}
                                 className="bg-international-orange hover:bg-international-orange-hover text-white"
                             >
                                 {isExecuting ? (

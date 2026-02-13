@@ -485,11 +485,15 @@ export function ArtifactDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="xl" className="max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+      <DialogContent size="xl" className="p-0">
         {/* Visually hidden description for accessibility */}
         <DialogDescription className="sr-only">
           Detail view for artifact: {artifact.title}
         </DialogDescription>
+
+        {/* Inner flex container — explicit max-h so ScrollArea gets a constrained height
+            regardless of the base DialogContent display/overflow styles */}
+        <div className="flex flex-col max-h-[90vh] overflow-hidden">
 
         {/* ================================================================ */}
         {/* HEADER                                                           */}
@@ -951,6 +955,8 @@ export function ArtifactDetailDialog({
             )}
           </div>
         </div>
+
+        </div>{/* end inner flex container */}
       </DialogContent>
     </Dialog>
   )

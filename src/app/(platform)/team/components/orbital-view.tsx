@@ -11,11 +11,13 @@
  * @param props.onViewProfile - Callback to open profile modal for real members
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { PanZoomCanvas } from './pan-zoom-canvas'
 import { OrbitSVG } from './orbit-svg'
 import { OrbitSidePanel } from './orbit-side-panel'
-import type { FunctionId, BusinessFunction } from '../types'
+import { SPECIALISTS } from '../../agents/specialists-data'
+import type { FunctionId, BusinessFunction, SpecialistNode } from '../types'
 import type { TeamDataResult } from '../hooks/use-team-data'
 
 interface OrbitalViewProps {
@@ -27,11 +29,24 @@ interface OrbitalViewProps {
   onViewProfile?: (memberId: string) => void
 }
 
+/**
+ * Derives a two-letter initial from a single first name.
+ *
+ * @param name - A short name like "Sam" or "Priya"
+ * @returns The first letter capitalised (e.g. "Sa", "Pr")
+ */
+function nameToInitials(name: string): string {
+  const trimmed = name.trim()
+  if (trimmed.length <= 2) return trimmed.toUpperCase()
+  return trimmed.slice(0, 2).toUpperCase()
+}
+
 export function OrbitalView({
   teamData,
   functions,
   onViewProfile,
 }: OrbitalViewProps) {
+  const router = useRouter()
   const [selected, setSelected] = useState<FunctionId | null>(null)
 
   const handleSelect = useCallback((id: FunctionId) => {
@@ -41,6 +56,25 @@ export function OrbitalView({
   const handleDeselect = useCallback(() => {
     setSelected(null)
   }, [])
+
+  /** Map the static specialist roster to lightweight orbit nodes */
+  const specialistNodes: SpecialistNode[] = useMemo(
+    () =>
+      SPECIALISTS.map((s) => ({
+        id: s.id,
+        name: s.name,
+        initials: nameToInitials(s.name),
+        title: s.title,
+      })),
+    []
+  )
+
+  const handleSpecialistClick = useCallback(
+    (specialistId: string) => {
+      router.push(`/agents?specialist=${specialistId}`)
+    },
+    [router]
+  )
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -55,6 +89,8 @@ export function OrbitalView({
           marketplaceCandidates={
             Object.values(teamData.marketplaceByFunction).flat()
           }
+          specialists={specialistNodes}
+          onSpecialistClick={handleSpecialistClick}
         />
       </PanZoomCanvas>
 

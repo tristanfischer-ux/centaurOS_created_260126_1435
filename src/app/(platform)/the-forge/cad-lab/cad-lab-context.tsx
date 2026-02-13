@@ -27,6 +27,7 @@ import {
   runCadLabResearch,
   generateCadLabInterface,
   generateCadLabModel,
+  generateCadLabModelSmart,
   decomposeIntoModules,
   prefillDiagnostics,
 } from "@/actions/cad-lab"
@@ -316,7 +317,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
     } else {
       try {
-        const res = await generateCadLabModel(`${mod.name} — ${mod.purpose}`, moduleResearchText, mod.interfaceDefinition || "", modelId)
+        const res = await generateCadLabModelSmart(`${mod.name} — ${mod.purpose}`, moduleResearchText, mod.interfaceDefinition || "", modelId)
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { stlData, stepData, ...resultWithoutBinary } = res
         const updated = modules.map((m) =>

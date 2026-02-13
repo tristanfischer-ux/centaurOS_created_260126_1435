@@ -2509,6 +2509,66 @@ export type Database = {
         }
         Relationships: []
       }
+      cad_grammars: {
+        Row: {
+          constraints_summary: string | null
+          core_library_code: string
+          created_at: string
+          defaults: Json
+          description: string
+          display_name: string
+          domain_keywords: string[]
+          example_prompts: string[]
+          id: string
+          is_active: boolean
+          name: string
+          param_specs: Json
+          python_code: string
+          research_references: Json | null
+          source: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          constraints_summary?: string | null
+          core_library_code: string
+          created_at?: string
+          defaults?: Json
+          description: string
+          display_name: string
+          domain_keywords?: string[]
+          example_prompts?: string[]
+          id?: string
+          is_active?: boolean
+          name: string
+          param_specs?: Json
+          python_code: string
+          research_references?: Json | null
+          source?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          constraints_summary?: string | null
+          core_library_code?: string
+          created_at?: string
+          defaults?: Json
+          description?: string
+          display_name?: string
+          domain_keywords?: string[]
+          example_prompts?: string[]
+          id?: string
+          is_active?: boolean
+          name?: string
+          param_specs?: Json
+          python_code?: string
+          research_references?: Json | null
+          source?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       cad_lab_projects: {
         Row: {
           batch_started_at: string | null

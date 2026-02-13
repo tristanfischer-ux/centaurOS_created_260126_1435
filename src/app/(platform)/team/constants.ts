@@ -36,20 +36,24 @@ export const CY = 420
 export const GAP_DEG = 4.5
 export const SLICE_DEG = (360 - 7 * GAP_DEG) / 7
 
+/** Center hub radius (founders) */
+export const HUB_R = 58
+/** Specialist advisors ring radius */
+export const SPEC_R = 78
 /** Function label band inner radius */
-export const FUNC_R1 = 88
+export const FUNC_R1 = 98
 /** Function label band outer radius */
-export const FUNC_R2 = 130
+export const FUNC_R2 = 138
 /** Executive ring radius */
-export const EXEC_R = 180
+export const EXEC_R = 190
 /** Apprentice ring radius */
-export const APPR_R = 240
+export const APPR_R = 250
 /** Company / marketplace boundary */
-export const BOUNDARY_R = 280
+export const BOUNDARY_R = 290
 /** Marketplace ring radius */
-export const MKT_R = 325
+export const MKT_R = 335
 /** Outer edge */
-export const OUTER_R = 370
+export const OUTER_R = 380
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // STATUS COLOUR PALETTE
