@@ -1,17 +1,22 @@
 /**
- * @file layout.tsx — Route segment config for CAD Lab page.
+ * @file layout.tsx — Shared layout for the CAD Lab multi-page pipeline.
  *
- * @description Sets maxDuration to 600s (10 min) for server actions called
- * from this route. Building/architectural models with 50+ components can
- * take 5-8 min for Claude code generation + Modal execution.
+ * @description Wraps all CAD Lab sub-routes in the CadLabProvider and renders
+ * the persistent header, project picker, pipeline stepper navigation,
+ * progress overlay, and milestone celebrations.
+ *
+ * maxDuration is set to 600s for long-running server actions (building
+ * architectural models with 50+ components can take 5-8 min).
  */
 
 export const maxDuration = 600
+
+import { CadLabProviderWrapper } from "./cad-lab-layout-client"
 
 export default function CadLabLayout({
   children,
 }: {
   children: React.ReactNode
-}) {
-  return <>{children}</>
+}): React.ReactNode {
+  return <CadLabProviderWrapper>{children}</CadLabProviderWrapper>
 }
