@@ -540,6 +540,7 @@ export function TeamMeetingDialog({
                     modelId: "claude-sonnet-4-20250514",
                     modality: "text",
                     threadId: threadId ?? undefined,
+                    specialistId: specialist.id,
                     customSystemPromptSuffix: systemSuffix,
                 }),
             })

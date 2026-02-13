@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ForgeOS Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; font-family: system-ui, -apple-system, sans-serif; overflow: hidden; }
+  
+  #canvas-container { width: 100vw; height: 100vh; }
+  
+  /* Top bar */
+  #topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 48px;
+    background: rgba(20, 20, 40, 0.95); border-bottom: 1px solid #333;
+    display: flex; align-items: center; padding: 0 16px; gap: 12px; z-index: 10;
+  }
+  #topbar h1 { color: #e0e0e0; font-size: 16px; font-weight: 600; }
+  #topbar select, #topbar button {
+    background: #2a2a4a; color: #ccc; border: 1px solid #444;
+    padding: 6px 12px; border-radius: 4px; font-size: 13px; cursor: pointer;
+  }
+  #topbar select:hover, #topbar button:hover { background: #3a3a5a; color: #fff; }
+  #topbar button.active { background: #4a6fa5; color: #fff; border-color: #5a8fbf; }
+  
+  /* Parts panel */
+  #parts-panel {
+    position: fixed; top: 48px; right: 0; width: 260px; bottom: 0;
+    background: rgba(20, 20, 40, 0.92); border-left: 1px solid #333;
+    overflow-y: auto; z-index: 10; padding: 8px 0;
+  }
+  #parts-panel h2 {
+    color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+    padding: 8px 16px 4px;
+  }
+  .part-item {
+    padding: 6px 16px; color: #bbb; font-size: 13px; cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .part-item:hover { background: rgba(74, 111, 165, 0.2); color: #fff; }
+  .part-item.selected { background: rgba(74, 111, 165, 0.4); color: #fff; }
+  .part-color {
+    width: 12px; height: 12px; border-radius: 2px; border: 1px solid #555;
+    flex-shrink: 0;
+  }
+  
+  /* Info bar */
+  #info-bar {
+    position: fixed; bottom: 0; left: 0; right: 260px; height: 32px;
+    background: rgba(20, 20, 40, 0.95); border-top: 1px solid #333;
+    display: flex; align-items: center; padding: 0 16px; gap: 20px;
+    color: #888; font-size: 12px; z-index: 10;
+  }
+  #info-bar span { white-space: nowrap; }
+  
+  /* Loading */
+  #loading {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    color: #888; font-size: 14px; z-index: 20;
+  }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>ForgeOS</h1>
+  <select id="model-select">
+    <option value="house.glb">House (BIM)</option>
+    <option value="drone.glb">Drone (FPV Quad)</option>
+  </select>
+  <button id="btn-wireframe">Wireframe</button>
+  <button id="btn-explode">Explode</button>
+  <button id="btn-reset">Reset View</button>
+</div>
+
+<div id="parts-panel">
+  <h2>Parts</h2>
+  <div id="parts-list"></div>
+</div>
+
+<div id="info-bar">
+  <span id="info-parts">—</span>
+  <span id="info-envelope">—</span>
+  <span id="info-selected">Click a part to inspect</span>
+</div>
+
+<div id="loading">Loading model...</div>
+<div id="canvas-container"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// ─── Setup ───────────────────────────────────────
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 100000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+container.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dir1 = new THREE.DirectionalLight(0xffffff, 1.0);
+dir1.position.set(5, 10, 7);
+scene.add(dir1);
+const dir2 = new THREE.DirectionalLight(0x8899bb, 0.4);
+dir2.position.set(-5, 5, -3);
+scene.add(dir2);
+
+// Grid
+const grid = new THREE.GridHelper(20000, 40, 0x333355, 0x222244);
+grid.rotation.x = 0; // XZ plane
+scene.add(grid);
+
+// ─── State ───────────────────────────────────────
+let currentModel = null;
+let parts = [];
+let selectedPart = null;
+let wireframeMode = false;
+let explodeMode = false;
+let explodeOffsets = [];
+const loader = new GLTFLoader();
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+// ─── Load Model ──────────────────────────────────
+function loadModel(filename) {
+  document.getElementById('loading').style.display = 'block';
+  
+  // Clear previous
+  if (currentModel) {
+    scene.remove(currentModel);
+    currentModel = null;
+  }
+  parts = [];
+  explodeOffsets = [];
+  selectedPart = null;
+  
+  loader.load(filename, (gltf) => {
+    currentModel = gltf.scene;
+    scene.add(currentModel);
+    
+    // Collect parts
+    currentModel.traverse((child) => {
+      if (child.isMesh) {
+        child.userData.originalMaterial = child.material.clone();
+        child.userData.originalPosition = child.position.clone();
+        parts.push(child);
+      }
+    });
+    
+    // Compute explode directions (away from centroid)
+    const centroid = new THREE.Vector3();
+    parts.forEach(p => {
+      const box = new THREE.Box3().setFromObject(p);
+      centroid.add(box.getCenter(new THREE.Vector3()));
+    });
+    centroid.divideScalar(parts.length || 1);
+    
+    parts.forEach(p => {
+      const box = new THREE.Box3().setFromObject(p);
+      const center = box.getCenter(new THREE.Vector3());
+      const dir = center.clone().sub(centroid).normalize();
+      const size = box.getSize(new THREE.Vector3()).length();
+      explodeOffsets.push(dir.multiplyScalar(size * 0.5));
+    });
+    
+    // Fit camera
+    const box = new THREE.Box3().setFromObject(currentModel);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    
+    camera.position.set(center.x + maxDim, center.y + maxDim * 0.8, center.z + maxDim);
+    controls.target.copy(center);
+    controls.update();
+    
+    // Update UI
+    updatePartsPanel();
+    document.getElementById('info-parts').textContent = `${parts.length} parts`;
+    document.getElementById('info-envelope').textContent = 
+      `${size.x.toFixed(0)} × ${size.y.toFixed(0)} × ${size.z.toFixed(0)} mm`;
+    document.getElementById('loading').style.display = 'none';
+    
+  }, undefined, (err) => {
+    document.getElementById('loading').textContent = 
+      `Failed to load ${filename}. Run "make viewer-assets" first.`;
+    console.error(err);
+  });
+}
+
+function updatePartsPanel() {
+  const list = document.getElementById('parts-list');
+  list.innerHTML = '';
+  parts.forEach((part, i) => {
+    const div = document.createElement('div');
+    div.className = 'part-item';
+    
+    const colorDot = document.createElement('div');
+    colorDot.className = 'part-color';
+    const mat = part.material;
+    const c = mat.color || new THREE.Color(0.5, 0.5, 0.5);
+    colorDot.style.background = `rgb(${c.r*255|0},${c.g*255|0},${c.b*255|0})`;
+    
+    const name = document.createElement('span');
+    name.textContent = part.name || `Part ${i+1}`;
+    
+    div.appendChild(colorDot);
+    div.appendChild(name);
+    div.addEventListener('click', () => selectPart(part));
+    list.appendChild(div);
+  });
+}
+
+function selectPart(part) {
+  // Deselect previous
+  if (selectedPart) {
+    selectedPart.material = selectedPart.userData.originalMaterial.clone();
+  }
+  
+  selectedPart = part;
+  part.material = part.userData.originalMaterial.clone();
+  part.material.emissive = new THREE.Color(0x4a6fa5);
+  part.material.emissiveIntensity = 0.3;
+  
+  // Measure
+  const box = new THREE.Box3().setFromObject(part);
+  const size = box.getSize(new THREE.Vector3());
+  document.getElementById('info-selected').textContent = 
+    `${part.name}: ${size.x.toFixed(0)} × ${size.y.toFixed(0)} × ${size.z.toFixed(0)} mm`;
+  
+  // Highlight in panel
+  document.querySelectorAll('.part-item').forEach((el, i) => {
+    el.classList.toggle('selected', parts[i] === part);
+  });
+}
+
+// ─── Controls ────────────────────────────────────
+document.getElementById('btn-wireframe').addEventListener('click', () => {
+  wireframeMode = !wireframeMode;
+  document.getElementById('btn-wireframe').classList.toggle('active', wireframeMode);
+  parts.forEach(p => { p.material.wireframe = wireframeMode; });
+});
+
+document.getElementById('btn-explode').addEventListener('click', () => {
+  explodeMode = !explodeMode;
+  document.getElementById('btn-explode').classList.toggle('active', explodeMode);
+  parts.forEach((p, i) => {
+    if (explodeMode) {
+      p.position.add(explodeOffsets[i]);
+    } else {
+      p.position.copy(p.userData.originalPosition);
+    }
+  });
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  if (currentModel) {
+    const box = new THREE.Box3().setFromObject(currentModel);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    camera.position.set(center.x + maxDim, center.y + maxDim * 0.8, center.z + maxDim);
+    controls.target.copy(center);
+  }
+});
+
+document.getElementById('model-select').addEventListener('change', (e) => {
+  loadModel(e.target.value);
+});
+
+// Click to select part
+renderer.domElement.addEventListener('click', (event) => {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(parts, false);
+  if (hits.length > 0) {
+    selectPart(hits[0].object);
+  }
+});
+
+// Resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Animate
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// Load default model
+loadModel('house.glb');
+</script>
+</body>
+</html>

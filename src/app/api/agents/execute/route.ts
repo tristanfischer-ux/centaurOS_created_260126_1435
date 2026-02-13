@@ -12,6 +12,8 @@ import {
     processMemory,
 } from "@/lib/agent-memory"
 import { buildAIContext } from "@/lib/ai-context/builder"
+import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { compilePersonalityPrompt } from "@/lib/agents/personality"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -90,6 +92,7 @@ export async function POST(request: Request) {
     let modality: OutputModality
     let threadId: string | undefined
     let customSystemPromptSuffix: string | undefined
+    let specialistId: string | undefined
 
     try {
         const body = await request.json()
@@ -100,6 +103,7 @@ export async function POST(request: Request) {
         modality = body.modality ?? "text"
         threadId = body.threadId ?? undefined
         customSystemPromptSuffix = typeof body.customSystemPromptSuffix === "string" ? body.customSystemPromptSuffix : undefined
+        specialistId = typeof body.specialistId === "string" ? body.specialistId : undefined
 
         if (!prompt || typeof prompt !== "string") {
             return NextResponse.json({ error: "prompt is required" }, { status: 400 })
@@ -203,7 +207,23 @@ export async function POST(request: Request) {
         }
     }
 
+    // Build system prompt: base + personality + company context + memory + custom suffix
     let systemPromptWithContext = SYSTEM_PROMPT
+
+    // Inject specialist personality prompt between base system prompt and company context.
+    // This gives the agent a distinct voice, backstory, and behavioral patterns.
+    if (specialistId) {
+        const specialist = getSpecialistById(specialistId)
+        if (specialist) {
+            const personalityPrompt = compilePersonalityPrompt(
+                `${specialist.name}, the ${specialist.title} specialist`,
+                specialist.personality,
+                specialist.description,
+            )
+            systemPromptWithContext += `\n\n## Your Identity & Personality\n${personalityPrompt}`
+        }
+    }
+
     if (companyContext) {
         systemPromptWithContext += `\n\n${companyContext}`
     }

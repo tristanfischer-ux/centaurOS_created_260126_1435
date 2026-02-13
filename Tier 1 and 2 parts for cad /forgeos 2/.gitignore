@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+# Generated model files (root level only)
+/*.step
+/*.stl
+/*.glb
+/*.gltf
+/*.dxf
+dist/
+*.egg-info/
+.venv/
+# Viewer GLBs are pre-generated — keep them in git
+# viewer/*.glb

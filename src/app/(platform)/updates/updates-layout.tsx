@@ -34,6 +34,8 @@ interface UpdatesLayoutProps {
   userId: string
   /** Current foundry ID */
   foundryId: string
+  /** Optional banner rendered between header and feed (e.g. recruits CTA) */
+  bannerSlot?: React.ReactNode
 }
 
 /**
@@ -42,7 +44,8 @@ interface UpdatesLayoutProps {
 export function UpdatesLayout({
   initialItems,
   userId,
-  foundryId
+  foundryId,
+  bannerSlot,
 }: UpdatesLayoutProps) {
   // Data state
   const [items, setItems] = useState<ActivityItem[]>(initialItems)
@@ -206,6 +209,13 @@ export function UpdatesLayout({
           />
         </div>
 
+        {/* Optional banner (e.g. recruits CTA for Founders) */}
+        {bannerSlot && (
+          <div className="px-4 sm:px-6 lg:px-8 pt-4 shrink-0">
+            {bannerSlot}
+          </div>
+        )}
+
         {/* Two-panel layout */}
         <div className="flex flex-1 overflow-hidden">
           {/* Left: Feed */}
@@ -252,6 +262,13 @@ export function UpdatesLayout({
             isMarkingRead={isMarkingRead}
           />
         </div>
+
+        {/* Optional banner (e.g. recruits CTA for Founders) */}
+        {bannerSlot && (
+          <div className="px-4 sm:px-6 pt-4 shrink-0">
+            {bannerSlot}
+          </div>
+        )}
 
         {/* Two-panel layout (narrower feed) */}
         <div className="flex flex-1 overflow-hidden">
@@ -319,6 +336,12 @@ export function UpdatesLayout({
               isMarkingRead={isMarkingRead}
             />
           </div>
+          {/* Optional banner */}
+          {bannerSlot && (
+            <div className="px-4 pt-3 shrink-0">
+              {bannerSlot}
+            </div>
+          )}
           <div className="flex-1 min-h-0">
             <UpdatesFeed
               items={items}

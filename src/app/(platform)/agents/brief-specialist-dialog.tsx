@@ -274,6 +274,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                     modelId: "claude-sonnet-4-20250514",
                     modality: "text",
                     threadId: threadId ?? undefined,
+                    specialistId: specialist.id,
                     customSystemPromptSuffix: systemExtras.join(""),
                 }),
             })

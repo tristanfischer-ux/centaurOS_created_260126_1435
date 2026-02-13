@@ -1,7 +1,8 @@
 /**
  * @file Sidebar.tsx — Main navigation component with four-section layout.
  *
- * @description Organizes navigation into four purpose-driven sections:
+ * @description Organizes navigation with a top-level "Today" link plus four sections:
+ * - "Today": top-level daily focus (always visible, first item after foundry switcher)
  * - "Me": personal pages (My Profile, Updates)
  * - "Plan": strategy and execution (Strategy, Objectives, Tasks)
  * - "Workshop": collaboration and building (The Forge, Team, Specialists)
@@ -78,8 +79,9 @@ const APP_VERSION = "0.9.0"
 // ─────────────────────────────────────────────────────────────────────────────
 // Section 1: "Me" — Personal pages
 // ─────────────────────────────────────────────────────────────────────────────
+const todayNavItem = { name: "Today", href: "/today", icon: CalendarDays, tooltip: "Your personalized daily focus — tasks, risks, and wins" }
+
 const meNavigation = [
-    { name: "Today", href: "/today", icon: CalendarDays, tooltip: "Your personalized daily focus — tasks, risks, and wins" },
     { name: "My Profile", href: "/my-profile", icon: UserCircle, tooltip: "Your profile, companies, and marketplace presence" },
     { name: "Updates", href: "/updates", icon: Bell, tooltip: "Notes, comments, and changes across tasks and objectives" },
 ]
@@ -178,7 +180,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                         ? "bg-orange-50 text-international-orange font-semibold"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     "group flex items-center justify-between py-2 text-sm transition-all duration-200 rounded-md",
-                    item.indent ? "pl-6 pr-3" : "px-3"
+                    item.indent ? "pl-8 pr-3" : "px-3"
                 )}
             >
                 <span className="flex items-center">
@@ -254,6 +256,13 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                     userName={userName}
                     userRole={userRole}
                 />
+
+                {/* ══════════════════════════════════════════════════ */}
+                {/* Today — Top-level daily focus (always visible)     */}
+                {/* ══════════════════════════════════════════════════ */}
+                {renderNavItem(todayNavItem)}
+
+                <div className="my-2 border-t border-slate-100" />
 
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 1: "Me" — Personal pages                  */}

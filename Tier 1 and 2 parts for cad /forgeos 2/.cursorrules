@@ -1,0 +1,135 @@
+# ForgeOS — Cursor Agent Rules
+
+## What This Is
+
+ForgeOS converts product descriptions into manufacturable 3D geometry using Domain Grammars — codified engineering knowledge for each product category.
+
+## Architecture
+
+```
+User: "5-inch FPV quad with 2306 motors"
+  ↓ Level 1: AI extracts parameters → {prop_size: 5, motor: "2306"}
+  ↓ Level 2: derive_skeleton() (pure math) → {wheelbase: 200, arm_length: 100, ...}
+  ↓ Level 3: build() (CadQuery) → cq.Assembly with named, coloured parts
+  ↓ Export: STEP / GLB / STL
+```
+
+The AI handles Level 1. Levels 2 and 3 are deterministic code.
+
+## Key Files
+
+```
+core/grammar.py              Base classes: DomainGrammar, ParamSpec, Constraint
+core/schema.py               JSON Schema / LLM tool / UI control export
+grammars/building.py         ✅ Complete — BIM house (15 parts, 10 tests)
+grammars/drone.py            ✅ Complete — FPV quad (18 parts, 10 tests)
+grammars/enclosure.py        🔲 Not started — see docs/ARCHITECTURE.md §1
+tests/test_building_grammar.py   10 tests
+tests/test_drone_grammar.py      10 tests
+tests/test_integration.py        7 tests (cross-grammar, export, isolation)
+tests/test_schema.py             Schema generation tests
+docs/ARCHITECTURE.md         Specs with formulas for unimplemented domains
+docs/GRAMMAR_AUTHORING.md    Step-by-step template for writing new grammars
+viewer/index.html            Three.js GLB viewer (model switcher, explode, part list)
+```
+
+## Quick Start
+
+```bash
+pip install cadquery --break-system-packages
+cd forgeos
+python -m pytest tests/ -v                    # 37 tests, all should pass
+make build-all                                # builds house + drone to dist/
+make viewer-assets                            # copies GLBs to viewer/ for preview
+python examples/house_v3.py --format glb      # or run examples directly
+python examples/drone_v1.py --format glb
+```
+
+## Grammar Design Rules
+
+1. **`derive_skeleton()` is pure math.** No CadQuery imports. No geometry. Just arithmetic and lookups.
+2. **`build()` reads ONLY from the skeleton dict.** Everything it needs must be computed in derive_skeleton().
+3. **Every part gets a name and colour** in the assembly.
+4. **ParamSpec types must be correct:**
+   - `"float"` for dimensions/angles, `"int"` for counts, `"bool"` for toggles
+   - `"enum"` with `enum_options=[...]` for fixed choices
+   - `"list"` for lists of numbers, `"dict_list"` for lists of dicts
+5. **Constraints validate the skeleton, not geometry.** Check dimensions and ratios.
+6. **Tests are mandatory.** Minimum: identity, defaults_valid, derive_skeleton, build_default, export_formats.
+
+## CadQuery Patterns That Work
+
+```python
+# Box centred at base (walls, plates)
+cq.Workplane("XY").box(L, W, H, centered=(True, True, False))
+
+# Polygon extrusion (gable walls, arm profiles)
+cq.Workplane("YZ").polyline(pts).close().extrude(thickness)
+
+# Boolean cut (openings, bolt holes)
+wall.cut(cutter.translate((cx, cy, cz)))
+
+# Rounded rectangle plate
+plate = cq.Workplane("XY").rect(L, W).extrude(t)
+plate = plate.edges("|Z").fillet(r)
+
+# Hollow cylinder (standoffs)
+cq.Workplane("XY").circle(od/2).circle(id/2).extrude(h)
+
+# Assembly positioning
+assy.add(part, loc=cq.Location(cq.Vector(x, y, z)),
+         color=cq.Color(r, g, b), name="PartName")
+
+# Rotation: translate then rotate with * operator
+loc = cq.Location(cq.Vector(x,y,z)) * cq.Location(cq.Vector(0,0,0), cq.Vector(0,0,1), angle_deg)
+
+# Export
+assy.save("out.step")
+assy.save("out.glb", exportType="GLTF", tolerance=1.0, angularTolerance=0.2)
+```
+
+## CadQuery Gotchas
+
+- `centered=(True, True, False)` = centred XY, Z starts at 0
+- Boolean cut depth must EXCEED wall thickness for clean through-cut
+- GLB export: use `exportType="GLTF"` (CadQuery detects format from .glb extension)
+- `fillet()` can fail on small/complex geometry — wrap in try/except
+- Colours are (R, G, B) in 0.0-1.0 range, optional alpha as 4th arg
+
+## Current Priorities
+
+### Priority 1: Electronics Enclosure Grammar
+
+Implement `grammars/enclosure.py`. Research is in `docs/ARCHITECTURE.md` §1.
+
+**Core pattern:** PCB dimensions → inner cavity → offset outward by wall thickness → split into base + lid → add mount posts, port cutouts, snap fits.
+
+Key references: YAPP Box (OpenSCAD), IEC 60529 IP ratings, IPC-2221.
+
+### Priority 2: Camera Mount + Battery Pad for Drone
+
+The drone grammar generates the frame but is missing:
+- Camera mount (L-bracket at front, tilted by camera_tilt_deg)
+- Battery pad (bottom plate feature with strap slot cutouts)
+- DXF export of 2D plate outlines for CNC cutting
+
+### Priority 3: Web Viewer with Parameter Sliders
+
+Enhance `viewer/index.html` to accept parameter changes and trigger rebuilds. Options: WebSocket to a Python backend, or compile CadQuery to WASM (harder).
+
+### Priority 4: More Grammars
+
+Research for rockets, gears, and furniture is in `docs/ARCHITECTURE.md`. Follow `docs/GRAMMAR_AUTHORING.md` for the template.
+
+## Writing a New Grammar
+
+See `docs/GRAMMAR_AUTHORING.md` for the complete step-by-step template with code structure and test checklist.
+
+**When adding a new grammar, update ALL of these:**
+
+1. `grammars/__init__.py` — add import, add to `__all__`, add to `GRAMMAR_REGISTRY`
+2. `core/schema.py` → `get_all_grammars()` — add the new grammar class
+3. `tests/test_integration.py` — will automatically test the new grammar via registry
+4. `viewer/index.html` — add `<option>` to the model selector dropdown
+5. `Makefile` — add a `dist/newgrammar.glb` target
+6. `README.md` — update project structure and examples

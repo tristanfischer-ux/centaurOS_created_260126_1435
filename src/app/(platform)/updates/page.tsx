@@ -49,13 +49,11 @@ export default async function UpdatesPage() {
   const isFounder = profile?.role === 'Founder'
 
   return (
-    <div>
-      {isFounder && <FounderRecruitsBanner />}
-      <UpdatesLayout
-        initialItems={initialItems}
-        userId={user.id}
-        foundryId={foundryId}
-      />
-    </div>
+    <UpdatesLayout
+      initialItems={initialItems}
+      userId={user.id}
+      foundryId={foundryId}
+      bannerSlot={isFounder ? <FounderRecruitsBanner /> : null}
+    />
   )
 }

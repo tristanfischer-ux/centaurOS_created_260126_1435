@@ -39,22 +39,14 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 }
 
 /**
- * Row-based accent colors for the card's left border.
+ * Default accent color for the card's left border.
  */
-const ROW_BORDER_COLORS: Record<string, string> = {
-    know: "border-l-electric-blue",
-    grow: "border-l-international-orange",
-    run: "border-l-status-success",
-}
+const CARD_BORDER_COLOR = "border-l-international-orange"
 
 /**
- * Row-based accent colors for the "Start here" badge.
+ * Default accent color for the "Start here" badge.
  */
-const ROW_BADGE_COLORS: Record<string, string> = {
-    know: "bg-electric-blue-light text-electric-blue",
-    grow: "bg-international-orange-light text-international-orange",
-    run: "bg-status-success-light text-status-success-dark",
-}
+const BADGE_COLOR = "bg-international-orange-light text-international-orange"
 
 interface SpecialistCardProps {
     /** The specialist data to display */
@@ -71,14 +63,11 @@ interface SpecialistCardProps {
  * SpecialistCard -- A single specialist in the 3x3 roster grid.
  *
  * @description Displays a specialist as a team member card with avatar image,
- * name, tagline, working style, capability count, highlights, and a "Brief" CTA.
- * Uses row-themed left border accent (blue=KNOW, orange=GROW, green=RUN).
- * Recommended specialists get a "Start here" badge.
+ * human name, functional title, tagline, working style, capability count,
+ * highlights, and a "Brief" CTA. Recommended specialists get a "Start here" badge.
  */
 export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0 }: SpecialistCardProps) {
     const Icon = ICON_MAP[specialist.icon] ?? Compass
-    const borderColor = ROW_BORDER_COLORS[specialist.row] ?? "border-l-muted"
-    const badgeColor = ROW_BADGE_COLORS[specialist.row] ?? "bg-muted text-muted-foreground"
 
     return (
         <motion.div
@@ -91,7 +80,7 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
                     "border-l-4 rounded-xl shadow-sm bg-card",
                     "transition-all duration-200 hover:shadow-lg hover:-translate-y-1",
                     "flex flex-col h-full group cursor-pointer",
-                    borderColor
+                    CARD_BORDER_COLOR
                 )}
                 onClick={() => onBrief(specialist.id)}
             >
@@ -99,7 +88,7 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
                     {/* Recommended Badge */}
                     {specialist.recommended && (
                         <div className="flex items-center gap-1.5 mb-3">
-                            <Badge className={cn("text-[11px] font-medium gap-1", badgeColor)}>
+                            <Badge className={cn("text-[11px] font-medium gap-1", BADGE_COLOR)}>
                                 <Sparkles className="h-3 w-3" />
                                 Start here
                             </Badge>
@@ -127,7 +116,10 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
                             <h3 className="font-display font-semibold text-foreground text-lg leading-tight">
                                 {specialist.name}
                             </h3>
-                            <p className="text-sm text-muted-foreground italic mt-0.5 leading-snug">
+                            <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                                {specialist.title}
+                            </p>
+                            <p className="text-sm text-muted-foreground italic mt-1 leading-snug">
                                 &ldquo;{specialist.tagline}&rdquo;
                             </p>
                         </div>

@@ -6,11 +6,12 @@ import { ArrowRight, Layers, Users, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 // Design system imported only when needed for inline usage
-import { SPECIALISTS, SPECIALIST_ROWS, getSpecialistsByRow } from "./specialists-data"
+import { SPECIALISTS } from "./specialists-data"
 import { SpecialistCard } from "./specialist-card"
 import { getPromptsByCategory } from "./lib/prompt-library"
 import { BriefSpecialistDialog } from "./brief-specialist-dialog"
 import { TeamMeetingDialog } from "./team-meeting-dialog"
+import { MeetingHistory } from "./meeting-history"
 
 interface SpecialistsLandingProps {
     /** Callback to switch to the workflow builder ("Team Project" mode) */
@@ -20,8 +21,8 @@ interface SpecialistsLandingProps {
 /**
  * SpecialistsLanding -- The default view for the Specialists page.
  *
- * @description Displays a 3x3 grid of specialist cards organized by
- * KNOW / GROW / RUN rows, with a hero message, row labels, and a
+ * @description Displays a flat 3x3 grid of specialist cards with human names
+ * and functional titles, a meeting history section, and a
  * "Plan a Team Project" CTA that opens the workflow builder.
  */
 export function SpecialistsLanding({
@@ -57,9 +58,6 @@ export function SpecialistsLanding({
         setReferredByName(null)
         setBriefSpecialistId(specialistId)
     }
-
-    // Running index for staggered animation across all cards
-    let cardIndex = 0
 
     return (
         <div className="space-y-10 pb-12">
@@ -97,48 +95,21 @@ export function SpecialistsLanding({
                 </div>
             </motion.div>
 
-            {/* ── Specialist Rows ───────────────────────────────────────── */}
-            {SPECIALIST_ROWS.map((row, rowIndex) => {
-                const rowSpecialists = getSpecialistsByRow(row.id)
+            {/* ── Specialist Grid ──────────────────────────────────────── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {SPECIALISTS.map((specialist, idx) => (
+                    <SpecialistCard
+                        key={specialist.id}
+                        specialist={specialist}
+                        capabilityCount={capabilityCounts[specialist.id] ?? 0}
+                        onBrief={handleBrief}
+                        index={idx}
+                    />
+                ))}
+            </div>
 
-                return (
-                    <div key={row.id} className="space-y-4">
-                        {/* Row Label */}
-                        <motion.div
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.4, delay: rowIndex * 0.15 }}
-                            className="flex items-center gap-3"
-                        >
-                            <div className={`h-6 w-1 rounded-full ${row.accentColor}`} />
-                            <div>
-                                <h3 className="text-xs font-mono uppercase tracking-widest text-foreground font-semibold">
-                                    {row.label}
-                                </h3>
-                                <p className="text-xs text-muted-foreground">
-                                    {row.subtitle}
-                                </p>
-                            </div>
-                        </motion.div>
-
-                        {/* Specialist Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {rowSpecialists.map((specialist) => {
-                                const idx = cardIndex++
-                                return (
-                                    <SpecialistCard
-                                        key={specialist.id}
-                                        specialist={specialist}
-                                        capabilityCount={capabilityCounts[specialist.id] ?? 0}
-                                        onBrief={handleBrief}
-                                        index={idx}
-                                    />
-                                )
-                            })}
-                        </div>
-                    </div>
-                )
-            })}
+            {/* ── Meeting History ─────────────────────────────────────── */}
+            <MeetingHistory initialLimit={3} />
 
             {/* ── Team Project CTA ─────────────────────────────────────── */}
             <motion.div

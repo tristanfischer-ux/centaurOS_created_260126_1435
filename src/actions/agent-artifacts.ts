@@ -986,3 +986,84 @@ export async function shareArtifact(
   return { error: null }
 }
 
+// ============================================================================
+// MEETING HISTORY
+// ============================================================================
+
+/** Shape returned by getMeetingHistory for each past team meeting */
+export interface MeetingHistoryItem {
+  id: string
+  title: string
+  createdAt: string
+  topic: string
+  attendees: string[]
+  roundCount: number
+  summary: string
+  actionItemCount: number
+  objectiveCount: number
+  content: string
+  metadata: Record<string, unknown>
+}
+
+/**
+ * Get past team meetings saved as artifacts.
+ *
+ * @description Queries agent_artifacts where metadata.source = 'team-meeting',
+ * ordered by created_at DESC. Returns structured meeting summaries.
+ *
+ * @param limit - Maximum number of meetings to return (default 20)
+ * @returns Array of meeting history items
+ * @security RLS enforces foundry isolation
+ */
+export async function getMeetingHistory(limit: number = 20): Promise<{
+  data: MeetingHistoryItem[]
+  error: string | null
+}> {
+  const supabase = await createClient()
+
+  // AUTH: Verify user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { data: [], error: 'Not authenticated' }
+  }
+
+  const { data, error } = await supabase
+    .from('agent_artifacts')
+    .select('id, title, content, metadata, created_at')
+    .eq('metadata->>source', 'team-meeting')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to fetch meeting history:', {
+      userId: user.id,
+      error: error.message,
+    })
+    return { data: [], error: sanitizeErrorMessage(error) }
+  }
+
+  // Transform raw rows into MeetingHistoryItem
+  const meetings: MeetingHistoryItem[] = (data ?? []).map((row) => {
+    const meta = (row.metadata ?? {}) as Record<string, unknown>
+    const notes = (meta.notes ?? {}) as Record<string, unknown>
+    const actionItems = Array.isArray(notes.actionItems) ? notes.actionItems : []
+    const attendees = Array.isArray(meta.attendees) ? meta.attendees as string[] : []
+
+    return {
+      id: row.id,
+      title: row.title,
+      createdAt: row.created_at,
+      topic: (meta.topic as string) ?? '',
+      attendees,
+      roundCount: (meta.roundCount as number) ?? 0,
+      summary: (notes.summary as string) ?? '',
+      actionItemCount: actionItems.length,
+      objectiveCount: (meta.objectiveCount as number) ?? 0,
+      content: row.content ?? '',
+      metadata: meta,
+    }
+  })
+
+  return { data: meetings, error: null }
+}
+
