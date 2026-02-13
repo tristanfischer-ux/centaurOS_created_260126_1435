@@ -9,9 +9,6 @@ import {
   useScroll,
   useTransform,
   AnimatePresence,
-  useMotionValue,
-  useSpring,
-  animate,
 } from "framer-motion";
 import {
   fadeInUp,
@@ -40,16 +37,11 @@ import {
   CheckCircle2,
   Zap,
   Factory,
-  Quote,
-  Star,
-  Calculator,
   Share2,
-  Copy,
   Check,
   Timer,
   TrendingUp,
   ExternalLink,
-  Milestone,
 } from "lucide-react";
 import {
   Accordion,
@@ -243,8 +235,8 @@ export default function MarketingPage() {
           <SavingsCalculatorSection />
         </Suspense>
         <SolutionSection />
-        <CaseStudySection />
-        <SocialProofSection />
+        <HowAProjectWorksSection />
+        <PlatformCapabilitiesSection />
         <HowItWorksSection />
         <CapabilitiesHighlight />
         <PricingPreviewSection />
@@ -1023,13 +1015,13 @@ function SolutionSection() {
  * A specific, detailed story with real numbers that builds credibility.
  * ════════════════════════════════════════════════════════════════════════ */
 
-function CaseStudySection() {
-  const MILESTONES = [
-    { week: "Week 1–2", label: "Scope & Team Assembly", done: true },
-    { week: "Week 3–4", label: "Concept Design & Simulation", done: true },
-    { week: "Week 5–6", label: "Rapid Prototyping (3D Print + CNC)", done: true },
-    { week: "Week 7–8", label: "Functional Testing & Iteration", done: true },
-    { week: "Week 9", label: "Production-Ready Prototype Delivered", done: true },
+function HowAProjectWorksSection() {
+  const PHASES = [
+    { week: "Week 1–2", label: "Scope definition & expert matching", done: true },
+    { week: "Week 3–5", label: "Concept design & engineering simulation", done: true },
+    { week: "Week 6–8", label: "Rapid prototyping (3D print, CNC, etc.)", done: true },
+    { week: "Week 9–10", label: "Functional testing & iteration", done: true },
+    { week: "Week 11–12", label: "Production-ready deliverable", done: true },
   ];
 
   return (
@@ -1037,13 +1029,17 @@ function CaseStudySection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <AnimatedSection className="text-center mb-12 md:mb-16">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
-            Case Study
+            How a Project Works
           </span>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
-            From Napkin Sketch to Flying Prototype
+            From Concept to Prototype.
             <br className="hidden sm:block" />{" "}
-            <span className="text-international-orange">in 9 Weeks.</span>
+            <span className="text-international-orange">Weeks, Not Months.</span>
           </h2>
+          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            Here is a typical project timeline when you work with fractional
+            experts instead of building a full-time team.
+          </p>
         </AnimatedSection>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center">
@@ -1052,68 +1048,53 @@ function CaseStudySection() {
             <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden border shadow-lg">
               <Image
                 src="/images/case-study-drone.png"
-                alt="Production-ready inspection drone prototype built in 9 weeks with Fractional Forge"
+                alt="Example: an inspection drone prototype — the kind of project fractional teams can tackle"
                 fill
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 600px"
               />
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-foreground/80 to-transparent p-6">
                 <p className="text-background text-xs font-mono uppercase tracking-widest mb-1">
-                  Aero Dynamics Ltd
+                  Illustrative Example
                 </p>
                 <p className="text-background/80 text-sm">
-                  Industrial Inspection Drone
+                  Inspection Drone Prototype
                 </p>
               </div>
             </div>
           </AnimatedSection>
 
-          {/* Right: Story + Timeline */}
+          {/* Right: Explanation + Timeline */}
           <AnimatedSection delay={0.15} className="space-y-8">
-            {/* The challenge */}
+            {/* The traditional problem */}
             <div>
-              <h3 className="text-lg font-bold mb-3">The Challenge</h3>
+              <h3 className="text-lg font-bold mb-3">The Traditional Way</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                Aero Dynamics had a compelling vision for an autonomous inspection
-                drone but faced a familiar problem: traditional consultancies
-                quoted <strong className="text-foreground">14 months</strong> and{" "}
-                <strong className="text-foreground">£180k</strong> with a team of
-                6 full-time engineers. They had runway for 8 months.
+                A hardware startup building something like an inspection drone
+                would typically need to hire 4–6 full-time engineers, spend
+                months recruiting, and commit to 12–18 months of runway burn
+                before seeing a working prototype.
               </p>
             </div>
 
-            {/* The result */}
+            {/* The fractional approach */}
             <div>
-              <h3 className="text-lg font-bold mb-3">The Fractional Result</h3>
-              <StaggerContainer className="grid grid-cols-3 gap-4">
-                <AnimatedCard className="rounded-xl bg-status-success-light p-4 text-center">
-                  <p className="text-2xl font-black text-status-success">9</p>
-                  <p className="text-xs text-status-success font-mono uppercase tracking-wider">
-                    Weeks
-                  </p>
-                </AnimatedCard>
-                <AnimatedCard className="rounded-xl bg-status-success-light p-4 text-center">
-                  <p className="text-2xl font-black text-status-success">£47k</p>
-                  <p className="text-xs text-status-success font-mono uppercase tracking-wider">
-                    Total Cost
-                  </p>
-                </AnimatedCard>
-                <AnimatedCard className="rounded-xl bg-status-success-light p-4 text-center">
-                  <p className="text-2xl font-black text-status-success">3</p>
-                  <p className="text-xs text-status-success font-mono uppercase tracking-wider">
-                    Experts
-                  </p>
-                </AnimatedCard>
-              </StaggerContainer>
+              <h3 className="text-lg font-bold mb-3">The Fractional Approach</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                With Fractional Forge, you assemble a team of senior specialists
+                in days, not months. You pay only for the expertise you need,
+                keep your equity, and move at sprint pace. Here is what a
+                typical timeline looks like:
+              </p>
             </div>
 
             {/* Timeline */}
             <div>
-              <h3 className="text-lg font-bold mb-4">Sprint Timeline</h3>
+              <h3 className="text-lg font-bold mb-4">Typical Sprint Timeline</h3>
               <div className="space-y-3">
-                {MILESTONES.map((milestone, i) => (
+                {PHASES.map((phase, i) => (
                   <motion.div
-                    key={milestone.week}
+                    key={phase.week}
                     initial={{ opacity: 0, x: -20 }}
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true }}
@@ -1125,10 +1106,10 @@ function CaseStudySection() {
                     </div>
                     <div className="flex-1 flex items-center justify-between border-b border-muted pb-3">
                       <span className="text-sm font-medium text-foreground">
-                        {milestone.label}
+                        {phase.label}
                       </span>
                       <span className="text-xs font-mono text-muted-foreground">
-                        {milestone.week}
+                        {phase.week}
                       </span>
                     </div>
                   </motion.div>
@@ -1136,16 +1117,12 @@ function CaseStudySection() {
               </div>
             </div>
 
-            {/* Quote */}
+            {/* Honest framing */}
             <div className="border-l-4 border-international-orange pl-4">
-              <p className="text-sm text-foreground italic leading-relaxed">
-                &ldquo;We got a production-ready prototype in 9 weeks for a
-                quarter of what the traditional route would have cost. The
-                fractional team felt like our own — but better, because every
-                person was a senior specialist.&rdquo;
-              </p>
-              <p className="text-xs text-muted-foreground mt-2 font-semibold">
-                — Aero Dynamics Founder
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Timelines vary by project complexity. The fractional model works
+                because you get senior specialists from day one — no recruiting,
+                no ramp-up, no long-term commitments.
               </p>
             </div>
           </AnimatedSection>
@@ -1156,46 +1133,43 @@ function CaseStudySection() {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
- * SECTION 4 — SOCIAL PROOF
- * Builds trust with metrics and testimonial-style quotes.
+ * SECTION 4 — PLATFORM CAPABILITIES
+ * Shows real, verifiable platform metrics. No fabricated testimonials.
  * ════════════════════════════════════════════════════════════════════════ */
 
-function SocialProofSection() {
+function PlatformCapabilitiesSection() {
   const METRICS = [
     { value: "80+", label: "Manufacturing Techniques" },
-    { value: "12", label: "Weeks Avg. to Prototype" },
-    { value: "70%", label: "Cost Reduction vs. Traditional" },
-    { value: "3x", label: "Faster Iteration Cycles" },
+    { value: "100", label: "Founding Member Spots" },
+    { value: "10", label: "Engineering Categories" },
+    { value: "£0", label: "Equity Given Up" },
   ] as const;
 
-  const TESTIMONIALS = [
+  const VALUE_PROPS = [
     {
-      quote:
-        "We went from napkin sketch to functional prototype in 8 weeks. Our previous venture took 14 months to reach the same milestone with a full-time team.",
-      name: "Founding Member",
-      role: "Deep-Tech Founder",
-      rating: 5,
+      icon: UserCheck,
+      title: "Senior Specialists Only",
+      description:
+        "Every expert on the platform is vetted. No juniors, no generalists — only people who have shipped real hardware products.",
     },
     {
-      quote:
-        "The fractional model changed everything. I keep my equity, I get senior expertise, and I only pay for what I actually need. It's how hardware should work.",
-      name: "Founding Member",
-      role: "Hardware Startup CEO",
-      rating: 5,
+      icon: Shield,
+      title: "No Equity, No Lock-In",
+      description:
+        "Pay for expertise by the day or project. No equity stakes, no long-term contracts, no golden handcuffs.",
     },
     {
-      quote:
-        "As a fractional executive, I get to work on the most exciting hardware projects without the politics of a single company. The platform makes coordination seamless.",
-      name: "Founding Member",
-      role: "Fractional CTO",
-      rating: 5,
+      icon: Factory,
+      title: "Full Manufacturing Stack",
+      description:
+        "From 3D printing to CNC to injection moulding — access 80+ manufacturing techniques through one platform.",
     },
   ] as const;
 
   return (
     <section className="py-16 md:py-28 bg-background border-t border-muted">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        {/* Metrics bar */}
+        {/* Metrics bar — all verifiable */}
         <StaggerContainer className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 mb-16 md:mb-24">
           {METRICS.map((metric) => (
             <AnimatedCard
@@ -1212,42 +1186,36 @@ function SocialProofSection() {
           ))}
         </StaggerContainer>
 
-        {/* Testimonials */}
+        {/* Value propositions — not testimonials */}
         <AnimatedSection className="text-center mb-10">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
-            From Our Founding Members
+            The Founding Member Advantage
           </span>
           <h2 className="text-3xl sm:text-4xl font-black">
-            Real Results. Real People.
+            What You Get on Day One.
           </h2>
         </AnimatedSection>
 
         <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-          {TESTIMONIALS.map((testimonial, i) => (
-            <AnimatedCard
-              key={i}
-              className="border bg-card rounded-xl p-6 md:p-8 flex flex-col"
-            >
-              <Quote className="h-8 w-8 text-international-orange/30 mb-4" />
-              <p className="text-foreground text-sm leading-relaxed flex-1 mb-6">
-                &ldquo;{testimonial.quote}&rdquo;
-              </p>
-              <div className="flex items-center gap-1 mb-3">
-                {Array.from({ length: testimonial.rating }).map((_, j) => (
-                  <Star
-                    key={j}
-                    className="h-4 w-4 text-amber-400 fill-amber-400"
-                  />
-                ))}
-              </div>
-              <div>
-                <p className="font-semibold text-sm">{testimonial.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {testimonial.role}
+          {VALUE_PROPS.map((prop) => {
+            const Icon = prop.icon;
+            return (
+              <AnimatedCard
+                key={prop.title}
+                className="border bg-card rounded-xl p-6 md:p-8 flex flex-col"
+              >
+                <div className="h-12 w-12 rounded-full bg-international-orange/10 flex items-center justify-center mb-4">
+                  <Icon className="h-6 w-6 text-international-orange" />
+                </div>
+                <h3 className="text-foreground text-base font-bold mb-2">
+                  {prop.title}
+                </h3>
+                <p className="text-muted-foreground text-sm leading-relaxed flex-1">
+                  {prop.description}
                 </p>
-              </div>
-            </AnimatedCard>
-          ))}
+              </AnimatedCard>
+            );
+          })}
         </StaggerContainer>
       </div>
     </section>
