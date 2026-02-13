@@ -36,6 +36,7 @@ import {
     ShoppingBag,
     Flame,
     Boxes,
+    CalendarDays,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -61,7 +62,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 
 // Primary nav items shown in the bottom bar
 const mainNavigation = [
-    { name: "My Profile", shortName: "Profile", href: "/my-profile", icon: UserCircle },
+    { name: "Today", shortName: "Today", href: "/today", icon: CalendarDays },
     { name: "Updates", shortName: "Updates", href: "/updates", icon: Bell },
     { name: "Tasks", shortName: "Tasks", href: "/new-tasks", icon: CheckSquare },
 ]

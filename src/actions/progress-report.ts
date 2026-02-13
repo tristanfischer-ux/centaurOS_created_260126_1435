@@ -4,8 +4,9 @@
  * @file progress-report.ts
  * 
  * @description Server actions for generating weekly progress reports.
- * Creates a summary of objectives and tasks progress with AI-written
- * executive summary. Reports can be shared via public link.
+ * Creates a narrative summary of objectives and tasks progress with
+ * AI-written executive summary that references specific tasks, people,
+ * and context. Reports can be shared via public link.
  * 
  * @security All actions require authentication and enforce foundry isolation
  */
@@ -30,6 +31,19 @@ export interface ObjectiveProgress {
   health: 'on-track' | 'at-risk' | 'off-track' | 'completed'
 }
 
+export interface CompletedTaskDetail {
+  title: string
+  completedBy: string
+  objectiveTitle: string
+}
+
+export interface OverdueTaskDetail {
+  title: string
+  objectiveTitle: string
+  daysOverdue: number
+  assignedTo: string
+}
+
 export interface WeeklyDigest {
   weekStarting: string
   weekEnding: string
@@ -41,6 +55,9 @@ export interface WeeklyDigest {
   overallHealthTrend: 'improving' | 'stable' | 'declining'
   highlights: string[]
   concerns: string[]
+  nextWeekPriorities: string[]
+  completedTaskDetails: CompletedTaskDetail[]
+  overdueTaskDetails: OverdueTaskDetail[]
 }
 
 // ─── Generate Weekly Digest ───────────────────────────────────────
@@ -129,21 +146,71 @@ export async function generateWeeklyDigest(): Promise<{ data?: WeeklyDigest; err
       }
     })
 
-    // 3. Count tasks completed and created this week
-    const { count: tasksCompleted } = await supabase
+    // 3. Fetch completed tasks WITH titles and assignee names
+    const { data: completedTaskRows } = await supabase
       .from('tasks')
-      .select('*', { count: 'exact', head: true })
+      .select(`
+        id, title, objective_id,
+        profiles:assigned_to(full_name),
+        objectives:objective_id(title)
+      `)
       .eq('foundry_id', foundryId)
       .eq('status', 'Completed')
       .gte('updated_at', weekAgoStr)
+      .order('updated_at', { ascending: false })
+      .limit(30)
 
+    const completedTaskDetails: CompletedTaskDetail[] = (completedTaskRows || []).map((t) => ({
+      title: t.title || 'Untitled task',
+      completedBy: (t.profiles as unknown as { full_name: string } | null)?.full_name || 'Unknown',
+      objectiveTitle: (t.objectives as unknown as { title: string } | null)?.title || 'No objective',
+    }))
+    const tasksCompleted = completedTaskDetails.length
+
+    // 4. Fetch tasks created this week
     const { count: tasksCreated } = await supabase
       .from('tasks')
       .select('*', { count: 'exact', head: true })
       .eq('foundry_id', foundryId)
       .gte('created_at', weekAgoStr)
 
-    // 4. Determine overall health trend
+    // 5. Fetch overdue tasks with context
+    const { data: overdueTaskRows } = await supabase
+      .from('tasks')
+      .select(`
+        id, title, end_date, objective_id,
+        profiles:assigned_to(full_name),
+        objectives:objective_id(title)
+      `)
+      .eq('foundry_id', foundryId)
+      .neq('status', 'Completed')
+      .lt('end_date', todayStr)
+      .order('end_date', { ascending: true })
+      .limit(15)
+
+    const overdueTaskDetails: OverdueTaskDetail[] = (overdueTaskRows || []).map((t) => {
+      const dueDate = t.end_date ? new Date(t.end_date) : today
+      const daysOverdue = Math.max(1, Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)))
+      return {
+        title: t.title || 'Untitled task',
+        objectiveTitle: (t.objectives as unknown as { title: string } | null)?.title || 'No objective',
+        daysOverdue,
+        assignedTo: (t.profiles as unknown as { full_name: string } | null)?.full_name || 'Unassigned',
+      }
+    })
+
+    // 6. Fetch previous week stats for comparison
+    const twoWeeksAgo = new Date(weekAgo)
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 7)
+    const { count: prevWeekCompleted } = await supabase
+      .from('tasks')
+      .select('*', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId)
+      .eq('status', 'Completed')
+      .gte('updated_at', twoWeeksAgo.toISOString())
+      .lt('updated_at', weekAgoStr)
+
+    // 7. Determine overall health trend
     const totalImproved = objectiveProgress.filter(
       (o) => o.progress > o.previousProgress
     ).length
@@ -155,41 +222,79 @@ export async function generateWeeklyDigest(): Promise<{ data?: WeeklyDigest; err
     if (totalImproved > totalDeclined + 1) overallHealthTrend = 'improving'
     if (totalDeclined > totalImproved) overallHealthTrend = 'declining'
 
-    // 5. Generate AI executive summary
-    const progressSummary = objectiveProgress.map((o) =>
-      `- ${o.title}: ${o.progress}% (${o.health}), ${o.completedTasks}/${o.totalTasks} tasks done, ${o.overdueTasks} overdue`
-    ).join('\n')
+    // 8. Build rich context for AI
+    const completedTasksList = completedTaskDetails.length > 0
+      ? completedTaskDetails.map((t) =>
+        `  - "${t.title}" completed by ${t.completedBy} (for: ${t.objectiveTitle})`
+      ).join('\n')
+      : '  None'
 
+    const overdueTasksList = overdueTaskDetails.length > 0
+      ? overdueTaskDetails.map((t) =>
+        `  - "${t.title}" — ${t.daysOverdue} day${t.daysOverdue > 1 ? 's' : ''} overdue, assigned to ${t.assignedTo} (for: ${t.objectiveTitle})`
+      ).join('\n')
+      : '  None'
+
+    const objectiveNarratives = objectiveProgress.map((o) => {
+      const delta = o.progress - o.previousProgress
+      const deltaStr = delta > 0 ? `+${delta}pp this week` : delta < 0 ? `${delta}pp this week` : 'no change'
+      return `  - "${o.title}": ${o.progress}% (${deltaStr}), ${o.completedTasks}/${o.totalTasks} tasks done, ${o.overdueTasks} overdue — ${o.health}`
+    }).join('\n')
+
+    const velocityComparison = prevWeekCompleted !== null
+      ? `Last week: ${prevWeekCompleted} tasks completed. This week: ${tasksCompleted}. ${tasksCompleted > (prevWeekCompleted || 0) ? 'Velocity UP.' : tasksCompleted < (prevWeekCompleted || 0) ? 'Velocity DOWN.' : 'Steady pace.'}`
+      : ''
+
+    // 9. Generate AI executive summary with rich context
     let summary = ''
     const highlights: string[] = []
     const concerns: string[] = []
+    const nextWeekPriorities: string[] = []
 
     try {
       const model = genAI.getGenerativeModel({
         model: 'gemini-2.0-flash',
         generationConfig: {
-          temperature: 0.5,
-          maxOutputTokens: 500,
+          temperature: 0.6,
+          maxOutputTokens: 1000,
           responseMimeType: 'application/json',
         },
       })
 
-      const systemPrompt = `You write concise weekly progress summaries for startup founders. Be direct, factual, and actionable. No fluff.
+      const systemPrompt = `You are a sharp, insightful chief of staff writing a weekly progress briefing for a startup founder. You know every task, every person, every objective by name. Write like a trusted advisor — direct, specific, and actionable.
 
-Given objective progress data, respond with ONLY valid JSON:
+Rules:
+- Reference specific tasks and people BY NAME. Never say "several tasks were completed" — say WHO did WHAT.
+- Highlights should be specific wins ("Sarah finished the competitive analysis ahead of schedule") not vague ("good progress was made").
+- Concerns should name the problem AND suggest action ("The vendor contract is 5 days overdue — consider escalating to the CEO").
+- Next week priorities should be concrete and actionable ("Unblock the API integration by reviewing the vendor contract").
+- If velocity changed week-over-week, mention why (more tasks? fewer? blockers?).
+- Celebrate wins warmly but briefly. Flag risks early and clearly.
+
+Respond with ONLY valid JSON:
 {
-  "summary": "2-3 sentence executive summary of the week's progress",
-  "highlights": ["2-3 positive developments"],
-  "concerns": ["1-3 items needing attention, or empty array if none"]
+  "summary": "3-4 sentence executive narrative of the week. Start with the biggest win or most important development. Be specific — use names and numbers.",
+  "highlights": ["2-3 specific wins, referencing people and tasks by name"],
+  "concerns": ["1-3 items needing attention with suggested action, or empty array"],
+  "nextWeekPriorities": ["2-3 specific, actionable priorities for the coming week"]
 }`
 
-      const userPrompt = `Week: ${weekAgo.toLocaleDateString()} - ${today.toLocaleDateString()}
-Tasks completed: ${tasksCompleted || 0}
-Tasks created: ${tasksCreated || 0}
-Health trend: ${overallHealthTrend}
+      const userPrompt = `Week: ${weekAgo.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
 
-Objectives:
-${progressSummary || 'No active objectives'}`
+COMPLETED TASKS (${tasksCompleted} this week):
+${completedTasksList}
+
+NEW TASKS CREATED: ${tasksCreated || 0}
+
+OVERDUE TASKS (${overdueTaskDetails.length}):
+${overdueTasksList}
+
+${velocityComparison}
+
+OBJECTIVES:
+${objectiveNarratives || '  No active objectives'}
+
+Overall health trend: ${overallHealthTrend}`
 
       const result = await model.generateContent(`${systemPrompt}\n\n${userPrompt}`)
       const content = result.response.text()
@@ -198,10 +303,12 @@ ${progressSummary || 'No active objectives'}`
         summary = parsed.summary || ''
         highlights.push(...(parsed.highlights || []))
         concerns.push(...(parsed.concerns || []))
+        nextWeekPriorities.push(...(parsed.nextWeekPriorities || []))
       }
     } catch (err) {
       console.error('[ProgressReport] AI summary failed:', err instanceof Error ? err.message : 'Unknown')
-      summary = `This week: ${tasksCompleted || 0} tasks completed across ${objectiveProgress.length} objectives. Overall trend: ${overallHealthTrend}.`
+      const topCompleted = completedTaskDetails.slice(0, 3).map((t) => t.title).join(', ')
+      summary = `This week: ${tasksCompleted} tasks completed${topCompleted ? ` including ${topCompleted}` : ''} across ${objectiveProgress.length} objectives. ${overdueTaskDetails.length > 0 ? `${overdueTaskDetails.length} tasks are overdue.` : ''} Overall trend: ${overallHealthTrend}.`
     }
 
     return {
@@ -210,12 +317,15 @@ ${progressSummary || 'No active objectives'}`
         weekEnding: todayStr,
         summary,
         objectiveProgress,
-        tasksCompleted: tasksCompleted || 0,
+        tasksCompleted,
         tasksCreated: tasksCreated || 0,
         totalActiveObjectives: objectiveProgress.filter((o) => o.health !== 'completed').length,
         overallHealthTrend,
         highlights,
         concerns,
+        nextWeekPriorities,
+        completedTaskDetails,
+        overdueTaskDetails,
       },
     }
   }) as Promise<{ data?: WeeklyDigest; error?: string }>

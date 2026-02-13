@@ -21,10 +21,11 @@ import {
   AlertTriangle,
   Target,
   Loader2,
-  Share2,
   Sparkles,
   Calendar,
   Plus,
+  ArrowRight,
+  Copy,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -89,24 +90,43 @@ export function WeeklyDigestPanel({ className }: WeeklyDigestPanelProps): React.
   const handleCopyReport = useCallback(() => {
     if (!digest) return
 
-    const text = `Weekly Progress Report (${digest.weekStarting} - ${digest.weekEnding})
+    const weekRange = `${new Date(digest.weekStarting).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(digest.weekEnding).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
 
-${digest.summary}
+    const sections: string[] = [
+      `📊 Weekly Progress Report (${weekRange})`,
+      '',
+      digest.summary,
+      '',
+      `📈 Stats: ${digest.tasksCompleted} completed · ${digest.tasksCreated} created · Trend: ${digest.overallHealthTrend}`,
+    ]
 
-Objectives:
-${digest.objectiveProgress.map((o) =>
-  `- ${o.title}: ${o.progress}% (${o.completedTasks}/${o.totalTasks} tasks)`
-).join('\n')}
+    if (digest.objectiveProgress.length > 0) {
+      sections.push('', '🎯 Objectives:')
+      digest.objectiveProgress.forEach((o) => {
+        const delta = o.progress - o.previousProgress
+        const deltaStr = delta > 0 ? ` (+${delta}%)` : ''
+        sections.push(`  • ${o.title}: ${o.progress}%${deltaStr} — ${o.completedTasks}/${o.totalTasks} tasks`)
+      })
+    }
 
-Tasks completed: ${digest.tasksCompleted}
-Overall trend: ${digest.overallHealthTrend}
+    if (digest.highlights.length > 0) {
+      sections.push('', '✅ Highlights:')
+      digest.highlights.forEach((h) => sections.push(`  + ${h}`))
+    }
 
-${digest.highlights.length > 0 ? `Highlights:\n${digest.highlights.map((h) => `+ ${h}`).join('\n')}` : ''}
-${digest.concerns.length > 0 ? `\nConcerns:\n${digest.concerns.map((c) => `- ${c}`).join('\n')}` : ''}
+    if (digest.concerns.length > 0) {
+      sections.push('', '⚠️ Needs Attention:')
+      digest.concerns.forEach((c) => sections.push(`  - ${c}`))
+    }
 
-Powered by ForgeOS`
+    if (digest.nextWeekPriorities && digest.nextWeekPriorities.length > 0) {
+      sections.push('', '🎯 Focus Next Week:')
+      digest.nextWeekPriorities.forEach((p) => sections.push(`  → ${p}`))
+    }
 
-    navigator.clipboard.writeText(text)
+    sections.push('', '— Powered by ForgeOS')
+
+    navigator.clipboard.writeText(sections.join('\n'))
     toast.success('Report copied to clipboard')
   }, [digest])
 
@@ -123,7 +143,7 @@ Powered by ForgeOS`
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh]">
+        <DialogContent size="md" className="max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-international-orange" />
@@ -239,6 +259,23 @@ Powered by ForgeOS`
                   </div>
                 )}
 
+                {/* Next Week Priorities */}
+                {digest.nextWeekPriorities && digest.nextWeekPriorities.length > 0 && (
+                  <div className="bg-international-orange/5 rounded-lg p-4 border border-international-orange/10">
+                    <p className="text-xs font-mono uppercase tracking-widest text-international-orange mb-2">
+                      Focus next week
+                    </p>
+                    <ul className="space-y-1.5">
+                      {digest.nextWeekPriorities.map((p, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm">
+                          <ArrowRight className="h-3.5 w-3.5 text-international-orange mt-0.5 shrink-0" />
+                          <span className="text-foreground font-medium">{p}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {/* ForgeOS Branding */}
                 <div className="text-center pt-2 border-t border-muted">
                   <p className="text-[10px] text-muted-foreground">
@@ -258,8 +295,8 @@ Powered by ForgeOS`
                 onClick={handleCopyReport}
                 className="gap-1.5"
               >
-                <Share2 className="h-4 w-4" />
-                Copy Report
+                <Copy className="h-4 w-4" />
+                Share Report
               </Button>
             </DialogFooter>
           )}

@@ -46,6 +46,7 @@ import {
     UserSearch,
     Settings,
     LogOut,
+    CalendarDays,
 } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
@@ -79,6 +80,7 @@ const APP_VERSION = "0.9.0"
 // Section 1: "Me" — Personal pages
 // ─────────────────────────────────────────────────────────────────────────────
 const meNavigation = [
+    { name: "Today", href: "/today", icon: CalendarDays, tooltip: "Your personalized daily focus — tasks, risks, and wins" },
     { name: "My Profile", href: "/my-profile", icon: UserCircle, tooltip: "Your profile, companies, and marketplace presence" },
     { name: "Updates", href: "/updates", icon: Bell, tooltip: "Notes, comments, and changes across tasks and objectives" },
 ]
@@ -214,7 +216,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
             {/* App Header — ForgeOS Branding */}
             <div className="px-5 pt-8 pb-4">
                 <div className="flex items-center justify-between">
-                    <Link href="/updates" className="group flex items-center gap-2">
+                    <Link href="/today" className="group flex items-center gap-2">
                         <span className="font-display text-2xl font-bold tracking-[0.05em] text-foreground group-hover:text-international-orange transition-colors">
                             ForgeOS
                         </span>
