@@ -197,6 +197,9 @@ environment variables (`NEXT_PUBLIC_BASE_URL` / `VERCEL_URL`) while forwarding u
 
 - Internal execution URL now derives from `request.nextUrl.origin`.
 - Removed environment-based base URL selection for the delegated execution call.
+- Matching server action hardening in `src/actions/run-specialist-council.ts`:
+  - resolves host/protocol from request headers with validation
+  - removes env-based URL routing for cookie-forwarded council API call.
 - Added regression guard in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 

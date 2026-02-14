@@ -13,7 +13,7 @@
 
 'use server'
 
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
@@ -69,6 +69,26 @@ export type CouncilActionResult =
     | { success: true; data: CouncilResult }
     | { success: false; error: string }
 
+function isValidHostHeader(host: string): boolean {
+    return /^[a-zA-Z0-9.-]+(?::\d+)?$/.test(host)
+}
+
+async function resolveInternalBaseUrl(): Promise<string | null> {
+    const headerStore = await headers()
+    const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host')
+    const protocol = headerStore.get('x-forwarded-proto') ?? (host?.includes('localhost') ? 'http' : 'https')
+
+    if (!host || !isValidHostHeader(host)) {
+        return null
+    }
+
+    if (protocol !== 'http' && protocol !== 'https') {
+        return null
+    }
+
+    return `${protocol}://${host}`
+}
+
 /**
  * Runs a Specialist Council debate and returns the results.
  *
@@ -101,18 +121,17 @@ export async function runSpecialistCouncil(
 
     try {
         // Call the council API (forward cookies so execute sub-requests are authenticated)
-        const baseUrl =
-            process.env.NEXT_PUBLIC_BASE_URL ||
-            (typeof process.env.VERCEL_URL === 'string'
-                ? `https://${process.env.VERCEL_URL}`
-                : 'http://localhost:3000')
+        const baseUrl = await resolveInternalBaseUrl()
+        if (!baseUrl) {
+            return { success: false, error: 'Unable to resolve internal API host' }
+        }
         const cookieStore = await cookies()
         const cookieHeader = cookieStore
             .getAll()
             .map((c) => `${c.name}=${c.value}`)
             .join('; ')
 
-        const response = await fetch(`${baseUrl}/api/agents/council`, {
+        const response = await fetch(new URL('/api/agents/council', baseUrl), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

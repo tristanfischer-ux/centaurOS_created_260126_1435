@@ -237,8 +237,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'No foundry found' }, { status: 404 })
         }
 
-        const foundryId = foundryMember.foundry_id
-
         // Parse request
         const body = await request.json()
         const { topic } = body

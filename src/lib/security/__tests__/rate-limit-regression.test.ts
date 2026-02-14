@@ -120,4 +120,15 @@ describe('internal API egress hardening regressions', () => {
     expect(source).not.toContain('process.env.NEXT_PUBLIC_BASE_URL')
     expect(source).not.toContain('process.env.VERCEL_URL')
   })
+
+  it('derives council server-action API host from request headers, not environment', async () => {
+    const actionPath = path.join(process.cwd(), 'src/actions/run-specialist-council.ts')
+    const source = await readFile(actionPath, 'utf-8')
+
+    expect(source).toContain("const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host')")
+    expect(source).toContain("new URL('/api/agents/council', baseUrl)")
+    expect(source).toContain('isValidHostHeader')
+    expect(source).not.toContain('process.env.NEXT_PUBLIC_BASE_URL')
+    expect(source).not.toContain('process.env.VERCEL_URL')
+  })
 })
