@@ -35,7 +35,7 @@ const ROLES = [
     ],
     cta: "Start as Founder",
     href: "/join/founder",
-    image: "/images/centaur-founder.png",
+    image: "/images/marketing/role-founder.png",
     accentBg: "bg-orange-100",
     accentText: "text-international-orange",
     accentBorder: "border-international-orange",
