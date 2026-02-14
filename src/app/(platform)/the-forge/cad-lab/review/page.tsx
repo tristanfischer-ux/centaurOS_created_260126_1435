@@ -9,17 +9,18 @@
  * Gate: redirects to /the-forge/cad-lab/build if no generated modules.
  */
 
-import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   ClipboardCheck,
   ArrowLeft,
   CheckCircle2,
   Download,
+  Box,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { EmptyState } from "@/components/ui/empty-state"
 import { CadLabReviewPackage } from "@/components/cad/cad-lab-review-package"
 import { CadLabPeople } from "@/components/cad/cad-lab-people"
 
@@ -32,14 +33,23 @@ export default function CadLabReviewPage(): React.ReactNode {
     editableReport, diagnosticAnswers,
   } = useCadLab()
 
-  // Gate: need at least one generated module
-  useEffect(() => {
-    if (generatedModuleCount === 0) {
-      router.replace("/the-forge/cad-lab/build")
-    }
-  }, [generatedModuleCount, router])
-
-  if (generatedModuleCount === 0) return null
+  // Show empty state instead of redirect
+  if (generatedModuleCount === 0) {
+    return (
+      <div className="py-12">
+        <EmptyState
+          title="No modules generated yet"
+          description="Generate at least one module in the Build stage to create a supplier-ready review package with expert discipline recommendations."
+          action={
+            <Button onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
+              <Box className="h-4 w-4" />
+              Go to Build
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
