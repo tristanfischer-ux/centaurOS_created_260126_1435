@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runSweepOrchestration } from '@/lib/agents/sweep-orchestrator'
+import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 
 /**
  * Verifies the cron secret to prevent unauthorized access.
@@ -50,6 +51,12 @@ function verifyCronSecret(req: NextRequest): NextResponse | null {
  * orchestration and returns aggregated results.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  const ip = getClientIP(req.headers)
+  const ipLimit = await rateLimit('webhook', `cron-agent-sweep:${ip}`)
+  if (!ipLimit.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   // AUTH: Verify cron authorization
   const authFailure = verifyCronSecret(req)
   if (authFailure) {

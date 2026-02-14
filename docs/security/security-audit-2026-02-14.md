@@ -239,6 +239,10 @@ non-production environments.
   - `src/app/api/cron/weekly-synthesis/route.ts`
   - `src/app/api/cron/agent-sweep/route.ts`
   - `src/app/api/cron/telegram-briefings/route.ts`
+- Added webhook-class IP throttling to cron entry points:
+  - key prefixes: `cron-morning-brief`, `cron-daily-reports`,
+    `cron-weekly-synthesis`, `cron-agent-sweep`, `cron-telegram-briefings`
+  - returns `429` on exhaustion before auth checks.
 - Unauthorized requests now consistently return 401 when secret mismatch.
 - Added regression assertion covering all four routes in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
@@ -300,6 +304,8 @@ service-unavailable behavior.
 
 - `verifyWebhookAuth(...)` now fail-closes with 503 when no `WEBHOOK_SECRET`/`CRON_SECRET` is configured.
 - Unauthorized requests continue to return 401 on secret mismatch.
+- Added webhook IP throttling (`sweep-trigger:${ip}`) with explicit `429`
+  responses on exhaustion.
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
@@ -707,6 +713,7 @@ The test suite enforces:
 15. Google OAuth signed-state validation and callback foundry-membership enforcement.
 16. Telegram linking settings routes use shared admin client helper and status-check throttling.
 17. Security typecheck scope includes reports actions that enforce Slack webhook validation.
+18. Cron and sweep-trigger ingress paths enforce IP-based webhook throttling.
 
 ---
 

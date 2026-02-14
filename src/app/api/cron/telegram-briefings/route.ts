@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { sendDailyBriefings } from '@/lib/telegram/notification-bridge'
+import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 
 // Verify cron secret to prevent unauthorized access
 function verifyCronSecret(req: NextRequest): NextResponse | null {
@@ -37,6 +38,12 @@ function verifyCronSecret(req: NextRequest): NextResponse | null {
 }
 
 export async function GET(req: NextRequest) {
+    const ip = getClientIP(req.headers)
+    const ipLimit = await rateLimit('webhook', `cron-telegram-briefings:${ip}`)
+    if (!ipLimit.success) {
+        return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
     // Verify authorization
     const authFailure = verifyCronSecret(req)
     if (authFailure) {

@@ -19,6 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { executeSingleSweep } from '@/lib/agents/sweep-orchestrator'
+import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -111,6 +112,12 @@ function verifyWebhookAuth(req: NextRequest): NextResponse | null {
  * determines which specialists should run, and dispatches targeted sweeps.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const ip = getClientIP(req.headers)
+  const ipLimit = await rateLimit('webhook', `sweep-trigger:${ip}`)
+  if (!ipLimit.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   // AUTH: Verify webhook authorization
   const authFailure = verifyWebhookAuth(req)
   if (authFailure) {

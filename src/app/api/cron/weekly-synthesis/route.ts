@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runWeeklySynthesis } from '@/lib/agents/sweep-synthesis'
+import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 
 /**
  * Verifies the cron secret to prevent unauthorized access.
@@ -49,6 +50,12 @@ function verifyCronSecret(req: NextRequest): NextResponse | null {
  * Cal produces unified executive briefs for all active foundries.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  const ip = getClientIP(req.headers)
+  const ipLimit = await rateLimit('webhook', `cron-weekly-synthesis:${ip}`)
+  if (!ipLimit.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   // AUTH: Verify cron authorization
   const authFailure = verifyCronSecret(req)
   if (authFailure) {

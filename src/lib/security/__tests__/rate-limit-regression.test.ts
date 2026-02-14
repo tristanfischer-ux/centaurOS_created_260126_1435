@@ -132,6 +132,23 @@ describe('cron authorization hardening regressions', () => {
     }
   })
 
+  it('rate limits cron endpoints before authorization checks', async () => {
+    const assertions: Array<{ routePath: string; keyPrefix: string }> = [
+      { routePath: 'src/app/api/cron/morning-brief/route.ts', keyPrefix: 'cron-morning-brief' },
+      { routePath: 'src/app/api/cron/reports/daily/route.ts', keyPrefix: 'cron-daily-reports' },
+      { routePath: 'src/app/api/cron/weekly-synthesis/route.ts', keyPrefix: 'cron-weekly-synthesis' },
+      { routePath: 'src/app/api/cron/agent-sweep/route.ts', keyPrefix: 'cron-agent-sweep' },
+      { routePath: 'src/app/api/cron/telegram-briefings/route.ts', keyPrefix: 'cron-telegram-briefings' },
+    ]
+
+    for (const { routePath, keyPrefix } of assertions) {
+      const source = await readFile(path.join(process.cwd(), routePath), 'utf-8')
+      expect(source).toContain('getClientIP(')
+      expect(source).toContain(`await rateLimit('webhook', \`${keyPrefix}:\${ip}\``)
+      expect(source).toContain("return NextResponse.json({ error: 'Too many requests' }, { status: 429 })")
+    }
+  })
+
   it('fails closed for sweep-trigger webhook auth when secrets are missing', async () => {
     const sweepTriggerPath = path.join(process.cwd(), 'src/app/api/agents/sweep-trigger/route.ts')
     const source = await readFile(sweepTriggerPath, 'utf-8')
@@ -139,6 +156,8 @@ describe('cron authorization hardening regressions', () => {
     expect(source).toContain('if (!webhookSecret)')
     expect(source).toContain("return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 })")
     expect(source).toContain('const authFailure = verifyWebhookAuth(req)')
+    expect(source).toContain("await rateLimit('webhook', `sweep-trigger:${ip}`)")
+    expect(source).toContain("return NextResponse.json({ error: 'Too many requests' }, { status: 429 })")
   })
 
   it('fails closed for telegram webhook route and guards GET status endpoint', async () => {

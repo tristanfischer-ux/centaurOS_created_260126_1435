@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { runMorningBriefing } from '@/lib/agents/morning-brief'
+import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +60,12 @@ function verifyCronSecret(request: Request): NextResponse | null {
  * @security Requires CRON_SECRET bearer authentication
  */
 export async function GET(request: Request) {
+  const ip = getClientIP(request.headers)
+  const ipLimit = await rateLimit('webhook', `cron-morning-brief:${ip}`)
+  if (!ipLimit.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   const authFailureResponse = verifyCronSecret(request)
   if (authFailureResponse) {
     return authFailureResponse

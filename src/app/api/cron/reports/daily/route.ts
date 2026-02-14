@@ -22,6 +22,7 @@ import {
     formatDailyPulseForTelegram,
     formatDailyPulseForSlack
 } from '@/lib/reports'
+import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 import { isValidSlackWebhookUrl, sanitizeUrlForLogging } from '@/lib/security/url-validation'
 
 // Get admin client for cron operations
@@ -57,6 +58,12 @@ function verifyCronSecret(req: NextRequest): NextResponse | null {
 }
 
 export async function GET(req: NextRequest) {
+    const ip = getClientIP(req.headers)
+    const ipLimit = await rateLimit('webhook', `cron-daily-reports:${ip}`)
+    if (!ipLimit.success) {
+        return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
     // Verify authorization
     const authFailure = verifyCronSecret(req)
     if (authFailure) {
