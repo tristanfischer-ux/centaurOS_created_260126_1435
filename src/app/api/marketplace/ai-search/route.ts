@@ -93,23 +93,7 @@ interface AISearchRequest {
     query: string;
 }
 
-// Response types
-interface AISearchSuccessResponse {
-    success: true;
-    filters: MarketplaceFilters;
-    explanation: string;
-    confidence: "high" | "medium" | "low";
-    alternativeCategories?: Array<"People" | "Products" | "Services">;
-}
-
-interface AISearchErrorResponse {
-    success: false;
-    error: string;
-}
-
-type AISearchResponse = AISearchSuccessResponse | AISearchErrorResponse;
-
-export async function POST(req: NextRequest): Promise<NextResponse<AISearchResponse>> {
+export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
         // SECURITY: Fail closed when OpenAI key is not configured.
         if (!process.env.OPENAI_API_KEY) {

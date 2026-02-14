@@ -228,7 +228,7 @@ export async function POST(request: NextRequest) {
 
         // Get user's foundry
         const { data: foundryMember } = await supabase
-            .from('foundry_members')
+            .from('foundry_memberships')
             .select('foundry_id, role')
             .eq('user_id', user.id)
             .single()

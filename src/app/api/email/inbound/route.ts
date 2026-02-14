@@ -147,6 +147,41 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         payload.text || payload.html || ''
     ).substring(0, 2000)
 
+    // Resolve objective context (tasks.objective_id is required by schema)
+    let objectiveId: string | null = null
+
+    const { data: defaultObjective } = await admin
+        .from('objectives')
+        .select('id')
+        .eq('foundry_id', profile.foundry_id)
+        .eq('title', 'No objective set')
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle()
+
+    objectiveId = defaultObjective?.id ?? null
+
+    if (!objectiveId) {
+        const { data: fallbackObjective } = await admin
+            .from('objectives')
+            .select('id')
+            .eq('foundry_id', profile.foundry_id)
+            .eq('is_ghost', false)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        objectiveId = fallbackObjective?.id ?? null
+    }
+
+    if (!objectiveId) {
+        return NextResponse.json(
+            { error: 'No objectives available for task creation' },
+            { status: 400 }
+        )
+    }
+
     // Create the task
     const { data: task, error: taskError } = await admin
         .from('tasks')
@@ -154,6 +189,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             foundry_id: profile.foundry_id,
             title,
             description: description || null,
+            objective_id: objectiveId,
             creator_id: profile.id,
             assignee_id: profile.id,
             status: 'Pending',

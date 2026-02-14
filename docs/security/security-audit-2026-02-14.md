@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 21 | 19 fixed, 2 open |
+| Medium | 22 | 20 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -187,6 +187,10 @@ This audit reviewed the application security posture across:
   - `Security Type Check`
 
 This introduces a hard gate for key security surfaces while broader type debt is addressed separately.
+
+Scope now includes additional hardened AI and webhook routes/actions (including
+advisory AI server actions, council/sweep/telegram routes, and voice-to-task)
+to prevent regressions from bypassing compile-time checks.
 
 ---
 
@@ -504,6 +508,29 @@ shared-source webhook scenarios.
 - Increased profile lookup limit to 2 and fail-closed unless **exactly one** match is found.
 - Preserved sender-email ownership enforcement before task creation.
 - Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 26) Voice/email task creation paths did not enforce required objective context (Medium)
+
+**Issue:** `tasks.objective_id` is mandatory in schema, but voice/email task creation flows
+did not guarantee objective resolution before inserts.  
+**Impact:** Runtime insert failures could be triggered via normal webhook/API usage, reducing
+availability and reliability of automated task ingestion.
+
+**Fix implemented:**
+
+- `src/app/api/voice-to-task/route.ts`
+  - resolves objective in this order:
+    1. foundry objective titled `"No objective set"` (when present)
+    2. most recent non-ghost, non-deleted objective in foundry
+  - fails closed with `400` when no objective exists.
+  - inserts `objective_id` explicitly for created tasks.
+- `src/app/api/email/inbound/route.ts`
+  - mirrors the same objective resolution and fail-closed behavior
+  - inserts `objective_id` explicitly on webhook-created tasks.
+- Added regression assertions in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
 ---

@@ -387,4 +387,26 @@ describe('email inbound webhook hardening regressions', () => {
     expect(source).toContain('.limit(2)')
     expect(source).toContain('profiles.length !== 1')
   })
+
+  it('resolves objective context before creating tasks from inbound email', async () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/email/inbound/route.ts')
+    const source = await readFile(routePath, 'utf-8')
+
+    expect(source).toContain(".from('objectives')")
+    expect(source).toContain(".eq('title', 'No objective set')")
+    expect(source).toContain('objective_id: objectiveId')
+    expect(source).toContain('No objectives available for task creation')
+  })
+})
+
+describe('voice-to-task objective enforcement regressions', () => {
+  it('resolves objective context before creating voice tasks', async () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/voice-to-task/route.ts')
+    const source = await readFile(routePath, 'utf-8')
+
+    expect(source).toContain(".from('objectives')")
+    expect(source).toContain(".eq('title', 'No objective set')")
+    expect(source).toContain('objective_id: objectiveId')
+    expect(source).toContain('No objectives available for task creation')
+  })
 })

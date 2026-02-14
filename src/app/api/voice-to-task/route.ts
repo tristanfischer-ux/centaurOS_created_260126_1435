@@ -166,7 +166,42 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'User not associated with a foundry' }, { status: 403 });
         }
 
-        // 4. Resolve Assignee ID
+        // 4. Resolve objective context (tasks.objective_id is required by schema)
+        let objectiveId: string | null = null
+
+        const { data: defaultObjective } = await supabase
+            .from('objectives')
+            .select('id')
+            .eq('foundry_id', profile.foundry_id)
+            .eq('title', 'No objective set')
+            .is('deleted_at', null)
+            .limit(1)
+            .maybeSingle()
+
+        objectiveId = defaultObjective?.id ?? null
+
+        if (!objectiveId) {
+            const { data: firstObjective } = await supabase
+                .from('objectives')
+                .select('id')
+                .eq('foundry_id', profile.foundry_id)
+                .eq('is_ghost', false)
+                .is('deleted_at', null)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+
+            objectiveId = firstObjective?.id ?? null
+        }
+
+        if (!objectiveId) {
+            return NextResponse.json(
+                { error: 'No objectives available for task creation' },
+                { status: 400 }
+            )
+        }
+
+        // 5. Resolve Assignee ID
         let assigneeId = null; // Default unassigned
 
         if (taskData.assignee_type === "Self") {
@@ -190,12 +225,13 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 5. Create Task in DB (foundry_id from step 3)
+        // 6. Create Task in DB (foundry_id from step 3)
         const { data: newTask, error } = await supabase
             .from("tasks")
             .insert({
                 title: taskData.title,
                 description: `${taskData.description}\n\n[Transcript]: ${transcriptText}`,
+                objective_id: objectiveId,
                 creator_id: user.id,
                 foundry_id: profile.foundry_id,
                 assignee_id: assigneeId,
