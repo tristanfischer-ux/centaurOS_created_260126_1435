@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 17 | 15 fixed, 2 open |
+| Medium | 18 | 16 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -415,6 +415,25 @@ resource contention.
   - limit: `30`
   - window: `60 * 60 * 1000` (1 hour)
 - Added explicit `429` response on limit exhaustion.
+- Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 22) QA test trigger endpoint lacked abuse throttling and used env-derived callback base URL (Medium)
+
+**Issue:** `POST /api/admin/qa-tests` allowed repeated workflow dispatches without
+trigger throttling and built callback URLs from environment-derived base URLs.  
+**Impact:** Increased GitHub Actions abuse/cost risk and potential callback misrouting under env misconfiguration.
+
+**Fix implemented (`src/app/api/admin/qa-tests/route.ts`):**
+
+- Added per-admin trigger throttling:
+  - key: `qa-tests-trigger:${user.id}`
+  - limit: `10`
+  - window: `60 * 60 * 1000` (1 hour)
+- Derived callback URL from `request.nextUrl.origin` instead of environment base URL.
+- Added fail-closed `QA_CALLBACK_SECRET` configuration guard before dispatch.
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 

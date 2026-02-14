@@ -321,3 +321,15 @@ describe('cad-lab generation abuse-control regressions', () => {
     expect(source).toContain('{ status: 429 }')
   })
 })
+
+describe('qa test trigger hardening regressions', () => {
+  it('rate limits admin QA triggers and derives callback URL from request origin', async () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/admin/qa-tests/route.ts')
+    const source = await readFile(routePath, 'utf-8')
+
+    expect(source).toContain("await rateLimit('api', `qa-tests-trigger:${user.id}`")
+    expect(source).toContain('window: 60 * 60 * 1000')
+    expect(source).toContain("new URL('/api/admin/qa-tests/callback', request.nextUrl.origin)")
+    expect(source).toContain('if (!process.env.QA_CALLBACK_SECRET)')
+  })
+})
