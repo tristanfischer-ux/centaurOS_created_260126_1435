@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 7 | 5 fixed, 2 open |
+| Medium | 8 | 6 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -201,6 +201,20 @@ environment variables (`NEXT_PUBLIC_BASE_URL` / `VERCEL_URL`) while forwarding u
   - resolves host/protocol from request headers with validation
   - removes env-based URL routing for cookie-forwarded council API call.
 - Added regression guard in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 11) QA callback metadata endpoint exposed unauthenticated readiness details (Medium)
+
+**Issue:** `GET /api/admin/qa-tests/callback` returned readiness metadata without secret validation.  
+**Impact:** Unauthenticated callers could confirm callback endpoint presence and liveness.
+
+**Fix implemented (`src/app/api/admin/qa-tests/callback/route.ts`):**
+
+- Added shared `verifyQaCallbackSecret(...)` guard.
+- Applied guard to both `POST` and `GET` handlers.
+- Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
 ---

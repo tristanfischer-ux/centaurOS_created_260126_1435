@@ -77,6 +77,19 @@ describe('cron authorization hardening regressions', () => {
     expect(source).toContain('isValidSlackWebhookUrl(pref.slack_webhook_url)')
     expect(source).toContain("redirect: 'error'")
   })
+
+  it('requires QA callback secret for both POST and GET handlers', async () => {
+    const qaCallbackRoutePath = path.join(
+      process.cwd(),
+      'src/app/api/admin/qa-tests/callback/route.ts'
+    )
+    const source = await readFile(qaCallbackRoutePath, 'utf-8')
+
+    expect(source).toContain('function verifyQaCallbackSecret')
+    expect(source).toContain('const authFailureResponse = verifyQaCallbackSecret(request)')
+    expect(source).toContain('if (authFailureResponse)')
+    expect(source).toContain('export async function GET(request: NextRequest)')
+  })
 })
 
 describe('message attachment authorization regressions', () => {

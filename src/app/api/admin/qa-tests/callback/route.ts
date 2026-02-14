@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { QATestWebhookPayload, QATestResults } from '@/types/qa.types'
 
+function verifyQaCallbackSecret(request: NextRequest): NextResponse | null {
+  const callbackSecret = process.env.QA_CALLBACK_SECRET
+  if (!callbackSecret) {
+    console.error('[QACallback] QA_CALLBACK_SECRET not configured — rejecting all requests')
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+  }
+
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${callbackSecret}`) {
+    console.warn('[QACallback] Invalid or missing authorization header')
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  return null
+}
+
 /**
  * POST /api/admin/qa-tests/callback
  * Webhook endpoint for GitHub Actions to report test results.
@@ -11,17 +27,10 @@ import type { QATestWebhookPayload, QATestResults } from '@/types/qa.types'
  */
 export async function POST(request: NextRequest) {
   try {
-    // SECURITY: Verify webhook secret before processing any data
-    const callbackSecret = process.env.QA_CALLBACK_SECRET
-    if (!callbackSecret) {
-      console.error('[QACallback] QA_CALLBACK_SECRET not configured — rejecting all requests')
-      return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
-    }
-
-    const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${callbackSecret}`) {
-      console.warn('[QACallback] Invalid or missing authorization header')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // SECURITY: Verify webhook secret before processing any data.
+    const authFailureResponse = verifyQaCallbackSecret(request)
+    if (authFailureResponse) {
+      return authFailureResponse
     }
 
     // Get test run ID from query params
@@ -94,6 +103,12 @@ export async function POST(request: NextRequest) {
 
 // Also support GET for verification
 export async function GET(request: NextRequest) {
+  // SECURITY: Keep callback metadata endpoint private behind callback secret.
+  const authFailureResponse = verifyQaCallbackSecret(request)
+  if (authFailureResponse) {
+    return authFailureResponse
+  }
+
   return NextResponse.json({ 
     message: 'QA Test callback endpoint',
     status: 'ready',
