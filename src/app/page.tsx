@@ -88,10 +88,26 @@ export default function MarketingPage() {
   const [navScrolled, setNavScrolled] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => setNavScrolled(window.scrollY > 20);
+    const handleScroll = () => {
+      setNavScrolled(window.scrollY > 20);
+      // Close mobile menu on scroll for better UX
+      if (mobileMenuOpen) setMobileMenuOpen(false);
+    };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [mobileMenuOpen]);
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -193,59 +209,72 @@ export default function MarketingPage() {
         {/* Mobile Menu */}
         <AnimatePresence>
           {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="md:hidden border-t border-muted bg-background overflow-hidden"
-            >
-              <div className="px-4 sm:px-6 py-4 flex flex-col gap-1">
-                {/* CTA first — always visible without scrolling */}
-                <Link
-                  href="/join/founder"
-                  className="mb-3 bg-international-orange hover:bg-international-orange-hover text-white py-3.5 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] flex items-center justify-center"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Get Started Free
-                </Link>
-                {[
-                  { href: "#problem", label: "Why Us" },
-                  { href: "#solution", label: "Solution" },
-                  { href: "#how-it-works", label: "Getting Started" },
-                  { href: "#faq", label: "FAQ" },
-                ].map((item) => (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50 last:border-b-0"
+            <>
+              {/* Backdrop overlay — tap to close */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="md:hidden fixed inset-0 top-[calc(env(safe-area-inset-top)+56px)] bg-foreground/20 backdrop-blur-[2px] z-[-1]"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-hidden="true"
+              />
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="md:hidden border-t border-muted bg-background overflow-hidden shadow-lg"
+              >
+                <div className="px-4 sm:px-6 py-4 flex flex-col gap-1">
+                  {/* CTA first — always visible without scrolling */}
+                  <Link
+                    href="/join/founder"
+                    className="mb-3 bg-international-orange hover:bg-international-orange-hover text-white py-3.5 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] flex items-center justify-center"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    {item.label}
+                    Get Started Free
+                  </Link>
+                  {[
+                    { href: "#problem", label: "Why Us" },
+                    { href: "#solution", label: "Solution" },
+                    { href: "#how-it-works", label: "Getting Started" },
+                    { href: "#faq", label: "FAQ" },
+                  ].map((item) => (
+                    <a
+                      key={item.href}
+                      href={item.href}
+                      className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50 last:border-b-0"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      {item.label}
+                    </a>
+                  ))}
+                  <Link
+                    href="/techniques"
+                    className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Techniques
+                  </Link>
+                  <Link
+                    href="/pricing"
+                    className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Pricing
+                  </Link>
+                  <a
+                    href={`${APP_DOMAIN}/login`}
+                    className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Login
                   </a>
-                ))}
-                <Link
-                  href="/techniques"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Techniques
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Pricing
-                </Link>
-                <a
-                  href={`${APP_DOMAIN}/login`}
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Login
-                </a>
-              </div>
-            </motion.div>
+                </div>
+              </motion.div>
+            </>
           )}
         </AnimatePresence>
       </nav>
@@ -418,12 +447,13 @@ function HeroSection() {
     },
   ];
 
+  // Slower image cycling on mobile to reduce battery drain and visual noise
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % heroImages.length);
-    }, 5000);
+    }, isMobile ? 8000 : 5000);
     return () => clearInterval(interval);
-  }, [heroImages.length]);
+  }, [heroImages.length, isMobile]);
 
   return (
     <section className="relative min-h-[85vh] sm:min-h-[90vh] md:min-h-screen flex items-center justify-center overflow-hidden bg-background pt-20 sm:pt-16">
@@ -589,7 +619,7 @@ function HeroSection() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2, duration: 0.6 }}
-          className="mt-8 md:mt-12 text-xs text-muted-foreground font-mono tracking-wider"
+          className="mt-6 sm:mt-8 md:mt-12 text-xs text-muted-foreground font-mono tracking-wider"
         >
           Shipping weekly. Shaped by founding members.
         </motion.p>
@@ -759,7 +789,7 @@ function SavingsCalculatorSection() {
   return (
     <section
       id="calculator"
-      className="py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20"
+      className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
@@ -801,7 +831,7 @@ function SavingsCalculatorSection() {
                   max={15}
                   value={teamSize}
                   onChange={(e) => setTeamSize(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md"
+                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
                   aria-label={`Team size: ${teamSize} engineers`}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -831,7 +861,7 @@ function SavingsCalculatorSection() {
                   step={500}
                   value={monthlyCost}
                   onChange={(e) => setMonthlyCost(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md"
+                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
                   aria-label={`Monthly cost per engineer: £${monthlyCost.toLocaleString()}`}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -860,7 +890,7 @@ function SavingsCalculatorSection() {
                   max={24}
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md"
+                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
                   aria-label={`Project duration: ${duration} months`}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -1536,7 +1566,7 @@ function PricingPreviewSection() {
               <motion.div whileHover={buttonHover} whileTap={buttonTap}>
                 <Link
                   href={tier.href}
-                  className={`block text-center py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] flex items-center justify-center ${
+                  className={`flex items-center justify-center py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] ${
                     tier.highlight
                       ? "bg-international-orange hover:bg-international-orange-hover text-white"
                       : "bg-muted hover:bg-secondary active:bg-secondary text-foreground"
