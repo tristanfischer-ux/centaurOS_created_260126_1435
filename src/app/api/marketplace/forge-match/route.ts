@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { Database } from '@/types/database.types'
 import { rateLimit } from '@/lib/security/rate-limit'
-import { aiGuard } from '@/lib/ai/guard'
 
 // SECURITY: Zod schema for input validation
 const ForgeMatchRequestSchema = z.object({
@@ -12,12 +10,6 @@ const ForgeMatchRequestSchema = z.object({
 })
 
 // Types for the API
-type Profile = Database['public']['Tables']['profiles']['Row']
-type MarketplaceListing = Database['public']['Tables']['marketplace_listings']['Row']
-
-interface ForgeMatchRequest {
-    memberId: string
-}
 
 interface AISuggestion {
     listingId: string
@@ -48,6 +40,15 @@ export async function POST(
     request: NextRequest
 ): Promise<NextResponse<ForgeMatchResponse | ErrorResponse>> {
     try {
+        // SECURITY: Fail closed when OpenAI key is not configured.
+        if (!process.env.OPENAI_API_KEY) {
+            console.error('[ForgeMatchAPI] OPENAI_API_KEY is not configured')
+            return NextResponse.json(
+                { error: 'Forge matching service is not configured' },
+                { status: 503 }
+            )
+        }
+
         // Create Supabase client and authenticate
         const supabase = await createClient()
         const { data: { user }, error: authError } = await supabase.auth.getUser()

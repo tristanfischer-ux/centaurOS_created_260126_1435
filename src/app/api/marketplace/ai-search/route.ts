@@ -100,6 +100,15 @@ type AISearchResponse = AISearchSuccessResponse | AISearchErrorResponse;
 
 export async function POST(req: NextRequest): Promise<NextResponse<AISearchResponse>> {
     try {
+        // SECURITY: Fail closed when OpenAI key is not configured.
+        if (!process.env.OPENAI_API_KEY) {
+            console.error('[AISearchAPI] OPENAI_API_KEY is not configured')
+            return NextResponse.json(
+                { success: false, error: 'AI search service is not configured' },
+                { status: 503 }
+            )
+        }
+
         // AUTH + AI LIMIT: Check subscription tier AI limits
         const supabase = await createClient()
         const guard = await aiGuard(supabase, 'ai_search')

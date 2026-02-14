@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 9 | 7 fixed, 2 open |
+| Medium | 10 | 8 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -234,6 +234,25 @@ non-production environments.
   - `src/app/api/cron/telegram-briefings/route.ts`
 - Unauthorized requests now consistently return 401 when secret mismatch.
 - Added regression assertion covering all four routes in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 13) Some OpenAI-backed routes did not fail closed on missing API key (Medium)
+
+**Issue:** Several AI routes instantiated OpenAI clients with build-time placeholder keys
+but lacked explicit runtime guardrails for missing `OPENAI_API_KEY`.  
+**Impact:** Misconfigured environments could produce ambiguous failures instead of explicit
+service-unavailable behavior.
+
+**Fix implemented:**
+
+- Added explicit fail-closed checks (503) in:
+  - `src/app/api/marketplace/ai-search/route.ts`
+  - `src/app/api/marketplace/talent-match/route.ts`
+  - `src/app/api/marketplace/forge-match/route.ts`
+  - `src/app/api/rfq/voice/route.ts`
+- Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
 ---

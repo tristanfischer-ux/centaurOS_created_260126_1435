@@ -160,3 +160,20 @@ describe('internal API egress hardening regressions', () => {
     expect(source).not.toContain('process.env.VERCEL_URL')
   })
 })
+
+describe('OpenAI key hardening regressions', () => {
+  it('fails closed on missing OPENAI_API_KEY for marketplace and RFQ routes', async () => {
+    const routes = [
+      'src/app/api/marketplace/ai-search/route.ts',
+      'src/app/api/marketplace/talent-match/route.ts',
+      'src/app/api/marketplace/forge-match/route.ts',
+      'src/app/api/rfq/voice/route.ts',
+    ]
+
+    for (const routePath of routes) {
+      const source = await readFile(path.join(process.cwd(), routePath), 'utf-8')
+      expect(source).toContain('if (!process.env.OPENAI_API_KEY)')
+      expect(source).toContain('{ status: 503 }')
+    }
+  })
+})

@@ -19,6 +19,15 @@ const RFQSchema = z.object({
 
 export async function POST(req: NextRequest) {
     try {
+        // SECURITY: Fail closed when OpenAI key is not configured.
+        if (!process.env.OPENAI_API_KEY) {
+            console.error('[VoiceToRFQAPI] OPENAI_API_KEY is not configured')
+            return NextResponse.json(
+                { error: 'Voice RFQ service is not configured' },
+                { status: 503 }
+            )
+        }
+
         const supabase = await createClient();
         const guard = await aiGuard(supabase, 'voice_to_rfq');
         if (guard.denied) return guard.response;
