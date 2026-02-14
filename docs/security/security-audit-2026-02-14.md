@@ -221,6 +221,9 @@ environment variables (`NEXT_PUBLIC_BASE_URL` / `VERCEL_URL`) while forwarding u
 
 - Added shared `verifyQaCallbackSecret(...)` guard.
 - Applied guard to both `POST` and `GET` handlers.
+- Added webhook IP throttling for both handlers:
+  - `rateLimit('webhook', \`qa-callback:${ip}\`)`
+  - explicit `429` on exhaustion.
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 

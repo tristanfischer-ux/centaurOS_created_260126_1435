@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 import type { QATestWebhookPayload, QATestResults } from '@/types/qa.types'
 
 function verifyQaCallbackSecret(request: NextRequest): NextResponse | null {
@@ -27,6 +28,12 @@ function verifyQaCallbackSecret(request: NextRequest): NextResponse | null {
  */
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIP(request.headers)
+    const ipLimit = await rateLimit('webhook', `qa-callback:${ip}`)
+    if (!ipLimit.success) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
     // SECURITY: Verify webhook secret before processing any data.
     const authFailureResponse = verifyQaCallbackSecret(request)
     if (authFailureResponse) {
@@ -103,6 +110,12 @@ export async function POST(request: NextRequest) {
 
 // Also support GET for verification
 export async function GET(request: NextRequest) {
+  const ip = getClientIP(request.headers)
+  const ipLimit = await rateLimit('webhook', `qa-callback:${ip}`)
+  if (!ipLimit.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   // SECURITY: Keep callback metadata endpoint private behind callback secret.
   const authFailureResponse = verifyQaCallbackSecret(request)
   if (authFailureResponse) {

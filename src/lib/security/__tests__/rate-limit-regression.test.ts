@@ -118,6 +118,8 @@ describe('cron authorization hardening regressions', () => {
     expect(source).toContain('const authFailureResponse = verifyQaCallbackSecret(request)')
     expect(source).toContain('if (authFailureResponse)')
     expect(source).toContain('export async function GET(request: NextRequest)')
+    expect(source).toContain("await rateLimit('webhook', `qa-callback:${ip}`)")
+    expect(source).toContain("return NextResponse.json({ error: 'Too many requests' }, { status: 429 })")
   })
 
   it('fails closed for all cron routes when CRON_SECRET is missing', async () => {
