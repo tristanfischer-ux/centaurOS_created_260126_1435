@@ -35,7 +35,7 @@ interface HandoffState {
 
 export function FloatingSpecialistFAB(): React.ReactElement | null {
   const pathname = usePathname()
-  const { screenContext, serializeScreenContext } = useScreenContext()
+  const { screenContext } = useScreenContext()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [activeSpecialist, setActiveSpecialist] = useState<Specialist | null>(
     null,
@@ -60,14 +60,6 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
     () => getSpecialistById(specialistId),
     [specialistId],
   )
-
-  // Hide on /agents — the specialists hub doesn't need a redundant FAB
-  if (pathname === "/agents" || pathname?.startsWith("/agents/")) {
-    return null
-  }
-  if (!specialist) {
-    return null
-  }
 
   const pageContext = useMemo(
     () => ({
@@ -100,6 +92,14 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
     },
     [activeSpecialist?.name],
   )
+
+  // Hide on /agents — the specialists hub doesn't need a redundant FAB
+  if (pathname === "/agents" || pathname?.startsWith("/agents/")) {
+    return null
+  }
+  if (!specialist) {
+    return null
+  }
 
   return (
     <>

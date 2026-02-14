@@ -336,8 +336,11 @@ export function ForgeProjectProvider({
         if ("spec" in imgResult) {
           setSpecInternal(imgResult.spec)
           specRef.current = imgResult.spec
-          toast.success("System blueprint ready")
-
+          if ("persistError" in imgResult) {
+            toast.warning("Results computed but failed to save. Please refresh and retry.")
+          } else {
+            toast.success("System blueprint ready")
+          }
           // Update thumbnail from system image
           if (imgResult.spec.systemImageUrl) {
             updateProjectMetadataAction(scanId, { thumbnailUrl: imgResult.spec.systemImageUrl })
@@ -357,7 +360,11 @@ export function ForgeProjectProvider({
               setSpecInternal(modResult.spec)
               specRef.current = modResult.spec
               const count = modResult.spec.modules.filter(m => m.imageStatus === "complete").length
-              if (count > 0) toast.success(`${count} module blueprints ready`)
+              if ("persistError" in modResult) {
+                toast.warning("Results computed but failed to save. Please refresh and retry.")
+              } else if (count > 0) {
+                toast.success(`${count} module blueprints ready`)
+              }
             }
           })
           .catch(() => {
@@ -459,7 +466,11 @@ export function ForgeProjectProvider({
       if ("error" in result) { toast.error(result.error); return }
       setSpecInternal(result.spec)
       specRef.current = result.spec
-      toast.success("Structural FEA complete")
+      if ("persistError" in result) {
+        toast.warning("Results computed but failed to save. Please refresh and retry.")
+      } else {
+        toast.success("Structural FEA complete")
+      }
     } catch (error) {
       toast.error("Structural FEA failed")
     } finally {
@@ -475,7 +486,9 @@ export function ForgeProjectProvider({
       if ("error" in result) { toast.error(result.error); return }
       setSpecInternal(result.spec)
       specRef.current = result.spec
-      if (result.evaluation.isConverged) {
+      if ("persistError" in result) {
+        toast.warning("Results computed but failed to save. Please refresh and retry.")
+      } else if (result.evaluation.isConverged) {
         toast.success("All convergence criteria met!")
       } else {
         toast.info(`${result.evaluation.proposedChanges.length} changes proposed`)
@@ -495,7 +508,11 @@ export function ForgeProjectProvider({
       if ("error" in result) { toast.error(result.error); return }
       setSpecInternal(result.spec)
       specRef.current = result.spec
-      toast.success("Premium analyses complete!")
+      if ("persistError" in result) {
+        toast.warning("Results computed but failed to save. Please refresh and retry.")
+      } else {
+        toast.success("Premium analyses complete!")
+      }
     } catch (error) {
       toast.error("Premium analysis failed")
     } finally {
@@ -549,6 +566,7 @@ export function ForgeProjectProvider({
           setSpecInternal(r.spec)
           specRef.current = r.spec
           updateStage("mass_dfm", { status: "complete" })
+          if ("persistError" in r) toast.warning("Mass/DFM: Results computed but failed to save.")
         }
       } catch (err) {
         updateStage("mass_dfm", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
@@ -565,6 +583,7 @@ export function ForgeProjectProvider({
           setSpecInternal(r.spec)
           specRef.current = r.spec
           updateStage("structural", { status: "complete" })
+          if ("persistError" in r) toast.warning("Structural FEA: Results computed but failed to save.")
         }
       } catch (err) {
         updateStage("structural", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
@@ -581,6 +600,7 @@ export function ForgeProjectProvider({
           setSpecInternal(r.spec)
           specRef.current = r.spec
           updateStage("thermal", { status: "complete" })
+          if ("persistError" in r) toast.warning("Thermal: Results computed but failed to save.")
         }
       } catch (err) {
         updateStage("thermal", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
@@ -597,6 +617,7 @@ export function ForgeProjectProvider({
           setSpecInternal(r.spec)
           specRef.current = r.spec
           updateStage("topology", { status: "complete" })
+          if ("persistError" in r) toast.warning("Topology: Results computed but failed to save.")
         }
       } catch (err) {
         updateStage("topology", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
@@ -613,6 +634,7 @@ export function ForgeProjectProvider({
           setSpecInternal(r.spec)
           specRef.current = r.spec
           updateStage("convergence", { status: "complete" })
+          if ("persistError" in r) toast.warning("Convergence: Results computed but failed to save.")
 
           // Store convergence results so the UI can show the review dialog
           setPipelineProgress((prev) => ({

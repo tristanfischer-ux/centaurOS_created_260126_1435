@@ -431,6 +431,21 @@ export const XRaySpecSchema = z.object({
 
 export type XRaySpec = z.infer<typeof XRaySpecSchema>
 
+/**
+ * Parses JSONB spec from DB with validation.
+ * On success returns validated XRaySpec. On failure, logs warning and returns
+ * raw data cast as XRaySpec (graceful degradation for partial/demo data).
+ *
+ * @param raw - JSON from xray_scans.spec column
+ * @returns Validated or fallback XRaySpec
+ */
+export function safeParseSpec(raw: unknown): XRaySpec {
+  const result = XRaySpecSchema.safeParse(raw)
+  if (result.success) return result.data
+  console.warn("[XRay] Spec validation failed, using raw data:", result.error.issues)
+  return raw as XRaySpec
+}
+
 // ─── Schema for AI scan output (subset used for structured generation) ─
 
 /**

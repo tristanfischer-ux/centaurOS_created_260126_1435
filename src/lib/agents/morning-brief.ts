@@ -10,7 +10,10 @@
  * @module agents/morning-brief
  */
 
-import { supabase } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+
+// SECURITY: Service role client for background cron job — no user cookies available
+const supabase = createAdminClient()
 import { sendAgentMessage, startCollaboration, addContribution, completeCollaboration } from './collaboration-hub'
 
 // ============================================================================

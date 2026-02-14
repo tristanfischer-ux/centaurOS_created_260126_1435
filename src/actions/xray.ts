@@ -40,6 +40,7 @@ import { runConvergenceStep } from "@/app/(platform)/the-forge/services/converge
 import { enrichModules } from "@/app/(platform)/the-forge/services/inspiration-bridge"
 import { generateReviewTasks } from "@/app/(platform)/the-forge/services/xray-to-objectives"
 
+import { safeParseSpec } from "@/app/(platform)/the-forge/services/xray-schema"
 import type { XRaySpec, ModuleSpec, SystemAnalysis, ModuleAnalysis } from "@/app/(platform)/the-forge/services/xray-schema"
 import type { PersonMatch } from "@/app/(platform)/the-forge/services/people"
 import type { SupplierMatch } from "@/app/(platform)/the-forge/services/suppliers"
@@ -73,6 +74,11 @@ async function loadScanForFoundry<T = { id: string; spec: Json }>(
 
   if (error || !scan) {
     return { error: "Scan not found" }
+  }
+
+  // Validate spec on read when present (graceful degradation on parse failure)
+  if (select.includes("spec") && scan && typeof scan === "object" && "spec" in scan && scan.spec != null) {
+    ;(scan as { spec: unknown }).spec = safeParseSpec(scan.spec)
   }
 
   return { scan: scan as T }
