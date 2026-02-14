@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 22 | 20 fixed, 2 open |
+| Medium | 23 | 21 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -531,6 +531,26 @@ availability and reliability of automated task ingestion.
   - mirrors the same objective resolution and fail-closed behavior
   - inserts `objective_id` explicitly on webhook-created tasks.
 - Added regression assertions in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 27) Stripe webhook processing used user-scoped Supabase client in server-to-server flow (Medium)
+
+**Issue:** `POST /api/webhooks/stripe` previously created Supabase clients via
+`createClient()` (anon key + request cookies), despite running as a webhook
+without user session context.  
+**Impact:** Inconsistent RLS behavior could cause webhook-processing reliability issues
+for payment/dispute/subscription state transitions.
+
+**Fix implemented (`src/app/api/webhooks/stripe/route.ts`):**
+
+- Switched all webhook data access paths to service-role client usage:
+  - `import { createAdminClient } from '@/lib/supabase/admin'`
+  - `const supabase = createAdminClient()`
+- Retained signature verification and endpoint throttling safeguards.
+- Added explicit fail-closed response (`503`) when `STRIPE_WEBHOOK_SECRET` is missing.
+- Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
 ---

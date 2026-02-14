@@ -433,5 +433,8 @@ describe('stripe webhook hardening regressions', () => {
     expect(source).toContain('if (!webhookSecret)')
     expect(source).toContain("return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })")
     expect(source).toContain("await rateLimit('webhook', `webhook:${ip}`)")
+    expect(source).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
+    expect(source).toContain('const supabase = createAdminClient()')
+    expect(source).not.toContain("import { createClient } from '@/lib/supabase/server'")
   })
 })

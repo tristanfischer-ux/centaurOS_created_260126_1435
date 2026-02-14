@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe/client'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { confirmPayment } from '@/lib/payments/flow'
 import { sendNotification } from '@/lib/notifications'
 import { handleSubscriptionEvent } from '@/lib/billing/subscriptions'
@@ -47,7 +47,7 @@ async function verifyWebhookSignature(
  */
 async function acquireEventLock(event: Stripe.Event): Promise<{ acquired: boolean; alreadyProcessed: boolean }> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     
     // Try to insert the event as 'processing'
     // If it already exists, the ON CONFLICT will update nothing and we can check the status
@@ -104,7 +104,7 @@ async function acquireEventLock(event: Stripe.Event): Promise<{ acquired: boolea
  */
 async function markEventProcessed(eventId: string): Promise<void> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     await supabase
       .from('stripe_events')
       .update({
@@ -123,7 +123,7 @@ async function markEventProcessed(eventId: string): Promise<void> {
  */
 async function markEventFailed(eventId: string, errorMessage: string): Promise<void> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     await supabase
       .from('stripe_events')
       .update({
@@ -159,7 +159,7 @@ async function handleBalanceTopUp(paymentIntent: Stripe.PaymentIntent, userId: s
     amount: paymentIntent.amount,
   })
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // Check if already processed (idempotency)
   const { data: existing } = await supabase
@@ -238,7 +238,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     return
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   
   // SECURITY: First validate the payment amount against database order
   const { data: orderValidation, error: validationError } = await supabase
@@ -335,15 +335,25 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     console.log('Timesheet marked as paid:', referenceId)
 
     // Notify seller about retainer payment
-    const seller = timesheet.retainer?.seller as { user_id: string } | null
-    if (seller?.user_id) {
+    const retainerRecord = Array.isArray(timesheet.retainer)
+      ? timesheet.retainer[0]
+      : timesheet.retainer
+    const sellerRecord = Array.isArray(retainerRecord?.seller)
+      ? retainerRecord.seller[0]
+      : retainerRecord?.seller
+    const sellerUserId = sellerRecord?.user_id ?? null
+    const retainerActionUrl = retainerRecord?.id
+      ? `/provider-portal/retainers/${retainerRecord.id}`
+      : '/provider-portal/retainers'
+
+    if (sellerUserId) {
       try {
         await sendNotification({
-          userId: seller.user_id,
+          userId: sellerUserId,
           priority: 'medium',
           title: 'Retainer Payment Received',
           body: `Payment of ${formatAmount(paymentIntent.amount, paymentIntent.currency)} for your retainer has been confirmed.`,
-          actionUrl: `/provider-portal/retainers/${timesheet.retainer?.id}`,
+          actionUrl: retainerActionUrl,
           metadata: {
             timesheetId: referenceId,
             paymentIntentId: paymentIntent.id,
@@ -387,7 +397,7 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent): P
     error: paymentIntent.last_payment_error?.message,
   })
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // Check if this is a retainer timesheet payment
   const { data: timesheet, error: timesheetError } = await supabase
@@ -410,7 +420,10 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent): P
       .eq('id', timesheet.id)
 
     // Notify the buyer about the failed payment
-    const retainerBuyerId = (timesheet.retainer as { buyer_id: string })?.buyer_id
+    const retainerRecord = Array.isArray(timesheet.retainer)
+      ? timesheet.retainer[0]
+      : timesheet.retainer
+    const retainerBuyerId = retainerRecord?.buyer_id ?? null
     if (retainerBuyerId) {
       try {
         await sendNotification({
@@ -496,7 +509,7 @@ async function handleAccountUpdated(account: Stripe.Account): Promise<void> {
     return
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // Update provider profile with Stripe account status
   const { error: updateError } = await supabase
@@ -558,7 +571,7 @@ async function handleTransferCreated(transfer: Stripe.Transfer): Promise<void> {
     return
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // Get order and seller details
   const { data: order, error: orderError } = await supabase
@@ -622,7 +635,7 @@ async function handleChargeDisputeCreated(dispute: Stripe.Dispute): Promise<void
     reason: dispute.reason,
   })
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // Get the charge to find the payment intent
   const charge = typeof dispute.charge === 'string' 
@@ -740,7 +753,7 @@ async function handlePayoutPaid(payout: Stripe.Payout): Promise<void> {
 
   // Note: Payouts go to the connected account's bank, not tied to specific orders
   // We can log this for auditing purposes
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // Find the seller by their Stripe account
   // The payout destination could be a bank account on a connected account
