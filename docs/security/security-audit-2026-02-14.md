@@ -166,7 +166,7 @@ This audit reviewed the application security posture across:
 **Fix implemented (`.github/workflows/docker-build.yml`):**
 
 - Security audit now runs as a gate:
-  - `npm audit --omit=dev --audit-level=high`
+  - `npm audit --omit=dev --audit-level=low`
   - no `continue-on-error`.
 
 ---
