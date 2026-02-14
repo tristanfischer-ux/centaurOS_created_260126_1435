@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 27 | 25 fixed, 2 open |
+| Medium | 27 | 26 fixed, 1 open |
 | Low | 3 | Open |
 
 ---
@@ -654,6 +654,33 @@ authenticated polling abuse on link-status checks.
 
 ---
 
+### 32) Full TypeScript checks could not gate CI due legacy debt (Medium)
+
+**Issue:** Repository-wide `tsc --noEmit` has significant pre-existing errors, so a
+strict global typecheck gate was not feasible without blocking all merges.  
+**Impact:** New TypeScript regressions outside the security-scoped subset could be introduced
+without a blocking CI signal.
+
+**Fix implemented:**
+
+- Added baseline regression checker:
+  - `scripts/check-typecheck-baseline.mjs`
+  - `scripts/typecheck-baseline.json`
+- Added scripts:
+  - `npm run typecheck:baseline`
+  - `npm run typecheck:baseline:update`
+- Updated CI (`.github/workflows/docker-build.yml`) to add a **blocking** global
+  no-regression gate:
+  - `Type Check (No Regressions)` → `npm run typecheck:baseline`
+- Updated static verification (`scripts/verify.sh`) to run:
+  - `npm run typecheck:security`
+  - `npm run typecheck:baseline`
+  before linting.
+
+This preserves a hard quality gate in CI while broader type debt is reduced incrementally.
+
+---
+
 ## Security Regression Coverage Added
 
 Added:
@@ -701,11 +728,13 @@ The test suite enforces:
 
 ### High / Medium
 
-2. **Global TypeScript gate still non-blocking**
+2. **Build pipeline still tolerates existing TypeScript debt**
    - `next.config.ts` retains `typescript.ignoreBuildErrors = true`.
-   - Type-check workflow step also remains non-blocking due broad pre-existing type debt.
-   - Mitigation shipped: focused `typecheck:security` gate is now blocking in CI.
-   - Required follow-up: staged type debt reduction and eventual full typecheck hard fail.
+   - Mitigations shipped:
+     - focused `typecheck:security` gate is blocking in CI
+     - baseline `typecheck:baseline` no-regression gate is blocking in CI
+   - Required follow-up: staged type-debt reduction and eventual removal of
+     `typescript.ignoreBuildErrors`.
 
 ---
 
@@ -721,6 +750,8 @@ The test suite enforces:
 
 - `npm test -- audit-log.test.ts rate-limit-regression.test.ts message-file-reference.test.ts url-validation.test.ts` → **pass**
 - `npm run typecheck:security` → **pass**
+- `npm run typecheck:baseline` → **pass** (no new errors vs committed baseline)
+- `npm run verify -- --static` → **pass**
 - `npm audit --omit=dev --json` → **0 vulnerabilities (low/moderate/high/critical)**
 
 > Note: repository-wide `tsc --noEmit` currently fails due numerous pre-existing unrelated typing issues outside this audit's change set.

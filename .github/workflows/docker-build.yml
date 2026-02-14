@@ -38,9 +38,8 @@ jobs:
       - name: Security Type Check
         run: npm run typecheck:security
 
-      - name: Type Check
-        run: npm run typecheck
-        continue-on-error: true  # TODO: Remove once pre-existing type errors are resolved
+      - name: Type Check (No Regressions)
+        run: npm run typecheck:baseline
 
       - name: Run Linter
         run: npm run lint

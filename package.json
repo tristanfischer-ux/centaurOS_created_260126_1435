@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "typecheck:baseline": "node scripts/check-typecheck-baseline.mjs",
+    "typecheck:baseline:update": "node scripts/check-typecheck-baseline.mjs --update",
     "typecheck:security": "tsc --noEmit -p tsconfig.security.json",
     "test": "jest",
     "test:coverage": "jest --coverage",
