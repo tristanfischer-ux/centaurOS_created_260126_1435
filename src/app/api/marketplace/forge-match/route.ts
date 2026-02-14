@@ -60,7 +60,7 @@ export async function POST(
         }
 
         // SECURITY: Rate limit AI endpoints (10 requests per minute per user)
-        const rateLimitResult = await rateLimit('api', `forge-match:${user.id}`, { limit: 10, window: 60 })
+        const rateLimitResult = await rateLimit('api', `forge-match:${user.id}`, { limit: 10, window: 60 * 1000 })
         if (!rateLimitResult.success) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Please wait before requesting more matches.' },

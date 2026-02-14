@@ -24,7 +24,13 @@ export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  // SECURITY: Fail closed when CRON_SECRET is not configured.
+  if (!cronSecret) {
+    console.error('[MorningBriefCron] CRON_SECRET is not configured')
+    return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })
+  }
+
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

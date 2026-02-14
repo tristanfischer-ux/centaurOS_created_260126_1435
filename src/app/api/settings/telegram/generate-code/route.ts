@@ -37,7 +37,7 @@ export async function POST() {
         }
 
         // SECURITY: Rate limit code generation (3 codes per 15 minutes per user)
-        const rateLimitResult = await rateLimit('api', `telegram-code:${user.id}`, { limit: 3, window: 900 })
+        const rateLimitResult = await rateLimit('api', `telegram-code:${user.id}`, { limit: 3, window: 900 * 1000 })
         if (!rateLimitResult.success) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Please wait before generating another code.' },

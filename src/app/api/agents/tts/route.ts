@@ -169,7 +169,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         // SECURITY: Rate limit to prevent cost abuse (20 per minute per user)
         const rateLimitResult = await rateLimit("api", `tts:${guard.userId}`, {
             limit: 20,
-            window: 60,
+            window: 60 * 1000,
         })
         if (!rateLimitResult.success) {
             return NextResponse.json(

@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
         const user = { id: guard.userId }
 
         // SECURITY: Rate limit to prevent OpenAI cost abuse (5 requests per hour per user)
-        const rateLimitResult = await rateLimit('api', `voice-to-task:${user.id}`, { limit: 5, window: 3600 })
+        const rateLimitResult = await rateLimit('api', `voice-to-task:${user.id}`, { limit: 5, window: 3600 * 1000 })
         if (!rateLimitResult.success) {
             return NextResponse.json(
                 { error: "Rate limit exceeded. Please wait before using voice-to-task again." },

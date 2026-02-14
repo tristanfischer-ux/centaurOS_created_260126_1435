@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     // SECURITY: Rate limit file uploads (10 per minute per user)
-    const rateLimitResult = await rateLimit('api', `rfq-upload:${user.id}`, { limit: 10, window: 60 })
+    const rateLimitResult = await rateLimit('api', `rfq-upload:${user.id}`, { limit: 10, window: 60 * 1000 })
     if (!rateLimitResult.success) {
       return NextResponse.json(
         { error: 'Rate limit exceeded. Please wait before uploading more files.' },

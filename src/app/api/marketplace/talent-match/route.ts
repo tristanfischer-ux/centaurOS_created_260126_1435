@@ -51,7 +51,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         if (guard.denied) return guard.response
 
         // SECURITY: Rate limit (5 requests per minute per user)
-        const rateLimitResult = await rateLimit('api', `talent-match:${guard.userId}`, { limit: 5, window: 60 })
+        const rateLimitResult = await rateLimit('api', `talent-match:${guard.userId}`, { limit: 5, window: 60 * 1000 })
         if (!rateLimitResult.success) {
             return NextResponse.json(
                 { success: false, error: "Rate limit exceeded. Please wait before searching again." },

@@ -122,7 +122,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         // Rate limit: 10 sessions per minute
         const rateLimitResult = await rateLimit("api", `avatar-session:${guard.userId}`, {
             limit: 10,
-            window: 60,
+            window: 60 * 1000,
         })
         if (!rateLimitResult.success) {
             return NextResponse.json(

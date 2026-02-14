@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
         // Rate limit — council triggers 12+ LLM calls per request
         const rateLimitResult = await rateLimit('api', `council:${user.id}`, {
             limit: 5,
-            window: 3600,
+            window: 3600 * 1000,
         })
         if (!rateLimitResult.success) {
             return NextResponse.json(

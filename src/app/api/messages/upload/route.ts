@@ -55,11 +55,11 @@ export async function POST(request: NextRequest) {
     }
 
     // SECURITY: Rate limit uploads
-    const ip = getClientIP(request)
+    const ip = getClientIP(request.headers)
     const rateLimitResult = await rateLimit(
+      'upload',
       `message-upload:${user.id}:${ip}`,
-      10, // 10 uploads
-      60  // per minute
+      { limit: 10, window: 60 * 1000 }
     )
     
     if (!rateLimitResult.success) {
