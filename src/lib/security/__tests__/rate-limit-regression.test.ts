@@ -90,6 +90,21 @@ describe('cron authorization hardening regressions', () => {
     expect(source).toContain('if (authFailureResponse)')
     expect(source).toContain('export async function GET(request: NextRequest)')
   })
+
+  it('fails closed for all cron routes when CRON_SECRET is missing', async () => {
+    const cronRoutes = [
+      'src/app/api/cron/reports/daily/route.ts',
+      'src/app/api/cron/weekly-synthesis/route.ts',
+      'src/app/api/cron/agent-sweep/route.ts',
+      'src/app/api/cron/telegram-briefings/route.ts',
+    ]
+
+    for (const routePath of cronRoutes) {
+      const source = await readFile(path.join(process.cwd(), routePath), 'utf-8')
+      expect(source).toContain('if (!cronSecret)')
+      expect(source).toContain("return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })")
+    }
+  })
 })
 
 describe('message attachment authorization regressions', () => {

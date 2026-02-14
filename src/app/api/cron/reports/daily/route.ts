@@ -39,26 +39,28 @@ function getAdminClient() {
 }
 
 // Verify cron secret to prevent unauthorized access
-function verifyCronSecret(req: NextRequest): boolean {
+function verifyCronSecret(req: NextRequest): NextResponse | null {
     const cronSecret = process.env.CRON_SECRET
-    
-    // In production, require the secret
+
+    // SECURITY: Fail closed when CRON_SECRET is missing.
     if (!cronSecret) {
-        if (process.env.NODE_ENV === 'production') {
-            console.error('[SECURITY] CRON_SECRET not configured in production!')
-            return false
-        }
-        return true // Allow in development
+        console.error('[SECURITY] CRON_SECRET not configured')
+        return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })
     }
 
     const authHeader = req.headers.get('authorization')
-    return authHeader === `Bearer ${cronSecret}`
+    if (authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    return null
 }
 
 export async function GET(req: NextRequest) {
     // Verify authorization
-    if (!verifyCronSecret(req)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const authFailure = verifyCronSecret(req)
+    if (authFailure) {
+        return authFailure
     }
 
     const supabase = getAdminClient()

@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 8 | 6 fixed, 2 open |
+| Medium | 9 | 7 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -215,6 +215,25 @@ environment variables (`NEXT_PUBLIC_BASE_URL` / `VERCEL_URL`) while forwarding u
 - Added shared `verifyQaCallbackSecret(...)` guard.
 - Applied guard to both `POST` and `GET` handlers.
 - Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 12) Multiple cron routes allowed secretless execution in development mode (Medium)
+
+**Issue:** Several cron routes accepted requests without `CRON_SECRET` outside production.  
+**Impact:** Inconsistent authorization posture and elevated accidental exposure risk in
+non-production environments.
+
+**Fix implemented:**
+
+- Updated cron routes to fail closed (503) when `CRON_SECRET` is missing:
+  - `src/app/api/cron/reports/daily/route.ts`
+  - `src/app/api/cron/weekly-synthesis/route.ts`
+  - `src/app/api/cron/agent-sweep/route.ts`
+  - `src/app/api/cron/telegram-briefings/route.ts`
+- Unauthorized requests now consistently return 401 when secret mismatch.
+- Added regression assertion covering all four routes in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
 ---
