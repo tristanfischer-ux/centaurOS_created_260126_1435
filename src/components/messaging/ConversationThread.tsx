@@ -338,6 +338,7 @@ export function ConversationThread({
       // Upload file to server
       const formData = new FormData()
       formData.append('file', file)
+      formData.append('conversationId', conversationId)
 
       const response = await fetch('/api/messages/upload', {
         method: 'POST',
@@ -349,10 +350,14 @@ export function ConversationThread({
         throw new Error(error.error || 'Upload failed')
       }
 
-      const { url, filename } = await response.json()
+      const { path, filename } = await response.json()
+
+      if (!path || typeof path !== 'string') {
+        throw new Error('Upload response missing file path')
+      }
 
       // Send message with file attachment using hook
-      const success = await sendMessage(filename, url)
+      const success = await sendMessage(filename, path)
       if (!success) {
         throw new Error('Failed to send message')
       }

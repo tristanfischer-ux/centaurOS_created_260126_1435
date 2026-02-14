@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Check, CheckCheck, FileIcon, AlertCircle, MessageSquare, Download, Image as ImageIcon } from 'lucide-react'
@@ -91,8 +91,69 @@ function FileAttachment({
   fileName: string
   isOwn: boolean
 }) {
-  const safeUrl = sanitizeHref(fileUrl)
-  if (safeUrl === '#') {
+  const [safeUrl, setSafeUrl] = useState<string | null>(null)
+  const [isResolving, setIsResolving] = useState(false)
+
+  const isStoragePath = !/^https?:\/\//i.test(fileUrl)
+
+  useEffect(() => {
+    let isMounted = true
+
+    const resolveFileUrl = async (): Promise<void> => {
+      if (!isStoragePath) {
+        const sanitized = sanitizeHref(fileUrl)
+        if (isMounted) {
+          setSafeUrl(sanitized === '#' ? null : sanitized)
+        }
+        return
+      }
+
+      setIsResolving(true)
+      try {
+        const response = await fetch('/api/messages/file-url', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ path: fileUrl }),
+        })
+
+        if (!response.ok) {
+          if (isMounted) {
+            setSafeUrl(null)
+          }
+          return
+        }
+
+        const payload = (await response.json()) as { url?: string }
+        const sanitized = sanitizeHref(payload.url || '#')
+
+        if (isMounted) {
+          setSafeUrl(sanitized === '#' ? null : sanitized)
+        }
+      } catch {
+        if (isMounted) {
+          setSafeUrl(null)
+        }
+      } finally {
+        if (isMounted) {
+          setIsResolving(false)
+        }
+      }
+    }
+
+    resolveFileUrl()
+
+    return () => {
+      isMounted = false
+    }
+  }, [fileUrl, isStoragePath])
+
+  if (isResolving) {
+    return <span className="text-sm text-muted-foreground">Loading file...</span>
+  }
+
+  if (!safeUrl) {
     return <span className="text-sm">Invalid file</span>
   }
   

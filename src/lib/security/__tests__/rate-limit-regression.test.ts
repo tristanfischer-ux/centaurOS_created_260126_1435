@@ -47,6 +47,18 @@ describe('rate-limit security regressions', () => {
       /rateLimit\(\s*'upload'\s*,\s*`message-upload:\$\{user\.id\}:\$\{ip\}`\s*,\s*\{\s*limit:\s*10,\s*window:\s*60\s*\*\s*1000\s*\}\s*\)/s
     )
   })
+
+  it('requires conversation-scoped upload paths and avoids public URL generation', async () => {
+    const messageUploadRoutePath = path.join(process.cwd(), 'src/app/api/messages/upload/route.ts')
+    const source = await readFile(messageUploadRoutePath, 'utf-8')
+
+    expect(source).toContain("const conversationId = formData.get('conversationId') as string | null")
+    expect(source).toContain('const filePath = `messages/${conversationId}/${fileName}`')
+    expect(source).toContain(".from('message-files')")
+    expect(source).toContain('.createSignedUrl(uploadData.path, 60 * 60)')
+    expect(source).not.toContain('.getPublicUrl(')
+    expect(source).not.toContain(".from('message-attachments')")
+  })
 })
 
 describe('cron authorization hardening regressions', () => {

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
 
 // Maximum file size: 10MB (smaller than RFQ uploads)
@@ -69,23 +68,46 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get foundry ID for storage path isolation
-    const foundryId = await getFoundryIdCached()
-    if (!foundryId) {
-      return NextResponse.json(
-        { error: 'User not in a foundry' },
-        { status: 400 }
-      )
-    }
-
     // Parse multipart form data
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    const conversationId = formData.get('conversationId') as string | null
 
     if (!file) {
       return NextResponse.json(
         { error: 'No file provided' },
         { status: 400 }
+      )
+    }
+
+    if (!conversationId) {
+      return NextResponse.json(
+        { error: 'Missing conversationId' },
+        { status: 400 }
+      )
+    }
+
+    // VALIDATION: Ensure conversation ID is a UUID.
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(conversationId)) {
+      return NextResponse.json(
+        { error: 'Invalid conversationId' },
+        { status: 400 }
+      )
+    }
+
+    // AUTH: Ensure user belongs to the conversation before allowing upload.
+    const { data: participant, error: participantError } = await supabase
+      .from('conversation_participants')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (participantError || !participant) {
+      return NextResponse.json(
+        { error: 'Access denied for this conversation' },
+        { status: 403 }
       )
     }
 
@@ -121,14 +143,15 @@ export async function POST(request: NextRequest) {
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
     const fileName = `${timestamp}-${randomSuffix}-${safeName}`
 
-    // Upload to Supabase Storage with foundry isolation
-    const filePath = `${foundryId}/messages/${fileName}`
+    // Upload to Supabase Storage with conversation-level isolation
+    // Path format aligns with storage policies: messages/{conversation_id}/{filename}
+    const filePath = `messages/${conversationId}/${fileName}`
     
     const arrayBuffer = await file.arrayBuffer()
     const buffer = new Uint8Array(arrayBuffer)
 
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('message-attachments')
+      .from('message-files')
       .upload(filePath, buffer, {
         contentType: file.type,
         upsert: false,
@@ -137,7 +160,7 @@ export async function POST(request: NextRequest) {
     if (uploadError) {
       console.error('[MessageUpload] Storage upload failed:', {
         error: uploadError.message,
-        foundryId,
+        conversationId,
         fileName,
       })
       return NextResponse.json(
@@ -146,21 +169,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get public URL for the uploaded file
-    const { data: { publicUrl } } = supabase.storage
-      .from('message-attachments')
-      .getPublicUrl(uploadData.path)
+    // SECURITY: Return a short-lived signed URL for immediate preview.
+    const { data: signedData } = await supabase.storage
+      .from('message-files')
+      .createSignedUrl(uploadData.path, 60 * 60)
 
     console.info('[MessageUpload] File uploaded successfully:', {
       userId: user.id,
-      foundryId,
+      conversationId,
       fileName: file.name,
       size: file.size,
       path: filePath,
     })
 
     return NextResponse.json({
-      url: publicUrl,
+      path: filePath,
+      url: signedData?.signedUrl || null,
       filename: file.name,
       size: file.size,
     })
