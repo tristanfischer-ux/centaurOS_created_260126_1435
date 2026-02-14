@@ -40,7 +40,7 @@ import { runConvergenceStep } from "@/app/(platform)/the-forge/services/converge
 import { enrichModules } from "@/app/(platform)/the-forge/services/inspiration-bridge"
 import { generateReviewTasks } from "@/app/(platform)/the-forge/services/xray-to-objectives"
 
-import { safeParseSpec } from "@/app/(platform)/the-forge/services/xray-schema"
+import { safeParseSpec, specToJson } from "@/app/(platform)/the-forge/services/xray-schema"
 import type { XRaySpec, ModuleSpec, SystemAnalysis, ModuleAnalysis } from "@/app/(platform)/the-forge/services/xray-schema"
 import type { PersonMatch } from "@/app/(platform)/the-forge/services/people"
 import type { SupplierMatch } from "@/app/(platform)/the-forge/services/suppliers"
@@ -77,8 +77,9 @@ async function loadScanForFoundry<T = { id: string; spec: Json }>(
   }
 
   // Validate spec on read when present (graceful degradation on parse failure)
-  if (select.includes("spec") && scan && typeof scan === "object" && "spec" in scan && scan.spec != null) {
-    ;(scan as { spec: unknown }).spec = safeParseSpec(scan.spec)
+  const row = scan as unknown as Record<string, unknown>
+  if (select.includes("spec") && row.spec != null) {
+    row.spec = safeParseSpec(row.spec)
   }
 
   return { scan: scan as T }
@@ -117,7 +118,7 @@ export async function scanIdeaAction(idea: string, researchReport?: string): Pro
         created_by: user.id,
         idea: idea.trim(),
         name: projectName,
-        spec: { idea: idea.trim(), function: "", assumptions: [], materials: [], processes: [], validation: [], modules: [] } as unknown as Json,
+        spec: specToJson({ idea: idea.trim(), function: "", assumptions: [], materials: [], processes: [], validation: [], modules: [] } as XRaySpec),
         status: "draft",
         stage: "concept",
         scan_status: "scanning",
@@ -134,14 +135,31 @@ export async function scanIdeaAction(idea: string, researchReport?: string): Pro
       return { error: `Failed to save scan: ${insertError.message}` }
     }
 
-    // AI scan — pass research report for grounded module decomposition
-    const spec = await scanIdeaService(idea.trim(), researchReport)
+    let spec: XRaySpec
+    try {
+      // AI scan — pass research report for grounded module decomposition
+      spec = await scanIdeaService(idea.trim(), researchReport)
+    } catch (aiError) {
+      // Cleanup: delete orphaned placeholder so it does not remain stuck as "scanning"
+      await supabase
+        .from("xray_scans")
+        .delete()
+        .eq("id", scan.id)
+        .eq("foundry_id", foundryId)
+      const message = aiError instanceof Error ? aiError.message : "AI scan failed"
+      console.error("[XRay] AI scan failed, deleted placeholder:", {
+        scanId: scan.id,
+        foundryId,
+        error: message,
+      })
+      return { error: `Scan failed: ${message}` }
+    }
 
     // Update the row with the completed spec and mark as complete
     const { error: updateError } = await supabase
       .from("xray_scans")
       .update({
-        spec: spec as unknown as Json,
+        spec: specToJson(spec),
         status: "scanned",
         scan_status: "complete",
       })
@@ -214,7 +232,7 @@ export async function refineScanAction(
       .from("xray_scans")
       .update({
         idea: updatedIdea.trim(),
-        spec: refinedSpec as unknown as Json,
+        spec: specToJson(refinedSpec),
         status: "refined",
         scan_status: "complete",
         updated_at: new Date().toISOString(),
@@ -357,7 +375,7 @@ export async function deriveProcessClassAction(
     const { error: updateError } = await supabase
       .from("xray_scans")
       .update({
-        spec: updatedSpec as unknown as Json,
+        spec: specToJson(updatedSpec),
         status: "diagnostic_complete",
       })
       .eq("id", scanId)
@@ -418,7 +436,7 @@ export async function generateImagesAction(scanId: string): Promise<
 
     const { error: updateError } = await supabase
       .from("xray_scans")
-      .update({ spec: updatedSpec as unknown as Json })
+      .update({ spec: specToJson(updatedSpec) })
       .eq("id", scanId)
       .eq("foundry_id", foundryId)
 
@@ -490,7 +508,7 @@ export async function generateModuleImagesAction(scanId: string): Promise<
       const batchSpec: XRaySpec = { ...currentSpec, modules: updatedModules }
       await supabase
         .from("xray_scans")
-        .update({ spec: batchSpec as unknown as Json })
+        .update({ spec: specToJson(batchSpec) })
         .eq("id", scanId)
         .eq("foundry_id", foundryId)
     }
@@ -501,7 +519,7 @@ export async function generateModuleImagesAction(scanId: string): Promise<
     const finalSpec: XRaySpec = { ...currentSpec, modules: updatedModules }
     const { error: updateError } = await supabase
       .from("xray_scans")
-      .update({ spec: finalSpec as unknown as Json })
+      .update({ spec: specToJson(finalSpec) })
       .eq("id", scanId)
       .eq("foundry_id", foundryId)
 
@@ -624,7 +642,7 @@ export async function generateCadModelsAction(
     // Persist
     const { error: updateError } = await supabase
       .from("xray_scans")
-      .update({ spec: updatedSpec as unknown as Json })
+      .update({ spec: specToJson(updatedSpec) })
       .eq("id", scanId)
       .eq("foundry_id", foundryId)
 
@@ -687,7 +705,7 @@ export async function generateSystemCadAction(scanId: string): Promise<
 
       const { error: updateError } = await supabase
         .from("xray_scans")
-        .update({ spec: updatedSpec as unknown as Json })
+        .update({ spec: specToJson(updatedSpec) })
         .eq("id", scanId)
         .eq("foundry_id", foundryId)
 
@@ -714,7 +732,7 @@ export async function generateSystemCadAction(scanId: string): Promise<
       }
       await supabase
         .from("xray_scans")
-        .update({ spec: failedSpec as unknown as Json })
+        .update({ spec: specToJson(failedSpec) })
         .eq("id", scanId)
         .eq("foundry_id", foundryId)
 
@@ -740,7 +758,7 @@ export async function updateScanSpecAction(
     const { error } = await supabase
       .from("xray_scans")
       .update({
-        spec: spec as unknown as Json,
+        spec: specToJson(spec),
         updated_at: new Date().toISOString(),
       })
       .eq("id", scanId)
@@ -779,7 +797,8 @@ export async function loadScanAction(scanId: string): Promise<
   } | { error: string }
 > {
   return withAuth(async ({ supabase, foundryId }) => {
-    const loadResult = await loadScanForFoundry(
+    type ScanRow = { id: string; foundry_id: string; spec: Json; status: string; scan_status: string; name: string | null; stage: string; idea: string; thumbnail_url: string | null; research_report: Json; created_at: string; updated_at: string }
+    const loadResult = await loadScanForFoundry<ScanRow>(
       supabase,
       scanId,
       foundryId,
@@ -830,7 +849,7 @@ export async function listScansAction(): Promise<
   return withAuth(async ({ supabase, foundryId }) => {
     const { data: scans, error } = await supabase
       .from("xray_scans")
-      .select("id, idea, name, status, stage, thumbnail_url, spec, created_at, updated_at")
+      .select("id, idea, name, status, stage, thumbnail_url, module_count, created_at, updated_at")
       .eq("foundry_id", foundryId)
       .order("updated_at", { ascending: false })
       .limit(50)
@@ -840,20 +859,17 @@ export async function listScansAction(): Promise<
     }
 
     return {
-      scans: (scans || []).map((s) => {
-        const spec = s.spec as unknown as XRaySpec | null
-        return {
-          id: s.id,
-          idea: s.idea,
-          name: s.name,
-          status: s.status,
-          stage: s.stage,
-          thumbnailUrl: s.thumbnail_url,
-          moduleCount: spec?.modules?.length ?? 0,
-          createdAt: s.created_at,
-          updatedAt: s.updated_at,
-        }
-      }),
+      scans: (scans || []).map((s) => ({
+        id: s.id,
+        idea: s.idea,
+        name: s.name,
+        status: s.status,
+        stage: s.stage,
+        thumbnailUrl: s.thumbnail_url,
+        moduleCount: s.module_count ?? 0,
+        createdAt: s.created_at,
+        updatedAt: s.updated_at,
+      })),
     }
   })
 }
@@ -927,7 +943,7 @@ export async function matchPeopleAction(
   return withAuth(async ({ supabase, foundryId }) => {
     // Check for cached data first
     if (scanId && !forceRefresh) {
-      const loadResult = await loadScanForFoundry(supabase, scanId, foundryId, "people_matches")
+      const loadResult = await loadScanForFoundry<{ people_matches: unknown }>(supabase, scanId, foundryId, "id, people_matches")
       if ("scan" in loadResult && loadResult.scan.people_matches) {
         return { people: loadResult.scan.people_matches as unknown as PersonMatch[] }
       }
@@ -974,7 +990,7 @@ export async function matchSuppliersAction(
   return withAuth(async ({ supabase, foundryId }) => {
     // Check for cached data first
     if (scanId && !forceRefresh) {
-      const loadResult = await loadScanForFoundry(supabase, scanId, foundryId, "supplier_matches")
+      const loadResult = await loadScanForFoundry<{ supplier_matches: unknown }>(supabase, scanId, foundryId, "id, supplier_matches")
       if ("scan" in loadResult && loadResult.scan.supplier_matches) {
         return { suppliersByModule: loadResult.scan.supplier_matches as unknown as Record<string, SupplierMatch[]> }
       }
@@ -1120,7 +1136,7 @@ export async function analyzeModulesAction(
     // Persist
     const { error: updateError } = await supabase
       .from("xray_scans")
-      .update({ spec: updatedSpec as unknown as Json })
+      .update({ spec: specToJson(updatedSpec) })
       .eq("id", scanId)
       .eq("foundry_id", foundryId)
 
@@ -1320,7 +1336,7 @@ export async function runStructuralAnalysisAction(
 
     const { error: updateError } = await supabase
       .from("xray_scans")
-      .update({ spec: updatedSpec as unknown as Json })
+      .update({ spec: specToJson(updatedSpec) })
       .eq("id", scanId)
       .eq("foundry_id", foundryId)
 
@@ -1414,7 +1430,7 @@ export async function runCfdAnalysisAction(
 
     const { error: updateError } = await supabase
       .from("xray_scans")
-      .update({ spec: updatedSpec as unknown as Json })
+      .update({ spec: specToJson(updatedSpec) })
       .eq("id", scanId)
       .eq("foundry_id", foundryId)
 
@@ -1507,7 +1523,7 @@ export async function runTopologyOptimizationAction(
 
     const { error: updateError } = await supabase
       .from("xray_scans")
-      .update({ spec: updatedSpec as unknown as Json })
+      .update({ spec: specToJson(updatedSpec) })
       .eq("id", scanId)
       .eq("foundry_id", foundryId)
 
@@ -1607,7 +1623,7 @@ export async function runThermalAnalysisAction(
 
     const { error: updateError } = await supabase
       .from("xray_scans")
-      .update({ spec: updatedSpec as unknown as Json })
+      .update({ spec: specToJson(updatedSpec) })
       .eq("id", scanId)
       .eq("foundry_id", foundryId)
 
@@ -1708,7 +1724,7 @@ export async function runPremiumAnalysisAction(
 
     const { error: updateError } = await supabase
       .from("xray_scans")
-      .update({ spec: updatedSpec as unknown as Json })
+      .update({ spec: specToJson(updatedSpec) })
       .eq("id", scanId)
       .eq("foundry_id", foundryId)
 
@@ -1759,7 +1775,7 @@ export async function runConvergenceStepAction(
     // Persist
     const { error: updateError } = await supabase
       .from("xray_scans")
-      .update({ spec: updatedSpec as unknown as Json })
+      .update({ spec: specToJson(updatedSpec) })
       .eq("id", scanId)
       .eq("foundry_id", foundryId)
 
@@ -1877,7 +1893,7 @@ export async function applyDesignChangesAction(
     // Persist
     const { error: updateError } = await supabase
       .from("xray_scans")
-      .update({ spec: updatedSpec as unknown as Json })
+      .update({ spec: specToJson(updatedSpec) })
       .eq("id", scanId)
       .eq("foundry_id", foundryId)
 
@@ -2175,7 +2191,7 @@ export async function copyScanAction(
         created_by: user.id,
         idea: source.idea,
         name: copyName,
-        spec: cleanSpec as unknown as Json,
+        spec: specToJson(cleanSpec),
         status: "scanned",
         stage: "concept",
         scan_status: "complete",

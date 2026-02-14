@@ -1,31 +1,10 @@
--- Migration: Add DELETE RLS policy for xray_scans + demo concept seed function
+-- Migration: Update demo forge concept seed to match ModuleSpec schema
 --
--- Purpose: 
--- 1. Enables users to delete their own forge projects (missing DELETE policy)
--- 2. Creates a function to seed a demo concept for new foundries so users
---    can see what The Forge produces before scanning their own ideas
+-- Purpose: Add required ModuleSpec fields (io, keyParts, tests, requirements,
+-- detail.whyItMatters, detail.commonFailureModes, detail.expertQuestions) to
+-- demo modules. Add materials/processes to meet XRaySpec min counts (8, 6).
 --
--- Security:
--- - DELETE policy requires foundry membership (same pattern as SELECT/UPDATE)
--- - Demo concept is read-only seed data per foundry
---
--- Related:
--- - Actions: src/actions/xray.ts (deleteScanAction, copyScanAction)
--- - Signup: src/actions/signup.ts (seeds demo on foundry creation)
---
--- Rollback: DROP POLICY IF EXISTS "delete_xray_scans_in_own_foundry" ON public.xray_scans;
---           DROP FUNCTION IF EXISTS public.seed_demo_forge_concept;
-
--- ─── DELETE RLS Policy ───────────────────────────────────────────────
-
-CREATE POLICY "delete_xray_scans_in_own_foundry"
-ON public.xray_scans
-FOR DELETE
-USING (
-    foundry_id = (SELECT foundry_id FROM public.profiles WHERE id = auth.uid())
-);
-
--- ─── Demo Concept Seed Function ─────────────────────────────────────
+-- Related: 20260211240000_forge_delete_policy_and_demo.sql (original seed)
 
 CREATE OR REPLACE FUNCTION public.seed_demo_forge_concept(
     p_foundry_id TEXT,
@@ -39,8 +18,6 @@ DECLARE
     v_scan_id UUID;
     v_demo_spec JSONB;
 BEGIN
-    -- Build the demo spec: a solar-powered weather station
-    -- This showcases modules, materials, processes, and validation criteria
     v_demo_spec := '{
         "idea": "A compact, solar-powered weather station that monitors temperature, humidity, wind speed, and atmospheric pressure. Designed for remote agricultural areas with no grid power. Must withstand outdoor conditions for 5+ years.",
         "function": "Collects and transmits real-time weather data using solar power for remote agricultural monitoring",
@@ -87,7 +64,7 @@ BEGIN
                 "tests": ["IP67 ingress protection per IEC 60529"],
                 "requirements": {"leadWeeks": 4, "notes": "Injection molding tooling required"},
                 "detail": {
-                    "whatItIs": "The weatherproof enclosure is a two-piece clamshell housing manufactured by injection molding from ASA (acrylonitrile styrene acrylate) thermoplastic, which provides superior UV resistance compared to standard ABS. The enclosure uses a tongue-and-groove mating surface with a continuous EPDM gasket to achieve IP67 ingress protection. Integrated M16 and M20 cable glands on the lower shell provide strain-relieved cable entry for sensor and power connections.\n\nThe ASA material is UV-stabilized per ISO 4892-2 (Cycle A, 2000 hours) with a wall thickness of 3 mm providing adequate structural rigidity while minimizing weight. Internal standoffs are molded-in brass threaded inserts (M3) for PCB mounting, eliminating the need for secondary fastener operations. The enclosure color is RAL 7035 (light grey) to minimize solar heat gain while maintaining visibility for field service.\n\nThe enclosure interfaces with the mounting bracket via a 4-bolt bottom flange pattern (M5 × 0.8, 60 mm PCD) and with the solar panel via a top-mounted compression gasket seal. The internal volume must accommodate the electronics PCB, battery pack, and wiring harness with adequate clearance for convective cooling. The thermal design is passive — no fans or vents — relying on the ASA's thermal conductivity and the enclosure's surface-area-to-volume ratio to maintain internal temperatures within the -20°C to 60°C operating range.",
+                    "whatItIs": "The weatherproof enclosure is a two-piece clamshell housing manufactured by injection molding from ASA (acrylonitrile styrene acrylate) thermoplastic, which provides superior UV resistance compared to standard ABS. The enclosure uses a tongue-and-groove mating surface with a continuous EPDM gasket to achieve IP67 ingress protection. Integrated M16 and M20 cable glands on the lower shell provide strain-relieved cable entry for sensor and power connections.\n\nThe ASA material is UV-stabilized per ISO 4892-2 (Cycle A, 2000 hours) with a wall thickness of 3 mm providing adequate structural rigidity while minimizing weight. Internal standoffs are molded-in brass threaded inserts (M3) for PCB mounting, eliminating the need for secondary fastener operations. The enclosure color is RAL 7035 (light grey) to minimize solar heat gain while maintaining visibility for field service.\n\nThe enclosure interfaces with the mounting bracket via a 4-bolt bottom flange pattern (M5 × 0.8, 60 mm PCD) and with the solar panel via a top-mounted compression gasket seal. The internal volume must accommodate the electronics PCB, battery pack, and wiring harness with adequate clearance for convective cooling. The thermal design is passive — no fans or vents — relying on the ASA''s thermal conductivity and the enclosure''s surface-area-to-volume ratio to maintain internal temperatures within the -20°C to 60°C operating range.",
                     "whyItMatters": "Without a sealed enclosure, moisture and dust would destroy the electronics within weeks in outdoor conditions.",
                     "commonFailureModes": ["Gasket degradation under UV", "Cable gland seal failure"],
                     "unknownsToResolve": ["Exact internal volume needed", "Cable gland positions for sensor wiring"],

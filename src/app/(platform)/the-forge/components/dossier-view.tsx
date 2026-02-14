@@ -89,6 +89,7 @@ export function DossierView(): React.ReactNode {
     isRunningPremium,
     // Summary tab needs these for SystemBlueprint
     isGeneratingImages,
+    isGeneratingModuleImages,
     handleGenerateImages,
   } = useForgeProject()
 
@@ -162,6 +163,7 @@ export function DossierView(): React.ReactNode {
               systemImageUrl={spec.systemImageUrl}
               systemImageStatus={spec.systemImageStatus}
               isGeneratingImages={isGeneratingImages}
+              isGeneratingModuleImages={isGeneratingModuleImages}
               hasImages={spec.modules.some((m) => m.imageStatus === "complete")}
               onGenerateImages={handleGenerateImages}
               canGenerate={!!scanId}

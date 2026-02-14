@@ -13,7 +13,7 @@
 
 "use client"
 
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react"
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from "react"
 
 import { toast } from "sonner"
 
@@ -114,6 +114,8 @@ export interface ForgeProjectContextValue {
   // ── Image generation ──
   handleGenerateImages: () => void
   isGeneratingImages: boolean
+  /** True when system image is done and module images are still generating */
+  isGeneratingModuleImages: boolean
 
   // ── Engineering analysis ──
   handleRunAnalysis: () => Promise<void>
@@ -154,6 +156,12 @@ export interface ForgeProjectContextValue {
   isScanning: boolean
   /** Background scan status from DB (idle | scanning | complete) */
   scanStatus: ScanStatus
+
+  // ── Persist feedback ──
+  /** Non-null when last persist failed (e.g. network error) */
+  persistError: string | null
+  /** True when spec changes are being saved (debounced persist in progress) */
+  isSaving: boolean
 }
 
 // ─── Context ─────────────────────────────────────────────────────────
@@ -231,6 +239,22 @@ export function ForgeProjectProvider({
   // on a genuine transition to "complete", not on every spec UPDATE.
   const lastStatusRef = useRef<string>(initialProject.scanStatus || "idle")
 
+  // Guard: skip Realtime updates when user has in-progress local edits
+  const localEditInProgressRef = useRef(false)
+
+  // Guard: skip state updates after unmount in fire-and-forget callbacks
+  const isMountedRef = useRef(true)
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current)
+        persistTimeoutRef.current = null
+      }
+    }
+  }, [])
+
   // ── Supabase Realtime subscription ──
   // Listens for scan_status changes on this scan row so the UI
   // auto-updates when a background scan completes (user can navigate away).
@@ -248,6 +272,10 @@ export function ForgeProjectProvider({
           filter: `id=eq.${scanId}`,
         },
         (payload) => {
+          if (!isMountedRef.current) return
+          // Skip spec updates when user has in-progress local edits
+          if (localEditInProgressRef.current) return
+
           const newRow = payload.new as {
             scan_status?: string
             spec?: XRaySpec
@@ -262,16 +290,15 @@ export function ForgeProjectProvider({
           }
 
           // Only toast when scan_status TRANSITIONS to "complete" (not on every update).
-          // Without this guard, every spec persistence (e.g. typing in the idea field)
-          // would re-trigger the toast because scan_status is already "complete".
+          // lastStatusRef is set to "complete" by handleRefineScan direct response, so
+          // we avoid duplicate toast when user stays on page during refine.
           if (
             newRow.scan_status === "complete" &&
             previousStatus !== "complete" &&
             newRow.spec
           ) {
             const updatedSpec = newRow.spec as XRaySpec
-            // Only update if the new spec has modules (completed scan)
-            if (updatedSpec.modules && updatedSpec.modules.length > 0) {
+            if (updatedSpec.modules && updatedSpec.modules.length > 0 && isMountedRef.current) {
               setSpecInternal(updatedSpec)
               specRef.current = updatedSpec
               setIsScanning(false)
@@ -280,10 +307,9 @@ export function ForgeProjectProvider({
           }
 
           // Sync spec on any update (e.g. image generation completions)
-          if (newRow.spec && newRow.scan_status !== "complete") {
+          if (newRow.spec && newRow.scan_status !== "complete" && !localEditInProgressRef.current) {
             const incomingSpec = newRow.spec as XRaySpec
-            // Only update if the incoming spec has data we don't
-            if (incomingSpec.modules?.length > 0) {
+            if (incomingSpec.modules?.length > 0 && isMountedRef.current) {
               setSpecInternal(incomingSpec)
               specRef.current = incomingSpec
             }
@@ -297,20 +323,55 @@ export function ForgeProjectProvider({
     }
   }, [scanId])
 
-  // ── Persist spec to DB ──
+  // ── Persist spec to DB (debounced 500ms) ──
+  const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSpecRef = useRef<XRaySpec | null>(null)
+  const [persistError, setPersistError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+
   const persistSpec = useCallback(async (nextSpec: XRaySpec): Promise<void> => {
     try {
       await updateScanSpecAction(scanId, nextSpec)
+      if (isMountedRef.current) {
+        setPersistError(null)
+        setIsSaving(false)
+      }
     } catch (error) {
-      console.warn("[Forge] Failed to persist spec:", error instanceof Error ? error.message : "Unknown")
+      const msg = error instanceof Error ? error.message : "Unknown"
+      console.warn("[Forge] Failed to persist spec:", msg)
+      if (isMountedRef.current) {
+        setPersistError("Failed to save. Please refresh and retry.")
+        setIsSaving(false)
+        toast.warning("Failed to save changes. Please refresh and retry.")
+      }
+    } finally {
+      if (isMountedRef.current) localEditInProgressRef.current = false
     }
   }, [scanId])
+
+  const flushPersist = useCallback((): void => {
+    if (persistTimeoutRef.current) {
+      clearTimeout(persistTimeoutRef.current)
+      persistTimeoutRef.current = null
+    }
+    const specToSave = pendingSpecRef.current
+    pendingSpecRef.current = null
+    if (specToSave) persistSpec(specToSave)
+  }, [persistSpec])
+
+  const schedulePersist = useCallback((nextSpec: XRaySpec): void => {
+    pendingSpecRef.current = nextSpec
+    if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
+    persistTimeoutRef.current = setTimeout(flushPersist, 500)
+  }, [flushPersist])
 
   const setSpec = useCallback((next: XRaySpec) => {
     setSpecInternal(next)
     specRef.current = next
-    persistSpec(next)
-  }, [persistSpec])
+    localEditInProgressRef.current = true
+    setIsSaving(true)
+    schedulePersist(next)
+  }, [schedulePersist])
 
   // ── Module update ──
   const handleModuleUpdate = useCallback((updated: ModuleSpec): void => {
@@ -333,6 +394,7 @@ export function ForgeProjectProvider({
     // Phase 1: System image first (fast, ~15s) — shows on concept page immediately
     generateImagesAction(scanId)
       .then((imgResult) => {
+        if (!isMountedRef.current) return
         if ("spec" in imgResult) {
           setSpecInternal(imgResult.spec)
           specRef.current = imgResult.spec
@@ -341,35 +403,36 @@ export function ForgeProjectProvider({
           } else {
             toast.success("System blueprint ready")
           }
-          // Update thumbnail from system image
           if (imgResult.spec.systemImageUrl) {
             updateProjectMetadataAction(scanId, { thumbnailUrl: imgResult.spec.systemImageUrl })
           }
+          // Phase 2: Module blueprint images — keep isGeneratingImages true
+          toast.info("Generating module blueprints...")
+          return generateModuleImagesAction(scanId)
         } else {
           toast.error(imgResult.error || "System image generation failed")
+          return null
         }
       })
-      .catch(() => toast.error("System image generation failed"))
+      .then((modResult) => {
+        if (!modResult || !isMountedRef.current) return
+        if ("spec" in modResult) {
+          setSpecInternal(modResult.spec)
+          specRef.current = modResult.spec
+          const count = modResult.spec.modules.filter(m => m.imageStatus === "complete").length
+          if ("persistError" in modResult) {
+            toast.warning("Results computed but failed to save. Please refresh and retry.")
+          } else if (count > 0) {
+            toast.success(`${count} module blueprints ready`)
+          }
+        }
+      })
+      .catch(() => {
+        toast.error("Image generation failed")
+        console.error("[Forge] Image generation error")
+      })
       .finally(() => {
-        setIsGeneratingImages(false)
-
-        // Phase 2: Module blueprint images (background, progressive via Realtime)
-        generateModuleImagesAction(scanId)
-          .then((modResult) => {
-            if ("spec" in modResult) {
-              setSpecInternal(modResult.spec)
-              specRef.current = modResult.spec
-              const count = modResult.spec.modules.filter(m => m.imageStatus === "complete").length
-              if ("persistError" in modResult) {
-                toast.warning("Results computed but failed to save. Please refresh and retry.")
-              } else if (count > 0) {
-                toast.success(`${count} module blueprints ready`)
-              }
-            }
-          })
-          .catch(() => {
-            console.error("[Forge] Module image generation failed")
-          })
+        if (isMountedRef.current) setIsGeneratingImages(false)
       })
   }, [scanId])
 
@@ -397,7 +460,8 @@ export function ForgeProjectProvider({
           return
         }
         // Direct response — update spec immediately (Realtime may also fire,
-        // but duplicate updates are harmless since React dedupes)
+        // but we set lastStatusRef so Realtime won't double-toast)
+        lastStatusRef.current = "complete"
         setSpecInternal(result.spec)
         specRef.current = result.spec
         setIsScanning(false)
@@ -738,6 +802,7 @@ export function ForgeProjectProvider({
     setIsPeopleLoading(true)
     matchPeopleAction(scanId, specRef.current.modules, forceRefresh)
       .then((result) => {
+        if (!isMountedRef.current) return
         if ("people" in result) setPeople(result.people)
         else console.error("[Forge] People error:", result.error)
       })
@@ -752,6 +817,7 @@ export function ForgeProjectProvider({
     setIsSuppliersLoading(true)
     matchSuppliersAction(scanId, specRef.current.modules, diagComplete, forceRefresh)
       .then((result) => {
+        if (!isMountedRef.current) return
         if ("suppliersByModule" in result) setSuppliersByModule(result.suppliersByModule)
         else console.error("[Forge] Supplier error:", result.error)
       })
@@ -778,45 +844,90 @@ export function ForgeProjectProvider({
     setProject((prev) => ({ ...prev, stage }))
   }, [scanId])
 
-  const value: ForgeProjectContextValue = {
-    project,
-    spec,
-    scanId,
-    setSpec,
-    handleModuleUpdate,
-    handleAssignSupplier,
-    handleRefineScan,
-    handleRefineModule,
-    handleDeriveProcessClass,
-    handleGenerateImages,
-    isGeneratingImages,
-    handleRunAnalysis,
-    handleRunStructural,
-    handleRunConvergence,
-    handleRunPremium,
-    isAnalyzing,
-    isRunningStructural,
-    isRunningConvergence,
-    isRunningPremium,
-    handleRunFullPipeline,
-    pipelineProgress,
-    dismissPipelineChanges,
-    handleCreateReviewObjective,
-    handleApplyDesignChanges,
-    people,
-    isPeopleLoading,
-    loadPeople,
-    suppliersByModule,
-    isSuppliersLoading,
-    loadSuppliers,
-    updateProjectName,
-    updateProjectStage,
+  const memoizedValue = useMemo<ForgeProjectContextValue>(
+    () => ({
+      project,
+      spec,
+      scanId,
+      setSpec,
+      handleModuleUpdate,
+      handleAssignSupplier,
+      handleRefineScan,
+      handleRefineModule,
+      handleDeriveProcessClass,
+      handleGenerateImages,
+      isGeneratingImages,
+      handleRunAnalysis,
+      handleRunStructural,
+      handleRunConvergence,
+      handleRunPremium,
+      isAnalyzing,
+      isRunningStructural,
+      isRunningConvergence,
+      isRunningPremium,
+      handleRunFullPipeline,
+      pipelineProgress,
+      dismissPipelineChanges,
+      handleCreateReviewObjective,
+      handleApplyDesignChanges,
+      people,
+      isPeopleLoading,
+      loadPeople,
+      suppliersByModule,
+      isSuppliersLoading,
+      loadSuppliers,
+      updateProjectName,
+      updateProjectStage,
     isScanning,
     scanStatus,
-  }
+    persistError,
+    isSaving,
+    isGeneratingModuleImages:
+      isGeneratingImages && spec.systemImageStatus === "complete",
+  }),
+    [
+      project,
+      spec,
+      scanId,
+      setSpec,
+      handleModuleUpdate,
+      handleAssignSupplier,
+      handleRefineScan,
+      handleRefineModule,
+      handleDeriveProcessClass,
+      handleGenerateImages,
+      isGeneratingImages,
+      handleRunAnalysis,
+      handleRunStructural,
+      handleRunConvergence,
+      handleRunPremium,
+      isAnalyzing,
+      isRunningStructural,
+      isRunningConvergence,
+      isRunningPremium,
+      handleRunFullPipeline,
+      pipelineProgress,
+      dismissPipelineChanges,
+      handleCreateReviewObjective,
+      handleApplyDesignChanges,
+      people,
+      isPeopleLoading,
+      loadPeople,
+      suppliersByModule,
+      isSuppliersLoading,
+      loadSuppliers,
+      updateProjectName,
+      updateProjectStage,
+      isScanning,
+      scanStatus,
+      persistError,
+      isSaving,
+      isGeneratingImages && spec.systemImageStatus === "complete",
+    ],
+  )
 
   return (
-    <ForgeProjectContext.Provider value={value}>
+    <ForgeProjectContext.Provider value={memoizedValue}>
       {children}
     </ForgeProjectContext.Provider>
   )

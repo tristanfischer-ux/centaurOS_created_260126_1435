@@ -12553,6 +12553,7 @@ export type Database = {
           foundry_id: string
           id: string
           idea: string
+          module_count: number | null
           name: string | null
           people_matches: Json | null
           research_report: Json | null
@@ -12571,6 +12572,7 @@ export type Database = {
           foundry_id: string
           id?: string
           idea: string
+          module_count?: number | null
           name?: string | null
           people_matches?: Json | null
           research_report?: Json | null
@@ -12589,6 +12591,7 @@ export type Database = {
           foundry_id?: string
           id?: string
           idea?: string
+          module_count?: number | null
           name?: string | null
           people_matches?: Json | null
           research_report?: Json | null

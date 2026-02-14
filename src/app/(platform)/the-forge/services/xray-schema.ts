@@ -17,6 +17,8 @@
 
 import { z } from "zod"
 
+import type { Json } from "@/types/database.types"
+
 // ─── Engineering Analysis Schemas ────────────────────────────────────
 
 /** DFM issue severity levels */
@@ -430,6 +432,27 @@ export const XRaySpecSchema = z.object({
 })
 
 export type XRaySpec = z.infer<typeof XRaySpecSchema>
+
+// ─── DB CHECK constraint enums (match xray_scans columns) ──────────────
+
+/** Matches xray_scans.scan_status CHECK */
+export const XRayScanStatusSchema = z.enum(["idle", "scanning", "complete"])
+export type XRayScanStatus = z.infer<typeof XRayScanStatusSchema>
+
+/** Matches xray_scans.status CHECK */
+export const XRayStatusSchema = z.enum(["draft", "scanned", "diagnostic_complete"])
+export type XRayStatus = z.infer<typeof XRayStatusSchema>
+
+/**
+ * Converts XRaySpec to JSON for DB storage.
+ * Use when persisting spec to xray_scans.spec column.
+ *
+ * @param spec - Validated XRaySpec
+ * @returns JSON-serializable value for JSONB column
+ */
+export function specToJson(spec: XRaySpec): Json {
+  return spec as unknown as Json
+}
 
 /**
  * Parses JSONB spec from DB with validation.

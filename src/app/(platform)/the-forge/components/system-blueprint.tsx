@@ -142,6 +142,8 @@ interface SystemBlueprintProps {
   systemImageStatus?: string
   /** Whether images are currently being generated */
   isGeneratingImages: boolean
+  /** True when Phase 2 (module blueprints) is running after system image */
+  isGeneratingModuleImages?: boolean
   /** Whether any module images have been generated */
   hasImages: boolean
   /** Called to trigger image generation */
@@ -168,6 +170,7 @@ export function SystemBlueprint({
   systemImageUrl,
   systemImageStatus,
   isGeneratingImages,
+  isGeneratingModuleImages = false,
   hasImages,
   onGenerateImages,
   canGenerate,
@@ -241,7 +244,7 @@ export function SystemBlueprint({
               {isGenerating && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Generating images...
+                  {isGeneratingModuleImages ? "Generating module blueprints..." : "Generating images..."}
                 </div>
               )}
               {n > 0 && (

@@ -14,7 +14,7 @@
 import React, { useState } from "react"
 import Link from "next/link"
 
-import { ArrowLeft, Pencil, Check, X } from "lucide-react"
+import { ArrowLeft, Pencil, Check, X, Loader2 } from "lucide-react"
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -30,7 +30,7 @@ import { useForgeProject } from "./forge-project-context"
  * header pattern with orange accent bar.
  */
 export function ForgeProjectHeader(): React.ReactNode {
-  const { project, updateProjectName } = useForgeProject()
+  const { project, updateProjectName, isSaving, persistError } = useForgeProject()
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(project.name || "")
 
@@ -100,6 +100,19 @@ export function ForgeProjectHeader(): React.ReactNode {
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
+              </div>
+            )}
+            {(isSaving || persistError) && (
+              <div className="flex items-center gap-2 mt-1 text-xs">
+                {isSaving && (
+                  <span className="text-muted-foreground inline-flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Saving...
+                  </span>
+                )}
+                {persistError && !isSaving && (
+                  <span className="text-destructive">{persistError}</span>
+                )}
               </div>
             )}
           </div>
