@@ -310,18 +310,44 @@ Output ONLY the Python code.`
       }
     }
 
-    // ── Step 5: Store in Supabase ──
-    console.info("[CAD-GRAMMAR-RESEARCH] Step 5: Storing grammar in Supabase...")
-
-    // Read the core library from an existing grammar
-    const { data: existingGrammar } = await supabase
+    // ── Step 4b: Fetch core library for Modal validation ──
+    const { data: coreRow } = await supabase
       .from("cad_grammars")
-      .select("core_library_code")
+      .select("python_code")
+      .eq("name", "__core_library__")
       .eq("is_active", true)
-      .limit(1)
       .single()
 
-    const coreLibraryCode = existingGrammar?.core_library_code ?? ""
+    const coreLibraryCode = coreRow?.python_code ?? ""
+    if (!coreLibraryCode) {
+      return {
+        success: false,
+        error: "No core library available in database. Cannot validate grammar on Modal.",
+        tokensIn: totalTokensIn,
+        tokensOut: totalTokensOut,
+      }
+    }
+
+    // ── Step 4c: Validate grammar executes on Modal ──
+    console.info("[CAD-GRAMMAR-RESEARCH] Step 4c: Validating grammar on Modal...")
+
+    const modalValidation = await validateGrammarOnModal(
+      coreLibraryCode,
+      cleanCode,
+      metadata.defaults_json ?? {},
+    )
+    if (!modalValidation.success) {
+      console.warn("[CAD-GRAMMAR-RESEARCH] Modal validation failed:", modalValidation.error)
+      return {
+        success: false,
+        error: `Grammar failed execution on Modal: ${modalValidation.error}`,
+        tokensIn: totalTokensIn,
+        tokensOut: totalTokensOut,
+      }
+    }
+
+    // ── Step 5: Store in Supabase ──
+    console.info("[CAD-GRAMMAR-RESEARCH] Step 5: Storing grammar in Supabase...")
 
     // Safe cast: param_specs and defaults are JSONB — cast through JSON stringify/parse
     const paramSpecsJson = JSON.parse(JSON.stringify(
@@ -338,7 +364,7 @@ Output ONLY the Python code.`
         domain_keywords: metadata.domain_keywords,
         example_prompts: metadata.example_prompts,
         python_code: cleanCode,
-        core_library_code: coreLibraryCode,
+        core_library_code: null, // Uses __core_library__ at runtime
         param_specs: paramSpecsJson,
         defaults: defaultsJson,
         constraints_summary: metadata.constraints_summary,
@@ -438,4 +464,91 @@ function validateGrammarCode(code: string, expectedName: string): string[] {
   }
 
   return errors
+}
+
+/** Response shape from Modal generate-from-grammar endpoint */
+interface ModalGrammarResponse {
+  error: string | null
+  step: string | null
+  stl: string | null
+  svg_iso: string | null
+  svg_top: string | null
+  svg_front: string | null
+  svg_back: string | null
+  svg_right: string | null
+  svg_left: string | null
+  svg_exploded: string | null
+}
+
+/**
+ * Validates that grammar code executes successfully on Modal.
+ * Calls generate_from_grammar_endpoint with default params and verifies output.
+ *
+ * @param coreCode - Core library Python code
+ * @param grammarCode - Grammar Python code
+ * @param params - Default parameter values
+ * @returns Success and optional error message
+ */
+async function validateGrammarOnModal(
+  coreCode: string,
+  grammarCode: string,
+  params: Record<string, unknown>,
+): Promise<{ success: boolean; error?: string }> {
+  const endpointUrl = process.env.MODAL_CAD_GRAMMAR_ENDPOINT_URL
+    ?? process.env.MODAL_CAD_ENDPOINT_URL?.replace(
+      "generate-cad-endpoint",
+      "generate-from-grammar-endpoint",
+    )
+
+  if (!endpointUrl) {
+    return { success: false, error: "MODAL_CAD_GRAMMAR_ENDPOINT_URL not configured" }
+  }
+
+  try {
+    const response = await fetch(endpointUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        core_code: coreCode,
+        grammar_code: grammarCode,
+        params,
+        material_density: 1240,
+      }),
+      signal: AbortSignal.timeout(120_000), // 2 min for validation
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      return {
+        success: false,
+        error: `Modal returned ${response.status}: ${errText.slice(0, 200)}`,
+      }
+    }
+
+    const data = (await response.json()) as ModalGrammarResponse
+    if (data.error) {
+      return { success: false, error: data.error }
+    }
+
+    const hasOutput =
+      (data.step && data.step.length > 0) ||
+      (data.stl && data.stl.length > 0) ||
+      (data.svg_iso && data.svg_iso.length > 0) ||
+      (data.svg_top && data.svg_top.length > 0) ||
+      (data.svg_front && data.svg_front.length > 0)
+
+    if (!hasOutput) {
+      return {
+        success: false,
+        error: "Modal execution produced no SVG, STEP, or STL output",
+      }
+    }
+
+    return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error during Modal validation",
+    }
+  }
 }
