@@ -202,6 +202,11 @@ export async function assessSingleFunction(
     foundryContext: string
 ): Promise<{ suggestion?: { status: CoverageStatus; priority: GapPriority; reasoning: string }; error?: string }> {
     return withAuth(async ({ user }) => {
+        const openai = getOpenAIClient()
+        if (!openai) {
+            return { error: 'AI single-function assessment service is not configured' }
+        }
+
         // SECURITY: Rate limit AI calls to prevent cost abuse
         const rateLimitError = await checkRateLimit('aiAnalysis', `ai:${user.id}`)
         if (rateLimitError) return { error: rateLimitError }

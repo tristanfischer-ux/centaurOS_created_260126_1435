@@ -194,6 +194,11 @@ export async function generateStructuredAnswer(
     input: GenerateAnswerInput
 ): Promise<{ result?: StructuredAnswer; error?: string }> {
     return withAuth(async ({ user }) => {
+        const openai = getOpenAIClient()
+        if (!openai) {
+            return { error: 'AI advisory service is not configured' }
+        }
+
         // SECURITY: Rate limit AI calls to prevent cost abuse
         const rateLimitError = await checkRateLimit('aiAdvisory', `ai:${user.id}`)
         if (rateLimitError) return { error: rateLimitError }
@@ -273,6 +278,11 @@ export async function suggestQuestionCategory(
     body: string
 ): Promise<{ category?: AdvisoryCategory; tags?: string[]; error?: string }> {
     return withAuth(async ({ user }) => {
+        const openai = getOpenAIClient()
+        if (!openai) {
+            return { error: 'AI advisory service is not configured' }
+        }
+
         // SECURITY: Rate limit AI calls to prevent cost abuse
         const rateLimitError = await checkRateLimit('aiAdvisory', `ai:${user.id}`)
         if (rateLimitError) return { error: rateLimitError }

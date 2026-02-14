@@ -297,6 +297,26 @@ describe('server action OpenAI hardening regressions', () => {
       expect(source).not.toMatch(/apiKey:\s*process\.env\.OPENAI_API_KEY\s*\|\|/)
     }
   })
+
+  it('fails closed for both assessCoverage and assessSingleFunction OpenAI usage', async () => {
+    const assessCoveragePath = path.join(process.cwd(), 'src/actions/assess-coverage.ts')
+    const source = await readFile(assessCoveragePath, 'utf-8')
+
+    expect(source).toContain('AI coverage analysis service is not configured')
+    expect(source).toContain('AI single-function assessment service is not configured')
+    expect(source).toMatch(/const openai = getOpenAIClient\(\)/g)
+  })
+
+  it('fails closed for all advisory answer AI entry points', async () => {
+    const advisoryActionPath = path.join(process.cwd(), 'src/actions/generate-advisory-answer.ts')
+    const source = await readFile(advisoryActionPath, 'utf-8')
+
+    expect(source).toContain('AI advisory service is not configured')
+    expect(source).toContain('export async function generateAdvisoryAnswer(')
+    expect(source).toContain('export async function generateStructuredAnswer(')
+    expect(source).toContain('export async function suggestQuestionCategory(')
+    expect(source.match(/const openai = getOpenAIClient\(\)/g)?.length).toBeGreaterThanOrEqual(3)
+  })
 })
 
 describe('billing test activation hardening regressions', () => {

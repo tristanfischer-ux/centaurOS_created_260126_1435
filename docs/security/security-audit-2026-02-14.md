@@ -377,6 +377,10 @@ credentials instead of consistently failing closed.
   - `src/app/actions/analyze-business-plan.ts`
   - `src/lib/telegram/ai-processor.ts`
 - Added explicit fail-closed behavior when `OPENAI_API_KEY` is unavailable.
+- Added explicit fail-closed OpenAI guard to `assessSingleFunction(...)` in
+  `src/actions/assess-coverage.ts` to prevent undefined-client execution.
+- Expanded focused `typecheck:security` scope to include these AI server actions and
+  Telegram AI processor path.
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
