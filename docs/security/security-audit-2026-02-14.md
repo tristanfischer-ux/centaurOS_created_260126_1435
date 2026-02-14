@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 10 | 8 fixed, 2 open |
+| Medium | 11 | 9 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -274,6 +274,20 @@ service-unavailable behavior.
 
 ---
 
+### 15) Sweep trigger webhook auth allowed secretless execution in development mode (Medium)
+
+**Issue:** `/api/agents/sweep-trigger` allowed requests when no webhook secret was configured outside production.  
+**Impact:** Inconsistent webhook authorization posture and avoidable accidental exposure risk.
+
+**Fix implemented (`src/app/api/agents/sweep-trigger/route.ts`):**
+
+- `verifyWebhookAuth(...)` now fail-closes with 503 when no `WEBHOOK_SECRET`/`CRON_SECRET` is configured.
+- Unauthorized requests continue to return 401 on secret mismatch.
+- Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
 ## Security Regression Coverage Added
 
 Added:
@@ -292,6 +306,7 @@ The test suite enforces:
 7. QA callback secret enforcement across both POST and GET handlers.
 8. Internal council routing no longer uses env-driven URLs for cookie-forwarded calls.
 9. OpenAI-key fail-closed guards for AI marketplace/RFQ routes.
+10. Sweep-trigger webhook secret fail-closed enforcement.
 
 ---
 

@@ -105,6 +105,15 @@ describe('cron authorization hardening regressions', () => {
       expect(source).toContain("return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })")
     }
   })
+
+  it('fails closed for sweep-trigger webhook auth when secrets are missing', async () => {
+    const sweepTriggerPath = path.join(process.cwd(), 'src/app/api/agents/sweep-trigger/route.ts')
+    const source = await readFile(sweepTriggerPath, 'utf-8')
+
+    expect(source).toContain('if (!webhookSecret)')
+    expect(source).toContain("return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 })")
+    expect(source).toContain('const authFailure = verifyWebhookAuth(req)')
+  })
 })
 
 describe('message attachment authorization regressions', () => {

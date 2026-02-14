@@ -85,19 +85,21 @@ const EVENT_SPECIALIST_MAP: Record<string, string[]> = {
  *
  * @security Accepts either CRON_SECRET or a dedicated WEBHOOK_SECRET
  */
-function verifyWebhookAuth(req: NextRequest): boolean {
+function verifyWebhookAuth(req: NextRequest): NextResponse | null {
   const webhookSecret = process.env.WEBHOOK_SECRET ?? process.env.CRON_SECRET
 
+  // SECURITY: Fail closed when no secret is configured.
   if (!webhookSecret) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error('[SECURITY] No webhook secret configured in production!')
-      return false
-    }
-    return true // Allow in development
+    console.error('[SECURITY] No webhook secret configured')
+    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 })
   }
 
   const authHeader = req.headers.get('authorization')
-  return authHeader === `Bearer ${webhookSecret}`
+  if (authHeader !== `Bearer ${webhookSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  return null
 }
 
 // ─── Route Handler ──────────────────────────────────────────────────
@@ -110,8 +112,9 @@ function verifyWebhookAuth(req: NextRequest): boolean {
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // AUTH: Verify webhook authorization
-  if (!verifyWebhookAuth(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const authFailure = verifyWebhookAuth(req)
+  if (authFailure) {
+    return authFailure
   }
 
   try {
