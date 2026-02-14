@@ -70,6 +70,8 @@ export interface Specialist {
     reportsTo: string | null
     /** Real-world leader whose personality inspires this specialist */
     inspiredBy: string
+    /** Ethics alignment — which ethical principles this specialist emphasizes */
+    ethicsAlignment?: string
 }
 
 export const SPECIALISTS: Specialist[] = [
@@ -132,6 +134,7 @@ export const SPECIALISTS: Specialist[] = [
         department: "Strategy",
         reportsTo: null,
         inspiredBy: "Jeff Bezos",
+        ethicsAlignment: "strategist",
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // TECHNOLOGY — The foundation of making things
@@ -192,6 +195,7 @@ export const SPECIALISTS: Specialist[] = [
         department: "Technology",
         reportsTo: null,
         inspiredBy: "Elon Musk + Jensen Huang",
+        ethicsAlignment: "cto",
     },
     {
         id: "vp-engineering",
@@ -483,6 +487,7 @@ export const SPECIALISTS: Specialist[] = [
         department: "Growth",
         reportsTo: "strategist",
         inspiredBy: "Seth Godin",
+        ethicsAlignment: "marketing",
     },
     {
         id: "sales-lead",
@@ -540,6 +545,7 @@ export const SPECIALISTS: Specialist[] = [
         department: "Growth",
         reportsTo: "strategist",
         inspiredBy: "Marc Benioff",
+        ethicsAlignment: "sales",
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // OPERATIONS — Keeping the machine running
@@ -600,6 +606,7 @@ export const SPECIALISTS: Specialist[] = [
         department: "Operations",
         reportsTo: null,
         inspiredBy: "Sheryl Sandberg",
+        ethicsAlignment: "chief-of-staff",
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // FINANCE — The fuel
@@ -660,6 +667,7 @@ export const SPECIALISTS: Specialist[] = [
         department: "Finance",
         reportsTo: null,
         inspiredBy: "Charlie Munger",
+        ethicsAlignment: "finance",
     },
     {
         id: "fundraising-advisor",
@@ -777,6 +785,7 @@ export const SPECIALISTS: Specialist[] = [
         department: "People",
         reportsTo: "chief-of-staff",
         inspiredBy: "Patty McCord",
+        ethicsAlignment: "people",
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // LEGAL — Protecting the company
@@ -837,6 +846,7 @@ export const SPECIALISTS: Specialist[] = [
         department: "Legal",
         reportsTo: null,
         inspiredBy: "David Boies",
+        ethicsAlignment: "legal",
     },
 ]
 

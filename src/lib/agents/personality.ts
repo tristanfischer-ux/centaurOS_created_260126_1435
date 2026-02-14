@@ -17,6 +17,7 @@
 
 import type { ArchetypeId } from "./archetypes"
 import { ARCHETYPES } from "./archetypes"
+import { compileEthicsPrompt } from "./ethics"
 
 // ─── Personality Type Definitions ────────────────────────────────────────────
 
@@ -98,12 +99,14 @@ export interface AgentPersonality {
  * @param name - The agent's display name (e.g., "Strategist", "Sam")
  * @param personality - The full personality definition
  * @param domainContext - Optional domain-specific context (e.g., specialist description)
+ * @param specialistId - Optional specialist ID for ethics alignment (e.g., "strategist", "cto")
  * @returns Compiled personality prompt block as a string
  */
 export function compilePersonalityPrompt(
-    name: string,
-    personality: AgentPersonality,
-    domainContext?: string,
+	name: string,
+	personality: AgentPersonality,
+	domainContext?: string,
+	specialistId?: string,
 ): string {
     const { backstory, voice, interactionStyle } = personality
     const primary = ARCHETYPES[personality.primaryArchetype]
@@ -185,6 +188,13 @@ export function compilePersonalityPrompt(
         `YOUR SELF-AWARENESS:\n- ${backstory.blindSpot}`,
     )
 
+    // ── Ethical Framework ────────────────────────────────────────────────
+    // Inject ethics prompt if specialistId provided
+    if (specialistId) {
+        const ethicsBlock = compileEthicsPrompt(specialistId)
+        sections.push(`\n\n---\n\n${ethicsBlock}`)
+    }
+
     return sections.join("\n\n")
 }
 
@@ -197,22 +207,30 @@ export function compilePersonalityPrompt(
  *
  * @param name - The agent's display name
  * @param archetypeId - Which archetype to use as the foundation
+ * @param specialistId - Optional specialist ID for ethics alignment
  * @returns Compiled personality prompt block
  */
 export function compileArchetypePrompt(
-    name: string,
-    archetypeId: ArchetypeId,
+	name: string,
+	archetypeId: ArchetypeId,
+	specialistId?: string,
 ): string {
-    const archetype = ARCHETYPES[archetypeId]
+	const archetype = ARCHETYPES[archetypeId]
 
-    const sections: string[] = [
-        `You are ${name}. ${archetype.coreBehavior}`,
-        "YOUR APPROACH:\n" +
-            archetype.promptPatterns.map((line) => `- ${line}`).join("\n"),
-        `YOUR VOICE:\n- ${archetype.communicationStyle}`,
-        "WHAT YOU DON'T DO:\n" +
-            archetype.antiPatterns.map((line) => `- ${line}`).join("\n"),
-    ]
+	const sections: string[] = [
+		`You are ${name}. ${archetype.coreBehavior}`,
+		"YOUR APPROACH:\n" +
+			archetype.promptPatterns.map((line) => `- ${line}`).join("\n"),
+		`YOUR VOICE:\n- ${archetype.communicationStyle}`,
+		"WHAT YOU DON'T DO:\n" +
+			archetype.antiPatterns.map((line) => `- ${line}`).join("\n"),
+	]
 
-    return sections.join("\n\n")
+	// Inject ethics prompt if specialistId provided
+	if (specialistId) {
+		const ethicsBlock = compileEthicsPrompt(specialistId)
+		sections.push(`\n\n---\n\n${ethicsBlock}`)
+	}
+
+	return sections.join("\n\n")
 }
