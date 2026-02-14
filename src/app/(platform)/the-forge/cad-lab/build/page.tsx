@@ -49,7 +49,7 @@ import { CadLabWhileYouWait } from "@/components/cad/cad-lab-while-you-wait"
 import type { CadLabResult } from "@/lib/cad-lab-types"
 
 import { useCadLab } from "../cad-lab-context"
-import { Metric, SvgView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
+import { Metric, InlineSvg, SvgView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
 
 // ─── View Tab Type ───────────────────────────────────────────────────
 
@@ -79,10 +79,16 @@ export default function CadLabBuildPage(): React.ReactNode {
   const [showCode, setShowCode] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
 
-  // Dialog state for viewing module results
+  // Dialog state for viewing module results — reset view tab on open
   const [dialogModuleId, setDialogModuleId] = useState<string | null>(null)
   const dialogModule = dialogModuleId ? modules.find((m) => m.id === dialogModuleId) : null
   const dialogResult = dialogModule?.result as CadLabResult | undefined
+
+  const openModuleDialog = useCallback((moduleId: string) => {
+    setActiveViewTab("3d")
+    setShowCode(false)
+    setDialogModuleId(moduleId)
+  }, [])
 
   // Gate: redirect if no research
   useEffect(() => {
@@ -251,7 +257,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                       isError ? "border-destructive/30 bg-status-error-light/10" :
                       "border-muted bg-muted/10"
                     }`}
-                    onClick={isDone ? () => setDialogModuleId(mod.id) : undefined}
+                    onClick={isDone ? () => openModuleDialog(mod.id) : undefined}
                     role={isDone ? "button" : undefined}
                     tabIndex={isDone ? 0 : undefined}
                   >
@@ -403,6 +409,20 @@ export default function CadLabBuildPage(): React.ReactNode {
                     </div>
                   </div>
 
+                  {/* SVG thumbnail — shown when module has been generated */}
+                  {mod.status === "generated" && (mod.result as CadLabResult | undefined)?.svgIso && (
+                    <button
+                      onClick={() => openModuleDialog(mod.id)}
+                      className="w-full h-24 rounded-md bg-muted/30 border border-muted overflow-hidden cursor-pointer hover:border-international-orange/30 transition-colors"
+                    >
+                      <InlineSvg
+                        src={(mod.result as CadLabResult).svgIso!}
+                        alt={`${mod.name} preview`}
+                        className="w-full h-full"
+                      />
+                    </button>
+                  )}
+
                   {/* Module meta row */}
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
@@ -443,7 +463,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setDialogModuleId(mod.id)}
+                        onClick={() => openModuleDialog(mod.id)}
                         className="text-xs h-8 gap-1"
                       >
                         <Maximize2 className="h-3 w-3" />
