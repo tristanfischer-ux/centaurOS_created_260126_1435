@@ -243,6 +243,10 @@ non-production environments.
   - key prefixes: `cron-morning-brief`, `cron-daily-reports`,
     `cron-weekly-synthesis`, `cron-agent-sweep`, `cron-telegram-briefings`
   - returns `429` on exhaustion before auth checks.
+- Standardized daily reports cron privileged DB access to shared helper:
+  - `src/app/api/cron/reports/daily/route.ts` now uses
+    `createAdminClient()` from `@/lib/supabase/admin` instead of ad-hoc
+    service-key client construction.
 - Unauthorized requests now consistently return 401 when secret mismatch.
 - Added regression assertion covering all four routes in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.

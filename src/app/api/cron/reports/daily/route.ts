@@ -16,7 +16,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { 
     generateDailyPulseReport, 
     formatDailyPulseForTelegram,
@@ -24,20 +23,7 @@ import {
 } from '@/lib/reports'
 import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 import { isValidSlackWebhookUrl, sanitizeUrlForLogging } from '@/lib/security/url-validation'
-
-// Get admin client for cron operations
-function getAdminClient() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!url || !serviceKey) {
-        throw new Error('Missing Supabase configuration')
-    }
-
-    return createClient(url, serviceKey, {
-        auth: { autoRefreshToken: false, persistSession: false }
-    })
-}
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // Verify cron secret to prevent unauthorized access
 function verifyCronSecret(req: NextRequest): NextResponse | null {
@@ -70,7 +56,8 @@ export async function GET(req: NextRequest) {
         return authFailure
     }
 
-    const supabase = getAdminClient()
+    // SECURITY: Service-role client is required for unattended cron execution.
+    const supabase = createAdminClient()
     let sent = 0
     let failed = 0
 

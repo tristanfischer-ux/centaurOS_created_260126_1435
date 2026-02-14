@@ -100,6 +100,9 @@ describe('cron authorization hardening regressions', () => {
     const dailyReportsRoutePath = path.join(process.cwd(), 'src/app/api/cron/reports/daily/route.ts')
     const source = await readFile(dailyReportsRoutePath, 'utf-8')
 
+    expect(source).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
+    expect(source).toContain('const supabase = createAdminClient()')
+    expect(source).not.toContain("import { createClient } from '@supabase/supabase-js'")
     expect(source).toContain('isValidSlackWebhookUrl(pref.slack_webhook_url)')
     expect(source).toContain("redirect: 'error'")
   })
