@@ -94,8 +94,8 @@ This audit reviewed the application security posture across:
 
 **Current `npm audit --omit=dev` status:**  
 - High: **0**  
-- Moderate: 5  
-- Low: 1
+- Moderate: **0**  
+- Low: **0**
 
 ---
 
