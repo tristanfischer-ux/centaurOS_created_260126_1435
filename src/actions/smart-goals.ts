@@ -18,14 +18,25 @@ import { buildAIContext } from '@/lib/ai-context/builder'
 import { escapeHtml } from '@/lib/security/sanitize'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
-/** Whether AI features are available (API key is set and not the build placeholder) */
-const AI_ENABLED =
-  !!process.env.OPENAI_API_KEY &&
-  process.env.OPENAI_API_KEY !== 'dummy-key-for-build'
+let openaiClient: OpenAI | null = null
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'dummy-key-for-build',
-})
+/** Whether AI features are available (API key is set). */
+function isAIEnabled(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY)
+}
+
+function getOpenAIClient(): OpenAI | null {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    return null
+  }
+
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey })
+  }
+
+  return openaiClient
+}
 
 /**
  * Lightweight check for whether AI features are configured.
@@ -36,7 +47,7 @@ const openai = new OpenAI({
  * @returns Whether the OpenAI API key is configured
  */
 export async function checkAIAvailable(): Promise<boolean> {
-  return AI_ENABLED
+  return isAIEnabled()
 }
 
 /** Source page context for pre-filling */
@@ -100,7 +111,10 @@ export interface SmartScoreResult {
 export async function smartifyGoal(
   input: SmartGoalInput
 ): Promise<SmartifyResult> {
-  if (!AI_ENABLED) return { error: 'AI not configured' }
+  if (!isAIEnabled()) return { error: 'AI not configured' }
+
+  const openai = getOpenAIClient()
+  if (!openai) return { error: 'AI not configured' }
 
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -252,7 +266,10 @@ export async function scoreSmartGoal(
   text: string,
   type: 'objective' | 'task'
 ): Promise<SmartScoreResult> {
-  if (!AI_ENABLED) return { error: 'AI not configured' }
+  if (!isAIEnabled()) return { error: 'AI not configured' }
+
+  const openai = getOpenAIClient()
+  if (!openai) return { error: 'AI not configured' }
 
   const trimmed = text?.trim()
   if (!trimmed || trimmed.length < 5) {

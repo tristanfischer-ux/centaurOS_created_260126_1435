@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 14 | 12 fixed, 2 open |
+| Medium | 15 | 13 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -353,6 +353,30 @@ did not enforce authenticated foundry membership before create/update operations
   - `src/actions/agent-objectives.ts`
   - `src/lib/agents/permission-guard.ts`
   - `src/lib/agents/collaboration-hub.ts`
+- Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 19) Server actions and Telegram AI processor used placeholder OpenAI key fallbacks (Medium)
+
+**Issue:** Several server-side AI entry points initialized OpenAI clients with
+placeholder fallback keys at module scope.  
+**Impact:** Misconfigured environments could attempt upstream AI calls with invalid
+credentials instead of consistently failing closed.
+
+**Fix implemented:**
+
+- Replaced placeholder fallback initialization with lazy `getOpenAIClient()`
+  guards in:
+  - `src/actions/strategic-planner.ts`
+  - `src/actions/smart-goals.ts`
+  - `src/actions/generate-advisory-answer.ts`
+  - `src/actions/assess-coverage.ts`
+  - `src/actions/analyze.ts`
+  - `src/app/actions/analyze-business-plan.ts`
+  - `src/lib/telegram/ai-processor.ts`
+- Added explicit fail-closed behavior when `OPENAI_API_KEY` is unavailable.
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 

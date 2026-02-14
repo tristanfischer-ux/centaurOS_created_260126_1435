@@ -30,9 +30,20 @@ import type {
 } from '@/types/strategic-planner'
 import type { Json } from '@/types/database.types'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'dummy-key-for-build',
-})
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI | null {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    return null
+  }
+
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey })
+  }
+
+  return openaiClient
+}
 
 // ─── Task Dependency Actions ─────────────────────────────────────
 
@@ -342,6 +353,11 @@ Respond with ONLY valid JSON matching this schema (no markdown, no code fences):
     }
   ]
 }`
+
+    const openai = getOpenAIClient()
+    if (!openai) {
+      return { error: 'AI planning service is not configured' }
+    }
 
     try {
       const response = await openai.chat.completions.create({

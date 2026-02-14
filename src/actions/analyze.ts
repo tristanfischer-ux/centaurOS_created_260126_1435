@@ -4,9 +4,20 @@ import OpenAI from 'openai'
 import { withAuth } from '@/lib/server-action-utils'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
-})
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 export type AnalyzedTask = {
     title: string
@@ -22,6 +33,11 @@ export type AnalyzedObjective = {
 
 export async function analyzeBusinessPlan(formData: FormData): Promise<{ objectives?: AnalyzedObjective[], error?: string }> {
     return withAuth(async ({ user }) => {
+        const openai = getOpenAIClient()
+        if (!openai) {
+            return { error: 'AI analysis service is not configured' }
+        }
+
         // SECURITY: Rate limit AI calls to prevent cost abuse
         const rateLimitError = await checkRateLimit('aiAnalysis', `ai:${user.id}`)
         if (rateLimitError) return { error: rateLimitError }

@@ -276,3 +276,25 @@ describe('agent objective action security regressions', () => {
     expect(source).not.toContain('.supabase.from(')
   })
 })
+
+describe('server action OpenAI hardening regressions', () => {
+  it('does not use dummy OpenAI key fallbacks in server actions and telegram AI processor', async () => {
+    const actionFiles = [
+      'src/actions/strategic-planner.ts',
+      'src/actions/smart-goals.ts',
+      'src/actions/generate-advisory-answer.ts',
+      'src/actions/assess-coverage.ts',
+      'src/actions/analyze.ts',
+      'src/app/actions/analyze-business-plan.ts',
+      'src/lib/telegram/ai-processor.ts',
+    ]
+
+    for (const filePath of actionFiles) {
+      const source = await readFile(path.join(process.cwd(), filePath), 'utf-8')
+      expect(source).toContain('function getOpenAIClient()')
+      expect(source).not.toContain('dummy-key-for-build')
+      expect(source).not.toContain('sk-placeholder-for-build-only')
+      expect(source).not.toMatch(/apiKey:\s*process\.env\.OPENAI_API_KEY\s*\|\|/)
+    }
+  })
+})
