@@ -111,6 +111,11 @@
 }
 
 @layer base {
+  /* Smooth scrolling for hash-link navigation */
+  html {
+    scroll-behavior: smooth;
+  }
+
   :root {
     /* Fractional Forge - Light Mode */
     --background: 0 0% 100%;
