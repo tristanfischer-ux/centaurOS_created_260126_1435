@@ -33,8 +33,7 @@ jobs:
         run: npm ci
 
       - name: Security audit
-        run: npm audit --audit-level=high
-        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Type Check
         run: npm run typecheck
