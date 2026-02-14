@@ -19,7 +19,6 @@ import {
   ChevronDown,
   ChevronRight,
   Globe,
-  ExternalLink,
   RotateCcw,
   ArrowRight,
   BarChart3,
@@ -28,6 +27,10 @@ import {
   Sparkles,
   Pencil,
   AlertCircle,
+  Building2,
+  BookOpen,
+  Database,
+  MessageSquare,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -47,6 +50,65 @@ import { CadLabResearchReport } from "@/components/cad/cad-lab-research-report"
 import { cn } from "@/lib/utils"
 
 import { useCadLab } from "./cad-lab-context"
+
+// ─── Source credibility classification ───────────────────────────────
+
+type SourceType = "manufacturer" | "datasheet" | "reference" | "community"
+
+/**
+ * Classifies a URL into a credibility category based on domain patterns.
+ *
+ * @param uri - Source URL
+ * @param title - Source title (for additional heuristics)
+ * @returns Source type for icon/label treatment
+ */
+function classifySource(uri: string, title: string): SourceType {
+  const lower = uri.toLowerCase()
+  const titleLower = title.toLowerCase()
+
+  // Datasheets and spec documents
+  if (titleLower.includes("datasheet") || titleLower.includes("spec sheet") ||
+      titleLower.includes("technical data") || lower.includes("/datasheet") ||
+      lower.includes(".pdf") || titleLower.includes("product specification")) {
+    return "datasheet"
+  }
+
+  // Known manufacturer/OEM domains
+  const manufacturerPatterns = [
+    "ti.com", "analog.com", "digikey.com", "mouser.com", "arrow.com",
+    "mcmaster.com", "misumi", "hiwin.com", "harmonicdrive", "maxon",
+    "faulhaber.com", "nanotec.com", "pololu.com", "sparkfun.com",
+    "adafruit.com", "dji.com", "cubespace", "nanoavionics", "endurosat",
+    "blue-canyon", "spacex.com", "boeing.com", "airbus.com", "tesla.com",
+    "nvidia.com", "intel.com", "stmicro", "nxp.com", "infineon.com",
+    "rohde-schwarz", "keysight.com", "thingiverse.com", "grabcad.com",
+    "manufacturer", ".gov", "nasa.gov", "esa.int", "mil",
+  ]
+  if (manufacturerPatterns.some((p) => lower.includes(p))) {
+    return "manufacturer"
+  }
+
+  // Reference/educational sites
+  const referencePatterns = [
+    "wikipedia", "engineering.com", "machinedesign.com", "asme.org",
+    "iso.org", "astm.org", "sae.org", "ieee.org", "springer.com",
+    "sciencedirect", "researchgate", "arxiv.org", ".edu", "handbook",
+    "standard", "reference",
+  ]
+  if (referencePatterns.some((p) => lower.includes(p))) {
+    return "reference"
+  }
+
+  // Community/forums/blogs
+  return "community"
+}
+
+const SOURCE_TYPE_CONFIG: Record<SourceType, { label: string; icon: typeof Globe; color: string }> = {
+  manufacturer: { label: "Manufacturer", icon: Building2, color: "text-status-success" },
+  datasheet: { label: "Datasheet", icon: Database, color: "text-electric-blue" },
+  reference: { label: "Reference", icon: BookOpen, color: "text-international-orange" },
+  community: { label: "Community", icon: MessageSquare, color: "text-muted-foreground" },
+}
 
 // ─── Quick-start templates ───────────────────────────────────────────
 
@@ -388,24 +450,44 @@ export default function CadLabResearchPage(): React.ReactNode {
               </CardHeader>
               {showSources && (
                 <CardContent className="space-y-4">
+                  {/* Source credibility legend */}
+                  <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+                    <span className="font-medium">Type:</span>
+                    {(Object.entries(SOURCE_TYPE_CONFIG) as [SourceType, typeof SOURCE_TYPE_CONFIG[SourceType]][]).map(([key, cfg]) => {
+                      const Icon = cfg.icon
+                      return (
+                        <div key={key} className="flex items-center gap-1">
+                          <Icon className={cn("h-3 w-3", cfg.color)} />
+                          <span>{cfg.label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Classified source list */}
                   {researchResult.sources.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Web Sources</p>
-                      <ul className="space-y-1">
-                        {researchResult.sources.map((source, i) => (
-                          <li key={i} className="text-xs font-mono flex items-start gap-1.5">
-                            <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1.5">
+                      {researchResult.sources.map((source, i) => {
+                        const sourceType = classifySource(source.uri, source.title || "")
+                        const cfg = SOURCE_TYPE_CONFIG[sourceType]
+                        const TypeIcon = cfg.icon
+                        return (
+                          <div key={i} className="flex items-start gap-2 text-xs">
+                            <TypeIcon className={cn("h-3 w-3 flex-shrink-0 mt-0.5", cfg.color)} />
                             <a
                               href={source.uri}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-electric-blue hover:underline truncate"
+                              className="text-electric-blue hover:underline truncate flex-1"
                             >
                               {source.title || source.uri}
                             </a>
-                          </li>
-                        ))}
-                      </ul>
+                            <span className={cn("text-[10px] font-mono flex-shrink-0 px-1.5 py-0.5 rounded", cfg.color, "bg-muted/50")}>
+                              {cfg.label}
+                            </span>
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </CardContent>
