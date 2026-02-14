@@ -344,8 +344,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `Unsupported modality: ${modality}` }, { status: 400 })
     } catch (err) {
         console.error(`[agents/execute] ${providerId}/${modality} error:`, err)
-        const message = err instanceof Error ? err.message : "Failed to execute prompt"
-        return NextResponse.json({ error: message }, { status: 500 })
+        return NextResponse.json(
+            { error: "Failed to execute prompt" },
+            { status: 500 }
+        )
     }
 }
 
@@ -408,16 +410,18 @@ async function handleTextStreaming(
                         }
                     },
                     onError(error) {
+                        const safeErrorMessage = "Stream interrupted"
+                        console.error("[agents/execute] stream error:", error)
                         controller.enqueue(
-                            encoder.encode(`data: ${JSON.stringify({ error })}\n\n`)
+                            encoder.encode(`data: ${JSON.stringify({ error: safeErrorMessage })}\n\n`)
                         )
                         controller.close()
                     },
                 })
             } catch (err) {
-                const message = err instanceof Error ? err.message : "Stream interrupted"
+                console.error("[agents/execute] stream setup failed:", err)
                 controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ error: message })}\n\n`)
+                    encoder.encode(`data: ${JSON.stringify({ error: "Stream interrupted" })}\n\n`)
                 )
                 controller.close()
             }

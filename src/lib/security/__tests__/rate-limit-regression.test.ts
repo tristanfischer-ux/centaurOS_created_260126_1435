@@ -224,6 +224,27 @@ describe('internal API egress hardening regressions', () => {
   })
 })
 
+describe('agent error-response sanitization regressions', () => {
+  it('does not expose raw server error messages from council route', async () => {
+    const councilRoutePath = path.join(process.cwd(), 'src/app/api/agents/council/route.ts')
+    const source = await readFile(councilRoutePath, 'utf-8')
+
+    expect(source).toContain("return NextResponse.json({ error: 'Council execution failed' }, { status: 500 })")
+    expect(source).not.toContain('return NextResponse.json({ error: message }, { status: 500 })')
+  })
+
+  it('sanitizes execute route terminal and stream error payloads', async () => {
+    const executeRoutePath = path.join(process.cwd(), 'src/app/api/agents/execute/route.ts')
+    const source = await readFile(executeRoutePath, 'utf-8')
+
+    expect(source).toContain('{ error: "Failed to execute prompt" }')
+    expect(source).toContain('const safeErrorMessage = "Stream interrupted"')
+    expect(source).toContain('JSON.stringify({ error: safeErrorMessage })')
+    expect(source).not.toContain('return NextResponse.json({ error: message }, { status: 500 })')
+    expect(source).not.toContain('JSON.stringify({ error })')
+  })
+})
+
 describe('OpenAI key hardening regressions', () => {
   it('fails closed on missing OPENAI_API_KEY for marketplace and RFQ routes', async () => {
     const routes = [

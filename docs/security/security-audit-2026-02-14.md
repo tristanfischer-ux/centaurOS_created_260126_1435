@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 23 | 21 fixed, 2 open |
+| Medium | 24 | 22 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -551,6 +551,29 @@ for payment/dispute/subscription state transitions.
 - Retained signature verification and endpoint throttling safeguards.
 - Added explicit fail-closed response (`503`) when `STRIPE_WEBHOOK_SECRET` is missing.
 - Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 28) Agent council/execute endpoints exposed raw provider/runtime error details (Medium)
+
+**Issue:** `POST /api/agents/council` and `POST /api/agents/execute` returned
+raw runtime/provider error messages in HTTP and SSE error payloads.  
+**Impact:** Authenticated clients could receive internal implementation/provider details,
+increasing information disclosure risk.
+
+**Fix implemented:**
+
+- `src/app/api/agents/council/route.ts`
+  - replaced terminal `500` response payload with a generic message:
+    - `"Council execution failed"`
+- `src/app/api/agents/execute/route.ts`
+  - replaced terminal `500` response payload with:
+    - `"Failed to execute prompt"`
+  - sanitized stream error payloads to constant:
+    - `"Stream interrupted"`
+  - retained detailed server-side logging for debugging.
+- Added regression assertions in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
 ---

@@ -324,6 +324,6 @@ export async function POST(request: NextRequest) {
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'
         console.error('[Council] Error:', message)
-        return NextResponse.json({ error: message }, { status: 500 })
+        return NextResponse.json({ error: 'Council execution failed' }, { status: 500 })
     }
 }
