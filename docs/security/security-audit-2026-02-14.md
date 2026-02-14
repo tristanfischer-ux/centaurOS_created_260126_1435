@@ -22,7 +22,7 @@ This audit reviewed the application security posture across:
 | Severity | Count | Status |
 | --- | ---: | --- |
 | Critical | 1 | Open |
-| High | 5 | 4 fixed, 1 open |
+| High | 5 | 5 fixed (pending migration deploy) |
 | Medium | 6 | 4 fixed, 2 open |
 | Low | 3 | Open |
 
@@ -116,6 +116,8 @@ This audit reviewed the application security posture across:
 - Migration added:
   - `supabase/migrations/20260214123000_secure_message_files_bucket.sql`
   - sets `message-files` bucket `public = false`.
+  - `supabase/migrations/20260214130000_secure_message_attachments_bucket.sql`
+  - sets legacy `message-attachments` bucket `public = false`.
 
 ---
 
@@ -194,16 +196,12 @@ The test suite enforces:
 
 ### High / Medium
 
-2. **Legacy `message-attachments` bucket remains public**
-   - New uploads moved to secured `message-files`, but legacy bucket remains public for backward compatibility.
-   - Required follow-up: migrate legacy objects and deprecate public bucket.
-
-3. **CI type-safety gate still non-blocking**
+2. **CI type-safety gate still non-blocking**
    - `next.config.ts` retains `typescript.ignoreBuildErrors = true`.
    - Type-check workflow step also remains non-blocking due broad pre-existing type debt.
    - Required follow-up: staged type debt reduction and hard fail gate enablement.
 
-4. **Residual moderate/low dependency vulnerabilities**
+3. **Residual moderate/low dependency vulnerabilities**
    - Mostly transitive through Excalidraw/Mermaid dependency chain.
    - Follow-up required with compatibility testing.
 
@@ -212,7 +210,7 @@ The test suite enforces:
 ## Recommended Remediation Order
 
 1. Deploy the `profiles` RLS restoration migration and verify on linked Supabase project. *(Critical)*
-2. Migrate legacy `message-attachments` objects and fully deprecate public bucket access. *(High)*
+2. Deploy bucket-hardening migrations and verify attachment access across current + legacy messages. *(High)*
 3. Harden remaining CI/type gates after reducing pre-existing type errors. *(Medium)*
 4. Resolve remaining moderate dependency vulnerabilities with targeted package upgrades. *(Medium)*
 

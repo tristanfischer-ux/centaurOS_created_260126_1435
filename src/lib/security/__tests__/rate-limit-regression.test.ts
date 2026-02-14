@@ -78,3 +78,18 @@ describe('cron authorization hardening regressions', () => {
     expect(source).toContain("redirect: 'error'")
   })
 })
+
+describe('message attachment authorization regressions', () => {
+  it('verifies conversation membership and message ownership before signed URL issuance', async () => {
+    const fileUrlRoutePath = path.join(process.cwd(), 'src/app/api/messages/file-url/route.ts')
+    const source = await readFile(fileUrlRoutePath, 'utf-8')
+
+    expect(source).toContain("const fileRef = body.fileRef?.trim()")
+    expect(source).toContain("const conversationId = body.conversationId?.trim()")
+    expect(source).toContain("const messageId = body.messageId?.trim()")
+    expect(source).toContain(".from('conversation_participants')")
+    expect(source).toContain(".from('messages')")
+    expect(source).toContain('.createSignedUrl(')
+    expect(source).toContain("bucket === 'message-files' || bucket === 'message-attachments'")
+  })
+})
