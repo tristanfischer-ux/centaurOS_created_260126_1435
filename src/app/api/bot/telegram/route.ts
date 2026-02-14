@@ -75,31 +75,34 @@ function getAdminClient() {
     })
 }
 
-// Verify webhook secret (REQUIRED in production)
-function verifyWebhookSecret(req: NextRequest): boolean {
+// Verify webhook secret (required in all environments).
+function verifyWebhookSecret(req: NextRequest): NextResponse | null {
     const secret = process.env.TELEGRAM_WEBHOOK_SECRET
-    
-    // SECURITY: Require webhook secret in production to prevent unauthorized access
+
+    // SECURITY: Fail closed when secret is not configured.
     if (!secret) {
-        if (process.env.NODE_ENV === 'production') {
-            console.error('[SECURITY] TELEGRAM_WEBHOOK_SECRET not configured in production!')
-            return false
-        }
-        // Allow in development only with warning
-        console.warn('[DEV] TELEGRAM_WEBHOOK_SECRET not configured - allowing request in development')
-        return true
+        console.error('[SECURITY] TELEGRAM_WEBHOOK_SECRET not configured')
+        return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 })
     }
 
     const providedSecret = req.headers.get('X-Telegram-Bot-Api-Secret-Token')
-    return providedSecret === secret
+    const authHeader = req.headers.get('authorization')
+
+    // SECURITY: Telegram POST uses the secret-token header. Allow bearer auth for manual checks.
+    if (providedSecret === secret || authHeader === `Bearer ${secret}`) {
+        return null
+    }
+
+    return NextResponse.json({ ok: false }, { status: 403 })
 }
 
 export async function POST(req: NextRequest) {
     try {
         // Verify webhook secret
-        if (!verifyWebhookSecret(req)) {
+        const authFailure = verifyWebhookSecret(req)
+        if (authFailure) {
             console.warn('Invalid webhook secret')
-            return NextResponse.json({ ok: false }, { status: 403 })
+            return authFailure
         }
 
         // SECURITY: IP-based rate limit on webhook endpoint
@@ -726,7 +729,7 @@ async function handleConfirm(
         await editMessage({
             chat_id: chatId,
             message_id: messageId,
-            text: `❌ Failed to create objective: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again.`,
+            text: '❌ Failed to create objective. Please try again.',
             reply_markup: createConfirmationKeyboard(intent.id),
         })
     }
@@ -2004,7 +2007,12 @@ async function handleSettingsToggleCallback(
     }
 }
 
-// GET endpoint for webhook verification (Telegram doesn't use this, but good to have)
-export async function GET() {
+// GET endpoint for webhook verification checks.
+export async function GET(req: NextRequest) {
+    const authFailure = verifyWebhookSecret(req)
+    if (authFailure) {
+        return authFailure
+    }
+
     return NextResponse.json({ status: 'ok', service: 'ForgeOS Telegram Bot' })
 }

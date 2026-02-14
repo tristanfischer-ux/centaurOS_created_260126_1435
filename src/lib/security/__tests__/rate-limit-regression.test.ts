@@ -114,6 +114,16 @@ describe('cron authorization hardening regressions', () => {
     expect(source).toContain("return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 })")
     expect(source).toContain('const authFailure = verifyWebhookAuth(req)')
   })
+
+  it('fails closed for telegram webhook route and guards GET status endpoint', async () => {
+    const telegramRoutePath = path.join(process.cwd(), 'src/app/api/bot/telegram/route.ts')
+    const source = await readFile(telegramRoutePath, 'utf-8')
+
+    expect(source).toContain('if (!secret)')
+    expect(source).toContain("return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 })")
+    expect(source).toContain('export async function GET(req: NextRequest)')
+    expect(source).toContain('const authFailure = verifyWebhookSecret(req)')
+  })
 })
 
 describe('message attachment authorization regressions', () => {

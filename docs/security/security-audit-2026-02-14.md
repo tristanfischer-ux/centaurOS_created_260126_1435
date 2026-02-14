@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 11 | 9 fixed, 2 open |
+| Medium | 12 | 10 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -288,6 +288,22 @@ service-unavailable behavior.
 
 ---
 
+### 16) Telegram webhook status endpoint exposed unauthenticated liveness metadata (Medium)
+
+**Issue:** `GET /api/bot/telegram` returned service status without webhook-secret validation.  
+**Impact:** Unauthenticated callers could enumerate webhook endpoint liveness and behavior.
+
+**Fix implemented (`src/app/api/bot/telegram/route.ts`):**
+
+- `verifyWebhookSecret(...)` now fail-closes with 503 when `TELEGRAM_WEBHOOK_SECRET` is missing.
+- Applied secret validation to both `POST` and `GET` handlers.
+- Added bearer fallback auth path for operational checks.
+- Removed internal error-detail echo in objective creation failure responses.
+- Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
 ## Security Regression Coverage Added
 
 Added:
@@ -307,6 +323,7 @@ The test suite enforces:
 8. Internal council routing no longer uses env-driven URLs for cookie-forwarded calls.
 9. OpenAI-key fail-closed guards for AI marketplace/RFQ routes.
 10. Sweep-trigger webhook secret fail-closed enforcement.
+11. Telegram webhook secret fail-closed enforcement and GET endpoint protection.
 
 ---
 
