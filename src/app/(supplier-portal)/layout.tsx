@@ -53,7 +53,7 @@ export default async function SupplierPortalLayout({
           
           {/* Main Content Area */}
           <main className="flex-1 min-h-screen">
-            <div className="p-4 sm:p-6 lg:p-8 pb-24 sm:pb-8">
+            <div className="p-4 sm:p-6 lg:p-8 pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] sm:pb-8">
               <ErrorBoundary>
                 {children}
               </ErrorBoundary>

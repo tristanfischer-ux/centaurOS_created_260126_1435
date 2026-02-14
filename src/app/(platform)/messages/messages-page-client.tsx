@@ -16,6 +16,7 @@ import { FullTaskView } from '@/components/tasks/full-task-view'
 import { useConversationList } from '@/hooks/useConversation'
 import { typography } from '@/lib/design-system'
 import { getTaskById } from '@/actions/tasks'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { toast } from 'sonner'
 import type { ConversationWithParticipants, ConversationType } from '@/lib/messaging/service'
 import type { ActivityItem } from '@/types/activity'
@@ -149,6 +150,7 @@ export function MessagesPageClient({
   const [searchQuery, setSearchQuery] = useState('')
   const [showCompose, setShowCompose] = useState(false)
   const [activeTab, setActiveTab] = useState<'conversations' | 'activity'>('conversations')
+  const isMobile = useMediaQuery('(max-width: 767px)')
   
   // Task dialog state
   const [selectedTask, setSelectedTask] = useState<TaskForDialog | null>(null)
@@ -203,11 +205,14 @@ export function MessagesPageClient({
   // Show conversation thread if selected
   if (selectedConversationId) {
     return (
-      <div className="h-[calc(100dvh-8rem)] flex flex-col">
+      <div className={cn(
+        'flex flex-col pb-safe',
+        isMobile ? 'h-[calc(100dvh-9.5rem)]' : 'h-[calc(100dvh-8rem)]'
+      )}>
         <div className="p-2 border-b">
           <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
             <ArrowLeft className="h-4 w-4" />
-            Back to messages
+            {isMobile ? 'Back' : 'Back to messages'}
           </Button>
         </div>
         <ConversationThread
@@ -245,7 +250,7 @@ export function MessagesPageClient({
         <Button
           onClick={() => setShowCompose(true)}
           className={cn(
-            "bg-international-orange hover:bg-international-orange-hover",
+            "bg-international-orange hover:bg-international-orange-hover w-full sm:w-auto",
             showCompose && "invisible"
           )}
         >
@@ -267,7 +272,7 @@ export function MessagesPageClient({
             <TabsList className="w-full grid grid-cols-2 mb-4">
               <TabsTrigger value="conversations" className="gap-2">
                 <MessageSquare className="h-4 w-4" />
-                Conversations
+                {isMobile ? 'Chats' : 'Conversations'}
                 {totalUnread > 0 && (
                   <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs bg-international-orange text-white">
                     {totalUnread}
@@ -287,7 +292,7 @@ export function MessagesPageClient({
 
             <TabsContent value="conversations" className="mt-0">
               {/* Search */}
-              <div className="relative max-w-md mb-4">
+              <div className="relative max-w-full sm:max-w-md mb-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search conversations..."

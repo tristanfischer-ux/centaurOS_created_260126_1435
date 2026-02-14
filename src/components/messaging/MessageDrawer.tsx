@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ConversationList } from './ConversationList'
 import { ConversationThread } from './ConversationThread'
@@ -105,13 +105,13 @@ export function MessageDrawer({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent 
-        side="right" 
-        className="w-full sm:w-[480px] sm:max-w-[480px] p-0 flex flex-col"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        size="lg"
+        className="p-0 h-[min(90dvh,760px)] overflow-hidden flex flex-col"
       >
         {/* Header */}
-        <SheetHeader className="p-4 border-b border-border flex-shrink-0">
+        <DialogHeader className="p-4 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-3">
             {viewMode === 'conversation' && !sellerId && (
               <Button variant="ghost" size="icon" onClick={handleBackToList}>
@@ -119,11 +119,11 @@ export function MessageDrawer({
               </Button>
             )}
             <MessageSquare className="w-5 h-5 text-muted-foreground" />
-            <SheetTitle className="text-lg font-semibold">
+            <DialogTitle className="text-lg font-semibold">
               {viewMode === 'list' ? 'Messages' : 'Conversation'}
-            </SheetTitle>
+            </DialogTitle>
           </div>
-        </SheetHeader>
+        </DialogHeader>
 
         {/* Content */}
         <div className="flex-1 overflow-hidden">
@@ -151,8 +151,8 @@ export function MessageDrawer({
             />
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }
 

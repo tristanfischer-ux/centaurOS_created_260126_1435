@@ -99,13 +99,13 @@ export default async function PlatformLayout({
             <PresenceProvider>
                 <ZoomProvider>
                   <ScreenContextProvider>
-                    <div className="flex h-screen overflow-hidden">
+                    <div className="flex min-h-screen sm:h-screen overflow-hidden">
                         <CommandPalette />
                         <KeyboardShortcutsDialog />
                         <MobileZoomControl />
                         <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} />
-                        <ZoomableContent className="flex-1 overflow-y-auto bg-background">
-                            <main className="p-4 sm:p-6 lg:p-8 pb-32 sm:pb-8">
+                        <ZoomableContent className="flex-1 overflow-y-auto overscroll-y-contain bg-background">
+                            <main className="p-4 sm:p-6 lg:p-8 pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))] sm:pb-8">
                                 <WelcomeBackBanner userName={profile?.full_name || user.email || "builder"} />
                                 <ErrorBoundary>
                                     {children}

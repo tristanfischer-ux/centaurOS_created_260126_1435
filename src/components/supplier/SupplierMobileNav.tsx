@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useMobileViewportState } from "@/hooks/useMobileViewportState"
 
 /**
  * Determines if a navigation item should be marked as active
@@ -48,9 +49,15 @@ const moreNavigation = [
 
 export function SupplierMobileNav() {
   const pathname = usePathname()
+  const { isKeyboardOpen } = useMobileViewportState()
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] sm:hidden pb-safe px-safe">
+    <div
+      className={cn(
+        "fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] sm:hidden pb-safe px-safe transition-all duration-200",
+        isKeyboardOpen && "translate-y-full opacity-0 pointer-events-none"
+      )}
+    >
       <div className="flex justify-around items-center h-16">
         {mainNavigation.map((item) => {
           const isActive = isRouteActive(pathname, item.href)
@@ -59,14 +66,13 @@ export function SupplierMobileNav() {
               key={item.name}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full space-y-0.5 xs:space-y-1 touch-action-manipulation",
-                isActive ? "text-international-orange" : "text-muted-foreground hover:text-foreground"
+                "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full gap-1 text-xs font-medium touch-action-manipulation transition-colors",
+                isActive ? "text-international-orange font-semibold" : "text-muted-foreground hover:text-foreground"
               )}
             >
               <item.icon className={cn("h-5 w-5 shrink-0", isActive && "fill-current")} />
-              <span className="text-[10px] xs:text-xs font-medium truncate max-w-[48px] xs:max-w-none">
-                <span className="xs:hidden">{item.shortName}</span>
-                <span className="hidden xs:inline">{item.name}</span>
+              <span className="text-xs font-medium truncate max-w-[52px]">
+                {item.shortName}
               </span>
             </Link>
           )
@@ -75,14 +81,14 @@ export function SupplierMobileNav() {
           <DropdownMenuTrigger asChild>
             <button
               className={cn(
-                "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full space-y-0.5 xs:space-y-1 touch-action-manipulation",
+                "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full gap-1 text-xs font-medium touch-action-manipulation transition-colors",
                 moreNavigation.some(item => isRouteActive(pathname, item.href))
-                  ? "text-international-orange" 
+                  ? "text-international-orange font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
               <MoreHorizontal className={cn("h-5 w-5 shrink-0", moreNavigation.some(item => isRouteActive(pathname, item.href)) && "fill-current")} />
-              <span className="text-[10px] xs:text-xs font-medium">More</span>
+              <span className="text-xs font-medium">More</span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe">

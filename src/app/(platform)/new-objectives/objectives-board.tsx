@@ -39,11 +39,9 @@ import { deleteObjective } from '@/actions/objectives'
 import { toast } from 'sonner'
 import { WeeklyDigestPanel } from './weekly-digest'
 import { TeamPulseDashboard } from './team-pulse'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { ObjectiveWithTasks, ObjectiveTask, Member, Team, StrategicObjective } from './types'
 import type { TaskWithData } from '../new-tasks/types'
-
-const LARGE_BREAKPOINT = 1280
-const MEDIUM_BREAKPOINT = 768
 
 /** Map an ObjectiveTask to the TaskWithData shape expected by TaskDetailPanel */
 function toTaskWithData(task: ObjectiveTask, parentObjective: ObjectiveWithTasks): TaskWithData {
@@ -108,19 +106,12 @@ export function ObjectivesBoard({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [showSearch, setShowSearch] = useState(false)
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1400)
   const [objectiveToDelete, setObjectiveToDelete] = useState<string | null>(null)
   const [deleteChildAction, setDeleteChildAction] = useState<'keep' | 'cascade'>('keep')
   const [objectiveToEdit, setObjectiveToEdit] = useState<ObjectiveWithTasks | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
-
-  // Track window width for responsive layout
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  const isLarge = useMediaQuery('(min-width: 1280px)')
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -251,7 +242,6 @@ export function ObjectivesBoard({
     return null
   }, [objectives, selectedTaskId])
 
-  const isLarge = windowWidth >= LARGE_BREAKPOINT
   const hasDetailPanel = (selectedObjective || selectedTaskData) && isLarge
 
   return (
@@ -414,10 +404,10 @@ export function ObjectivesBoard({
       />
 
       {/* Toolbar: View tabs + Strategy Filter + Search */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3 overflow-x-auto pb-1 sm:pb-0">
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-            <TabsList className="h-9">
+            <TabsList className="h-9 min-w-max">
               <TabsTrigger value="board" className="text-xs gap-1.5 px-3">
                 <LayoutGrid className="h-3.5 w-3.5" />
                 Board
@@ -457,7 +447,7 @@ export function ObjectivesBoard({
                 placeholder="Search objectives..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 w-48 text-sm"
+                className="h-8 w-40 sm:w-48 text-sm"
               />
               <Button
                 variant="ghost"
@@ -543,7 +533,7 @@ export function ObjectivesBoard({
 
       {/* Mobile detail: Full-screen overlay */}
       {selectedTaskData && !isLarge && (
-        <div className="fixed inset-0 z-50 bg-background">
+        <div className="fixed inset-0 z-50 bg-background overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">
           <TaskDetailPanel
             task={selectedTaskData}
             onClose={() => setSelectedTaskId(null)}
@@ -551,7 +541,7 @@ export function ObjectivesBoard({
         </div>
       )}
       {selectedObjective && !selectedTaskData && !isLarge && (
-        <div className="fixed inset-0 z-50 bg-background">
+        <div className="fixed inset-0 z-50 bg-background overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">
           <ObjectiveDetailPanel
             objective={selectedObjective}
             onClose={() => setSelectedId(null)}

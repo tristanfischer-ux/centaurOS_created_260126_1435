@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { cn, getInitials } from '@/lib/utils'
 import {
     getCategoryBadgeClasses,
@@ -30,6 +31,7 @@ import Link from 'next/link'
 import { saveMarketplaceListing, unsaveMarketplaceListing } from '@/actions/marketplace'
 import { toast } from 'sonner'
 import type { MarketplaceListing } from '@/actions/marketplace'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 
 interface MarketplaceCompareViewProps {
     listings: MarketplaceListing[]
@@ -39,7 +41,7 @@ interface MarketplaceCompareViewProps {
     onRemove: (id: string) => void
 }
 
-function getAIIcon(subcategory: string): React.ElementType {
+function getAIIcon(subcategory: string): React.ComponentType<{ className?: string }> {
     switch (subcategory) {
         case 'Agent': return Bot
         case 'Assistant': return Sparkles
@@ -50,8 +52,8 @@ function getAIIcon(subcategory: string): React.ElementType {
 }
 
 /** Get all unique attribute keys worth comparing across listings */
-function getComparisonRows(listings: MarketplaceListing[]): { key: string; label: string; icon?: React.ElementType }[] {
-    const rows: { key: string; label: string; icon?: React.ElementType }[] = [
+function getComparisonRows(listings: MarketplaceListing[]): { key: string; label: string; icon?: React.ComponentType<{ className?: string }> }[] {
+    const rows: { key: string; label: string; icon?: React.ComponentType<{ className?: string }> }[] = [
         { key: 'price', label: 'Price' },
         { key: 'rating', label: 'Rating', icon: Star },
         { key: 'reviews', label: 'Reviews' },
@@ -228,6 +230,8 @@ export function MarketplaceCompareView({
     onBack,
     onRemove,
 }: MarketplaceCompareViewProps) {
+    const isMediumUp = useMediaQuery('(min-width: 768px)')
+
     const handleSave = async (listingId: string) => {
         const isSaved = savedIds.has(listingId)
         try {
@@ -260,7 +264,8 @@ export function MarketplaceCompareView({
                 </p>
             </div>
 
-            {/* Comparison table */}
+            {/* Comparison table / cards */}
+            {isMediumUp ? (
             <div className="overflow-x-auto rounded-xl border bg-background">
                 <table className="w-full min-w-[600px]" role="table" aria-label="Listing comparison">
                     <thead>
@@ -397,6 +402,95 @@ export function MarketplaceCompareView({
                     </tbody>
                 </table>
             </div>
+            ) : (
+            <div className="space-y-3">
+                {listings.map((listing, idx) => {
+                    const isAI = listing.category === 'AI'
+                    const AIIcon = isAI ? getAIIcon(listing.subcategory) : null
+                    const initials = getInitials(listing.title)
+                    const gradient = getAvatarGradient(listing.category as MarketplaceCategory, listing.title)
+                    return (
+                        <Card key={listing.id} className="border">
+                            <CardContent className="pt-4 space-y-3">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className={cn(
+                                            'w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center text-white font-semibold text-sm shadow-sm',
+                                            gradient
+                                        )}>
+                                            {isAI && AIIcon ? <AIIcon className="w-5 h-5" /> : initials}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-foreground truncate">{listing.title}</p>
+                                            <Badge
+                                                variant="secondary"
+                                                className={cn(
+                                                    'text-[10px] uppercase tracking-wider font-semibold border-0 mt-0.5',
+                                                    getCategoryBadgeClasses(listing.category as MarketplaceCategory)
+                                                )}
+                                            >
+                                                {listing.subcategory}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={() => handleSave(listing.id)}
+                                            className={cn(
+                                                'min-w-[44px] min-h-[44px] w-8 h-8 rounded-full flex items-center justify-center transition-all',
+                                                savedIds.has(listing.id)
+                                                    ? 'bg-destructive text-destructive-foreground shadow-sm'
+                                                    : 'bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
+                                            )}
+                                            aria-label={savedIds.has(listing.id) ? 'Remove from favourites' : 'Add to favourites'}
+                                        >
+                                            <Heart className={cn('w-4 h-4', savedIds.has(listing.id) && 'fill-current')} />
+                                        </button>
+                                        <button
+                                            onClick={() => onRemove(listing.id)}
+                                            className="min-w-[44px] min-h-[44px] w-8 h-8 rounded-full bg-muted hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors"
+                                            aria-label={`Remove ${listing.title} from comparison`}
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {rows.map((row) => {
+                                        const value = getComparisonValue(listing, row.key)
+                                        const bestIdx = getBestIndex(listings, row.key)
+                                        const isBest = bestIdx === idx
+                                        return (
+                                            <div key={`${listing.id}-${row.key}`} className={cn(
+                                                'flex items-start justify-between gap-3 rounded-lg border p-2',
+                                                isBest && 'bg-status-success-light/30'
+                                            )}>
+                                                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                                    {row.label}
+                                                </span>
+                                                <div className="text-sm text-foreground text-right min-w-0">
+                                                    {value}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                <Button size="sm" className="w-full gap-1.5" asChild>
+                                    <Link href={`/marketplace/${listing.id}/book`}>
+                                        <CalendarDays className="w-3.5 h-3.5" />
+                                        {listing.category === 'People' ? 'Book' :
+                                         listing.category === 'Products' ? 'Quote' :
+                                         listing.category === 'AI' ? 'Try' : 'Hire'}
+                                    </Link>
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )
+                })}
+            </div>
+            )}
         </div>
     )
 }

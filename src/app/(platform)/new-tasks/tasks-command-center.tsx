@@ -24,9 +24,8 @@ import { CreateTaskDialog } from '../tasks/create-task-dialog'
 import { EditTaskDialog } from '@/components/tasks/edit-task-dialog'
 import { TasksGanttView } from './gantt-view'
 import { useRegisterScreenContext } from '@/contexts/screen-context'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { TaskWithData, Member, Team } from './types'
-
-const LARGE_BREAKPOINT = 1280
 
 interface TasksCommandCenterProps {
   tasks: TaskWithData[]
@@ -60,16 +59,9 @@ export function TasksCommandCenter({
   const [selectedId, setSelectedId] = useState<string | null>(initialTaskId || null)
   const [groupBy, setGroupBy] = useState<GroupBy>('none')
   const [strategyFilter, setStrategyFilter] = useState<string | null>(null)
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1400)
   const [editingTask, setEditingTask] = useState<TaskWithData | null>(null)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
-
-  // Track window width
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  const isLarge = useMediaQuery('(min-width: 1280px)')
 
   // Refs for keyboard handler to avoid stale closures
   const filteredTasksRef = useRef<TaskWithData[]>([])
@@ -242,7 +234,6 @@ export function TasksCommandCenter({
     setSelectedId(prev => prev === id ? null : id)
   }, [])
 
-  const isLarge = windowWidth >= LARGE_BREAKPOINT
   const showDetailPanel = selectedTask && isLarge
 
   return (
@@ -307,7 +298,7 @@ export function TasksCommandCenter({
       {/* Toolbar: View tabs + Search + Group By */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-          <TabsList className="h-9">
+          <TabsList className="h-9 w-full sm:w-auto flex-wrap sm:flex-nowrap">
             <TabsTrigger value="focus" className="text-xs gap-1.5 px-3">
               <Crosshair className="h-3.5 w-3.5" />
               Focus
@@ -411,7 +402,7 @@ export function TasksCommandCenter({
                 placeholder="Search tasks..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 w-48 text-sm"
+                className="h-8 w-40 sm:w-48 text-sm"
               />
               <Button
                 variant="ghost"
@@ -499,7 +490,7 @@ export function TasksCommandCenter({
 
       {/* Mobile detail: Full-screen overlay */}
       {selectedTask && !isLarge && (
-        <div className="fixed inset-0 z-50 bg-background">
+        <div className="fixed inset-0 z-50 bg-background overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">
           <TaskDetailPanel
             task={selectedTask}
             onClose={() => setSelectedId(null)}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { X, Send, Loader2, MessageSquare } from 'lucide-react'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { UserAvatar } from '@/components/ui/user-avatar'
@@ -142,14 +142,14 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
 
 
   return (
-    <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="w-[480px] sm:w-[540px] p-0 flex flex-col">
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent size="lg" className="p-0 h-[min(90dvh,760px)] flex flex-col overflow-hidden">
         {/* Header */}
-        <SheetHeader className="px-6 py-4 border-b">
+        <DialogHeader className="px-6 py-4 border-b">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-muted-foreground" />
-              <SheetTitle>Thread</SheetTitle>
+              <DialogTitle>Thread</DialogTitle>
               {parentMessage && (
                 <span className="text-sm text-muted-foreground">
                   {parentMessage.reply_count} {parentMessage.reply_count === 1 ? 'reply' : 'replies'}
@@ -166,7 +166,7 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
               <X className="h-4 w-4" />
             </Button>
           </div>
-        </SheetHeader>
+        </DialogHeader>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
@@ -289,7 +289,7 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
             </div>
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }

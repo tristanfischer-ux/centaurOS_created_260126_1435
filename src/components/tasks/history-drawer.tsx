@@ -1,14 +1,13 @@
 "use client"
 
 import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetDescription,
-    SheetFooter,
-    SheetClose,
-} from "@/components/ui/sheet"
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -122,15 +121,15 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
     }
 
     return (
-        <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0 bg-card">
-                <SheetHeader className="p-6 border-b border-border">
-                    <SheetTitle className="flex items-center gap-2 text-foreground">
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent size="lg" className="h-[min(90dvh,760px)] flex flex-col p-0 bg-card overflow-hidden">
+                <DialogHeader className="p-6 border-b border-border">
+                    <DialogTitle className="flex items-center gap-2 text-foreground">
                         <History className="w-5 h-5 text-muted-foreground" />
                         History: {taskTitle}
-                    </SheetTitle>
-                    <SheetDescription>Audit log of all actions performed on this task.</SheetDescription>
-                </SheetHeader>
+                    </DialogTitle>
+                    <DialogDescription>Audit log of all actions performed on this task.</DialogDescription>
+                </DialogHeader>
 
                 <ScrollArea className="flex-1 px-6">
                     {loading ? (
@@ -180,12 +179,10 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
                     )}
                 </ScrollArea>
 
-                <SheetFooter className="p-6 border-t border-border mt-auto">
-                    <SheetClose asChild>
-                        <Button variant="secondary">Close</Button>
-                    </SheetClose>
-                </SheetFooter>
-            </SheetContent>
-        </Sheet>
+                <DialogFooter className="p-6 border-t border-border mt-auto">
+                    <Button variant="secondary" onClick={() => onOpenChange(false)}>Close</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     )
 }

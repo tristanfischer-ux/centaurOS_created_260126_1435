@@ -26,6 +26,7 @@ import { useScreenContext } from "@/contexts/screen-context"
 import { getSpecialistForRoute } from "@/lib/route-specialist-map"
 import { serializeContext } from "./types"
 import type { Specialist } from "@/app/(platform)/agents/specialists-data"
+import { useMobileViewportState } from "@/hooks/useMobileViewportState"
 
 /** Handoff state when switching specialists from within the dialog */
 interface HandoffState {
@@ -45,6 +46,7 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
     referredBy: null,
   })
   const [mounted, setMounted] = useState(false)
+  const { isKeyboardOpen } = useMobileViewportState()
 
   // Entrance delay to avoid flash on navigation
   useEffect(() => {
@@ -72,6 +74,9 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
   const entityContext = serializeContext(pageContext)
 
   const openDialog = useCallback(() => {
+    if (!specialist) {
+      return
+    }
     setHandoff({ context: null, referredBy: null })
     setActiveSpecialist(specialist)
     setDialogOpen(true)
@@ -106,8 +111,9 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
       <div
         className={cn(
           "fixed z-[200] transition-all duration-200 ease-out",
-          "bottom-24 right-4 sm:bottom-6 sm:right-6",
+          "right-3 bottom-[calc(env(safe-area-inset-bottom,0px)+5.25rem)] sm:right-6 sm:bottom-6",
           mounted ? "opacity-100 scale-100" : "opacity-0 scale-95",
+          isKeyboardOpen && "opacity-0 scale-95 pointer-events-none",
         )}
       >
         <Tooltip>

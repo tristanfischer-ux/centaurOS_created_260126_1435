@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { signOut } from "@/actions/auth"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
+import { useMobileViewportState } from "@/hooks/useMobileViewportState"
 
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 
@@ -93,6 +94,7 @@ export function MobileNav() {
     const pathname = usePathname()
     const router = useRouter()
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
+    const { isKeyboardOpen } = useMobileViewportState()
 
     const handleCaptureObjective = (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
         const prefillText = suggestion?.title || rawIdea
@@ -116,8 +118,8 @@ export function MobileNav() {
                 <Link
                     href={item.href}
                     className={cn(
-                        "flex items-center justify-between gap-2 cursor-pointer w-full",
-                        isActive && "text-international-orange"
+                        "flex items-center justify-between gap-2 cursor-pointer w-full text-sm font-medium transition-colors",
+                        isActive && "text-international-orange font-semibold"
                     )}
                 >
                     <span className="flex items-center gap-2">
@@ -131,11 +133,19 @@ export function MobileNav() {
 
     return (
         <>
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] sm:hidden pb-safe px-safe">
+        <div
+            className={cn(
+                "fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] sm:hidden pb-safe px-safe transition-all duration-200",
+                isKeyboardOpen && "translate-y-full opacity-0 pointer-events-none"
+            )}
+        >
             {/* Floating "+" FAB centered above the nav bar */}
             <button
                 onClick={() => setIsQuickCaptureOpen(true)}
-                className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-background shadow-lg hover:bg-international-orange-hover transition-colors active:scale-95"
+                className={cn(
+                    "absolute -top-6 left-1/2 -translate-x-1/2 flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-background shadow-lg hover:bg-international-orange-hover transition-all active:scale-95",
+                    isKeyboardOpen && "opacity-0 pointer-events-none"
+                )}
                 aria-label="Capture an idea"
             >
                 <Plus className="h-5 w-5" />
@@ -148,14 +158,13 @@ export function MobileNav() {
                             key={item.name}
                             href={item.href}
                             className={cn(
-                                "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full space-y-0.5 xs:space-y-1 touch-action-manipulation",
-                                isActive ? "text-international-orange" : "text-muted-foreground hover:text-foreground"
+                                "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full gap-1 text-xs font-medium touch-action-manipulation transition-colors",
+                                isActive ? "text-international-orange font-semibold" : "text-muted-foreground hover:text-foreground"
                             )}
                         >
                             <item.icon className={cn("h-5 w-5 shrink-0", isActive && "fill-current")} />
-                            <span className="text-[10px] xs:text-xs font-medium truncate max-w-[48px] xs:max-w-none">
-                                <span className="xs:hidden">{item.shortName}</span>
-                                <span className="hidden xs:inline">{item.name}</span>
+                            <span className="text-xs font-medium truncate max-w-[52px]">
+                                {item.shortName}
                             </span>
                         </Link>
                     )
@@ -164,14 +173,14 @@ export function MobileNav() {
                     <DropdownMenuTrigger asChild>
                         <button
                             className={cn(
-                                "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full space-y-0.5 xs:space-y-1 touch-action-manipulation",
+                                "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full gap-1 touch-action-manipulation text-xs font-medium transition-colors",
                                 allMoreItems.some(item => isRouteActive(pathname, item.href))
-                                    ? "text-international-orange" 
+                                    ? "text-international-orange font-semibold"
                                     : "text-muted-foreground hover:text-foreground"
                             )}
                         >
                             <MoreHorizontal className={cn("h-5 w-5 shrink-0", allMoreItems.some(item => isRouteActive(pathname, item.href)) && "fill-current")} />
-                            <span className="text-[10px] xs:text-xs font-medium">More</span>
+                            <span className="text-xs font-medium">More</span>
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe w-56">

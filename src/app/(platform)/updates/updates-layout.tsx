@@ -11,8 +11,7 @@
  * @component
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react'
-import { cn } from '@/lib/utils'
+import { useState, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
@@ -21,11 +20,8 @@ import { UpdatesHeader } from '@/components/updates/updates-header'
 import { UpdatesFeed } from '@/components/updates/updates-feed'
 import { UpdatesThreadPanel } from '@/components/updates/updates-thread-panel'
 import { ThreadEmptyState } from '@/components/updates/updates-empty-state'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { ActivityItem, ActivityFilter } from '@/types/activity'
-
-// Breakpoints matching the Home page pattern
-const LARGE_BREAKPOINT = 1280
-const MEDIUM_BREAKPOINT = 768
 
 interface UpdatesLayoutProps {
   /** Initial activity items from server */
@@ -66,26 +62,9 @@ export function UpdatesLayout({
   })
 
   // Layout state
-  const [screenSize, setScreenSize] = useState<'large' | 'medium' | 'small'>('large')
   const [showThread, setShowThread] = useState(false)
-
-  // Detect screen size
-  useEffect(() => {
-    const checkScreenSize = (): void => {
-      const width = window.innerWidth
-      if (width >= LARGE_BREAKPOINT) {
-        setScreenSize('large')
-      } else if (width >= MEDIUM_BREAKPOINT) {
-        setScreenSize('medium')
-      } else {
-        setScreenSize('small')
-      }
-    }
-
-    checkScreenSize()
-    window.addEventListener('resize', checkScreenSize)
-    return () => window.removeEventListener('resize', checkScreenSize)
-  }, [])
+  const isLargeScreen = useMediaQuery('(min-width: 1280px)')
+  const isMediumScreen = useMediaQuery('(min-width: 768px)')
 
   // Fetch items when filter changes
   const fetchItems = useCallback(async (newFilter: ActivityFilter) => {
@@ -195,7 +174,7 @@ export function UpdatesLayout({
     : null
 
   // ----- LARGE SCREEN: Two panels side by side -----
-  if (screenSize === 'large') {
+  if (isLargeScreen) {
     return (
       <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4 sm:-m-6 lg:-m-8">
         {/* Header */}
@@ -249,7 +228,7 @@ export function UpdatesLayout({
   }
 
   // ----- MEDIUM SCREEN: Narrower feed + thread -----
-  if (screenSize === 'medium') {
+  if (isMediumScreen) {
     return (
       <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4 sm:-m-6 lg:-m-8">
         {/* Header */}
@@ -304,7 +283,7 @@ export function UpdatesLayout({
 
   // ----- SMALL SCREEN (Mobile): Single column, tap to navigate -----
   return (
-    <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4">
+    <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">
       {showThread && selectedSource ? (
         // Thread view (full screen)
         <div className="flex flex-col h-full">
