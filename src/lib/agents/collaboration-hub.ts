@@ -10,8 +10,11 @@
  * @module agents/collaboration-hub
  */
 
-import { supabase } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { logAgentAction } from './permission-guard'
+
+// SECURITY: Collaboration orchestration executes in background agent flows without user cookies.
+const supabase = createAdminClient()
 
 // ============================================================================
 // TYPES

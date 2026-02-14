@@ -11,7 +11,10 @@
  * @module agents/permission-guard
  */
 
-import { supabase } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+
+// SECURITY: Governance checks run in unattended agent contexts; service role is required.
+const supabase = createAdminClient()
 
 // ============================================================================
 // TYPES

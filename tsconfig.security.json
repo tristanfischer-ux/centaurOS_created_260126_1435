@@ -8,7 +8,8 @@
     "src/lib/security/**/*.ts",
     "src/actions/run-specialist-council.ts",
     "src/app/api/messages/**/*.ts",
-    "src/app/api/cron/reports/daily/route.ts"
+    "src/app/api/cron/reports/daily/route.ts",
+    "src/app/api/cron/morning-brief/route.ts"
   ],
   "exclude": [
     "node_modules",

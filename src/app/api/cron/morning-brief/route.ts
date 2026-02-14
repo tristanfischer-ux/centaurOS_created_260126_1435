@@ -8,19 +8,24 @@
  */
 
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { runMorningBriefing } from '@/lib/agents/morning-brief'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * GET /api/cron/morning-brief
+ * Verifies cron authorization headers against the configured shared secret.
  *
- * Generates morning briefings for all active foundries.
- * Called by Vercel Cron.
+ * @description Enforces fail-closed authorization for cron invocations. Returns
+ * an HTTP response when authorization should be denied and null when the
+ * request is authorized to proceed.
+ *
+ * @param {Request} request - Incoming cron request
+ * @returns {NextResponse | null} Authorization failure response or null
+ *
+ * @security Requires CRON_SECRET and a matching Bearer token
  */
-export async function GET(request: Request) {
-  // Verify cron secret
+function verifyCronSecret(request: Request): NextResponse | null {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
@@ -32,6 +37,31 @@ export async function GET(request: Request) {
 
   if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  return null
+}
+
+/**
+ * GET /api/cron/morning-brief
+ *
+ * Generates morning briefings for all active foundries.
+ * Called by Vercel Cron.
+ *
+ * @description Executes the daily morning brief generation workflow for all
+ * active foundries with morning briefs enabled.
+ *
+ * @param {Request} request - Incoming cron request
+ * @returns {Promise<NextResponse>} Job execution result summary
+ *
+ * @throws {Error} Logs internal failures and returns generic 500 response
+ *
+ * @security Requires CRON_SECRET bearer authentication
+ */
+export async function GET(request: Request) {
+  const authFailureResponse = verifyCronSecret(request)
+  if (authFailureResponse) {
+    return authFailureResponse
   }
 
   const startTime = Date.now()
@@ -46,6 +76,9 @@ export async function GET(request: Request) {
   }
 
   try {
+    // SECURITY: Service-role client is required for unattended cron execution.
+    const supabase = createAdminClient()
+
     // Get all active foundries
     const { data: foundries, error: foundriesError } = await supabase
       .from('foundries')
@@ -55,10 +88,7 @@ export async function GET(request: Request) {
 
     if (foundriesError) {
       console.error('[MorningBriefCron] Error fetching foundries:', foundriesError)
-      return NextResponse.json(
-        { error: 'Failed to fetch foundries', details: foundriesError },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Failed to fetch foundries' }, { status: 500 })
     }
 
     if (!foundries || foundries.length === 0) {
@@ -93,19 +123,27 @@ export async function GET(request: Request) {
             success: true
           })
         } else {
+          console.error('[MorningBriefCron] Foundry briefing failed:', {
+            foundryId: foundry.id,
+            error: result.error ?? 'Unknown error'
+          })
           results.failed++
           results.details.push({
             foundryId: foundry.id,
             success: false,
-            error: result.error
+            error: 'Generation failed'
           })
         }
       } catch (error) {
+        console.error('[MorningBriefCron] Foundry briefing exception:', {
+          foundryId: foundry.id,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        })
         results.failed++
         results.details.push({
           foundryId: foundry.id,
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: 'Generation failed'
         })
       }
     }
@@ -126,13 +164,6 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('[MorningBriefCron] Fatal error:', error)
 
-    return NextResponse.json(
-      {
-        error: 'Fatal error',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        results
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Morning brief job failed', results }, { status: 500 })
   }
 }

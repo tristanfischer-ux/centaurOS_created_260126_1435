@@ -44,7 +44,7 @@ describe('rate-limit security regressions', () => {
 
     expect(source).toContain('const ip = getClientIP(request.headers)')
     expect(source).toMatch(
-      /rateLimit\(\s*'upload'\s*,\s*`message-upload:\$\{user\.id\}:\$\{ip\}`\s*,\s*\{\s*limit:\s*10,\s*window:\s*60\s*\*\s*1000\s*\}\s*\)/s
+      /rateLimit\(\s*'upload'\s*,\s*`message-upload:\$\{user\.id\}:\$\{ip\}`\s*,\s*\{\s*limit:\s*10,\s*window:\s*60\s*\*\s*1000\s*\}\s*\)/
     )
   })
 
@@ -68,6 +68,32 @@ describe('cron authorization hardening regressions', () => {
 
     expect(source).toContain('if (!cronSecret)')
     expect(source).toContain("return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })")
+  })
+
+  it('uses admin client for morning brief and avoids broken server singleton imports', async () => {
+    const morningBriefRoutePath = path.join(process.cwd(), 'src/app/api/cron/morning-brief/route.ts')
+    const source = await readFile(morningBriefRoutePath, 'utf-8')
+
+    expect(source).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
+    expect(source).toContain('const supabase = createAdminClient()')
+    expect(source).not.toContain("import { supabase } from '@/lib/supabase/server'")
+  })
+
+  it('uses admin clients for agent governance and collaboration modules', async () => {
+    const permissionGuardPath = path.join(process.cwd(), 'src/lib/agents/permission-guard.ts')
+    const collaborationHubPath = path.join(process.cwd(), 'src/lib/agents/collaboration-hub.ts')
+    const [permissionGuardSource, collaborationHubSource] = await Promise.all([
+      readFile(permissionGuardPath, 'utf-8'),
+      readFile(collaborationHubPath, 'utf-8')
+    ])
+
+    expect(permissionGuardSource).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
+    expect(permissionGuardSource).toContain('const supabase = createAdminClient()')
+    expect(permissionGuardSource).not.toContain("import { supabase } from '@/lib/supabase/server'")
+
+    expect(collaborationHubSource).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
+    expect(collaborationHubSource).toContain('const supabase = createAdminClient()')
+    expect(collaborationHubSource).not.toContain("import { supabase } from '@/lib/supabase/server'")
   })
 
   it('validates Slack webhook URLs before outbound cron fetch', async () => {
@@ -127,6 +153,7 @@ describe('cron authorization hardening regressions', () => {
 
   it('does not echo raw internal error messages from cron and sweep-trigger APIs', async () => {
     const routes = [
+      'src/app/api/cron/morning-brief/route.ts',
       'src/app/api/cron/reports/daily/route.ts',
       'src/app/api/cron/weekly-synthesis/route.ts',
       'src/app/api/cron/agent-sweep/route.ts',

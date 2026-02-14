@@ -115,14 +115,14 @@ async function getPendingApprovals(foundryId: string): Promise<{ objectives: any
       .select('*')
       .eq('foundry_id', foundryId)
       .eq('agent_approved', false)
-      .eq('created_by_agent_id', 'not', null)
+      .not('created_by_agent_id', 'is', null)
       .order('created_at', { ascending: false }),
     supabase
       .from('tasks')
       .select('*')
       .eq('foundry_id', foundryId)
       .eq('agent_approved', false)
-      .eq('created_by_agent_id', 'not', null)
+      .not('created_by_agent_id', 'is', null)
       .order('created_at', { ascending: false })
   ])
 
@@ -490,7 +490,7 @@ export async function getTodaysBriefing(
   const contentParts = data.content.split('\n\n---\n\n')
 
   for (const part of contentParts) {
-    const match = part.match(/^## (.+)\n\n(.+)$/s)
+    const match = part.match(/^## (.+)\n\n([\s\S]+)$/)
     if (match) {
       sections.push({
         title: match[1],

@@ -81,6 +81,9 @@ This audit reviewed the application security posture across:
 - Added fail-closed guard:
   - If `CRON_SECRET` is missing → return `503`
   - If auth header mismatches → return `401`
+- Replaced invalid `supabase` singleton import with `createAdminClient()` instantiation
+  inside the handler so the cron query path executes with a valid service-role client.
+- Removed internal database/error details from HTTP responses while preserving server logs.
 
 ---
 
