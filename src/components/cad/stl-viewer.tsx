@@ -74,12 +74,12 @@ function STLModel({ stlData }: { stlData: string }) {
 
   return (
     <>
-      {/* Main model */}
+      {/* Main model — warm gray on light background */}
       <mesh geometry={geometry} castShadow receiveShadow>
         <meshStandardMaterial
-          color="#e0e0e0"
-          metalness={0.3}
-          roughness={0.6}
+          color="#b0b0b0"
+          metalness={0.25}
+          roughness={0.55}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -88,10 +88,10 @@ function STLModel({ stlData }: { stlData: string }) {
       {showWireframe && (
         <mesh geometry={geometry}>
           <meshBasicMaterial
-            color="#404040"
+            color="#666666"
             wireframe
             transparent
-            opacity={0.1}
+            opacity={0.08}
           />
         </mesh>
       )}
@@ -108,10 +108,10 @@ function STLModel({ stlData }: { stlData: string }) {
         args={[r * 4, r * 4]}
         cellSize={r / 10}
         cellThickness={0.5}
-        cellColor="#6e6e6e"
+        cellColor="#c0c0c0"
         sectionSize={r / 2}
         sectionThickness={1}
-        sectionColor="#9d4b4b"
+        sectionColor="#e0836b"
         fadeDistance={r * 8}
         fadeStrength={1}
         followCamera={false}
@@ -122,7 +122,7 @@ function STLModel({ stlData }: { stlData: string }) {
   )
 }
 
-export function STLViewer({ stlData, backgroundColor = "#1a1a1a" }: STLViewerProps) {
+export function STLViewer({ stlData, backgroundColor = "#f5f5f5" }: STLViewerProps) {
   return (
     <div className="w-full h-full min-h-[400px] rounded-lg overflow-hidden border border-border">
       <Canvas
@@ -131,20 +131,20 @@ export function STLViewer({ stlData, backgroundColor = "#1a1a1a" }: STLViewerPro
         gl={{ antialias: true, alpha: false }}
       >
         <Suspense fallback={null}>
-          {/* Lighting setup */}
-          <ambientLight intensity={0.4} />
+          {/* Lighting setup — optimised for light background */}
+          <ambientLight intensity={0.6} />
           <directionalLight
             position={[10, 10, 5]}
-            intensity={1}
+            intensity={0.8}
             castShadow
             shadow-mapSize-width={2048}
             shadow-mapSize-height={2048}
           />
           <directionalLight position={[-10, -10, -5]} intensity={0.3} />
 
-          {/* Fill light from below for better visibility (replaces external HDR environment map) */}
-          <directionalLight position={[0, -5, 5]} intensity={0.2} />
-          <hemisphereLight intensity={0.5} color="#ffffff" groundColor="#444444" />
+          {/* Fill light from below for better visibility */}
+          <directionalLight position={[0, -5, 5]} intensity={0.15} />
+          <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#d0d0d0" />
 
           {/* 3D Model */}
           <STLModel stlData={stlData} />

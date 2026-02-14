@@ -18,10 +18,8 @@ import {
   Code2,
   Timer,
   Zap,
-  FileText,
   CheckCircle2,
   AlertTriangle,
-  ChevronDown,
   ChevronRight,
   ArrowRight,
   RotateCcw,
@@ -43,6 +41,8 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { STLViewer } from "@/components/cad/stl-viewer"
 import { CadLabWhileYouWait } from "@/components/cad/cad-lab-while-you-wait"
@@ -62,7 +62,7 @@ export default function CadLabBuildPage(): React.ReactNode {
   const {
     hasResearch, isAnyLoading,
     subject, editableReport,
-    modules, setModules, expandedModuleId, setExpandedModuleId,
+    modules,
     activeModuleId,
     isDecomposing, handleDecompose,
     handleModuleGenerate, handleGenerateAllModules,
@@ -70,7 +70,6 @@ export default function CadLabBuildPage(): React.ReactNode {
     generatedModuleCount,
     diagCompletedCount,
     handleDownload,
-    setMilestone,
   } = useCadLab()
 
   // Local UI state for result viewing
@@ -79,6 +78,11 @@ export default function CadLabBuildPage(): React.ReactNode {
   const [viewingModuleId, setViewingModuleId] = useState<string | null>(null)
   const [showCode, setShowCode] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
+
+  // Dialog state for viewing module results
+  const [dialogModuleId, setDialogModuleId] = useState<string | null>(null)
+  const dialogModule = dialogModuleId ? modules.find((m) => m.id === dialogModuleId) : null
+  const dialogResult = dialogModule?.result as CadLabResult | undefined
 
   // Gate: redirect if no research
   useEffect(() => {
@@ -247,7 +251,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                       isError ? "border-destructive/30 bg-status-error-light/10" :
                       "border-muted bg-muted/10"
                     }`}
-                    onClick={isDone ? () => setExpandedModuleId(expandedModuleId === mod.id ? null : mod.id) : undefined}
+                    onClick={isDone ? () => setDialogModuleId(mod.id) : undefined}
                     role={isDone ? "button" : undefined}
                     tabIndex={isDone ? 0 : undefined}
                   >
@@ -348,7 +352,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                           isError ? "text-destructive" :
                           "text-muted-foreground"
                         }`}>
-                          {isDone ? "Complete — click to view" :
+                          {isDone ? "Complete — click to open" :
                            status === "interface" ? "Planning dims..." :
                            status === "generating" ? "Building CAD..." :
                            isError ? "Failed" :
@@ -378,190 +382,176 @@ export default function CadLabBuildPage(): React.ReactNode {
             />
           )}
 
-          {/* Module list */}
+          {/* Module grid — compact cards instead of long accordion */}
           {modules.length > 0 && (
-            <div className="space-y-2 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
               {modules.map((mod) => (
-                <div key={mod.id} className="border rounded-md overflow-hidden">
-                  {/* Module header */}
-                  <button
-                    onClick={() => setExpandedModuleId(expandedModuleId === mod.id ? null : mod.id)}
-                    className="flex items-center justify-between w-full p-3 text-left hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className={`h-2 w-2 rounded-full flex-shrink-0 ${
-                        mod.status === "generated" ? "bg-status-success"
-                        : mod.status === "interface_ready" ? "bg-status-info"
-                        : "bg-muted-foreground"
-                      }`} />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{mod.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{mod.purpose}</p>
-                      </div>
+                <div
+                  key={mod.id}
+                  className="border rounded-lg p-4 space-y-3 hover:bg-muted/30 transition-colors"
+                >
+                  {/* Module header row */}
+                  <div className="flex items-start gap-3">
+                    <div className={`h-2.5 w-2.5 rounded-full flex-shrink-0 mt-1.5 ${
+                      mod.status === "generated" ? "bg-status-success"
+                      : mod.status === "interface_ready" ? "bg-status-info"
+                      : "bg-muted-foreground"
+                    }`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground truncate">{mod.name}</p>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">{mod.purpose}</p>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1" title={`Estimated procurement lead time: ${mod.leadWeeks} weeks`}>
-                        <Clock className="h-3 w-3" />
-                        {mod.leadWeeks} wk lead time
+                  </div>
+
+                  {/* Module meta row */}
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {mod.leadWeeks}w lead
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Puzzle className="h-3 w-3" />
+                      {mod.keyParts.length} parts
+                    </span>
+                    {mod.result?.bbox && (
+                      <span className="flex items-center gap-1 font-mono">
+                        <Ruler className="h-3 w-3" />
+                        {mod.result.bbox.xLen.toFixed(0)}×{mod.result.bbox.yLen.toFixed(0)}×{mod.result.bbox.zLen.toFixed(0)}mm
                       </span>
-                      <span className="text-xs text-muted-foreground flex items-center gap-1" title={`${mod.keyParts.length} key physical components in this sub-assembly`}>
-                        <Puzzle className="h-3 w-3" />
-                        {mod.keyParts.length} parts
+                    )}
+                  </div>
+
+                  {/* Module action */}
+                  <div className="flex items-center gap-2">
+                    {mod.status === "pending" && (
+                      <Button size="sm" variant="outline" onClick={() => handleModuleGenerate(mod.id, "interface")} disabled={activeModuleId !== null} className="text-xs h-8">
+                        {activeModuleId === mod.id
+                          ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Planning...</>
+                          : <><Ruler className="h-3 w-3 mr-1" /> Plan Dimensions</>
+                        }
+                      </Button>
+                    )}
+                    {mod.status === "interface_ready" && (
+                      <Button size="sm" variant="outline" onClick={() => handleModuleGenerate(mod.id, "generate")} disabled={activeModuleId !== null} className="text-xs h-8">
+                        {activeModuleId === mod.id
+                          ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Generating...</>
+                          : <><Box className="h-3 w-3 mr-1" /> Generate CAD</>
+                        }
+                      </Button>
+                    )}
+                    {mod.status === "generated" && mod.result && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDialogModuleId(mod.id)}
+                        className="text-xs h-8 gap-1"
+                      >
+                        <Maximize2 className="h-3 w-3" />
+                        View Results
+                      </Button>
+                    )}
+                    {mod.status === "generated" && (
+                      <span className="text-[10px] text-status-success flex items-center gap-1 ml-auto">
+                        <CheckCircle2 className="h-3 w-3" /> Generated
                       </span>
-                      {expandedModuleId === mod.id
-                        ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        : <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      }
-                    </div>
-                  </button>
+                    )}
+                  </div>
 
-                  {/* Expanded module detail */}
-                  {expandedModuleId === mod.id && (
-                    <div className="border-t p-4 space-y-4 bg-muted/20">
-                      {/* Description */}
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Description</p>
-                        <p className="text-sm text-foreground">{mod.description}</p>
+                  {/* Expandable details */}
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors py-1">
+                      Details
+                    </summary>
+                    <div className="pt-2 space-y-2 border-t border-muted mt-1">
+                      <p className="text-foreground">{mod.description}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {mod.keyParts.map((part, i) => (
+                          <span key={i} className="bg-muted px-1.5 py-0.5 rounded font-mono text-[10px]">{part}</span>
+                        ))}
                       </div>
-
-                      {/* IO Flow */}
-                      <div className="flex items-center gap-4 text-xs">
-                        <div>
-                          <p className="font-semibold text-muted-foreground mb-1">Inputs</p>
-                          {mod.inputs.map((inp, i) => (
-                            <span key={i} className="inline-block bg-muted px-2 py-0.5 rounded mr-1 mb-1 font-mono">{inp}</span>
-                          ))}
-                        </div>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <div>
-                          <p className="font-semibold text-muted-foreground mb-1">Outputs</p>
-                          {mod.outputs.map((out, i) => (
-                            <span key={i} className="inline-block bg-muted px-2 py-0.5 rounded mr-1 mb-1 font-mono">{out}</span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Key Parts */}
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Key Components</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {mod.keyParts.map((part, i) => (
-                            <span key={i} className="text-xs bg-muted px-2 py-0.5 rounded font-mono">{part}</span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Risks & Unknowns */}
-                      {(mod.failureModes.length > 0 || mod.unknowns.length > 0) && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {mod.failureModes.length > 0 && (
-                            <div>
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Failure Modes</p>
-                              <ul className="space-y-1">
-                                {mod.failureModes.map((fm, i) => (
-                                  <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
-                                    <AlertTriangle className="h-3 w-3 text-status-warning flex-shrink-0 mt-0.5" />{fm}
-                                  </li>
-                                ))}
-                              </ul>
+                      {mod.failureModes.length > 0 && (
+                        <div className="space-y-1">
+                          {mod.failureModes.map((fm, i) => (
+                            <div key={i} className="flex items-start gap-1 text-foreground">
+                              <AlertTriangle className="h-3 w-3 text-status-warning flex-shrink-0 mt-0.5" />
+                              <span>{fm}</span>
                             </div>
-                          )}
-                          {mod.unknowns.length > 0 && (
-                            <div>
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Unknowns</p>
-                              <ul className="space-y-1">
-                                {mod.unknowns.map((u, i) => (
-                                  <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
-                                    <Info className="h-3 w-3 text-status-info flex-shrink-0 mt-0.5" />{u}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Module pipeline actions */}
-                      <div className="flex items-center gap-2 pt-2 border-t border-muted">
-                        {mod.status === "pending" && (
-                          <Button size="sm" variant="outline" onClick={() => handleModuleGenerate(mod.id, "interface")} disabled={activeModuleId !== null}>
-                            {activeModuleId === mod.id
-                              ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Planning Dimensions...</>
-                              : <><Ruler className="h-3.5 w-3.5 mr-1.5" /> Plan Dimensions</>
-                            }
-                          </Button>
-                        )}
-                        {mod.status === "interface_ready" && (
-                          <>
-                            <span className="text-xs text-status-success flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Dimensions planned</span>
-                            <Button size="sm" variant="outline" onClick={() => handleModuleGenerate(mod.id, "generate")} disabled={activeModuleId !== null}>
-                              {activeModuleId === mod.id
-                                ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Generating CAD...</>
-                                : <><ArrowRight className="h-3.5 w-3.5 mr-1.5" /> Generate CAD</>
-                              }
-                            </Button>
-                          </>
-                        )}
-                        {mod.status === "generated" && (
-                          <span className="text-xs text-status-success flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3" /> CAD generated
-                            {mod.result?.bbox && (
-                              <span className="text-muted-foreground ml-2">
-                                {mod.result.bbox.xLen}×{mod.result.bbox.yLen}×{mod.result.bbox.zLen}mm
-                              </span>
-                            )}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Dimension plan */}
-                      {mod.interfaceDefinition && (
-                        <details className="border rounded-md">
-                          <summary className="cursor-pointer p-2 text-xs font-medium hover:bg-muted/50 transition-colors">
-                            View dimension plan
-                          </summary>
-                          <div className="p-3 border-t">
-                            <pre className="text-xs font-mono whitespace-pre-wrap text-foreground">{mod.interfaceDefinition}</pre>
-                          </div>
-                        </details>
-                      )}
-
-                      {/* Module results (when generated) */}
-                      {mod.status === "generated" && mod.result && (
-                        <ModuleResultsView
-                          result={mod.result as CadLabResult}
-                          moduleName={mod.name}
-                          code={mod.code}
-                          showCode={showCode}
-                          setShowCode={setShowCode}
-                          codeCopied={codeCopied}
-                          onCopyCode={handleCopyCode}
-                          activeViewTab={activeViewTab}
-                          setActiveViewTab={setActiveViewTab}
-                          onFullscreen={(view, moduleId) => {
-                            setViewingModuleId(moduleId)
-                            setFullscreenView(view)
-                          }}
-                          moduleId={mod.id}
-                          onDownload={handleDownload}
-                        />
-                      )}
-
-                      {/* SVG preview (fallback for older module data without full result viewer) */}
-                      {mod.result?.svgIso && mod.status === "generated" && !(mod.result as CadLabResult).stlData && (
-                        <div className="bg-muted rounded-lg p-2">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={mod.result.svgIso} alt={`${mod.name} isometric view`} className="w-full" />
+                          ))}
                         </div>
                       )}
                     </div>
-                  )}
+                  </details>
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* ── What's Next CTA — shown when all modules are generated ── */}
+      {generatedModuleCount > 0 && generatedModuleCount === modules.length && !isBatchRunning && (
+        <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Next: Engineering Analysis
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  View risk register, project timeline, and system-level engineering metrics.
+                </p>
+              </div>
+              <Button onClick={() => router.push("/the-forge/cad-lab/analysis")} className="gap-1.5">
+                <BarChart3 className="h-4 w-4" />
+                Continue to Analysis
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Module Results Dialog ── */}
+      <Dialog open={dialogModuleId !== null} onOpenChange={(open) => { if (!open) setDialogModuleId(null) }}>
+        <DialogContent size="lg" className="max-h-[90vh]">
+          {dialogModule && dialogResult && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Box className="h-4 w-4" />
+                  {dialogModule.name}
+                  {dialogResult.bbox && (
+                    <span className="text-xs font-normal text-muted-foreground font-mono ml-2">
+                      {dialogResult.bbox.xLen.toFixed(0)}×{dialogResult.bbox.yLen.toFixed(0)}×{dialogResult.bbox.zLen.toFixed(0)}mm
+                    </span>
+                  )}
+                </DialogTitle>
+              </DialogHeader>
+              <ScrollArea className="max-h-[75vh]">
+                <div className="pr-4">
+                  <ModuleResultsView
+                    result={dialogResult}
+                    moduleName={dialogModule.name}
+                    code={dialogModule.code}
+                    showCode={showCode}
+                    setShowCode={setShowCode}
+                    codeCopied={codeCopied}
+                    onCopyCode={handleCopyCode}
+                    activeViewTab={activeViewTab}
+                    setActiveViewTab={setActiveViewTab}
+                    onFullscreen={(view, modId) => {
+                      setViewingModuleId(modId)
+                      setFullscreenView(view)
+                    }}
+                    moduleId={dialogModule.id}
+                    onDownload={handleDownload}
+                  />
+                </div>
+              </ScrollArea>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── Fullscreen overlay ── */}
       {fullscreenView && viewingResult && (

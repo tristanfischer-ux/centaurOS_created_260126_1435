@@ -197,6 +197,7 @@ async function fetchGrammarRegistry(): Promise<Array<{
     .from("cad_grammars")
     .select("id, name, display_name, description, domain_keywords, example_prompts, param_specs, defaults, constraints_summary, source")
     .eq("is_active", true)
+    .neq("name", "__core_library__")
     .order("name")
 
   if (error) {
@@ -210,6 +211,26 @@ async function fetchGrammarRegistry(): Promise<Array<{
     param_specs: row.param_specs as unknown as GrammarParamSpec[],
     defaults: row.defaults as unknown as Record<string, unknown>,
   }))
+}
+
+/**
+ * Fetches the core library code from the __core_library__ row.
+ * Used when a grammar's core_library_code is null (shared core).
+ */
+async function getCoreLibraryCode(): Promise<string> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("cad_grammars")
+    .select("python_code")
+    .eq("name", "__core_library__")
+    .eq("is_active", true)
+    .single()
+
+  if (error || !data?.python_code) {
+    console.error("[CAD-GRAMMAR] Core library not found")
+    return ""
+  }
+  return data.python_code
 }
 
 /**
@@ -232,6 +253,12 @@ async function fetchGrammarByName(name: string): Promise<CadGrammar | null> {
     return null
   }
 
+  // Resolve core: use embedded if present, else fetch __core_library__
+  const coreLibraryCode =
+    data.core_library_code != null && data.core_library_code.trim() !== ""
+      ? data.core_library_code
+      : await getCoreLibraryCode()
+
   return {
     id: data.id,
     name: data.name,
@@ -240,7 +267,7 @@ async function fetchGrammarByName(name: string): Promise<CadGrammar | null> {
     domainKeywords: data.domain_keywords,
     examplePrompts: data.example_prompts,
     pythonCode: data.python_code,
-    coreLibraryCode: data.core_library_code,
+    coreLibraryCode,
     paramSpecs: data.param_specs as unknown as GrammarParamSpec[],
     defaults: data.defaults as unknown as Record<string, unknown>,
     constraintsSummary: data.constraints_summary,
@@ -248,6 +275,53 @@ async function fetchGrammarByName(name: string): Promise<CadGrammar | null> {
     isActive: data.is_active,
     version: data.version,
   }
+}
+
+/** A version record from cad_grammar_versions */
+export interface GrammarVersion {
+  id: string
+  grammarId: string
+  version: number
+  pythonCode: string
+  coreLibraryCode: string | null
+  paramSpecs: GrammarParamSpec[]
+  defaults: Record<string, unknown>
+  createdAt: string
+  changeSummary: string | null
+}
+
+/**
+ * Fetches version history for a grammar (for rollback / audit).
+ *
+ * @param grammarId - UUID of the grammar
+ * @returns Array of past versions, newest first
+ */
+export async function listGrammarVersions(
+  grammarId: string,
+): Promise<GrammarVersion[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("cad_grammar_versions")
+    .select("id, grammar_id, version, python_code, core_library_code, param_specs, defaults, created_at, change_summary")
+    .eq("grammar_id", grammarId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("[CAD-GRAMMAR] Failed to fetch grammar versions:", error.message)
+    return []
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    grammarId: row.grammar_id,
+    version: row.version,
+    pythonCode: row.python_code,
+    coreLibraryCode: row.core_library_code,
+    paramSpecs: (row.param_specs ?? []) as unknown as GrammarParamSpec[],
+    defaults: (row.defaults ?? {}) as unknown as Record<string, unknown>,
+    createdAt: row.created_at,
+    changeSummary: row.change_summary,
+  }))
 }
 
 // ─── Grammar Selection ──────────────────────────────────────────────

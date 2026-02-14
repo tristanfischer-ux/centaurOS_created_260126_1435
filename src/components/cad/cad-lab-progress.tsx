@@ -682,20 +682,13 @@ export function CadLabProgress({ lines, isActive, operationType, subject = "" }:
 
   if (!isActive && lines.length === 0) return null
 
-  // For non-batch operations, show a time-based progress estimate.
   // Batch operations show real per-module progress in the batch grid instead.
   const isBatch = operationType === "batch"
-  const estimatedSeconds = operationType === "research" ? 60
-    : operationType === "breakdown" ? 30
-    : operationType === "generate" ? 45
-    : 120
-
-  const progress = Math.min((elapsedSeconds / estimatedSeconds) * 100, 95)
 
   return (
     <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/20 to-background overflow-hidden">
       <CardContent className="pt-6 space-y-4">
-        {/* Progress bar — hidden for batch (batch grid shows real progress) */}
+        {/* Indeterminate progress bar — honest about timing, shows elapsed only */}
         {isActive && !isBatch && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -705,17 +698,25 @@ export function CadLabProgress({ lines, isActive, operationType, subject = "" }:
                  operationType === "breakdown" ? "Mapping sub-assemblies..." :
                  "Generating parametric CAD..."}
               </span>
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1 font-mono">
                 <Clock className="h-3 w-3" />
                 {elapsedSeconds}s
               </span>
             </div>
             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full bg-international-orange rounded-full transition-all duration-1000 ease-out"
-                style={{ width: `${progress}%` }}
+                className="h-full w-1/3 bg-international-orange rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]"
+                style={{
+                  animation: "indeterminate 1.5s ease-in-out infinite",
+                }}
               />
             </div>
+            <style jsx>{`
+              @keyframes indeterminate {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(400%); }
+              }
+            `}</style>
           </div>
         )}
 

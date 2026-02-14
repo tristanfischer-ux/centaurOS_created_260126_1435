@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { rateLimit } from '@/lib/security/rate-limit'
 import { SPECIALISTS } from '@/app/(platform)/agents/specialists-data'
 import { synthesizeCouncilDebate, type DebateTranscriptEntry } from '@/lib/agents/sweep-synthesis'
@@ -95,6 +96,61 @@ function selectSpecialistsForTopic(topic: string): typeof SPECIALISTS {
 }
 
 /**
+ * Maximum character budget for the prior discussion block in council prompts.
+ * The /api/agents/execute endpoint has a 50k char limit on the prompt field.
+ * Reserve headroom for template text, specialist metadata, and company context.
+ */
+const MAX_PRIOR_DISCUSSION_CHARS = 30_000
+
+/**
+ * Truncates the prior discussion block to fit within the character budget.
+ * Keeps the most recent entries in full and summarizes older entries.
+ *
+ * @param responses - All prior debate entries
+ * @param maxChars - Maximum character budget for the block
+ * @returns Formatted prior discussion string within the budget
+ */
+function buildPriorDiscussionBlock(
+    responses: DebateTranscriptEntry[],
+    maxChars: number = MAX_PRIOR_DISCUSSION_CHARS
+): string {
+    if (responses.length === 0) return '(No prior responses yet)'
+
+    const formatted = responses.map(
+        (r) => `**${r.specialistName}** (Round ${r.round}):\n${r.content}`
+    )
+
+    const separator = '\n\n---\n\n'
+    const fullBlock = formatted.join(separator)
+    if (fullBlock.length <= maxChars) return fullBlock
+
+    // Keep recent entries in full, truncate older ones
+    let recentBlock = ''
+    let recentCount = 0
+
+    for (let i = formatted.length - 1; i >= 0; i--) {
+        const candidate = recentCount === 0
+            ? formatted[i]
+            : formatted[i] + separator + recentBlock
+        if (candidate.length > maxChars - 2000 && recentCount > 0) break
+        recentBlock = candidate
+        recentCount++
+    }
+
+    const truncatedCount = responses.length - recentCount
+    if (truncatedCount === 0) {
+        return fullBlock.slice(0, maxChars) + '\n\n*[Discussion truncated for length]*'
+    }
+
+    const truncatedSummary = responses
+        .slice(0, truncatedCount)
+        .map((r) => `- ${r.specialistName} (Round ${r.round})`)
+        .join('\n')
+
+    return `*[Earlier discussion summarized — ${truncatedCount} responses from:]*\n${truncatedSummary}\n\n---\n\n${recentBlock}`
+}
+
+/**
  * Builds the debate prompt for a specialist
  */
 function buildDebatePrompt(
@@ -103,9 +159,7 @@ function buildDebatePrompt(
     allResponses: DebateTranscriptEntry[],
     debateRound: number
 ): string {
-    const priorBlock = allResponses
-        .map(r => `**${r.specialistName}** (Round ${r.round}):\n${r.content}`)
-        .join('\n\n---\n\n')
+    const priorBlock = buildPriorDiscussionBlock(allResponses)
 
     return `You are the ${specialist.name} in an active specialist council debate.
 
@@ -119,7 +173,7 @@ ${specialist.workingStyle}
 "${topic}"
 
 ## Discussion So Far
-${priorBlock || '(No prior responses yet)'}
+${priorBlock}
 
 ## Your Task (Debate Round ${debateRound})
 The founder is NOT participating — this is an autonomous debate between specialists.
@@ -230,18 +284,11 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Get user's foundry
-        const { data: foundryMember } = await supabase
-            .from('foundry_members')
-            .select('foundry_id, role')
-            .eq('user_id', user.id)
-            .single()
-
-        if (!foundryMember) {
+        // Get user's foundry (standard pattern: profiles.active_foundry_id / foundry_id)
+        const foundryId = await getFoundryIdCached()
+        if (!foundryId) {
             return NextResponse.json({ error: 'No foundry found' }, { status: 404 })
         }
-
-        const foundryId = foundryMember.foundry_id
 
         // Parse request
         const body = await request.json()

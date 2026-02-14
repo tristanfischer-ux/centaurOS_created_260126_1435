@@ -39,6 +39,7 @@ class BracketGrammar(DomainGrammar):
         return a
 $CODE$,
   $CORE$
+"""ForgeOS Core — Domain Grammar Base Classes"""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -46,44 +47,110 @@ import cadquery as cq
 
 @dataclass
 class ParamSpec:
-    name: str; type: str; unit: Optional[str] = None; description: str = ""; default: Any = None; min_val: Any = None; max_val: Any = None; enum_options: Optional[List[str]] = None
-    def validate(self, value): return True, ""
+    name: str
+    type: str
+    unit: Optional[str] = None
+    description: str = ""
+    default: Any = None
+    min_val: Any = None
+    max_val: Any = None
+    enum_options: Optional[List[str]] = None
+    def validate(self, value):
+        if value is None: return True, ""
+        if self.type == "float":
+            try: v = float(value)
+            except (TypeError, ValueError): return False, f"{self.name}: expected float, got {type(value).__name__}"
+            if self.min_val is not None and v < self.min_val: return False, f"{self.name}: {v} < minimum {self.min_val}"
+            if self.max_val is not None and v > self.max_val: return False, f"{self.name}: {v} > maximum {self.max_val}"
+        elif self.type == "int":
+            try: v = int(value)
+            except (TypeError, ValueError): return False, f"{self.name}: expected int, got {type(value).__name__}"
+            if self.min_val is not None and v < self.min_val: return False, f"{self.name}: {v} < minimum {self.min_val}"
+            if self.max_val is not None and v > self.max_val: return False, f"{self.name}: {v} > maximum {self.max_val}"
+        elif self.type == "enum":
+            if self.enum_options and value not in self.enum_options: return False, f"{self.name}: '{value}' not in {self.enum_options}"
+        elif self.type == "bool":
+            if not isinstance(value, bool): return False, f"{self.name}: expected bool, got {type(value).__name__}"
+        elif self.type == "list":
+            if not isinstance(value, list): return False, f"{self.name}: expected list, got {type(value).__name__}"
+        elif self.type == "dict_list":
+            if not isinstance(value, list): return False, f"{self.name}: expected list of dicts, got {type(value).__name__}"
+        return True, ""
 
 @dataclass
 class Constraint:
-    name: str; description: str; check_fn: Any; severity: str = "error"
-    def check(self, s): return self.check_fn(s)
+    name: str
+    description: str
+    check_fn: Any
+    severity: str = "error"
+    def check(self, skeleton):
+        return self.check_fn(skeleton)
 
 @dataclass
 class ValidationResult:
-    passed: bool; errors: List[str] = field(default_factory=list); warnings: List[str] = field(default_factory=list); metrics: Dict[str, Any] = field(default_factory=dict)
+    passed: bool
+    errors: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    metrics: Dict[str, Any] = field(default_factory=dict)
 
 class DomainGrammar(ABC):
     @property
     @abstractmethod
-    def name(self): ...
+    def name(self) -> str: ...
     @property
     @abstractmethod
-    def display_name(self): ...
+    def display_name(self) -> str: ...
     @property
     @abstractmethod
-    def description(self): ...
+    def description(self) -> str: ...
     @abstractmethod
-    def param_specs(self): ...
-    def defaults(self): return {s.name: s.default for s in self.param_specs() if s.default is not None}
-    def constraints(self): return []
+    def param_specs(self) -> List[ParamSpec]: ...
+    def defaults(self) -> Dict[str, Any]:
+        return {s.name: s.default for s in self.param_specs() if s.default is not None}
+    def constraints(self) -> List[Constraint]:
+        return []
     @abstractmethod
-    def derive_skeleton(self, p): ...
+    def derive_skeleton(self, params: Dict[str, Any]) -> Dict[str, Any]: ...
     @abstractmethod
-    def build(self, s): ...
+    def build(self, skeleton: Dict[str, Any]) -> cq.Assembly: ...
     def validate(self, skeleton, assembly):
-        r = ValidationResult(passed=True)
-        bb = assembly.toCompound().BoundingBox()
-        r.metrics["part_count"]=len(assembly.children)
-        return r
+        result = ValidationResult(passed=True)
+        for constraint in self.constraints():
+            ok, msg = constraint.check(skeleton)
+            if not ok:
+                if constraint.severity == "error":
+                    result.errors.append(f"[{constraint.name}] {msg}")
+                    result.passed = False
+                else:
+                    result.warnings.append(f"[{constraint.name}] {msg}")
+        compound = assembly.toCompound()
+        bb = compound.BoundingBox()
+        result.metrics["part_count"] = len(assembly.children)
+        result.metrics["envelope_mm"] = f"{bb.xlen:.0f} x {bb.ylen:.0f} x {bb.zlen:.0f}"
+        return result
+    def validate_params(self, params):
+        result = ValidationResult(passed=True)
+        full_params = {**self.defaults(), **params}
+        for spec in self.param_specs():
+            if spec.name not in full_params:
+                if spec.default is None and spec.type not in ("dict_list", "list"):
+                    result.errors.append(f"Required parameter '{spec.name}' not provided")
+                    result.passed = False
+                continue
+            ok, msg = spec.validate(full_params[spec.name])
+            if not ok:
+                result.errors.append(msg)
+                result.passed = False
+        return result
     def generate(self, params):
-        sk=self.derive_skeleton({**self.defaults(),**params})
-        return self.build(sk), self.validate(sk, self.build(sk))
+        full_params = {**self.defaults(), **params}
+        param_result = self.validate_params(full_params)
+        if not param_result.passed:
+            return None, param_result
+        skeleton = self.derive_skeleton(full_params)
+        assembly = self.build(skeleton)
+        result = self.validate(skeleton, assembly)
+        return assembly, result
 $CORE$,
   '[{"name":"width","type":"float","unit":"mm","description":"Width","default":50,"min_val":20,"max_val":200},
     {"name":"height","type":"float","unit":"mm","description":"Height","default":50,"min_val":20,"max_val":200},

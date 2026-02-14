@@ -14,6 +14,8 @@ import { useRouter } from "next/navigation"
 import {
   BarChart3,
   ArrowLeft,
+  ArrowRight,
+  ShoppingCart,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -58,6 +60,27 @@ export default function CadLabAnalysisPage(): React.ReactNode {
       <CadLabAnalysisDashboard modules={modules} projectName={subject} />
       <CadLabTimeline modules={modules} />
       <CadLabRiskRegister modules={modules} />
+
+      {/* What's Next CTA */}
+      <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Next: Procurement &amp; Supply Chain
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Complete manufacturing diagnostics, get cost estimates, and identify suppliers for each module.
+              </p>
+            </div>
+            <Button onClick={() => router.push("/the-forge/cad-lab/procurement")} className="gap-1.5">
+              <ShoppingCart className="h-4 w-4" />
+              Continue to Procurement
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

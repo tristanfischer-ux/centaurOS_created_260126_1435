@@ -88,7 +88,7 @@ export function SupplierSidebar({ userName, userEmail }: SupplierSidebarProps) {
   }
 
   return (
-    <div className="hidden md:flex h-screen w-64 flex-col bg-background border-r border-slate-100 text-foreground">
+    <div className="hidden sm:flex h-screen w-64 flex-col bg-background border-r border-slate-100 text-foreground">
       {/* App Header */}
       <div className="px-5 pt-8 pb-6">
         <div className="flex items-center justify-between">
