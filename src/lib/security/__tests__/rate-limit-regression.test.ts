@@ -320,6 +320,15 @@ describe('cad-lab generation abuse-control regressions', () => {
     expect(source).toContain('window: 60 * 60 * 1000')
     expect(source).toContain('{ status: 429 }')
   })
+
+  it('rate limits cad-lab batch status polling endpoint', async () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/cad-lab/generate-batch/route.ts')
+    const source = await readFile(routePath, 'utf-8')
+
+    expect(source).toContain("await rateLimit('api', `cad-lab-batch-status:${user.id}`")
+    expect(source).toContain('window: 60 * 1000')
+    expect(source).toContain('{ status: 429 }')
+  })
 })
 
 describe('qa test trigger hardening regressions', () => {

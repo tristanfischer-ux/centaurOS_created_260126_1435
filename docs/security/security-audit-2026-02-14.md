@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 18 | 16 fixed, 2 open |
+| Medium | 19 | 17 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -434,6 +434,25 @@ trigger throttling and built callback URLs from environment-derived base URLs.
   - window: `60 * 60 * 1000` (1 hour)
 - Derived callback URL from `request.nextUrl.origin` instead of environment base URL.
 - Added fail-closed `QA_CALLBACK_SECRET` configuration guard before dispatch.
+- Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 23) CAD batch status polling endpoint lacked request throttling (Medium)
+
+**Issue:** `GET /api/cad-lab/generate-batch` exposed a frequent polling path
+without endpoint-level throttling.  
+**Impact:** Authenticated polling abuse could increase database load and degrade
+CAD-lab responsiveness.
+
+**Fix implemented (`src/app/api/cad-lab/generate-batch/route.ts`):**
+
+- Added per-user polling throttle:
+  - key: `cad-lab-batch-status:${user.id}`
+  - limit: `120`
+  - window: `60 * 1000` (1 minute)
+- Added explicit `429` response when exceeded.
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 

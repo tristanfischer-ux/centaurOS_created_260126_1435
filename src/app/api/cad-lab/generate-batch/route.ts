@@ -14,6 +14,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { rateLimit } from "@/lib/security/rate-limit"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 
 export const runtime = "nodejs"
@@ -52,6 +53,18 @@ export async function GET(request: Request): Promise<NextResponse> {
   } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  // SECURITY: Rate limit polling endpoint to reduce DB abuse risk.
+  const rateLimitResult = await rateLimit('api', `cad-lab-batch-status:${user.id}`, {
+    limit: 120,
+    window: 60 * 1000,
+  })
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded. Please wait before polling batch status again." },
+      { status: 429 },
+    )
   }
 
   const url = new URL(request.url)

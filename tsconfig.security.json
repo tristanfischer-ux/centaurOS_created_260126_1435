@@ -15,6 +15,7 @@
     "src/app/api/cron/morning-brief/route.ts",
     "src/app/api/billing/test-activate/route.ts",
     "src/app/api/cad-lab/generate-module/route.ts",
+    "src/app/api/cad-lab/generate-batch/route.ts",
     "src/app/api/admin/qa-tests/route.ts"
   ],
   "exclude": [
