@@ -342,3 +342,16 @@ describe('qa test trigger hardening regressions', () => {
     expect(source).toContain('if (!process.env.QA_CALLBACK_SECRET)')
   })
 })
+
+describe('dev-login hardening regressions', () => {
+  it('requires explicit enablement, secret auth, and rate limiting for dev-login route', async () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/dev-login/route.ts')
+    const source = await readFile(routePath, 'utf-8')
+
+    expect(source).toContain("process.env.ALLOW_DEV_LOGIN !== 'true'")
+    expect(source).toContain('const devLoginSecret = process.env.DEV_LOGIN_SECRET')
+    expect(source).toContain('if (authHeader !== `Bearer ${devLoginSecret}`)')
+    expect(source).toContain("await rateLimit('api', `dev-login:${ip}`")
+    expect(source).toContain('{ status: 429 }')
+  })
+})

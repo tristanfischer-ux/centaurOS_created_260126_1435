@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 19 | 17 fixed, 2 open |
+| Medium | 20 | 18 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -453,6 +453,30 @@ CAD-lab responsiveness.
   - limit: `120`
   - window: `60 * 1000` (1 minute)
 - Added explicit `429` response when exceeded.
+- Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 24) Development auto-login endpoint lacked explicit enablement and shared-secret protection (Medium)
+
+**Issue:** `GET /api/dev-login` was gated by `NODE_ENV !== 'production'` but did not
+require explicit feature enablement, shared-secret authorization, or request throttling.  
+**Impact:** Misconfigured deployments and shared preview/test environments had elevated
+risk of unauthorized test-session creation.
+
+**Fix implemented (`src/app/api/dev-login/route.ts`):**
+
+- Added explicit opt-in requirement:
+  - `ALLOW_DEV_LOGIN === 'true'`
+- Added shared-secret auth requirement:
+  - configured `DEV_LOGIN_SECRET`
+  - `Authorization: Bearer <DEV_LOGIN_SECRET>`
+- Added IP-based endpoint throttling:
+  - key: `dev-login:${ip}`
+  - limit: `20`
+  - window: `60 * 1000` (1 minute)
+- Removed detailed login-failure payload fields from response.
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
