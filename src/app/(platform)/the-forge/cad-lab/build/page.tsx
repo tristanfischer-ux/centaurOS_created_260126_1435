@@ -90,6 +90,48 @@ export default function CadLabBuildPage(): React.ReactNode {
     setDialogModuleId(moduleId)
   }, [])
 
+  // Download All ZIP — collects all STEP + STL files into a single download
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false)
+  const handleDownloadAll = useCallback(async () => {
+    setIsDownloadingAll(true)
+    try {
+      const JSZip = (await import("jszip")).default
+      const zip = new JSZip()
+      let fileCount = 0
+
+      for (const mod of modules) {
+        if (mod.status !== "generated" || !mod.result) continue
+        const result = mod.result as CadLabResult
+        const safeName = mod.name.replace(/[^a-zA-Z0-9_-]/g, "_")
+
+        if (result.stepData) {
+          const bytes = Uint8Array.from(atob(result.stepData), (c) => c.charCodeAt(0))
+          zip.file(`${safeName}.step`, bytes)
+          fileCount++
+        }
+        if (result.stlData) {
+          const bytes = Uint8Array.from(atob(result.stlData), (c) => c.charCodeAt(0))
+          zip.file(`${safeName}.stl`, bytes)
+          fileCount++
+        }
+      }
+
+      if (fileCount === 0) return
+
+      const blob = await zip.generateAsync({ type: "blob" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${subject.replace(/[^a-zA-Z0-9_-]/g, "_")}_CAD_files.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error("[CAD-LAB] Download All failed:", err)
+    } finally {
+      setIsDownloadingAll(false)
+    }
+  }, [modules, subject])
+
   // Gate: redirect if no research
   useEffect(() => {
     if (!hasResearch) {
@@ -138,6 +180,19 @@ export default function CadLabBuildPage(): React.ReactNode {
                 </Button>
                 <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => router.push("/the-forge/cad-lab/review")}>
                   <ClipboardCheck className="h-3 w-3" /> Review Package
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  onClick={handleDownloadAll}
+                  disabled={isDownloadingAll}
+                >
+                  {isDownloadingAll ? (
+                    <><Loader2 className="h-3 w-3 animate-spin" /> Zipping...</>
+                  ) : (
+                    <><Download className="h-3 w-3" /> Download All (ZIP)</>
+                  )}
                 </Button>
               </div>
             </div>
