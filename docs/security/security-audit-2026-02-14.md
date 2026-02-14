@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 13 | 11 fixed, 2 open |
+| Medium | 14 | 12 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -322,6 +322,27 @@ directly in JSON error responses.
   - `src/app/api/cron/telegram-briefings/route.ts`
   - `src/app/api/agents/sweep-trigger/route.ts`
 - Preserved structured server-side logging of internal error messages.
+- Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 18) Agent objective/task actions lacked authenticated foundry scoping (Medium)
+
+**Issue:** `src/actions/agent-objectives.ts` used an invalid Supabase singleton import and
+did not enforce authenticated foundry membership before create/update operations.  
+**Impact:** Risk of runtime failures plus weak tenant-boundary enforcement for agent objective/task writes.
+
+**Fix implemented:**
+
+- Replaced dynamic `.supabase` import pattern with authenticated `createClient()` usage.
+- Added explicit auth guard helper (`getAuthenticatedClient`) returning unauthorized failures.
+- Added foundry membership guard (`ensureFoundryMembership`) before agent objective/task creation.
+- Preserved retry behavior while routing all writes through authenticated client context.
+- Expanded `typecheck:security` scope to include:
+  - `src/actions/agent-objectives.ts`
+  - `src/lib/agents/permission-guard.ts`
+  - `src/lib/agents/collaboration-hub.ts`
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 

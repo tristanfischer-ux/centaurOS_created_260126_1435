@@ -15,18 +15,15 @@
  */
 
 import { revalidatePath } from 'next/cache'
-import { Database } from '@/types/database.types'
+import { createClient } from '@/lib/supabase/server'
 import {
   checkAgentPermission,
   logAgentAction,
-  isAlwaysAllowed,
-  ActionTier,
-  quickCheckPermission,
   type PermissionResult
 } from '@/lib/agents/permission-guard'
 import { withRetry } from '@/lib/retry'
 
-type SupabaseClient = Database
+type UserScopedSupabaseClient = Awaited<ReturnType<typeof createClient>>
 
 // ============================================================================
 // TYPES
@@ -84,6 +81,47 @@ async function checkTaskPermission(
   return checkAgentPermission('create_task', foundryId, agentId)
 }
 
+/**
+ * AUTH: Returns an authenticated Supabase client for server actions.
+ */
+async function getAuthenticatedClient(): Promise<{
+  supabase: UserScopedSupabaseClient
+  userId: string
+} | {
+  error: string
+}> {
+  const supabase = await createClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+
+  if (error || !user) {
+    return { error: 'Unauthorized' }
+  }
+
+  return { supabase, userId: user.id }
+}
+
+/**
+ * AUTH: Ensures the authenticated user belongs to the target foundry.
+ */
+async function ensureFoundryMembership(
+  supabase: UserScopedSupabaseClient,
+  userId: string,
+  foundryId: string
+): Promise<string | null> {
+  const { data: membership, error } = await supabase
+    .from('foundry_memberships')
+    .select('foundry_id')
+    .eq('foundry_id', foundryId)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (error || !membership) {
+    return 'Unauthorized for this foundry'
+  }
+
+  return null
+}
+
 // ============================================================================
 // AGENT OBJECTIVE CREATION
 // ============================================================================
@@ -108,6 +146,12 @@ async function checkTaskPermission(
 export async function createAgentObjective(
   input: AgentObjectiveInput
 ): Promise<AgentActionResult> {
+  const authResult = await getAuthenticatedClient()
+  if ('error' in authResult) {
+    return { success: false, error: authResult.error }
+  }
+
+  const { supabase, userId } = authResult
   const { title, description, foundryId, agentId, agentName, parentObjectiveId } = input
 
   // Validate required fields
@@ -119,6 +163,10 @@ export async function createAgentObjective(
   }
   if (!agentId) {
     return { success: false, error: 'Agent ID is required' }
+  }
+  const membershipError = await ensureFoundryMembership(supabase, userId, foundryId)
+  if (membershipError) {
+    return { success: false, error: membershipError }
   }
 
   // Check permission
@@ -150,22 +198,22 @@ export async function createAgentObjective(
 
   // If requires approval, create as pending
   if (permission.requiresApproval) {
-    const pendingResult = await createObjectivePending(input, permission)
+    const pendingResult = await createObjectivePending(supabase, input)
 
     return {
       success: true,
-      id: pendingResult.id,
+      id: pendingResult.id ?? undefined,
       requiresApproval: true,
       permissionResult: permission
     }
   }
 
   // Otherwise, create directly (elevated permissions)
-  const directResult = await createObjectiveDirect(input, permission)
+  const directResult = await createObjectiveDirect(supabase, input)
 
   return {
     success: directResult.success,
-    id: directResult.id,
+    id: directResult.id ?? undefined,
     requiresApproval: false,
     error: directResult.error,
     permissionResult: permission
@@ -176,15 +224,15 @@ export async function createAgentObjective(
  * Create objective requiring human approval
  */
 async function createObjectivePending(
-  input: AgentObjectiveInput,
-  permission: PermissionResult
+  supabase: UserScopedSupabaseClient,
+  input: AgentObjectiveInput
 ): Promise<{ id: string | null; success: boolean; error?: string }> {
   const { title, description, foundryId, agentId, parentObjectiveId } = input
 
   try {
     const { data, error } = await withRetry(async () => {
-      return await (await import('@/lib/supabase/server'))
-        .supabase.from('objectives')
+      return await supabase
+        .from('objectives')
         .insert({
           title: title.trim(),
           description: description?.trim() || null,
@@ -216,15 +264,15 @@ async function createObjectivePending(
  * Create objective directly (elevated permissions)
  */
 async function createObjectiveDirect(
-  input: AgentObjectiveInput,
-  permission: PermissionResult
+  supabase: UserScopedSupabaseClient,
+  input: AgentObjectiveInput
 ): Promise<{ id: string | null; success: boolean; error?: string }> {
   const { title, description, foundryId, agentId, parentObjectiveId } = input
 
   try {
     const { data, error } = await withRetry(async () => {
-      return await (await import('@/lib/supabase/server'))
-        .supabase.from('objectives')
+      return await supabase
+        .from('objectives')
         .insert({
           title: title.trim(),
           description: description?.trim() || null,
@@ -275,6 +323,12 @@ async function createObjectiveDirect(
 export async function createAgentTask(
   input: AgentTaskInput
 ): Promise<AgentActionResult> {
+  const authResult = await getAuthenticatedClient()
+  if ('error' in authResult) {
+    return { success: false, error: authResult.error }
+  }
+
+  const { supabase, userId } = authResult
   const {
     title,
     objectiveId,
@@ -298,6 +352,10 @@ export async function createAgentTask(
   }
   if (!agentId) {
     return { success: false, error: 'Agent ID is required' }
+  }
+  const membershipError = await ensureFoundryMembership(supabase, userId, foundryId)
+  if (membershipError) {
+    return { success: false, error: membershipError }
   }
 
   // Check permission
@@ -331,22 +389,22 @@ export async function createAgentTask(
 
   // If requires approval, create as pending
   if (permission.requiresApproval) {
-    const pendingResult = await createTaskPending(input, permission)
+    const pendingResult = await createTaskPending(supabase, input)
 
     return {
       success: true,
-      id: pendingResult.id,
+      id: pendingResult.id ?? undefined,
       requiresApproval: true,
       permissionResult: permission
     }
   }
 
   // Otherwise, create directly (elevated permissions)
-  const directResult = await createTaskDirect(input, permission)
+  const directResult = await createTaskDirect(supabase, input)
 
   return {
     success: directResult.success,
-    id: directResult.id,
+    id: directResult.id ?? undefined,
     requiresApproval: false,
     error: directResult.error,
     permissionResult: permission
@@ -357,15 +415,15 @@ export async function createAgentTask(
  * Create task requiring human approval
  */
 async function createTaskPending(
-  input: AgentTaskInput,
-  permission: PermissionResult
+  supabase: UserScopedSupabaseClient,
+  input: AgentTaskInput
 ): Promise<{ id: string | null; success: boolean; error?: string }> {
   const { title, objectiveId, foundryId, agentId, description, assigneeId, dueDate } = input
 
   try {
     const { data, error } = await withRetry(async () => {
-      return await (await import('@/lib/supabase/server'))
-        .supabase.from('tasks')
+      return await supabase
+        .from('tasks')
         .insert({
           title: title.trim(),
           description: description?.trim() || null,
@@ -399,15 +457,15 @@ async function createTaskPending(
  * Create task directly (elevated permissions)
  */
 async function createTaskDirect(
-  input: AgentTaskInput,
-  permission: PermissionResult
+  supabase: UserScopedSupabaseClient,
+  input: AgentTaskInput
 ): Promise<{ id: string | null; success: boolean; error?: string }> {
   const { title, objectiveId, foundryId, agentId, description, assigneeId, dueDate } = input
 
   try {
     const { data, error } = await withRetry(async () => {
-      return await (await import('@/lib/supabase/server'))
-        .supabase.from('tasks')
+      return await supabase
+        .from('tasks')
         .insert({
           title: title.trim(),
           description: description?.trim() || null,
@@ -445,12 +503,17 @@ async function createTaskDirect(
  * Approve an agent-created objective
  */
 export async function approveAgentObjective(
-  objectiveId: string,
-  approvedBy: string
+  objectiveId: string
 ): Promise<{ success: boolean; error?: string }> {
+  const authResult = await getAuthenticatedClient()
+  if ('error' in authResult) {
+    return { success: false, error: authResult.error }
+  }
+
+  const { supabase } = authResult
+
   try {
-    const { error } = await (await import('@/lib/supabase/server'))
-      .supabase
+    const { error } = await supabase
       .from('objectives')
       .update({
         agent_approved: true,
@@ -478,13 +541,17 @@ export async function approveAgentObjective(
  * Reject an agent-created objective
  */
 export async function rejectAgentObjective(
-  objectiveId: string,
-  rejectedBy: string,
-  reason: string
+  objectiveId: string
 ): Promise<{ success: boolean; error?: string }> {
+  const authResult = await getAuthenticatedClient()
+  if ('error' in authResult) {
+    return { success: false, error: authResult.error }
+  }
+
+  const { supabase } = authResult
+
   try {
-    const { error } = await (await import('@/lib/supabase/server'))
-      .supabase
+    const { error } = await supabase
       .from('objectives')
       .update({
         status: 'Rejected',
@@ -512,9 +579,15 @@ export async function rejectAgentObjective(
 export async function approveAgentTask(
   taskId: string
 ): Promise<{ success: boolean; error?: string }> {
+  const authResult = await getAuthenticatedClient()
+  if ('error' in authResult) {
+    return { success: false, error: authResult.error }
+  }
+
+  const { supabase } = authResult
+
   try {
-    const { error } = await (await import('@/lib/supabase/server'))
-      .supabase
+    const { error } = await supabase
       .from('tasks')
       .update({
         agent_approved: true,
@@ -541,12 +614,17 @@ export async function approveAgentTask(
  * Reject an agent-created task
  */
 export async function rejectAgentTask(
-  taskId: string,
-  reason: string
+  taskId: string
 ): Promise<{ success: boolean; error?: string }> {
+  const authResult = await getAuthenticatedClient()
+  if ('error' in authResult) {
+    return { success: false, error: authResult.error }
+  }
+
+  const { supabase } = authResult
+
   try {
-    const { error } = await (await import('@/lib/supabase/server'))
-      .supabase
+    const { error } = await supabase
       .from('tasks')
       .update({
         status: 'Rejected',

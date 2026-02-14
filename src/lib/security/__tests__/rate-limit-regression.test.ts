@@ -240,3 +240,17 @@ describe('OpenAI key hardening regressions', () => {
     }
   })
 })
+
+describe('agent objective action security regressions', () => {
+  it('requires authenticated user and foundry membership before agent objective/task writes', async () => {
+    const agentObjectivesPath = path.join(process.cwd(), 'src/actions/agent-objectives.ts')
+    const source = await readFile(agentObjectivesPath, 'utf-8')
+
+    expect(source).toContain('async function getAuthenticatedClient()')
+    expect(source).toContain('async function ensureFoundryMembership(')
+    expect(source).toContain(".from('foundry_memberships')")
+    expect(source).toContain("return { success: false, error: authResult.error }")
+    expect(source).toContain('const membershipError = await ensureFoundryMembership(')
+    expect(source).not.toContain('.supabase.from(')
+  })
+})

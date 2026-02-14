@@ -6,6 +6,9 @@
   "include": [
     "next-env.d.ts",
     "src/lib/security/**/*.ts",
+    "src/lib/agents/permission-guard.ts",
+    "src/lib/agents/collaboration-hub.ts",
+    "src/actions/agent-objectives.ts",
     "src/actions/run-specialist-council.ts",
     "src/app/api/messages/**/*.ts",
     "src/app/api/cron/reports/daily/route.ts",
