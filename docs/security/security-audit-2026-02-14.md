@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 6 | 4 fixed, 2 open |
+| Medium | 7 | 5 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -184,6 +184,21 @@ This audit reviewed the application security posture across:
   - `Security Type Check`
 
 This introduces a hard gate for key security surfaces while broader type debt is addressed separately.
+
+---
+
+### 10) Council internal execution route could be env-rerouted (Medium)
+
+**Issue:** Specialist council debate execution previously built internal API URL from
+environment variables (`NEXT_PUBLIC_BASE_URL` / `VERCEL_URL`) while forwarding user cookies.  
+**Impact:** Misconfigured env could route authenticated internal calls to an external host.
+
+**Fix implemented (`src/app/api/agents/council/route.ts`):**
+
+- Internal execution URL now derives from `request.nextUrl.origin`.
+- Removed environment-based base URL selection for the delegated execution call.
+- Added regression guard in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
 ---
 

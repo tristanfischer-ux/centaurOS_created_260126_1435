@@ -109,3 +109,15 @@ describe('message attachment authorization regressions', () => {
     expect(source).toContain('replace(name, \'/\', \'%2F\')')
   })
 })
+
+describe('internal API egress hardening regressions', () => {
+  it('uses request origin for council specialist execution calls', async () => {
+    const councilRoutePath = path.join(process.cwd(), 'src/app/api/agents/council/route.ts')
+    const source = await readFile(councilRoutePath, 'utf-8')
+
+    expect(source).toContain('const internalApiOrigin = request.nextUrl.origin')
+    expect(source).toContain("new URL('/api/agents/execute', internalApiOrigin)")
+    expect(source).not.toContain('process.env.NEXT_PUBLIC_BASE_URL')
+    expect(source).not.toContain('process.env.VERCEL_URL')
+  })
+})
