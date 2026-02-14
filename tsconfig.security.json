@@ -16,6 +16,7 @@
     "src/actions/generate-advisory-answer.ts",
     "src/actions/assess-coverage.ts",
     "src/actions/analyze.ts",
+    "src/actions/reports.ts",
     "src/app/actions/analyze-business-plan.ts",
     "src/app/api/team/compare/route.ts",
     "src/app/api/marketplace/compare/route.ts",

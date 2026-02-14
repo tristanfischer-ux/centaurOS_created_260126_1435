@@ -189,7 +189,7 @@ This audit reviewed the application security posture across:
 This introduces a hard gate for key security surfaces while broader type debt is addressed separately.
 
 Scope now includes additional hardened AI and webhook routes/actions (including
-advisory AI server actions, council/sweep/telegram routes, and voice-to-task)
+advisory AI server actions, reports preference/reporting actions, council/sweep/telegram routes, and voice-to-task)
 to prevent regressions from bypassing compile-time checks.
 
 ---
@@ -706,6 +706,7 @@ The test suite enforces:
 14. Stripe webhook fail-closed secret enforcement and endpoint throttling checks.
 15. Google OAuth signed-state validation and callback foundry-membership enforcement.
 16. Telegram linking settings routes use shared admin client helper and status-check throttling.
+17. Security typecheck scope includes reports actions that enforce Slack webhook validation.
 
 ---
 

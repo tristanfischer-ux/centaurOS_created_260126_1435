@@ -92,6 +92,24 @@ export interface WeeklyRollupResult {
     error?: string
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null
+}
+
+function isWeeklyRollupData(value: unknown): value is WeeklyRollupData {
+    if (!isRecord(value)) {
+        return false
+    }
+
+    return (
+        isRecord(value.period)
+        && isRecord(value.stats)
+        && isRecord(value.previous_week)
+        && Array.isArray(value.top_completers)
+        && Array.isArray(value.objectives_progress)
+    )
+}
+
 /**
  * Get the weekly rollup report for the user's foundry
  */
@@ -122,7 +140,7 @@ export async function getWeeklyRollup(weekStart?: string): Promise<WeeklyRollupR
         const { data, error } = await supabase
             .rpc('get_weekly_rollup', {
                 p_foundry_id: foundryId,
-                p_week_start: weekStart || null
+                p_week_start: weekStart ?? undefined
             })
         
         if (error) {
@@ -130,7 +148,13 @@ export async function getWeeklyRollup(weekStart?: string): Promise<WeeklyRollupR
             return { success: false, error: sanitizeErrorMessage(error) }
         }
         
-        const report = data as WeeklyRollupData
+        // VALIDATION: Enforce expected RPC payload shape before use.
+        if (!isWeeklyRollupData(data)) {
+            console.error('Weekly rollup payload did not match expected shape')
+            return { success: false, error: 'Failed to parse weekly rollup report' }
+        }
+
+        const report = data
         
         // Calculate trends
         const trends = calculateWeeklyTrends(
@@ -144,9 +168,7 @@ export async function getWeeklyRollup(weekStart?: string): Promise<WeeklyRollupR
         const insights = generateWeeklyInsights(report, userRole)
         
         // Generate summary
-        const topPerformer = report.top_completers.length > 0 
-            ? report.top_completers[0].full_name 
-            : null
+        const topPerformer = report.top_completers[0]?.full_name ?? null
         const atRiskObjectives = report.objectives_progress.filter(o => {
             const remaining = o.tasks_remaining || 0
             return o.progress < 50 && remaining > 5
@@ -182,6 +204,20 @@ export interface MonthlySummaryResult {
     error?: string
 }
 
+function isMonthlySummaryData(value: unknown): value is MonthlySummaryData {
+    if (!isRecord(value)) {
+        return false
+    }
+
+    return (
+        isRecord(value.period)
+        && isRecord(value.stats)
+        && isRecord(value.previous_month)
+        && Array.isArray(value.top_contributors)
+        && Array.isArray(value.completion_rate_timeline)
+    )
+}
+
 /**
  * Get the monthly summary report for the user's foundry
  */
@@ -203,7 +239,7 @@ export async function getMonthlySummary(month?: string): Promise<MonthlySummaryR
         const { data, error } = await supabase
             .rpc('get_monthly_summary', {
                 p_foundry_id: foundryId,
-                p_month: month || null
+                p_month: month ?? undefined
             })
         
         if (error) {
@@ -211,7 +247,13 @@ export async function getMonthlySummary(month?: string): Promise<MonthlySummaryR
             return { success: false, error: sanitizeErrorMessage(error) }
         }
         
-        const report = data as MonthlySummaryData
+        // VALIDATION: Enforce expected RPC payload shape before use.
+        if (!isMonthlySummaryData(data)) {
+            console.error('Monthly summary payload did not match expected shape')
+            return { success: false, error: 'Failed to parse monthly summary report' }
+        }
+
+        const report = data
         
         // Import summary generator
         const { generateMonthlySummary: genSummary } = await import('@/lib/reports/summary-generator')
@@ -220,7 +262,7 @@ export async function getMonthlySummary(month?: string): Promise<MonthlySummaryR
             report.stats.tasks_completed,
             report.previous_month.tasks_completed,
             report.stats.objectives_completed,
-            report.period.month_name
+            report.period.month_name ?? 'Current month'
         )
         
         return {

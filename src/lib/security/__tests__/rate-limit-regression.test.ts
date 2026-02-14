@@ -508,6 +508,15 @@ describe('telegram settings route hardening regressions', () => {
   })
 })
 
+describe('security typecheck scope regressions', () => {
+  it('includes reports action in security typecheck scope', async () => {
+    const configPath = path.join(process.cwd(), 'tsconfig.security.json')
+    const source = await readFile(configPath, 'utf-8')
+
+    expect(source).toContain('"src/actions/reports.ts"')
+  })
+})
+
 describe('stripe webhook hardening regressions', () => {
   it('fails closed when Stripe webhook secret is missing', async () => {
     const routePath = path.join(process.cwd(), 'src/app/api/webhooks/stripe/route.ts')
