@@ -121,6 +121,8 @@ This audit reviewed the application security posture across:
   - sets `message-files` bucket `public = false`.
   - `supabase/migrations/20260214130000_secure_message_attachments_bucket.sql`
   - sets legacy `message-attachments` bucket `public = false`.
+  - `supabase/migrations/20260214134000_tighten_legacy_message_attachment_policies.sql`
+  - removes legacy foundry-wide storage policies and enforces conversation-participant checks.
 
 ---
 
@@ -234,7 +236,7 @@ The test suite enforces:
 ## Recommended Remediation Order
 
 1. Deploy the `profiles` RLS restoration migration and verify on linked Supabase project. *(Critical)*
-2. Deploy bucket-hardening migrations and verify attachment access across current + legacy messages. *(High)*
+2. Deploy bucket/policy-hardening migrations and verify attachment access across current + legacy messages. *(High)*
 3. Harden remaining CI/type gates after reducing pre-existing type errors. *(Medium)*
 4. Resolve remaining moderate dependency vulnerabilities with targeted package upgrades. *(Medium)*
 

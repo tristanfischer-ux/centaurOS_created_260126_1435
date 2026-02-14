@@ -92,4 +92,20 @@ describe('message attachment authorization regressions', () => {
     expect(source).toContain('normalizeMessageFileReference')
     expect(source).toContain('.createSignedUrl(')
   })
+
+  it('tightens legacy message-attachments storage policies to conversation participants only', async () => {
+    const migrationPath = path.join(
+      process.cwd(),
+      'supabase/migrations/20260214134000_tighten_legacy_message_attachment_policies.sql'
+    )
+    const source = await readFile(migrationPath, 'utf-8')
+
+    expect(source).toContain('DROP POLICY "Users can upload to own foundry" ON storage.objects')
+    expect(source).toContain(
+      'CREATE POLICY "Users can view legacy message attachments from participant conversations"'
+    )
+    expect(source).toContain('JOIN public.conversation_participants cp')
+    expect(source).toContain("bucket_id = 'message-attachments'")
+    expect(source).toContain('replace(name, \'/\', \'%2F\')')
+  })
 })
