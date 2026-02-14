@@ -166,6 +166,22 @@ This audit reviewed the application security posture across:
 
 ---
 
+### 9) Missing security-focused type gate in CI (Medium)
+
+**Issue:** Global `typecheck` remains non-blocking due known repository-wide legacy errors, which weakens confidence for security-sensitive paths.  
+**Fix implemented:**
+
+- Added focused security TypeScript project:
+  - `tsconfig.security.json`
+- Added script:
+  - `npm run typecheck:security`
+- Added blocking CI step in `.github/workflows/docker-build.yml`:
+  - `Security Type Check`
+
+This introduces a hard gate for key security surfaces while broader type debt is addressed separately.
+
+---
+
 ## Security Regression Coverage Added
 
 Added: `src/lib/security/__tests__/rate-limit-regression.test.ts`
@@ -196,10 +212,11 @@ The test suite enforces:
 
 ### High / Medium
 
-2. **CI type-safety gate still non-blocking**
+2. **Global TypeScript gate still non-blocking**
    - `next.config.ts` retains `typescript.ignoreBuildErrors = true`.
    - Type-check workflow step also remains non-blocking due broad pre-existing type debt.
-   - Required follow-up: staged type debt reduction and hard fail gate enablement.
+   - Mitigation shipped: focused `typecheck:security` gate is now blocking in CI.
+   - Required follow-up: staged type debt reduction and eventual full typecheck hard fail.
 
 3. **Residual moderate/low dependency vulnerabilities**
    - Mostly transitive through Excalidraw/Mermaid dependency chain.

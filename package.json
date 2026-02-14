@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "typecheck:security": "tsc --noEmit -p tsconfig.security.json",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "test:e2e": "playwright test",

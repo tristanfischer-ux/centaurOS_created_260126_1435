@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "next-env.d.ts",
+    "src/lib/security/**/*.ts",
+    "src/app/api/messages/**/*.ts",
+    "src/app/api/cron/reports/daily/route.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "supabase",
+    "duplicate_routes_backup",
+    "scripts",
+    "e2e",
+    "src/lib/security/__tests__/**"
+  ]
+}

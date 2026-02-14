@@ -35,6 +35,9 @@ jobs:
       - name: Security audit
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Security Type Check
+        run: npm run typecheck:security
+
       - name: Type Check
         run: npm run typecheck
         continue-on-error: true  # TODO: Remove once pre-existing type errors are resolved
