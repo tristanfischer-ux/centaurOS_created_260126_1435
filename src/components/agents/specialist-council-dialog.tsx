@@ -244,7 +244,7 @@ export function SpecialistCouncilDialog({
                                 </h3>
                                 <div className="space-y-2">
                                     {result.report.tensions.map((tension, idx) => (
-                                        <Alert key={idx} variant="warning">
+                                        <Alert key={idx} className="border-status-warning bg-status-warning-light">
                                             <AlertCircle className="h-4 w-4" />
                                             <AlertDescription>
                                                 <span className="font-medium">
