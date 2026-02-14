@@ -97,7 +97,18 @@
   },
   "overrides": {
     "react": "$react",
-    "react-dom": "$react-dom"
+    "react-dom": "$react-dom",
+    "@excalidraw/excalidraw": {
+      "nanoid": "3.3.8"
+    },
+    "@excalidraw/mermaid-to-excalidraw": {
+      "mermaid": "10.9.4",
+      "nanoid": "5.0.9"
+    },
+    "mermaid@10.9.4": {
+      "dompurify": "3.2.4"
+    },
+    "dompurify": "3.2.4"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.2.0",

@@ -257,6 +257,23 @@ service-unavailable behavior.
 
 ---
 
+### 14) Residual transitive dependency vulnerabilities in Excalidraw/Mermaid chain (Medium)
+
+**Issue:** Remaining moderate vulnerabilities were concentrated in transitive dependencies
+(`mermaid`, `dompurify`, `nanoid`) under the Excalidraw integration path.  
+**Impact:** Dependency risk remained non-zero despite high-severity gates.
+
+**Fix implemented:**
+
+- Added targeted dependency overrides in `package.json` for vulnerable transitive packages:
+  - `@excalidraw/mermaid-to-excalidraw` → `mermaid@10.9.4`, `nanoid@5.0.9`
+  - `@excalidraw/excalidraw` → `nanoid@3.3.8`
+  - global `dompurify@3.2.4`
+- Reinstalled lockfile to enforce resolved tree.
+- Verified production audit now reports zero vulnerabilities.
+
+---
+
 ## Security Regression Coverage Added
 
 Added:
@@ -269,9 +286,12 @@ The test suite enforces:
 1. No second-based raw `window` literals (`60`, `900`, `3600`) in API `rateLimit` calls.
 2. Correct `getClientIP(request.headers)` and `rateLimit('upload', ...)` signature for message uploads.
 3. Conversation-scoped attachment path handling and no public URL generation in message upload route.
-4. Fail-closed behavior marker for missing `CRON_SECRET` in morning brief cron route.
+4. Fail-closed behavior markers for cron authorization paths (`CRON_SECRET` required).
 5. Slack webhook validation guard in daily report cron route.
 6. Canonical normalization support for legacy/current attachment references.
+7. QA callback secret enforcement across both POST and GET handlers.
+8. Internal council routing no longer uses env-driven URLs for cookie-forwarded calls.
+9. OpenAI-key fail-closed guards for AI marketplace/RFQ routes.
 
 ---
 
@@ -297,10 +317,6 @@ The test suite enforces:
    - Mitigation shipped: focused `typecheck:security` gate is now blocking in CI.
    - Required follow-up: staged type debt reduction and eventual full typecheck hard fail.
 
-3. **Residual moderate/low dependency vulnerabilities**
-   - Mostly transitive through Excalidraw/Mermaid dependency chain.
-   - Follow-up required with compatibility testing.
-
 ---
 
 ## Recommended Remediation Order
@@ -308,7 +324,6 @@ The test suite enforces:
 1. Deploy the `profiles` RLS restoration migration and verify on linked Supabase project. *(Critical)*
 2. Deploy bucket/policy-hardening migrations and verify attachment access across current + legacy messages. *(High)*
 3. Harden remaining CI/type gates after reducing pre-existing type errors. *(Medium)*
-4. Resolve remaining moderate dependency vulnerabilities with targeted package upgrades. *(Medium)*
 
 ---
 
@@ -316,6 +331,6 @@ The test suite enforces:
 
 - `npm test -- audit-log.test.ts rate-limit-regression.test.ts message-file-reference.test.ts url-validation.test.ts` → **pass**
 - `npm run typecheck:security` → **pass**
-- `npm audit --omit=dev --json` → **high vulnerabilities reduced to 0**
+- `npm audit --omit=dev --json` → **0 vulnerabilities (low/moderate/high/critical)**
 
 > Note: repository-wide `tsc --noEmit` currently fails due numerous pre-existing unrelated typing issues outside this audit's change set.
