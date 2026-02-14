@@ -43,6 +43,8 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog"
+import { CadLabResearchReport } from "@/components/cad/cad-lab-research-report"
+import { cn } from "@/lib/utils"
 
 import { useCadLab } from "./cad-lab-context"
 
@@ -83,8 +85,9 @@ export default function CadLabResearchPage(): React.ReactNode {
   // Reset confirmation dialog
   const [showResetConfirm, setShowResetConfirm] = useState(false)
 
-  // Whether the user is editing the report
-  const [isEditingReport, setIsEditingReport] = useState(false)
+  // Report view mode: structured cards, raw markdown, or editing
+  type ReportViewMode = "structured" | "markdown" | "edit"
+  const [reportViewMode, setReportViewMode] = useState<ReportViewMode>("structured")
 
   /**
    * Handles template pill click — sets subject and triggers research directly.
@@ -292,7 +295,7 @@ export default function CadLabResearchPage(): React.ReactNode {
             </div>
           </div>
 
-          {/* Research Report — rendered nicely */}
+          {/* Research Report — structured view with mode toggle */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -300,33 +303,62 @@ export default function CadLabResearchPage(): React.ReactNode {
                   <FileText className="h-4 w-4" />
                   Research Report
                 </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditingReport(!isEditingReport)}
-                  className="gap-1.5 text-xs"
-                >
-                  <Pencil className="h-3 w-3" />
-                  {isEditingReport ? "Preview" : "Edit"}
-                </Button>
+                <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+                  <button
+                    onClick={() => setReportViewMode("structured")}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
+                      reportViewMode === "structured"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Structured
+                  </button>
+                  <button
+                    onClick={() => setReportViewMode("markdown")}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
+                      reportViewMode === "markdown"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Markdown
+                  </button>
+                  <button
+                    onClick={() => setReportViewMode("edit")}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
+                      reportViewMode === "edit"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Edit
+                  </button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {isEditingReport ? (
+              {reportViewMode === "edit" ? (
                 <Textarea
                   value={editableReport}
                   onChange={(e) => setEditableReport(e.target.value)}
                   className="font-mono text-xs min-h-[400px]"
                   disabled={isAnyLoading}
                 />
-              ) : (
+              ) : reportViewMode === "markdown" ? (
                 <div className="border rounded-md p-4 bg-muted/30 max-h-[500px] overflow-y-auto">
                   <Markdown content={editableReport} className="text-sm text-foreground" />
                 </div>
+              ) : (
+                <CadLabResearchReport report={editableReport} />
               )}
               <p className="text-xs text-muted-foreground">
                 {editableReport.length.toLocaleString()} characters
-                {isEditingReport && " · Edit dimensions before proceeding"}
+                {reportViewMode === "edit" && " · Edit dimensions before proceeding"}
               </p>
             </CardContent>
           </Card>
