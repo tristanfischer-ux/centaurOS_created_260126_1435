@@ -19,6 +19,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createOAuth2Client } from '@/lib/google/client'
 import { saveGoogleToken } from '@/lib/google/tokens'
 import { verifySignedOAuthState } from '@/lib/security/oauth-state'
+import { rateLimit } from '@/lib/security/rate-limit'
 import { google } from 'googleapis'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -47,6 +48,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (!user) {
         return NextResponse.redirect(
             new URL('/login?redirect=/settings/integrations', req.nextUrl.origin)
+        )
+    }
+
+    // SECURITY: Throttle callback handling per user to reduce replay abuse.
+    const rateLimitResult = await rateLimit('api', `google-callback:${user.id}`, {
+        limit: 30,
+        window: 10 * 60 * 1000,
+    })
+    if (!rateLimitResult.success) {
+        return NextResponse.redirect(
+            new URL('/settings/integrations?error=rate_limited', req.nextUrl.origin)
         )
     }
 

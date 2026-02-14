@@ -465,6 +465,7 @@ describe('google oauth state hardening regressions', () => {
     expect(source).toContain('buildOAuthStatePayload')
     expect(source).toContain("process.env.GOOGLE_OAUTH_STATE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET")
     expect(source).toContain("return NextResponse.json({ error: 'OAuth state signing not configured' }, { status: 503 })")
+    expect(source).toContain("await rateLimit('api', `google-connect:${user.id}`")
   })
 
   it('verifies signed oauth state and foundry membership at callback step', async () => {
@@ -476,6 +477,8 @@ describe('google oauth state hardening regressions', () => {
     expect(source).toContain(".from('foundry_memberships')")
     expect(source).toContain(".eq('foundry_id', stateData.foundryId)")
     expect(source).toContain("error=foundry_mismatch")
+    expect(source).toContain("await rateLimit('api', `google-callback:${user.id}`")
+    expect(source).toContain("error=rate_limited")
   })
 })
 

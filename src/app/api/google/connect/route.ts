@@ -19,6 +19,7 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { createOAuth2Client } from '@/lib/google/client'
 import { getScopesForFeatures } from '@/lib/google/scopes'
 import { buildOAuthStatePayload, createSignedOAuthState } from '@/lib/security/oauth-state'
+import { rateLimit } from '@/lib/security/rate-limit'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
     // AUTH: Verify the user is authenticated
@@ -27,6 +28,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // SECURITY: Limit OAuth connect initiations per user to reduce abuse.
+    const rateLimitResult = await rateLimit('api', `google-connect:${user.id}`, {
+        limit: 20,
+        window: 10 * 60 * 1000,
+    })
+    if (!rateLimitResult.success) {
+        return NextResponse.json(
+            { error: 'Rate limit exceeded. Please try again shortly.' },
+            { status: 429 }
+        )
     }
 
     const foundryId = await getFoundryIdCached()

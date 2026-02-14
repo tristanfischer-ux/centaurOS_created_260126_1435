@@ -615,10 +615,12 @@ if state was altered or replayed.
   - now builds and signs OAuth state via:
     - `buildOAuthStatePayload(...)`
     - `createSignedOAuthState(...)`
+  - adds per-user OAuth initiation throttling (`google-connect:${user.id}`)
   - fail-closes (`503`) when state signing secret is not configured
     (`GOOGLE_OAUTH_STATE_SECRET` fallback `GOOGLE_CLIENT_SECRET`).
 - `src/app/api/google/callback/route.ts`
   - verifies signed state with 10-minute expiry
+  - adds per-user callback throttling (`google-callback:${user.id}`)
   - enforces user membership in `stateData.foundryId` via `foundry_memberships`
     before persisting Google tokens.
 - Added tests:
