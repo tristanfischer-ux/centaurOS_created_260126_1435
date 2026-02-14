@@ -55,6 +55,28 @@ const APP_DOMAIN =
   process.env.NEXT_PUBLIC_APP_DOMAIN || "https://fractionalforge.app";
 
 /**
+ * Custom hook to detect mobile viewport for performance optimizations.
+ *
+ * @description Used to disable heavy animations (parallax, hover effects)
+ * on mobile devices where they cause jank.
+ *
+ * @returns Whether the viewport is mobile-sized (< 768px)
+ */
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+
+  return isMobile;
+}
+
+/**
  * Marketing landing page — conversion-optimized structure.
  *
  * @description Follows the proven landing page framework:
@@ -83,15 +105,15 @@ export default function MarketingPage() {
 
       {/* ── Sticky Navigation ── */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 pt-[env(safe-area-inset-top)] ${
           navScrolled
             ? "bg-background/95 backdrop-blur-sm shadow-sm border-b border-muted"
             : "bg-transparent"
         }`}
         aria-label="Main navigation"
       >
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="text-lg md:text-xl font-bold tracking-tight">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+          <Link href="/" className="text-base sm:text-lg md:text-xl font-bold tracking-tight">
             FRACTIONAL FORGE
           </Link>
 
@@ -177,7 +199,15 @@ export default function MarketingPage() {
               exit={{ opacity: 0, height: 0 }}
               className="md:hidden border-t border-muted bg-background overflow-hidden"
             >
-              <div className="px-6 py-4 flex flex-col gap-2">
+              <div className="px-4 sm:px-6 py-4 flex flex-col gap-1">
+                {/* CTA first — always visible without scrolling */}
+                <Link
+                  href="/join/founder"
+                  className="mb-3 bg-international-orange hover:bg-international-orange-hover text-white py-3.5 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] flex items-center justify-center"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Get Started Free
+                </Link>
                 {[
                   { href: "#problem", label: "Why Us" },
                   { href: "#solution", label: "Solution" },
@@ -187,7 +217,7 @@ export default function MarketingPage() {
                   <a
                     key={item.href}
                     href={item.href}
-                    className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
+                    className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50 last:border-b-0"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     {item.label}
@@ -195,32 +225,25 @@ export default function MarketingPage() {
                 ))}
                 <Link
                   href="/techniques"
-                  className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Techniques
                 </Link>
                 <Link
                   href="/pricing"
-                  className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Pricing
                 </Link>
                 <a
                   href={`${APP_DOMAIN}/login`}
-                  className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Login
                 </a>
-                <Link
-                  href="/join/founder"
-                  className="mt-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px] flex items-center justify-center"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Get Started Free
-                </Link>
               </div>
             </motion.div>
           )}
@@ -253,12 +276,12 @@ export default function MarketingPage() {
       </main>
 
       {/* ── Footer ── */}
-      <footer className="py-12 md:py-16 border-t border-muted bg-muted">
+      <footer className="py-10 sm:py-12 md:py-16 border-t border-muted bg-muted pb-[calc(2.5rem+env(safe-area-inset-bottom))] sm:pb-12 md:pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-8">
             {/* Brand */}
-            <div className="md:col-span-2">
-              <p className="text-lg font-bold tracking-tight mb-3">
+            <div className="col-span-2">
+              <p className="text-base sm:text-lg font-bold tracking-tight mb-2 sm:mb-3">
                 FRACTIONAL FORGE
               </p>
               <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
@@ -269,25 +292,25 @@ export default function MarketingPage() {
 
             {/* Links */}
             <div>
-              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
+              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">
                 Platform
               </p>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2.5 sm:gap-2">
                 <Link
                   href="/pricing"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
                 >
                   Pricing
                 </Link>
                 <a
                   href={`${APP_DOMAIN}/login`}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
                 >
                   Login
                 </a>
                 <Link
                   href="/join/founder"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
                 >
                   Get Started Free
                 </Link>
@@ -295,25 +318,25 @@ export default function MarketingPage() {
             </div>
 
             <div>
-              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">
+              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">
                 Roles
               </p>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2.5 sm:gap-2">
                 <Link
                   href="/join/founder"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
                 >
                   Founders
                 </Link>
                 <Link
                   href="/join/executive"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
                 >
                   Executives
                 </Link>
                 <Link
                   href="/join/apprentice"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
                 >
                   Apprentices
                 </Link>
@@ -321,8 +344,8 @@ export default function MarketingPage() {
             </div>
           </div>
 
-          <div className="border-t border-muted pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">
+          <div className="border-t border-muted pt-6 sm:pt-8 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               &copy; {new Date().getFullYear()} Fractional Forge Ltd. All rights
               reserved.
             </p>
@@ -342,8 +365,10 @@ export default function MarketingPage() {
  * ════════════════════════════════════════════════════════════════════════ */
 
 function HeroSection() {
+  const isMobile = useIsMobile();
   const { scrollY } = useScroll();
-  const parallaxY = useTransform(scrollY, [0, 500], [0, 150]);
+  // Disable parallax on mobile — causes janky scrolling on low-end devices
+  const parallaxY = useTransform(scrollY, [0, 500], [0, isMobile ? 0 : 150]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [memberCount, setMemberCount] = useState<number | null>(null);
 
@@ -401,7 +426,7 @@ function HeroSection() {
   }, [heroImages.length]);
 
   return (
-    <section className="relative min-h-[90vh] md:min-h-screen flex items-center justify-center overflow-hidden bg-background pt-16">
+    <section className="relative min-h-[85vh] sm:min-h-[90vh] md:min-h-screen flex items-center justify-center overflow-hidden bg-background pt-20 sm:pt-16">
       {/* Background images with parallax */}
       <motion.div
         style={{ y: parallaxY }}
@@ -432,16 +457,16 @@ function HeroSection() {
       </motion.div>
 
       {/* Content */}
-      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center">
         {/* Early Access Badge */}
         <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInScale}
-          className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border bg-card rounded-full"
+          className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full"
         >
           <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
-          <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
+          <span className="text-international-orange text-[10px] sm:text-xs font-mono uppercase tracking-widest">
             Early Access &mdash; Founding Members Only
           </span>
         </motion.div>
@@ -463,7 +488,7 @@ function HeroSection() {
                     </span>{" "}
                     of 100 founding spots claimed
                   </p>
-                  <div className="w-48 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div className="w-36 sm:w-48 h-1.5 bg-muted rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${Math.min((memberCount / 100) * 100, 100)}%` }}
@@ -506,9 +531,11 @@ function HeroSection() {
           initial="hidden"
           animate="visible"
           variants={heroHeadline}
-          className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-[1.1] mb-6 md:mb-8"
+          className="text-[2rem] sm:text-5xl md:text-6xl lg:text-7xl font-black leading-[1.08] mb-5 sm:mb-6 md:mb-8"
         >
-          Stop Burning Runway on{" "}
+          Stop Burning Runway
+          <br className="sm:hidden" />
+          {" "}on{" "}
           <br className="hidden sm:block" />
           Hardware That Takes{" "}
           <motion.span
@@ -526,7 +553,7 @@ function HeroSection() {
           initial="hidden"
           animate="visible"
           variants={heroTagline}
-          className="text-foreground text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8 md:mb-10"
+          className="text-foreground text-base sm:text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10"
         >
           Launch physical products in weeks, not years. Fractional teams.
           Fractional cost. Full ownership.
@@ -537,12 +564,12 @@ function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.6 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto"
         >
-          <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+          <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
             <Link
               href="/join/founder"
-              className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px]"
+              className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto"
             >
               Get Started Free
               <ArrowRight className="h-4 w-4" />
@@ -550,7 +577,7 @@ function HeroSection() {
           </motion.div>
           <a
             href="#how-it-works"
-            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[44px]"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
           >
             See How It Works
             <ChevronDown className="h-4 w-4" />
@@ -602,18 +629,18 @@ function ProblemSection() {
   ] as const;
 
   return (
-    <section id="problem" className="py-16 md:py-28 bg-background">
+    <section id="problem" className="py-12 sm:py-16 md:py-28 bg-background scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Section header */}
-        <AnimatedSection className="text-center mb-12 md:mb-20">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-20">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             The Hardware Trap
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
             Building Hardware Shouldn&apos;t
             <br className="hidden sm:block" /> Mean Burning Everything.
           </h2>
-          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
             Most hardware startups fail not because of bad ideas — but because
             the traditional development model is broken. Here&apos;s what
             founders are up against:
@@ -621,21 +648,21 @@ function ProblemSection() {
         </AnimatedSection>
 
         {/* Pain point cards */}
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
           {PAIN_POINTS.map((point) => {
             const Icon = point.icon;
             return (
               <AnimatedCard
                 key={point.title}
-                className="border bg-card rounded-xl p-6 md:p-8 flex flex-col text-center"
+                className="border bg-card rounded-xl p-5 sm:p-6 md:p-8 flex flex-col text-center"
               >
-                <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-status-error-light flex items-center justify-center">
-                  <Icon className="h-6 w-6 text-destructive" />
+                <div className="mx-auto mb-3 sm:mb-4 h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-status-error-light flex items-center justify-center">
+                  <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-destructive" />
                 </div>
-                <p className="text-2xl md:text-3xl font-black text-foreground mb-2">
+                <p className="text-2xl sm:text-2xl md:text-3xl font-black text-foreground mb-1 sm:mb-2">
                   {point.stat}
                 </p>
-                <h3 className="text-lg font-bold mb-3">{point.title}</h3>
+                <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">{point.title}</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">
                   {point.description}
                 </p>
@@ -644,18 +671,19 @@ function ProblemSection() {
           })}
         </StaggerContainer>
 
-        {/* Comparison image */}
-        <AnimatedSection className="mt-12 md:mt-20" delay={0.2}>
-          <div className="relative w-full aspect-[2.2/1] rounded-xl overflow-hidden border">
+        {/* Comparison image — taller aspect ratio on mobile for readability */}
+        <AnimatedSection className="mt-10 sm:mt-12 md:mt-20" delay={0.2}>
+          <div className="relative w-full aspect-[3/2] sm:aspect-[2.2/1] rounded-lg sm:rounded-xl overflow-hidden border">
             <Image
               src="/images/problem-comparison.png"
               alt="Comparison: 18 months of traditional hardware development versus 6 weeks with Fractional Forge"
               fill
               className="object-cover"
-              sizes="(max-width: 768px) 100vw, 1200px"
+              sizes="(max-width: 640px) 100vw, (max-width: 768px) 100vw, 1200px"
+              loading="lazy"
             />
           </div>
-          <p className="text-center text-xs text-muted-foreground mt-4 font-mono tracking-wider">
+          <p className="text-center text-xs text-muted-foreground mt-3 sm:mt-4 font-mono tracking-wider">
             Traditional Development vs. The Fractional Model
           </p>
         </AnimatedSection>
@@ -731,27 +759,28 @@ function SavingsCalculatorSection() {
   return (
     <section
       id="calculator"
-      className="py-16 md:py-28 bg-muted/30 border-t border-muted"
+      className="py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-12 md:mb-16">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             See Your Savings
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
             How Much Is Your Full-Time Team
             <br className="hidden sm:block" />{" "}
             <span className="text-international-orange">Really Costing You?</span>
           </h2>
-          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
             Drag the sliders to match your situation. Watch the savings add up.
           </p>
         </AnimatedSection>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12">
-          {/* Left: Sliders */}
-          <AnimatedSection className="space-y-8">
-            <div className="border bg-card rounded-xl p-6 md:p-8 space-y-8">
+        {/* On mobile, show results first (order-2 on sliders, order-1 on results) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 md:gap-12">
+          {/* Left: Sliders — appears second on mobile (results first) */}
+          <AnimatedSection className="space-y-6 sm:space-y-8 order-2 lg:order-1">
+            <div className="border bg-card rounded-xl p-5 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
               {/* Team Size */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -772,7 +801,7 @@ function SavingsCalculatorSection() {
                   max={15}
                   value={teamSize}
                   onChange={(e) => setTeamSize(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md"
+                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md"
                   aria-label={`Team size: ${teamSize} engineers`}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -802,7 +831,7 @@ function SavingsCalculatorSection() {
                   step={500}
                   value={monthlyCost}
                   onChange={(e) => setMonthlyCost(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md"
+                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md"
                   aria-label={`Monthly cost per engineer: £${monthlyCost.toLocaleString()}`}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -831,7 +860,7 @@ function SavingsCalculatorSection() {
                   max={24}
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md"
+                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md"
                   aria-label={`Project duration: ${duration} months`}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -853,44 +882,44 @@ function SavingsCalculatorSection() {
             </div>
           </AnimatedSection>
 
-          {/* Right: Results */}
-          <AnimatedSection delay={0.15}>
-            <div className="border bg-card rounded-xl p-6 md:p-8 space-y-6 sticky top-24">
+          {/* Right: Results — appears first on mobile for instant impact */}
+          <AnimatedSection delay={0.15} className="order-1 lg:order-2">
+            <div className="border bg-card rounded-xl p-5 sm:p-6 md:p-8 space-y-5 sm:space-y-6 lg:sticky lg:top-24">
               {/* Traditional vs Fractional comparison */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-xl bg-status-error-light p-5 text-center">
-                  <p className="text-xs font-mono uppercase tracking-widest text-destructive mb-2">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="rounded-xl bg-status-error-light p-4 sm:p-5 text-center">
+                  <p className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-destructive mb-1.5 sm:mb-2">
                     Traditional
                   </p>
-                  <p className="text-2xl md:text-3xl font-black text-destructive">
+                  <p className="text-xl sm:text-2xl md:text-3xl font-black text-destructive">
                     {formatCurrency(traditionalCost)}
                   </p>
-                  <p className="text-xs text-destructive/70 mt-1">
+                  <p className="text-[10px] sm:text-xs text-destructive/70 mt-1">
                     {traditionalWeeks} weeks
                   </p>
                 </div>
-                <div className="rounded-xl bg-status-success-light p-5 text-center">
-                  <p className="text-xs font-mono uppercase tracking-widest text-status-success mb-2">
+                <div className="rounded-xl bg-status-success-light p-4 sm:p-5 text-center">
+                  <p className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-status-success mb-1.5 sm:mb-2">
                     Fractional
                   </p>
-                  <p className="text-2xl md:text-3xl font-black text-status-success">
+                  <p className="text-xl sm:text-2xl md:text-3xl font-black text-status-success">
                     {formatCurrency(fractionalCost)}
                   </p>
-                  <p className="text-xs text-status-success/70 mt-1">
+                  <p className="text-[10px] sm:text-xs text-status-success/70 mt-1">
                     ~{fractionalWeeks} weeks
                   </p>
                 </div>
               </div>
 
               {/* Savings highlight */}
-              <div className="rounded-xl border-2 border-international-orange bg-international-orange/5 p-6 text-center">
-                <p className="text-xs font-mono uppercase tracking-widest text-international-orange mb-2">
+              <div className="rounded-xl border-2 border-international-orange bg-international-orange/5 p-5 sm:p-6 text-center">
+                <p className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-international-orange mb-1.5 sm:mb-2">
                   You Save
                 </p>
-                <p className="text-4xl md:text-5xl font-black text-international-orange">
+                <p className="text-3xl sm:text-4xl md:text-5xl font-black text-international-orange">
                   {formatCurrency(savings)}
                 </p>
-                <p className="text-sm text-muted-foreground mt-2">
+                <p className="text-xs sm:text-sm text-muted-foreground mt-2">
                   {savingsPercent}% cost reduction &middot; {weeksSaved} weeks
                   faster
                 </p>
@@ -934,7 +963,7 @@ function SavingsCalculatorSection() {
                 >
                   <Link
                     href="/join/founder"
-                    className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-6 py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px] w-full"
+                    className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-6 py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full"
                   >
                     Get Started
                     <ArrowRight className="h-4 w-4" />
@@ -942,7 +971,7 @@ function SavingsCalculatorSection() {
                 </motion.div>
                 <button
                   onClick={handleShare}
-                  className="flex items-center justify-center gap-2 border rounded-md px-4 py-3 text-xs font-mono font-bold tracking-widest uppercase text-muted-foreground hover:text-foreground hover:bg-muted transition-colors min-h-[44px]"
+                  className="flex items-center justify-center gap-2 border rounded-md px-4 py-3 text-xs font-mono font-bold tracking-widest uppercase text-muted-foreground hover:text-foreground active:text-foreground hover:bg-muted active:bg-muted transition-colors min-h-[48px]"
                   aria-label="Share your savings calculation"
                 >
                   {copied ? (
@@ -1014,37 +1043,37 @@ function SolutionSection() {
   return (
     <section
       id="solution"
-      className="py-16 md:py-28 bg-muted/30 border-t border-muted"
+      className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-12 md:mb-20">
-          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-4 block">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-20">
+          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             The Fractional Model
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
             What If You Could Build Hardware
             <br className="hidden sm:block" />{" "}
             <span className="text-electric-blue">Like Software?</span>
           </h2>
-          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
             Fractional Forge gives you on-demand access to the people,
             processes, and manufacturing network you need — without the
             overhead of building it all yourself.
           </p>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {BENEFITS.map((benefit) => {
             const Icon = benefit.icon;
             return (
               <AnimatedCard
                 key={benefit.title}
-                className="border bg-card rounded-xl p-6 md:p-8 flex flex-col"
+                className="border bg-card rounded-xl p-5 sm:p-6 md:p-8 flex flex-col"
               >
-                <div className="mb-4 h-12 w-12 rounded-lg bg-electric-blue-light flex items-center justify-center">
-                  <Icon className="h-5 w-5 text-electric-blue" />
+                <div className="mb-3 sm:mb-4 h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-electric-blue-light flex items-center justify-center">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-electric-blue" />
                 </div>
-                <h3 className="text-lg font-bold mb-2">{benefit.title}</h3>
+                <h3 className="text-base sm:text-lg font-bold mb-2">{benefit.title}</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed flex-1">
                   {benefit.description}
                 </p>
@@ -1072,35 +1101,36 @@ function HowAProjectWorksSection() {
   ];
 
   return (
-    <section className="py-16 md:py-28 bg-background border-t border-muted">
+    <section className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-12 md:mb-16">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             A Typical Sprint
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
             From Concept to Prototype.
             <br className="hidden sm:block" />{" "}
             <span className="text-international-orange">Weeks, Not Months.</span>
           </h2>
-          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
             Here is a typical project timeline when you work with fractional
             experts instead of building a full-time team.
           </p>
         </AnimatedSection>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center">
           {/* Left: Image */}
           <AnimatedSection>
-            <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden border shadow-lg">
+            <div className="relative w-full aspect-[4/3] rounded-lg sm:rounded-xl overflow-hidden border shadow-lg">
               <Image
                 src="/images/case-study-drone.png"
                 alt="Example: an inspection drone prototype — the kind of project fractional teams can tackle"
                 fill
                 className="object-cover"
-                sizes="(max-width: 768px) 100vw, 600px"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 600px"
+                loading="lazy"
               />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-foreground/80 to-transparent p-6">
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-foreground/80 to-transparent p-4 sm:p-6">
                 <p className="text-background/80 text-sm">
                   Inspection Drone Prototype
                 </p>
@@ -1109,10 +1139,10 @@ function HowAProjectWorksSection() {
           </AnimatedSection>
 
           {/* Right: Explanation + Timeline */}
-          <AnimatedSection delay={0.15} className="space-y-8">
+          <AnimatedSection delay={0.15} className="space-y-6 sm:space-y-8">
             {/* The traditional problem */}
             <div>
-              <h3 className="text-lg font-bold mb-3">The Traditional Way</h3>
+              <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">The Traditional Way</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">
                 A hardware startup building something like an inspection drone
                 would typically need to hire 4–6 full-time engineers, spend
@@ -1123,7 +1153,7 @@ function HowAProjectWorksSection() {
 
             {/* The fractional approach */}
             <div>
-              <h3 className="text-lg font-bold mb-3">The Fractional Approach</h3>
+              <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">The Fractional Approach</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">
                 With Fractional Forge, you assemble a team of senior specialists
                 in days, not months. You pay only for the expertise you need,
@@ -1134,25 +1164,25 @@ function HowAProjectWorksSection() {
 
             {/* Timeline */}
             <div>
-              <h3 className="text-lg font-bold mb-4">Typical Sprint Timeline</h3>
-              <div className="space-y-3">
+              <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4">Typical Sprint Timeline</h3>
+              <div className="space-y-2.5 sm:space-y-3">
                 {PHASES.map((phase, i) => (
                   <motion.div
                     key={phase.week}
                     initial={{ opacity: 0, x: -20 }}
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true }}
-                    transition={{ delay: i * 0.1, duration: 0.4 }}
-                    className="flex items-center gap-3"
+                    transition={{ delay: i * 0.08, duration: 0.4 }}
+                    className="flex items-start sm:items-center gap-3"
                   >
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-international-orange flex items-center justify-center">
-                      <CheckCircle2 className="h-4 w-4 text-white" />
+                    <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-international-orange flex items-center justify-center mt-0.5 sm:mt-0">
+                      <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                     </div>
-                    <div className="flex-1 flex items-center justify-between border-b border-muted pb-3">
+                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-muted pb-2.5 sm:pb-3 gap-0.5 sm:gap-2">
                       <span className="text-sm font-medium text-foreground">
                         {phase.label}
                       </span>
-                      <span className="text-xs font-mono text-muted-foreground">
+                      <span className="text-xs font-mono text-muted-foreground flex-shrink-0">
                         {phase.week}
                       </span>
                     </div>
@@ -1211,19 +1241,19 @@ function PlatformCapabilitiesSection() {
   ] as const;
 
   return (
-    <section className="py-16 md:py-28 bg-background border-t border-muted">
+    <section className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Metrics bar — all verifiable */}
-        <StaggerContainer className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 mb-16 md:mb-24">
+        <StaggerContainer className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 md:gap-8 mb-12 sm:mb-16 md:mb-24">
           {METRICS.map((metric) => (
             <AnimatedCard
               key={metric.label}
-              className="text-center p-6 rounded-xl border bg-card"
+              className="text-center p-4 sm:p-6 rounded-xl border bg-card"
             >
-              <p className="text-3xl md:text-4xl font-black text-international-orange mb-1">
+              <p className="text-2xl sm:text-3xl md:text-4xl font-black text-international-orange mb-1">
                 {metric.value}
               </p>
-              <p className="text-xs md:text-sm text-muted-foreground font-mono uppercase tracking-wider">
+              <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground font-mono uppercase tracking-wider">
                 {metric.label}
               </p>
             </AnimatedCard>
@@ -1231,25 +1261,25 @@ function PlatformCapabilitiesSection() {
         </StaggerContainer>
 
         {/* Value propositions — not testimonials */}
-        <AnimatedSection className="text-center mb-10">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
+        <AnimatedSection className="text-center mb-8 sm:mb-10">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             The Founding Member Advantage
           </span>
-          <h2 className="text-3xl sm:text-4xl font-black">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black">
             What You Get on Day One.
           </h2>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
           {VALUE_PROPS.map((prop) => {
             const Icon = prop.icon;
             return (
               <AnimatedCard
                 key={prop.title}
-                className="border bg-card rounded-xl p-6 md:p-8 flex flex-col"
+                className="border bg-card rounded-xl p-5 sm:p-6 md:p-8 flex flex-col"
               >
-                <div className="h-12 w-12 rounded-full bg-international-orange/10 flex items-center justify-center mb-4">
-                  <Icon className="h-6 w-6 text-international-orange" />
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-international-orange/10 flex items-center justify-center mb-3 sm:mb-4">
+                  <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-international-orange" />
                 </div>
                 <h3 className="text-foreground text-base font-bold mb-2">
                   {prop.title}
@@ -1263,8 +1293,8 @@ function PlatformCapabilitiesSection() {
         </StaggerContainer>
 
         {/* Manufacturing capabilities — merged from former CapabilitiesHighlight */}
-        <AnimatedSection className="text-center mt-16 md:mt-24">
-          <div className="flex flex-wrap justify-center gap-3 mb-6">
+        <AnimatedSection className="text-center mt-12 sm:mt-16 md:mt-24">
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-5 sm:mb-6">
             {[
               "Additive Manufacturing",
               "CNC Machining",
@@ -1277,20 +1307,20 @@ function PlatformCapabilitiesSection() {
             ].map((cap) => (
               <span
                 key={cap}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border bg-card text-sm font-medium text-foreground"
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border bg-card text-xs sm:text-sm font-medium text-foreground"
               >
-                <CheckCircle2 className="h-4 w-4 text-status-success" />
+                <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-status-success flex-shrink-0" />
                 {cap}
               </span>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground font-mono tracking-wider mb-6">
+          <p className="text-[10px] sm:text-xs text-muted-foreground font-mono tracking-wider mb-5 sm:mb-6">
             + Welding, Brazing, Carbon Fibre, Nano-Imprint, Bio-Printing, and
             dozens more.
           </p>
           <Link
             href="/techniques"
-            className="inline-flex items-center gap-2 text-electric-blue hover:text-electric-blue-hover text-sm font-mono uppercase tracking-wider transition-colors"
+            className="inline-flex items-center justify-center gap-2 text-electric-blue hover:text-electric-blue-hover text-xs sm:text-sm font-mono uppercase tracking-wider transition-colors min-h-[44px] sm:min-h-0"
           >
             Explore All 78+ Techniques
             <ExternalLink className="h-4 w-4" />
@@ -1343,45 +1373,45 @@ function HowItWorksSection() {
   return (
     <section
       id="how-it-works"
-      className="py-16 md:py-28 bg-muted/30 border-t border-muted"
+      className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-12 md:mb-20">
-          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-4 block">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-20">
+          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             Getting Started
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6">
             Three Steps to Your First Build
           </h2>
-          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
             From signup to shipping product — here&apos;s the path.
           </p>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
           {STEPS.map((step) => {
             const Icon = step.icon;
             return (
               <AnimatedCard
                 key={step.number}
-                className="border bg-card rounded-xl p-6 md:p-8 flex flex-col relative"
+                className="border bg-card rounded-xl p-5 sm:p-6 md:p-8 flex flex-col relative overflow-hidden"
               >
-                {/* Step number */}
-                <span className="text-6xl md:text-7xl font-black text-muted/50 absolute top-4 right-6 select-none">
+                {/* Step number — smaller on mobile to prevent overlap */}
+                <span className="text-5xl sm:text-6xl md:text-7xl font-black text-muted/50 absolute top-3 right-4 sm:top-4 sm:right-6 select-none pointer-events-none">
                   {step.number}
                 </span>
-                <div className="mb-4 h-12 w-12 rounded-lg bg-electric-blue-light flex items-center justify-center">
-                  <Icon className="h-5 w-5 text-electric-blue" />
+                <div className="mb-3 sm:mb-4 h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-electric-blue-light flex items-center justify-center">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-electric-blue" />
                 </div>
-                <h3 className="text-xl font-bold mb-3">{step.title}</h3>
+                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-3">{step.title}</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed flex-1">
                   {step.description}
                 </p>
                 {step.cta && (
-                  <div className="mt-6">
+                  <div className="mt-4 sm:mt-6">
                     <Link
                       href={step.cta.href}
-                      className="inline-flex items-center gap-2 text-international-orange hover:text-international-orange-hover text-sm font-mono font-bold uppercase tracking-wider transition-colors"
+                      className="inline-flex items-center gap-2 text-international-orange hover:text-international-orange-hover text-sm font-mono font-bold uppercase tracking-wider transition-colors min-h-[44px]"
                     >
                       {step.cta.label}
                       <ArrowRight className="h-4 w-4" />
@@ -1450,48 +1480,49 @@ function PricingPreviewSection() {
   return (
     <section
       id="pricing"
-      className="py-16 md:py-28 bg-muted/30 border-t border-muted"
+      className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-12 md:mb-16">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-4 block">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             Simple Pricing
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6">
             Transparent. No Surprises.
           </h2>
-          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
             Start free. Upgrade when you&apos;re ready. All plans include a 10%
             platform fee on marketplace transactions.
           </p>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-10">
+        {/* On mobile, highlighted (recommended) tier appears first via CSS order */}
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8 mb-8 sm:mb-10">
           {TIERS.map((tier) => (
             <AnimatedCard
               key={tier.name}
-              className={`border rounded-xl p-6 md:p-8 flex flex-col bg-card ${
+              className={`border rounded-xl p-5 sm:p-6 md:p-8 flex flex-col bg-card overflow-visible ${
                 tier.highlight
-                  ? "border-international-orange border-2 relative"
+                  ? "border-international-orange border-2 relative order-first md:order-none"
                   : ""
               }`}
             >
               {tier.highlight && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-international-orange text-white text-xs font-mono font-bold tracking-widest uppercase px-4 py-1 rounded-full">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-international-orange text-white text-[10px] sm:text-xs font-mono font-bold tracking-widest uppercase px-3 sm:px-4 py-1 rounded-full whitespace-nowrap">
                   Recommended
                 </span>
               )}
-              <h3 className="text-xl font-bold mb-1">{tier.name}</h3>
-              <p className="text-xs text-muted-foreground mb-4">
+              <h3 className="text-lg sm:text-xl font-bold mb-1">{tier.name}</h3>
+              <p className="text-xs text-muted-foreground mb-3 sm:mb-4">
                 {tier.description}
               </p>
-              <div className="mb-6">
-                <span className="text-4xl font-black">{tier.price}</span>
+              <div className="mb-4 sm:mb-6">
+                <span className="text-3xl sm:text-4xl font-black">{tier.price}</span>
                 <span className="text-muted-foreground text-sm">
                   {tier.period}
                 </span>
               </div>
-              <ul className="space-y-2 mb-8 flex-1">
+              <ul className="space-y-2 mb-6 sm:mb-8 flex-1">
                 {tier.features.map((feature) => (
                   <li
                     key={feature}
@@ -1505,10 +1536,10 @@ function PricingPreviewSection() {
               <motion.div whileHover={buttonHover} whileTap={buttonTap}>
                 <Link
                   href={tier.href}
-                  className={`block text-center py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px] ${
+                  className={`block text-center py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] flex items-center justify-center ${
                     tier.highlight
                       ? "bg-international-orange hover:bg-international-orange-hover text-white"
-                      : "bg-muted hover:bg-secondary text-foreground"
+                      : "bg-muted hover:bg-secondary active:bg-secondary text-foreground"
                   }`}
                 >
                   {tier.cta}
@@ -1521,7 +1552,7 @@ function PricingPreviewSection() {
         <div className="text-center">
           <Link
             href="/pricing"
-            className="inline-flex items-center gap-2 text-electric-blue hover:text-electric-blue-hover text-sm font-mono uppercase tracking-wider transition-colors"
+            className="inline-flex items-center gap-2 text-electric-blue hover:text-electric-blue-hover text-xs sm:text-sm font-mono uppercase tracking-wider transition-colors min-h-[44px]"
           >
             View Full Pricing &amp; Feature Comparison
             <ArrowRight className="h-4 w-4" />
@@ -1582,32 +1613,32 @@ function FAQSection() {
   ] as const;
 
   return (
-    <section id="faq" className="py-16 md:py-28 bg-background border-t border-muted">
+    <section id="faq" className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-12 md:mb-16">
-          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-4 block">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
             Questions &amp; Answers
           </span>
-          <h2 className="text-3xl sm:text-4xl font-black mb-6">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mb-4 sm:mb-6">
             Frequently Asked Questions
           </h2>
-          <p className="text-muted-foreground text-base max-w-xl mx-auto leading-relaxed">
+          <p className="text-muted-foreground text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
             Everything you need to know before getting started.
           </p>
         </AnimatedSection>
 
         <AnimatedSection delay={0.1}>
-          <Accordion type="single" collapsible className="space-y-4">
+          <Accordion type="single" collapsible className="space-y-3 sm:space-y-4">
             {FAQS.map((faq, i) => (
               <AccordionItem
                 key={i}
                 value={`faq-${i}`}
-                className="border rounded-xl bg-card px-6 data-[state=open]:shadow-sm transition-shadow"
+                className="border rounded-xl bg-card px-4 sm:px-6 data-[state=open]:shadow-sm transition-shadow"
               >
-                <AccordionTrigger className="text-left text-sm md:text-base font-semibold py-5 hover:no-underline">
+                <AccordionTrigger className="text-left text-sm sm:text-base font-semibold py-4 sm:py-5 hover:no-underline">
                   {faq.question}
                 </AccordionTrigger>
-                <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-5">
+                <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-4 sm:pb-5">
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>
@@ -1626,7 +1657,7 @@ function FAQSection() {
 
 function FinalCTASection() {
   return (
-    <section className="py-16 md:py-28 bg-foreground text-background">
+    <section className="py-12 sm:py-16 md:py-28 bg-foreground text-background">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
         <AnimatedSection>
           <motion.div
@@ -1634,29 +1665,29 @@ function FinalCTASection() {
             whileInView="visible"
             viewport={{ once: true }}
             variants={fadeInScale}
-            className="inline-flex items-center gap-2 mb-6 px-4 py-2 border border-background/20 rounded-full"
+            className="inline-flex items-center gap-2 mb-5 sm:mb-6 px-3 sm:px-4 py-2 border border-background/20 rounded-full"
           >
             <Zap className="h-4 w-4 text-international-orange" />
-            <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
+            <span className="text-international-orange text-[10px] sm:text-xs font-mono uppercase tracking-widest">
               Limited Founding Member Spots
             </span>
           </motion.div>
 
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6 leading-tight">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
             Ready to Build Hardware
             <br className="hidden sm:block" /> at Software Speed?
           </h2>
-          <p className="text-background/70 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-10">
+          <p className="text-background/70 text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-8 sm:mb-10">
             Founding members get early access pricing locked in forever,
             direct product influence, and priority matching with our best
             executives. Don&apos;t wait for the waitlist.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
               <Link
                 href="/join/founder"
-                className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px]"
+                className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto"
               >
                 Get Started Free
                 <ArrowRight className="h-4 w-4" />
@@ -1664,13 +1695,13 @@ function FinalCTASection() {
             </motion.div>
             <a
               href={`${APP_DOMAIN}/login`}
-              className="inline-flex items-center gap-2 text-background/60 hover:text-background text-sm font-mono tracking-wider uppercase transition-colors min-h-[44px]"
+              className="inline-flex items-center gap-2 text-background/60 hover:text-background text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
             >
               Already a member? Login
             </a>
           </div>
 
-          <p className="mt-8 text-xs text-background/40 font-mono tracking-wider">
+          <p className="mt-6 sm:mt-8 text-xs text-background/60 font-mono tracking-wider">
             No credit card required. Start free. Cancel anytime.
           </p>
         </AnimatedSection>

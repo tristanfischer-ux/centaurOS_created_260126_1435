@@ -108,13 +108,13 @@ export function AnimatedSection({ children, className, delay = 0 }: AnimatedSect
     <motion.div
       initial="hidden"
       whileInView="visible"
-      viewport={{ once: true, margin: "-100px" }}
+      viewport={{ once: true, margin: "-60px" }}
       variants={{
-        hidden: { opacity: 0, y: 30 },
+        hidden: { opacity: 0, y: 24 },
         visible: { 
           opacity: 1, 
           y: 0,
-          transition: { duration: 0.6, ease: "easeOut", delay }
+          transition: { duration: 0.5, ease: "easeOut", delay }
         }
       }}
       className={className}
@@ -144,6 +144,10 @@ export function AnimatedCard({ children, className }: AnimatedCardProps) {
         boxShadow: "0 20px 40px -12px rgba(0, 0, 0, 0.15)",
         transition: { duration: 0.3 }
       }}
+      whileTap={{
+        scale: 0.98,
+        transition: { duration: 0.15 }
+      }}
       className={className}
     >
       {children}
@@ -167,7 +171,7 @@ export function StaggerContainer({ children, className }: StaggerContainerProps)
     <motion.div
       initial="hidden"
       whileInView="visible"
-      viewport={{ once: true, margin: "-50px" }}
+      viewport={{ once: true, margin: "-30px" }}
       variants={staggerContainer}
       className={className}
     >
