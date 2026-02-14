@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import { cn } from '@/lib/utils'
 
@@ -29,6 +30,7 @@ function isValidUrl(url: string | undefined): boolean {
  *
  * @description Provides styled rendering for research reports, documentation,
  * and any markdown content. Uses semantic color tokens for consistency.
+ * Memoized to avoid re-renders when parent updates (e.g. streaming content).
  *
  * @param content - The markdown string to render
  * @param className - Additional CSS classes for the wrapper
@@ -36,7 +38,7 @@ function isValidUrl(url: string | undefined): boolean {
  * @example
  * <Markdown content={report} className="text-sm" />
  */
-export function Markdown({ content, className }: MarkdownProps) {
+function MarkdownInner({ content, className }: MarkdownProps) {
   if (!content) return null
 
   return (
@@ -129,3 +131,5 @@ export function Markdown({ content, className }: MarkdownProps) {
     </div>
   )
 }
+
+export const Markdown = React.memo(MarkdownInner)

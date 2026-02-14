@@ -253,6 +253,69 @@ function getDynamicPlaceholder(selectedIds: Set<string>): string {
 
 // ─── Prompt Templates ─────────────────────────────────────────────────────────
 
+/**
+ * Maximum character budget for the prior discussion block in prompts.
+ * The /api/agents/execute endpoint has a 50k char limit on the prompt field.
+ * We reserve ~15k for the prompt template, company context placeholder, and
+ * specialist metadata, leaving ~30k for prior discussion content.
+ */
+const MAX_PRIOR_DISCUSSION_CHARS = 30_000
+
+/**
+ * Truncates the prior discussion block to fit within the character budget.
+ * Keeps the most recent entries in full (they're most relevant for continuity)
+ * and summarizes older entries with just the specialist name and round.
+ *
+ * @param responses - All prior meeting entries
+ * @param maxChars - Maximum character budget for the block
+ * @returns Formatted prior discussion string within the budget
+ */
+function buildPriorDiscussionBlock(
+    responses: MeetingEntry[],
+    maxChars: number = MAX_PRIOR_DISCUSSION_CHARS
+): string {
+    if (responses.length === 0) return ""
+
+    // Format all entries
+    const formatted = responses.map(
+        (r) => `**${r.specialistName}** (Round ${r.round}):\n${r.content}`
+    )
+
+    // Check if everything fits
+    const fullBlock = formatted.join("\n\n---\n\n")
+    if (fullBlock.length <= maxChars) return fullBlock
+
+    // Doesn't fit — keep recent entries in full, truncate older ones.
+    // Work backwards from the most recent entry.
+    const separator = "\n\n---\n\n"
+    let recentBlock = ""
+    let recentCount = 0
+
+    for (let i = formatted.length - 1; i >= 0; i--) {
+        const candidate = recentCount === 0
+            ? formatted[i]
+            : formatted[i] + separator + recentBlock
+        // Reserve ~2k chars for the summary header of truncated entries
+        if (candidate.length > maxChars - 2000 && recentCount > 0) break
+        recentBlock = candidate
+        recentCount++
+    }
+
+    const truncatedCount = responses.length - recentCount
+    if (truncatedCount === 0) {
+        // Even with all entries, we're over budget — just hard-truncate
+        return fullBlock.slice(0, maxChars) + "\n\n*[Discussion truncated for length]*"
+    }
+
+    // Build a brief summary of the truncated (older) entries
+    const truncatedSummary = responses
+        .slice(0, truncatedCount)
+        .map((r) => `- ${r.specialistName} (Round ${r.round})`)
+        .join("\n")
+
+    return `*[Earlier discussion summarized — ${truncatedCount} responses from:]*\n${truncatedSummary}\n\n---\n\n${recentBlock}`
+}
+
 function buildMeetingPrompt(
     specialist: Specialist,
     topic: string,
@@ -260,12 +323,7 @@ function buildMeetingPrompt(
     round: number,
     userThoughts?: string
 ): string {
-    const priorBlock =
-        priorResponses.length > 0
-            ? priorResponses
-                  .map((r) => `**${r.specialistName}** (Round ${r.round}):\n${r.content}`)
-                  .join("\n\n---\n\n")
-            : ""
+    const priorBlock = buildPriorDiscussionBlock(priorResponses)
 
     const displayName = getSpecialistDisplayName(specialist)
 
@@ -326,9 +384,7 @@ function buildDebatePrompt(
     allResponses: MeetingEntry[],
     debateRound: number
 ): string {
-    const priorBlock = allResponses
-        .map((r) => `**${r.specialistName}** (Round ${r.round}):\n${r.content}`)
-        .join("\n\n---\n\n")
+    const priorBlock = buildPriorDiscussionBlock(allResponses)
 
     return `You are the ${specialist.name} in an active team debate.
 
@@ -590,6 +646,7 @@ export function TeamMeetingDialog({
         async (round: number, threads: Record<string, string>, thoughts?: string) => {
             setPhase("in-progress")
             setError(null)
+            setIsStreaming(true)
 
             // Local accumulator so each specialist sees what earlier
             // specialists said in THIS round (not just prior rounds)
@@ -599,7 +656,6 @@ export function TeamMeetingDialog({
                 const specialist = selectedSpecialists[i]
                 setCurrentSpecialistIdx(i)
                 setStreamingContent("")
-                setIsStreaming(true)
 
                 try {
                     // Pass the accumulator (includes earlier responses from this round)
@@ -644,12 +700,13 @@ export function TeamMeetingDialog({
                     // Add to both accumulator and state so next specialist sees the gap
                     roundAccumulator.push(errorEntry)
                     setEntries((prev) => [...prev, errorEntry])
-                } finally {
-                    setIsStreaming(false)
-                    setStreamingContent("")
                 }
             }
 
+            setIsStreaming(false)
+            setStreamingContent("")
+            // Brief delay so streaming UI can fade out before switching to round-complete
+            await new Promise((r) => setTimeout(r, 200))
             setCurrentRound(round)
             setPhase("round-complete")
 
@@ -1135,9 +1192,14 @@ export function TeamMeetingDialog({
                             )
                         })}
 
-                        {/* Currently streaming specialist */}
-                        {isStreaming && currentSpecialist && (
-                            <div className="space-y-2">
+                        {/* Currently streaming specialist — always mounted during round, opacity transition when done */}
+                        {currentSpecialist && (
+                            <div
+                                className={cn(
+                                    "space-y-2 transition-opacity duration-200",
+                                    !isStreaming && "opacity-0 pointer-events-none"
+                                )}
+                            >
                                 <div className="flex items-center gap-2">
                                     <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted flex-shrink-0">
                                         {currentSpecialist.avatarImage ? (
@@ -1171,29 +1233,32 @@ export function TeamMeetingDialog({
                             </div>
                         )}
 
-                        {/* Progress indicator */}
-                        {isStreaming && (
-                            <div className="flex items-center justify-center gap-2 py-2">
-                                <div className="flex gap-1">
-                                    {selectedSpecialists.map((s, i) => (
-                                        <div
-                                            key={s.id}
-                                            className={cn(
-                                                "h-1.5 w-6 rounded-full transition-colors",
-                                                i < currentSpecialistIdx
-                                                    ? "bg-international-orange"
-                                                    : i === currentSpecialistIdx
-                                                    ? "bg-international-orange/50"
-                                                    : "bg-muted"
-                                            )}
-                                        />
-                                    ))}
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                    {currentSpecialistIdx + 1} of {selectedSpecialists.length}
-                                </span>
+                        {/* Progress indicator — always mounted during round, opacity transition when done */}
+                        <div
+                            className={cn(
+                                "flex items-center justify-center gap-2 py-2 transition-opacity duration-200",
+                                !isStreaming && "opacity-0 pointer-events-none"
+                            )}
+                        >
+                            <div className="flex gap-1">
+                                {selectedSpecialists.map((s, i) => (
+                                    <div
+                                        key={s.id}
+                                        className={cn(
+                                            "h-1.5 w-6 rounded-full transition-colors",
+                                            i < currentSpecialistIdx
+                                                ? "bg-international-orange"
+                                                : i === currentSpecialistIdx
+                                                ? "bg-international-orange/50"
+                                                : "bg-muted"
+                                        )}
+                                    />
+                                ))}
                             </div>
-                        )}
+                            <span className="text-xs text-muted-foreground">
+                                {currentSpecialistIdx + 1} of {selectedSpecialists.length}
+                            </span>
+                        </div>
                     </div>
                 )}
 
