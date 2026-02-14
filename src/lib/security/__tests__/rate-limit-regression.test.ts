@@ -298,3 +298,15 @@ describe('server action OpenAI hardening regressions', () => {
     }
   })
 })
+
+describe('billing test activation hardening regressions', () => {
+  it('requires explicit enablement and shared-secret auth for test activation endpoint', async () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/billing/test-activate/route.ts')
+    const source = await readFile(routePath, 'utf-8')
+
+    expect(source).toContain("process.env.ALLOW_TEST_BILLING_ACTIVATION === 'true'")
+    expect(source).toContain('const testBillingSecret = process.env.TEST_BILLING_SECRET')
+    expect(source).toContain('if (authHeader !== `Bearer ${testBillingSecret}`)')
+    expect(source).toContain('const authFailure = verifyTestBillingAccess(request)')
+  })
+})

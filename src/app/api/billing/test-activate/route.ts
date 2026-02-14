@@ -5,8 +5,8 @@
  * upserting a user_subscriptions row. This allows end-to-end testing of the
  * billing flow without a real Stripe account or products configured.
  *
- * @security Only available when STRIPE_PRICE_STARTER_MONTHLY is NOT set.
- * When real Stripe products are configured, this endpoint returns 403.
+ * @security Requires explicit test-mode enablement and shared-secret auth.
+ * Also disabled automatically when real Stripe products are configured.
  * Requires authentication — only activates for the current user.
  */
 
@@ -18,6 +18,44 @@ import type { SubscriptionTier } from '@/lib/billing/subscriptions'
 
 const VALID_TIERS: SubscriptionTier[] = ['starter', 'professional', 'enterprise']
 
+/**
+ * Verifies whether test subscription activation is explicitly enabled and authorized.
+ *
+ * @description Enforces fail-closed access controls for the test activation endpoint.
+ * Requires ALLOW_TEST_BILLING_ACTIVATION=true and a matching bearer token in
+ * TEST_BILLING_SECRET.
+ *
+ * @param {NextRequest} request - Incoming API request
+ * @returns {NextResponse | null} Failure response or null when authorized
+ *
+ * @security Requires explicit opt-in + shared secret
+ */
+function verifyTestBillingAccess(request: NextRequest): NextResponse | null {
+  const allowTestBilling = process.env.ALLOW_TEST_BILLING_ACTIVATION === 'true'
+  if (!allowTestBilling) {
+    return NextResponse.json(
+      { error: 'Test billing activation is disabled' },
+      { status: 403 }
+    )
+  }
+
+  const testBillingSecret = process.env.TEST_BILLING_SECRET
+  if (!testBillingSecret) {
+    console.error('[TestActivate] TEST_BILLING_SECRET is not configured')
+    return NextResponse.json(
+      { error: 'Test billing secret not configured' },
+      { status: 503 }
+    )
+  }
+
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${testBillingSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  return null
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // SECURITY: Only available in test mode (no Stripe prices configured)
   if (process.env.STRIPE_PRICE_STARTER_MONTHLY) {
@@ -25,6 +63,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { error: 'Test mode is disabled when Stripe is configured' },
       { status: 403 }
     )
+  }
+
+  const authFailure = verifyTestBillingAccess(request)
+  if (authFailure) {
+    return authFailure
   }
 
   try {

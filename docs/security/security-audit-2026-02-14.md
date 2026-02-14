@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 15 | 13 fixed, 2 open |
+| Medium | 16 | 14 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -377,6 +377,25 @@ credentials instead of consistently failing closed.
   - `src/app/actions/analyze-business-plan.ts`
   - `src/lib/telegram/ai-processor.ts`
 - Added explicit fail-closed behavior when `OPENAI_API_KEY` is unavailable.
+- Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 20) Billing test activation endpoint could be enabled by partial Stripe misconfiguration (Medium)
+
+**Issue:** `POST /api/billing/test-activate` relied only on absence of
+`STRIPE_PRICE_STARTER_MONTHLY` to permit test subscription activation.  
+**Impact:** Environments with incomplete Stripe configuration could expose a
+self-service subscription escalation path.
+
+**Fix implemented (`src/app/api/billing/test-activate/route.ts`):**
+
+- Added `verifyTestBillingAccess(...)` fail-closed guard requiring:
+  - `ALLOW_TEST_BILLING_ACTIVATION === 'true'` (explicit opt-in)
+  - `TEST_BILLING_SECRET` to be configured
+  - `Authorization: Bearer <TEST_BILLING_SECRET>` on each request
+- Retained existing guard that disables endpoint when real Stripe prices are configured.
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
