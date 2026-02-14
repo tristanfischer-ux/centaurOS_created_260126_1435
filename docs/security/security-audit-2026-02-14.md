@@ -112,10 +112,15 @@ The test suite enforces:
 
 ### Critical
 
-1. **Profiles RLS disabled in migration history**
-   - Migration `supabase/migrations/20260204260000_emergency_disable_profiles_rls.sql` disables RLS on `public.profiles`.
-   - Risk: cross-tenant profile data exposure/modification depending on grants.
-   - Required follow-up: restore RLS with non-recursive policies and regression tests for foundry isolation.
+1. **Profiles RLS emergency disable present in migration history**
+   - Historical migration `supabase/migrations/20260204260000_emergency_disable_profiles_rls.sql` disables RLS on `public.profiles`.
+   - Remediation migration added in this audit:
+     - `supabase/migrations/20260214120000_restore_profiles_rls_with_membership_guard.sql`
+   - New migration restores profile RLS with:
+     - `can_access_profile(uuid)` SECURITY DEFINER helper to avoid recursion
+     - shared-foundry profile visibility only
+     - self-only insert/update policies
+   - Deployment status: **pending Supabase project authentication in this environment**.
 
 ### High / Medium
 
