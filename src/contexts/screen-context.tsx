@@ -23,6 +23,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useMemo,
   type ReactNode,
 } from "react"
 import { usePathname } from "next/navigation"
@@ -215,10 +216,16 @@ export function ScreenContextProvider({ children }: { children: ReactNode }) {
     return lines.join("\n")
   }, [screenContext])
 
+  // Memoize the provider value to prevent unnecessary consumer re-renders.
+  // Without this, every setRichContext call creates a new value object,
+  // which triggers all consumers to re-render even if the data they use hasn't changed.
+  const value = useMemo(
+    () => ({ screenContext, registerScreenContext, serializeScreenContext }),
+    [screenContext, registerScreenContext, serializeScreenContext],
+  )
+
   return (
-    <ScreenContext.Provider
-      value={{ screenContext, registerScreenContext, serializeScreenContext }}
-    >
+    <ScreenContext.Provider value={value}>
       {children}
     </ScreenContext.Provider>
   )
@@ -273,12 +280,16 @@ export function useRegisterScreenContext(
   data: Omit<ScreenContextData, "route" | "registeredAt"> | null,
 ): void {
   const ctx = useContext(ScreenContext)
+  // Extract the stable callback (wrapped in useCallback in the provider)
+  // to avoid depending on the entire context value object, which changes
+  // every render and would cause an infinite re-render loop.
+  const register = ctx?.registerScreenContext
 
   useEffect(() => {
-    if (ctx && data) {
-      ctx.registerScreenContext(data)
+    if (register && data) {
+      register(data)
     }
     // Re-register when data changes (deps on serialized form to avoid infinite loops)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx, data?.pageTitle, data?.summary])
+  }, [register, data?.pageTitle, data?.summary])
 }
