@@ -45,6 +45,7 @@ import { toast } from "sonner"
 import { createArtifact } from "@/actions/agent-artifacts"
 import type { ConversationMode, ConversationEngine, SpecialistState } from "@/lib/agents/conversation-engine"
 import { createConversationEngine, resolveConversationMode } from "@/lib/agents/conversation-engine"
+import { compilePersonalityPrompt } from "@/lib/agents/personality"
 // Register all engines on import
 import "@/lib/agents/engines"
 import type { Specialist } from "@/app/(platform)/agents/specialists-data"
@@ -133,6 +134,7 @@ export function useSpecialistChat({
     // ─── Refs ────────────────────────────────────────────────────────────
     const engineRef = useRef<ConversationEngine | null>(null)
     const unsubscribeRef = useRef<(() => void) | null>(null)
+    const lastUserMessageRef = useRef<string | null>(null)
 
     // ─── Engine Lifecycle ────────────────────────────────────────────────
 
@@ -156,6 +158,23 @@ export function useSpecialistChat({
         const resolvedMode = resolveConversationMode(preferredMode)
         setActiveMode(resolvedMode)
 
+        // For voice/avatar: build full system prompt (personality + context).
+        // Text mode uses execute API which builds it server-side.
+        const fullSystemPrompt =
+            resolvedMode === "text"
+                ? systemPromptSuffix
+                : [
+                      compilePersonalityPrompt(
+                          specialist.name,
+                          specialist.personality,
+                          undefined,
+                          specialist.id,
+                      ),
+                      systemPromptSuffix,
+                  ]
+                      .filter(Boolean)
+                      .join("\n\n")
+
         // Create the engine
         const engine = createConversationEngine(resolvedMode)
         if (!engine) {
@@ -173,18 +192,47 @@ export function useSpecialistChat({
                     setStreamingResponse((prev) => prev + (event.text ?? ""))
                     break
 
-                case "text_done":
-                    if (event.text) {
+                case "text_done": {
+                    const text = event.text ?? ""
+                    if (text) {
                         const assistantMessage: ChatMessage = {
                             role: "assistant",
-                            content: event.text,
+                            content: text,
                             timestamp: new Date(),
                         }
                         setMessages((prev) => [...prev, assistantMessage])
-                        setStreamingResponse("")
-                        setIsExecuting(false)
+
+                        // Auto-save to deliverables (fire on completion, not setTimeout)
+                        const userMsg = lastUserMessageRef.current
+                        if (userMsg) {
+                            lastUserMessageRef.current = null
+                            createArtifact({
+                                title: `${specialist.name}: ${userMsg.slice(0, 80)}`,
+                                content: text,
+                                contentType: "document",
+                                metadata: {
+                                    specialistId: specialist.id,
+                                    specialistName: specialist.name,
+                                    source: "specialist-brief",
+                                    conversationMode: resolvedMode,
+                                    userPrompt: userMsg,
+                                },
+                            }).then((result) => {
+                                if (result.data) {
+                                    toast.success("Saved to Deliverables", {
+                                        description: "You can find this output in your Deliverables.",
+                                        duration: 3000,
+                                    })
+                                }
+                            }).catch((err) => {
+                                console.warn("[useSpecialistChat] Auto-save failed:", err)
+                            })
+                        }
                     }
+                    setStreamingResponse("")
+                    setIsExecuting(false)
                     break
+                }
 
                 case "state_change":
                     if (event.state) {
@@ -229,7 +277,7 @@ export function useSpecialistChat({
             foundryId: null, // Resolved server-side from auth
             providerId,
             modelId,
-            systemPromptSuffix,
+            systemPromptSuffix: fullSystemPrompt,
             voice: specialist.voice,
             deepThinkEnabled,
         }).catch((err) => {
@@ -243,10 +291,7 @@ export function useSpecialistChat({
             engine.disconnect().catch(() => { /* ignore cleanup errors */ })
             engineRef.current = null
         }
-    // We intentionally only re-run when isOpen or specialist.id changes.
-    // systemPromptSuffix and deepThinkEnabled are passed per-message.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, specialist.id, preferredMode])
+    }, [isOpen, specialist.id, specialist.name, specialist.personality, preferredMode, systemPromptSuffix])
 
     // ─── Send Message ────────────────────────────────────────────────────
 
@@ -268,6 +313,8 @@ export function useSpecialistChat({
         setError(null)
         setDynamicSuggestion(null)
 
+        lastUserMessageRef.current = message
+
         try {
             await engineRef.current.sendText(message, promptTemplate)
         } catch (err) {
@@ -275,40 +322,9 @@ export function useSpecialistChat({
             console.error("[useSpecialistChat] Send failed:", errMessage)
             setError(errMessage)
             setIsExecuting(false)
+            lastUserMessageRef.current = null
         }
-
-        // Auto-save last response to deliverables (fire and forget)
-        // We schedule this for the next tick to ensure the response message is in state
-        setTimeout(() => {
-            const transcript = engineRef.current?.getTranscript()
-            if (!transcript || transcript.length === 0) return
-
-            const lastAssistant = [...transcript].reverse().find((m) => m.role === "assistant")
-            if (!lastAssistant) return
-
-            createArtifact({
-                title: `${specialist.name}: ${message.slice(0, 80)}`,
-                content: lastAssistant.content,
-                contentType: "document",
-                metadata: {
-                    specialistId: specialist.id,
-                    specialistName: specialist.name,
-                    source: "specialist-brief",
-                    conversationMode: activeMode,
-                    userPrompt: message,
-                },
-            }).then((result) => {
-                if (result.data) {
-                    toast.success("Saved to Deliverables", {
-                        description: "You can find this output in your Deliverables.",
-                        duration: 3000,
-                    })
-                }
-            }).catch((err) => {
-                console.warn("[useSpecialistChat] Auto-save failed:", err)
-            })
-        }, 500)
-    }, [specialist, activeMode])
+    }, [specialist])
 
     // ─── Helpers ─────────────────────────────────────────────────────────
 

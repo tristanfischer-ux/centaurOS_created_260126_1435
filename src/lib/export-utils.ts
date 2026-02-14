@@ -193,9 +193,9 @@ export async function exportAsPDF(
     wrapper.style.maxWidth = "100%"
 
     const options = {
-        margin: [10, 15, 10, 15],
-        filename: filename,
-        image: { type: "jpeg", quality: 0.85 },
+        margin: [10, 15, 10, 15] as [number, number, number, number],
+        filename,
+        image: { type: "jpeg" as const, quality: 0.85 },
         html2canvas: { scale: 1.5, useCORS: true, logging: false },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
     }

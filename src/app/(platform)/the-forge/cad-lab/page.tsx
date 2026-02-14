@@ -1,9 +1,9 @@
 "use client"
 
 /**
- * @file page.tsx — CAD Lab: Research stage (Stage 1).
+ * @file page.tsx — The Forge: Research stage (Stage 1).
  *
- * @description Landing page for the CAD Lab pipeline. Shows hero content
+ * @description Landing page for The Forge pipeline. Shows hero content
  * and quick-start templates before research, and the editable research
  * report + sources after research completes. Auto-triggers decomposition
  * and navigates to /build once modules are mapped.

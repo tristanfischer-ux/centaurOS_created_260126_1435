@@ -1336,7 +1336,7 @@ function HowItWorksSection() {
       icon: Hammer,
       title: "Start Building",
       description:
-        "Use The Forge to turn ideas into engineering dossiers, CAD Lab for parametric design, and the supplier marketplace to source manufacturing. ForgeOS keeps everything coordinated — objectives, tasks, team, and suppliers.",
+        "Use The Forge to turn ideas into engineering dossiers, The Forge for parametric design, and the supplier marketplace to source manufacturing. ForgeOS keeps everything coordinated — objectives, tasks, team, and suppliers.",
     },
   ];
 

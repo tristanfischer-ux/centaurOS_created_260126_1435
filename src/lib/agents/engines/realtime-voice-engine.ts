@@ -101,7 +101,7 @@ class RealtimeVoiceEngine implements ConversationEngine {
     private currentState: SpecialistState = "idle"
     private mediaStream: MediaStream | null = null
     private audioContext: AudioContext | null = null
-    private mediaRecorder: MediaRecorder | null = null
+    private scriptProcessor: ScriptProcessorNode | null = null
     private sessionId: string | null = null
 
     // ─── ConversationEngine interface ────────────────────────────────────
@@ -208,8 +208,27 @@ class RealtimeVoiceEngine implements ConversationEngine {
     }
 
     /**
+     * Converts Float32Array to PCM16 (Int16) and returns base64.
+     * Realtime API expects pcm16 at 24kHz mono.
+     */
+    private float32ToPcm16Base64(input: Float32Array): string {
+        const pcm16 = new Int16Array(input.length)
+        for (let i = 0; i < input.length; i++) {
+            const s = Math.max(-1, Math.min(1, input[i]))
+            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff
+        }
+        const bytes = new Uint8Array(pcm16.buffer)
+        let binary = ""
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i])
+        }
+        return btoa(binary)
+    }
+
+    /**
      * Start streaming microphone audio directly to the Realtime API.
-     * This enables true real-time conversation with minimal latency.
+     * Uses ScriptProcessorNode to capture raw PCM16 (required by Realtime API).
+     * MediaRecorder produces Opus/WebM which is not supported.
      */
     async startMicrophoneStream(): Promise<void> {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -223,37 +242,27 @@ class RealtimeVoiceEngine implements ConversationEngine {
                     echoCancellation: true,
                     noiseSuppression: true,
                     autoGainControl: true,
-                    sampleRate: 24000, // Realtime API expects 24kHz
+                    sampleRate: 24000,
                 },
             })
 
             this.audioContext = new AudioContext({ sampleRate: 24000 })
+            const source = this.audioContext.createMediaStreamSource(this.mediaStream)
 
-            // Use MediaRecorder to capture audio chunks
-            const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-                ? "audio/webm;codecs=opus"
-                : "audio/webm"
+            // ScriptProcessorNode captures raw Float32; we convert to PCM16.
+            // Buffer 2048 samples ≈ 85ms at 24kHz for low latency.
+            const processor = this.audioContext.createScriptProcessor(2048, 1, 1)
+            this.scriptProcessor = processor
 
-            this.mediaRecorder = new MediaRecorder(this.mediaStream, { mimeType })
-
-            this.mediaRecorder.ondataavailable = async (event) => {
-                if (event.data.size > 0 && this.ws?.readyState === WebSocket.OPEN) {
-                    const arrayBuffer = await event.data.arrayBuffer()
-                    const base64 = btoa(
-                        new Uint8Array(arrayBuffer).reduce(
-                            (data, byte) => data + String.fromCharCode(byte),
-                            ""
-                        )
-                    )
-                    this.wsSend({
-                        type: "input_audio_buffer.append",
-                        audio: base64,
-                    })
-                }
+            processor.onaudioprocess = (event) => {
+                if (this.ws?.readyState !== WebSocket.OPEN) return
+                const input = event.inputBuffer.getChannelData(0)
+                const base64 = this.float32ToPcm16Base64(input)
+                this.wsSend({ type: "input_audio_buffer.append", audio: base64 })
             }
 
-            // Capture in small chunks for low latency
-            this.mediaRecorder.start(100) // 100ms chunks
+            source.connect(processor)
+            processor.connect(this.audioContext.destination)
             this.setState("listening")
         } catch (err) {
             const message = err instanceof Error ? err.message : "Microphone access denied"
@@ -266,8 +275,9 @@ class RealtimeVoiceEngine implements ConversationEngine {
      * Stop streaming microphone audio and commit the buffer.
      */
     stopMicrophoneStream(): void {
-        if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
-            this.mediaRecorder.stop()
+        if (this.scriptProcessor) {
+            this.scriptProcessor.disconnect()
+            this.scriptProcessor = null
         }
         if (this.mediaStream) {
             this.mediaStream.getTracks().forEach((track) => track.stop())
@@ -321,20 +331,29 @@ class RealtimeVoiceEngine implements ConversationEngine {
     /**
      * Configure the Realtime API session with specialist personality.
      * Sent immediately after WebSocket connection opens.
+     * Uses systemPromptSuffix as the full instructions when provided (caller must
+     * include personality + context). Fallback for backward compatibility.
      */
     private configureSession(): void {
         if (!this.config) return
 
         const { specialistId, voice, systemPromptSuffix } = this.config
 
+        const instructions =
+            systemPromptSuffix.trim().length > 100
+                ? systemPromptSuffix
+                : [
+                      `You are a specialist AI advisor. Your specialist ID is "${specialistId}".`,
+                      systemPromptSuffix,
+                  ]
+                      .filter(Boolean)
+                      .join("\n\n")
+
         this.wsSend({
             type: "session.update",
             session: {
                 modalities: ["text", "audio"],
-                instructions: [
-                    `You are a specialist AI advisor. Your specialist ID is "${specialistId}".`,
-                    systemPromptSuffix,
-                ].filter(Boolean).join("\n\n"),
+                instructions,
                 voice: voice || "alloy",
                 input_audio_format: "pcm16",
                 output_audio_format: "pcm16",

@@ -4,7 +4,7 @@
  * @description Programmatically authenticates a test user and redirects to any
  * protected page. This eliminates the login-page blocker that prevents AI agents
  * (browser-use subagents, Playwright, curl) from testing authenticated features
- * like the CAD Lab pipeline.
+ * like The Forge pipeline.
  *
  * Usage:
  *   GET /api/dev-login?role=founder&redirect=/the-forge/cad-lab

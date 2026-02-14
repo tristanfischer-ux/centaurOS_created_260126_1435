@@ -23,6 +23,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getOpenAIClient } from '@/lib/ai/openai-lazy'
 import { buildAIContextWithServiceClient } from './sweep-context'
 import { estimateAICost } from '@/lib/ai/usage-tracking'
 import { SPECIALISTS } from '@/app/(platform)/agents/specialists-data'
@@ -305,7 +306,12 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
     const companyContext = await buildAIContextWithServiceClient(config.foundryId)
 
     // 2. Build the sweep prompt
-    const personalityPrompt = compilePersonalityPrompt(specialist.name, specialist.personality)
+    const personalityPrompt = compilePersonalityPrompt(
+      specialist.name,
+      specialist.personality,
+      undefined,
+      config.specialistId,
+    )
     const sweepPrompt = getBackgroundSweepPrompt(config.specialistId)
 
     const systemPrompt = [
@@ -347,7 +353,7 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
       throw new Error('MINIMAX_API_KEY not configured')
     }
 
-    const OpenAI = (await import('openai')).default
+    const OpenAI = await getOpenAIClient()
     const client = new OpenAI({
       apiKey,
       baseURL: 'https://api.minimax.io/v1',
@@ -390,50 +396,64 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
       // Non-fatal: log the sweep but with zero insights
     }
 
-    // 5. Filter valid insights and store them
+    // 5. Filter valid insights and store them (parallel inserts)
     const validTypes = ['alert', 'recommendation', 'observation', 'reminder', 'report']
     const validUrgencies = ['critical', 'important', 'informational']
-    let insightsStored = 0
+    const validInsights = insights.filter(
+      i =>
+        validTypes.includes(i.type) &&
+        validUrgencies.includes(i.urgency) &&
+        i.title?.trim() &&
+        i.body?.trim()
+    )
+
+    const insertResults = await Promise.allSettled(
+      validInsights.map(insight =>
+        supabase.rpc('insert_agent_insight', {
+          p_foundry_id: config.foundryId,
+          p_specialist_id: config.specialistId,
+          p_insight_type: insight.type,
+          p_urgency: insight.urgency,
+          p_title: insight.title.slice(0, 200),
+          p_body: insight.body.slice(0, 2000),
+          p_domain_data: insight.domain_data ?? {},
+          p_suggested_actions: insight.suggested_actions ?? [],
+        })
+      )
+    )
+
     const storedInsights: AgentInsight[] = []
-
-    for (const insight of insights) {
-      if (!validTypes.includes(insight.type) || !validUrgencies.includes(insight.urgency)) continue
-      if (!insight.title?.trim() || !insight.body?.trim()) continue
-
-      const { data: insightId, error: insertError } = await supabase.rpc('insert_agent_insight', {
-        p_foundry_id: config.foundryId,
-        p_specialist_id: config.specialistId,
-        p_insight_type: insight.type,
-        p_urgency: insight.urgency,
-        p_title: insight.title.slice(0, 200),
-        p_body: insight.body.slice(0, 2000),
-        p_domain_data: insight.domain_data ?? {},
-        p_suggested_actions: insight.suggested_actions ?? [],
-      })
-
+    let insightsStored = 0
+    for (let i = 0; i < insertResults.length; i++) {
+      const result = insertResults[i]
+      const insight = validInsights[i]
+      if (result.status === 'rejected') {
+        console.error(`[SweepOrchestrator] Failed to insert insight:`, result.reason)
+        continue
+      }
+      const { data: insightId, error: insertError } = result.value
       if (insertError) {
         console.error(`[SweepOrchestrator] Failed to insert insight:`, insertError.message)
-      } else {
-        insightsStored++
-        // Build a partial insight for notification dispatch
-        storedInsights.push({
-          id: insightId as string,
-          foundry_id: config.foundryId,
-          specialist_id: config.specialistId,
-          insight_type: insight.type as AgentInsight['insight_type'],
-          urgency: insight.urgency as AgentInsight['urgency'],
-          title: insight.title.slice(0, 200),
-          body: insight.body.slice(0, 2000),
-          domain_data: insight.domain_data ?? {},
-          suggested_actions: (insight.suggested_actions ?? []) as AgentInsight['suggested_actions'],
-          is_read: false,
-          is_dismissed: false,
-          acted_on: false,
-          acted_on_at: null,
-          created_at: new Date().toISOString(),
-          expires_at: null,
-        })
+        continue
       }
+      insightsStored++
+      storedInsights.push({
+        id: insightId as string,
+        foundry_id: config.foundryId,
+        specialist_id: config.specialistId,
+        insight_type: insight.type as AgentInsight['insight_type'],
+        urgency: insight.urgency as AgentInsight['urgency'],
+        title: insight.title.slice(0, 200),
+        body: insight.body.slice(0, 2000),
+        domain_data: insight.domain_data ?? {},
+        suggested_actions: (insight.suggested_actions ?? []) as AgentInsight['suggested_actions'],
+        is_read: false,
+        is_dismissed: false,
+        acted_on: false,
+        acted_on_at: null,
+        created_at: new Date().toISOString(),
+        expires_at: null,
+      })
     }
 
     // 6. Dispatch notifications for critical/important insights
@@ -450,16 +470,16 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
     const criticalInsights = storedInsights.filter(i => i.urgency === 'critical')
     if (criticalInsights.length > 0) {
       // Map specialist domains to relevant cross-functional specialists
-      const DECISION_SUPPORT_MAP: Record<string, string[]> = {
+      const DECISION_SUPPORT_MAP: Partial<Record<string, string[]>> = {
         'chief-of-staff': ['strategist', 'finance-lead'],
         'finance-lead': ['chief-of-staff', 'strategist'],
-        'strategist': ['chief-of-staff', 'finance-lead', 'product-lead'],
+        strategist: ['chief-of-staff', 'finance-lead', 'product-lead'],
         'product-lead': ['strategist', 'growth-marketer'],
         'growth-marketer': ['product-lead', 'sales-lead'],
         'sales-lead': ['finance-lead', 'growth-marketer'],
         'fundraising-advisor': ['finance-lead', 'strategist'],
-        'hiring-team': ['chief-of-staff', 'forge-ops'],
-        'forge-ops': ['chief-of-staff', 'product-lead'],
+        'hiring-team': ['chief-of-staff', 'vp-manufacturing'],
+        'vp-manufacturing': ['chief-of-staff', 'product-lead'],
         'legal-counsel': ['chief-of-staff', 'finance-lead'],
       }
 

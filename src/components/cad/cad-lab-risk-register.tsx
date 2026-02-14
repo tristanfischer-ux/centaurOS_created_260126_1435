@@ -1,5 +1,5 @@
 /**
- * @file cad-lab-risk-register.tsx — Aggregated risk register for CAD Lab.
+ * @file cad-lab-risk-register.tsx — Aggregated risk register for The Forge.
  *
  * @description Pulls all risks from all modules into a unified view:
  * failure modes (from decomposition), unknowns (open questions), and

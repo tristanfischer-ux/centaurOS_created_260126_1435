@@ -1,5 +1,5 @@
 /**
- * @file cad-lab-timeline.tsx — Gantt-style timeline for CAD Lab modules.
+ * @file cad-lab-timeline.tsx — Gantt-style timeline for The Forge modules.
  *
  * @description Horizontal bar chart showing module lead times with
  * dependency-based scheduling. Infers dependencies from module

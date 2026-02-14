@@ -1,5 +1,5 @@
 /**
- * @file cad-lab-supply-chain.tsx — Supply chain overview for CAD Lab.
+ * @file cad-lab-supply-chain.tsx — Supply chain overview for The Forge.
  *
  * @description Shows per-module manufacturing requirements derived from
  * diagnostic answers and CAD results. For each module, displays the

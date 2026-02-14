@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { ArrowRight, Layers, Users, MessageSquare, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -57,12 +58,24 @@ interface SpecialistsLandingProps {
 export function SpecialistsLanding({
     onOpenProjectBuilder,
 }: SpecialistsLandingProps) {
+    const searchParams = useSearchParams()
+    const router = useRouter()
     const [briefSpecialistId, setBriefSpecialistId] = useState<string | null>(null)
     const [isMeetingOpen, setIsMeetingOpen] = useState(false)
     const [isCouncilOpen, setIsCouncilOpen] = useState(false)
     const [handoffContext, setHandoffContext] = useState<string | null>(null)
     const [referredByName, setReferredByName] = useState<string | null>(null)
     const [showOrgChart, setShowOrgChart] = useState(false)
+
+    // Auto-open specialist from URL query param (e.g. /agents?specialist=strategist)
+    useEffect(() => {
+        const specialistParam = searchParams.get('specialist')
+        if (specialistParam && SPECIALISTS.some(s => s.id === specialistParam)) {
+            setBriefSpecialistId(specialistParam)
+            // Clean the URL so refreshing doesn't re-open the dialog
+            router.replace('/agents', { scroll: false })
+        }
+    }, [searchParams, router])
 
     // Pre-compute hierarchy
     const orgHierarchy = useMemo(() => getOrgChartHierarchy(), [])

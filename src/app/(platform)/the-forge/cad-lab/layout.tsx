@@ -1,7 +1,7 @@
 /**
- * @file layout.tsx — Shared layout for the CAD Lab multi-page pipeline.
+ * @file layout.tsx — Shared layout for The Forge multi-page pipeline.
  *
- * @description Wraps all CAD Lab sub-routes in the CadLabProvider and renders
+ * @description Wraps all The Forge sub-routes in the CadLabProvider and renders
  * the persistent header, project picker, pipeline stepper navigation,
  * progress overlay, and milestone celebrations.
  *

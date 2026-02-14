@@ -19,6 +19,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getOpenAIClient } from '@/lib/ai/openai-lazy'
 import { buildAIContextWithServiceClient } from './sweep-context'
 import { estimateAICost } from '@/lib/ai/usage-tracking'
 import { SPECIALISTS } from '@/app/(platform)/agents/specialists-data'
@@ -213,7 +214,12 @@ export async function generateWeeklyBrief(foundryId: string): Promise<SynthesisR
       throw new Error('Cal (Chief of Staff) specialist not found in registry')
     }
 
-    const personalityPrompt = compilePersonalityPrompt(calSpecialist.name, calSpecialist.personality)
+    const personalityPrompt = compilePersonalityPrompt(
+      calSpecialist.name,
+      calSpecialist.personality,
+      undefined,
+      CAL_SPECIALIST_ID,
+    )
 
     // 5. Build synthesis prompt
     const systemPrompt = buildSynthesisSystemPrompt(personalityPrompt, companyContext)
@@ -225,7 +231,7 @@ export async function generateWeeklyBrief(foundryId: string): Promise<SynthesisR
       throw new Error('MINIMAX_API_KEY not configured')
     }
 
-    const OpenAI = (await import('openai')).default
+    const OpenAI = await getOpenAIClient()
     const client = new OpenAI({
       apiKey,
       baseURL: 'https://api.minimax.io/v1',
@@ -463,7 +469,7 @@ export async function generateDecisionSupportPackage(
     const apiKey = process.env.MINIMAX_API_KEY
     if (!apiKey) return null
 
-    const OpenAI = (await import('openai')).default
+    const OpenAI = await getOpenAIClient()
     const client = new OpenAI({ apiKey, baseURL: 'https://api.minimax.io/v1' })
 
     const completion = await client.chat.completions.create({
@@ -642,7 +648,7 @@ export async function synthesizeCouncilDebate(
     throw new Error('MINIMAX_API_KEY not configured')
   }
 
-  const OpenAI = (await import('openai')).default
+  const OpenAI = await getOpenAIClient()
   const client = new OpenAI({
     apiKey,
     baseURL: 'https://api.minimax.io/v1',
@@ -696,7 +702,12 @@ function buildCouncilSystemPrompt(): string {
     throw new Error('Cal (Chief of Staff) specialist not found')
   }
 
-  const personalityPrompt = compilePersonalityPrompt(calSpecialist.name, calSpecialist.personality)
+  const personalityPrompt = compilePersonalityPrompt(
+    calSpecialist.name,
+    calSpecialist.personality,
+    undefined,
+    CAL_SPECIALIST_ID,
+  )
 
   return [
     personalityPrompt,

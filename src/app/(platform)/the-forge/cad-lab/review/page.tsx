@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * @file review/page.tsx — CAD Lab: Review stage (Stage 5).
+ * @file review/page.tsx — The Forge: Review stage (Stage 5).
  *
  * @description Final review package with supplier-ready documentation and
  * expert discipline matching. Requires at least one generated module.

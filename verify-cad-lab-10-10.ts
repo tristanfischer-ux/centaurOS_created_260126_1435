@@ -128,7 +128,7 @@ async function verifyCadLab10() {
         console.log(`   ✅ Found hero image: ${alt}`)
         console.log(`      Source: ${src}`)
         heroBannerFound = true
-        heroBannerAlt = alt
+        heroBannerAlt = alt ?? ''
         break
       }
     }

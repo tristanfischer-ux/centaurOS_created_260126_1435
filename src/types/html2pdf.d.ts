@@ -1,8 +1,8 @@
 declare module "html2pdf.js" {
     interface Html2PdfOptions {
-        margin?: number | number[]
+        margin?: number | [number, number] | [number, number, number, number]
         filename?: string
-        image?: { type?: string; quality?: number }
+        image?: { type?: "jpeg" | "png" | "webp"; quality?: number }
         html2canvas?: Record<string, unknown>
         jsPDF?: { unit?: string; format?: string; orientation?: "portrait" | "landscape" }
     }

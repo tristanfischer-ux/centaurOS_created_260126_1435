@@ -24,6 +24,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getOpenAIClient } from '@/lib/ai/openai-lazy'
 import { buildAIContextWithServiceClient } from './sweep-context'
 import { estimateAICost } from '@/lib/ai/usage-tracking'
 import { SPECIALISTS } from '@/app/(platform)/agents/specialists-data'
@@ -192,7 +193,7 @@ async function generateDraftTask(
 
   const specialist = SPECIALISTS.find(s => s.id === insight.specialist_id)
 
-  const OpenAI = (await import('openai')).default
+  const OpenAI = await getOpenAIClient()
   const client = new OpenAI({ apiKey, baseURL: 'https://api.minimax.io/v1' })
 
   const completion = await client.chat.completions.create({
@@ -315,7 +316,7 @@ export async function autoGenerateReport(
     const apiKey = process.env.MINIMAX_API_KEY
     if (!apiKey) return null
 
-    const OpenAI = (await import('openai')).default
+    const OpenAI = await getOpenAIClient()
     const client = new OpenAI({ apiKey, baseURL: 'https://api.minimax.io/v1' })
 
     const completion = await client.chat.completions.create({

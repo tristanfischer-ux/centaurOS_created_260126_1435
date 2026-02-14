@@ -83,12 +83,13 @@ export async function dispatchInsightNotifications(
       m => m.role === 'Founder' || m.role === 'Executive'
     )
 
-    // 3. Process each insight
+    // 3. Collect all notification work and run in parallel
+    const tasks: Promise<unknown>[] = []
+
     for (const insight of insights) {
       const specialist = SPECIALISTS.find(s => s.id === insight.specialist_id)
       const specialistName = specialist?.name ?? 'Specialist'
 
-      // Determine channels based on urgency
       const shouldTelegram =
         (insight.urgency === 'critical' && preferences.notify_critical_telegram) ||
         (insight.urgency === 'important' && preferences.notify_important_telegram)
@@ -97,38 +98,39 @@ export async function dispatchInsightNotifications(
         (insight.urgency === 'critical' && preferences.notify_critical_in_app) ||
         (insight.urgency === 'important' && preferences.notify_important_in_app)
 
-      // In-app notifications (stored in notifications table if it exists)
       if (shouldInApp) {
         for (const member of notifyMembers) {
-          try {
-            await supabase.from('notifications').insert({
-              user_id: member.id,
-              type: `agent_insight_${insight.urgency}`,
-              title: `${specialistName}: ${insight.title}`,
-              message: insight.body.slice(0, 200),
-              link: '/today',
-              metadata: {
-                insight_id: insight.id,
-                specialist_id: insight.specialist_id,
-                urgency: insight.urgency,
-                insight_type: insight.insight_type,
-              },
-            })
-          } catch {
-            // Notifications table may not exist yet — not critical
-            console.debug(`[SweepNotifications] In-app notification skipped for ${member.id}`)
-          }
+          tasks.push(
+            supabase
+              .from('notifications')
+              .insert({
+                user_id: member.id,
+                type: `agent_insight_${insight.urgency}`,
+                title: `${specialistName}: ${insight.title}`,
+                message: insight.body.slice(0, 200),
+                link: '/today',
+                metadata: {
+                  insight_id: insight.id,
+                  specialist_id: insight.specialist_id,
+                  urgency: insight.urgency,
+                  insight_type: insight.insight_type,
+                },
+              })
+              .then(() => {})
+              .catch(() => {
+                console.debug(`[SweepNotifications] In-app notification skipped for ${member.id}`)
+              })
+          )
         }
       }
 
-      // Telegram notifications for critical/important
       if (shouldTelegram) {
         const urgencyEmoji = insight.urgency === 'critical' ? '🔴' : '🟡'
         const telegramTitle = `${urgencyEmoji} ${specialistName}: ${insight.title}`
 
         for (const member of notifyMembers) {
-          try {
-            await pushNotificationToTelegram({
+          tasks.push(
+            pushNotificationToTelegram({
               user_id: member.id,
               type: 'agent_insight',
               title: telegramTitle,
@@ -139,13 +141,15 @@ export async function dispatchInsightNotifications(
                 specialist_id: insight.specialist_id,
                 urgency: insight.urgency,
               },
+            }).catch(err => {
+              console.debug(`[SweepNotifications] Telegram push failed for ${member.id}:`, err)
             })
-          } catch (err) {
-            console.debug(`[SweepNotifications] Telegram push failed for ${member.id}:`, err)
-          }
+          )
         }
       }
     }
+
+    await Promise.allSettled(tasks)
 
     console.info(
       `[SweepNotifications] Dispatched notifications for ${insights.length} insights ` +

@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * @file cad-lab-context.tsx — Shared state for the CAD Lab multi-page pipeline.
+ * @file cad-lab-context.tsx — Shared state for The Forge multi-page pipeline.
  *
  * @description Extracts all stateful logic from the original monolithic page.tsx
  * into a React Context so that Research, Build, Analysis, Procurement, and
@@ -125,7 +125,7 @@ export interface CadLabContextValue {
 const CadLabContext = createContext<CadLabContextValue | null>(null)
 
 /**
- * useCadLab — access shared CAD Lab state from any sub-route page.
+ * useCadLab — access shared The Forge state from any sub-route page.
  *
  * @throws If used outside of CadLabProvider
  */

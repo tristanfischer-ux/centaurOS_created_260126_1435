@@ -12,7 +12,7 @@
 export const CAD_INSTRUCTIONS = `# CLAUDE.md — CadQuery Parametric CAD Pipeline
 
 ## For: Claude Code (Opus 4.6)
-## Project: ForgeOS CAD Lab at https://centauros.io/the-forge/cad-lab
+## Project: ForgeOS The Forge at https://centauros.io/the-forge/cad-lab
 ## Stack: CadQuery + Python, executed server-side, results displayed at the URL above
 
 ---

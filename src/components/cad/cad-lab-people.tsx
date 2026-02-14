@@ -1,5 +1,5 @@
 /**
- * @file cad-lab-people.tsx — Expert discipline matching for CAD Lab.
+ * @file cad-lab-people.tsx — Expert discipline matching for The Forge.
  *
  * @description Derives required engineering disciplines from module data
  * (key parts, failure modes, manufacturing process) and shows which

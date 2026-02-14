@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * @file cad-lab-layout-client.tsx — Client-side layout wrapper for CAD Lab.
+ * @file cad-lab-layout-client.tsx — Client-side layout wrapper for The Forge.
  *
  * @description Renders the CadLabProvider, persistent header with project
  * picker, pipeline stepper navigation, progress overlay, and milestone
@@ -61,7 +61,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-8 w-1 rounded-full bg-international-orange" />
-            <h1 className="text-2xl font-bold text-foreground">CAD Lab</h1>
+            <h1 className="text-2xl font-bold text-foreground">The Forge</h1>
             <span className="text-xs font-mono bg-muted text-muted-foreground px-2 py-1 rounded">
               PIPELINE
             </span>

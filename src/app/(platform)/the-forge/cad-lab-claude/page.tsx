@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * @file page.tsx — CAD Lab (Claude Pipeline)
+ * @file page.tsx — The Forge (Claude Pipeline)
  *
  * @description Clean implementation following CLAUDE_CAD_INSTRUCTIONS exactly.
  * Each step is visible: the user watches research happen, sees the interface
@@ -317,7 +317,7 @@ export default function CadLabClaudePage(): React.ReactNode {
       <div className="pb-4 border-b border-muted">
         <div className="flex items-center gap-3">
           <div className="h-8 w-1 rounded-full bg-international-orange" />
-          <h1 className="text-2xl font-bold text-foreground">CAD Lab</h1>
+          <h1 className="text-2xl font-bold text-foreground">The Forge</h1>
           <span className="text-xs font-mono bg-international-orange/10 text-international-orange px-2 py-1 rounded">
             CLAUDE
           </span>

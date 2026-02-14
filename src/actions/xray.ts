@@ -140,6 +140,7 @@ export async function scanIdeaAction(idea: string, researchReport?: string): Pro
         scan_status: "complete",
       })
       .eq("id", scan.id)
+      .eq("foundry_id", foundryId)
 
     if (updateError) {
       console.error("[XRay] Failed to persist scan result:", {
@@ -417,6 +418,7 @@ export async function generateImagesAction(scanId: string): Promise<
 
     if (updateError) {
       console.error("[XRay] Failed to persist system image:", updateError.message)
+      return { spec: updatedSpec, persistError: updateError.message }
     }
 
     return { spec: updatedSpec }
@@ -475,8 +477,11 @@ export async function generateModuleImagesAction(scanId: string): Promise<
         }
       }
 
-      // Progressive save after each batch — UI updates via Realtime
-      const batchSpec: XRaySpec = { ...spec, modules: updatedModules }
+      // Re-fetch spec before save to avoid overwriting concurrent updates
+      // (e.g. system image from generateImagesAction)
+      const refetch = await loadScanForFoundry(supabase, scanId, foundryId)
+      const currentSpec = "error" in refetch ? spec : (refetch.scan.spec as unknown as XRaySpec)
+      const batchSpec: XRaySpec = { ...currentSpec, modules: updatedModules }
       await supabase
         .from("xray_scans")
         .update({ spec: batchSpec as unknown as Json })
@@ -484,9 +489,10 @@ export async function generateModuleImagesAction(scanId: string): Promise<
         .eq("foundry_id", foundryId)
     }
 
-    const finalSpec: XRaySpec = { ...spec, modules: updatedModules }
-
-    // Final persist
+    // Final persist — re-fetch once more to merge any concurrent updates
+    const refetch = await loadScanForFoundry(supabase, scanId, foundryId)
+    const currentSpec = "error" in refetch ? spec : (refetch.scan.spec as unknown as XRaySpec)
+    const finalSpec: XRaySpec = { ...currentSpec, modules: updatedModules }
     const { error: updateError } = await supabase
       .from("xray_scans")
       .update({ spec: finalSpec as unknown as Json })
@@ -495,6 +501,7 @@ export async function generateModuleImagesAction(scanId: string): Promise<
 
     if (updateError) {
       console.error("[XRay] Failed to persist module images:", updateError.message)
+      return { spec: finalSpec, persistError: updateError.message }
     }
 
     return { spec: finalSpec }
@@ -617,6 +624,7 @@ export async function generateCadModelsAction(
 
     if (updateError) {
       console.error("[XRay] Failed to persist CAD models:", updateError.message)
+      return { spec: updatedSpec, persistError: updateError.message }
     }
 
     // AUDIT: Log CAD generation results
@@ -679,6 +687,7 @@ export async function generateSystemCadAction(scanId: string): Promise<
 
       if (updateError) {
         console.error("[XRay] Failed to persist system CAD:", updateError.message)
+        return { spec: updatedSpec, persistError: updateError.message }
       }
 
       console.info("[XRay] System CAD model generated:", { scanId, hasStl: !!result.stlUrl })
@@ -1008,18 +1017,10 @@ export async function analyzeModulesAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
-    // Load scan
-    const { data: scan, error: loadError } = await supabase
-      .from("xray_scans")
-      .select("id, spec")
-      .eq("id", scanId)
-      .single()
-
-    if (loadError || !scan) {
-      return { error: "Scan not found" }
-    }
-
+  return withAuth(async ({ supabase, foundryId }) => {
+    const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
+    if ("error" in loadResult) return { error: loadResult.error }
+    const { scan } = loadResult
     const spec = scan.spec as unknown as XRaySpec
     const updatedModules = [...spec.modules]
 
@@ -1115,9 +1116,11 @@ export async function analyzeModulesAction(
       .from("xray_scans")
       .update({ spec: updatedSpec as unknown as Json })
       .eq("id", scanId)
+      .eq("foundry_id", foundryId)
 
     if (updateError) {
       console.error("[XRay] Failed to persist analysis results:", updateError.message)
+      return { spec: updatedSpec, persistError: updateError.message }
     }
 
     console.info("[XRay] Module analysis complete:", {
@@ -1223,17 +1226,10 @@ export async function runStructuralAnalysisAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
-    const { data: scan, error: loadError } = await supabase
-      .from("xray_scans")
-      .select("id, spec")
-      .eq("id", scanId)
-      .single()
-
-    if (loadError || !scan) {
-      return { error: "Scan not found" }
-    }
-
+  return withAuth(async ({ supabase, foundryId }) => {
+    const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
+    if ("error" in loadResult) return { error: loadResult.error }
+    const { scan } = loadResult
     const spec = scan.spec as unknown as XRaySpec
     const updatedModules = [...spec.modules]
 
@@ -1320,9 +1316,11 @@ export async function runStructuralAnalysisAction(
       .from("xray_scans")
       .update({ spec: updatedSpec as unknown as Json })
       .eq("id", scanId)
+      .eq("foundry_id", foundryId)
 
     if (updateError) {
       console.error("[XRay] Failed to persist structural results:", updateError.message)
+      return { spec: updatedSpec, persistError: updateError.message }
     }
 
     console.info("[XRay] Structural analysis complete:", {
@@ -1349,17 +1347,10 @@ export async function runCfdAnalysisAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
-    const { data: scan, error: loadError } = await supabase
-      .from("xray_scans")
-      .select("id, spec")
-      .eq("id", scanId)
-      .single()
-
-    if (loadError || !scan) {
-      return { error: "Scan not found" }
-    }
-
+  return withAuth(async ({ supabase, foundryId }) => {
+    const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
+    if ("error" in loadResult) return { error: loadResult.error }
+    const { scan } = loadResult
     const spec = scan.spec as unknown as XRaySpec
     const updatedModules = [...spec.modules]
 
@@ -1419,9 +1410,11 @@ export async function runCfdAnalysisAction(
       .from("xray_scans")
       .update({ spec: updatedSpec as unknown as Json })
       .eq("id", scanId)
+      .eq("foundry_id", foundryId)
 
     if (updateError) {
       console.error("[XRay] Failed to persist CFD results:", updateError.message)
+      return { spec: updatedSpec, persistError: updateError.message }
     }
 
     console.info("[XRay] CFD analysis complete:", {
@@ -1449,17 +1442,10 @@ export async function runTopologyOptimizationAction(
   moduleIds?: string[],
   volumeFraction: number = 0.5,
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
-    const { data: scan, error: loadError } = await supabase
-      .from("xray_scans")
-      .select("id, spec")
-      .eq("id", scanId)
-      .single()
-
-    if (loadError || !scan) {
-      return { error: "Scan not found" }
-    }
-
+  return withAuth(async ({ supabase, foundryId }) => {
+    const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
+    if ("error" in loadResult) return { error: loadResult.error }
+    const { scan } = loadResult
     const spec = scan.spec as unknown as XRaySpec
     const updatedModules = [...spec.modules]
 
@@ -1517,9 +1503,11 @@ export async function runTopologyOptimizationAction(
       .from("xray_scans")
       .update({ spec: updatedSpec as unknown as Json })
       .eq("id", scanId)
+      .eq("foundry_id", foundryId)
 
     if (updateError) {
       console.error("[XRay] Failed to persist topology results:", updateError.message)
+      return { spec: updatedSpec, persistError: updateError.message }
     }
 
     return { spec: updatedSpec }
@@ -1540,17 +1528,10 @@ export async function runThermalAnalysisAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
-    const { data: scan, error: loadError } = await supabase
-      .from("xray_scans")
-      .select("id, spec")
-      .eq("id", scanId)
-      .single()
-
-    if (loadError || !scan) {
-      return { error: "Scan not found" }
-    }
-
+  return withAuth(async ({ supabase, foundryId }) => {
+    const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
+    if ("error" in loadResult) return { error: loadResult.error }
+    const { scan } = loadResult
     const spec = scan.spec as unknown as XRaySpec
     const updatedModules = [...spec.modules]
 
@@ -1622,9 +1603,11 @@ export async function runThermalAnalysisAction(
       .from("xray_scans")
       .update({ spec: updatedSpec as unknown as Json })
       .eq("id", scanId)
+      .eq("foundry_id", foundryId)
 
     if (updateError) {
       console.error("[XRay] Failed to persist thermal results:", updateError.message)
+      return { spec: updatedSpec, persistError: updateError.message }
     }
 
     return { spec: updatedSpec }
@@ -1647,17 +1630,10 @@ export async function runPremiumAnalysisAction(
   analysisTypes: ("emi" | "fatigue" | "impact")[],
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
-    const { data: scan, error: loadError } = await supabase
-      .from("xray_scans")
-      .select("id, spec")
-      .eq("id", scanId)
-      .single()
-
-    if (loadError || !scan) {
-      return { error: "Scan not found" }
-    }
-
+  return withAuth(async ({ supabase, foundryId }) => {
+    const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
+    if ("error" in loadResult) return { error: loadResult.error }
+    const { scan } = loadResult
     const spec = scan.spec as unknown as XRaySpec
     const updatedModules = [...spec.modules]
 
@@ -1728,9 +1704,11 @@ export async function runPremiumAnalysisAction(
       .from("xray_scans")
       .update({ spec: updatedSpec as unknown as Json })
       .eq("id", scanId)
+      .eq("foundry_id", foundryId)
 
     if (updateError) {
       console.error("[XRay] Failed to persist premium analysis results:", updateError.message)
+      return { spec: updatedSpec, persistError: updateError.message }
     }
 
     return { spec: updatedSpec }
@@ -1753,17 +1731,10 @@ export async function runConvergenceStepAction(
   shouldContinue: boolean
   spec: XRaySpec
 } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
-    const { data: scan, error: loadError } = await supabase
-      .from("xray_scans")
-      .select("id, spec")
-      .eq("id", scanId)
-      .single()
-
-    if (loadError || !scan) {
-      return { error: "Scan not found" }
-    }
-
+  return withAuth(async ({ supabase, foundryId }) => {
+    const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
+    if ("error" in loadResult) return { error: loadResult.error }
+    const { scan } = loadResult
     const spec = scan.spec as unknown as XRaySpec
 
     const { evaluation, updatedSystemAnalysis, shouldContinue } =
@@ -1784,9 +1755,17 @@ export async function runConvergenceStepAction(
       .from("xray_scans")
       .update({ spec: updatedSpec as unknown as Json })
       .eq("id", scanId)
+      .eq("foundry_id", foundryId)
 
     if (updateError) {
       console.error("[XRay] Failed to persist convergence state:", updateError.message)
+      return {
+        evaluation,
+        proposedChanges: evaluation.proposedChanges,
+        shouldContinue,
+        spec: updatedSpec,
+        persistError: updateError.message,
+      }
     }
 
     return {
@@ -1823,17 +1802,10 @@ export async function applyDesignChangesAction(
     newValue: string
   }>,
 ): Promise<{ spec: XRaySpec; appliedCount: number } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
-    const { data: scan, error: loadError } = await supabase
-      .from("xray_scans")
-      .select("id, spec")
-      .eq("id", scanId)
-      .single()
-
-    if (loadError || !scan) {
-      return { error: "Scan not found" }
-    }
-
+  return withAuth(async ({ supabase, foundryId }) => {
+    const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
+    if ("error" in loadResult) return { error: loadResult.error }
+    const { scan } = loadResult
     const spec = scan.spec as unknown as XRaySpec
     let appliedCount = 0
 
@@ -1901,6 +1873,7 @@ export async function applyDesignChangesAction(
       .from("xray_scans")
       .update({ spec: updatedSpec as unknown as Json })
       .eq("id", scanId)
+      .eq("foundry_id", foundryId)
 
     if (updateError) {
       console.error("[XRay] Failed to persist design changes:", updateError.message)
@@ -1940,21 +1913,13 @@ export async function createEngineeringReviewAction(
   scanId: string,
   evaluation?: ConvergenceEvaluation,
 ): Promise<EngineeringReviewResult | { error: string }> {
-  return withAuth(async ({ supabase, userId, foundryId }) => {
-    // Load the scan spec
-    const { data: scan, error: loadError } = await supabase
-      .from("xray_scans")
-      .select("id, spec, name")
-      .eq("id", scanId)
-      .single()
-
-    if (loadError || !scan) {
-      return { error: "Scan not found" }
-    }
-
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    const loadResult = await loadScanForFoundry(supabase, scanId, foundryId, "id, spec, name")
+    if ("error" in loadResult) return { error: loadResult.error }
+    const scan = loadResult.scan
     const spec = scan.spec as unknown as XRaySpec
     const projectName = (scan as Record<string, unknown>).name as string | null
-    const displayName = projectName || spec.productName || "Forge Project"
+    const displayName = projectName || "Forge Project"
 
     // Generate review task definitions from analysis results
     const taskDefs = generateReviewTasks(spec, evaluation)
@@ -1970,7 +1935,7 @@ export async function createEngineeringReviewAction(
         title: `Engineering Review: ${displayName}`,
         description: `Review and validate engineering analysis results for "${displayName}". ` +
           `${taskDefs.length} items need human review before design can be approved.`,
-        creator_id: userId,
+        creator_id: user.id,
         foundry_id: foundryId,
       })
       .select("id")
@@ -1993,7 +1958,7 @@ export async function createEngineeringReviewAction(
       title: def.title,
       description: def.description,
       objective_id: objective.id,
-      creator_id: userId,
+      creator_id: user.id,
       foundry_id: foundryId,
       status: "Pending" as const,
       risk_level: def.riskLevel,
@@ -2037,7 +2002,7 @@ export async function createEngineeringReviewAction(
         title: `Gate: ${def.title}`,
         description: `Review gate for: ${def.title}`,
         required_skills: def.requiredSkills ?? [],
-        created_by: userId,
+        created_by: user.id,
       })
     }
 
@@ -2112,6 +2077,7 @@ export async function deleteScanAction(
       .from("xray_scans")
       .delete()
       .eq("id", scanId)
+      .eq("foundry_id", foundryId)
 
     if (deleteError) {
       console.error("[XRay] Failed to delete scan:", {
@@ -2235,35 +2201,32 @@ export async function copyScanAction(
 // ─── Demo Concept Seeding ────────────────────────────────────────────
 
 /**
- * Seeds a demo forge concept for a new foundry so users can see
+ * Seeds a demo forge concept for the current user's foundry so users can see
  * what The Forge produces before scanning their own ideas.
  *
  * @description Calls the Supabase RPC function that inserts a
  * pre-built "Solar Weather Station" demo project with 5 modules.
  * Safe to call multiple times — but should only be called once
- * during signup.
+ * during signup or when user explicitly requests a demo.
  *
- * @param foundryId - The newly created foundry ID
- * @param userId - The user ID who created the foundry
  * @returns The demo scan ID, or error
  *
- * @security Uses service-level RPC with SECURITY DEFINER
+ * @security Uses auth context — seeds only into caller's foundry
  */
-export async function seedDemoConceptAction(
-  foundryId: string,
-  userId: string,
-): Promise<{ demoScanId: string } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+export async function seedDemoConceptAction(): Promise<
+  { demoScanId: string } | { error: string }
+> {
+  return withAuth(async ({ supabase, user, foundryId }) => {
     const { data, error } = await supabase.rpc("seed_demo_forge_concept", {
       p_foundry_id: foundryId,
-      p_user_id: userId,
+      p_user_id: user.id,
     })
 
     if (error) {
       console.error("[XRay] Failed to seed demo concept:", {
         error: error.message,
         foundryId,
-        userId,
+        userId: user.id,
       })
       return { error: `Failed to seed demo: ${error.message}` }
     }
@@ -2271,7 +2234,7 @@ export async function seedDemoConceptAction(
     console.info("[XRay] Demo concept seeded:", {
       demoScanId: data,
       foundryId,
-      userId,
+      userId: user.id,
     })
 
     return { demoScanId: data as string }
@@ -2292,7 +2255,7 @@ export interface ConceptResearchResult {
 /**
  * System prompt for Claude Opus to synthesize a concept research report.
  *
- * @description Unlike the CAD Lab's engineering-focused report, this covers
+ * @description Unlike The Forge's engineering-focused report, this covers
  * the full product concept: market context, technical feasibility, key components,
  * manufacturing considerations, competitive landscape, and risk factors.
  */
@@ -2586,7 +2549,7 @@ export async function saveConceptResearchAction(
   report: string,
   sources: Array<{ uri: string; title: string }>,
 ): Promise<{ success: true } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  return withAuth(async ({ supabase, foundryId }) => {
     const { error: updateError } = await supabase
       .from("xray_scans")
       .update({
@@ -2594,6 +2557,7 @@ export async function saveConceptResearchAction(
         updated_at: new Date().toISOString(),
       })
       .eq("id", scanId)
+      .eq("foundry_id", foundryId)
 
     if (updateError) {
       console.error("[Forge] Failed to save research report:", updateError.message)
@@ -2622,17 +2586,17 @@ export async function enrichModulesAction(
   spec: XRaySpec,
   forceRefresh = false,
 ): Promise<{ enrichments: ModuleEnrichment[] } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  return withAuth(async ({ supabase, foundryId }) => {
     // Check for cached data first
     if (scanId && !forceRefresh) {
-      const { data: scan } = await supabase
-        .from("xray_scans")
-        .select("enrichments")
-        .eq("id", scanId)
-        .single()
-
-      if (scan?.enrichments) {
-        return { enrichments: scan.enrichments as unknown as ModuleEnrichment[] }
+      const loadResult = await loadScanForFoundry<{ enrichments: Json | null }>(
+        supabase,
+        scanId,
+        foundryId,
+        "enrichments",
+      )
+      if ("scan" in loadResult && loadResult.scan.enrichments) {
+        return { enrichments: loadResult.scan.enrichments as unknown as ModuleEnrichment[] }
       }
     }
 
@@ -2645,6 +2609,7 @@ export async function enrichModulesAction(
         .from("xray_scans")
         .update({ enrichments: enrichments as unknown as Json })
         .eq("id", scanId)
+        .eq("foundry_id", foundryId)
 
       if (updateError) {
         console.warn("[XRay] Failed to cache enrichments:", updateError.message)

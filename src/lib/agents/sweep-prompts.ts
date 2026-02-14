@@ -17,9 +17,11 @@
  * - Sweep orchestrator: src/lib/agents/sweep-orchestrator.ts
  */
 
+import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+
 // ─── Sweep Prompt Registry ──────────────────────────────────────────
 
-const SWEEP_PROMPTS: Record<string, string> = {
+const SWEEP_PROMPTS: Partial<Record<SpecialistId, string>> = {
   /**
    * Cal (Chief of Staff) — Priority stack-ranking, overdue alerts, blind spots
    *
@@ -233,10 +235,10 @@ Urgency guide:
 `,
 
   /**
-   * Owen (Operations) — Process bottlenecks, capacity, supply chain
+   * Kai (VP Manufacturing) — Process bottlenecks, capacity, operations
    */
-  'forge-ops': `
-BACKGROUND SWEEP: Operations Analysis
+  'vp-manufacturing': `
+BACKGROUND SWEEP: Operations & Manufacturing Analysis
 
 Your job is to make the machine run. Analyze:
 
@@ -294,7 +296,7 @@ Urgency guide:
  * @returns The sweep prompt string, or a generic fallback
  */
 export function getBackgroundSweepPrompt(specialistId: string): string {
-  return SWEEP_PROMPTS[specialistId] ?? `
+  return SWEEP_PROMPTS[specialistId as SpecialistId] ?? `
 BACKGROUND SWEEP: General Analysis
 
 Analyze the business context and identify any noteworthy findings:

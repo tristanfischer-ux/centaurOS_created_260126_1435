@@ -31,6 +31,7 @@
  * - https://docs.heygen.com/docs/streaming-api-overview — HeyGen docs
  */
 
+import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
 import type {
     ConversationEngine,
     ConversationEngineConfig,
@@ -369,17 +370,20 @@ class AvatarEngine implements ConversationEngine {
  *
  * PLACEHOLDER: Replace with actual HeyGen avatar IDs once created.
  */
-const SPECIALIST_AVATAR_MAP: Record<string, string> = {
-    strategist: "avatar_sam_placeholder",      // Sam
-    "product-lead": "avatar_priya_placeholder", // Priya
-    "chief-of-staff": "avatar_cal_placeholder", // Cal
-    "marketing-lead": "avatar_mia_placeholder", // Mia
-    "sales-lead": "avatar_nate_placeholder",    // Nate
-    fundraiser: "avatar_fiona_placeholder",     // Fiona
-    "finance-lead": "avatar_eli_placeholder",   // Eli
-    "hr-lead": "avatar_harper_placeholder",     // Harper
-    "operations-lead": "avatar_owen_placeholder", // Owen
-    "legal-lead": "avatar_leo_placeholder",     // Leo
+const SPECIALIST_AVATAR_MAP: Partial<Record<SpecialistId, string>> = {
+    strategist: "avatar_sam_placeholder",        // Sam
+    cto: "avatar_zara_placeholder",              // Zara
+    "vp-engineering": "avatar_dev_placeholder",  // Dev
+    "vp-manufacturing": "avatar_kai_placeholder", // Kai
+    "vp-supply-chain": "avatar_suki_placeholder", // Suki
+    "product-lead": "avatar_priya_placeholder",  // Priya
+    "growth-marketer": "avatar_mia_placeholder", // Mia
+    "sales-lead": "avatar_nate_placeholder",     // Nate
+    "chief-of-staff": "avatar_cal_placeholder",  // Cal
+    "finance-lead": "avatar_eli_placeholder",    // Eli
+    "fundraising-advisor": "avatar_fiona_placeholder", // Fiona
+    "hiring-team": "avatar_harper_placeholder",  // Harper
+    "legal-counsel": "avatar_leo_placeholder",   // Leo
 }
 
 /**
@@ -387,7 +391,7 @@ const SPECIALIST_AVATAR_MAP: Record<string, string> = {
  * Falls back to a generic avatar if no custom one is configured.
  */
 function getAvatarIdForSpecialist(specialistId: string): string {
-    return SPECIALIST_AVATAR_MAP[specialistId] ?? "avatar_default"
+    return SPECIALIST_AVATAR_MAP[specialistId as SpecialistId] ?? "avatar_default"
 }
 
 // ─── Register ────────────────────────────────────────────────────────────────

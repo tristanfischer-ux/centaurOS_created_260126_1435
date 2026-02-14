@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * @file analysis/page.tsx — CAD Lab: Analysis stage (Stage 3).
+ * @file analysis/page.tsx — The Forge: Analysis stage (Stage 3).
  *
  * @description Engineering analysis dashboard with risk register, timeline,
  * and design quality metrics. Requires at least one generated module.

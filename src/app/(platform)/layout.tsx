@@ -16,6 +16,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
 import { ZoomProvider, MobileZoomControl, ZoomableContent } from "@/components/ZoomProvider";
 import { ScreenContextProvider } from "@/contexts/screen-context";
+import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
 import { createClient } from "@/lib/supabase/server";
 import { getUserFoundries } from "@/lib/supabase/foundry-context";
 import { redirect } from "next/navigation";
@@ -112,6 +113,9 @@ export default async function PlatformLayout({
                             </main>
                         </ZoomableContent>
                         <MobileNav />
+                        <Suspense fallback={null}>
+                            <FloatingSpecialistFAB />
+                        </Suspense>
                         <PWARegister />
                         <DragDropPolyfill />
                         <OfflineIndicator />

@@ -48,7 +48,7 @@ export interface FoundryPurposeData {
  */
 export type UpdateFoundryPurposeData = Partial<Omit<FoundryPurposeData, 'updatedAt' | 'updatedBy'>>
 
-// --- Sector (for CAD Lab component filtering) ---
+// --- Sector (for The Forge component filtering) ---
 
 /** Standardised industry sector used for CAD component library filtering */
 export type Sector =

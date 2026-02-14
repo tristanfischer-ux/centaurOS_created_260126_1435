@@ -1,9 +1,9 @@
 "use client"
 
 /**
- * @file cad-lab-utils.tsx — Shared sub-components for CAD Lab pages.
+ * @file cad-lab-utils.tsx — Shared sub-components for The Forge pages.
  *
- * @description Utility components used across multiple CAD Lab sub-routes:
+ * @description Utility components used across multiple The Forge sub-routes:
  * Metric, InlineSvg, SvgView, FullscreenOverlay, and formatRelativeTime.
  */
 

@@ -1,5 +1,5 @@
 /**
- * @file cad-lab-types.ts — Shared types and constants for the CAD Lab.
+ * @file cad-lab-types.ts — Shared types and constants for The Forge.
  *
  * @description Separated from src/actions/cad-lab.ts because "use server"
  * files turn ALL exports into server action proxies on the client.
@@ -119,7 +119,7 @@ export interface CadLabInterfaceResult {
 // ─── Module Types ────────────────────────────────────────────────────
 
 /**
- * A single module within a CAD Lab project.
+ * A single module within a The Forge project.
  *
  * @description After research, a product can be decomposed into modules.
  * Each module represents a physical sub-assembly that can independently

@@ -10,11 +10,13 @@
 
 import { useMemo } from 'react'
 
+import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+
 // ─── Domain-to-specialist mapping ────────────────────────────────────────────
 
 interface DomainRule {
   /** Specialist ID from specialists-data.ts */
-  specialistId: string
+  specialistId: SpecialistId
   /** Human-readable specialist name */
   specialistName: string
   /** Keywords that signal this domain (lowercase) */
@@ -54,6 +56,7 @@ const DOMAIN_RULES: DomainRule[] = [
       'tolerance', 'tooling', 'mold', 'injection', 'casting', 'cnc',
       'assembly', 'bill of materials', 'bom', 'supplier', 'vendor', 'oem',
       'contract manufacturer', 'cm', 'production planning', 'capacity',
+      'operations', 'bottleneck', 'throughput', 'process', 'efficiency',
     ],
   },
   {
@@ -147,18 +150,6 @@ const DOMAIN_RULES: DomainRule[] = [
       'board meeting', 'stakeholder', 'agenda', 'follow up', 'planning',
     ],
   },
-  {
-    specialistId: 'forge-ops',
-    specialistName: 'Owen',
-    keywords: [
-      'operations', 'manufacturing', 'supply chain', 'vendor', 'supplier',
-      'production', 'fulfillment', 'delivery', 'logistics', 'inventory',
-      'quality', 'qc', 'qa', 'process', 'bottleneck', 'throughput',
-      'capacity', 'warehouse', 'shipping', 'procurement', 'efficiency',
-      'sla', 'lead time', 'batch', 'assembly', 'cad', 'component',
-      'forge', 'foundry operations', 'operational',
-    ],
-  },
 ]
 
 /** Default specialist when no domain keywords match */
@@ -188,7 +179,7 @@ function scoreKeywords(text: string, keywords: string[]): number {
 
 interface RelevantSpecialistResult {
   /** The recommended specialist ID */
-  specialistId: string
+  specialistId: SpecialistId
   /** The recommended specialist's human name */
   specialistName: string
   /** Whether this is the default (no strong signal) */

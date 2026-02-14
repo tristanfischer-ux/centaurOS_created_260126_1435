@@ -43,7 +43,7 @@ interface GenerateModuleError {
 }
 
 /**
- * Generates a single CAD Lab module (interface + CAD generation).
+ * Generates a single The Forge module (interface + CAD generation).
  *
  * @description Each module gets its own serverless invocation with a full
  * 5-minute timeout. The client fires N of these in parallel (with a

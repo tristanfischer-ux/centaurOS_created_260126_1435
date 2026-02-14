@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * @file cad-lab-nav.tsx — Pipeline stepper navigation for CAD Lab stages.
+ * @file cad-lab-nav.tsx — Pipeline stepper navigation for The Forge stages.
  *
  * @description Five-stage pipeline stepper modeled on ForgeSubNav. Stages
  * unlock progressively: Research is always accessible, Build requires research
@@ -59,7 +59,7 @@ function getStageAccess(
 }
 
 /**
- * CadLabNav — Pipeline stepper for the CAD Lab multi-page flow.
+ * CadLabNav — Pipeline stepper for The Forge multi-page flow.
  *
  * @description Shows 5 stages as connected circles with labels.
  * Disabled stages are muted and not clickable. Active stage glows orange.
@@ -74,7 +74,7 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
   return (
     <nav
       className={cn("flex items-center py-4 px-2 sm:px-4", className)}
-      aria-label="CAD Lab pipeline stages"
+      aria-label="The Forge pipeline stages"
     >
       <div className="flex items-start w-full max-w-2xl mx-auto">
         {STAGES.map((stage, index) => {

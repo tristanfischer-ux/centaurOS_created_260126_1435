@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * @file procurement/page.tsx — CAD Lab: Procurement stage (Stage 4).
+ * @file procurement/page.tsx — The Forge: Procurement stage (Stage 4).
  *
  * @description Supply chain diagnostics, cost estimation, and contracting
  * tools. Requires at least one generated module.

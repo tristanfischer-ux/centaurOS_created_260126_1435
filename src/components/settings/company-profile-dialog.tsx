@@ -367,7 +367,7 @@ function StepBasics({
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          Used to show relevant components in the CAD Lab.
+          Used to show relevant components in The Forge.
         </p>
       </div>
 

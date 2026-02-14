@@ -64,67 +64,83 @@ export interface RunSpecialistCouncilParams {
     context?: string
 }
 
+/** Return type for the council action — errors returned as data, never thrown */
+export type CouncilActionResult =
+    | { success: true; data: CouncilResult }
+    | { success: false; error: string }
+
 /**
  * Runs a Specialist Council debate and returns the results.
  *
+ * @description Returns errors as data (not thrown) so Next.js production
+ * builds don't sanitize the message into a generic "Server Components render" error.
+ *
  * @param params - The council parameters
- * @returns The debate results and Chief of Staff report
+ * @returns Success with council result, or failure with error message
  */
 export async function runSpecialistCouncil(
     params: RunSpecialistCouncilParams
-): Promise<CouncilResult> {
+): Promise<CouncilActionResult> {
     const { topic, context } = params
 
     if (!topic || topic.trim().length === 0) {
-        throw new Error('Topic is required')
+        return { success: false, error: 'Topic is required' }
     }
 
     if (topic.length > 500) {
-        throw new Error('Topic must be 500 characters or less')
+        return { success: false, error: 'Topic must be 500 characters or less' }
     }
 
-    // Authenticate
+    // AUTH: Authenticate before proceeding
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-        throw new Error('Unauthorized')
+        return { success: false, error: 'Please sign in to use the Specialist Council' }
     }
 
-    // Call the council API (forward cookies so execute sub-requests are authenticated)
-    const baseUrl =
-        process.env.NEXT_PUBLIC_BASE_URL ||
-        (typeof process.env.VERCEL_URL === 'string'
-            ? `https://${process.env.VERCEL_URL}`
-            : 'http://localhost:3000')
-    const cookieStore = await cookies()
-    const cookieHeader = cookieStore
-        .getAll()
-        .map((c) => `${c.name}=${c.value}`)
-        .join('; ')
+    try {
+        // Call the council API (forward cookies so execute sub-requests are authenticated)
+        const baseUrl =
+            process.env.NEXT_PUBLIC_BASE_URL ||
+            (typeof process.env.VERCEL_URL === 'string'
+                ? `https://${process.env.VERCEL_URL}`
+                : 'http://localhost:3000')
+        const cookieStore = await cookies()
+        const cookieHeader = cookieStore
+            .getAll()
+            .map((c) => `${c.name}=${c.value}`)
+            .join('; ')
 
-    const response = await fetch(`${baseUrl}/api/agents/council`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            ...(cookieHeader && { Cookie: cookieHeader }),
-        },
-        body: JSON.stringify({
-            topic: topic.trim(),
-            context: context?.trim(),
-        }),
-    })
+        const response = await fetch(`${baseUrl}/api/agents/council`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(cookieHeader && { Cookie: cookieHeader }),
+            },
+            body: JSON.stringify({
+                topic: topic.trim(),
+                context: context?.trim(),
+            }),
+        })
 
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
-        throw new Error(errorData.error || `Request failed with status ${response.status}`)
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
+            const message = errorData.error || `Request failed with status ${response.status}`
+            console.error('[Council Action] API request failed:', { status: response.status, message })
+            return { success: false, error: message }
+        }
+
+        const result = await response.json() as CouncilResult
+
+        // Revalidate relevant paths
+        revalidatePath('/today')
+        revalidatePath('/agents')
+
+        return { success: true, data: result }
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        console.error('[Council Action] Unexpected error:', { error: message })
+        return { success: false, error: `Council failed: ${message}` }
     }
-
-    const result = await response.json() as CouncilResult
-
-    // Revalidate relevant paths
-    revalidatePath('/today')
-    revalidatePath('/agents')
-
-    return result
 }

@@ -61,7 +61,7 @@ async function lookupUserSector(
 
     return (foundry?.sector as Sector) ?? null
   } catch {
-    console.warn('[CAD-LAB] Failed to look up user sector, continuing without filter')
+    console.warn('[THE-FORGE] Failed to look up user sector, continuing without filter')
     return null
   }
 }
@@ -213,7 +213,7 @@ async function searchCadModels(
 ): Promise<ThingiverseResult[]> {
   const token = process.env.THINGIVERSE_API_TOKEN
   if (!token) {
-    console.info("[CAD-LAB] THINGIVERSE_API_TOKEN not set, skipping CAD model search")
+    console.info("[THE-FORGE] THINGIVERSE_API_TOKEN not set, skipping CAD model search")
     return []
   }
 
@@ -237,7 +237,7 @@ async function searchCadModels(
     })
 
     if (!response.ok) {
-      console.warn(`[CAD-LAB] Thingiverse API error (${response.status})`)
+      console.warn(`[THE-FORGE] Thingiverse API error (${response.status})`)
       return []
     }
 
@@ -262,7 +262,7 @@ async function searchCadModels(
       }))
   } catch (error) {
     console.warn(
-      "[CAD-LAB] Thingiverse search failed:",
+      "[THE-FORGE] Thingiverse search failed:",
       error instanceof Error ? error.message : "Unknown error",
     )
     return []
@@ -432,7 +432,7 @@ export async function runCadLabResearch(
   const start = Date.now()
 
   try {
-    console.info("[CAD-LAB] Step 1: Research — web search + CAD model search...")
+    console.info("[THE-FORGE] Step 1: Research — web search + CAD model search...")
 
     // 1. Run Gemini + Google Search and Thingiverse in parallel
     const [webResult, cadResult] = await Promise.allSettled([
@@ -477,7 +477,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.`
     const rawContext = rawDataSections.join("\n\n")
 
     // 3. Send to Claude for synthesis
-    console.info("[CAD-LAB] Step 1: Synthesizing report with Claude...")
+    console.info("[THE-FORGE] Step 1: Synthesizing report with Claude...")
     const claudeResult = await callClaude(
       RESEARCH_SYNTHESIS_PROMPT,
       `Product to research: ${description}\n\n${rawContext}`,
@@ -486,7 +486,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.`
     const referenceModels = cadModels.map((m) => ({ name: m.name, url: m.url }))
 
     console.info(
-      `[CAD-LAB] Step 1 complete: ${webSources.length} web sources, ${referenceModels.length} CAD refs, ${Date.now() - start}ms`,
+      `[THE-FORGE] Step 1 complete: ${webSources.length} web sources, ${referenceModels.length} CAD refs, ${Date.now() - start}ms`,
     )
 
     return {
@@ -497,7 +497,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.`
       researchTime: Date.now() - start,
     }
   } catch (error) {
-    console.error("[CAD-LAB] Step 1 failed:", error instanceof Error ? error.message : error)
+    console.error("[THE-FORGE] Step 1 failed:", error instanceof Error ? error.message : error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "Research failed",
@@ -546,7 +546,7 @@ export async function generateCadLabInterface(
   const start = Date.now()
 
   try {
-    console.info("[CAD-LAB] Step 2: Generating interface definition...")
+    console.info("[THE-FORGE] Step 2: Generating interface definition...")
 
     // Look up user's sector and fetch filtered library
     const sector = await lookupUserSector(supabase, user.id)
@@ -623,7 +623,7 @@ Generate the complete interface definition following the exact 4-section format.
       8192,
     )
 
-    console.info(`[CAD-LAB] Step 2 complete: ${Date.now() - start}ms`)
+    console.info(`[THE-FORGE] Step 2 complete: ${Date.now() - start}ms`)
 
     return {
       success: true,
@@ -633,7 +633,7 @@ Generate the complete interface definition following the exact 4-section format.
       tokensOut,
     }
   } catch (error) {
-    console.error("[CAD-LAB] Step 2 failed:", error instanceof Error ? error.message : error)
+    console.error("[THE-FORGE] Step 2 failed:", error instanceof Error ? error.message : error)
       return {
         success: false,
       error: error instanceof Error ? error.message : "Interface definition generation failed",
@@ -692,7 +692,7 @@ export async function generateCadLabModel(
 
   try {
     // ── Generate code with Claude ──
-    console.info("[CAD-LAB] Step 3: Generating complete CadQuery code with Claude...")
+    console.info("[THE-FORGE] Step 3: Generating complete CadQuery code with Claude...")
 
     // Look up user's sector and fetch filtered library for prompt injection
     const sector = await lookupUserSector(supabase, user.id)
@@ -779,19 +779,19 @@ If the research report or interface definition contains any unresolved questions
     const codeLines = finalCode.split("\n").length
     const generationTime = Date.now() - pipelineStart
 
-    console.info(`[CAD-LAB] Step 3: Code generated (${codeLines} lines, ${generationTime}ms)`)
+    console.info(`[THE-FORGE] Step 3: Code generated (${codeLines} lines, ${generationTime}ms)`)
 
     // ── Prepend library function definitions for any used slugs ──
     const { combinedCode, libraryComponents } = await prepareCodeWithLibrary(finalCode)
     if (libraryComponents.length > 0) {
-      console.info("[CAD-LAB] Library components prepended for execution:", {
+      console.info("[THE-FORGE] Library components prepended for execution:", {
         count: libraryComponents.length,
         slugs: libraryComponents,
       })
     }
 
     // ── Execute on Modal ──
-    console.info("[CAD-LAB] Step 4: Executing on Modal...")
+    console.info("[THE-FORGE] Step 4: Executing on Modal...")
     const modalStart = Date.now()
     const modalResult = await executeOnModal(combinedCode)
     const modalTime = Date.now() - modalStart
@@ -857,7 +857,7 @@ If the research report or interface definition contains any unresolved questions
     }
 
     console.info(
-      `[CAD-LAB] Pipeline complete: ${codeLines} lines, ${bboxResult?.xLen ?? "?"}×${bboxResult?.yLen ?? "?"}×${bboxResult?.zLen ?? "?"}mm, ${Date.now() - pipelineStart}ms total`,
+      `[THE-FORGE] Pipeline complete: ${codeLines} lines, ${bboxResult?.xLen ?? "?"}×${bboxResult?.yLen ?? "?"}×${bboxResult?.zLen ?? "?"}mm, ${Date.now() - pipelineStart}ms total`,
     )
 
     // ── Extract DFM analysis ──
@@ -998,7 +998,7 @@ export async function decomposeIntoModules(
   const start = Date.now()
 
   try {
-    console.info("[CAD-LAB] Decomposing product into modules...")
+    console.info("[THE-FORGE] Decomposing product into modules...")
 
     const userPrompt = `Product: ${description}
 
@@ -1024,7 +1024,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     try {
       rawModules = JSON.parse(jsonText)
     } catch {
-      console.error("[CAD-LAB] Failed to parse module JSON:", jsonText.slice(0, 200))
+      console.error("[THE-FORGE] Failed to parse module JSON:", jsonText.slice(0, 200))
       return {
         success: false,
         error: "Failed to parse module decomposition — AI returned invalid JSON",
@@ -1066,7 +1066,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     })
 
     console.info(
-      `[CAD-LAB] Decomposed into ${modules.length} modules in ${Date.now() - start}ms`,
+      `[THE-FORGE] Decomposed into ${modules.length} modules in ${Date.now() - start}ms`,
     )
 
     return {
@@ -1077,7 +1077,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       tokensOut,
     }
   } catch (error) {
-    console.error("[CAD-LAB] Module decomposition failed:", error instanceof Error ? error.message : error)
+    console.error("[THE-FORGE] Module decomposition failed:", error instanceof Error ? error.message : error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "Module decomposition failed",
@@ -1183,11 +1183,11 @@ Recommend diagnostic answers for each module. Output JSON only.`
       }
     }
 
-    console.info(`[CAD-LAB] Pre-filled diagnostics for ${Object.keys(cleanAnswers).length} modules`)
+    console.info(`[THE-FORGE] Pre-filled diagnostics for ${Object.keys(cleanAnswers).length} modules`)
 
     return { success: true, answers: cleanAnswers }
   } catch (error) {
-    console.error("[CAD-LAB] Diagnostic pre-fill failed:", error instanceof Error ? error.message : error)
+    console.error("[THE-FORGE] Diagnostic pre-fill failed:", error instanceof Error ? error.message : error)
     return { success: false, answers: {}, error: "Failed to pre-fill diagnostics" }
   }
 }
@@ -1220,25 +1220,25 @@ export async function generateCadLabModelSmart(
   modelId: ClaudeModelId = "claude-opus-4-6",
 ): Promise<CadLabResult & { grammarUsed?: string }> {
   // ── Try grammar-based generation first ──
-  console.info("[CAD-LAB] Smart generation: attempting grammar-based path...")
+  console.info("[THE-FORGE] Smart generation: attempting grammar-based path...")
   try {
     const grammarResult = await generateFromGrammar(description)
 
     if (grammarResult.success) {
-      console.info(`[CAD-LAB] Grammar-based generation succeeded (${grammarResult.grammarUsed})`)
+      console.info(`[THE-FORGE] Grammar-based generation succeeded (${grammarResult.grammarUsed})`)
       return grammarResult
     }
 
     if (!grammarResult.shouldFallback) {
       // Grammar was found but execution failed — return the error
-      console.warn("[CAD-LAB] Grammar found but execution failed:", grammarResult.error)
+      console.warn("[THE-FORGE] Grammar found but execution failed:", grammarResult.error)
       return grammarResult
     }
 
-    console.info("[CAD-LAB] No grammar matched, falling back to raw CadQuery pipeline...")
+    console.info("[THE-FORGE] No grammar matched, falling back to raw CadQuery pipeline...")
   } catch (err) {
     // Grammar pipeline threw — fall back gracefully
-    console.warn("[CAD-LAB] Grammar pipeline error, falling back:", err instanceof Error ? err.message : err)
+    console.warn("[THE-FORGE] Grammar pipeline error, falling back:", err instanceof Error ? err.message : err)
   }
 
   // ── Fallback to existing raw CadQuery pipeline ──

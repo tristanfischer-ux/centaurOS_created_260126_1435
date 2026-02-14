@@ -226,7 +226,7 @@ export async function getFoundryPurpose(
  * @description Allows founders to set structured company context so the AI
  * can provide more relevant recommendations across advisory, marketplace,
  * and workflow features. The sector field controls which Tier 3 domain
- * components appear in the CAD Lab.
+ * components appear in The Forge.
  * 
  * @param {string} foundryId - The foundry to update
  * @param {CompanyProfile} profileData - Complete company profile data

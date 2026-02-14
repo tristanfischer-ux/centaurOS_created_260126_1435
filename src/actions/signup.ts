@@ -229,7 +229,7 @@ export async function signup(formData: FormData) {
 
   // 3c. Seed demo data for new founders so they can explore the app with sample content
   if (role === "founder" && foundryId && authData.user) {
-    // Seed demo forge concept (CAD lab example)
+    // Seed demo forge concept (The Forge example)
     try {
       await supabase.rpc("seed_demo_forge_concept", {
         p_foundry_id: foundryId,

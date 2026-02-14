@@ -43,6 +43,7 @@ import { cn } from '@/lib/utils'
 import {
     runSpecialistCouncil,
     type CouncilResult,
+    type CouncilActionResult,
 } from '@/actions/run-specialist-council'
 
 interface SpecialistCouncilDialogProps {
@@ -73,11 +74,16 @@ export function SpecialistCouncilDialog({
         setResult(null)
 
         try {
-            const councilResult = await runSpecialistCouncil({
+            const actionResult = await runSpecialistCouncil({
                 topic: topic.trim(),
                 context: context.trim() || undefined,
             })
-            setResult(councilResult)
+
+            if (!actionResult.success) {
+                setError(actionResult.error)
+            } else {
+                setResult(actionResult.data)
+            }
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to run council'
             setError(message)
@@ -96,7 +102,7 @@ export function SpecialistCouncilDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogContent size="xl" className="max-h-[90vh] overflow-hidden flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Users className="h-5 w-5 text-international-orange" />
@@ -110,7 +116,7 @@ export function SpecialistCouncilDialog({
 
                 {!result ? (
                     // Setup Phase
-                    <div className="space-y-6 py-4">
+                    <div className="space-y-6 py-4" aria-busy={isLoading} aria-live="polite">
                         <div className="space-y-2">
                             <Label htmlFor="topic" className="text-sm font-medium">
                                 What should the council discuss?{' '}
@@ -173,7 +179,11 @@ export function SpecialistCouncilDialog({
                     </div>
                 ) : (
                     // Results Phase
-                    <div className="flex-1 overflow-y-auto space-y-6 py-4">
+                    <div
+                        className="flex-1 overflow-y-auto space-y-6 py-4"
+                        role="region"
+                        aria-label="Council results"
+                    >
                         {/* Executive Summary */}
                         <div className="bg-muted/50 rounded-lg p-4">
                             <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2">

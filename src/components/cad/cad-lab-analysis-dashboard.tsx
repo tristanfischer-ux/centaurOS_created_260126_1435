@@ -1,5 +1,5 @@
 /**
- * @file cad-lab-analysis-dashboard.tsx — Engineering analysis dashboard for CAD Lab.
+ * @file cad-lab-analysis-dashboard.tsx — Engineering analysis dashboard for The Forge.
  *
  * @description Aggregates per-module CAD generation results into a system-level
  * engineering summary. Displays total mass, volume, dimensions, DFM readiness,
@@ -72,7 +72,7 @@ interface SystemMetrics {
 /**
  * Computes system-level metrics by aggregating per-module results.
  *
- * @param modules - Array of CAD Lab modules
+ * @param modules - Array of The Forge modules
  * @returns Aggregated system metrics
  */
 function computeSystemMetrics(modules: CadLabModule[]): SystemMetrics {

@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * @file build/page.tsx — CAD Lab: Build stage (Stage 2).
+ * @file build/page.tsx — The Forge: Build stage (Stage 2).
  *
  * @description Module decomposition, batch pipeline, per-module interface
  * definition and CAD generation. Shows live batch progress grid and

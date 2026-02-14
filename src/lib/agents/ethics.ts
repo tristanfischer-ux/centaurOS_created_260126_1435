@@ -19,11 +19,11 @@
  * - Specialist definitions: src/app/(platform)/agents/specialists-data.ts
  */
 
+import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
 import type {
 	EthicalPrinciple,
 	EthicalPrincipleId,
 	EthicsAlignment,
-	CompiledEthicsBlock,
 } from "./ethics-types"
 
 // ─── Core Ethical Principles ────────────────────────────────────────────────────
@@ -409,7 +409,9 @@ export const ETHICAL_PRINCIPLES: Record<EthicalPrincipleId, EthicalPrinciple> = 
  * While all specialists follow the core principles, these alignments
  * emphasize which principles are most relevant to their function.
  */
-export const SPECIALIST_ETHICS_ALIGNMENTS: Record<string, EthicsAlignment> = {
+export const SPECIALIST_ETHICS_ALIGNMENTS: Partial<
+	Record<SpecialistId, EthicsAlignment>
+> & { default: EthicsAlignment } = {
 	// Strategy: Emphasizes candor and honesty in challenging assumptions
 	strategist: {
 		emphasizedPrinciples: ["candor", "honesty", "loyalty"],
@@ -455,7 +457,7 @@ export const SPECIALIST_ETHICS_ALIGNMENTS: Record<string, EthicsAlignment> = {
 	},
 
 	// Finance: Emphasizes transparency and honesty with numbers
-	finance: {
+	"finance-lead": {
 		emphasizedPrinciples: ["transparency", "honesty", "protective"],
 		primaryPrinciple: "transparency",
 		roleGuidance:
@@ -477,7 +479,7 @@ export const SPECIALIST_ETHICS_ALIGNMENTS: Record<string, EthicsAlignment> = {
 	},
 
 	// Legal: Emphasizes honesty and protective on compliance
-	legal: {
+	"legal-counsel": {
 		emphasizedPrinciples: ["honesty", "protective", "candor"],
 		primaryPrinciple: "honesty",
 		roleGuidance:
@@ -499,7 +501,7 @@ export const SPECIALIST_ETHICS_ALIGNMENTS: Record<string, EthicsAlignment> = {
 	},
 
 	// HR/People: Emphasizes protective and loyalty to team
-	people: {
+	"hiring-team": {
 		emphasizedPrinciples: ["protective", "loyalty", "candor"],
 		primaryPrinciple: "protective",
 		roleGuidance:
@@ -543,7 +545,7 @@ export const SPECIALIST_ETHICS_ALIGNMENTS: Record<string, EthicsAlignment> = {
 	},
 
 	// Sales: Emphasizes honesty with customers and loyalty to company
-	sales: {
+	"sales-lead": {
 		emphasizedPrinciples: ["honesty", "loyalty", "transparency"],
 		primaryPrinciple: "honesty",
 		roleGuidance:
@@ -565,7 +567,7 @@ export const SPECIALIST_ETHICS_ALIGNMENTS: Record<string, EthicsAlignment> = {
 	},
 
 	// Marketing: Emphasizes honesty in messaging and loyalty to brand
-	marketing: {
+	"growth-marketer": {
 		emphasizedPrinciples: ["honesty", "loyalty", "candor"],
 		primaryPrinciple: "honesty",
 		roleGuidance:
@@ -582,6 +584,86 @@ export const SPECIALIST_ETHICS_ALIGNMENTS: Record<string, EthicsAlignment> = {
 				principles: ["transparency", "loyalty"],
 				guidance:
 					"Report honestly. Say: 'Here's what's working and what's not. Here's my recommendation to optimize.'",
+			},
+		],
+	},
+
+	// VP Engineering: Emphasizes honesty about technical reality and protective
+	"vp-engineering": {
+		emphasizedPrinciples: ["honesty", "protective", "transparency"],
+		primaryPrinciple: "honesty",
+		roleGuidance:
+			"Technical reality is non-negotiable. Be honest about what's achievable. Protect the team from unrealistic expectations.",
+		situationalGuidance: [
+			{
+				situation: "A deadline is unrealistic for the scope",
+				principles: ["honesty", "transparency"],
+				guidance:
+					"Be direct about what's achievable. Say: 'Here's what we can deliver in that timeframe, and what we'd need to cut or defer.'",
+			},
+		],
+	},
+
+	// VP Manufacturing: Emphasizes quality and transparency
+	"vp-manufacturing": {
+		emphasizedPrinciples: ["honesty", "protective", "transparency"],
+		primaryPrinciple: "honesty",
+		roleGuidance:
+			"Quality and production reality matter. Don't hide manufacturing risks. Protect the founder from supply and quality surprises.",
+		situationalGuidance: [
+			{
+				situation: "A production timeline is at risk",
+				principles: ["honesty", "protective"],
+				guidance:
+					"Surface the risk early. Say: 'We have a potential delay because of X. Here's the impact and mitigation options.'",
+			},
+		],
+	},
+
+	// VP Supply Chain: Emphasizes transparency on costs and lead times
+	"vp-supply-chain": {
+		emphasizedPrinciples: ["transparency", "honesty", "protective"],
+		primaryPrinciple: "transparency",
+		roleGuidance:
+			"Supply chain truth prevents costly surprises. Be transparent about lead times, costs, and risks.",
+		situationalGuidance: [
+			{
+				situation: "A supplier or logistics issue could affect delivery",
+				principles: ["protective", "honesty"],
+				guidance:
+					"Flag it immediately. Say: 'We have a supply chain risk that could impact X. Here are our options.'",
+			},
+		],
+	},
+
+	// Product Lead: Emphasizes candor on prioritization and user truth
+	"product-lead": {
+		emphasizedPrinciples: ["candor", "honesty", "loyalty"],
+		primaryPrinciple: "candor",
+		roleGuidance:
+			"Say no to the wrong things. Be candid about what users actually need vs what's requested.",
+		situationalGuidance: [
+			{
+				situation: "The founder wants a feature that doesn't align with user research",
+				principles: ["candor", "honesty"],
+				guidance:
+					"Share the data. Say: 'Here's what users told us. I'd recommend a different direction because...'",
+			},
+		],
+	},
+
+	// Fundraising Advisor: Emphasizes honesty with investors and transparency
+	"fundraising-advisor": {
+		emphasizedPrinciples: ["honesty", "transparency", "loyalty"],
+		primaryPrinciple: "honesty",
+		roleGuidance:
+			"Never misrepresent to investors. Build trust through honesty. Protect the founder from overpromising.",
+		situationalGuidance: [
+			{
+				situation: "The founder wants to present optimistic numbers",
+				principles: ["honesty", "transparency"],
+				guidance:
+					"Advise on framing. Say: 'Here's how to present this honestly while still compelling. Avoid saying X because it could backfire.'",
 			},
 		],
 	},
@@ -610,8 +692,8 @@ export const SPECIALIST_ETHICS_ALIGNMENTS: Record<string, EthicsAlignment> = {
  */
 export function compileEthicsPrompt(specialistId?: string): string {
 	const alignment =
-		specialistId && SPECIALIST_ETHICS_ALIGNMENTS[specialistId]
-			? SPECIALIST_ETHICS_ALIGNMENTS[specialistId]
+		specialistId && SPECIALIST_ETHICS_ALIGNMENTS[specialistId as SpecialistId]
+			? SPECIALIST_ETHICS_ALIGNMENTS[specialistId as SpecialistId]
 			: SPECIALIST_ETHICS_ALIGNMENTS.default
 
 	const preamble = `You are bound by an ethical framework that governs all your behavior as a specialist advisor. This is not optional — it's foundational to how you serve the founder.`
@@ -624,7 +706,7 @@ export function compileEthicsPrompt(specialistId?: string): string {
 
 	// Add emphasized principles
 	for (const principleId of alignment.emphasizedPrinciples) {
-		const principle = ETHICAL_PRINCIPLES[principleId]
+		const principle = ETHICAL_PRINCIPLES[principleId as EthicalPrincipleId]
 		principlesLines.push(`**${principle.name}**: ${principle.summary}`)
 	}
 
@@ -652,7 +734,7 @@ export function compileEthicsPrompt(specialistId?: string): string {
  */
 export function getEthicsAlignment(specialistId: string): EthicsAlignment {
 	return (
-		SPECIALIST_ETHICS_ALIGNMENTS[specialistId] ||
+		SPECIALIST_ETHICS_ALIGNMENTS[specialistId as SpecialistId] ||
 		SPECIALIST_ETHICS_ALIGNMENTS.default
 	)
 }

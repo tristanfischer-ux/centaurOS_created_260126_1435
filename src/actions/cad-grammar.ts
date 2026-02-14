@@ -304,7 +304,7 @@ export async function selectGrammar(
     return `- **${g.name}** (${g.display_name}): ${g.description}\n  Keywords: ${keywords}\n  Examples: ${examples}\n  Parameters: ${params}`
   }).join("\n\n")
 
-  const systemPrompt = `You are a CAD grammar selector for ForgeOS. Your job is to match a user's product description to the most suitable parametric design grammar.
+  const systemPrompt = `You are The Forge grammar selector for ForgeOS. Your job is to match a user's product description to the most suitable parametric design grammar.
 
 Each grammar encodes domain-specific engineering knowledge (e.g., building codes, drone frame sizing rules, gear mesh formulas). Using a grammar produces MORE RELIABLE results than generating CadQuery code from scratch.
 
@@ -766,7 +766,7 @@ export async function generateFromGrammar(
  * Returns the list of available grammars for display in the UI.
  *
  * @description Fetches grammar metadata (not code) for showing
- * available domains in the CAD Lab interface.
+ * available domains in The Forge interface.
  *
  * @returns Array of grammar summaries
  */

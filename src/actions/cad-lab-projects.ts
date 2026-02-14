@@ -1,9 +1,9 @@
 "use server"
 
 /**
- * @file cad-lab-projects.ts — Server actions for persisting CAD Lab projects.
+ * @file cad-lab-projects.ts — Server actions for persisting The Forge projects.
  *
- * @description Provides CRUD operations for CAD Lab projects so users can
+ * @description Provides CRUD operations for The Forge projects so users can
  * save, load, and resume their 3-step pipeline work (research → interface
  * definition → generation). Projects are isolated by foundry via RLS.
  *
@@ -73,7 +73,7 @@ export interface CadLabProjectData {
 // ─── List Projects ───────────────────────────────────────────────────
 
 /**
- * Lists all CAD Lab projects for the current user's foundry.
+ * Lists all The Forge projects for the current user's foundry.
  *
  * @description Returns a summary list sorted by most recently updated.
  * Excludes large data (research reports, code, results) for performance.
@@ -91,7 +91,7 @@ export async function listCadLabProjects(): Promise<
       .limit(50)
 
     if (error) {
-      console.error("[CAD-LAB-PROJECTS] Failed to list projects:", error.message)
+      console.error("[THE-FORGE-PROJECTS] Failed to list projects:", error.message)
       return { error: `Failed to list projects: ${error.message}` }
     }
 
@@ -113,7 +113,7 @@ export async function listCadLabProjects(): Promise<
 // ─── Load Project ────────────────────────────────────────────────────
 
 /**
- * Loads a full CAD Lab project by ID.
+ * Loads a full The Forge project by ID.
  *
  * @description Returns all project data needed to restore the editor state.
  * Excludes large binary data (STL/STEP) which can be regenerated from code.
@@ -139,7 +139,7 @@ export async function loadCadLabProject(
       .single()
 
     if (error || !project) {
-      console.error("[CAD-LAB-PROJECTS] Failed to load project:", error?.message)
+      console.error("[THE-FORGE-PROJECTS] Failed to load project:", error?.message)
       return { error: "Project not found" }
     }
 
@@ -171,7 +171,7 @@ export async function loadCadLabProject(
 // ─── Create Project ──────────────────────────────────────────────────
 
 /**
- * Creates a new CAD Lab project.
+ * Creates a new The Forge project.
  *
  * @description Called when the user starts a new design. Creates a minimal
  * project record that gets updated as pipeline steps complete.
@@ -210,12 +210,12 @@ export async function createCadLabProject(
       .single()
 
     if (error) {
-      console.error("[CAD-LAB-PROJECTS] Failed to create project:", error.message)
+      console.error("[THE-FORGE-PROJECTS] Failed to create project:", error.message)
       return { error: `Failed to create project: ${error.message}` }
     }
 
     // AUDIT: Log project creation
-    console.info("[CAD-LAB-PROJECTS] Project created:", {
+    console.info("[THE-FORGE-PROJECTS] Project created:", {
       projectId: data.id,
       foundryId,
       userId: user.id,
@@ -258,7 +258,7 @@ export async function saveCadLabResearch(
       .eq("id", projectId)
 
     if (error) {
-      console.error("[CAD-LAB-PROJECTS] Failed to save research:", error.message)
+      console.error("[THE-FORGE-PROJECTS] Failed to save research:", error.message)
       return { error: `Failed to save research: ${error.message}` }
     }
 
@@ -291,7 +291,7 @@ export async function saveCadLabInterface(
       .eq("id", projectId)
 
     if (error) {
-      console.error("[CAD-LAB-PROJECTS] Failed to save interface:", error.message)
+      console.error("[THE-FORGE-PROJECTS] Failed to save interface:", error.message)
       return { error: `Failed to save interface: ${error.message}` }
     }
 
@@ -334,7 +334,7 @@ export async function saveCadLabResult(
       .eq("id", projectId)
 
     if (error) {
-      console.error("[CAD-LAB-PROJECTS] Failed to save result:", error.message)
+      console.error("[THE-FORGE-PROJECTS] Failed to save result:", error.message)
       return { error: `Failed to save result: ${error.message}` }
     }
 
@@ -366,7 +366,7 @@ export async function saveCadLabModules(
       .eq("id", projectId)
 
     if (error) {
-      console.error("[CAD-LAB-PROJECTS] Failed to save modules:", error.message)
+      console.error("[THE-FORGE-PROJECTS] Failed to save modules:", error.message)
       return { error: `Failed to save modules: ${error.message}` }
     }
 
@@ -404,7 +404,7 @@ export async function updateCadLabBatchStatus(
       .eq("id", projectId)
 
     if (error) {
-      console.error("[CAD-LAB-PROJECTS] Failed to update batch status:", error.message)
+      console.error("[THE-FORGE-PROJECTS] Failed to update batch status:", error.message)
       return { error: `Failed to update batch status: ${error.message}` }
     }
 
@@ -468,7 +468,7 @@ export async function loadCadLabBatchStatus(
 // ─── Rename Project ──────────────────────────────────────────────────
 
 /**
- * Renames a CAD Lab project.
+ * Renames a The Forge project.
  *
  * @param projectId - Project to rename
  * @param name - New name (max 200 chars)
@@ -489,7 +489,7 @@ export async function renameCadLabProject(
       .eq("id", projectId)
 
     if (error) {
-      console.error("[CAD-LAB-PROJECTS] Failed to rename project:", error.message)
+      console.error("[THE-FORGE-PROJECTS] Failed to rename project:", error.message)
       return { error: `Failed to rename: ${error.message}` }
     }
 
@@ -500,7 +500,7 @@ export async function renameCadLabProject(
 // ─── Delete Project ──────────────────────────────────────────────────
 
 /**
- * Deletes a CAD Lab project.
+ * Deletes a The Forge project.
  *
  * @param projectId - Project to delete
  * @returns Success or error
@@ -520,12 +520,12 @@ export async function deleteCadLabProject(
       .eq("id", projectId)
 
     if (error) {
-      console.error("[CAD-LAB-PROJECTS] Failed to delete project:", error.message)
+      console.error("[THE-FORGE-PROJECTS] Failed to delete project:", error.message)
       return { error: `Failed to delete: ${error.message}` }
     }
 
     // AUDIT: Log deletion
-    console.info("[CAD-LAB-PROJECTS] Project deleted:", { projectId, userId: user.id })
+    console.info("[THE-FORGE-PROJECTS] Project deleted:", { projectId, userId: user.id })
 
     return { success: true as const }
   })
