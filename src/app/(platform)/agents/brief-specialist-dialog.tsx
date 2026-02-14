@@ -39,11 +39,12 @@ const ENABLE_ADVANCED_MODES = typeof window !== "undefined"
 
 // ─── Specialist Model Configuration ───────────────────────────────────────────
 // Centralizes model choices so upgrades are a one-line change.
-// Currently using OpenAI for reliability.
+// MiniMax M2.5 provides frontier-quality reasoning at ~100x lower cost than
+// Claude Opus 4.6. Uses their OpenAI-compatible API at api.minimax.io/v1.
 
 const SPECIALIST_MODELS = {
-    greeting: { providerId: "openai", modelId: "gpt-4o" },
-    conversation: { providerId: "openai", modelId: "gpt-4o" },
+    greeting: { providerId: "minimax", modelId: "MiniMax-M2.5" },
+    conversation: { providerId: "minimax", modelId: "MiniMax-M2.5" },
 } as const
 
 const DEEP_THINK_STORAGE_KEY = "forgeOS-specialist-deep-think"

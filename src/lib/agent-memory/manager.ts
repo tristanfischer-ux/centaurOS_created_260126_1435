@@ -102,19 +102,21 @@ export async function getOrCreateFoundryThread(
 ): Promise<MemoryThread | null> {
   const supabase = await createClient()
 
-  // Look for existing foundry thread
+  // CONCURRENCY: Use maybeSingle() instead of single() to avoid errors
+  // when no row exists. Then create with a direct insert that won't
+  // duplicate thanks to the unique index on (foundry_id, context_type)
+  // WHERE context_id IS NULL.
   const { data: existing } = await supabase
     .from('agent_memory_threads')
     .select()
     .eq('foundry_id', foundryId)
     .eq('context_type', 'foundry')
-    .order('created_at', { ascending: true })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   if (existing) return existing as MemoryThread
 
-  // Create a new one
+  // Create a new one — unique index prevents duplicates from concurrent calls
   return createMemoryThread(foundryId, userId, 'foundry')
 }
 
@@ -302,6 +304,24 @@ export async function processMemory(
 ): Promise<void> {
   const supabase = await createClient()
 
+  // CONCURRENCY: Acquire an advisory lock to prevent two concurrent processMemory
+  // calls from double-processing the same unobserved messages. If another process
+  // already holds the lock, we skip silently (the other process will handle it).
+  try {
+    const { data: lockAcquired } = await supabase.rpc(
+      'acquire_memory_processing_lock',
+      { p_thread_id: threadId }
+    )
+    if (lockAcquired === false) {
+      console.info('[AgentMemory/Manager] Skipping processMemory — another process holds the lock:', { threadId })
+      return
+    }
+  } catch {
+    // If the RPC doesn't exist yet (migration not applied), proceed without lock
+    // This is a best-effort concurrency guard
+    console.warn('[AgentMemory/Manager] Advisory lock RPC not available, proceeding without lock')
+  }
+
   // 1. Check unobserved message token count
   const { data: unobservedMessages } = await supabase
     .from('agent_memory_messages')
@@ -353,6 +373,8 @@ export async function processMemory(
   const mergedTokens = countTokens(mergedObservations)
 
   // 6. Upsert observations
+  // CONCURRENCY: Use upsert with ON CONFLICT on the unique thread_id index
+  // to prevent duplicate observation rows from concurrent processMemory calls.
   if (existingObs) {
     await supabase
       .from('agent_memory_observations')
@@ -364,13 +386,16 @@ export async function processMemory(
       })
       .eq('id', existingObs.id)
   } else {
-    await supabase.from('agent_memory_observations').insert({
-      thread_id: threadId,
-      foundry_id: foundryId,
-      observations_text: mergedObservations,
-      token_count: mergedTokens,
-      version: 1,
-    })
+    await supabase.from('agent_memory_observations').upsert(
+      {
+        thread_id: threadId,
+        foundry_id: foundryId,
+        observations_text: mergedObservations,
+        token_count: mergedTokens,
+        version: 1,
+      },
+      { onConflict: 'thread_id' }
+    )
   }
 
   // 7. Mark messages as observed

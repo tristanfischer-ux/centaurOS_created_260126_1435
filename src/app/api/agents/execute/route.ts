@@ -206,8 +206,12 @@ export async function POST(request: Request) {
             const memoryContext = await getMemoryContext(threadId, foundryId, true)
             memoryBlock = formatMemoryForPrompt(memoryContext)
 
-            // Record the user's prompt as a message in the memory thread
-            await addMemoryMessage(threadId, foundryId, "user", finalPrompt)
+            // Record the user's ACTUAL input as a message in the memory thread.
+            // We save `input` (what the user typed) rather than `finalPrompt`
+            // (which includes the full template + company context) so that
+            // conversation history reads naturally when fetched back.
+            const userMessageForHistory = input.trim() || finalPrompt.slice(0, 500)
+            await addMemoryMessage(threadId, foundryId, "user", userMessageForHistory)
         } catch (err) {
             // Non-critical — proceed without memory context
             console.warn("[agents/execute] Could not load agent memory:", err)
@@ -274,7 +278,9 @@ export async function POST(request: Request) {
     const memoryCallback = threadId && foundryId
         ? async (fullOutput: string) => {
             try {
-                await addMemoryMessage(threadId!, foundryId, "assistant", fullOutput)
+                // Strip internal NEXT_SPECIALIST directive before saving to history
+                const cleanOutput = fullOutput.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
+                await addMemoryMessage(threadId!, foundryId, "assistant", cleanOutput || fullOutput)
                 // Process memory asynchronously (observe/reflect if thresholds hit)
                 // Fire-and-forget — don't block the response
                 processMemory(threadId!, foundryId).catch((err) => {

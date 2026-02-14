@@ -41,6 +41,14 @@ interface AskSpecialistButtonProps {
   label?: string
 }
 
+/** Handoff state passed between specialists during a conversation switch */
+interface HandoffState {
+  /** Context summary from the referring specialist's conversation */
+  context: string | null
+  /** Name of the specialist that referred the user */
+  referredBy: string | null
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 /**
@@ -63,6 +71,7 @@ export function AskSpecialistButton({
 }: AskSpecialistButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [activeSpecialist, setActiveSpecialist] = useState<Specialist | null>(null)
+  const [handoff, setHandoff] = useState<HandoffState>({ context: null, referredBy: null })
 
   // Resolve pre-selected specialist
   const preselected = specialistId ? getSpecialistById(specialistId) : null
@@ -72,6 +81,7 @@ export function AskSpecialistButton({
   const openDialog = useCallback((id: string) => {
     const spec = getSpecialistById(id)
     if (spec) {
+      setHandoff({ context: null, referredBy: null })
       setActiveSpecialist(spec)
       setDialogOpen(true)
     }
@@ -80,22 +90,32 @@ export function AskSpecialistButton({
   /** Handle direct click when specialist is pre-selected */
   const handleDirectClick = useCallback(() => {
     if (preselected) {
+      setHandoff({ context: null, referredBy: null })
       setActiveSpecialist(preselected)
       setDialogOpen(true)
     }
   }, [preselected])
 
-  /** Handle specialist switch from within the dialog */
+  /**
+   * Handle specialist switch from within the dialog.
+   * Captures the referring specialist's name and handoff context,
+   * then reopens the dialog with the new specialist.
+   */
   const handleSwitchSpecialist = useCallback((newId: string, handoffCtx?: string) => {
     const spec = getSpecialistById(newId)
     if (spec) {
+      const fromName = activeSpecialist?.name ?? null
+      setHandoff({
+        context: handoffCtx ?? null,
+        referredBy: handoffCtx ? fromName : null,
+      })
       setActiveSpecialist(spec)
-      // The dialog will handle its own re-initialization
+      setDialogOpen(true)
     }
-  }, [])
+  }, [activeSpecialist?.name])
 
-  // Serialize context for the dialog
-  const handoffContext = serializeContext(context)
+  // Serialize entity context for the dialog (page/entity being discussed)
+  const entityContext = serializeContext(context)
   const contextLabel = context.title
 
   // ── Render: Chip variant ──
@@ -145,7 +165,8 @@ export function AskSpecialistButton({
             open={dialogOpen}
             onOpenChange={setDialogOpen}
             onSwitchSpecialist={handleSwitchSpecialist}
-            handoffContext={handoffContext}
+            handoffContext={handoff.context ?? entityContext}
+            referredBy={handoff.referredBy}
             contextLabel={contextLabel}
           />
         )}
@@ -195,7 +216,8 @@ export function AskSpecialistButton({
             open={dialogOpen}
             onOpenChange={setDialogOpen}
             onSwitchSpecialist={handleSwitchSpecialist}
-            handoffContext={handoffContext}
+            handoffContext={handoff.context ?? entityContext}
+            referredBy={handoff.referredBy}
             contextLabel={contextLabel}
           />
         )}
@@ -249,7 +271,8 @@ export function AskSpecialistButton({
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           onSwitchSpecialist={handleSwitchSpecialist}
-          handoffContext={handoffContext}
+          handoffContext={handoff.context ?? entityContext}
+          referredBy={handoff.referredBy}
           contextLabel={contextLabel}
         />
       )}

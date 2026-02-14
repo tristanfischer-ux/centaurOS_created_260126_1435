@@ -12768,6 +12768,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      acquire_memory_processing_lock: {
+        Args: { p_thread_id: string }
+        Returns: boolean
+      }
       adjust_account_balance: {
         Args: {
           p_amount: number
@@ -13147,6 +13151,16 @@ export type Database = {
           task_status: string
           task_title: string
         }[]
+      }
+      get_or_create_specialist_thread: {
+        Args: {
+          p_context_id: string
+          p_context_type: string
+          p_foundry_id: string
+          p_metadata?: Json
+          p_user_id: string
+        }
+        Returns: string
       }
       get_pending_decisions_count: {
         Args: { p_profile_id: string }

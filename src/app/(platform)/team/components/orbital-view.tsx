@@ -20,19 +20,16 @@ import { SPECIALISTS } from '../../agents/specialists-data'
 import type { FunctionId, BusinessFunction, SpecialistNode } from '../types'
 import type { TeamDataResult } from '../hooks/use-team-data'
 
-// ── Specialist → Function mapping ────────────────────────────────────────────
-// Derived from each specialist's categories in specialists-data.ts.
-// Two functions (product, finance) have two specialists each.
-const SPECIALIST_FUNCTION_MAP: Record<string, FunctionId> = {
-  'strategist':          'product',     // Sam — Strategy
-  'product-lead':        'product',     // Priya — Product Development
-  'chief-of-staff':      'operations',  // Cal — Chief of Staff
-  'growth-marketer':     'marketing',   // Mia — Marketing
-  'sales-lead':          'sales',       // Nate — Sales
-  'fundraising-advisor': 'finance',     // Fiona — Fundraising
-  'finance-lead':        'finance',     // Eli — Finance
-  'hiring-team':         'hr',          // Harper — HR
-  'legal-counsel':       'legal',       // Leo — Legal
+// ── Primary specialist per function (one per slice for clean orbital ring) ───
+// Only these 7 specialists appear on the diagram; others remain on /agents.
+const PRIMARY_SPECIALIST_MAP: Record<string, FunctionId> = {
+  'strategist':       'product',     // Sam — most senior for Product
+  'chief-of-staff':   'operations',  // Cal — most senior for Operations
+  'finance-lead':     'finance',     // Eli — most senior for Finance
+  'legal-counsel':    'legal',       // Leo — most senior for Legal
+  'sales-lead':       'sales',       // Nate — sole Sales specialist
+  'growth-marketer':  'marketing',   // Mia — sole Marketing specialist
+  'hiring-team':      'hr',          // Harper — sole HR specialist
 }
 
 interface OrbitalViewProps {
@@ -72,15 +69,15 @@ export function OrbitalView({
     setSelected(null)
   }, [])
 
-  /** Map the static specialist roster to lightweight orbit nodes */
+  /** Map primary specialists only to orbit nodes (one per function). */
   const specialistNodes: SpecialistNode[] = useMemo(
     () =>
-      SPECIALISTS.map((s) => ({
+      SPECIALISTS.filter((s) => s.id in PRIMARY_SPECIALIST_MAP).map((s) => ({
         id: s.id,
         name: s.name,
         initials: nameToInitials(s.name),
         title: s.title,
-        functionId: SPECIALIST_FUNCTION_MAP[s.id] ?? 'operations',
+        functionId: PRIMARY_SPECIALIST_MAP[s.id],
       })),
     []
   )

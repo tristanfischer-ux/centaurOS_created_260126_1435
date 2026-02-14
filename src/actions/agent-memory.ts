@@ -145,35 +145,58 @@ export async function getOrCreateSpecialistThread(
             return { threadId: null, error: 'No active foundry' }
         }
 
-        // Look for existing specialist thread in this foundry
-        const { data: existing } = await supabase
-            .from('agent_memory_threads')
-            .select()
-            .eq('foundry_id', foundryId)
-            .eq('context_type', 'specialist')
-            .eq('context_id', specialistId)
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .single()
-
-        if (existing) {
-            return { threadId: (existing as MemoryThread).id, error: null }
-        }
-
-        // Create a new specialist thread
-        const thread = await createMemoryThread(
-            foundryId,
-            user.id,
-            'specialist',
-            specialistId,
-            { specialistId, specialistType: 'specialist' }
+        // CONCURRENCY: Use atomic RPC to get-or-create in a single DB round-trip.
+        // This prevents the race condition where two concurrent calls both see
+        // "no thread" and both INSERT, creating duplicates.
+        const { data: threadId, error: rpcError } = await supabase.rpc(
+            'get_or_create_specialist_thread',
+            {
+                p_foundry_id: foundryId,
+                p_user_id: user.id,
+                p_context_type: 'specialist',
+                p_context_id: specialistId,
+                p_metadata: { specialistId, specialistType: 'specialist' },
+            }
         )
 
-        if (!thread) {
-            return { threadId: null, error: 'Failed to create specialist thread' }
+        if (rpcError || !threadId) {
+            console.error('[agent-memory] RPC get_or_create_specialist_thread failed:', {
+                specialistId,
+                error: rpcError?.message ?? 'No thread ID returned',
+            })
+
+            // Fallback: try the direct query approach (handles case where RPC
+            // doesn't exist yet, e.g., migration not applied)
+            const { data: existing } = await supabase
+                .from('agent_memory_threads')
+                .select('id')
+                .eq('foundry_id', foundryId)
+                .eq('context_type', 'specialist')
+                .eq('context_id', specialistId)
+                .limit(1)
+                .maybeSingle()
+
+            if (existing) {
+                return { threadId: existing.id, error: null }
+            }
+
+            // Last resort: create directly
+            const thread = await createMemoryThread(
+                foundryId,
+                user.id,
+                'specialist',
+                specialistId,
+                { specialistId, specialistType: 'specialist' }
+            )
+
+            if (!thread) {
+                return { threadId: null, error: 'Failed to create specialist thread' }
+            }
+
+            return { threadId: thread.id, error: null }
         }
 
-        return { threadId: thread.id, error: null }
+        return { threadId: threadId as string, error: null }
     } catch (err) {
         console.error('[agent-memory] Failed to get/create specialist thread:', {
             specialistId,
@@ -319,6 +342,8 @@ export async function getSpecialistThreadHistory(
         }
 
         // Find the specialist thread
+        // CONCURRENCY: Use maybeSingle() instead of single() to avoid errors
+        // when no thread exists yet (returns null instead of throwing)
         const { data: thread } = await supabase
             .from('agent_memory_threads')
             .select('id')
@@ -326,7 +351,7 @@ export async function getSpecialistThreadHistory(
             .eq('context_type', 'specialist')
             .eq('context_id', specialistId)
             .limit(1)
-            .single()
+            .maybeSingle()
 
         if (!thread) {
             return { data: [], error: null }
