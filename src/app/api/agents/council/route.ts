@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { rateLimit } from '@/lib/security/rate-limit'
 import { SPECIALISTS } from '@/app/(platform)/agents/specialists-data'
 import { synthesizeCouncilDebate, type DebateTranscriptEntry } from '@/lib/agents/sweep-synthesis'
@@ -230,18 +231,11 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Get user's foundry
-        const { data: foundryMember } = await supabase
-            .from('foundry_members')
-            .select('foundry_id, role')
-            .eq('user_id', user.id)
-            .single()
-
-        if (!foundryMember) {
+        // Get user's foundry (standard pattern: profiles.active_foundry_id / foundry_id)
+        const foundryId = await getFoundryIdCached()
+        if (!foundryId) {
             return NextResponse.json({ error: 'No foundry found' }, { status: 404 })
         }
-
-        const foundryId = foundryMember.foundry_id
 
         // Parse request
         const body = await request.json()
