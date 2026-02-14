@@ -16,7 +16,7 @@ import { createClient } from "@/lib/supabase/server"
 import OpenAI from "openai"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { aiGuard } from "@/lib/ai/guard"
-import { getAudioProvider, type AudioGenerationOptions } from "@/lib/ai-providers/registry"
+import { getAudioProvider } from "@/lib/ai-providers/registry"
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -79,10 +79,6 @@ const OPENAI_TO_MINIMAX_VOICE: Record<string, string> = {
     // Deep, authoritative voices
     onyx: "male-qn-badao",
     verse: "male-qn-jingying",
-    
-    // Additional mapping for common voices
-    alloy: "male-qn-qingse",
-    coral: "female-shaonv",
 }
 
 /** Maximum text length to send to TTS (chars) */
@@ -142,24 +138,9 @@ async function generateMiniMaxTTS(text: string, voice: string): Promise<ArrayBuf
 // ─── Main Handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest): Promise<Response> {
+    let activeProvider: "openai" | "minimax" = TTS_PROVIDER === "minimax" ? "minimax" : "openai"
+
     try {
-        // SECURITY: Check provider configuration
-        if (TTS_PROVIDER === "minimax" && !getMiniMaxKey()) {
-            console.error("[TTS] MiniMax API key not configured")
-            return NextResponse.json(
-                { error: "TTS provider not configured. Please set MINIMAX_API_KEY." },
-                { status: 503 }
-            )
-        }
-
-        if (TTS_PROVIDER === "openai" && !getOpenAIKey()) {
-            console.error("[TTS] OpenAI API key not configured")
-            return NextResponse.json(
-                { error: "Service temporarily unavailable" },
-                { status: 503 }
-            )
-        }
-
         const supabase = await createClient()
 
         // AUTH: Verify user is authenticated and within AI limits
@@ -194,7 +175,36 @@ export async function POST(req: NextRequest): Promise<Response> {
         }
 
         // Determine which provider to use (allow client override for testing)
-        const activeProvider = provider ?? TTS_PROVIDER
+        if (provider === "openai" || provider === "minimax") {
+            activeProvider = provider
+        } else {
+            activeProvider = TTS_PROVIDER === "minimax" ? "minimax" : "openai"
+        }
+
+        // VALIDATION: Reject unsupported provider values early.
+        if (activeProvider !== "openai" && activeProvider !== "minimax") {
+            return NextResponse.json(
+                { error: `Unsupported provider: ${activeProvider}` },
+                { status: 400 }
+            )
+        }
+
+        // SECURITY: Check provider configuration for the selected provider.
+        if (activeProvider === "minimax" && !getMiniMaxKey()) {
+            console.error("[TTS] MiniMax API key not configured")
+            return NextResponse.json(
+                { error: "TTS provider not configured. Please set MINIMAX_API_KEY." },
+                { status: 503 }
+            )
+        }
+
+        if (activeProvider === "openai" && !getOpenAIKey()) {
+            console.error("[TTS] OpenAI API key not configured")
+            return NextResponse.json(
+                { error: "Service temporarily unavailable" },
+                { status: 503 }
+            )
+        }
 
         // Validate voice based on provider
         if (activeProvider === "openai") {

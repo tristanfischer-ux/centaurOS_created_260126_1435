@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 24 | 22 fixed, 2 open |
+| Medium | 25 | 23 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -574,6 +574,27 @@ increasing information disclosure risk.
     - `"Stream interrupted"`
   - retained detailed server-side logging for debugging.
 - Added regression assertions in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 29) Specialist TTS route provider selection and config checks were inconsistent (Medium)
+
+**Issue:** `POST /api/agents/tts` validated provider credentials only against
+the environment-default provider, while allowing request-level provider override.
+Error-path logging also relied on provider state that could diverge from request selection.  
+**Impact:** Misleading configuration behavior and avoidable runtime failures on
+provider overrides, reducing reliability for authenticated TTS calls.
+
+**Fix implemented (`src/app/api/agents/tts/route.ts`):**
+
+- Introduced explicit `activeProvider` state at handler scope.
+- Normalized provider selection to allowed values (`openai`/`minimax`) and rejected invalid overrides.
+- Moved provider configuration checks to validate the **selected** provider:
+  - `activeProvider === "minimax"` requires `MINIMAX_API_KEY`
+  - `activeProvider === "openai"` requires `OPENAI_API_KEY`
+- Preserved per-user rate limiting (`tts:${guard.userId}`) and existing auth guard behavior.
+- Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
 ---
