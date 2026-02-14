@@ -91,9 +91,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // SECURITY: Normalize sender identity before any routing/authorization logic.
+    const senderEmail = (payload.from.match(/<(.+?)>/)?.[1] || payload.from).trim().toLowerCase()
+    if (!senderEmail.includes('@')) {
+        return NextResponse.json({ error: 'Invalid sender address' }, { status: 400 })
+    }
+
+    // SECURITY: Add sender-scoped rate limiting in addition to IP throttling.
+    const senderLimit = await rateLimit('webhook', `email-inbound-sender:${senderEmail}`, {
+        limit: 30,
+        window: 60 * 60 * 1000,
+    })
+    if (!senderLimit.success) {
+        return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+    }
+
     // Extract the user token from the "to" address
     // Format: tasks+{user_id_prefix}@fractionalforge.app
-    const toMatch = payload.to.match(/tasks\+([a-zA-Z0-9_-]+)@/)
+    const toMatch = payload.to.match(/tasks\+([a-f0-9]{8})@/i)
     if (!toMatch) {
         console.warn('[EmailInbound] Invalid to address format:', payload.to)
         return NextResponse.json({ error: 'Invalid recipient address' }, { status: 400 })
@@ -107,9 +122,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .from('profiles')
         .select('id, foundry_id, email')
         .like('id', `${userToken}%`)
-        .limit(1)
+        .limit(2)
 
-    if (profileError || !profiles || profiles.length === 0) {
+    if (profileError || !profiles || profiles.length !== 1) {
         console.warn('[EmailInbound] No user found for token:', userToken)
         return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
@@ -118,8 +133,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // SECURITY: Verify the sender email matches the user's email
     // This prevents others from creating tasks in someone's account
-    const senderEmail = payload.from.match(/<(.+?)>/)?.[1] || payload.from
-    if (senderEmail.toLowerCase() !== profile.email?.toLowerCase()) {
+    if (senderEmail !== profile.email?.toLowerCase()) {
         console.warn('[EmailInbound] Sender mismatch:', {
             sender: senderEmail,
             expected: profile.email,

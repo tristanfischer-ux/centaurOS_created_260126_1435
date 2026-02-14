@@ -17,7 +17,8 @@
     "src/app/api/cad-lab/generate-module/route.ts",
     "src/app/api/cad-lab/generate-batch/route.ts",
     "src/app/api/admin/qa-tests/route.ts",
-    "src/app/api/dev-login/route.ts"
+    "src/app/api/dev-login/route.ts",
+    "src/app/api/email/inbound/route.ts"
   ],
   "exclude": [
     "node_modules",

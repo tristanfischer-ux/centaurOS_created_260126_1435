@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 20 | 18 fixed, 2 open |
+| Medium | 21 | 19 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -477,6 +477,28 @@ risk of unauthorized test-session creation.
   - limit: `20`
   - window: `60 * 1000` (1 minute)
 - Removed detailed login-failure payload fields from response.
+- Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 25) Email inbound webhook recipient resolution and sender abuse controls were too permissive (Medium)
+
+**Issue:** `POST /api/email/inbound` accepted broad recipient token patterns and
+lacked sender-scoped throttling beyond IP rate limiting.  
+**Impact:** Increased risk of targeted abuse and ambiguous user-token resolution in
+shared-source webhook scenarios.
+
+**Fix implemented (`src/app/api/email/inbound/route.ts`):**
+
+- Added normalized sender identity validation and sender-scoped throttling:
+  - key: `email-inbound-sender:${senderEmail}`
+  - limit: `30`
+  - window: `60 * 60 * 1000` (1 hour)
+- Tightened recipient token parsing to exact 8-char hex prefixes:
+  - `tasks+([a-f0-9]{8})@`
+- Increased profile lookup limit to 2 and fail-closed unless **exactly one** match is found.
+- Preserved sender-email ownership enforcement before task creation.
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 

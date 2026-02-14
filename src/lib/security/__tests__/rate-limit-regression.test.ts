@@ -355,3 +355,16 @@ describe('dev-login hardening regressions', () => {
     expect(source).toContain('{ status: 429 }')
   })
 })
+
+describe('email inbound webhook hardening regressions', () => {
+  it('enforces sender-scoped rate limiting and strict recipient token format', async () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/email/inbound/route.ts')
+    const source = await readFile(routePath, 'utf-8')
+
+    expect(source).toContain("email-inbound-sender:${senderEmail}")
+    expect(source).toContain('window: 60 * 60 * 1000')
+    expect(source).toContain('/tasks\\+([a-f0-9]{8})@/i')
+    expect(source).toContain('.limit(2)')
+    expect(source).toContain('profiles.length !== 1')
+  })
+})
