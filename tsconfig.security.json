@@ -29,6 +29,7 @@
     "src/app/api/agents/sweep-trigger/route.ts",
     "src/app/api/bot/telegram/route.ts",
     "src/app/api/google/calendar/webhook/route.ts",
+    "src/app/api/webhooks/stripe/route.ts",
     "src/app/api/messages/**/*.ts",
     "src/app/api/cron/reports/daily/route.ts",
     "src/app/api/cron/morning-brief/route.ts",

@@ -424,3 +424,14 @@ describe('google calendar webhook hardening regressions', () => {
     expect(source).toContain("await rateLimit('webhook', `webhook:${ip}`)")
   })
 })
+
+describe('stripe webhook hardening regressions', () => {
+  it('fails closed when Stripe webhook secret is missing', async () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/webhooks/stripe/route.ts')
+    const source = await readFile(routePath, 'utf-8')
+
+    expect(source).toContain('if (!webhookSecret)')
+    expect(source).toContain("return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })")
+    expect(source).toContain("await rateLimit('webhook', `webhook:${ip}`)")
+  })
+})

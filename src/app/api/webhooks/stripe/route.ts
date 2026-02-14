@@ -774,6 +774,12 @@ async function handlePayoutPaid(payout: Stripe.Payout): Promise<void> {
  * SECURITY: Uses atomic idempotency check to prevent race conditions
  */
 export async function POST(request: NextRequest) {
+  // SECURITY: Fail closed when webhook secret is not configured.
+  if (!webhookSecret) {
+    console.error('[StripeWebhook] STRIPE_WEBHOOK_SECRET not configured — rejecting all requests')
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+  }
+
   // SECURITY: IP-based rate limit on webhook endpoint
   const ip = getClientIP(request.headers)
   const ipLimit = await rateLimit('webhook', `webhook:${ip}`)

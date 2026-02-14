@@ -557,6 +557,7 @@ The test suite enforces:
 11. Telegram webhook secret fail-closed enforcement and GET endpoint protection.
 12. Cron/sweep APIs no longer expose raw internal exception messages in responses.
 13. Google Calendar webhook fail-closed secret enforcement and webhook auth checks.
+14. Stripe webhook fail-closed secret enforcement and endpoint throttling checks.
 
 ---
 
