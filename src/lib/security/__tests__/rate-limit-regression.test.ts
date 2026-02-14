@@ -410,3 +410,17 @@ describe('voice-to-task objective enforcement regressions', () => {
     expect(source).toContain('No objectives available for task creation')
   })
 })
+
+describe('google calendar webhook hardening regressions', () => {
+  it('fails closed when webhook secret is missing and enforces header auth', async () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/google/calendar/webhook/route.ts')
+    const source = await readFile(routePath, 'utf-8')
+
+    expect(source).toContain('const webhookSecret = process.env.GOOGLE_CALENDAR_WEBHOOK_SECRET')
+    expect(source).toContain("if (!webhookSecret)")
+    expect(source).toContain("return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })")
+    expect(source).toContain("if (channelToken !== webhookSecret)")
+    expect(source).toContain("return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })")
+    expect(source).toContain("await rateLimit('webhook', `webhook:${ip}`)")
+  })
+})
