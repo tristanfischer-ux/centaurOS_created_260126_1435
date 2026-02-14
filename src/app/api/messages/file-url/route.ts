@@ -2,87 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
+import {
+  normalizeMessageFileReference,
+  toMessageFileIdentity,
+} from '@/lib/security/message-file-reference'
 
 const CONVERSATION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const MESSAGE_FILES_PATH_PATTERN = /^messages\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/[a-zA-Z0-9._-]+$/i
-
-type SupportedBucket = 'message-files' | 'message-attachments'
-
-interface NormalizedFileRef {
-  bucket: SupportedBucket
-  objectPath: string
-  conversationIdFromPath?: string
-}
 
 interface FileUrlRequestBody {
   fileRef?: string
   conversationId?: string
   messageId?: string
-}
-
-/**
- * Normalizes a file reference into bucket + object path.
- *
- * @description Accepts either a storage path (e.g. `messages/{conversationId}/file.pdf`)
- * or a Supabase public URL for legacy records and returns a canonical reference.
- *
- * @param {string} fileRef - Storage path or full URL stored on message records.
- * @returns {NormalizedFileRef | null} Normalized reference if supported, otherwise null.
- */
-function normalizeFileReference(fileRef: string): NormalizedFileRef | null {
-  const trimmedRef = fileRef.trim()
-  if (!trimmedRef) {
-    return null
-  }
-
-  const messageFilesMatch = MESSAGE_FILES_PATH_PATTERN.exec(trimmedRef)
-  if (messageFilesMatch) {
-    return {
-      bucket: 'message-files',
-      objectPath: trimmedRef,
-      conversationIdFromPath: messageFilesMatch[1],
-    }
-  }
-
-  try {
-    const parsed = new URL(trimmedRef)
-    const pathSegments = parsed.pathname.split('/').filter(Boolean)
-    const objectSegmentIndex = pathSegments.findIndex(
-      (segment, index) =>
-        segment === 'object'
-        && (pathSegments[index + 1] === 'public' || pathSegments[index + 1] === 'sign')
-    )
-
-    if (objectSegmentIndex < 0 || pathSegments.length <= objectSegmentIndex + 3) {
-      return null
-    }
-
-    const bucket = pathSegments[objectSegmentIndex + 2]
-    const objectPath = decodeURIComponent(pathSegments.slice(objectSegmentIndex + 3).join('/'))
-
-    if ((bucket === 'message-files' || bucket === 'message-attachments') && objectPath) {
-      const match = MESSAGE_FILES_PATH_PATTERN.exec(objectPath)
-      return {
-        bucket,
-        objectPath,
-        conversationIdFromPath: match?.[1],
-      }
-    }
-  } catch {
-    return null
-  }
-
-  return null
-}
-
-/**
- * Creates a canonical storage identity string.
- *
- * @param {NormalizedFileRef} reference - Normalized reference.
- * @returns {string} Canonical identity used for equality checks.
- */
-function toCanonicalIdentity(reference: NormalizedFileRef): string {
-  return `${reference.bucket}/${reference.objectPath}`
 }
 
 /**
@@ -143,7 +73,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Invalid messageId' }, { status: 400 })
     }
 
-    const normalizedRequestedRef = normalizeFileReference(fileRef)
+    const normalizedRequestedRef = normalizeMessageFileReference(fileRef)
     if (!normalizedRequestedRef) {
       return NextResponse.json({ error: 'Unsupported file reference' }, { status: 400 })
     }
@@ -180,12 +110,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Message attachment not found' }, { status: 404 })
     }
 
-    const normalizedStoredRef = normalizeFileReference(message.file_url)
+    const normalizedStoredRef = normalizeMessageFileReference(message.file_url)
     if (!normalizedStoredRef) {
       return NextResponse.json({ error: 'Stored file reference is invalid' }, { status: 400 })
     }
 
-    if (toCanonicalIdentity(normalizedStoredRef) !== toCanonicalIdentity(normalizedRequestedRef)) {
+    if (toMessageFileIdentity(normalizedStoredRef) !== toMessageFileIdentity(normalizedRequestedRef)) {
       return NextResponse.json({ error: 'Attachment reference mismatch' }, { status: 403 })
     }
 

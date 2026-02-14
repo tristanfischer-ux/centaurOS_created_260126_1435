@@ -89,7 +89,7 @@ describe('message attachment authorization regressions', () => {
     expect(source).toContain("const messageId = body.messageId?.trim()")
     expect(source).toContain(".from('conversation_participants')")
     expect(source).toContain(".from('messages')")
+    expect(source).toContain('normalizeMessageFileReference')
     expect(source).toContain('.createSignedUrl(')
-    expect(source).toContain("bucket === 'message-files' || bucket === 'message-attachments'")
   })
 })

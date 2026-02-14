@@ -113,6 +113,9 @@ This audit reviewed the application security posture across:
   - validates conversation membership before issuing URL
 - `src/components/messaging/ConversationThread.tsx` now sends attachment `path` in message payload.
 - `src/components/messaging/MessageBubble.tsx` now resolves signed URLs for storage-path attachments.
+- Added shared parsing utility for canonical attachment references:
+  - `src/lib/security/message-file-reference.ts`
+  - normalizes both current storage paths and legacy Supabase public/signed URLs.
 - Migration added:
   - `supabase/migrations/20260214123000_secure_message_files_bucket.sql`
   - sets `message-files` bucket `public = false`.
@@ -184,7 +187,10 @@ This introduces a hard gate for key security surfaces while broader type debt is
 
 ## Security Regression Coverage Added
 
-Added: `src/lib/security/__tests__/rate-limit-regression.test.ts`
+Added:
+
+- `src/lib/security/__tests__/rate-limit-regression.test.ts`
+- `src/lib/security/__tests__/message-file-reference.test.ts`
 
 The test suite enforces:
 
@@ -193,6 +199,7 @@ The test suite enforces:
 3. Conversation-scoped attachment path handling and no public URL generation in message upload route.
 4. Fail-closed behavior marker for missing `CRON_SECRET` in morning brief cron route.
 5. Slack webhook validation guard in daily report cron route.
+6. Canonical normalization support for legacy/current attachment references.
 
 ---
 
@@ -235,7 +242,8 @@ The test suite enforces:
 
 ## Verification Evidence (This Audit Run)
 
-- `npm test -- audit-log.test.ts rate-limit-regression.test.ts url-validation.test.ts` → **pass**
+- `npm test -- audit-log.test.ts rate-limit-regression.test.ts message-file-reference.test.ts url-validation.test.ts` → **pass**
+- `npm run typecheck:security` → **pass**
 - `npm audit --omit=dev --json` → **high vulnerabilities reduced to 0**
 
 > Note: repository-wide `tsc --noEmit` currently fails due numerous pre-existing unrelated typing issues outside this audit's change set.
