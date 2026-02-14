@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 12 | 10 fixed, 2 open |
+| Medium | 13 | 11 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -304,6 +304,26 @@ service-unavailable behavior.
 
 ---
 
+### 17) Cron/sweep endpoints returned raw internal error details (Medium)
+
+**Issue:** Several secret-protected cron/webhook endpoints echoed internal exception messages
+directly in JSON error responses.  
+**Impact:** Increased information disclosure risk for authorized-but-untrusted callers and logs aggregation.
+
+**Fix implemented:**
+
+- Replaced raw error-message responses with generic failure strings in:
+  - `src/app/api/cron/reports/daily/route.ts`
+  - `src/app/api/cron/weekly-synthesis/route.ts`
+  - `src/app/api/cron/agent-sweep/route.ts`
+  - `src/app/api/cron/telegram-briefings/route.ts`
+  - `src/app/api/agents/sweep-trigger/route.ts`
+- Preserved structured server-side logging of internal error messages.
+- Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
 ## Security Regression Coverage Added
 
 Added:
@@ -324,6 +344,7 @@ The test suite enforces:
 9. OpenAI-key fail-closed guards for AI marketplace/RFQ routes.
 10. Sweep-trigger webhook secret fail-closed enforcement.
 11. Telegram webhook secret fail-closed enforcement and GET endpoint protection.
+12. Cron/sweep APIs no longer expose raw internal exception messages in responses.
 
 ---
 

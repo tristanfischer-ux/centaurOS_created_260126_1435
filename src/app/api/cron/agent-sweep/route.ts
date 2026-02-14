@@ -78,11 +78,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    console.error('[Cron] Agent sweep error:', error)
+    console.error('[Cron] Agent sweep error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
 
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: 'Agent sweep job failed',
     }, { status: 500 })
   }
 }

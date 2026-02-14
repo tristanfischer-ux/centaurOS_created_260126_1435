@@ -75,11 +75,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    console.error('[Cron] Weekly synthesis error:', error)
+    console.error('[Cron] Weekly synthesis error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
 
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: 'Weekly synthesis job failed',
     }, { status: 500 })
   }
 }

@@ -217,11 +217,13 @@ export async function GET(req: NextRequest) {
             timestamp: new Date().toISOString()
         })
     } catch (error) {
-        console.error('[Cron] Daily reports error:', error)
+        console.error('[Cron] Daily reports error:', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+        })
         
         return NextResponse.json({
             success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: 'Daily reports job failed',
             sent,
             failed
         }, { status: 500 })

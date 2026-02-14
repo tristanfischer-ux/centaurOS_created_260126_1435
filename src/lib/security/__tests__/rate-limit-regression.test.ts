@@ -124,6 +124,23 @@ describe('cron authorization hardening regressions', () => {
     expect(source).toContain('export async function GET(req: NextRequest)')
     expect(source).toContain('const authFailure = verifyWebhookSecret(req)')
   })
+
+  it('does not echo raw internal error messages from cron and sweep-trigger APIs', async () => {
+    const routes = [
+      'src/app/api/cron/reports/daily/route.ts',
+      'src/app/api/cron/weekly-synthesis/route.ts',
+      'src/app/api/cron/agent-sweep/route.ts',
+      'src/app/api/cron/telegram-briefings/route.ts',
+      'src/app/api/agents/sweep-trigger/route.ts',
+    ]
+
+    for (const routePath of routes) {
+      const source = await readFile(path.join(process.cwd(), routePath), 'utf-8')
+      expect(source).not.toMatch(
+        /NextResponse\.json\(\s*\{[\s\S]{0,160}error:\s*error instanceof Error \? error\.message/
+      )
+    }
+  })
 })
 
 describe('message attachment authorization regressions', () => {

@@ -178,10 +178,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    console.error('[SweepTrigger] Error:', error)
+    console.error('[SweepTrigger] Error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: 'Sweep trigger failed',
     }, { status: 500 })
   }
 }

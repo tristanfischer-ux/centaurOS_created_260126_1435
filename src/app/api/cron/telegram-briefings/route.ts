@@ -57,11 +57,13 @@ export async function GET(req: NextRequest) {
             timestamp: new Date().toISOString(),
         })
     } catch (error) {
-        console.error('[Cron] Daily briefings error:', error)
+        console.error('[Cron] Daily briefings error:', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+        })
         
         return NextResponse.json({
             success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: 'Daily briefings job failed',
         }, { status: 500 })
     }
 }
