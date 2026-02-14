@@ -22,6 +22,7 @@ import {
     formatDailyPulseForTelegram,
     formatDailyPulseForSlack
 } from '@/lib/reports'
+import { isValidSlackWebhookUrl, sanitizeUrlForLogging } from '@/lib/security/url-validation'
 
 // Get admin client for cron operations
 function getAdminClient() {
@@ -162,14 +163,38 @@ export async function GET(req: NextRequest) {
                 
                 // Send via Slack
                 if (pref.slack_enabled && pref.slack_webhook_url) {
+                    // SECURITY: Validate webhook URL before making outbound request.
+                    if (!isValidSlackWebhookUrl(pref.slack_webhook_url)) {
+                        console.warn('[Cron] Skipping invalid Slack webhook URL:', {
+                            profileId: pref.profile_id,
+                            webhook: sanitizeUrlForLogging(pref.slack_webhook_url),
+                        })
+                        failed++
+                        continue
+                    }
+
                     const slackPayload = formatDailyPulseForSlack(report)
-                    
-                    await fetch(pref.slack_webhook_url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(slackPayload)
-                    })
-                    sent++
+
+                    const controller = new AbortController()
+                    const timeout = setTimeout(() => controller.abort(), 10_000)
+
+                    try {
+                        const slackResponse = await fetch(pref.slack_webhook_url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(slackPayload),
+                            redirect: 'error',
+                            signal: controller.signal,
+                        })
+
+                        if (!slackResponse.ok) {
+                            throw new Error(`Slack webhook returned status ${slackResponse.status}`)
+                        }
+
+                        sent++
+                    } finally {
+                        clearTimeout(timeout)
+                    }
                 }
                 
                 // Email would be handled here if implemented

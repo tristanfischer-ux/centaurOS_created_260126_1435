@@ -69,4 +69,12 @@ describe('cron authorization hardening regressions', () => {
     expect(source).toContain('if (!cronSecret)')
     expect(source).toContain("return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })")
   })
+
+  it('validates Slack webhook URLs before outbound cron fetch', async () => {
+    const dailyReportsRoutePath = path.join(process.cwd(), 'src/app/api/cron/reports/daily/route.ts')
+    const source = await readFile(dailyReportsRoutePath, 'utf-8')
+
+    expect(source).toContain('isValidSlackWebhookUrl(pref.slack_webhook_url)')
+    expect(source).toContain("redirect: 'error'")
+  })
 })

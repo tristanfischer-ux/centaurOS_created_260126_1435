@@ -21,6 +21,7 @@ import { generateWeeklyInsights } from '@/lib/reports/insights'
 import { generateWeeklySummary } from '@/lib/reports/summary-generator'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { isValidSlackWebhookUrl } from '@/lib/security/url-validation'
 
 // ========================
 // Daily Pulse Actions
@@ -307,12 +308,51 @@ export async function updateReportPreferences(
         if (!user) {
             return { success: false, error: 'Not authenticated' }
         }
+
+        const normalizedPreferences: Partial<Omit<ReportPreferences, 'id' | 'profile_id'>> = {
+            ...preferences,
+            ...(typeof preferences.slack_webhook_url === 'string'
+                ? { slack_webhook_url: preferences.slack_webhook_url.trim() }
+                : {}),
+        }
+
+        // SECURITY: Load existing preference values to validate effective Slack settings.
+        const { data: existingPreferences, error: existingPreferencesError } = await supabase
+            .from('report_preferences')
+            .select('slack_enabled, slack_webhook_url')
+            .eq('profile_id', user.id)
+            .maybeSingle()
+
+        if (existingPreferencesError && existingPreferencesError.code !== 'PGRST116') {
+            console.error('Failed to load existing report preferences:', existingPreferencesError)
+            return { success: false, error: sanitizeErrorMessage(existingPreferencesError) }
+        }
+
+        const effectiveSlackEnabled =
+            normalizedPreferences.slack_enabled
+            ?? existingPreferences?.slack_enabled
+            ?? false
+
+        const effectiveSlackWebhook =
+            normalizedPreferences.slack_webhook_url !== undefined
+                ? normalizedPreferences.slack_webhook_url
+                : (existingPreferences?.slack_webhook_url ?? null)
+
+        // SECURITY: Prevent SSRF by validating stored webhook destination.
+        if (effectiveSlackWebhook && !isValidSlackWebhookUrl(effectiveSlackWebhook)) {
+            return { success: false, error: 'Slack webhook URL must be a valid Slack incoming webhook endpoint.' }
+        }
+
+        // VALIDATION: Enabling Slack delivery requires a webhook URL.
+        if (effectiveSlackEnabled && !effectiveSlackWebhook) {
+            return { success: false, error: 'Slack webhook URL is required when Slack reports are enabled.' }
+        }
         
         const { error } = await supabase
             .from('report_preferences')
             .upsert({
                 profile_id: user.id,
-                ...preferences,
+                ...normalizedPreferences,
                 updated_at: new Date().toISOString()
             }, {
                 onConflict: 'profile_id'
