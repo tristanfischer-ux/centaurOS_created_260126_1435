@@ -131,7 +131,7 @@ export function MobileNav() {
 
     return (
         <>
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] md:hidden pb-safe px-safe">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] sm:hidden pb-safe px-safe">
             {/* Floating "+" FAB centered above the nav bar */}
             <button
                 onClick={() => setIsQuickCaptureOpen(true)}
