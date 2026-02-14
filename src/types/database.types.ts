@@ -3134,12 +3134,60 @@ export type Database = {
         }
         Relationships: []
       }
+      cad_grammar_versions: {
+        Row: {
+          change_summary: string | null
+          core_library_code: string | null
+          created_at: string
+          created_by: string | null
+          defaults: Json | null
+          grammar_id: string
+          id: string
+          param_specs: Json | null
+          python_code: string
+          version: number
+        }
+        Insert: {
+          change_summary?: string | null
+          core_library_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          defaults?: Json | null
+          grammar_id: string
+          id?: string
+          param_specs?: Json | null
+          python_code: string
+          version: number
+        }
+        Update: {
+          change_summary?: string | null
+          core_library_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          defaults?: Json | null
+          grammar_id?: string
+          id?: string
+          param_specs?: Json | null
+          python_code?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cad_grammar_versions_grammar_id_fkey"
+            columns: ["grammar_id"]
+            isOneToOne: false
+            referencedRelation: "cad_grammars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cad_grammars: {
         Row: {
           constraints_summary: string | null
-          core_library_code: string
+          core_library_code: string | null
           created_at: string
           defaults: Json
+          deprecation_notice: string | null
           description: string
           display_name: string
           domain_keywords: string[]
@@ -3148,6 +3196,7 @@ export type Database = {
           is_active: boolean
           name: string
           param_specs: Json
+          previous_version_id: string | null
           python_code: string
           research_references: Json | null
           source: string
@@ -3156,9 +3205,10 @@ export type Database = {
         }
         Insert: {
           constraints_summary?: string | null
-          core_library_code: string
+          core_library_code?: string | null
           created_at?: string
           defaults?: Json
+          deprecation_notice?: string | null
           description: string
           display_name: string
           domain_keywords?: string[]
@@ -3167,6 +3217,7 @@ export type Database = {
           is_active?: boolean
           name: string
           param_specs?: Json
+          previous_version_id?: string | null
           python_code: string
           research_references?: Json | null
           source?: string
@@ -3175,9 +3226,10 @@ export type Database = {
         }
         Update: {
           constraints_summary?: string | null
-          core_library_code?: string
+          core_library_code?: string | null
           created_at?: string
           defaults?: Json
+          deprecation_notice?: string | null
           description?: string
           display_name?: string
           domain_keywords?: string[]
@@ -3186,13 +3238,22 @@ export type Database = {
           is_active?: boolean
           name?: string
           param_specs?: Json
+          previous_version_id?: string | null
           python_code?: string
           research_references?: Json | null
           source?: string
           updated_at?: string
           version?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cad_grammars_previous_version_id_fkey"
+            columns: ["previous_version_id"]
+            isOneToOne: false
+            referencedRelation: "cad_grammar_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cad_lab_projects: {
         Row: {
