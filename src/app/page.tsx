@@ -109,6 +109,17 @@ export default function MarketingPage() {
     };
   }, [mobileMenuOpen]);
 
+  // Show floating CTA on mobile after scrolling past hero
+  const [showFloatingCTA, setShowFloatingCTA] = useState(false);
+  useEffect(() => {
+    const handleFloatingCTA = () => {
+      // Show after scrolling ~80% of viewport height (past hero)
+      setShowFloatingCTA(window.scrollY > window.innerHeight * 0.8);
+    };
+    window.addEventListener("scroll", handleFloatingCTA, { passive: true });
+    return () => window.removeEventListener("scroll", handleFloatingCTA);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Skip Navigation - Accessibility */}
@@ -216,7 +227,8 @@ export default function MarketingPage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="md:hidden fixed inset-0 top-[calc(env(safe-area-inset-top)+56px)] bg-foreground/20 backdrop-blur-[2px] z-[-1]"
+                className="md:hidden fixed inset-0 bg-foreground/20 backdrop-blur-[2px]"
+                style={{ zIndex: -1 }}
                 onClick={() => setMobileMenuOpen(false)}
                 aria-hidden="true"
               />
@@ -304,8 +316,30 @@ export default function MarketingPage() {
         <FinalCTASection />
       </main>
 
+      {/* ── Floating Mobile CTA — appears after scrolling past hero ── */}
+      <AnimatePresence>
+        {showFloatingCTA && !mobileMenuOpen && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-t border-muted px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+          >
+            <Link
+              href="/join/founder"
+              className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full"
+            >
+              Get Started Free
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Footer ── */}
-      <footer className="py-10 sm:py-12 md:py-16 border-t border-muted bg-muted pb-[calc(2.5rem+env(safe-area-inset-bottom))] sm:pb-12 md:pb-16">
+      {/* Extra bottom padding on mobile for floating CTA bar */}
+      <footer className="py-10 sm:py-12 md:py-16 border-t border-muted bg-muted pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-12 md:pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-8">
             {/* Brand */}
@@ -624,6 +658,24 @@ function HeroSection() {
           Shipping weekly. Shaped by founding members.
         </motion.p>
       </div>
+
+      {/* Scroll indicator — visible on mobile, fades on scroll */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 2, duration: 0.6 }}
+        className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1"
+      >
+        <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest hidden sm:block">
+          Scroll
+        </span>
+        <motion.div
+          animate={{ y: [0, 6, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        </motion.div>
+      </motion.div>
     </section>
   );
 }
