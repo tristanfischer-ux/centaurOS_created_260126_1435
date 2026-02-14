@@ -571,7 +571,10 @@ The test suite enforces:
      - `can_access_profile(uuid)` SECURITY DEFINER helper to avoid recursion
      - shared-foundry profile visibility only
      - self-only insert/update policies
-   - Deployment status: **pending Supabase project authentication in this environment**.
+  - Deployment automation added:
+    - `scripts/deploy-security-migrations.sh`
+    - `.github/workflows/deploy-security-migrations.yml` (manual workflow)
+  - Deployment status: **pending Supabase project authentication in this environment**.
 
 ### High / Medium
 
