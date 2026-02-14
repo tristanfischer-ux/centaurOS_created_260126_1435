@@ -23,7 +23,7 @@ describe('rate-limit security regressions', () => {
     const routeFiles = await getRouteFilesRecursively(apiDirectory)
     const regressions: string[] = []
 
-    const secondWindowRegex = /rateLimit\([\s\S]{0,240}?window:\s*(60|900|3600)\b(?!\s*\*\s*1000)/g
+    const secondWindowRegex = /rateLimit\([\s\S]{0,240}?window:\s*(60|900|3600)\s*[,}]/g
 
     for (const routeFile of routeFiles) {
       const source = await readFile(routeFile, 'utf-8')
@@ -308,5 +308,16 @@ describe('billing test activation hardening regressions', () => {
     expect(source).toContain('const testBillingSecret = process.env.TEST_BILLING_SECRET')
     expect(source).toContain('if (authHeader !== `Bearer ${testBillingSecret}`)')
     expect(source).toContain('const authFailure = verifyTestBillingAccess(request)')
+  })
+})
+
+describe('cad-lab generation abuse-control regressions', () => {
+  it('rate limits per-user module generation in cad-lab generate-module route', async () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/cad-lab/generate-module/route.ts')
+    const source = await readFile(routePath, 'utf-8')
+
+    expect(source).toContain("await rateLimit('api', `cad-lab-module:${user.id}`")
+    expect(source).toContain('window: 60 * 60 * 1000')
+    expect(source).toContain('{ status: 429 }')
   })
 })

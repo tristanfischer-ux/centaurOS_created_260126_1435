@@ -13,7 +13,8 @@
     "src/app/api/messages/**/*.ts",
     "src/app/api/cron/reports/daily/route.ts",
     "src/app/api/cron/morning-brief/route.ts",
-    "src/app/api/billing/test-activate/route.ts"
+    "src/app/api/billing/test-activate/route.ts",
+    "src/app/api/cad-lab/generate-module/route.ts"
   ],
   "exclude": [
     "node_modules",

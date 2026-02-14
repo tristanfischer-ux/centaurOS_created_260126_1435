@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 16 | 14 fixed, 2 open |
+| Medium | 17 | 15 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -396,6 +396,25 @@ self-service subscription escalation path.
   - `TEST_BILLING_SECRET` to be configured
   - `Authorization: Bearer <TEST_BILLING_SECRET>` on each request
 - Retained existing guard that disables endpoint when real Stripe prices are configured.
+- Added regression assertion in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
+### 21) CAD module generation endpoint lacked abuse throttling for expensive workloads (Medium)
+
+**Issue:** `POST /api/cad-lab/generate-module` performed long-running AI + CAD
+generation without endpoint-level throttling.  
+**Impact:** Authenticated abuse could drive disproportionate AI/Modal cost and
+resource contention.
+
+**Fix implemented (`src/app/api/cad-lab/generate-module/route.ts`):**
+
+- Added per-user rate limiting:
+  - key: `cad-lab-module:${user.id}`
+  - limit: `30`
+  - window: `60 * 60 * 1000` (1 hour)
+- Added explicit `429` response on limit exhaustion.
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
