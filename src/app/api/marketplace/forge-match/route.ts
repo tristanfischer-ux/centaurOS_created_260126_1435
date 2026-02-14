@@ -32,9 +32,20 @@ interface ErrorResponse {
     error: string
 }
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
-})
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 export async function POST(
     request: NextRequest
@@ -43,6 +54,14 @@ export async function POST(
         // SECURITY: Fail closed when OpenAI key is not configured.
         if (!process.env.OPENAI_API_KEY) {
             console.error('[ForgeMatchAPI] OPENAI_API_KEY is not configured')
+            return NextResponse.json(
+                { error: 'Forge matching service is not configured' },
+                { status: 503 }
+            )
+        }
+
+        const openai = getOpenAIClient()
+        if (!openai) {
             return NextResponse.json(
                 { error: 'Forge matching service is not configured' },
                 { status: 503 }

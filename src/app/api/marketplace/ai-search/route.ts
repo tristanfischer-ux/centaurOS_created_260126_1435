@@ -7,9 +7,20 @@ import { rateLimit } from "@/lib/security/rate-limit";
 import { buildAIContext } from "@/lib/ai-context/builder";
 import { aiGuard } from "@/lib/ai/guard";
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
-});
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 // Marketplace categories
 const MarketplaceCategory = z.enum(["People", "Products", "Services"]);
@@ -103,6 +114,14 @@ export async function POST(req: NextRequest): Promise<NextResponse<AISearchRespo
         // SECURITY: Fail closed when OpenAI key is not configured.
         if (!process.env.OPENAI_API_KEY) {
             console.error('[AISearchAPI] OPENAI_API_KEY is not configured')
+            return NextResponse.json(
+                { success: false, error: 'AI search service is not configured' },
+                { status: 503 }
+            )
+        }
+
+        const openai = getOpenAIClient()
+        if (!openai) {
             return NextResponse.json(
                 { success: false, error: 'AI search service is not configured' },
                 { status: 503 }

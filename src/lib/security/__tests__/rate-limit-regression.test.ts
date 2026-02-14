@@ -239,6 +239,28 @@ describe('OpenAI key hardening regressions', () => {
       expect(source).toContain('{ status: 503 }')
     }
   })
+
+  it('does not use dummy OpenAI API key fallbacks in request handlers', async () => {
+    const routes = [
+      'src/app/api/marketplace/ai-search/route.ts',
+      'src/app/api/marketplace/talent-match/route.ts',
+      'src/app/api/marketplace/forge-match/route.ts',
+      'src/app/api/rfq/voice/route.ts',
+      'src/app/api/agents/stt/route.ts',
+      'src/app/api/voice-to-task/route.ts',
+      'src/app/api/marketplace/compare/route.ts',
+      'src/app/api/team/compare/route.ts',
+    ]
+
+    for (const routePath of routes) {
+      const source = await readFile(path.join(process.cwd(), routePath), 'utf-8')
+      expect(source).toContain('function getOpenAIClient()')
+      expect(source).toContain('const openai = getOpenAIClient()')
+      expect(source).not.toContain('dummy-key-for-build')
+      expect(source).not.toContain('sk-placeholder-for-build-only')
+      expect(source).not.toMatch(/apiKey:\s*process\.env\.OPENAI_API_KEY\s*\|\|/)
+    }
+  })
 })
 
 describe('agent objective action security regressions', () => {

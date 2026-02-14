@@ -16,9 +16,20 @@ import { aiGuard } from "@/lib/ai/guard"
  * @audit Tracks AI usage via aiGuard.trackUsage.
  */
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
-})
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 interface ListingSummary {
     id: string
@@ -48,6 +59,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // SECURITY: Fail closed when OpenAI key is not configured.
         if (!process.env.OPENAI_API_KEY) {
             console.error('[TalentMatchAPI] OPENAI_API_KEY is not configured')
+            return NextResponse.json(
+                { success: false, error: 'Talent matching service is not configured' },
+                { status: 503 }
+            )
+        }
+
+        const openai = getOpenAIClient()
+        if (!openai) {
             return NextResponse.json(
                 { success: false, error: 'Talent matching service is not configured' },
                 { status: 503 }

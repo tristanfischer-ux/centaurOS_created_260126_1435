@@ -255,6 +255,16 @@ service-unavailable behavior.
   - `src/app/api/marketplace/talent-match/route.ts`
   - `src/app/api/marketplace/forge-match/route.ts`
   - `src/app/api/rfq/voice/route.ts`
+- Removed dummy/placeholder OpenAI key fallbacks and switched to lazy
+  `getOpenAIClient()` initialization in:
+  - `src/app/api/marketplace/ai-search/route.ts`
+  - `src/app/api/marketplace/talent-match/route.ts`
+  - `src/app/api/marketplace/forge-match/route.ts`
+  - `src/app/api/rfq/voice/route.ts`
+  - `src/app/api/agents/stt/route.ts`
+  - `src/app/api/voice-to-task/route.ts`
+  - `src/app/api/marketplace/compare/route.ts`
+  - `src/app/api/team/compare/route.ts`
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 

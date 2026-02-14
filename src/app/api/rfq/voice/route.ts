@@ -6,9 +6,20 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { aiGuard } from "@/lib/ai/guard";
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
-});
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 // Schema for RFQ Extraction
 const RFQSchema = z.object({
@@ -22,6 +33,14 @@ export async function POST(req: NextRequest) {
         // SECURITY: Fail closed when OpenAI key is not configured.
         if (!process.env.OPENAI_API_KEY) {
             console.error('[VoiceToRFQAPI] OPENAI_API_KEY is not configured')
+            return NextResponse.json(
+                { error: 'Voice RFQ service is not configured' },
+                { status: 503 }
+            )
+        }
+
+        const openai = getOpenAIClient()
+        if (!openai) {
             return NextResponse.json(
                 { error: 'Voice RFQ service is not configured' },
                 { status: 503 }

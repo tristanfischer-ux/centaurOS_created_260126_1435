@@ -7,15 +7,20 @@ import { sanitizeFileName } from "@/lib/security/sanitize";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { aiGuard } from "@/lib/ai/guard";
 
-// SECURITY: Fail fast if OpenAI API key is not configured
-const apiKey = process.env.OPENAI_API_KEY
-if (!apiKey && process.env.NODE_ENV === 'production') {
-    console.error('[CRITICAL] OPENAI_API_KEY not configured in production!')
-}
+let openaiClient: OpenAI | null = null
 
-const openai = new OpenAI({
-    apiKey: apiKey || 'dummy-key-for-build', // Build-time only fallback
-});
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 // Schema for Task Extraction
 const TaskSchema = z.object({
@@ -31,6 +36,11 @@ export async function POST(req: NextRequest) {
         // SECURITY: Check if OpenAI is configured before processing
         if (!process.env.OPENAI_API_KEY) {
             console.error('[VOICE-TO-TASK] OpenAI API key not configured')
+            return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+        }
+
+        const openai = getOpenAIClient()
+        if (!openai) {
             return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
         }
         
