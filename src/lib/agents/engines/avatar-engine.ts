@@ -8,9 +8,12 @@
  * voice/LLM work to the RealtimeVoiceEngine and adds a video avatar layer.
  *
  * Architecture:
- * - RealtimeVoiceEngine handles STT + LLM + TTS via OpenAI Realtime API
+ * - RealtimeVoiceEngine handles STT + LLM + TTS (currently via OpenAI Realtime API)
  * - Avatar provider renders a video stream driven by the audio output
  * - The specialist's face is lip-synced to the audio in real-time
+ *
+ * NOTE: OpenAI Realtime API is used for voice because MiniMax does not offer
+ * a unified realtime API. See realtime-voice-engine.ts for details.
  *
  * Supported avatar providers (via adapter pattern):
  * - HeyGen LiveAvatar API (Tier 3: $0.07/min)

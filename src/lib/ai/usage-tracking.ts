@@ -99,6 +99,10 @@ const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number 
 /**
  * Cost per minute for real-time features (USD).
  * Used for voice/avatar sessions which are billed by duration, not tokens.
+ *
+ * NOTE: OpenAI Realtime is used for voice/avatar because MiniMax does not
+ * offer a unified realtime API. MiniMax has separate TTS, STT, and text APIs
+ * that would require custom orchestration. See realtime-voice-engine.ts.
  */
 const REALTIME_COSTS_PER_MINUTE: Record<string, number> = {
   // OpenAI Realtime API (audio input + output combined)

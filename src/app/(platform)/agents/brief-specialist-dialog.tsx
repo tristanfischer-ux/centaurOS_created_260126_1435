@@ -170,16 +170,6 @@ export function BriefSpecialistDialog({
         },
     })
 
-    // Get all prompts for this specialist's categories
-    const capabilities = useMemo(() => {
-        const prompts: PromptTemplate[] = []
-        for (const cat of specialist.categories) {
-            prompts.push(...getPromptsByCategory(cat))
-        }
-        return prompts
-    }, [specialist.categories])
-
-    // Suggested next specialists
     const suggestedSpecialists = useMemo(() => {
         if (!specialist.suggestedNext) return []
         return specialist.suggestedNext
@@ -438,21 +428,10 @@ ${contextParts.join("\n\n")}
 
     // ─── Handlers ─────────────────────────────────────────────────────────
 
-    const handleSelectCapability = useCallback((prompt: PromptTemplate) => {
-        if (selectedPrompt?.id === prompt.id) {
-            setSelectedPrompt(null)
-        } else {
-            setSelectedPrompt(prompt)
-            if (!briefText.trim()) {
-                textareaRef.current?.focus()
-            }
-        }
-    }, [selectedPrompt, briefText])
-
     const handleExecute = useCallback(async () => {
         const userInput = briefText.trim()
-        if (!userInput && !selectedPrompt) {
-            setError("Tell your specialist what you need, or pick a capability above.")
+        if (!userInput) {
+            setError("Tell your specialist what you need.")
             return
         }
 
@@ -1013,57 +992,6 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             </div>
                         )}
 
-                        {/* Capability Chips (shown on first visit only — hidden when history exists) */}
-                        {!hasNonHistoricalMessages && !isGeneratingGreeting && !hasHistoricalMessages && (
-                            <div className="space-y-2 mb-4">
-                                <Label className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-                                    Quick-select a capability
-                                </Label>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {capabilities.map((cap) => (
-                                        <Badge
-                                            key={cap.id}
-                                            variant={selectedPrompt?.id === cap.id ? "default" : "secondary"}
-                                            className={cn(
-                                                "cursor-pointer text-xs transition-colors",
-                                                selectedPrompt?.id === cap.id
-                                                    ? "bg-international-orange text-white hover:bg-international-orange-hover"
-                                                    : "hover:bg-muted"
-                                            )}
-                                            onClick={() => handleSelectCapability(cap)}
-                                        >
-                                            {cap.title}
-                                        </Badge>
-                                    ))}
-                                </div>
-                                {selectedPrompt && (
-                                    <div className="p-3 rounded-lg bg-international-orange/5 border border-international-orange/15 space-y-2">
-                                        <p className="text-sm text-foreground font-medium">
-                                            {selectedPrompt.description}
-                                        </p>
-                                        {selectedPrompt.inputHint && (
-                                            <div className="space-y-1">
-                                                <p className="text-xs font-semibold text-muted-foreground">What to include:</p>
-                                                <div className="text-xs text-muted-foreground leading-relaxed space-y-0.5">
-                                                    {selectedPrompt.inputHint.split("\n").map((line, i) => (
-                                                        <p key={i}>{line}</p>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {selectedPrompt.exampleInput && (
-                                            <div className="space-y-1">
-                                                <p className="text-xs font-semibold text-muted-foreground">Example:</p>
-                                                <p className="text-xs text-muted-foreground/70 italic leading-relaxed">
-                                                    &ldquo;{selectedPrompt.exampleInput}&rdquo;
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
                         {/* Suggested Next Specialists (after at least one response) */}
                         {/* AI-Powered Dynamic Recommendation */}
                         {lastAssistantMessage && !isExecuting && dynamicSuggestion && (() => {
@@ -1234,7 +1162,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         size="icon"
                                         variant="ghost"
                                         onClick={handleExecute}
-                                        disabled={isExecuting || (!briefText.trim() && !selectedPrompt)}
+                                        disabled={isExecuting || !briefText.trim()}
                                         className="h-8 w-8 text-muted-foreground hover:text-international-orange"
                                         aria-label="Send brief"
                                     >
@@ -1326,7 +1254,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         {!messages.some((m) => m.role === "user" && !m.historical) && (
                             <Button
                                 onClick={handleExecute}
-                                disabled={isExecuting || isGeneratingGreeting || (!briefText.trim() && !selectedPrompt)}
+                                disabled={isExecuting || isGeneratingGreeting || !briefText.trim()}
                                 className="bg-international-orange hover:bg-international-orange-hover text-white"
                             >
                                 {isExecuting ? (

@@ -17,6 +17,7 @@ import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { ChevronsUpDown, Check, Building2 } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -109,6 +110,8 @@ export function FoundrySwitcher({
       if (result.success) {
         setOpen(false)
         router.refresh()
+      } else {
+        toast.error(result.error || 'Failed to switch workspace')
       }
     })
   }

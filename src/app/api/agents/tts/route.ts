@@ -16,7 +16,7 @@ import { createClient } from "@/lib/supabase/server"
 import OpenAI from "openai"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { aiGuard } from "@/lib/ai/guard"
-import { generateMiniMaxAudio } from "@/lib/ai-providers/registry"
+import { getAudioProvider, type AudioGenerationOptions } from "@/lib/ai-providers/registry"
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -118,7 +118,12 @@ async function generateMiniMaxTTS(text: string, voice: string): Promise<ArrayBuf
 
     const minimaxVoice = OPENAI_TO_MINIMAX_VOICE[voice] || "male-qn-qingse"
 
-    const result = await generateMiniMaxAudio({
+    const audioFn = getAudioProvider("minimax")
+    if (!audioFn) {
+        throw new Error("MiniMax audio provider not available")
+    }
+
+    const result = await audioFn({
         apiKey,
         modelId: MINIMAX_TTS_MODEL,
         text,
@@ -238,13 +243,26 @@ export async function POST(req: NextRequest): Promise<Response> {
         })
     } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error"
-        console.error("[TTS] Failed:", { error: message })
+        console.error("[TTS] Failed:", { 
+            error: message, 
+            activeProvider, 
+            hasMiniMax: !!getMiniMaxKey(), 
+            hasOpenAI: !!getOpenAIKey() 
+        })
 
         // Check for specific errors
-        if (message.includes("API key") || message.includes("not configured")) {
+        if (message.includes("API key") || message.includes("not configured") || message.includes("not available")) {
             return NextResponse.json(
-                { error: "AI service configuration error" },
+                { error: "AI service not configured. Please contact support." },
                 { status: 503 }
+            )
+        }
+
+        // Check for MiniMax-specific errors
+        if (message.includes("MiniMax") || message.includes("minimax")) {
+            return NextResponse.json(
+                { error: "Voice service temporarily unavailable. Please try again." },
+                { status: 500 }
             )
         }
 

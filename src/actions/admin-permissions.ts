@@ -70,10 +70,10 @@ export async function hasFoundryAdminAccess(): Promise<boolean> {
         .eq('id', user.id)
         .single()
     
-    // TODO(TECH-DEBT): Enable is_active check — column exists in select but guard is disabled
-    // if (!profile?.is_active) {
-    //     return false
-    // }
+    // SECURITY: Ensure user is active before granting admin access
+    if (!profile?.is_active) {
+        return false
+    }
     
     if (profile.role === 'Founder') {
         return true

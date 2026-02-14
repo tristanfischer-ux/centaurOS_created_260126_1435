@@ -3,6 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type ExportFormat = 'csv' | 'excel'
 export type ExportableTable = 'profiles' | 'tasks' | 'objectives' | 'standups' | 'teams' | 'orders'
@@ -91,7 +92,7 @@ export async function exportFoundryData(
 
  
 async function fetchTableData(
-    supabase: any,
+    supabase: SupabaseClient,
     table: ExportableTable,
     foundryId: string,
     dateRange?: DateRange

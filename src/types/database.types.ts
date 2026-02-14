@@ -452,6 +452,139 @@ export type Database = {
           },
         ]
       }
+      agent_action_log: {
+        Row: {
+          action_description: string | null
+          action_type: string
+          agent_id: string | null
+          agent_name: string | null
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          details: Json | null
+          foundry_id: string
+          id: string
+          rejection_reason: string | null
+          requires_approval_from: string | null
+          status: string | null
+          tier: string
+        }
+        Insert: {
+          action_description?: string | null
+          action_type: string
+          agent_id?: string | null
+          agent_name?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          details?: Json | null
+          foundry_id: string
+          id?: string
+          rejection_reason?: string | null
+          requires_approval_from?: string | null
+          status?: string | null
+          tier: string
+        }
+        Update: {
+          action_description?: string | null
+          action_type?: string
+          agent_id?: string | null
+          agent_name?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          details?: Json | null
+          foundry_id?: string
+          id?: string
+          rejection_reason?: string | null
+          requires_approval_from?: string | null
+          status?: string | null
+          tier?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_action_log_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_action_log_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_action_log_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_action_log_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_action_log_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_action_log_requires_approval_from_fkey"
+            columns: ["requires_approval_from"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_action_log_requires_approval_from_fkey"
+            columns: ["requires_approval_from"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_action_tier_map: {
+        Row: {
+          action_type: string
+          created_at: string
+          description: string | null
+          id: string
+          tier_name: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          tier_name: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          tier_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_action_tier_map_tier_name_fkey"
+            columns: ["tier_name"]
+            isOneToOne: false
+            referencedRelation: "agent_permission_tiers"
+            referencedColumns: ["tier_name"]
+          },
+        ]
+      }
       agent_artifact_versions: {
         Row: {
           artifact_id: string
@@ -607,6 +740,132 @@ export type Database = {
           },
         ]
       }
+      agent_collaboration_contributions: {
+        Row: {
+          agent_id: string | null
+          agent_name: string
+          content: string
+          contribution_type: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          session_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          agent_name: string
+          content: string
+          contribution_type?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          session_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          agent_name?: string
+          content?: string
+          contribution_type?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_collaboration_contributions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_collaboration_contributions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_collaboration_contributions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "agent_collaboration_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_collaboration_sessions: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          foundry_id: string
+          id: string
+          initiated_by_agent_id: string | null
+          initiated_by_agent_name: string
+          result_artifact_id: string | null
+          result_summary: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          foundry_id: string
+          id?: string
+          initiated_by_agent_id?: string | null
+          initiated_by_agent_name: string
+          result_artifact_id?: string | null
+          result_summary?: string | null
+          status?: string
+          title: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          foundry_id?: string
+          id?: string
+          initiated_by_agent_id?: string | null
+          initiated_by_agent_name?: string
+          result_artifact_id?: string | null
+          result_summary?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_collaboration_sessions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_collaboration_sessions_initiated_by_agent_id_fkey"
+            columns: ["initiated_by_agent_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_collaboration_sessions_initiated_by_agent_id_fkey"
+            columns: ["initiated_by_agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_collaboration_sessions_result_artifact_id_fkey"
+            columns: ["result_artifact_id"]
+            isOneToOne: false
+            referencedRelation: "agent_artifacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_custom_prompts: {
         Row: {
           category: string
@@ -676,6 +935,123 @@ export type Database = {
             columns: ["foundry_id"]
             isOneToOne: false
             referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_delegation_requests: {
+        Row: {
+          completed_artifact_id: string | null
+          completed_at: string | null
+          context_objective_id: string | null
+          context_task_id: string | null
+          created_at: string
+          description: string | null
+          foundry_id: string
+          id: string
+          request_type: string
+          requesting_agent_id: string | null
+          requesting_agent_name: string
+          responded_at: string | null
+          response_note: string | null
+          status: string
+          target_agent_id: string | null
+          target_agent_name: string
+          title: string
+        }
+        Insert: {
+          completed_artifact_id?: string | null
+          completed_at?: string | null
+          context_objective_id?: string | null
+          context_task_id?: string | null
+          created_at?: string
+          description?: string | null
+          foundry_id: string
+          id?: string
+          request_type: string
+          requesting_agent_id?: string | null
+          requesting_agent_name: string
+          responded_at?: string | null
+          response_note?: string | null
+          status?: string
+          target_agent_id?: string | null
+          target_agent_name: string
+          title: string
+        }
+        Update: {
+          completed_artifact_id?: string | null
+          completed_at?: string | null
+          context_objective_id?: string | null
+          context_task_id?: string | null
+          created_at?: string
+          description?: string | null
+          foundry_id?: string
+          id?: string
+          request_type?: string
+          requesting_agent_id?: string | null
+          requesting_agent_name?: string
+          responded_at?: string | null
+          response_note?: string | null
+          status?: string
+          target_agent_id?: string | null
+          target_agent_name?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_delegation_requests_completed_artifact_id_fkey"
+            columns: ["completed_artifact_id"]
+            isOneToOne: false
+            referencedRelation: "agent_artifacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_delegation_requests_context_objective_id_fkey"
+            columns: ["context_objective_id"]
+            isOneToOne: false
+            referencedRelation: "objectives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_delegation_requests_context_task_id_fkey"
+            columns: ["context_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_delegation_requests_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_delegation_requests_requesting_agent_id_fkey"
+            columns: ["requesting_agent_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_delegation_requests_requesting_agent_id_fkey"
+            columns: ["requesting_agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_delegation_requests_target_agent_id_fkey"
+            columns: ["target_agent_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_delegation_requests_target_agent_id_fkey"
+            columns: ["target_agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -892,6 +1268,140 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      agent_messages: {
+        Row: {
+          content: string
+          context_objective_id: string | null
+          context_task_id: string | null
+          created_at: string
+          foundry_id: string
+          from_agent_id: string | null
+          from_agent_name: string
+          id: string
+          is_read: boolean | null
+          message_type: string
+          metadata: Json | null
+          to_agent_id: string | null
+          to_agent_name: string | null
+        }
+        Insert: {
+          content: string
+          context_objective_id?: string | null
+          context_task_id?: string | null
+          created_at?: string
+          foundry_id: string
+          from_agent_id?: string | null
+          from_agent_name: string
+          id?: string
+          is_read?: boolean | null
+          message_type?: string
+          metadata?: Json | null
+          to_agent_id?: string | null
+          to_agent_name?: string | null
+        }
+        Update: {
+          content?: string
+          context_objective_id?: string | null
+          context_task_id?: string | null
+          created_at?: string
+          foundry_id?: string
+          from_agent_id?: string | null
+          from_agent_name?: string
+          id?: string
+          is_read?: boolean | null
+          message_type?: string
+          metadata?: Json | null
+          to_agent_id?: string | null
+          to_agent_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_messages_context_objective_id_fkey"
+            columns: ["context_objective_id"]
+            isOneToOne: false
+            referencedRelation: "objectives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_messages_context_task_id_fkey"
+            columns: ["context_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_messages_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_messages_from_agent_id_fkey"
+            columns: ["from_agent_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_messages_from_agent_id_fkey"
+            columns: ["from_agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_messages_to_agent_id_fkey"
+            columns: ["to_agent_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_messages_to_agent_id_fkey"
+            columns: ["to_agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_permission_tiers: {
+        Row: {
+          can_block: boolean | null
+          created_at: string
+          description: string | null
+          id: string
+          requires_approval: boolean | null
+          requires_explicit_approval: boolean | null
+          requires_human_review: boolean | null
+          tier_level: number
+          tier_name: string
+        }
+        Insert: {
+          can_block?: boolean | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          requires_approval?: boolean | null
+          requires_explicit_approval?: boolean | null
+          requires_human_review?: boolean | null
+          tier_level: number
+          tier_name: string
+        }
+        Update: {
+          can_block?: boolean | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          requires_approval?: boolean | null
+          requires_explicit_approval?: boolean | null
+          requires_human_review?: boolean | null
+          tier_level?: number
+          tier_name?: string
+        }
+        Relationships: []
       }
       agent_sweep_log: {
         Row: {
@@ -4390,6 +4900,41 @@ export type Database = {
           },
         ]
       }
+      foundry_agent_permissions: {
+        Row: {
+          created_at: string
+          custom_limits: Json | null
+          enabled: boolean | null
+          foundry_id: string
+          id: string
+          tier_name: string
+        }
+        Insert: {
+          created_at?: string
+          custom_limits?: Json | null
+          enabled?: boolean | null
+          foundry_id: string
+          id?: string
+          tier_name: string
+        }
+        Update: {
+          created_at?: string
+          custom_limits?: Json | null
+          enabled?: boolean | null
+          foundry_id?: string
+          id?: string
+          tier_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foundry_agent_permissions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       foundry_agent_preferences: {
         Row: {
           created_at: string
@@ -6375,9 +6920,11 @@ export type Database = {
       }
       objectives: {
         Row: {
+          agent_approved: boolean | null
           ai_suggestions: Json | null
           blueprint_id: string | null
           created_at: string | null
+          created_by_agent_id: string | null
           creator_id: string
           deleted_at: string | null
           description: string | null
@@ -6394,6 +6941,7 @@ export type Database = {
           is_strategic_goal: boolean | null
           milestone_date: string | null
           milestone_order_index: number
+          owner_agent_id: string | null
           parent_objective_id: string | null
           progress: number | null
           resource_suggestions: Json | null
@@ -6404,9 +6952,11 @@ export type Database = {
           workstream: string | null
         }
         Insert: {
+          agent_approved?: boolean | null
           ai_suggestions?: Json | null
           blueprint_id?: string | null
           created_at?: string | null
+          created_by_agent_id?: string | null
           creator_id: string
           deleted_at?: string | null
           description?: string | null
@@ -6423,6 +6973,7 @@ export type Database = {
           is_strategic_goal?: boolean | null
           milestone_date?: string | null
           milestone_order_index?: number
+          owner_agent_id?: string | null
           parent_objective_id?: string | null
           progress?: number | null
           resource_suggestions?: Json | null
@@ -6433,9 +6984,11 @@ export type Database = {
           workstream?: string | null
         }
         Update: {
+          agent_approved?: boolean | null
           ai_suggestions?: Json | null
           blueprint_id?: string | null
           created_at?: string | null
+          created_by_agent_id?: string | null
           creator_id?: string
           deleted_at?: string | null
           description?: string | null
@@ -6452,6 +7005,7 @@ export type Database = {
           is_strategic_goal?: boolean | null
           milestone_date?: string | null
           milestone_order_index?: number
+          owner_agent_id?: string | null
           parent_objective_id?: string | null
           progress?: number | null
           resource_suggestions?: Json | null
@@ -6470,6 +7024,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "objectives_created_by_agent_id_fkey"
+            columns: ["created_by_agent_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "objectives_created_by_agent_id_fkey"
+            columns: ["created_by_agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "objectives_creator_id_fkey"
             columns: ["creator_id"]
             isOneToOne: false
@@ -6479,6 +7047,20 @@ export type Database = {
           {
             foreignKeyName: "objectives_creator_id_fkey"
             columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objectives_owner_agent_id_fkey"
+            columns: ["owner_agent_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "objectives_owner_agent_id_fkey"
+            columns: ["owner_agent_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -10910,12 +11492,14 @@ export type Database = {
       }
       tasks: {
         Row: {
+          agent_approved: boolean | null
           amendment_notes: string | null
           approval_escalated: boolean | null
           approval_requested_at: string | null
           assignee_id: string | null
           client_visible: boolean | null
           created_at: string | null
+          created_by_agent_id: string | null
           creator_id: string
           deleted_at: string | null
           description: string | null
@@ -10933,6 +11517,7 @@ export type Database = {
           metadata: Json | null
           nudge_count: number | null
           objective_id: string
+          owner_agent_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           start_date: string | null
@@ -10943,12 +11528,14 @@ export type Database = {
           workstream: string | null
         }
         Insert: {
+          agent_approved?: boolean | null
           amendment_notes?: string | null
           approval_escalated?: boolean | null
           approval_requested_at?: string | null
           assignee_id?: string | null
           client_visible?: boolean | null
           created_at?: string | null
+          created_by_agent_id?: string | null
           creator_id: string
           deleted_at?: string | null
           description?: string | null
@@ -10966,6 +11553,7 @@ export type Database = {
           metadata?: Json | null
           nudge_count?: number | null
           objective_id: string
+          owner_agent_id?: string | null
           progress?: number | null
           risk_level?: Database["public"]["Enums"]["risk_level"]
           start_date?: string | null
@@ -10976,12 +11564,14 @@ export type Database = {
           workstream?: string | null
         }
         Update: {
+          agent_approved?: boolean | null
           amendment_notes?: string | null
           approval_escalated?: boolean | null
           approval_requested_at?: string | null
           assignee_id?: string | null
           client_visible?: boolean | null
           created_at?: string | null
+          created_by_agent_id?: string | null
           creator_id?: string
           deleted_at?: string | null
           description?: string | null
@@ -10999,6 +11589,7 @@ export type Database = {
           metadata?: Json | null
           nudge_count?: number | null
           objective_id?: string
+          owner_agent_id?: string | null
           progress?: number | null
           risk_level?: Database["public"]["Enums"]["risk_level"]
           start_date?: string | null
@@ -11024,6 +11615,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tasks_created_by_agent_id_fkey"
+            columns: ["created_by_agent_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_agent_id_fkey"
+            columns: ["created_by_agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tasks_creator_id_fkey"
             columns: ["creator_id"]
             isOneToOne: false
@@ -11042,6 +11647,20 @@ export type Database = {
             columns: ["objective_id"]
             isOneToOne: false
             referencedRelation: "objectives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_owner_agent_id_fkey"
+            columns: ["owner_agent_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "tasks_owner_agent_id_fkey"
+            columns: ["owner_agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -12195,6 +12814,14 @@ export type Database = {
         Args: { p_task_id: string; p_user_id: string }
         Returns: boolean
       }
+      check_agent_permission: {
+        Args: {
+          p_action_type: string
+          p_agent_id?: string
+          p_foundry_id: string
+        }
+        Returns: Json
+      }
       check_ai_spending_cap: { Args: { p_foundry_id: string }; Returns: Json }
       check_rate_limit: {
         Args: {
@@ -12271,12 +12898,14 @@ export type Database = {
       escalate_task: {
         Args: { p_reason?: string; p_task_id: string }
         Returns: {
+          agent_approved: boolean | null
           amendment_notes: string | null
           approval_escalated: boolean | null
           approval_requested_at: string | null
           assignee_id: string | null
           client_visible: boolean | null
           created_at: string | null
+          created_by_agent_id: string | null
           creator_id: string
           deleted_at: string | null
           description: string | null
@@ -12294,6 +12923,7 @@ export type Database = {
           metadata: Json | null
           nudge_count: number | null
           objective_id: string
+          owner_agent_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           start_date: string | null
@@ -12322,7 +12952,19 @@ export type Database = {
         Args: { full_name: string; user_id: string }
         Returns: string
       }
+      get_active_collaborations: {
+        Args: { p_foundry_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          initiated_by_agent_name: string
+          participant_count: number
+          status: string
+          title: string
+        }[]
+      }
       get_active_foundry_id: { Args: { p_user_id: string }; Returns: string }
+      get_agent_unread_count: { Args: { p_agent_id: string }; Returns: number }
       get_ai_usage_current_month: {
         Args: { p_foundry_id: string }
         Returns: {
@@ -12334,12 +12976,14 @@ export type Database = {
       get_blueprint_tasks: {
         Args: { p_blueprint_id: string }
         Returns: {
+          agent_approved: boolean | null
           amendment_notes: string | null
           approval_escalated: boolean | null
           approval_requested_at: string | null
           assignee_id: string | null
           client_visible: boolean | null
           created_at: string | null
+          created_by_agent_id: string | null
           creator_id: string
           deleted_at: string | null
           description: string | null
@@ -12357,6 +13001,7 @@ export type Database = {
           metadata: Json | null
           nudge_count: number | null
           objective_id: string
+          owner_agent_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           start_date: string | null
@@ -12397,12 +13042,14 @@ export type Database = {
       get_domain_tasks: {
         Args: { p_domain_id: string }
         Returns: {
+          agent_approved: boolean | null
           amendment_notes: string | null
           approval_escalated: boolean | null
           approval_requested_at: string | null
           assignee_id: string | null
           client_visible: boolean | null
           created_at: string | null
+          created_by_agent_id: string | null
           creator_id: string
           deleted_at: string | null
           description: string | null
@@ -12420,6 +13067,7 @@ export type Database = {
           metadata: Json | null
           nudge_count: number | null
           objective_id: string
+          owner_agent_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           start_date: string | null
@@ -12503,6 +13151,17 @@ export type Database = {
       get_pending_decisions_count: {
         Args: { p_profile_id: string }
         Returns: number
+      }
+      get_pending_delegations: {
+        Args: { p_agent_id: string }
+        Returns: {
+          created_at: string
+          description: string
+          id: string
+          request_type: string
+          requesting_agent_name: string
+          title: string
+        }[]
       }
       get_platform_fee_percent: {
         Args: { p_order_type?: string; p_role?: string }
@@ -12626,6 +13285,19 @@ export type Database = {
         Returns: boolean
       }
       is_otjt_on_track: { Args: { enrollment_id: string }; Returns: boolean }
+      log_agent_action: {
+        Args: {
+          p_action_description: string
+          p_action_type: string
+          p_agent_id: string
+          p_agent_name: string
+          p_details?: Json
+          p_foundry_id: string
+          p_requires_approval_from?: string
+          p_status?: string
+        }
+        Returns: string
+      }
       log_agent_sweep: {
         Args: {
           p_duration_ms?: number

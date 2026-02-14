@@ -4,6 +4,21 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 // Types for provider data
+interface ProviderOrderRow {
+    id: string
+    order_number: string | null
+    status: string | null
+    total_amount: number | null
+    currency: string | null
+    created_at: string | null
+    buyer: {
+        full_name: string | null
+    } | null
+    listing: {
+        title: string | null
+    } | null
+}
+
 export interface ProviderProfile {
     id: string
     user_id: string
@@ -315,7 +330,7 @@ export async function getProviderDashboardStats(): Promise<{
             .from('orders')
             .select('id', { count: 'exact', head: true })
             .eq('seller_id', profile.id)
-            .in('status', ['pending', 'accepted', 'in_progress'] as any)
+            .in('status', ['pending', 'accepted', 'in_progress'] as const)
 
         // Get upcoming bookings count
         const today = new Date().toISOString().split('T')[0]
@@ -413,8 +428,7 @@ export async function getProviderOrders(options?: {
             .order('created_at', { ascending: false })
 
         if (options?.status && options.status.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            query = query.in('status', options.status as any)
+            query = query.in('status', options.status as readonly string[])
         }
 
         if (options?.limit) {
@@ -428,7 +442,7 @@ export async function getProviderOrders(options?: {
             return { orders: [], error: error.message }
         }
 
-        const orders: ProviderOrder[] = (data || []).map((order: any) => ({
+        const orders: ProviderOrder[] = (data || []).map((order: ProviderOrderRow) => ({
             id: order.id,
             order_number: order.order_number || '',
             buyer_name: order.buyer?.full_name || 'Unknown',

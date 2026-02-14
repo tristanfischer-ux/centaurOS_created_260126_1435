@@ -560,6 +560,211 @@ export async function generateDecisionSupportPackage(
   }
 }
 
+// ─── Council Debate Synthesis ────────────────────────────────────────
+
+/**
+ * Result from synthesizing a specialist council debate
+ */
+export interface CouncilReport {
+  executive_summary: string
+  positions: Array<{
+    specialist: string
+    specialist_id: string
+    key_position: string
+    conviction: 'high' | 'medium' | 'low'
+  }>
+  tensions: Array<{
+    between: string[]
+    description: string
+  }>
+  consensus: string[]
+  recommendations: string[]
+  decision_options: Array<{
+    option: string
+    supporters: string[]
+    rationale: string
+  }>
+}
+
+/**
+ * Transcript entry from a single specialist in the debate
+ */
+export interface DebateTranscriptEntry {
+  specialistId: string
+  specialistName: string
+  specialistTitle: string
+  round: number
+  content: string
+}
+
+/**
+ * Synthesizes a specialist council debate into a decision recommendation report.
+ *
+ * @description After specialists debate a topic, Cal (Chief of Staff) synthesizes
+ * the debate into a structured report with positions, tensions, consensus,
+ * recommendations, and decision options for the founder to weigh in on.
+ *
+ * @param topic - The debate topic/question
+ * @param debateTranscripts - All specialist responses across rounds
+ * @returns Structured council report
+ */
+export async function synthesizeCouncilDebate(
+  topic: string,
+  debateTranscripts: DebateTranscriptEntry[],
+): Promise<CouncilReport> {
+  // Group transcripts by specialist
+  const bySpecialist = new Map<string, { name: string; title: string; responses: string[] }>()
+
+  for (const entry of debateTranscripts) {
+    const existing = bySpecialist.get(entry.specialistId) ?? {
+      name: entry.specialistName,
+      title: entry.specialistTitle,
+      responses: [],
+    }
+    existing.responses.push(`[Round ${entry.round}]: ${entry.content}`)
+    bySpecialist.set(entry.specialistId, existing)
+  }
+
+  const specialistDebates = Array.from(bySpecialist.entries()).map(([id, data]) => ({
+    specialist_id: id,
+    specialist_name: data.name,
+    specialist_title: data.title,
+    responses: data.responses.join('\n\n'),
+  }))
+
+  // Build the synthesis prompt
+  const systemPrompt = buildCouncilSystemPrompt()
+  const userPrompt = buildCouncilUserPrompt(topic, specialistDebates)
+
+  // Call MiniMax M2.5
+  const apiKey = process.env.MINIMAX_API_KEY
+  if (!apiKey) {
+    throw new Error('MINIMAX_API_KEY not configured')
+  }
+
+  const OpenAI = (await import('openai')).default
+  const client = new OpenAI({
+    apiKey,
+    baseURL: 'https://api.minimax.io/v1',
+  })
+
+  const completion = await client.chat.completions.create({
+    model: SYNTHESIS_MODEL,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    max_tokens: SYNTHESIS_MAX_TOKENS,
+    temperature: 0.3,
+  })
+
+  const responseText = completion.choices[0]?.message?.content ?? ''
+
+  // Parse response
+  let report: CouncilReport
+
+  try {
+    const jsonMatch = responseText.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/) || [null, responseText]
+    const jsonStr = jsonMatch[1]?.trim() ?? responseText.trim()
+    report = JSON.parse(jsonStr)
+  } catch {
+    // Fallback if JSON parsing fails
+    report = {
+      executive_summary: responseText.slice(0, 500),
+      positions: specialistDebates.map(s => ({
+        specialist: s.specialist_name,
+        specialist_id: s.specialist_id,
+        key_position: s.responses.slice(0, 300),
+        conviction: 'medium' as const,
+      })),
+      tensions: [],
+      consensus: [],
+      recommendations: [],
+      decision_options: [],
+    }
+  }
+
+  return report
+}
+
+/**
+ * Builds the system prompt for Cal's council synthesis.
+ */
+function buildCouncilSystemPrompt(): string {
+  const calSpecialist = SPECIALISTS.find(s => s.id === CAL_SPECIALIST_ID)
+  if (!calSpecialist) {
+    throw new Error('Cal (Chief of Staff) specialist not found')
+  }
+
+  const personalityPrompt = compilePersonalityPrompt(calSpecialist.name, calSpecialist.personality)
+
+  return [
+    personalityPrompt,
+    '',
+    '--- SPECIALIST COUNCIL DEBATE SYNTHESIS MODE ---',
+    '',
+    'You are Cal, Chief of Staff, synthesizing a specialist council debate.',
+    'Your job is to produce a structured decision recommendation report that:',
+    '',
+    '1. SUMMARIZES each specialist\'s key position (keep it brief)',
+    '2. IDENTIFIES tensions/disagreements between specialists',
+    '3. HIGHLIGHTS areas of consensus',
+    '4. PROVIDES 2-3 clear recommendations',
+    '5. PRESENTS decision options for the founder to weigh in on',
+    '',
+    'Be direct and opinionated. The founder needs clarity, not hedging.',
+    'If specialists disagree, surface that tension — don\'t smooth it over.',
+    '',
+    'Respond with ONLY valid JSON in this exact format:',
+    '```json',
+    '{',
+    '  "executive_summary": "2-3 sentence overview of the debate outcome",',
+    '  "positions": [',
+    '    { "specialist": "Name", "specialist_id": "id", "key_position": "1-2 sentence summary", "conviction": "high|medium|low" }',
+    '  ],',
+    '  "tensions": [',
+    '    { "between": ["Specialist A", "Specialist B"], "description": "What they disagree on" }',
+    '  ],',
+    '  "consensus": ["Area 1 where specialists agree", "Area 2"],',
+    '  "recommendations": ["Recommendation 1", "Recommendation 2", "Recommendation 3"],',
+    '  "decision_options": [',
+    '    { "option": "Option description", "supporters": ["Specialist A", "Specialist B"], "rationale": "Why this option" }',
+    '  ]',
+    '}',
+    '```',
+  ].join('\n')
+}
+
+/**
+ * Builds the user prompt with debate transcripts.
+ */
+function buildCouncilUserPrompt(
+  topic: string,
+  specialists: Array<{
+    specialist_id: string
+    specialist_name: string
+    specialist_title: string
+    responses: string
+  }>,
+): string {
+  const debateBlocks = specialists.map(s => {
+    return [
+      `### ${s.specialist_name} (${s.specialist_title})`,
+      s.responses,
+    ].join('\n')
+  }).join('\n\n')
+
+  return [
+    `Topic: ${topic}`,
+    '',
+    'Here is the full debate transcript:',
+    '',
+    debateBlocks,
+    '',
+    'Synthesize this debate into the structured report format.',
+  ].join('\n')
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 /**

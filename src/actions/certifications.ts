@@ -1,8 +1,5 @@
 "use server"
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// Note: Using 'any' type assertions because provider tables are not in generated database types
-
 /**
  * Certifications actions module
  * Complete certification-related functionality
@@ -62,11 +59,11 @@ export async function getCertifications(providerId?: string): Promise<{
 
         let targetProviderId = providerId
         if (!targetProviderId) {
-            const { data: profile, error: profileError } = await (supabase as any)
+            const { data: profile, error: profileError } = await supabase
                 .from('provider_profiles')
                 .select('id')
                 .eq('user_id', user.id)
-                .single() as { data: ProviderProfileRecord | null; error: any }
+                .single()
 
             if (profileError || !profile) {
                 return { data: [], error: null } // No profile yet
@@ -74,7 +71,7 @@ export async function getCertifications(providerId?: string): Promise<{
             targetProviderId = profile.id
         }
 
-        const { data, error } = await (supabase as any)
+        const { data, error } = await supabase
             .from('provider_certifications')
             .select('*')
             .eq('provider_id', targetProviderId)
@@ -118,17 +115,17 @@ export async function addCertification(certification: {
             return { data: null, error: "Not authenticated" }
         }
 
-        const { data: profile, error: profileError } = await (supabase as any)
+        const { data: profile, error: profileError } = await supabase
             .from('provider_profiles')
             .select('id')
             .eq('user_id', user.id)
-            .single() as { data: ProviderProfileRecord | null; error: any }
+            .single()
 
         if (profileError || !profile) {
             return { data: null, error: "No provider profile found" }
         }
 
-        const { data, error } = await (supabase as any)
+        const { data, error } = await supabase
             .from('provider_certifications')
             .insert({
                 provider_id: profile.id,
@@ -184,17 +181,17 @@ export async function updateCertification(
             return { success: false, error: "Not authenticated" }
         }
 
-        const { data: profile, error: profileError } = await (supabase as any)
+        const { data: profile, error: profileError } = await supabase
             .from('provider_profiles')
             .select('id')
             .eq('user_id', user.id)
-            .single() as { data: ProviderProfileRecord | null; error: any }
+            .single()
 
         if (profileError || !profile) {
             return { success: false, error: "No provider profile found" }
         }
 
-        const { error } = await (supabase as any)
+        const { error } = await supabase
             .from('provider_certifications')
             .update(updates)
             .eq('id', certificationId)
@@ -232,17 +229,17 @@ export async function deleteCertification(certificationId: string): Promise<{
             return { success: false, error: "Not authenticated" }
         }
 
-        const { data: profile, error: profileError } = await (supabase as any)
+        const { data: profile, error: profileError } = await supabase
             .from('provider_profiles')
             .select('id')
             .eq('user_id', user.id)
-            .single() as { data: ProviderProfileRecord | null; error: any }
+            .single()
 
         if (profileError || !profile) {
             return { success: false, error: "No provider profile found" }
         }
 
-        const { error } = await (supabase as any)
+        const { error } = await supabase
             .from('provider_certifications')
             .delete()
             .eq('id', certificationId)
@@ -281,23 +278,23 @@ export async function requestVerification(certificationId: string): Promise<{
             return { success: false, error: "Not authenticated" }
         }
 
-        const { data: profile, error: profileError } = await (supabase as any)
+        const { data: profile, error: profileError } = await supabase
             .from('provider_profiles')
             .select('id')
             .eq('user_id', user.id)
-            .single() as { data: ProviderProfileRecord | null; error: any }
+            .single()
 
         if (profileError || !profile) {
             return { success: false, error: "No provider profile found" }
         }
 
         // Verify ownership and get current verification status
-        const { data: cert, error: fetchError } = await (supabase as any)
+        const { data: cert, error: fetchError } = await supabase
             .from('provider_certifications')
             .select('id, is_verified, verification_url')
             .eq('id', certificationId)
             .eq('provider_id', profile.id)
-            .single() as { data: CertificationRecord | null; error: any }
+            .single()
 
         if (fetchError || !cert) {
             return { success: false, error: "Certification not found" }
@@ -312,7 +309,7 @@ export async function requestVerification(certificationId: string): Promise<{
         }
 
         // Update certification to mark verification as requested
-        const { error: updateError } = await (supabase as any)
+        const { error: updateError } = await supabase
             .from('provider_certifications')
             .update({
                 verification_requested_at: new Date().toISOString(),
@@ -359,11 +356,11 @@ export async function getExpiringCertifications(providerId?: string): Promise<{
 
         let targetProviderId = providerId
         if (!targetProviderId) {
-            const { data: profile, error: profileError } = await (supabase as any)
+            const { data: profile, error: profileError } = await supabase
                 .from('provider_profiles')
                 .select('id')
                 .eq('user_id', user.id)
-                .single() as { data: ProviderProfileRecord | null; error: any }
+                .single()
 
             if (profileError || !profile) {
                 return { data: [], error: "No provider profile found" }
@@ -374,7 +371,7 @@ export async function getExpiringCertifications(providerId?: string): Promise<{
         const ninetyDaysFromNow = new Date()
         ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90)
 
-        const { data, error } = await (supabase as any)
+        const { data, error } = await supabase
             .from('provider_certifications')
             .select('id, certification_name, expiry_date')
             .eq('provider_id', targetProviderId)

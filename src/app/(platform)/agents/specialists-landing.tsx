@@ -12,6 +12,7 @@ import { SpecialistCard } from "./specialist-card"
 import { getPromptsByCategory } from "./lib/prompt-library"
 import { BriefSpecialistDialog } from "./brief-specialist-dialog"
 import { TeamMeetingDialog } from "./team-meeting-dialog"
+import { SpecialistCouncilDialog } from "@/components/agents/specialist-council-dialog"
 import { MeetingHistory } from "./meeting-history"
 
 /**
@@ -58,6 +59,7 @@ export function SpecialistsLanding({
 }: SpecialistsLandingProps) {
     const [briefSpecialistId, setBriefSpecialistId] = useState<string | null>(null)
     const [isMeetingOpen, setIsMeetingOpen] = useState(false)
+    const [isCouncilOpen, setIsCouncilOpen] = useState(false)
     const [handoffContext, setHandoffContext] = useState<string | null>(null)
     const [referredByName, setReferredByName] = useState<string | null>(null)
     const [showOrgChart, setShowOrgChart] = useState(false)
@@ -123,6 +125,15 @@ export function SpecialistsLanding({
                             <MessageSquare className="h-4 w-4 mr-2" />
                             Call a Team Meeting
                         </Button>
+                        <Button
+                            onClick={() => setIsCouncilOpen(true)}
+                            variant="outline"
+                            className="rounded-full"
+                            size="sm"
+                        >
+                            <Users className="h-4 w-4 mr-2" />
+                            Specialist Council
+                        </Button>
                     </div>
                 </div>
             </motion.div>
@@ -171,7 +182,6 @@ export function SpecialistsLanding({
                                 >
                                     <span className="text-sm font-semibold text-foreground">{specialist.name}</span>
                                     <span className="text-xs text-muted-foreground">{specialist.title}</span>
-                                    <span className="text-[10px] text-muted-foreground/70">via {specialist.inspiredBy.split(',')[0]}</span>
                                 </button>
                             ))}
                         </div>
@@ -294,6 +304,12 @@ export function SpecialistsLanding({
             <TeamMeetingDialog
                 open={isMeetingOpen}
                 onOpenChange={setIsMeetingOpen}
+            />
+
+            {/* ── Specialist Council Dialog ──────────────────────────────── */}
+            <SpecialistCouncilDialog
+                open={isCouncilOpen}
+                onOpenChange={setIsCouncilOpen}
             />
         </div>
     )

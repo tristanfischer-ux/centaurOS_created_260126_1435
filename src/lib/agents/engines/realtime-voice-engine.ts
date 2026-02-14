@@ -1,16 +1,18 @@
 /**
  * @file realtime-voice-engine.ts
  *
- * @description Tier 2 ConversationEngine — OpenAI Realtime API for bidirectional
+ * @description Tier 2 ConversationEngine — Realtime API for bidirectional
  * voice conversation. Provides sub-300ms latency by combining STT + LLM + TTS
  * in a single WebSocket connection.
  *
- * EXPERIMENTAL: This engine is a working prototype for evaluation. It requires:
- * - An OpenAI API key with Realtime API access
- * - A relay server endpoint to proxy the WebSocket (browser cannot hold API keys)
+ * NOTE: This engine currently uses OpenAI's Realtime API because MiniMax does
+ * not offer a unified realtime API equivalent. MiniMax provides separate:
+ * - WebSocket TTS (streaming speech synthesis)
+ * - HTTP STT (speech-to-text)
+ * - HTTP Text (M2.5 for conversation)
  *
- * The relay server should be at /api/agents/realtime-relay and forward
- * authenticated WebSocket frames between the browser and OpenAI's Realtime API.
+ * These are separate APIs requiring custom orchestration, which is a significant
+ * undertaking. OpenAI's Realtime API provides a unified bidirectional protocol.
  *
  * Cost model (Feb 2026):
  * - Audio input: ~$0.06/min (100 tokens/sec)
@@ -20,6 +22,7 @@
  * @related
  * - src/lib/agents/conversation-engine.ts — Interface definition
  * - https://platform.openai.com/docs/guides/realtime — OpenAI docs
+ * - https://platform.minimax.io/docs/api-reference/speech-t2a-websocket — MiniMax TTS (separate)
  */
 
 import type {
@@ -32,7 +35,11 @@ import { registerEngine } from "../conversation-engine"
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** WebSocket relay endpoint (browser -> our server -> OpenAI Realtime) */
+/** WebSocket relay endpoint (browser -> our server -> OpenAI Realtime)
+ * NOTE: Currently connects directly as OpenAI supports client-side WebSocket
+ * with proper authentication. If we switch to MiniMax, we'd need a relay server
+ * because MiniMax doesn't support client-side WebSocket authentication.
+ */
 const RELAY_ENDPOINT = "/api/agents/realtime-relay"
 
 /**
@@ -70,6 +77,10 @@ interface RealtimeServerEvent {
 /**
  * Tier 2 conversation engine — real-time bidirectional voice via OpenAI
  * Realtime API over WebSocket.
+ *
+ * NOTE: OpenAI is used because MiniMax does not offer a unified realtime API.
+ * MiniMax requires separate orchestration of TTS (WebSocket), STT (HTTP),
+ * and text generation (HTTP), which is more complex to implement.
  *
  * Connection flow:
  * 1. connect() opens WebSocket to our relay server
