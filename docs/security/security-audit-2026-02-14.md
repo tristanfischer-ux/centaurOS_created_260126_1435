@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 25 | 23 fixed, 2 open |
+| Medium | 26 | 24 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -599,6 +599,34 @@ provider overrides, reducing reliability for authenticated TTS calls.
 
 ---
 
+### 30) Google OAuth state used unsigned payload and trusted callback foundry context (Medium)
+
+**Issue:** Google OAuth connect/callback flow used a base64-encoded JSON state payload
+without tamper-evident signing and accepted callback `foundryId` from state directly.  
+**Impact:** Increased risk of OAuth state manipulation and incorrect foundry-context token writes
+if state was altered or replayed.
+
+**Fix implemented:**
+
+- Added signed OAuth state utility:
+  - `src/lib/security/oauth-state.ts`
+  - HMAC-signed state token creation/verification with timestamp and nonce.
+- `src/app/api/google/connect/route.ts`
+  - now builds and signs OAuth state via:
+    - `buildOAuthStatePayload(...)`
+    - `createSignedOAuthState(...)`
+  - fail-closes (`503`) when state signing secret is not configured
+    (`GOOGLE_OAUTH_STATE_SECRET` fallback `GOOGLE_CLIENT_SECRET`).
+- `src/app/api/google/callback/route.ts`
+  - verifies signed state with 10-minute expiry
+  - enforces user membership in `stateData.foundryId` via `foundry_memberships`
+    before persisting Google tokens.
+- Added tests:
+  - `src/lib/security/__tests__/oauth-state.test.ts` (unit tests for sign/verify)
+  - regression assertions in `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
 ## Security Regression Coverage Added
 
 Added:
@@ -622,6 +650,7 @@ The test suite enforces:
 12. Cron/sweep APIs no longer expose raw internal exception messages in responses.
 13. Google Calendar webhook fail-closed secret enforcement and webhook auth checks.
 14. Stripe webhook fail-closed secret enforcement and endpoint throttling checks.
+15. Google OAuth signed-state validation and callback foundry-membership enforcement.
 
 ---
 

@@ -456,6 +456,29 @@ describe('google calendar webhook hardening regressions', () => {
   })
 })
 
+describe('google oauth state hardening regressions', () => {
+  it('signs oauth state at connect step and fails closed without signing secret', async () => {
+    const connectRoutePath = path.join(process.cwd(), 'src/app/api/google/connect/route.ts')
+    const source = await readFile(connectRoutePath, 'utf-8')
+
+    expect(source).toContain('createSignedOAuthState')
+    expect(source).toContain('buildOAuthStatePayload')
+    expect(source).toContain("process.env.GOOGLE_OAUTH_STATE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET")
+    expect(source).toContain("return NextResponse.json({ error: 'OAuth state signing not configured' }, { status: 503 })")
+  })
+
+  it('verifies signed oauth state and foundry membership at callback step', async () => {
+    const callbackRoutePath = path.join(process.cwd(), 'src/app/api/google/callback/route.ts')
+    const source = await readFile(callbackRoutePath, 'utf-8')
+
+    expect(source).toContain('verifySignedOAuthState')
+    expect(source).toContain('10 * 60 * 1000')
+    expect(source).toContain(".from('foundry_memberships')")
+    expect(source).toContain(".eq('foundry_id', stateData.foundryId)")
+    expect(source).toContain("error=foundry_mismatch")
+  })
+})
+
 describe('stripe webhook hardening regressions', () => {
   it('fails closed when Stripe webhook secret is missing', async () => {
     const routePath = path.join(process.cwd(), 'src/app/api/webhooks/stripe/route.ts')
