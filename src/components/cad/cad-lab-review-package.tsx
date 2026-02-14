@@ -336,6 +336,18 @@ export function CadLabReviewPackage({
                   </div>
                 </div>
 
+                {/* SVG thumbnail for generated modules */}
+                {mod.status === "generated" && mod.result?.svgIso && (
+                  <div className="w-full h-20 rounded-md bg-muted/30 border border-muted overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={mod.result.svgIso}
+                      alt={`${mod.name} isometric view`}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                )}
+
                 {/* Purpose and description */}
                 <p className="text-xs text-muted-foreground">
                   {mod.purpose}
