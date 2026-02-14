@@ -482,6 +482,32 @@ describe('google oauth state hardening regressions', () => {
   })
 })
 
+describe('telegram settings route hardening regressions', () => {
+  it('uses shared admin client helper for telegram linking routes', async () => {
+    const routes = [
+      'src/app/api/settings/telegram/generate-code/route.ts',
+      'src/app/api/settings/telegram/check-link/route.ts',
+      'src/app/api/settings/telegram/unlink/route.ts',
+    ]
+
+    for (const routePath of routes) {
+      const source = await readFile(path.join(process.cwd(), routePath), 'utf-8')
+      expect(source).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
+      expect(source).toContain('const admin = createAdminClient()')
+      expect(source).not.toContain("createClient as createAdminClient")
+    }
+  })
+
+  it('rate limits telegram link status checks', async () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/settings/telegram/check-link/route.ts')
+    const source = await readFile(routePath, 'utf-8')
+
+    expect(source).toContain("await rateLimit('api', `telegram-check-link:${user.id}`")
+    expect(source).toContain('window: 60 * 1000')
+    expect(source).toContain('{ status: 429 }')
+  })
+})
+
 describe('stripe webhook hardening regressions', () => {
   it('fails closed when Stripe webhook secret is missing', async () => {
     const routePath = path.join(process.cwd(), 'src/app/api/webhooks/stripe/route.ts')

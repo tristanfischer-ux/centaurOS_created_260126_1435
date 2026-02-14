@@ -23,7 +23,7 @@ This audit reviewed the application security posture across:
 | --- | ---: | --- |
 | Critical | 1 | Open |
 | High | 5 | 5 fixed (pending migration deploy) |
-| Medium | 26 | 24 fixed, 2 open |
+| Medium | 27 | 25 fixed, 2 open |
 | Low | 3 | Open |
 
 ---
@@ -629,6 +629,31 @@ if state was altered or replayed.
 
 ---
 
+### 31) Telegram linking settings routes used ad-hoc admin client construction and unthrottled status checks (Medium)
+
+**Issue:** Telegram settings routes (`generate-code`, `check-link`, `unlink`) each created
+their own service-role client via local constructors, and `GET /check-link` had no endpoint-level
+throttling.  
+**Impact:** Increased maintenance drift risk for admin client initialization and avoidable
+authenticated polling abuse on link-status checks.
+
+**Fix implemented:**
+
+- `src/app/api/settings/telegram/generate-code/route.ts`
+- `src/app/api/settings/telegram/check-link/route.ts`
+- `src/app/api/settings/telegram/unlink/route.ts`
+  - replaced ad-hoc admin client construction with shared:
+    - `import { createAdminClient } from '@/lib/supabase/admin'`
+    - `const admin = createAdminClient()`
+- Added rate limiting to Telegram link status checks:
+  - key: `telegram-check-link:${user.id}`
+  - limit: `60`
+  - window: `60 * 1000` (1 minute)
+- Added regression assertions in:
+  - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
+
+---
+
 ## Security Regression Coverage Added
 
 Added:
@@ -653,6 +678,7 @@ The test suite enforces:
 13. Google Calendar webhook fail-closed secret enforcement and webhook auth checks.
 14. Stripe webhook fail-closed secret enforcement and endpoint throttling checks.
 15. Google OAuth signed-state validation and callback foundry-membership enforcement.
+16. Telegram linking settings routes use shared admin client helper and status-check throttling.
 
 ---
 
