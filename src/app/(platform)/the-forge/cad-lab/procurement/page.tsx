@@ -14,9 +14,12 @@ import { useRouter } from "next/navigation"
 import {
   ShoppingCart,
   ArrowLeft,
+  ArrowRight,
+  ClipboardCheck,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { CadLabDiagnostics } from "@/components/cad/cad-lab-diagnostics"
 import { CadLabSupplyChain } from "@/components/cad/cad-lab-supply-chain"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
@@ -68,6 +71,27 @@ export default function CadLabProcurementPage(): React.ReactNode {
       <CadLabSupplyChain modules={modules} diagnosticAnswers={diagnosticAnswers} />
       <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
       <CadLabContracting modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
+
+      {/* What's Next CTA */}
+      <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Next: Review Package
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Generate a supplier-ready engineering review package with expert discipline recommendations.
+              </p>
+            </div>
+            <Button onClick={() => router.push("/the-forge/cad-lab/review")} className="gap-1.5">
+              <ClipboardCheck className="h-4 w-4" />
+              Continue to Review
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

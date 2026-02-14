@@ -128,6 +128,12 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                     )}
                   >
                     {stage.label}
+                    {/* Module count badge for Build stage */}
+                    {stage.id === "build" && generatedModuleCount > 0 && modules.length > 0 && (
+                      <span className="ml-1 text-[9px] font-mono opacity-75">
+                        {generatedModuleCount}/{modules.length}
+                      </span>
+                    )}
                   </span>
                 </Link>
               ) : (

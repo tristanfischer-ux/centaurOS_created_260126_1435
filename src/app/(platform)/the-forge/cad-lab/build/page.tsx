@@ -563,6 +563,29 @@ export default function CadLabBuildPage(): React.ReactNode {
         </CardContent>
       </Card>
 
+      {/* ── What's Next CTA — shown when all modules are generated ── */}
+      {generatedModuleCount > 0 && generatedModuleCount === modules.length && !isBatchRunning && (
+        <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Next: Engineering Analysis
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  View risk register, project timeline, and system-level engineering metrics.
+                </p>
+              </div>
+              <Button onClick={() => router.push("/the-forge/cad-lab/analysis")} className="gap-1.5">
+                <BarChart3 className="h-4 w-4" />
+                Continue to Analysis
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Fullscreen overlay ── */}
       {fullscreenView && viewingResult && (
         <FullscreenOverlay
