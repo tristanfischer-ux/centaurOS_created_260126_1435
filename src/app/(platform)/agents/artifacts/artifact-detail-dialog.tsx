@@ -686,6 +686,7 @@ export function ArtifactDetailDialog({
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditContent(e.target.value)}
                 className="flex-1 w-full p-4 text-sm font-mono bg-background text-foreground resize-none focus:outline-none"
                 placeholder="Write your content in markdown..."
+                aria-label="Content editor"
               />
               <div className="px-4 py-3 border-t flex items-center gap-2">
                 <Button

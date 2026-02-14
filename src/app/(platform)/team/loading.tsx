@@ -76,8 +76,8 @@ export default function TeamLoading() {
             {/* Member Sections */}
             {[
                 { role: "Founders", color: "bg-international-orange/30", count: 1 },
-                { role: "Executives", color: "bg-orange-400/30", count: 3 },
-                { role: "Apprentices", color: "bg-slate-400/30", count: 4 }
+                { role: "Executives", color: "bg-international-orange/20", count: 3 },
+                { role: "Apprentices", color: "bg-muted-foreground/30", count: 4 }
             ].map(({ role, color, count }) => (
                 <div key={role} className="space-y-4">
                     <div className="flex items-center gap-3 border-b border-muted pb-3">

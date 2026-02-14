@@ -246,31 +246,36 @@ export async function getRecentSpecialistOutputs(
             return { data: [], error: null }
         }
 
-        const results: Array<{ specialistId: string; summary: string }> = []
+        const threadIds = threads.map((t) => t.id)
 
-        // For each thread, get the most recent user + assistant message pair
+        // Single batch query: fetch recent messages for all threads (avoids N+1)
+        const { data: allMsgs } = await supabase
+            .from('agent_memory_messages')
+            .select('thread_id, role, content, created_at')
+            .in('thread_id', threadIds)
+            .in('role', ['user', 'assistant'])
+            .order('created_at', { ascending: false })
+            .limit(threadIds.length * 4)
+
+        // Group by thread, keep most recent 2 messages per thread
+        const msgsByThread = new Map<string, Array<{ role: string; content: string; created_at: string }>>()
+        for (const m of allMsgs ?? []) {
+            const tid = m.thread_id as string
+            if (!msgsByThread.has(tid)) msgsByThread.set(tid, [])
+            const arr = msgsByThread.get(tid)!
+            if (arr.length < 2) arr.push({ role: m.role as string, content: m.content as string, created_at: m.created_at as string })
+        }
+
+        const results: Array<{ specialistId: string; summary: string }> = []
         for (const thread of threads) {
             if (results.length >= limit) break
-
-            // Fetch last 2 messages (user question + assistant response)
-            const { data: recentMsgs } = await supabase
-                .from('agent_memory_messages')
-                .select('role, content, created_at')
-                .eq('thread_id', thread.id)
-                .in('role', ['user', 'assistant'])
-                .order('created_at', { ascending: false })
-                .limit(2)
-
-            if (!recentMsgs || recentMsgs.length === 0) continue
-
+            const recentMsgs = msgsByThread.get(thread.id) ?? []
             const lastAssistant = recentMsgs.find((m) => m.role === 'assistant')
             const lastUser = recentMsgs.find((m) => m.role === 'user')
-
             if (!lastAssistant?.content) continue
 
-            // Build structured summary with user question, timestamp, and key output
             const timestamp = lastAssistant.created_at
-                ? new Date(lastAssistant.created_at as string).toLocaleDateString('en-US', {
+                ? new Date(lastAssistant.created_at).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
                   })
@@ -278,17 +283,14 @@ export async function getRecentSpecialistOutputs(
 
             const parts: string[] = []
             if (timestamp) parts.push(`(${timestamp})`)
-
             if (lastUser?.content) {
-                const userQ = (lastUser.content as string).slice(0, 200)
-                parts.push(`Asked about: "${userQ}${(lastUser.content as string).length > 200 ? '...' : ''}"`)
+                const userQ = lastUser.content.slice(0, 200)
+                parts.push(`Asked about: "${userQ}${lastUser.content.length > 200 ? '...' : ''}"`)
             }
-
-            // Truncate assistant output to 500 chars for richer context
-            const assistantContent = lastAssistant.content as string
-            const truncated = assistantContent.length > 500
-                ? assistantContent.slice(0, 500) + '...'
-                : assistantContent
+            const truncated =
+                lastAssistant.content.length > 500
+                    ? lastAssistant.content.slice(0, 500) + '...'
+                    : lastAssistant.content
             parts.push(`Key output: "${truncated}"`)
 
             results.push({

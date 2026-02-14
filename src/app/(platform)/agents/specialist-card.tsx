@@ -84,6 +84,9 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
             transition={{ duration: 0.4, delay: index * 0.08, ease: "easeOut" }}
         >
             <Card
+                role="button"
+                tabIndex={0}
+                aria-label={`Brief ${specialist.name}, ${specialist.title}`}
                 className={cn(
                     "border-l-4 rounded-xl shadow-sm bg-card",
                     "transition-all duration-200 hover:shadow-lg hover:-translate-y-1",
@@ -91,6 +94,12 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
                     CARD_BORDER_COLOR
                 )}
                 onClick={() => onBrief(specialist.id)}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        onBrief(specialist.id)
+                    }
+                }}
             >
                 <CardContent className="pt-6 flex flex-col h-full">
                     {/* Recommended Badge */}

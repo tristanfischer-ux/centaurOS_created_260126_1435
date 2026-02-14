@@ -1,35 +1,13 @@
-import { Suspense } from 'react'
-
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { typography } from '@/lib/design-system'
 import { getArtifacts } from '@/actions/agent-artifacts'
 import { ArtifactsView } from './artifacts-view'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { RefreshButton } from '@/components/RefreshButton'
+import { AlertCircle } from 'lucide-react'
 
 import type { AgentArtifactRow } from '@/actions/agent-artifacts'
-
-/**
- * Loading fallback for the artifacts list.
- */
-function ArtifactsSkeleton(): React.JSX.Element {
-  return (
-    <div className="space-y-6 pt-6">
-      <div className="flex items-center gap-4">
-        <Skeleton className="h-10 flex-1" />
-        <Skeleton className="h-10 w-32" />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Skeleton className="h-48" />
-        <Skeleton className="h-48" />
-        <Skeleton className="h-48" />
-        <Skeleton className="h-48" />
-        <Skeleton className="h-48" />
-        <Skeleton className="h-48" />
-      </div>
-    </div>
-  )
-}
 
 export const revalidate = 60
 
@@ -75,6 +53,19 @@ export default async function ArtifactsPage(): Promise<React.JSX.Element> {
           </p>
         </div>
       </div>
+
+      {error && (
+        <div className="mt-6 space-y-4">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Failed to load deliverables</AlertTitle>
+            <AlertDescription>
+              {typeof error === 'string' ? error : 'Unable to load artifacts. Please try again.'}
+            </AlertDescription>
+          </Alert>
+          <RefreshButton showLabel />
+        </div>
+      )}
 
       {/* Interactive listing */}
       <ArtifactsView artifacts={safeArtifacts} />

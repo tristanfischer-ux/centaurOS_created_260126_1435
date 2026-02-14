@@ -107,14 +107,29 @@ export async function getInsightFeed(limit: number = 10): Promise<InsightFeedRes
  * Marks an insight as read.
  *
  * @param insightId - The insight to mark as read
+ *
+ * @security Requires authenticated user; update scoped to user's foundry
  */
 export async function markInsightRead(insightId: string): Promise<void> {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('foundry_id, active_foundry_id')
+    .eq('id', user.id)
+    .single()
+
+  const foundryId = profile?.active_foundry_id ?? profile?.foundry_id
+  if (!foundryId) return
 
   const { error } = await supabase
     .from('agent_insights')
     .update({ is_read: true })
     .eq('id', insightId)
+    .eq('foundry_id', foundryId)
 
   if (error) {
     console.error('[AgentInsights] Failed to mark insight read:', error.message)
@@ -125,14 +140,29 @@ export async function markInsightRead(insightId: string): Promise<void> {
  * Dismisses an insight (hides it from the feed).
  *
  * @param insightId - The insight to dismiss
+ *
+ * @security Requires authenticated user; update scoped to user's foundry
  */
 export async function dismissInsight(insightId: string): Promise<void> {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('foundry_id, active_foundry_id')
+    .eq('id', user.id)
+    .single()
+
+  const foundryId = profile?.active_foundry_id ?? profile?.foundry_id
+  if (!foundryId) return
 
   const { error } = await supabase
     .from('agent_insights')
     .update({ is_dismissed: true })
     .eq('id', insightId)
+    .eq('foundry_id', foundryId)
 
   if (error) {
     console.error('[AgentInsights] Failed to dismiss insight:', error.message)
@@ -143,9 +173,23 @@ export async function dismissInsight(insightId: string): Promise<void> {
  * Marks an insight as acted on.
  *
  * @param insightId - The insight that was acted on
+ *
+ * @security Requires authenticated user; update scoped to user's foundry
  */
 export async function markInsightActedOn(insightId: string): Promise<void> {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('foundry_id, active_foundry_id')
+    .eq('id', user.id)
+    .single()
+
+  const foundryId = profile?.active_foundry_id ?? profile?.foundry_id
+  if (!foundryId) return
 
   const { error } = await supabase
     .from('agent_insights')
@@ -154,6 +198,7 @@ export async function markInsightActedOn(insightId: string): Promise<void> {
       acted_on_at: new Date().toISOString(),
     })
     .eq('id', insightId)
+    .eq('foundry_id', foundryId)
 
   if (error) {
     console.error('[AgentInsights] Failed to mark insight acted on:', error.message)

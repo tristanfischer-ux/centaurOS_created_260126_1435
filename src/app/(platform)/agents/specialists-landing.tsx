@@ -20,14 +20,14 @@ import { MeetingHistory } from "./meeting-history"
  */
 function getOrgChartHierarchy() {
     const departments = [
-        { id: 'strategy', name: 'Strategy', color: 'bg-violet-500' },
-        { id: 'technology', name: 'Technology', color: 'bg-cyan-500' },
-        { id: 'product', name: 'Product', color: 'bg-pink-500' },
-        { id: 'growth', name: 'Growth', color: 'bg-emerald-500' },
-        { id: 'operations', name: 'Operations', color: 'bg-amber-500' },
-        { id: 'finance', name: 'Finance', color: 'bg-orange-500' },
-        { id: 'people', name: 'People', color: 'bg-teal-500' },
-        { id: 'legal', name: 'Legal', color: 'bg-slate-500' },
+        { id: 'strategy', name: 'Strategy', color: 'bg-chart-5' },
+        { id: 'technology', name: 'Technology', color: 'bg-chart-2' },
+        { id: 'product', name: 'Product', color: 'bg-chart-6' },
+        { id: 'growth', name: 'Growth', color: 'bg-chart-3' },
+        { id: 'operations', name: 'Operations', color: 'bg-chart-4' },
+        { id: 'finance', name: 'Finance', color: 'bg-chart-1' },
+        { id: 'people', name: 'People', color: 'bg-chart-3' },
+        { id: 'legal', name: 'Legal', color: 'bg-chart-2' },
     ]
 
     // Build hierarchy: direct reports first, then by department

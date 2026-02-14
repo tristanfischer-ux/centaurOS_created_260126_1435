@@ -288,7 +288,7 @@ function MeetingDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
+            <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="font-display flex items-center gap-2">
                         <FileText className="h-5 w-5 text-electric-blue" />

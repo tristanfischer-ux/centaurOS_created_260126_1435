@@ -48,9 +48,9 @@ function getBandwidthInfo(member: MemberWithMetrics) {
 
 function getRoleConfig(role: string) {
     switch (role) {
-        case 'Founder': return { color: 'text-orange-700', bg: 'bg-orange-100', border: 'border-orange-200' }
-        case 'Executive': return { color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' }
-        case 'AI_Agent': return { color: 'text-purple-600', bg: 'bg-purple-100', border: 'border-purple-200' }
+        case 'Founder': return { color: 'text-international-orange', bg: 'bg-international-orange/10', border: 'border-international-orange/30' }
+        case 'Executive': return { color: 'text-international-orange/80', bg: 'bg-international-orange/5', border: 'border-international-orange/20' }
+        case 'AI_Agent': return { color: 'text-chart-5', bg: 'bg-chart-5/10', border: 'border-chart-5/30' }
         default: return { color: 'text-muted-foreground', bg: 'bg-muted', border: 'border-muted' }
     }
 }
@@ -272,7 +272,7 @@ export function NewTeamForm({ members }: NewTeamFormProps) {
                                                     "w-1 h-4 rounded-full",
                                                     role === 'Founder' ? 'bg-international-orange' :
                                                     role === 'Executive' ? 'bg-orange-400' :
-                                                    role === 'AI_Agent' ? 'bg-purple-500' : 'bg-slate-400'
+                                                    role === 'AI_Agent' ? 'bg-chart-5' : 'bg-muted-foreground'
                                                 )} />
                                                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                                     {role === 'AI_Agent' ? 'AI Agents' : `${role}s`}
@@ -310,7 +310,7 @@ export function NewTeamForm({ members }: NewTeamFormProps) {
                                                             {/* Avatar */}
                                                             {isAI ? (
                                                                 <Avatar className="h-9 w-9 shrink-0">
-                                                                    <AvatarFallback className="bg-purple-100 text-purple-600 text-xs">
+                                                                    <AvatarFallback className="bg-chart-5/10 text-chart-5 text-xs">
                                                                         <Brain className="h-4 w-4" />
                                                                     </AvatarFallback>
                                                                 </Avatar>
@@ -389,7 +389,7 @@ export function NewTeamForm({ members }: NewTeamFormProps) {
                                             {selectedMembers.slice(0, 6).map(member => (
                                                 member.role === 'AI_Agent' ? (
                                                     <Avatar key={member.id} className="h-10 w-10 border-2 border-background">
-                                                        <AvatarFallback className="bg-purple-100 text-purple-600 text-xs">
+                                                        <AvatarFallback className="bg-chart-5/10 text-chart-5 text-xs">
                                                             <Brain className="h-4 w-4" />
                                                         </AvatarFallback>
                                                     </Avatar>
@@ -421,7 +421,7 @@ export function NewTeamForm({ members }: NewTeamFormProps) {
                                                     >
                                                         {member.role === 'AI_Agent' ? (
                                                             <Avatar className="h-6 w-6">
-                                                                <AvatarFallback className="bg-purple-100 text-purple-600 text-[8px]">
+                                                                <AvatarFallback className="bg-chart-5/10 text-chart-5 text-[8px]">
                                                                     <Brain className="h-3 w-3" />
                                                                 </AvatarFallback>
                                                             </Avatar>

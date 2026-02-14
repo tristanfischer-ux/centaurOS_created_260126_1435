@@ -22,10 +22,10 @@ import type { TeamMember, MarketplaceCandidate } from '../types'
 type RoleKey = 'FOUNDER' | 'EXECUTIVE' | 'APPRENTICE' | 'MARKETPLACE'
 
 const ROLE_STYLES = {
-  FOUNDER: 'bg-orange-50 text-orange-700 border-orange-300',
-  EXECUTIVE: 'bg-orange-50 text-orange-700 border-orange-300',
-  APPRENTICE: 'bg-blue-50 text-blue-700 border-blue-300',
-  MARKETPLACE: 'bg-purple-50 text-purple-700 border-purple-300',
+  FOUNDER: 'bg-international-orange/10 text-international-orange border-international-orange/30',
+  EXECUTIVE: 'bg-international-orange/10 text-international-orange border-international-orange/30',
+  APPRENTICE: 'bg-chart-2/10 text-chart-2 border-chart-2/30',
+  MARKETPLACE: 'bg-chart-5/10 text-chart-5 border-chart-5/30',
 } satisfies Record<RoleKey, string>
 
 function RoleBadge({ role }: { role: RoleKey }) {
@@ -47,7 +47,7 @@ function CapacityBadge({ status }: { status: 'has_capacity' | 'at_capacity' }) {
     <span
       className={cn(
         'text-[11px] font-bold px-2.5 py-1 rounded-md',
-        isAtCap ? 'text-orange-600 bg-orange-50' : 'text-emerald-600 bg-emerald-50'
+        isAtCap ? 'text-status-warning bg-status-warning-light' : 'text-status-success bg-status-success-light'
       )}
     >
       {isAtCap ? 'At capacity' : 'Has capacity'}
@@ -199,11 +199,10 @@ export function PersonCard({
             </span>
             <button
               className={cn(
-                'text-xs font-bold text-white bg-emerald-500',
+                'text-xs font-bold text-primary-foreground bg-status-success',
                 'border-none rounded-lg px-4 py-[7px] cursor-pointer',
                 'inline-flex items-center gap-1.5',
-                'shadow-[0_2px_6px_rgba(16,185,129,0.25)]',
-                'transition-all duration-150 hover:bg-emerald-600'
+                'transition-all duration-150 hover:opacity-90'
               )}
             >
               👁 View

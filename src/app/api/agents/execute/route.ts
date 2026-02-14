@@ -105,7 +105,10 @@ export async function POST(request: Request) {
         modelId = body.modelId ?? "claude-opus-4-6"
         modality = body.modality ?? "text"
         threadId = body.threadId ?? undefined
-        customSystemPromptSuffix = typeof body.customSystemPromptSuffix === "string" ? body.customSystemPromptSuffix : undefined
+        customSystemPromptSuffix =
+            typeof body.customSystemPromptSuffix === "string"
+                ? body.customSystemPromptSuffix.slice(0, 2000)
+                : undefined
         specialistId = typeof body.specialistId === "string" ? body.specialistId : undefined
         enableThinking = body.enableThinking === true
         videoConfig = body.videoConfig ?? undefined
@@ -179,6 +182,22 @@ export async function POST(request: Request) {
 
     // 4. Build rich company context using the AI Context Builder
     const foundryId = await resolveFoundryId(supabase, user.id)
+
+    // 4b. Validate threadId belongs to user's foundry (IDOR prevention)
+    if (threadId && foundryId) {
+        const { data: thread } = await supabase
+            .from("agent_memory_threads")
+            .select("id")
+            .eq("id", threadId)
+            .eq("foundry_id", foundryId)
+            .single()
+        if (!thread) {
+            return NextResponse.json(
+                { error: "Invalid or inaccessible thread" },
+                { status: 403 }
+            )
+        }
+    }
     let companyContext = ""
     try {
         if (foundryId) {

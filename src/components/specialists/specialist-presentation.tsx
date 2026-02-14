@@ -32,7 +32,7 @@
 
 import { useRef, useEffect } from "react"
 import Image from "next/image"
-import { Loader2, Volume2, Mic, Brain, Wifi } from "lucide-react"
+import { AlertCircle, Loader2, Volume2, Mic, Brain, Wifi } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ConversationMode, SpecialistState } from "@/lib/agents/conversation-engine"
 import type { Specialist } from "@/app/(platform)/agents/specialists-data"
@@ -111,8 +111,9 @@ export function SpecialistPresentation({
                         ref={videoRef}
                         autoPlay
                         playsInline
-                        muted={false}
+                        muted
                         className="h-full w-full object-cover"
+                        aria-label={`${specialist.name} avatar video`}
                     />
 
                     {/* State overlay */}
@@ -241,7 +242,7 @@ function StateIndicator({
             className: "text-international-orange",
         },
         error: {
-            icon: Loader2,
+            icon: AlertCircle,
             label: "Error",
             className: "text-destructive",
         },

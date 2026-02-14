@@ -2,6 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { TeamPageView } from './team-page-view'
 import { isPast } from 'date-fns'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { RefreshButton } from '@/components/RefreshButton'
+import { AlertCircle } from 'lucide-react'
 import type { BusinessFunction, FunctionId } from './types'
 
 /**
@@ -22,33 +25,53 @@ export default async function TeamPage() {
     }
 
     // AUTH: Verify user has a foundry
-    const { data: currentUserProfile } = await supabase
+    const { data: currentUserProfile, error: profileError } = await supabase
         .from('profiles')
         .select('foundry_id')
         .eq('id', user.id)
         .single()
 
+    if (profileError) {
+        console.error('[TeamPage] Failed to fetch user profile:', { error: profileError.message, userId: user.id })
+    }
+
     const foundry_id = currentUserProfile?.foundry_id || user.app_metadata?.foundry_id
 
     if (!foundry_id) {
-        return <div className="p-8 text-destructive">Error: No Foundry associated with your account.</div>
+        return (
+            <div className="p-8">
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Configuration Error</AlertTitle>
+                    <AlertDescription>No Foundry associated with your account. Please contact your administrator.</AlertDescription>
+                </Alert>
+            </div>
+        )
     }
 
     // Fetch all tasks with extended fields
-    const { data: tasks } = await supabase
+    const { data: tasks, error: tasksError } = await supabase
         .from('tasks')
         .select('id, assignee_id, status, title, end_date, start_date, created_at, objective_id, progress, risk_level')
         .eq('foundry_id', foundry_id)
         .eq('is_ghost', false)
         .is('deleted_at', null)
 
+    if (tasksError) {
+        console.error('[TeamPage] Failed to fetch tasks:', { error: tasksError.message, foundryId: foundry_id })
+    }
+
     // Fetch objectives for name labels
-    const { data: objectives } = await supabase
+    const { data: objectives, error: objectivesError } = await supabase
         .from('objectives')
         .select('id, title')
         .eq('foundry_id', foundry_id)
         .eq('is_ghost', false)
         .is('deleted_at', null)
+
+    if (objectivesError) {
+        console.error('[TeamPage] Failed to fetch objectives:', { error: objectivesError.message, foundryId: foundry_id })
+    }
 
     const objectiveMap: Record<string, string> = {}
     for (const obj of objectives || []) {
@@ -56,7 +79,7 @@ export default async function TeamPage() {
     }
 
     // Fetch all profiles for the current foundry (include primary_function for orbit view)
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select(`
             id,
@@ -71,17 +94,29 @@ export default async function TeamPage() {
         .eq('foundry_id', foundry_id)
         .order('role', { ascending: true })
 
+    if (profilesError) {
+        console.error('[TeamPage] Failed to fetch profiles:', { error: profilesError.message, foundryId: foundry_id })
+    }
+
     // Fetch business functions catalog (for orbit function categories)
-    const { data: businessFunctions } = await supabase
+    const { data: businessFunctions, error: businessFunctionsError } = await supabase
         .from('business_functions')
         .select('id, category, name, display_order')
 
+    if (businessFunctionsError) {
+        console.error('[TeamPage] Failed to fetch business functions:', { error: businessFunctionsError.message })
+    }
+
     // Fetch custom function definitions for this foundry (if any)
-    const { data: customFunctions } = await supabase
+    const { data: customFunctions, error: customFunctionsError } = await supabase
         .from('foundry_business_functions')
         .select('function_id, label, short, display_order')
         .eq('foundry_id', foundry_id)
         .order('display_order')
+
+    if (customFunctionsError) {
+        console.error('[TeamPage] Failed to fetch custom functions:', { error: customFunctionsError.message, foundryId: foundry_id })
+    }
 
     // Build functions array: use custom if exists, otherwise use defaults
     const DEFAULT_FUNCTIONS: BusinessFunction[] = [
@@ -103,10 +138,14 @@ export default async function TeamPage() {
         : DEFAULT_FUNCTIONS
 
     // Fetch foundry function coverage (for orbit status per function)
-    const { data: rawCoverageData } = await supabase
+    const { data: rawCoverageData, error: coverageError } = await supabase
         .from('foundry_function_coverage')
         .select('id, function_id, coverage_status, covered_by')
         .eq('foundry_id', foundry_id)
+
+    if (coverageError) {
+        console.error('[TeamPage] Failed to fetch function coverage:', { error: coverageError.message, foundryId: foundry_id })
+    }
 
     // Enrich coverage rows with function category info via lookup
     interface CoverageRow {
@@ -126,11 +165,15 @@ export default async function TeamPage() {
     })
 
     // Fetch marketplace People listings (for orbit outer ring + card view)
-    const { data: marketplacePeople } = await supabase
+    const { data: marketplacePeople, error: marketplaceError } = await supabase
         .from('marketplace_listings')
         .select('id, title, subcategory, description, attributes')
         .eq('category', 'People')
         .eq('is_verified', true)
+
+    if (marketplaceError) {
+        console.error('[TeamPage] Failed to fetch marketplace listings:', { error: marketplaceError.message })
+    }
 
     // Fetch teams with members
     interface TeamMemberJoin {
@@ -141,7 +184,7 @@ export default async function TeamPage() {
         } | null
     }
 
-    const { data: rawTeams } = await supabase
+    const { data: rawTeams, error: rawTeamsError } = await supabase
         .from('teams')
         .select(`
             id,
@@ -155,6 +198,28 @@ export default async function TeamPage() {
         `)
         .eq('foundry_id', foundry_id)
         .order('created_at', { ascending: false })
+
+    if (rawTeamsError) {
+        console.error('[TeamPage] Failed to fetch teams:', { error: rawTeamsError.message, foundryId: foundry_id })
+    }
+
+    // Surface user-facing error when critical queries fail
+    const criticalErrors = [tasksError, objectivesError, profilesError, rawTeamsError].filter(Boolean)
+    if (criticalErrors.length > 0) {
+        const firstError = criticalErrors[0] as { message: string }
+        return (
+            <div className="p-8 space-y-4">
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Failed to load team data</AlertTitle>
+                    <AlertDescription>
+                        {firstError.message} Please try again.
+                    </AlertDescription>
+                </Alert>
+                <RefreshButton showLabel />
+            </div>
+        )
+    }
 
     const teams = rawTeams?.map(team => ({
         ...team,

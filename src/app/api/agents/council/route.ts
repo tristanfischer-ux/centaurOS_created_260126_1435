@@ -12,9 +12,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/security/rate-limit'
 import { SPECIALISTS } from '@/app/(platform)/agents/specialists-data'
 import { synthesizeCouncilDebate, type DebateTranscriptEntry } from '@/lib/agents/sweep-synthesis'
-import { getOrCreateMemoryThread } from '@/actions/agent-memory'
+import { getOrCreateSpecialistThread } from '@/actions/agent-memory'
 
 // Model configuration
 const PROVIDER_ID = 'anthropic'
@@ -144,11 +145,22 @@ async function executeSpecialist(
     specialist: typeof SPECIALISTS[0],
     threadId: string | undefined,
     prompt: string,
-    input: string
+    input: string,
+    cookieHeader: string | null
 ): Promise<string> {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/agents/execute`, {
+    const baseUrl =
+        process.env.NEXT_PUBLIC_BASE_URL ||
+        (typeof process.env.VERCEL_URL === 'string'
+            ? `https://${process.env.VERCEL_URL}`
+            : 'http://localhost:3000')
+    const url = `${baseUrl}/api/agents/execute`
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (cookieHeader) headers['Cookie'] = cookieHeader
+
+    const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
             prompt,
             input,
@@ -182,9 +194,9 @@ async function executeSpecialist(
         for (const line of lines) {
             if (line.startsWith('data: ')) {
                 try {
-                    const data = JSON.parse(line.slice(6))
-                    if (data.type === 'content') {
-                        fullResponse += data.content
+                    const data = JSON.parse(line.slice(6)) as { text?: string }
+                    if (data.text) {
+                        fullResponse += data.text
                     }
                 } catch {
                     // Skip invalid JSON
@@ -199,11 +211,23 @@ async function executeSpecialist(
 export async function POST(request: NextRequest) {
     try {
         // Authenticate
-        const supabase = createClient()
+        const supabase = await createClient()
         const { data: { user }, error: authError } = await supabase.auth.getUser()
 
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        // Rate limit — council triggers 12+ LLM calls per request
+        const rateLimitResult = await rateLimit('api', `council:${user.id}`, {
+            limit: 5,
+            window: 3600,
+        })
+        if (!rateLimitResult.success) {
+            return NextResponse.json(
+                { error: rateLimitResult.error || 'Rate limit exceeded' },
+                { status: 429 }
+            )
         }
 
         // Get user's foundry
@@ -236,16 +260,13 @@ export async function POST(request: NextRequest) {
         // Get or create memory threads for each specialist
         const threadIds: Record<string, string> = {}
         for (const specialist of selectedSpecialists) {
-            const { data: threadId } = await getOrCreateMemoryThread(
-                foundryId,
-                specialist.id,
-                user.id,
-                `Council: ${topic.slice(0, 50)}`
-            )
+            const { threadId } = await getOrCreateSpecialistThread(specialist.id)
             if (threadId) {
                 threadIds[specialist.id] = threadId
             }
         }
+
+        const cookieHeader = request.headers.get('cookie')
 
         // Run debate rounds
         const debateEntries: DebateTranscriptEntry[] = []
@@ -266,7 +287,8 @@ export async function POST(request: NextRequest) {
                         specialist,
                         threadIds[specialist.id],
                         prompt,
-                        topic
+                        topic,
+                        cookieHeader
                     )
 
                     debateEntries.push({

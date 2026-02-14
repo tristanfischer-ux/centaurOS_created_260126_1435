@@ -3,7 +3,7 @@
 /**
  * @file specialist-picker.tsx
  *
- * @description A compact popover grid showing all 9 specialists,
+ * @description A compact popover grid showing all specialists,
  * letting the user choose which specialist to consult. Each item
  * shows the specialist's avatar, name, and title. Clicking one
  * fires onSelect with the specialist ID.
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/popover"
 import {
   Compass, Package, Crown, Megaphone, Handshake,
-  TrendingUp, Calculator, UserPlus, Scale,
+  TrendingUp, Calculator, UserPlus, Scale, Cpu, Code2, Factory, Route,
 } from "lucide-react"
 import { SPECIALISTS } from "@/app/(platform)/agents/specialists-data"
 import type { Specialist } from "@/app/(platform)/agents/specialists-data"
@@ -35,6 +35,10 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   UserPlus,
   Users: UserPlus,
   Scale,
+  Cpu,
+  Code2,
+  Factory,
+  Route,
 }
 
 interface SpecialistPickerProps {
@@ -49,7 +53,7 @@ interface SpecialistPickerProps {
 }
 
 /**
- * SpecialistPicker -- Popover grid of all 9 specialists.
+ * SpecialistPicker -- Popover grid of all specialists.
  *
  * @description Opens a compact 3x3 grid showing each specialist with
  * their avatar, name, and title. The recommended specialist (if provided)

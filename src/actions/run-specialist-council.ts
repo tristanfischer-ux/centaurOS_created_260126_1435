@@ -13,6 +13,7 @@
 
 'use server'
 
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
@@ -83,19 +84,30 @@ export async function runSpecialistCouncil(
     }
 
     // Authenticate
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
         throw new Error('Unauthorized')
     }
 
-    // Call the council API
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || ''
+    // Call the council API (forward cookies so execute sub-requests are authenticated)
+    const baseUrl =
+        process.env.NEXT_PUBLIC_BASE_URL ||
+        (typeof process.env.VERCEL_URL === 'string'
+            ? `https://${process.env.VERCEL_URL}`
+            : 'http://localhost:3000')
+    const cookieStore = await cookies()
+    const cookieHeader = cookieStore
+        .getAll()
+        .map((c) => `${c.name}=${c.value}`)
+        .join('; ')
+
     const response = await fetch(`${baseUrl}/api/agents/council`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            ...(cookieHeader && { Cookie: cookieHeader }),
         },
         body: JSON.stringify({
             topic: topic.trim(),

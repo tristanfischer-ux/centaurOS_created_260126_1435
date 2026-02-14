@@ -203,7 +203,7 @@ export function TodayView(): React.ReactElement {
 
     if (bothFailed) {
         return (
-            <div className="max-w-3xl mx-auto space-y-8">
+            <div className="max-w-5xl space-y-8">
                 <PageHeader />
                 <Card className="rounded-xl border shadow-sm">
                     <CardContent className="pt-6 pb-6 flex flex-col items-center gap-4 text-center">
@@ -238,7 +238,7 @@ export function TodayView(): React.ReactElement {
     // ─── Main render ──────────────────────────────────────────────
 
     return (
-        <div className="max-w-3xl mx-auto space-y-8">
+        <div className="max-w-5xl space-y-8">
             <PageHeader />
 
             {/* Hero Narrative Card */}
@@ -575,7 +575,7 @@ function PageHeader(): React.ReactElement {
  */
 function TodayViewSkeleton(): React.ReactElement {
     return (
-        <div className="max-w-3xl mx-auto space-y-8">
+        <div className="max-w-5xl space-y-8">
             <PageHeader />
 
             {/* Greeting card skeleton */}

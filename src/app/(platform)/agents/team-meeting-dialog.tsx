@@ -869,7 +869,7 @@ export function TeamMeetingDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col">
+            <DialogContent size="xl" className="max-h-[90vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="font-display flex items-center gap-2">
                         <Users className="h-5 w-5 text-international-orange" />

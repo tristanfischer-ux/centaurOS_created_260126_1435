@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { toggleArtifactStar } from '@/actions/agent-artifacts'
 import { ArtifactDetailDialog } from './artifact-detail-dialog'
+import { EmptyState } from '@/components/ui/empty-state'
 
 import type { AgentArtifactRow, ArtifactContentType } from '@/actions/agent-artifacts'
 
@@ -46,7 +47,7 @@ const CONTENT_TYPE_BADGE_STYLES: Record<ArtifactContentType, string> = {
   document: 'bg-muted text-foreground',
   email: 'bg-status-info-light text-status-info-dark',
   report: 'bg-status-warning-light text-status-warning-dark',
-  presentation: 'bg-orange-50 text-international-orange',
+  presentation: 'bg-status-warning-light text-status-warning-dark',
   checklist: 'bg-status-success-light text-status-success-dark',
 }
 
@@ -293,8 +294,17 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
             return (
               <Card
                 key={artifact.id}
+                role="button"
+                tabIndex={0}
                 className="cursor-pointer hover:shadow-md transition-shadow border"
                 onClick={() => setSelectedArtifactId(artifact.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSelectedArtifactId(artifact.id)
+                  }
+                }}
+                aria-label={`View ${artifact.title}`}
               >
                 <CardContent className="pt-6">
                   <div className="space-y-3">
@@ -363,20 +373,15 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
           })}
         </div>
       ) : (
-        /* ── Empty state ── */
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="rounded-full bg-muted p-4 mb-4">
-            <Sparkles className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">
-            No saved outputs yet
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-sm">
-            {debouncedSearch || activeTypeFilter !== 'all' || starredOnly
+        <EmptyState
+          icon={<Sparkles className="h-8 w-8" />}
+          title="No saved outputs yet"
+          description={
+            debouncedSearch || activeTypeFilter !== 'all' || starredOnly
               ? 'No saved outputs match your current filters. Try adjusting your search or filters.'
-              : 'Run an agent workflow to generate your first output. Outputs are saved automatically when workflows complete.'}
-          </p>
-        </div>
+              : 'Run an agent workflow to generate your first output. Outputs are saved automatically when workflows complete.'
+          }
+        />
       )}
 
       {/* ── Detail dialog ── */}

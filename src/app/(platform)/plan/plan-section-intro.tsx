@@ -166,7 +166,7 @@ export function PlanSectionIntro(): React.ReactElement {
                 <OneSentencePlanner />
             </div>
 
-            {/* CAD Lab Discovery — surface the most impressive feature */}
+            {/* The Forge Discovery — surface the most impressive feature */}
             <div className="px-4 sm:px-6 lg:px-8 pt-6">
                 <Link href="/the-forge/cad-lab" className="block group">
                     <Card className="border border-dashed border-electric-blue/20 hover:border-electric-blue/40 hover:shadow-md hover:-translate-y-0.5 transition-all bg-gradient-to-br from-background to-electric-blue/[0.02]">
@@ -176,7 +176,7 @@ export function PlanSectionIntro(): React.ReactElement {
                             </div>
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-semibold text-foreground group-hover:text-electric-blue transition-colors">
-                                    Design physical products? Try the CAD Lab
+                                    Design physical products? Try The Forge
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                     Turn any product idea into manufacturing-ready 3D CAD models

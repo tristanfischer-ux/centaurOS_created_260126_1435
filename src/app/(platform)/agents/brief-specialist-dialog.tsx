@@ -157,6 +157,8 @@ export function BriefSpecialistDialog({
     const greetingGeneratedRef = useRef(false)
     /** Tracks whether we've already played the intro video for this specialist session */
     const introVideoPlayedRef = useRef(false)
+    /** AbortController for in-flight execute request — aborted when dialog closes or specialist changes */
+    const executeAbortRef = useRef<AbortController | null>(null)
 
     // ─── Screen Awareness ─────────────────────────────────────────────────
     const { serializeScreenContext, screenContext } = useScreenContext()
@@ -291,6 +293,14 @@ export function BriefSpecialistDialog({
         setIntroVideoUrl(null)
     }, [specialist.id])
 
+    // Abort in-flight execute request when dialog closes or specialist changes
+    useEffect(() => {
+        return () => {
+            executeAbortRef.current?.abort()
+            executeAbortRef.current = null
+        }
+    }, [open, specialist.id])
+
     // Focus textarea when ready
     useEffect(() => {
         if (open && !isLoadingThread && !isExecuting) {
@@ -319,7 +329,8 @@ export function BriefSpecialistDialog({
         // Only generate a dynamic greeting if there's context to reference
         if (!hasHistoricalMessages && !hasCrossContext) return
 
-        let cancelled = false
+        const controller = new AbortController()
+        const signal = controller.signal
 
         async function generateGreeting(): Promise<void> {
             setIsGeneratingGreeting(true)
@@ -366,9 +377,10 @@ ${contextParts.join("\n\n")}
                         threadId: threadId ?? undefined,
                         specialistId: specialist.id,
                     }),
+                    signal,
                 })
 
-                if (!res.ok || cancelled) return
+                if (!res.ok || signal.aborted) return
 
                 // Consume SSE stream
                 const reader = res.body?.getReader()
@@ -378,14 +390,18 @@ ${contextParts.join("\n\n")}
 
                 while (true) {
                     const { done, value } = await reader.read()
-                    if (done) break
+                    if (done || signal.aborted) break
                     const chunk = decoder.decode(value, { stream: true })
                     for (const line of chunk.split("\n")) {
                         if (line.startsWith("data: ")) {
                             const data = line.slice(6)
                             if (data === "[DONE]") continue
                             try {
-                                const parsed = JSON.parse(data)
+                                const parsed = JSON.parse(data) as { text?: string; error?: string }
+                                if (parsed.error) {
+                                    setError(parsed.error)
+                                    return
+                                }
                                 if (parsed.text) fullResponse += parsed.text
                             } catch {
                                 fullResponse += data
@@ -394,7 +410,7 @@ ${contextParts.join("\n\n")}
                     }
                 }
 
-                if (cancelled || !fullResponse.trim()) return
+                if (signal.aborted || !fullResponse.trim()) return
 
                 // Strip any NEXT_SPECIALIST recommendation from the greeting
                 const cleaned = fullResponse.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
@@ -413,17 +429,19 @@ ${contextParts.join("\n\n")}
                     })
                 }
             } catch (err) {
+                if (err instanceof Error && err.name === "AbortError") return
                 // Greeting is nice-to-have — don't block the user
                 console.warn("[BriefDialog] Greeting generation failed:", err)
             } finally {
-                if (!cancelled) setIsGeneratingGreeting(false)
+                if (!signal.aborted) setIsGeneratingGreeting(false)
             }
         }
 
         generateGreeting()
-        return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLoadingThread, open])
+        return () => {
+            controller.abort()
+        }
+    }, [isLoadingThread, open, specialist.id, specialist.name, specialist.title, specialist.workingStyle, specialist.voice, threadId, messages, crossSpecialistContext, tts.voiceEnabled])
 
     // ─── Handlers ─────────────────────────────────────────────────────────
 
@@ -490,6 +508,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
         const promptTemplate = selectedPrompt?.defaultPrompt ??
             `You are ${specialist.name}, the ${specialist.title} specialist for this company. ${specialist.workingStyle}\n\n{{input}}\n\n{{company_context}}\n\nProvide a thorough, actionable response that demonstrates deep expertise. Use markdown formatting with headers, tables, and bullet points for clarity.`
 
+        const controller = new AbortController()
+        executeAbortRef.current = controller
+
         try {
             const res = await fetch("/api/agents/execute", {
                 method: "POST",
@@ -505,6 +526,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                     customSystemPromptSuffix: systemExtras.join(""),
                     enableThinking: deepThinkEnabled,
                 }),
+                signal: controller.signal,
             })
 
             if (!res.ok) {
@@ -518,10 +540,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
 
             const decoder = new TextDecoder()
             let fullResponse = ""
+            let streamError: string | null = null
 
             while (true) {
                 const { done, value } = await reader.read()
-                if (done) break
+                if (done || controller.signal.aborted) break
 
                 const chunk = decoder.decode(value, { stream: true })
                 const lines = chunk.split("\n")
@@ -530,7 +553,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         const data = line.slice(6)
                         if (data === "[DONE]") continue
                         try {
-                            const parsed = JSON.parse(data)
+                            const parsed = JSON.parse(data) as { text?: string; error?: string }
+                            if (parsed.error) {
+                                streamError = parsed.error
+                                break
+                            }
                             if (parsed.text) {
                                 fullResponse += parsed.text
                                 setStreamingResponse(fullResponse)
@@ -541,6 +568,12 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         }
                     }
                 }
+                if (streamError) break
+            }
+
+            if (streamError) {
+                setError(streamError)
+                return
             }
 
             if (!fullResponse) {
@@ -600,15 +633,16 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             })
 
         } catch (err) {
+            if (err instanceof Error && err.name === "AbortError") return
             const message = err instanceof Error ? err.message : "Unknown error"
             console.error("[BriefDialog] Execution failed:", { specialist: specialist.id, error: message })
             setError(message)
             setStreamingResponse("")
         } finally {
+            executeAbortRef.current = null
             setIsExecuting(false)
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, tts.voiceEnabled, tts.warmUp, deepThinkEnabled])
+    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, tts.voiceEnabled, tts.warmUp, tts.play, deepThinkEnabled, serializeScreenContext])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
@@ -680,7 +714,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[750px] max-h-[90vh] flex flex-col">
+            <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
                 {/* Header */}
                 <DialogHeader>
                     <div className="flex items-start gap-4">
@@ -867,7 +901,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                         videoIntroRef.current.pause()
                                                     }
                                                 }}
-                                                className="h-7 text-xs bg-black/50 text-white hover:bg-black/70 border-0"
+                                                className="h-7 text-xs bg-foreground/50 text-background hover:bg-foreground/70 border-0"
                                             >
                                                 Skip
                                             </Button>
@@ -881,6 +915,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         {(hasConversation || hasHistoricalMessages) && (
                             <div
                                 ref={scrollRef}
+                                role="log"
+                                aria-live="polite"
+                                aria-label="Conversation with specialist"
                                 className="flex-1 min-h-0 overflow-y-auto space-y-4 mb-4 pr-1"
                                 style={{ maxHeight: "45vh" }}
                             >

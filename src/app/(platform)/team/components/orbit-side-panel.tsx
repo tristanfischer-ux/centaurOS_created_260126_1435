@@ -190,8 +190,7 @@ export function OrbitSidePanel({
                   className="flex items-center gap-3 p-2.5 rounded-xl w-full text-left cursor-pointer hover:bg-muted/60 transition-colors"
                 >
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0"
-                    style={{ background: '#FFEDD5', border: '2px solid #F97316', color: '#C2410C' }}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0 bg-international-orange/10 border-2 border-international-orange text-foreground"
                   >
                     {m.initials}
                   </div>
@@ -222,8 +221,7 @@ export function OrbitSidePanel({
                   className="flex items-center gap-3 p-2.5 rounded-xl w-full text-left cursor-pointer hover:bg-muted/60 transition-colors"
                 >
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0"
-                    style={{ background: '#F3E8FF', border: '2px solid #A78BFA', color: '#7C3AED' }}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0 bg-chart-5/10 border-2 border-chart-5 text-chart-5"
                   >
                     {s.initials}
                   </div>
@@ -252,8 +250,7 @@ export function OrbitSidePanel({
                   className="flex items-center gap-3 p-2.5 rounded-xl w-full text-left cursor-pointer hover:bg-muted/60 transition-colors"
                 >
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0"
-                    style={{ background: '#FFF7ED', border: '2px solid #FB923C', color: '#EA580C' }}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0 bg-international-orange/5 border-2 border-international-orange text-foreground"
                   >
                     {m.initials}
                   </div>
@@ -284,8 +281,7 @@ export function OrbitSidePanel({
                   className="flex items-center gap-3 p-2.5 rounded-xl w-full text-left cursor-pointer hover:bg-muted/60 transition-colors"
                 >
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0"
-                    style={{ background: '#F1F5F9', border: '2px solid #94A3B8', color: '#64748B' }}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0 bg-muted border-2 border-border text-muted-foreground"
                   >
                     {m.initials}
                   </div>
@@ -426,7 +422,7 @@ export function OrbitSidePanel({
             onClick={() => onViewProfile?.(a.id)}
             className="flex items-center gap-2.5 p-2.5 rounded-xl mb-1.5 bg-muted/40 border border-border w-full text-left cursor-pointer hover:bg-muted/60 transition-colors"
           >
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold bg-background border-2 border-indigo-200 text-indigo-500">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-extrabold bg-background border-2 border-chart-5/30 text-chart-5">
               {a.initials}
             </div>
             <div className="flex-1 min-w-0">
@@ -445,8 +441,8 @@ export function OrbitSidePanel({
       {/* Marketplace Candidates */}
       {mktAll.length > 0 && (
         <>
-          <div className="relative h-px bg-indigo-200 my-4">
-            <span className="absolute -top-2 left-0 bg-muted/50 pr-2 text-[9px] text-indigo-500 font-bold tracking-[1.5px]">
+          <div className="relative h-px bg-chart-5/20 my-4">
+            <span className="absolute -top-2 left-0 bg-muted/50 pr-2 text-[9px] text-chart-5 font-bold tracking-[1.5px]">
               MARKETPLACE
             </span>
           </div>
@@ -455,7 +451,7 @@ export function OrbitSidePanel({
             return (
               <div key={c.id} className="mb-2">
                 <div
-                  className="flex items-center gap-2.5 p-3 rounded-xl bg-background border border-indigo-100"
+                  className="flex items-center gap-2.5 p-3 rounded-xl bg-background border border-chart-5/20"
                 >
                   <div
                     className="w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-extrabold"
@@ -506,7 +502,7 @@ export function OrbitSidePanel({
           })}
           <Link
             href={`/marketplace?category=People`}
-            className="block w-full mt-2.5 py-3 bg-indigo-600 border-none rounded-xl text-white text-[13px] font-bold text-center cursor-pointer hover:bg-indigo-700 transition-colors"
+            className="block w-full mt-2.5 py-3 bg-accent border-none rounded-xl text-accent-foreground text-[13px] font-bold text-center cursor-pointer hover:opacity-90 transition-colors"
           >
             Browse All Marketplace →
           </Link>

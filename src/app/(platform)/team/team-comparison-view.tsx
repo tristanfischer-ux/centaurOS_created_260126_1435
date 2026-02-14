@@ -445,11 +445,11 @@ export function TeamComparisonView({ founders, executives, apprentices, teams, c
         const isPaired = !!member.paired_ai_id && !!pairedAI
 
         const roleBadgeClass = isAIAgent
-            ? 'text-purple-600 border-purple-200 bg-purple-100'
+            ? 'text-chart-5 border-chart-5/30 bg-chart-5/10'
             : member.role === 'Founder'
-                ? 'text-orange-700 border-orange-200 bg-orange-100'
+                ? 'text-international-orange border-international-orange/30 bg-international-orange/10'
                 : member.role === 'Executive'
-                    ? 'text-orange-600 border-orange-100 bg-orange-50'
+                    ? 'text-international-orange/80 border-international-orange/20 bg-international-orange/5'
                     : 'text-muted-foreground border bg-muted'
 
         return (
@@ -462,8 +462,8 @@ export function TeamComparisonView({ founders, executives, apprentices, teams, c
                         >
                             <div className="relative">
                                 {isAIAgent ? (
-                                    <Avatar className="h-9 w-9 border border-purple-200">
-                                        <AvatarFallback className="bg-purple-100 text-purple-600 text-xs">
+                                    <Avatar className="h-9 w-9 border border-chart-5/30">
+                                        <AvatarFallback className="bg-chart-5/10 text-chart-5 text-xs">
                                             <Brain className="h-4 w-4" />
                                         </AvatarFallback>
                                     </Avatar>
@@ -837,13 +837,13 @@ export function TeamComparisonView({ founders, executives, apprentices, teams, c
                     <MemberSection
                         title="Executives"
                         subtitle="Evaluators"
-                        accentColor="bg-orange-400"
+                        accentColor="bg-international-orange"
                         members={filteredExecutives}
                     />
                     <MemberSection
                         title="Apprentices"
                         subtitle="Executors"
-                        accentColor="bg-slate-400"
+                        accentColor="bg-muted-foreground"
                         members={filteredApprentices}
                     />
                 </div>

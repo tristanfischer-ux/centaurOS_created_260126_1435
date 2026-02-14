@@ -48,6 +48,7 @@ import { startDirectMessage } from '@/actions/messaging'
 import { deleteTeam, updateTeamName } from '@/actions/teams'
 import { pairAIAgent, unpairAIAgent } from '@/actions/team'
 import { createClient } from '@/lib/supabase/client'
+import type { Database } from '@/types/database.types'
 
 // View components
 import { OrbitalView } from './components/orbital-view'
@@ -227,8 +228,7 @@ export function TeamPageView({
     // Profile & task modals
     const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FullTaskView accepts a broad Task shape from Supabase
-    const [fullTaskData, setFullTaskData] = useState<any>(null)
+    const [fullTaskData, setFullTaskData] = useState<Database['public']['Tables']['tasks']['Row'] | null>(null)
     const [isLoadingTask, setIsLoadingTask] = useState(false)
 
     // Register screen context so specialists know what the user is viewing
@@ -865,8 +865,12 @@ export function TeamPageView({
                 </div>
 
                 {/* Center: tabs */}
-                <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-muted">
+                <div role="tablist" aria-label="Team views" className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-muted">
                     <button
+                        role="tab"
+                        aria-selected={activeTab === 'members'}
+                        aria-controls="team-members-panel"
+                        id="team-members-tab"
                         onClick={() => { setActiveTab('members'); setSearchQuery('') }}
                         className={cn(
                             'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200',
@@ -879,6 +883,10 @@ export function TeamPageView({
                         Members
                     </button>
                     <button
+                        role="tab"
+                        aria-selected={activeTab === 'workload'}
+                        aria-controls="team-workload-panel"
+                        id="team-workload-tab"
                         onClick={() => { setActiveTab('workload'); setSearchQuery('') }}
                         className={cn(
                             'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200',
@@ -891,6 +899,10 @@ export function TeamPageView({
                         Workload
                     </button>
                     <button
+                        role="tab"
+                        aria-selected={activeTab === 'teams'}
+                        aria-controls="team-teams-panel"
+                        id="team-teams-tab"
                         onClick={() => { setActiveTab('teams'); setSearchQuery('') }}
                         className={cn(
                             'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200',
@@ -1435,7 +1447,7 @@ export function TeamPageView({
             />
 
             {/* Task Modal */}
-            {fullTaskData && (
+            {fullTaskData ? (
                 <FullTaskView
                     open={!!selectedTaskId && !!fullTaskData}
                     onOpenChange={(open) => {
@@ -1453,7 +1465,15 @@ export function TeamPageView({
                     }))}
                     currentUserId={currentUserId}
                 />
-            )}
+            ) : selectedTaskId && isLoadingTask ? (
+                <Dialog open onOpenChange={() => { setSelectedTaskId(null); setIsLoadingTask(false) }}>
+                    <DialogContent size="lg" className="max-h-[90vh]">
+                        <div className="flex items-center justify-center py-16">
+                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            ) : null}
 
             {/* Quick Assign Dialog */}
             {unassignedTasks && (

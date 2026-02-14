@@ -135,7 +135,7 @@ function TaskAssignmentRow({
                                 {workload.label}
                             </Badge>
                             {isTop && !isSelected && (
-                                <Zap className="h-3 w-3 text-emerald-500" />
+                                <Zap className="h-3 w-3 text-status-success" />
                             )}
                             {isSelected && <Check className="h-3 w-3" />}
                         </button>
@@ -242,7 +242,7 @@ export function QuickAssignDialog({ open, onOpenChange, unassignedTasks, members
                 <ScrollArea className="flex-1 -mx-6 px-6">
                     {filteredTasks.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
-                            <Check className="h-8 w-8 mx-auto mb-3 text-emerald-500" />
+                            <Check className="h-8 w-8 mx-auto mb-3 text-status-success" />
                             <p className="text-sm font-medium">
                                 {assignedTaskIds.size > 0
                                     ? "All tasks assigned!"

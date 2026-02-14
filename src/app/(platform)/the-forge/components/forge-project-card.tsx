@@ -172,7 +172,7 @@ export function ForgeProjectCard({ scan }: ForgeProjectCardProps): React.ReactNo
         }}
       >
         {/* Thumbnail or gradient placeholder */}
-        <div className="h-32 rounded-t-xl overflow-hidden bg-gradient-to-br from-orange-50 to-amber-50 relative">
+        <div className="h-32 rounded-t-xl overflow-hidden bg-gradient-to-br from-international-orange/5 to-muted relative">
           {scan.thumbnailUrl ? (
             <img
               src={scan.thumbnailUrl}

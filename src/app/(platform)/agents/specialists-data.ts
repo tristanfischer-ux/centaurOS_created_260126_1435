@@ -33,11 +33,32 @@
 import type { PromptCategory } from "./lib/agent-types"
 import type { AgentPersonality } from "@/lib/agents/personality"
 
+// ─── Specialist ID Union Type ─────────────────────────────────────────────────
+
+/**
+ * Canonical specialist identifiers. Use this type for all specialist ID lookups,
+ * maps, and references to ensure consistency across ethics, avatars, sweeps, etc.
+ */
+export type SpecialistId =
+    | "strategist"
+    | "cto"
+    | "vp-engineering"
+    | "vp-manufacturing"
+    | "vp-supply-chain"
+    | "product-lead"
+    | "growth-marketer"
+    | "sales-lead"
+    | "chief-of-staff"
+    | "finance-lead"
+    | "fundraising-advisor"
+    | "hiring-team"
+    | "legal-counsel"
+
 // ─── Specialist Definitions ──────────────────────────────────────────────────
 
 export interface Specialist {
     /** Unique identifier */
-    id: string
+    id: SpecialistId
     /** Human name (e.g., "Sam") */
     name: string
     /** Functional title (e.g., "Strategy") */
@@ -61,13 +82,13 @@ export interface Specialist {
     /** Path to a generated avatar image (relative to /public) */
     avatarImage?: string
     /** IDs of specialists to suggest after this one completes a brief */
-    suggestedNext?: string[]
+    suggestedNext?: SpecialistId[]
     /** OpenAI TTS voice ID for spoken output */
     voice: string
     /** Department grouping for org chart (e.g., "Strategy", "Technology", "Finance") */
     department: string
     /** Specialist ID this person reports to (null = direct CEO report) */
-    reportsTo: string | null
+    reportsTo: SpecialistId | null
     /** Real-world leader whose personality inspires this specialist */
     inspiredBy: string
     /** Ethics alignment — which ethical principles this specialist emphasizes */
@@ -853,14 +874,14 @@ export const SPECIALISTS: Specialist[] = [
 /**
  * Get a specialist by ID.
  */
-export function getSpecialistById(id: string): Specialist | undefined {
+export function getSpecialistById(id: SpecialistId | string): Specialist | undefined {
     return SPECIALISTS.find((s) => s.id === id)
 }
 
 /**
  * Get all prompt categories that a specialist covers.
  */
-export function getSpecialistCategories(specialistId: string): PromptCategory[] {
+export function getSpecialistCategories(specialistId: SpecialistId | string): PromptCategory[] {
     const specialist = getSpecialistById(specialistId)
     return specialist?.categories ?? []
 }
