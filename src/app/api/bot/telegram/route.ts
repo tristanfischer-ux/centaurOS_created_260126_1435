@@ -4,8 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { TelegramUpdate, TelegramMessage, TelegramCallbackQuery, ParsedObjective } from '@/lib/telegram/types'
 import {
     sendMessage,
@@ -49,6 +49,8 @@ import {
 import { createObjectiveFromInput } from '@/actions/objective-from-input'
 import { calculateTaskDates } from '@/lib/objective-utils'
 
+const getAdminClient = createAdminClient
+
 /**
  * Helper to extract objective title from Supabase join result
  * Handles both array and single object returns from the query
@@ -59,20 +61,6 @@ function getObjectiveTitle(objectives: unknown): string | undefined {
         return (objectives[0] as { title?: string })?.title
     }
     return (objectives as { title?: string })?.title
-}
-
-// Use service role for webhook operations (bypasses RLS)
-function getAdminClient() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!url || !serviceKey) {
-        throw new Error('Missing Supabase configuration')
-    }
-
-    return createClient(url, serviceKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-    })
 }
 
 // Verify webhook secret (required in all environments).
@@ -930,7 +918,7 @@ async function handleEditResponse(
  * Get foundry ID for a profile
  */
 async function getFoundryId(
-    supabase: ReturnType<typeof getAdminClient>,
+    supabase: ReturnType<typeof createAdminClient>,
     profileId: string
 ): Promise<string> {
     const { data } = await supabase

@@ -169,6 +169,9 @@ describe('cron authorization hardening regressions', () => {
     const telegramRoutePath = path.join(process.cwd(), 'src/app/api/bot/telegram/route.ts')
     const source = await readFile(telegramRoutePath, 'utf-8')
 
+    expect(source).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
+    expect(source).toContain('const getAdminClient = createAdminClient')
+    expect(source).not.toContain("import { createClient } from '@supabase/supabase-js'")
     expect(source).toContain('if (!secret)')
     expect(source).toContain("return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 })")
     expect(source).toContain('export async function GET(req: NextRequest)')
@@ -438,6 +441,8 @@ describe('email inbound webhook hardening regressions', () => {
     const routePath = path.join(process.cwd(), 'src/app/api/email/inbound/route.ts')
     const source = await readFile(routePath, 'utf-8')
 
+    expect(source).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
+    expect(source).not.toContain("import { createClient as createAdminClient } from '@supabase/supabase-js'")
     expect(source).toContain("email-inbound-sender:${senderEmail}")
     expect(source).toContain('window: 60 * 60 * 1000')
     expect(source).toContain('/tasks\\+([a-f0-9]{8})@/i')

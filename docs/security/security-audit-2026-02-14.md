@@ -329,6 +329,8 @@ service-unavailable behavior.
 - Applied secret validation to both `POST` and `GET` handlers.
 - Added bearer fallback auth path for operational checks.
 - Removed internal error-detail echo in objective creation failure responses.
+- Standardized privileged DB access to shared helper:
+  - route now imports `createAdminClient()` from `@/lib/supabase/admin`.
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.
 
@@ -520,6 +522,8 @@ shared-source webhook scenarios.
   - key: `email-inbound-sender:${senderEmail}`
   - limit: `30`
   - window: `60 * 60 * 1000` (1 hour)
+- Replaced ad-hoc service-role client constructor with shared
+  `createAdminClient()` helper from `@/lib/supabase/admin`.
 - Tightened recipient token parsing to exact 8-char hex prefixes:
   - `tasks+([a-f0-9]{8})@`
 - Increased profile lookup limit to 2 and fail-closed unless **exactly one** match is found.
