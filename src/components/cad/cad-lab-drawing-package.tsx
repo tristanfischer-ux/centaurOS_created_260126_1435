@@ -13,7 +13,7 @@ import { FileArchive, Download, ExternalLink, CheckCircle2, AlertTriangle } from
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { CadLabModule, CadLabResult } from "@/lib/cad-lab-types"
 import { getModuleArtifactReadiness } from "@/lib/cad-lab-readiness"
 import { trackFeatureUse } from "@/hooks/useActivityTracker"
 
@@ -51,9 +51,9 @@ export interface DrawingPackageManifestPayload {
     id: string
     name: string
     purpose: string
-    envelopeMm: CadLabModule["result"] extends { bbox: infer B } ? B | null : null
+    envelopeMm: CadLabResult["bbox"] | null
     massGrams: number | null
-    drawingPackage: CadLabModule["result"] extends { drawingPackage: infer D } ? D | null : null
+    drawingPackage: CadLabResult["drawingPackage"] | null
   }>
   files: PackageFileEntry[]
   moduleCoverage: ModuleArtifactCoverage[]

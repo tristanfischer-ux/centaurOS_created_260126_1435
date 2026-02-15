@@ -250,8 +250,13 @@ export async function createTask(formData: FormData) {
 
       const { title: validatedTitle, description: validatedDescription, assigneeIds: validatedAssigneeIds, objectiveId: validatedObjectiveId, deadline, riskLevel, fileCount } = validation.data
 
+      if (!validatedObjectiveId) {
+          return { error: 'Objective is required' }
+      }
+
+      const primaryAssigneeId = validatedAssigneeIds[0]
       // Ensure we have at least one assignee after validation
-      if (validatedAssigneeIds.length === 0 || !validatedAssigneeIds[0]) {
+      if (!primaryAssigneeId) {
           return { error: 'At least one assignee is required' }
       }
 
@@ -263,9 +268,9 @@ export async function createTask(formData: FormData) {
                   foundry_id: foundryId,
                   title: validatedTitle.trim(),
                   description: validatedDescription || null,
-                  objective_id: validatedObjectiveId ?? null,
+                  objective_id: validatedObjectiveId,
                   creator_id: user.id,
-                  assignee_id: validatedAssigneeIds[0], // Primary assignee
+                  assignee_id: primaryAssigneeId, // Primary assignee
                   start_date: startDate || null,
                   end_date: deadline || null,
                   status: 'Pending',
@@ -1813,10 +1818,24 @@ export async function updateTaskStatus(
         if (!newStatus?.trim()) {
             return { error: 'Status is required' }
         }
+        const normalizedStatus = newStatus.trim() as TaskStatus
+        const allowedStatuses: TaskStatus[] = [
+            'Pending',
+            'Accepted',
+            'Rejected',
+            'Amended',
+            'Amended_Pending_Approval',
+            'Completed',
+            'Pending_Peer_Review',
+            'Pending_Executive_Approval',
+        ]
+        if (!allowedStatuses.includes(normalizedStatus)) {
+            return { error: 'Invalid status value' }
+        }
 
         const { error } = await supabase
             .from('tasks')
-            .update({ status: newStatus })
+            .update({ status: normalizedStatus })
             .eq('id', taskId)
             .eq('foundry_id', foundryId)
 
@@ -1825,7 +1844,7 @@ export async function updateTaskStatus(
         // AUDIT: Log the status change
         try {
             await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
-                new_status: newStatus,
+                new_status: normalizedStatus,
             })
         } catch (logError) {
             console.error('[TaskService] Failed to log status change:', {
