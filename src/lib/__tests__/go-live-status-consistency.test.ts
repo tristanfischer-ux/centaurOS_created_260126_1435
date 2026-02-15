@@ -21,6 +21,8 @@ describe("go-live status consistency", () => {
     expect(statusDoc).toContain("Verification environment")
     expect(statusDoc).toContain("design-to-rfq-manual-product-pass-results.md")
     expect(statusDoc).toContain("design-to-rfq-migration-closure-report.md")
+    expect(statusDoc).toContain("Migration closure report artifact")
+    expect(statusDoc).toContain("target SQL outputs")
     expect(statusDoc).toContain("design-to-rfq-release-handoff.md")
     expect(statusDoc).toContain("forge-rfq-release-operations.yml")
     expect(statusDoc).toContain("SUPABASE_ACCESS_TOKEN")
