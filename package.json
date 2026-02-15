@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "test:forge-rfq": "jest src/actions/__tests__/cad-lab-rfq-golden-benchmarks.test.ts src/actions/__tests__/cad-lab-rfq.test.ts src/lib/__tests__/cad-lab-quality-scorecard.test.ts src/lib/__tests__/cad-lab-readiness.test.ts src/components/cad/__tests__/cad-lab-procurement-utils.test.ts",
+    "test:forge-rfq": "jest src/actions/__tests__/cad-lab-rfq-golden-benchmarks.test.ts src/actions/__tests__/cad-lab-rfq.test.ts src/lib/__tests__/cad-lab-quality-scorecard.test.ts src/lib/__tests__/cad-lab-readiness.test.ts src/lib/__tests__/forge-route-consistency.test.ts src/components/cad/__tests__/cad-lab-procurement-utils.test.ts",
     "test:forge-rfq:e2e-smoke": "playwright test e2e/auth.setup.ts --project=auth-setup && playwright test e2e/cad-lab-visual-check.spec.ts --project=chromium && playwright test e2e/forge-entrypoint.spec.ts --project=chromium && playwright test e2e/forge-navigation-link.spec.ts --project=chromium",
     "verify:forge-rfq-release": "npm run test:forge-rfq && npm run test:forge-rfq:e2e-smoke",
     "test:e2e": "playwright test",

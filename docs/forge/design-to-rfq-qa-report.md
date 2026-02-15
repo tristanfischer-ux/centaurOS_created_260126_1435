@@ -25,6 +25,7 @@ Coverage includes:
 - `cad-lab-rfq.test.ts`
 - `cad-lab-quality-scorecard.test.ts`
 - `cad-lab-readiness.test.ts`
+- `forge-route-consistency.test.ts`
 - `cad-lab-procurement-utils.test.ts`
 
 ### 2) CAD Lab visual smoke (Playwright)
