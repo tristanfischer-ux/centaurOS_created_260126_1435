@@ -23,6 +23,7 @@ import type {
   CadLabInterfaceResult,
   CadLabDecompositionResult,
   CadLabModule,
+  CadLabDesignBrief,
 } from "@/lib/cad-lab-types"
 import { generateFromGrammar } from "@/actions/cad-grammar"
 import { checkRateLimit } from "@/lib/security/rate-limit"
@@ -402,6 +403,26 @@ RULES:
 
 // ─── Step 1: Research (exported) ─────────────────────────────────────
 
+function formatDesignBriefForPrompt(
+  designBrief?: CadLabDesignBrief,
+  assumptionNotes?: string,
+): string {
+  if (!designBrief && !assumptionNotes?.trim()) return ""
+
+  const lines = [
+    "DESIGN INTAKE CONSTRAINTS (prioritise these when selecting references and dimensions):",
+    designBrief?.useCase ? `- Use case: ${designBrief.useCase}` : null,
+    designBrief?.targetProcess ? `- Target process: ${designBrief.targetProcess}` : null,
+    designBrief?.targetMaterial ? `- Target material: ${designBrief.targetMaterial}` : null,
+    designBrief?.toleranceTarget ? `- Tolerance target: ${designBrief.toleranceTarget}` : null,
+    designBrief?.quantityTarget ? `- Quantity target: ${designBrief.quantityTarget}` : null,
+    designBrief?.complianceNotes ? `- Compliance/certification: ${designBrief.complianceNotes}` : null,
+    assumptionNotes?.trim() ? `- User assumptions: ${assumptionNotes.trim()}` : null,
+  ].filter(Boolean)
+
+  return `\n\n${lines.join("\n")}`
+}
+
 /**
  * Runs standalone research for a product: web search + CAD model search + Claude synthesis.
  *
@@ -419,6 +440,10 @@ RULES:
  */
 export async function runCadLabResearch(
   description: string,
+  options?: {
+    designBrief?: CadLabDesignBrief
+    assumptionNotes?: string
+  },
 ): Promise<CadLabResearchResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -435,6 +460,8 @@ export async function runCadLabResearch(
     console.info("[THE-FORGE] Step 1: Research — web search + CAD model search...")
 
     // 1. Run Gemini + Google Search and Thingiverse in parallel
+    const intakeContext = formatDesignBriefForPrompt(options?.designBrief, options?.assumptionNotes)
+
     const [webResult, cadResult] = await Promise.allSettled([
       callGeminiWithSearch(
         `Find the real-world specifications for: ${description}
@@ -451,7 +478,7 @@ I need precise engineering dimensions for 3D CAD modelling. Search for:
 
 Format your response as a structured specification sheet with exact numbers in millimetres. If a dimension is approximate, say so. If you find conflicting specs from different sources, list both.
 
-Do NOT guess dimensions. Only include measurements you found from real sources.`,
+Do NOT guess dimensions. Only include measurements you found from real sources.${intakeContext}`,
       ),
       searchCadModels(description),
     ])
@@ -495,6 +522,8 @@ Do NOT guess dimensions. Only include measurements you found from real sources.`
       sources: webSources,
       referenceModels,
       researchTime: Date.now() - start,
+      designBrief: options?.designBrief,
+      assumptionNotes: options?.assumptionNotes,
     }
   } catch (error) {
     console.error("[THE-FORGE] Step 1 failed:", error instanceof Error ? error.message : error)
@@ -505,6 +534,8 @@ Do NOT guess dimensions. Only include measurements you found from real sources.`
       sources: [],
       referenceModels: [],
       researchTime: Date.now() - start,
+      designBrief: options?.designBrief,
+      assumptionNotes: options?.assumptionNotes,
     }
   }
 }

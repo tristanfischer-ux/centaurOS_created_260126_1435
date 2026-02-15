@@ -15,6 +15,22 @@ export const CLAUDE_MODELS = [
 
 export type ClaudeModelId = (typeof CLAUDE_MODELS)[number]["id"]
 
+/** Structured intake fields captured before research/generation */
+export interface CadLabDesignBrief {
+  /** What the user is building this for */
+  useCase: string
+  /** Preferred manufacturing process */
+  targetProcess: string
+  /** Preferred material family */
+  targetMaterial: string
+  /** Critical tolerance requirement */
+  toleranceTarget: string
+  /** Expected production scale */
+  quantityTarget: string
+  /** Compliance / certification notes */
+  complianceNotes: string
+}
+
 /** DFM (Design for Manufacturability) analysis result */
 export interface CadLabDfmResult {
   /** Whether the part is printable on common FDM printers */
@@ -188,4 +204,8 @@ export interface CadLabResearchResult {
   referenceModels: Array<{ name: string; url: string; thumbnail?: string }>
   /** Time taken for the research step in ms */
   researchTime: number
+  /** Structured design brief used to guide research */
+  designBrief?: CadLabDesignBrief
+  /** Explicit assumptions provided by the user */
+  assumptionNotes?: string
 }

@@ -18,9 +18,9 @@ import type { Json } from "@/types/database.types"
 import type {
   CadLabResult,
   CadLabResearchResult,
-  CadLabInterfaceResult,
   CadLabModule,
   ClaudeModelId,
+  CadLabDesignBrief,
 } from "@/lib/cad-lab-types"
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -52,6 +52,8 @@ export interface CadLabProjectData {
     sources: Array<{ uri: string; title: string }>
     referenceModels: Array<{ name: string; url: string }>
     researchTime: number
+    designBrief?: CadLabDesignBrief
+    assumptionNotes?: string
   } | null
 
   /** Step 2 interface definition text */
@@ -247,6 +249,8 @@ export async function saveCadLabResearch(
       sources: research.sources,
       referenceModels: research.referenceModels,
       researchTime: research.researchTime,
+      designBrief: research.designBrief,
+      assumptionNotes: research.assumptionNotes,
     }
 
     const { error } = await supabase

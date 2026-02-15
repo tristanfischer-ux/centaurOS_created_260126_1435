@@ -26,7 +26,6 @@ import { createClient } from "@/lib/supabase/client"
 import {
   runCadLabResearch,
   generateCadLabInterface,
-  generateCadLabModel,
   generateCadLabModelSmart,
   decomposeIntoModules,
   prefillDiagnostics,
@@ -46,6 +45,7 @@ import type {
   CadLabResearchResult,
   CadLabModule,
   ClaudeModelId,
+  CadLabDesignBrief,
 } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { Sector } from "@/types/foundry"
@@ -75,6 +75,11 @@ export interface CadLabContextValue {
   setSubject: (v: string) => void
   modelId: ClaudeModelId
   setModelId: (v: ClaudeModelId) => void
+  designBrief: CadLabDesignBrief
+  setDesignBrief: Dispatch<SetStateAction<CadLabDesignBrief>>
+  assumptionNotes: string
+  setAssumptionNotes: (v: string) => void
+  designReadinessPct: number
 
   // Research
   isResearching: boolean
@@ -171,6 +176,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Input state ──
   const [subject, setSubject] = useState("")
   const [modelId, setModelId] = useState<ClaudeModelId>("claude-opus-4-6")
+  const [designBrief, setDesignBrief] = useState<CadLabDesignBrief>({
+    useCase: "",
+    targetProcess: "",
+    targetMaterial: "",
+    toleranceTarget: "",
+    quantityTarget: "",
+    complianceNotes: "",
+  })
+  const [assumptionNotes, setAssumptionNotes] = useState("")
 
   // ── Research state ──
   const [isResearching, setIsResearching] = useState(false)
@@ -198,6 +212,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Computed ──
   const hasResearch = !!(researchResult?.success && editableReport.trim().length > 0)
+  const readinessFields = [
+    designBrief.useCase,
+    designBrief.targetProcess,
+    designBrief.targetMaterial,
+    designBrief.toleranceTarget,
+    designBrief.quantityTarget,
+  ]
+  const designReadinessPct = Math.round((readinessFields.filter((v) => v.trim().length > 0).length / readinessFields.length) * 100)
   const isAnyLoading = isResearching || isDecomposing || isBatchRunning || activeModuleId !== null
   const generatedModuleCount = modules.filter((m) => m.status === "generated").length
   const riskCount = modules.reduce(
@@ -416,7 +438,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       cancelled = true
       if (pollInterval) clearInterval(pollInterval)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId, modules.length])
 
   // ── Per-module generation with client-side concurrency limit ──
@@ -572,7 +593,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     const t4 = setTimeout(() => addProgressLine("Extracting key dimensions and constraints..."), 15000)
 
     try {
-      const res = await runCadLabResearch(subject)
+      const res = await runCadLabResearch(subject, {
+        designBrief,
+        assumptionNotes,
+      })
       clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4)
 
       setProgressLines([
@@ -610,7 +634,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     } finally {
       setIsResearching(false)
     }
-  }, [subject, ensureProject, refreshProjects, addProgressLine])
+  }, [subject, designBrief, assumptionNotes, ensureProject, refreshProjects, addProgressLine])
 
   // ── Reset ──
   const handleReset = useCallback(() => {
@@ -618,6 +642,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setEditableReport("")
     setActiveProjectId(null)
     setLastSaved(null)
+    setDesignBrief({
+      useCase: "",
+      targetProcess: "",
+      targetMaterial: "",
+      toleranceTarget: "",
+      quantityTarget: "",
+      complianceNotes: "",
+    })
+    setAssumptionNotes("")
     setModules([])
     setExpandedModuleId(null)
     setActiveModuleId(null)
@@ -640,17 +673,37 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setActiveProjectId(p.id)
 
       if (p.research) {
+        setDesignBrief(p.research.designBrief ?? {
+          useCase: "",
+          targetProcess: "",
+          targetMaterial: "",
+          toleranceTarget: "",
+          quantityTarget: "",
+          complianceNotes: "",
+        })
+        setAssumptionNotes(p.research.assumptionNotes ?? "")
         setResearchResult({
           success: true,
           report: p.research.report,
           sources: p.research.sources,
           referenceModels: p.research.referenceModels,
           researchTime: p.research.researchTime,
+          designBrief: p.research.designBrief,
+          assumptionNotes: p.research.assumptionNotes,
         })
         setEditableReport(p.research.report)
       } else {
         setResearchResult(null)
         setEditableReport("")
+        setDesignBrief({
+          useCase: "",
+          targetProcess: "",
+          targetMaterial: "",
+          toleranceTarget: "",
+          quantityTarget: "",
+          complianceNotes: "",
+        })
+        setAssumptionNotes("")
       }
 
       if (p.modules && p.modules.length > 0) {
@@ -712,6 +765,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     refreshProjects, handleLoadProject, handleDeleteProject,
     sector,
     subject, setSubject, modelId, setModelId,
+    designBrief, setDesignBrief, assumptionNotes, setAssumptionNotes, designReadinessPct,
     isResearching, researchResult, editableReport, setEditableReport,
     showSources, setShowSources, hasResearch,
     handleResearch, handleReset,

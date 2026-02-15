@@ -28,6 +28,10 @@ import {
   Ruler,
   ArrowRight,
   BarChart3,
+  Factory,
+  Scale,
+  ShieldCheck,
+  ClipboardList,
   ShoppingCart,
   ClipboardCheck,
 } from "lucide-react"
@@ -64,6 +68,44 @@ const PIPELINE_STAGES = [
   { icon: ClipboardCheck, label: "Review", desc: "Supplier-ready package" },
 ]
 
+const TARGET_PROCESS_OPTIONS = [
+  "CNC Machining",
+  "Sheet Metal",
+  "Injection Molding",
+  "Casting",
+  "FDM 3D Print",
+  "SLS/Powder Print",
+  "Manual Assembly",
+  "Undecided",
+] as const
+
+const TARGET_MATERIAL_OPTIONS = [
+  "Aluminium",
+  "Steel/Stainless",
+  "ABS/Nylon",
+  "PLA/PETG",
+  "Carbon Fiber Composite",
+  "Copper/Brass",
+  "Titanium",
+  "Undecided",
+] as const
+
+const TOLERANCE_OPTIONS = [
+  "±1mm (concept)",
+  "±0.5mm (standard)",
+  "±0.1mm (precision)",
+  "±0.05mm (tight fit)",
+  "Undecided",
+] as const
+
+const QUANTITY_OPTIONS = [
+  "Prototype (1-5)",
+  "Pilot (10-100)",
+  "Low-volume (100-1000)",
+  "Production (1000+)",
+  "Undecided",
+] as const
+
 // ─── Page Component ──────────────────────────────────────────────────
 
 export default function CadLabResearchPage(): React.ReactNode {
@@ -71,6 +113,9 @@ export default function CadLabResearchPage(): React.ReactNode {
   const {
     subject, setSubject,
     modelId, setModelId,
+    designBrief, setDesignBrief,
+    assumptionNotes, setAssumptionNotes,
+    designReadinessPct,
     isResearching, researchResult, editableReport, setEditableReport,
     showSources, setShowSources,
     hasResearch, isAnyLoading,
@@ -226,6 +271,126 @@ export default function CadLabResearchPage(): React.ReactNode {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Structured design intake ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />
+            Design Intake
+            <span className="text-xs font-normal text-muted-foreground">
+              RFQ readiness: {designReadinessPct}%
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-international-orange rounded-full transition-all duration-500"
+              style={{ width: `${designReadinessPct}%` }}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="use-case" className="flex items-center gap-1.5">
+                <Ruler className="h-3.5 w-3.5" /> Use case & critical dimensions
+              </Label>
+              <Textarea
+                id="use-case"
+                value={designBrief.useCase}
+                onChange={(e) => setDesignBrief((prev) => ({ ...prev, useCase: e.target.value }))}
+                placeholder="e.g. Outdoor heavy-lift UAV payload mount, 300×220×120mm envelope, must survive 20g shock"
+                className="min-h-[84px]"
+                disabled={isAnyLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="compliance" className="flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5" /> Compliance and constraints
+              </Label>
+              <Textarea
+                id="compliance"
+                value={designBrief.complianceNotes}
+                onChange={(e) => setDesignBrief((prev) => ({ ...prev, complianceNotes: e.target.value }))}
+                placeholder="e.g. IP54 ingress protection, ASTM F963 edges, RoHS, food-safe surfaces"
+                className="min-h-[84px]"
+                disabled={isAnyLoading}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="target-process" className="flex items-center gap-1.5">
+                <Factory className="h-3.5 w-3.5" /> Process
+              </Label>
+              <select
+                id="target-process"
+                value={designBrief.targetProcess}
+                onChange={(e) => setDesignBrief((prev) => ({ ...prev, targetProcess: e.target.value }))}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                disabled={isAnyLoading}
+              >
+                <option value="">Select process</option>
+                {TARGET_PROCESS_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="target-material" className="flex items-center gap-1.5">
+                <Box className="h-3.5 w-3.5" /> Material
+              </Label>
+              <select
+                id="target-material"
+                value={designBrief.targetMaterial}
+                onChange={(e) => setDesignBrief((prev) => ({ ...prev, targetMaterial: e.target.value }))}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                disabled={isAnyLoading}
+              >
+                <option value="">Select material</option>
+                {TARGET_MATERIAL_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="target-tolerance" className="flex items-center gap-1.5">
+                <Scale className="h-3.5 w-3.5" /> Tolerance
+              </Label>
+              <select
+                id="target-tolerance"
+                value={designBrief.toleranceTarget}
+                onChange={(e) => setDesignBrief((prev) => ({ ...prev, toleranceTarget: e.target.value }))}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                disabled={isAnyLoading}
+              >
+                <option value="">Select tolerance</option>
+                {TOLERANCE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="target-quantity">Quantity target</Label>
+              <select
+                id="target-quantity"
+                value={designBrief.quantityTarget}
+                onChange={(e) => setDesignBrief((prev) => ({ ...prev, quantityTarget: e.target.value }))}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                disabled={isAnyLoading}
+              >
+                <option value="">Select quantity</option>
+                {QUANTITY_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="assumptions">Known assumptions or non-negotiables (optional)</Label>
+            <Textarea
+              id="assumptions"
+              value={assumptionNotes}
+              onChange={(e) => setAssumptionNotes(e.target.value)}
+              placeholder="e.g. Must fit existing M3 bolt pattern at 60mm PCD; supplier must support PPAP level 3"
+              className="min-h-[72px]"
+              disabled={isAnyLoading}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── Model selector ── */}
       <Card>
