@@ -15,6 +15,7 @@ Validation of the end-to-end Design → Drawings → RFQ flow, including:
 ### 1) Core RFQ/quality regression suite
 
 ```bash
+npm run test:forge-rfq:contracts
 npm run test:forge-rfq
 ```
 

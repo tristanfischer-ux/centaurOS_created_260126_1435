@@ -19,6 +19,7 @@ Ship only when all of the following are true:
 Run these before each release candidate:
 
 ```bash
+npm run test:forge-rfq:contracts
 npm run test:forge-rfq
 npm run test:forge-rfq:e2e-smoke
 ```

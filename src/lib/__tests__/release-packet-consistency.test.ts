@@ -18,6 +18,7 @@ describe("release packet consistency", () => {
 
     const requiredScripts = [
       "test:forge-rfq",
+      "test:forge-rfq:contracts",
       "test:forge-rfq:e2e-smoke",
       "verify:forge-rfq-release",
     ]
