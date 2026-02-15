@@ -43,4 +43,20 @@ describe("release packet consistency", () => {
       expect(fs.existsSync(absolutePath)).toBe(true)
     }
   })
+
+  it("retains critical release sign-off checklist gates", () => {
+    const releasePacket = fs.readFileSync(releasePacketPath, "utf8")
+
+    const requiredChecklistLines = [
+      "`npm run test:forge-rfq:contracts` passes.",
+      "DB migration applied in target environment.",
+      "Profiles policy-expression SQL audit confirms no helper recursion",
+      "5-scenario manual product pass results artifact updated and attached.",
+      "No unresolved P0/P1 issues for RFQ creation flow.",
+    ]
+
+    for (const checklistLine of requiredChecklistLines) {
+      expect(releasePacket).toContain(checklistLine)
+    }
+  })
 })

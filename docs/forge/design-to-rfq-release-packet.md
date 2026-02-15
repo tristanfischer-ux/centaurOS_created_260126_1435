@@ -66,5 +66,6 @@ Apply before rollout to eliminate profile policy recursion noise:
 - [ ] DB migration applied in target environment.
 - [ ] Profiles policy-expression SQL audit confirms no helper recursion (`get_my_foundry_id` / `is_active_user`).
 - [ ] Demo walkthrough executed once in staging.
+- [ ] 5-scenario manual product pass results artifact updated and attached.
 - [ ] Telemetry events visible in activity stream.
 - [ ] No unresolved P0/P1 issues for RFQ creation flow.
