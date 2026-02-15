@@ -6,26 +6,68 @@ export interface RfqReadinessSummary {
   generatedCount: number
   diagnosticsComplete: number
   artifactComplete: number
+  quoteReadyModuleCount: number
   gaps: string[]
+  moduleDetails: ModuleReadinessDetail[]
 }
+
+export interface ModuleReadinessDetail {
+  moduleId: string
+  moduleName: string
+  generated: boolean
+  missingDiagnostics: string[]
+  missingArtifacts: string[]
+  quoteReady: boolean
+}
+
+const REQUIRED_DIAGNOSTIC_KEYS = [
+  "mfg_process",
+  "material",
+  "tolerance",
+  "finish",
+  "batch_size",
+  "environment",
+] as const
 
 export function computeRfqReadiness(
   modules: CadLabModule[],
   diagnosticAnswers?: DiagnosticAnswers,
 ): RfqReadinessSummary {
   const moduleCount = modules.length || 1
-  const generatedCount = modules.filter((mod) => mod.status === "generated").length
-  const diagnosticsComplete = modules.filter((mod) => {
+  const moduleDetails = modules.map((mod): ModuleReadinessDetail => {
+    const generated = mod.status === "generated"
     const answers = diagnosticAnswers?.[mod.id] || {}
-    return Object.keys(answers).length >= 6
-  }).length
-  const artifactComplete = modules.filter((mod) => {
+    const missingDiagnostics = REQUIRED_DIAGNOSTIC_KEYS.filter((key) => {
+      const value = answers[key]
+      return typeof value !== "string" || value.trim().length === 0
+    })
+
     const files = mod.result?.drawingPackage?.files || []
     const hasStep = files.some((file) => file.name.toLowerCase().endsWith(".step"))
     const hasStl = files.some((file) => file.name.toLowerCase().endsWith(".stl"))
     const hasManifest = Boolean(mod.result?.drawingPackage?.manifestUrl)
-    return hasStep && hasStl && hasManifest
-  }).length
+    const missingArtifacts: string[] = []
+    if (!hasStep) missingArtifacts.push("STEP")
+    if (!hasStl) missingArtifacts.push("STL")
+    if (!hasManifest) missingArtifacts.push("Manifest")
+
+    return {
+      moduleId: mod.id,
+      moduleName: mod.name,
+      generated,
+      missingDiagnostics,
+      missingArtifacts,
+      quoteReady: generated && missingArtifacts.length === 0,
+    }
+  })
+  const generatedCount = moduleDetails.filter((mod) => mod.generated).length
+  const diagnosticsComplete = moduleDetails.filter(
+    (mod) => mod.missingDiagnostics.length === 0,
+  ).length
+  const artifactComplete = moduleDetails.filter(
+    (mod) => mod.missingArtifacts.length === 0,
+  ).length
+  const quoteReadyModuleCount = moduleDetails.filter((mod) => mod.quoteReady).length
 
   const generationScore = generatedCount / moduleCount
   const diagnosticsScore = diagnosticsComplete / moduleCount
@@ -52,6 +94,8 @@ export function computeRfqReadiness(
     generatedCount,
     diagnosticsComplete,
     artifactComplete,
+    quoteReadyModuleCount,
     gaps,
+    moduleDetails,
   }
 }

@@ -115,10 +115,44 @@ describe("Cad Lab procurement utility functions", () => {
     expect(readiness.generatedCount).toBe(2)
     expect(readiness.diagnosticsComplete).toBe(1)
     expect(readiness.artifactComplete).toBe(1)
+    expect(readiness.quoteReadyModuleCount).toBe(1)
     expect(readiness.gaps).toEqual([
       "1 module(s) still need generated geometry",
       "2 module(s) missing procurement diagnostics",
       "2 module(s) missing full STEP/STL/manifest package",
+    ])
+    expect(readiness.moduleDetails).toEqual([
+      {
+        moduleId: "frame",
+        moduleName: "Frame",
+        generated: true,
+        missingDiagnostics: [],
+        missingArtifacts: [],
+        quoteReady: true,
+      },
+      {
+        moduleId: "bracket",
+        moduleName: "Bracket",
+        generated: true,
+        missingDiagnostics: ["tolerance", "finish", "batch_size", "environment"],
+        missingArtifacts: ["STL"],
+        quoteReady: false,
+      },
+      {
+        moduleId: "cover",
+        moduleName: "Cover",
+        generated: false,
+        missingDiagnostics: [
+          "mfg_process",
+          "material",
+          "tolerance",
+          "finish",
+          "batch_size",
+          "environment",
+        ],
+        missingArtifacts: ["STEP", "STL", "Manifest"],
+        quoteReady: false,
+      },
     ])
   })
 

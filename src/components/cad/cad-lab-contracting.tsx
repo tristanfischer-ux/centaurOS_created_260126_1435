@@ -362,10 +362,9 @@ export function CadLabContracting({
     [modules, diagnosticAnswers],
   )
   const canCreateRfq =
-    rfqReadiness.generatedCount > 0 &&
-    rfqReadiness.artifactComplete > 0
+    rfqReadiness.quoteReadyModuleCount > 0
   const createRfqBlockedReason = !canCreateRfq
-    ? "Generate at least one module with STEP/STL/manifest artifacts before creating an RFQ."
+    ? "At least one module must be quote-ready (generated + STEP/STL/manifest) before RFQ creation."
     : null
 
   useEffect(() => {
@@ -560,7 +559,7 @@ export function CadLabContracting({
             />
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Generated: {rfqReadiness.generatedCount}/{modules.length} • Diagnostics: {rfqReadiness.diagnosticsComplete}/{modules.length} • Artifacts: {rfqReadiness.artifactComplete}/{modules.length}
+            Generated: {rfqReadiness.generatedCount}/{modules.length} • Diagnostics: {rfqReadiness.diagnosticsComplete}/{modules.length} • Artifacts: {rfqReadiness.artifactComplete}/{modules.length} • Quote-ready: {rfqReadiness.quoteReadyModuleCount}/{modules.length}
           </p>
           {rfqReadiness.gaps.length > 0 && (
             <ul className="list-disc pl-4 space-y-1 text-[11px] text-muted-foreground">
@@ -568,6 +567,20 @@ export function CadLabContracting({
                 <li key={gap}>{gap}</li>
               ))}
             </ul>
+          )}
+          {rfqReadiness.moduleDetails.some((module) => module.quoteReady === false) && (
+            <div className="border-t pt-2 space-y-1">
+              <p className="text-[11px] font-medium text-foreground">Module blockers</p>
+              {rfqReadiness.moduleDetails
+                .filter((module) => !module.quoteReady)
+                .slice(0, 4)
+                .map((module) => (
+                  <p key={module.moduleId} className="text-[11px] text-muted-foreground">
+                    {module.moduleName}: {module.generated ? "missing " : "not generated; missing "}
+                    {module.missingArtifacts.join(", ")}
+                  </p>
+                ))}
+            </div>
           )}
         </div>
 
