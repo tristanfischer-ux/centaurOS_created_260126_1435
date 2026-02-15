@@ -121,7 +121,7 @@ Validated:
 
 - full RFQ/unit regression cluster passes in one command
 - full E2E smoke chain passes (auth setup + Cad Lab visual + Forge entrypoint + Forge navigation)
-- latest local execution snapshot: `2026-02-15 18:05:16 UTC` on commit `b53b3aab`
+- latest local execution snapshot: `2026-02-15 18:25:59 UTC` on commit `64a84e67`
 
 ### 7) Five-scenario product pass outcome log
 
@@ -138,7 +138,7 @@ Status: **PASS** (all benchmark scenarios + smoke journey checks)
 - Attempting `npx supabase db push --db-url` with pooler URL + `SUPABASE_SERVICE_ROLE_KEY` also fails password auth (`FATAL: password authentication failed for user "postgres"`), confirming service-role keys are not DB password substitutes.
 - Attempting Supabase management SQL API (`/v1/projects/<ref>/database/query`) with `SUPABASE_SERVICE_ROLE_KEY` bearer auth returns `401` with `JWT could not be decoded`, confirming management endpoints require PAT-based auth context.
 - Attempting to trigger `forge-rfq-release-operations.yml` before it exists on the repository default branch returns `workflow ... not found on the default branch`; dispatch becomes available after merge.
-- Release PR status remains `draft` with merge state `DIRTY` (PR #36), so merge conflict resolution is required before workflow-dispatch migration operations can be run from `main`.
+- Release PR status remains `draft` with merge state `UNSTABLE` (PR #36); merge conflicts are resolved, but branch protections/checks still need to clear before workflow-dispatch migration operations can run from `main`.
 - During auth flows, some environments may log:
   - `Failed to fetch user profile: infinite recursion detected in policy for relation "profiles"`
 - A dedicated migration now exists to harden profiles RLS and remove recursive policy paths:

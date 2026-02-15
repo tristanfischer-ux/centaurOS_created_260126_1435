@@ -4,8 +4,8 @@ This status page captures the current release readiness state for the Design →
 
 ## Verification Snapshot
 
-- Last verified at (UTC): `2026-02-15 18:05:16 UTC`
-- Branch head at verification: `b53b3aab`
+- Last verified at (UTC): `2026-02-15 18:25:59 UTC`
+- Branch head at verification: `64a84e67`
 - Verification command: `npm run verify:forge-rfq-release`
 - Verification environment: `SUPABASE_ACCESS_TOKEN=missing` (migration apply remains blocked in this runtime)
 
@@ -18,21 +18,21 @@ This status page captures the current release readiness state for the Design →
 | End-to-end smoke bundle (`test:forge-rfq:e2e-smoke`) | ✅ PASS | Included in `verify:forge-rfq-release` |
 | One-command release verification (`verify:forge-rfq-release`) | ✅ PASS | Latest local execution completed successfully |
 | Five-scenario product pass results artifact | ✅ PASS | `design-to-rfq-manual-product-pass-results.md` |
-| Release operations workflow available on default branch | ⛔ PENDING | PR #36 currently `draft` with merge state `DIRTY`; workflow dispatch requires merge to `main` |
+| Release operations workflow available on default branch | ⛔ PENDING | PR #36 currently `draft` with merge state `UNSTABLE`; workflow dispatch requires merge to `main` |
 | Migration closure report artifact | ⛔ PENDING | `design-to-rfq-migration-closure-report.md` must be updated with target SQL outputs |
 | Profiles RLS migration applied in target environment | ⛔ PENDING | Requires Supabase CLI PAT (`SUPABASE_ACCESS_TOKEN`) or manual SQL editor execution |
 
 ## Active Blocker
 
 - **Pending external action:** apply `20260215120000_stabilize_profiles_rls_no_recursion.sql` in target environment.
-- **Pending release operations action:** merge PR #36 to `main` so `.github/workflows/forge-rfq-release-operations.yml` can be dispatched.
+- **Pending release operations action:** mark PR #36 ready, clear branch protections, and merge to `main` so `.github/workflows/forge-rfq-release-operations.yml` can be dispatched.
 - Current runtime lacks Supabase CLI PAT auth; documented fallback is manual SQL execution in Supabase dashboard.
 - Migration closure report still requires target-environment SQL verification evidence attachment.
 - Execute `docs/forge/design-to-rfq-release-handoff.md` in staging/target to close migration and sign-off gates.
 
 ## Immediate Next Action
 
-1. Resolve PR #36 merge conflicts and merge `cursor/forge-design-to-rfq-fc87` into `main`.
+1. Mark PR #36 ready for review, satisfy required checks, and merge `cursor/forge-design-to-rfq-fc87` into `main`.
 2. Execute `docs/forge/design-to-rfq-release-handoff.md` in staging/target environment.
 3. Apply migration in staging via authenticated runner/dashboard.
 4. Optionally trigger `.github/workflows/forge-rfq-release-operations.yml` with `apply_migration=true` for managed CI execution.

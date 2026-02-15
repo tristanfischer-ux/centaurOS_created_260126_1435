@@ -24,7 +24,7 @@ describe("go-live status consistency", () => {
     expect(statusDoc).toContain("Migration closure report artifact")
     expect(statusDoc).toContain("target SQL outputs")
     expect(statusDoc).toContain("PR #36")
-    expect(statusDoc).toContain("DIRTY")
+    expect(statusDoc).toContain("UNSTABLE")
     expect(statusDoc).toContain("design-to-rfq-release-handoff.md")
     expect(statusDoc).toContain("forge-rfq-release-operations.yml")
     expect(statusDoc).toContain("SUPABASE_ACCESS_TOKEN")
