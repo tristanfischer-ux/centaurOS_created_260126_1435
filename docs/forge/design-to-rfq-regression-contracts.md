@@ -53,6 +53,13 @@ As the release packet grows, some failures are best caught by low-cost contract 
   - published product-pass results table stays aligned with benchmark scenario fixture set
   - release artifact continues to capture smoke-chain evidence and migration blocker context
 
+### 7) Go-live status contract
+
+- Test: `go-live-status-consistency.test.ts`
+- Protects:
+  - current branch go-live status document tracks all critical release gates
+  - migration blocker remains explicit until target environment migration is applied
+
 ## Operational Usage
 
 Run:
@@ -75,6 +82,7 @@ This command now validates both product logic regressions and release-contract d
 
 - `profiles-rls-migration.test.ts`
 - `manual-product-pass-results-consistency.test.ts`
+- `go-live-status-consistency.test.ts`
 - `release-config-consistency.test.ts`
 - `release-docs-consistency.test.ts`
 - `release-packet-consistency.test.ts`

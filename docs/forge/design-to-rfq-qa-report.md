@@ -27,6 +27,7 @@ Coverage includes:
 - `cad-lab-quality-scorecard.test.ts`
 - `cad-lab-readiness.test.ts`
 - `forge-route-consistency.test.ts`
+- `go-live-status-consistency.test.ts`
 - `manual-product-pass-results-consistency.test.ts`
 - `profiles-rls-migration.test.ts`
 - `release-config-consistency.test.ts`

@@ -12,6 +12,7 @@ This packet is the final handoff bundle for launch readiness.
 - Product polish plan: `docs/forge/design-to-rfq-product-polish-plan.md`
 - Manual product pass checklist: `docs/forge/design-to-rfq-manual-product-pass.md`
 - Manual product pass results: `docs/forge/design-to-rfq-manual-product-pass-results.md`
+- Go-live status: `docs/forge/design-to-rfq-go-live-status.md`
 - QA execution report: `docs/forge/design-to-rfq-qa-report.md`
 - Scenario matrix: `docs/forge/design-to-rfq-scenario-matrix.md`
 - Migration verification runbook: `docs/forge/design-to-rfq-migration-verification.md`
