@@ -70,7 +70,7 @@ Validated:
 - `/the-forge` surfaces **Design-to-RFQ Lab** as the recommended path
 - direct CTA to `/the-forge/cad-lab` is visible
 - recommended CTA click navigates into `/the-forge/cad-lab`
-- legacy concept CTA points to `/the-forge/new`
+- legacy concept CTA points to `/the-forge/new` and click navigates there
 - recommendation remains visible even when legacy project list enters error state
 
 ### 5) Forge navigation link smoke (Playwright)

@@ -45,4 +45,11 @@ test.describe('Forge entrypoint routing', () => {
     await page.waitForURL('**/the-forge/cad-lab')
     await expect(page).toHaveURL(/\/the-forge\/cad-lab$/)
   })
+
+  test('legacy CTA navigates into concept flow', async ({ page }) => {
+    await loginIfNeeded(page)
+    await page.getByRole('link', { name: /Open Legacy Concept Flow/i }).click()
+    await page.waitForURL('**/the-forge/new')
+    await expect(page).toHaveURL(/\/the-forge\/new$/)
+  })
 })
