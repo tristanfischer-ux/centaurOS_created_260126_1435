@@ -795,7 +795,7 @@ export async function POST(request: NextRequest) {
 
   // SECURITY: IP-based rate limit on webhook endpoint
   const ip = getClientIP(request.headers)
-  const ipLimit = await rateLimit('webhook', `webhook:${ip}`)
+  const ipLimit = await rateLimit('webhook', `stripe-webhook:${ip}`)
   if (!ipLimit.success) {
     return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
   }

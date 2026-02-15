@@ -445,6 +445,7 @@ describe('email inbound webhook hardening regressions', () => {
 
     expect(source).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
     expect(source).not.toContain("import { createClient as createAdminClient } from '@supabase/supabase-js'")
+    expect(source).toContain("await rateLimit('webhook', `email-inbound:${ip}`)")
     expect(source).toContain("email-inbound-sender:${senderEmail}")
     expect(source).toContain('window: 60 * 60 * 1000')
     expect(source).toContain('/tasks\\+([a-f0-9]{8})@/i')
@@ -485,7 +486,7 @@ describe('google calendar webhook hardening regressions', () => {
     expect(source).toContain("return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })")
     expect(source).toContain("if (channelToken !== webhookSecret)")
     expect(source).toContain("return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })")
-    expect(source).toContain("await rateLimit('webhook', `webhook:${ip}`)")
+    expect(source).toContain("await rateLimit('webhook', `google-calendar-webhook:${ip}`)")
   })
 })
 
@@ -557,7 +558,7 @@ describe('stripe webhook hardening regressions', () => {
 
     expect(source).toContain('if (!webhookSecret)')
     expect(source).toContain("return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })")
-    expect(source).toContain("await rateLimit('webhook', `webhook:${ip}`)")
+    expect(source).toContain("await rateLimit('webhook', `stripe-webhook:${ip}`)")
     expect(source).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
     expect(source).toContain('const supabase = createAdminClient()')
     expect(source).not.toContain("import { createClient } from '@/lib/supabase/server'")

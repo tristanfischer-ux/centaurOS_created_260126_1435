@@ -525,6 +525,9 @@ shared-source webhook scenarios.
   - key: `email-inbound-sender:${senderEmail}`
   - limit: `30`
   - window: `60 * 60 * 1000` (1 hour)
+- Added route-specific webhook ingress throttling:
+  - key: `email-inbound:${ip}`
+  - returns `429` when exceeded.
 - Replaced ad-hoc service-role client constructor with shared
   `createAdminClient()` helper from `@/lib/supabase/admin`.
 - Tightened recipient token parsing to exact 8-char hex prefixes:
@@ -573,6 +576,8 @@ for payment/dispute/subscription state transitions.
   - `import { createAdminClient } from '@/lib/supabase/admin'`
   - `const supabase = createAdminClient()`
 - Retained signature verification and endpoint throttling safeguards.
+- Endpoint throttling now uses route-specific key:
+  - `stripe-webhook:${ip}`
 - Added explicit fail-closed response (`503`) when `STRIPE_WEBHOOK_SECRET` is missing.
 - Added regression assertion in:
   - `src/lib/security/__tests__/rate-limit-regression.test.ts`.

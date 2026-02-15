@@ -37,7 +37,7 @@ const INBOUND_WEBHOOK_SECRET = process.env.EMAIL_INBOUND_WEBHOOK_SECRET
 export async function POST(req: NextRequest): Promise<NextResponse> {
     // SECURITY: IP-based rate limit on webhook endpoint
     const ip = getClientIP(req.headers)
-    const ipLimit = await rateLimit('webhook', `webhook:${ip}`)
+    const ipLimit = await rateLimit('webhook', `email-inbound:${ip}`)
     if (!ipLimit.success) {
         return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
     }
