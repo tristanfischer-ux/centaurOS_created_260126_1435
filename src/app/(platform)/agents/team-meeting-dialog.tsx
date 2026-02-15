@@ -49,6 +49,7 @@ import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
 import { getOrCreateSpecialistThread } from "@/actions/agent-memory"
 import { SPECIALISTS, getSpecialistById, getSpecialistDisplayName } from "./specialists-data"
+import { compileInterSpecialistDynamics } from "@/lib/agents/relationship-matrix"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import { MeetingOutputs } from "./meeting-outputs"
@@ -667,12 +668,19 @@ export function TeamMeetingDialog({
                         thoughts
                     )
 
+                    // Build inter-specialist dynamics context (relationships + strong opinions)
+                    const dynamicsBlock = compileInterSpecialistDynamics(
+                        specialist.id,
+                        selectedSpecialists.map((s) => s.id),
+                        topic,
+                    )
+
                     const response = await executeSpecialist(
                         specialist,
                         threads[specialist.id],
                         prompt,
                         topic,
-                        `\n\n## Meeting Context\nThis is a team meeting with ${selectedSpecialists.length} specialists. Topic: "${topic}"`
+                        `\n\n## Meeting Context\nThis is a team meeting with ${selectedSpecialists.length} specialists. Topic: "${topic}"${dynamicsBlock ? `\n\n${dynamicsBlock}` : ""}`
                     )
 
                     const entry: MeetingEntry = {
@@ -807,12 +815,19 @@ export function TeamMeetingDialog({
                         debateRound
                     )
 
+                    // Build inter-specialist dynamics for debate
+                    const debateDynamicsBlock = compileInterSpecialistDynamics(
+                        specialist.id,
+                        selectedSpecialists.map((s) => s.id),
+                        topic,
+                    )
+
                     const response = await executeSpecialist(
                         specialist,
                         threadIds[specialist.id],
                         prompt,
                         topic,
-                        `\n\n## Autonomous Debate\nThe specialists are debating among themselves. The founder is listening. Round: ${roundLabel}`
+                        `\n\n## Autonomous Debate\nThe specialists are debating among themselves. The founder is listening. Round: ${roundLabel}${debateDynamicsBlock ? `\n\n${debateDynamicsBlock}` : ""}`
                     )
 
                     const entry: MeetingEntry = {
