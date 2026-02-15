@@ -46,6 +46,13 @@ As the release packet grows, some failures are best caught by low-cost contract 
   - QA scenario matrix stays aligned with golden benchmark fixtures
   - documented scenario count remains synchronized with benchmark set size
 
+### 6) Manual product-pass results contract
+
+- Test: `manual-product-pass-results-consistency.test.ts`
+- Protects:
+  - published product-pass results table stays aligned with benchmark scenario fixture set
+  - release artifact continues to capture smoke-chain evidence and migration blocker context
+
 ## Operational Usage
 
 Run:
@@ -67,6 +74,7 @@ This command now validates both product logic regressions and release-contract d
 ## Focused Contract Suite Inventory (`test:forge-rfq:contracts`)
 
 - `profiles-rls-migration.test.ts`
+- `manual-product-pass-results-consistency.test.ts`
 - `release-config-consistency.test.ts`
 - `release-docs-consistency.test.ts`
 - `release-packet-consistency.test.ts`
