@@ -11,13 +11,11 @@ import {
   AnimatePresence,
 } from "framer-motion";
 import {
-  fadeInUp,
   fadeInScale,
   heroHeadline,
   heroTagline,
   buttonHover,
   buttonTap,
-  AnimatedHeader,
   StaggerContainer,
   AnimatedCard,
   AnimatedSection,
@@ -49,6 +47,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { RolesSection } from "@/components/marketing/RolesSection";
+import { GuildSection } from "@/components/marketing/GuildSection";
+import { PlatformShowcaseSection } from "@/components/marketing/PlatformShowcaseSection";
+import { EcosystemSection } from "@/components/marketing/EcosystemSection";
+import { TrustSection } from "@/components/marketing/TrustSection";
 
 // Domain configuration
 const APP_DOMAIN =
@@ -147,16 +150,22 @@ export default function MarketingPage() {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
             <a
+              href="#roles"
+              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
+            >
+              Roles
+            </a>
+            <a
               href="#problem"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               Why Us
             </a>
             <a
-              href="#solution"
+              href="#guild"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
-              Solution
+              Guild
             </a>
             <a
               href="#how-it-works"
@@ -176,12 +185,6 @@ export default function MarketingPage() {
             >
               FAQ
             </a>
-            <Link
-              href="/techniques"
-              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
-            >
-              Techniques
-            </Link>
             <a
               href={`${APP_DOMAIN}/login`}
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
@@ -249,8 +252,9 @@ export default function MarketingPage() {
                     Get Started Free
                   </Link>
                   {[
+                    { href: "#roles", label: "Roles" },
                     { href: "#problem", label: "Why Us" },
-                    { href: "#solution", label: "Solution" },
+                    { href: "#guild", label: "Guild" },
                     { href: "#how-it-works", label: "Getting Started" },
                     { href: "#faq", label: "FAQ" },
                   ].map((item) => (
@@ -263,13 +267,6 @@ export default function MarketingPage() {
                       {item.label}
                     </a>
                   ))}
-                  <Link
-                    href="/techniques"
-                    className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Techniques
-                  </Link>
                   <Link
                     href="/pricing"
                     className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50"
@@ -294,6 +291,7 @@ export default function MarketingPage() {
       {/* ── Main Content ── */}
       <main id="main-content">
         <HeroSection />
+        <RolesSection />
         <ProblemSection />
         <Suspense fallback={
           <div className="py-16 px-4">
@@ -308,8 +306,12 @@ export default function MarketingPage() {
           <SavingsCalculatorSection />
         </Suspense>
         <SolutionSection />
+        <PlatformShowcaseSection />
         <HowItWorksSection />
+        <GuildSection />
+        <EcosystemSection />
         <HowAProjectWorksSection />
+        <TrustSection />
         <PlatformCapabilitiesSection />
         <PricingPreviewSection />
         <FAQSection />
@@ -327,10 +329,10 @@ export default function MarketingPage() {
             className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-t border-muted px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
           >
             <Link
-              href="/join/founder"
+              href="#roles"
               className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full"
             >
-              Get Started Free
+              Choose Your Path
               <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
@@ -628,24 +630,43 @@ function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.6 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto"
+          className="flex flex-col items-center gap-4 w-full sm:w-auto"
         >
-          <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
-            <Link
-              href="/join/founder"
-              className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto"
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
+              <Link
+                href="/join/founder"
+                className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto"
+              >
+                Start as Founder
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </motion.div>
+            <a
+              href="#roles"
+              className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
             >
-              Get Started Free
-              <ArrowRight className="h-4 w-4" />
+              Choose Your Path
+              <ChevronDown className="h-4 w-4" />
+            </a>
+          </div>
+          {/* Secondary role links */}
+          <div className="flex items-center gap-4 text-xs font-mono text-muted-foreground">
+            <span>Also join as:</span>
+            <Link
+              href="/join/executive"
+              className="text-international-orange/80 hover:text-international-orange transition-colors uppercase tracking-wider"
+            >
+              Executive
             </Link>
-          </motion.div>
-          <a
-            href="#how-it-works"
-            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
-          >
-            See How It Works
-            <ChevronDown className="h-4 w-4" />
-          </a>
+            <span className="text-muted-foreground/40">|</span>
+            <Link
+              href="/join/apprentice"
+              className="text-international-orange/80 hover:text-international-orange transition-colors uppercase tracking-wider"
+            >
+              Apprentice
+            </Link>
+          </div>
         </motion.div>
 
         {/* Version line */}
@@ -1118,7 +1139,7 @@ function SolutionSection() {
       icon: Wrench,
       title: "Operating System",
       description:
-        "ForgeOS coordinates your fractional team, tracks objectives, manages suppliers, and keeps everyone aligned. The glue that makes fractional work.",
+        "ForgeOS coordinates your fractional team, tracks objectives, manages suppliers, and keeps everyone aligned — the system that makes fractional collaboration work.",
     },
   ] as const;
 
@@ -1431,10 +1452,10 @@ function HowItWorksSection() {
     {
       number: "01",
       icon: UserCheck,
-      title: "Sign Up",
+      title: "Choose Your Role",
       description:
-        "Create your free account in under a minute. No application, no waitlist — just pick your role and you're in. Founding members get early access pricing locked in forever.",
-      cta: { label: "Get Started Free", href: "/join/founder" },
+        "Are you a Founder launching a hardware company? An Executive with expertise to deploy? An Apprentice ready to learn? Pick your path and create your free account in under a minute.",
+      cta: { label: "Choose Your Path", href: "#roles" },
     },
     {
       number: "02",
@@ -1678,9 +1699,19 @@ function FAQSection() {
         "The platform starts free. Paid plans start at £49/month for growing ventures. On top of the subscription, there's a 10% platform fee on marketplace transactions (manufacturing orders, retainer payments). No hidden fees. Cancel anytime.",
     },
     {
-      question: "What if I'm not a founder? Can I still join?",
+      question: "What's the difference between Founder, Executive, and Apprentice?",
       answer:
-        "Absolutely. We have three roles: Founders (who need things built), Executives (senior engineers who provide fractional expertise), and Apprentices (emerging talent paired with executives for accelerated learning). Each role has its own signup path.",
+        "Founders bring vision and capital — they need hardware built. Executives are senior professionals who deploy their expertise fractionally across multiple ventures. Apprentices are ambitious early-career people who get paired with executives for structured mentorship while shipping real projects. Each role has its own signup path and experience inside the platform.",
+    },
+    {
+      question: "How does the Guild work?",
+      answer:
+        "The Guild is our community hub. It hosts events, workshops, and networking sessions. Executives mentor apprentices through structured programmes. Apprentices build portfolios of real work. Founders connect with people who can help. It's the human side of making hardware fast — because tools alone don't ship products, people do.",
+    },
+    {
+      question: "How do Executives get paid?",
+      answer:
+        "Executives set their own rates and work through retainer agreements managed on the platform. Payment is handled through Stripe Connect — secure, transparent, and automatic. You can work with multiple startups simultaneously, choosing your own level of engagement.",
     },
     {
       question: "How quickly can I go from idea to prototype?",
@@ -1756,34 +1787,54 @@ function FinalCTASection() {
           </motion.div>
 
           <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Ready to Build Hardware
-            <br className="hidden sm:block" /> at Software Speed?
+            Ready to Make Manufacturing
+            <br className="hidden sm:block" /> as Fast as Software?
           </h2>
           <p className="text-background/70 text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-8 sm:mb-10">
-            Founding members get early access pricing locked in forever,
-            direct product influence, and priority matching with our best
-            executives. Don&apos;t wait for the waitlist.
+            Whether you&apos;re launching a hardware company, deploying your expertise
+            fractionally, or starting your career — there&apos;s a seat at the forge.
+            Founding members get early access pricing locked in forever.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
-            <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
+          {/* Three role CTAs */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-2xl mx-auto mb-6">
+            <motion.div whileHover={buttonHover} whileTap={buttonTap}>
               <Link
                 href="/join/founder"
-                className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto"
+                className="flex flex-col items-center justify-center gap-1 bg-international-orange hover:bg-international-orange-hover text-white px-6 py-4 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
               >
-                Get Started Free
-                <ArrowRight className="h-4 w-4" />
+                <Rocket className="h-4 w-4 mb-1" />
+                Start as Founder
               </Link>
             </motion.div>
-            <a
-              href={`${APP_DOMAIN}/login`}
-              className="inline-flex items-center gap-2 text-background/60 hover:text-background text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
-            >
-              Already a member? Login
-            </a>
+            <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+              <Link
+                href="/join/executive"
+                className="flex flex-col items-center justify-center gap-1 border border-background/30 hover:bg-background/10 text-background px-6 py-4 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
+              >
+                <UserCheck className="h-4 w-4 mb-1" />
+                Join as Executive
+              </Link>
+            </motion.div>
+            <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+              <Link
+                href="/join/apprentice"
+                className="flex flex-col items-center justify-center gap-1 border border-background/30 hover:bg-background/10 text-background px-6 py-4 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
+              >
+                <Users className="h-4 w-4 mb-1" />
+                Enter the Guild
+              </Link>
+            </motion.div>
           </div>
 
-          <p className="mt-6 sm:mt-8 text-xs text-background/60 font-mono tracking-wider">
+          <a
+            href={`${APP_DOMAIN}/login`}
+            className="inline-flex items-center gap-2 text-background/60 hover:text-background text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
+          >
+            Already a member? Login
+          </a>
+
+          <p className="mt-4 sm:mt-6 text-xs text-background/60 font-mono tracking-wider">
             No credit card required. Start free. Cancel anytime.
           </p>
         </AnimatedSection>

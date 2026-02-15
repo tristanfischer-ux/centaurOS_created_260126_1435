@@ -173,9 +173,14 @@ export async function POST(request: Request) {
     }
 
     if (!apiKey) {
-        console.error("[agents/execute] No API key configured for provider:", { providerId })
+        const providerName = PROVIDER_REGISTRY[providerId]?.name ?? providerId
+        console.error("[agents/execute] No API key configured for provider:", { providerId, modelId })
         return NextResponse.json(
-            { error: "This feature is temporarily unavailable. Please try again later." },
+            {
+                error: `${providerName} is not configured. Try again later or add an API key in settings.`,
+                code: "PROVIDER_UNAVAILABLE",
+                providerId,
+            },
             { status: 503 }
         )
     }

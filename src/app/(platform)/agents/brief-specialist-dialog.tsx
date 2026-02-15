@@ -71,6 +71,31 @@ function getSpecialistIntroVideoUrl(specialistId: string): string | undefined {
     // return `/videos/specialists/${specialistId}.mp4`
 }
 
+/**
+ * Build a static fallback greeting from specialist personality when the API greeting fails.
+ * Uses tagline and first signature phrase so the user still sees an in-character opening.
+ */
+function getFallbackGreeting(specialist: Specialist): string {
+    const phrase = specialist.personality.voice.signaturePhrases[0]
+    return phrase
+        ? `${specialist.tagline} ${phrase}`
+        : `${specialist.tagline} What's the one thing we should focus on first?`
+}
+
+/**
+ * Show a friendly, actionable message when the specialist can't connect (e.g. provider unavailable).
+ */
+function normalizeSpecialistError(error: string, specialistName: string): string {
+    if (
+        error.includes("temporarily unavailable") ||
+        error.includes("not configured") ||
+        error.includes("PROVIDER_UNAVAILABLE")
+    ) {
+        return `${specialistName} is having trouble connecting right now. Try again in a moment, or check your AI provider settings.`
+    }
+    return error
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ChatMessage {
@@ -316,18 +341,12 @@ export function BriefSpecialistDialog({
     }, [messages, streamingResponse])
 
     // ─── Proactive Greeting ──────────────────────────────────────────────
-    // After initialization, generate a proactive opening message from the specialist.
-    // Only fires once per specialist session, and only when there's context to reference.
+    // After initialization, always generate a proactive opening message from the specialist.
+    // Tiered: with history/cross-context reference it; first-time use company context or a compelling opening question.
     useEffect(() => {
         if (isLoadingThread || !open) return
         if (greetingGeneratedRef.current) return
         greetingGeneratedRef.current = true
-
-        const hasHistoricalMessages = messages.some((m) => m.historical)
-        const hasCrossContext = crossSpecialistContext.length > 0
-
-        // Only generate a dynamic greeting if there's context to reference
-        if (!hasHistoricalMessages && !hasCrossContext) return
 
         const controller = new AbortController()
         const signal = controller.signal
@@ -350,18 +369,28 @@ export function BriefSpecialistDialog({
                 contextParts.push(`## ${crossSpecialistContext}`)
             }
 
-            const greetingPrompt = `You are ${specialist.name}, the ${specialist.title} specialist. ${specialist.workingStyle}
-
-The founder is opening a conversation with you. Based on the context below, write a brief, proactive opening message (2-4 sentences). Reference specific details from the context. Either:
+            const hasContextToReference = contextParts.length > 0
+            const greetingInstructions = hasContextToReference
+                ? `The founder is opening a conversation with you. Based on the context below, write a brief, proactive opening message (2-4 sentences). Reference specific details. Either:
 - Pick up where you left off and suggest a next step
 - Comment on what other specialists have been working on and connect it to your domain
 - Ask a pointed question that would advance their work
 
-Stay in character as ${specialist.name}. Be concise, direct, and actionable. Jump straight into substance — no "Hi!" or "Welcome back!" greetings.
+Stay in character as ${specialist.name}. Be concise, direct, and actionable. Jump straight into substance — no "Hi!" or "Welcome back!" greetings.`
+                : `A founder is meeting you for the first time. Write a brief, engaging opening (2-3 sentences) that:
+- Introduces your perspective and what you bring to the table
+- Asks ONE specific, thought-provoking question that shows your expertise
+- Makes the founder feel like they just gained a sharp advisor
 
-${contextParts.join("\n\n")}
+If company context is provided below, reference specific details and suggest 1-2 things you could help with right now. If no company context is provided, ask something that will help you quickly understand their situation.
 
-{{input}}
+Stay in character as ${specialist.name}. Be warm but direct. No generic pleasantries.`
+
+            const greetingPrompt = `You are ${specialist.name}, the ${specialist.title} specialist. ${specialist.workingStyle}
+
+${greetingInstructions}
+
+${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
 
 {{company_context}}`
 
@@ -380,7 +409,15 @@ ${contextParts.join("\n\n")}
                     signal,
                 })
 
-                if (!res.ok || signal.aborted) return
+                if (!res.ok || signal.aborted) {
+                    const fallback: ChatMessage = {
+                        role: "assistant",
+                        content: getFallbackGreeting(specialist),
+                        timestamp: new Date(),
+                    }
+                    setMessages((prev) => [...prev, fallback])
+                    return
+                }
 
                 // Consume SSE stream
                 const reader = res.body?.getReader()
@@ -399,7 +436,13 @@ ${contextParts.join("\n\n")}
                             try {
                                 const parsed = JSON.parse(data) as { text?: string; error?: string }
                                 if (parsed.error) {
-                                    setError(parsed.error)
+                                    setError(normalizeSpecialistError(parsed.error, specialist.name))
+                                    const fallback: ChatMessage = {
+                                        role: "assistant",
+                                        content: getFallbackGreeting(specialist),
+                                        timestamp: new Date(),
+                                    }
+                                    setMessages((prev) => [...prev, fallback])
                                     return
                                 }
                                 if (parsed.text) fullResponse += parsed.text
@@ -410,7 +453,15 @@ ${contextParts.join("\n\n")}
                     }
                 }
 
-                if (signal.aborted || !fullResponse.trim()) return
+                if (signal.aborted || !fullResponse.trim()) {
+                    const fallback: ChatMessage = {
+                        role: "assistant",
+                        content: getFallbackGreeting(specialist),
+                        timestamp: new Date(),
+                    }
+                    setMessages((prev) => [...prev, fallback])
+                    return
+                }
 
                 // Strip any NEXT_SPECIALIST recommendation from the greeting
                 const cleaned = fullResponse.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
@@ -430,8 +481,14 @@ ${contextParts.join("\n\n")}
                 }
             } catch (err) {
                 if (err instanceof Error && err.name === "AbortError") return
-                // Greeting is nice-to-have — don't block the user
+                // Greeting failed — show static fallback so the user still sees an in-character opening
                 console.warn("[BriefDialog] Greeting generation failed:", err)
+                const fallback: ChatMessage = {
+                    role: "assistant",
+                    content: getFallbackGreeting(specialist),
+                    timestamp: new Date(),
+                }
+                setMessages((prev) => [...prev, fallback])
             } finally {
                 if (!signal.aborted) setIsGeneratingGreeting(false)
             }
@@ -531,7 +588,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({ error: "Execution failed" }))
-                throw new Error(errData.error || `HTTP ${res.status}`)
+                const rawError = errData.error || `HTTP ${res.status}`
+                throw new Error(normalizeSpecialistError(rawError, specialist.name))
             }
 
             // Handle streaming response
@@ -572,7 +630,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             }
 
             if (streamError) {
-                setError(streamError)
+                setError(normalizeSpecialistError(streamError, specialist.name))
                 return
             }
 
@@ -656,6 +714,13 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             toast.error("Failed to copy")
         }
     }, [messages])
+
+    /** Pre-fill the textarea with a natural question from a conversation starter chip. */
+    const handleStarterClick = useCallback((highlight: string) => {
+        setBriefText(`Help me with ${highlight}`)
+        setError(null)
+        textareaRef.current?.focus()
+    }, [])
 
     const handleSwitchSpecialist = useCallback((id: string) => {
         // Build handoff context from recent conversation
@@ -809,15 +874,6 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             )}
                         </div>
                     </div>
-                    {/* Working Style (only on first visit — hidden when history or conversation exists) */}
-                    {!hasConversation && !hasHistoricalMessages && (
-                        <div className="flex items-start gap-2 mt-3 p-3 rounded-lg bg-muted/50 border border-muted">
-                            <MessageSquareQuote className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                                {specialist.workingStyle}
-                            </p>
-                        </div>
-                    )}
                 </DialogHeader>
 
                 {/* Loading State */}
@@ -1093,6 +1149,55 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         </button>
                                     ))}
                                 </div>
+                            </div>
+                        )}
+
+                        {/* First-meeting card: avatar, tagline, and conversation starters */}
+                        {!hasConversation && !hasHistoricalMessages && (
+                            <div className="mb-4 p-4 rounded-lg bg-muted/30 border border-muted space-y-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="flex-shrink-0">
+                                        <SpecialistChatAvatar
+                                            specialist={specialist}
+                                            state={isGeneratingGreeting ? "thinking" : "idle"}
+                                        />
+                                    </div>
+                                    <div className="min-w-0 flex-1 pt-0.5">
+                                        <p className="text-sm font-medium text-foreground italic">
+                                            &ldquo;{specialist.tagline}&rdquo;
+                                        </p>
+                                        {isGeneratingGreeting && (
+                                            <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                {specialist.name} is getting up to speed...
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                                {specialist.highlights.length > 0 && (
+                                    <>
+                                        <p className="text-xs font-medium text-muted-foreground">
+                                            Start with a topic
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {specialist.highlights.map((highlight) => (
+                                                <button
+                                                    key={highlight}
+                                                    type="button"
+                                                    onClick={() => handleStarterClick(highlight)}
+                                                    disabled={isExecuting}
+                                                    className={cn(
+                                                        "inline-flex items-center rounded-md border border-muted bg-background px-3 py-1.5 text-sm font-medium text-foreground",
+                                                        "hover:border-international-orange/50 hover:bg-muted/50 transition-colors",
+                                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-2"
+                                                    )}
+                                                >
+                                                    {highlight}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
 

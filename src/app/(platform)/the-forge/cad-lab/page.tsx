@@ -3,15 +3,13 @@
 /**
  * @file page.tsx — The Forge: Research stage (Stage 1).
  *
- * @description Landing page for The Forge pipeline. Shows hero content
- * and quick-start templates before research, and the editable research
- * report + sources after research completes. Auto-triggers decomposition
- * and navigates to /build once modules are mapped.
+ * @description Focused landing page with a single-action input field,
+ * quick-start template pills, and a clean research report display.
+ * User controls the pace — no auto-navigation.
  */
 
-import { useEffect, useRef } from "react"
+import { useCallback, useState } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import {
   Loader2,
   Search,
@@ -21,47 +19,116 @@ import {
   ChevronDown,
   ChevronRight,
   Globe,
-  ExternalLink,
   RotateCcw,
-  Download,
-  Printer,
-  Ruler,
   ArrowRight,
   BarChart3,
   ShoppingCart,
   ClipboardCheck,
+  Sparkles,
+  Pencil,
+  AlertCircle,
+  Building2,
+  BookOpen,
+  Database,
+  MessageSquare,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Markdown } from "@/components/ui/markdown"
-import { CLAUDE_MODELS } from "@/lib/cad-lab-types"
-import type { ClaudeModelId } from "@/lib/cad-lab-types"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { CadLabResearchReport } from "@/components/cad/cad-lab-research-report"
+import { cn } from "@/lib/utils"
 
 import { useCadLab } from "./cad-lab-context"
+
+// ─── Source credibility classification ───────────────────────────────
+
+type SourceType = "manufacturer" | "datasheet" | "reference" | "community"
+
+/**
+ * Classifies a URL into a credibility category based on domain patterns.
+ *
+ * @param uri - Source URL
+ * @param title - Source title (for additional heuristics)
+ * @returns Source type for icon/label treatment
+ */
+function classifySource(uri: string, title: string): SourceType {
+  const lower = uri.toLowerCase()
+  const titleLower = title.toLowerCase()
+
+  // Datasheets and spec documents
+  if (titleLower.includes("datasheet") || titleLower.includes("spec sheet") ||
+      titleLower.includes("technical data") || lower.includes("/datasheet") ||
+      lower.includes(".pdf") || titleLower.includes("product specification")) {
+    return "datasheet"
+  }
+
+  // Known manufacturer/OEM domains
+  const manufacturerPatterns = [
+    "ti.com", "analog.com", "digikey.com", "mouser.com", "arrow.com",
+    "mcmaster.com", "misumi", "hiwin.com", "harmonicdrive", "maxon",
+    "faulhaber.com", "nanotec.com", "pololu.com", "sparkfun.com",
+    "adafruit.com", "dji.com", "cubespace", "nanoavionics", "endurosat",
+    "blue-canyon", "spacex.com", "boeing.com", "airbus.com", "tesla.com",
+    "nvidia.com", "intel.com", "stmicro", "nxp.com", "infineon.com",
+    "rohde-schwarz", "keysight.com", "thingiverse.com", "grabcad.com",
+    "manufacturer", ".gov", "nasa.gov", "esa.int", "mil",
+  ]
+  if (manufacturerPatterns.some((p) => lower.includes(p))) {
+    return "manufacturer"
+  }
+
+  // Reference/educational sites
+  const referencePatterns = [
+    "wikipedia", "engineering.com", "machinedesign.com", "asme.org",
+    "iso.org", "astm.org", "sae.org", "ieee.org", "springer.com",
+    "sciencedirect", "researchgate", "arxiv.org", ".edu", "handbook",
+    "standard", "reference",
+  ]
+  if (referencePatterns.some((p) => lower.includes(p))) {
+    return "reference"
+  }
+
+  // Community/forums/blogs
+  return "community"
+}
+
+const SOURCE_TYPE_CONFIG: Record<SourceType, { label: string; icon: typeof Globe; color: string }> = {
+  manufacturer: { label: "Manufacturer", icon: Building2, color: "text-status-success" },
+  datasheet: { label: "Datasheet", icon: Database, color: "text-electric-blue" },
+  reference: { label: "Reference", icon: BookOpen, color: "text-international-orange" },
+  community: { label: "Community", icon: MessageSquare, color: "text-muted-foreground" },
+}
 
 // ─── Quick-start templates ───────────────────────────────────────────
 
 const QUICK_START_TEMPLATES = [
-  { id: "cubesat", label: "CubeSat Bus", subject: "1U CubeSat structural bus frame (100×100×100mm) with PC-104 avionics stack mounting, solar panel rail interfaces, and deployment switch cutout per CDS rev 14", image: "/cad-lab/templates/cubesat.png", complexity: "Aerospace" },
-  { id: "rocket", label: "Rocket Thrust Mount", subject: "Bipropellant rocket engine thrust structure with gimbal bearing attachment points, regenerative cooling channel interfaces, and propellant feed-through ports for 5kN class engine", image: "/cad-lab/templates/rocket-mount.png", complexity: "Aerospace" },
-  { id: "ev-battery", label: "EV Battery Module", subject: "Prismatic cell battery module enclosure with liquid cooling channels, BMS mounting plate, thermal runaway vent ports, and HV busbar connectors for 400V architecture", image: "/cad-lab/templates/ev-battery.png", complexity: "Automotive" },
-  { id: "robotic-arm", label: "Robotic Arm Joint", subject: "6-DOF robotic arm wrist joint with harmonic drive gear housing, precision encoder mount, cable passthrough channels, and force-torque sensor interface", image: "/cad-lab/templates/robotic-arm.png", complexity: "Robotics" },
-  { id: "reaction-wheel", label: "Reaction Wheel", subject: "Satellite reaction wheel assembly with precision flywheel housing, BLDC motor mount, optical encoder interface, and vibration-isolated mounting flange", image: "/cad-lab/templates/reaction-wheel.png", complexity: "Aerospace" },
-  { id: "heavy-drone", label: "Heavy-Lift Drone", subject: "Octocopter heavy-lift drone frame with coaxial motor mounts, central payload bay with 3-axis gimbal interface, retractable landing gear, and folding arm hinges in carbon fiber", image: "/cad-lab/templates/heavy-drone.png", complexity: "UAV" },
+  { id: "cubesat", label: "CubeSat Bus", subject: "1U CubeSat structural bus frame (100×100×100mm) with PC-104 avionics stack mounting, solar panel rail interfaces, and deployment switch cutout per CDS rev 14", tag: "Aerospace" },
+  { id: "rocket", label: "Rocket Thrust Mount", subject: "Bipropellant rocket engine thrust structure with gimbal bearing attachment points, regenerative cooling channel interfaces, and propellant feed-through ports for 5kN class engine", tag: "Aerospace" },
+  { id: "ev-battery", label: "EV Battery Module", subject: "Prismatic cell battery module enclosure with liquid cooling channels, BMS mounting plate, thermal runaway vent ports, and HV busbar connectors for 400V architecture", tag: "Automotive" },
+  { id: "robotic-arm", label: "Robotic Arm Joint", subject: "6-DOF robotic arm wrist joint with harmonic drive gear housing, precision encoder mount, cable passthrough channels, and force-torque sensor interface", tag: "Robotics" },
+  { id: "reaction-wheel", label: "Reaction Wheel", subject: "Satellite reaction wheel assembly with precision flywheel housing, BLDC motor mount, optical encoder interface, and vibration-isolated mounting flange", tag: "Aerospace" },
+  { id: "heavy-drone", label: "Heavy-Lift Drone", subject: "Octocopter heavy-lift drone frame with coaxial motor mounts, central payload bay with 3-axis gimbal interface, retractable landing gear, and folding arm hinges in carbon fiber", tag: "UAV" },
 ] as const
 
-// ─── Pipeline preview shown during research wait ─────────────────────
+// ─── Pipeline preview (always visible) ───────────────────────────────
 
 const PIPELINE_STAGES = [
-  { icon: Search, label: "Research", desc: "Real-world specs from datasheets" },
-  { icon: Box, label: "Build", desc: "Parametric CAD for each module" },
-  { icon: BarChart3, label: "Analysis", desc: "Risk register & timeline" },
-  { icon: ShoppingCart, label: "Procurement", desc: "Costs & supply chain" },
-  { icon: ClipboardCheck, label: "Review", desc: "Supplier-ready package" },
+  { icon: Search, label: "Research", desc: "Real-world specs" },
+  { icon: Box, label: "Build", desc: "Parametric CAD" },
+  { icon: BarChart3, label: "Analysis", desc: "Risk & timeline" },
+  { icon: ShoppingCart, label: "Procurement", desc: "Costs & supply" },
+  { icon: ClipboardCheck, label: "Review", desc: "Supplier-ready" },
 ]
 
 // ─── Page Component ──────────────────────────────────────────────────
@@ -70,358 +137,440 @@ export default function CadLabResearchPage(): React.ReactNode {
   const router = useRouter()
   const {
     subject, setSubject,
-    modelId, setModelId,
     isResearching, researchResult, editableReport, setEditableReport,
     showSources, setShowSources,
     hasResearch, isAnyLoading,
     handleResearch, handleReset, handleDecompose,
-    modules, isDecomposing, milestone,
+    modules, isDecomposing,
   } = useCadLab()
 
-  // Auto-decompose after research completes (only if no modules yet)
-  const hasAutoDecomposed = useRef(false)
-  useEffect(() => {
-    if (hasResearch && modules.length === 0 && !isDecomposing && !hasAutoDecomposed.current) {
-      hasAutoDecomposed.current = true
-      const timer = setTimeout(() => { handleDecompose() }, 1500)
-      return () => clearTimeout(timer)
-    }
-  }, [hasResearch, modules.length, isDecomposing, handleDecompose])
+  // Reset confirmation dialog
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
 
-  // Reset auto-decompose flag when starting fresh
-  useEffect(() => {
-    if (!hasResearch) hasAutoDecomposed.current = false
-  }, [hasResearch])
+  // Report view mode: structured cards, raw markdown, or editing
+  type ReportViewMode = "structured" | "markdown" | "edit"
+  const [reportViewMode, setReportViewMode] = useState<ReportViewMode>("structured")
 
-  // Auto-navigate to /build after decompose completes
-  useEffect(() => {
-    if (milestone === "breakdown" && modules.length > 0) {
-      const timer = setTimeout(() => {
-        router.push("/the-forge/cad-lab/build")
-      }, 2500) // Let milestone banner show briefly
-      return () => clearTimeout(timer)
+  /**
+   * Handles template pill click — sets subject and triggers research directly.
+   *
+   * @param templateSubject - The template's subject string
+   */
+  const handleTemplateClick = useCallback((templateSubject: string) => {
+    setSubject(templateSubject)
+    // We need a small delay for the state to propagate before calling handleResearch
+    // which reads subject from context. Instead, we'll use a ref approach via
+    // the input value, but since handleResearch reads from context state,
+    // we trigger it on next tick.
+    setTimeout(() => {
+      // handleResearch reads from the context `subject`, which is now set
+      handleResearch()
+    }, 50)
+  }, [setSubject, handleResearch])
+
+  /**
+   * Handles safe reset with confirmation.
+   */
+  const handleSafeReset = useCallback(() => {
+    if (hasResearch || modules.length > 0) {
+      setShowResetConfirm(true)
+    } else {
+      handleReset()
     }
-  }, [milestone, modules.length, router])
+  }, [hasResearch, modules.length, handleReset])
+
+  const handleConfirmReset = useCallback(() => {
+    setShowResetConfirm(false)
+    handleReset()
+  }, [handleReset])
+
+  /**
+   * Handles "Continue to Build" — decomposes if needed, then navigates.
+   */
+  const handleContinueToBuild = useCallback(async () => {
+    if (modules.length === 0 && !isDecomposing) {
+      await handleDecompose()
+    }
+    router.push("/the-forge/cad-lab/build")
+  }, [modules.length, isDecomposing, handleDecompose, router])
 
   return (
     <div className="space-y-6">
-      {/* ── Hero landing (before research) ── */}
+      {/* ── Focused Launchpad (before research) ── */}
       {!hasResearch && !isResearching && (
         <div className="space-y-8">
-          {/* Hero banner */}
-          <div className="relative rounded-xl overflow-hidden border border-muted">
-            <Image
-              src="/cad-lab/hero.png"
-              alt="From idea to manufacturing-ready CAD"
-              width={1200}
-              height={400}
-              className="w-full h-auto object-cover"
-              priority
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/60 to-transparent flex items-center">
-              <div className="p-8 max-w-lg">
-                <h2 className="text-2xl font-bold text-foreground leading-tight">
-                  Parametric CAD from a single sentence
-                </h2>
-                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                  Describe any physical product. The system researches real-world specifications, generates
-                  parametric CadQuery models with 7 orthographic projections, runs DFM analysis, and
-                  delivers STEP + STL exports with center-of-gravity data.
-                </p>
-              </div>
+          {/* Hero area — clean and focused */}
+          <div className="text-center space-y-3 pt-4">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Sparkles className="h-5 w-5 text-international-orange" />
+              <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                From idea to manufacturing-ready CAD
+              </span>
             </div>
+            <h2 className="text-3xl font-bold text-foreground leading-tight">
+              Parametric CAD from a single sentence
+            </h2>
+            <p className="text-sm text-muted-foreground max-w-xl mx-auto leading-relaxed">
+              Describe any physical product. We&apos;ll research real-world specs, generate parametric models
+              with 7 orthographic projections, run DFM analysis, and deliver STEP + STL exports.
+            </p>
           </div>
 
-          {/* Credibility stats bar */}
-          <div className="flex items-center justify-center gap-6 py-3 px-4 rounded-lg bg-muted/50 border border-muted text-xs text-muted-foreground">
-            <span className="font-mono font-semibold text-foreground">256</span> Parametric Components
-            <span className="text-muted">|</span>
-            <span className="font-mono font-semibold text-foreground">15</span> Industry Sectors
-            <span className="text-muted">|</span>
-            <span className="font-mono font-semibold text-foreground">7</span> Projection Views
-            <span className="text-muted">|</span>
-            <span className="font-mono font-semibold text-foreground">STEP + STL</span> Export
+          {/* Primary input — the center of gravity */}
+          <div className="max-w-2xl mx-auto space-y-3">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                id="subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && subject.trim() && !isAnyLoading) {
+                    handleResearch()
+                  }
+                }}
+                placeholder="Describe a product or sub-assembly to engineer..."
+                disabled={isAnyLoading}
+                className="h-14 pl-12 pr-4 text-base rounded-xl border-2 border-muted focus:border-international-orange transition-colors"
+              />
+            </div>
+            <Button
+              id="research-btn"
+              onClick={handleResearch}
+              disabled={isAnyLoading || !subject.trim()}
+              className="w-full h-12 text-base rounded-xl gap-2"
+            >
+              <Search className="h-5 w-5" />
+              Research &amp; Build
+            </Button>
           </div>
 
-          {/* 5 Capability cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {[
-              { icon: Search, title: "AI Research", desc: "Real-world specs from datasheets, reference designs, and engineering databases" },
-              { icon: Box, title: "256 Components", desc: "Parametric library spanning CubeSats, EVs, drones, robotics, and more" },
-              { icon: Printer, title: "DFM Analysis", desc: "Printability, support volume, material usage, and compatible printers" },
-              { icon: Ruler, title: "Mass Properties", desc: "Bounding box, mass, volume, surface area, and center-of-gravity coordinates" },
-              { icon: Download, title: "STEP + STL", desc: "Industry-standard exports compatible with SolidWorks, Fusion 360, and any slicer" },
-            ].map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="flex flex-col items-center gap-2 p-4 rounded-lg border border-muted bg-card text-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-international-orange-light">
-                  <Icon className="h-5 w-5 text-international-orange" />
-                </div>
-                <h3 className="text-xs font-semibold text-foreground">{title}</h3>
-                <p className="text-[10px] text-muted-foreground leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Quick-start templates */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">Quick Start — select an engineering template or describe your own product</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {/* Template pills */}
+          <div className="max-w-2xl mx-auto space-y-2">
+            <p className="text-xs text-muted-foreground text-center">
+              Or try an engineering template:
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
               {QUICK_START_TEMPLATES.map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => {
-                    setSubject(t.subject)
-                    setTimeout(() => {
-                      const btn = document.getElementById("research-btn")
-                      if (btn) btn.click()
-                    }, 400)
-                  }}
-                  className="group flex flex-col items-center gap-2 p-3 rounded-lg border border-muted bg-card hover:border-international-orange/50 hover:bg-international-orange-light/10 transition-all text-center cursor-pointer"
+                  onClick={() => handleTemplateClick(t.subject)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-muted bg-card text-xs font-medium text-foreground hover:border-international-orange/50 hover:bg-international-orange-light/10 transition-all cursor-pointer"
                 >
-                  <Image
-                    src={t.image}
-                    alt={t.label}
-                    width={80}
-                    height={80}
-                    className="rounded-md group-hover:scale-105 transition-transform"
-                  />
-                  <span className="text-xs font-medium text-foreground">{t.label}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
-                    {t.complexity}
-                  </span>
+                  {t.label}
+                  <span className="text-[10px] text-muted-foreground font-mono">{t.tag}</span>
                 </button>
               ))}
             </div>
           </div>
-        </div>
-      )}
 
-      {/* ── Pipeline preview during research wait ── */}
-      {isResearching && (
-        <Card className="border-international-orange/20">
-          <CardContent className="pt-6">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">What happens next</p>
-            <div className="flex items-start gap-2">
+          {/* Credibility stats — subtle */}
+          <div className="flex items-center justify-center gap-6 py-3 px-4 text-xs text-muted-foreground">
+            <span><span className="font-mono font-semibold text-foreground">256</span> Components</span>
+            <span className="text-muted">·</span>
+            <span><span className="font-mono font-semibold text-foreground">15</span> Sectors</span>
+            <span className="text-muted">·</span>
+            <span><span className="font-mono font-semibold text-foreground">7</span> Views</span>
+            <span className="text-muted">·</span>
+            <span className="font-mono font-semibold text-foreground">STEP + STL</span>
+          </div>
+
+          {/* Pipeline preview — always visible, teaching the user what comes next */}
+          <div className="max-w-lg mx-auto">
+            <div className="flex items-start">
               {PIPELINE_STAGES.map((stage, i) => {
                 const Icon = stage.icon
-                const isCurrent = i === 0
                 return (
                   <div key={stage.label} className="flex items-start flex-1">
-                    {i > 0 && <div className={`h-0.5 flex-1 mt-4 ${isCurrent ? "bg-international-orange" : "bg-muted"}`} />}
-                    <div className="flex flex-col items-center gap-1.5 text-center">
-                      <div className={`flex h-8 w-8 items-center justify-center rounded-full ${isCurrent ? "bg-international-orange text-white" : "bg-muted text-muted-foreground"}`}>
+                    {i > 0 && <div className="h-0.5 flex-1 mt-4 bg-muted" />}
+                    <div className="flex flex-col items-center gap-1 text-center">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
                         <Icon className="h-4 w-4" />
                       </div>
-                      <span className={`text-[10px] font-medium ${isCurrent ? "text-international-orange" : "text-muted-foreground"}`}>
+                      <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
                         {stage.label}
-                      </span>
-                      <span className="text-[9px] text-muted-foreground leading-tight hidden sm:block">
-                        {stage.desc}
                       </span>
                     </div>
                   </div>
                 )
               })}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {/* ── Model selector ── */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="subject">Product or sub-assembly to engineer</Label>
+      {/* ── Researching state ── */}
+      {isResearching && (
+        <div className="text-center space-y-4 py-8">
+          <div className="flex items-center justify-center gap-2">
+            <Search className="h-5 w-5 text-international-orange" />
+            <h3 className="text-lg font-semibold text-foreground">Researching: {subject}</h3>
+          </div>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            Searching engineering databases, cross-referencing datasheets, and synthesising a dimensional report...
+          </p>
+        </div>
+      )}
+
+      {/* ── Research Results (after research completes) ── */}
+      {hasResearch && !isResearching && (
+        <>
+          {/* Success banner with actions */}
+          <Card className="border-status-success/30 bg-gradient-to-r from-status-success-light/20 to-background">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-light">
+                    <CheckCircle2 className="h-5 w-5 text-status-success" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Research Complete</p>
+                    <p className="text-xs text-muted-foreground">
+                      {researchResult?.sources.length ?? 0} sources · {editableReport.length.toLocaleString()} chars
+                      {researchResult?.researchTime ? ` · ${(researchResult.researchTime / 1000).toFixed(1)}s` : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => handleResearch()} disabled={isAnyLoading}>
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Re-research
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={handleSafeReset}>
+                    Start Over
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Input — still visible for editing */}
+          <div className="max-w-2xl mx-auto">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                id="subject"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder="e.g., 1U CubeSat bus structure, EV battery module enclosure, 6-DOF robotic arm joint"
                 disabled={isAnyLoading}
+                className="pl-10 text-sm"
               />
             </div>
-            <div className="w-64 space-y-2">
-              <Label htmlFor="model">Claude Model</Label>
-              <select
-                id="model"
-                value={modelId}
-                onChange={(e) => setModelId(e.target.value as ClaudeModelId)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                disabled={isAnyLoading}
-              >
-                {CLAUDE_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Research button ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Search className="h-4 w-4" />
-            Research Real Dimensions
-            {researchResult?.success && (
-              <span className="text-xs font-normal text-status-success flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                Complete ({(researchResult.researchTime / 1000).toFixed(1)}s)
-              </span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Before anything else, search for real-world reference dimensions. Never invent dimensions.
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              id="research-btn"
-              onClick={handleResearch}
-              disabled={isAnyLoading || !subject.trim()}
-              variant={hasResearch ? "secondary" : "default"}
-            >
-              {isResearching ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Researching...</>
-              ) : hasResearch ? (
-                <><RotateCcw className="h-4 w-4 mr-2" />Re-Research</>
-              ) : (
-                <><Search className="h-4 w-4 mr-2" />Research Product</>
-              )}
-            </Button>
-            {hasResearch && (
-              <Button variant="ghost" size="sm" onClick={handleReset}>Start Over</Button>
-            )}
           </div>
 
-          {researchResult && !researchResult.success && researchResult.error && (
-            <div className="p-3 bg-status-error-light rounded text-sm text-destructive font-mono">
-              {researchResult.error}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ── Research Report (editable) ── */}
-      {hasResearch && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Research Report
-              <span className="text-xs font-normal text-muted-foreground">
-                (review and edit dimensions before proceeding)
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="border rounded-md p-4 bg-muted/30">
-              <Markdown content={editableReport} className="text-sm text-foreground" />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {editableReport.length.toLocaleString()} characters
-            </p>
-            <details className="border rounded-md">
-              <summary className="cursor-pointer p-3 text-sm font-medium hover:bg-muted/50 transition-colors">
-                Edit raw markdown
-              </summary>
-              <div className="p-3 border-t">
+          {/* Research Report — structured view with mode toggle */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Research Report
+                </CardTitle>
+                <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+                  <button
+                    onClick={() => setReportViewMode("structured")}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
+                      reportViewMode === "structured"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Structured
+                  </button>
+                  <button
+                    onClick={() => setReportViewMode("markdown")}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
+                      reportViewMode === "markdown"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Markdown
+                  </button>
+                  <button
+                    onClick={() => setReportViewMode("edit")}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
+                      reportViewMode === "edit"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Edit
+                  </button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {reportViewMode === "edit" ? (
                 <Textarea
                   value={editableReport}
                   onChange={(e) => setEditableReport(e.target.value)}
                   className="font-mono text-xs min-h-[400px]"
                   disabled={isAnyLoading}
                 />
-              </div>
-            </details>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Research Sources ── */}
-      {researchResult?.success &&
-        ((researchResult.sources.length > 0) || (researchResult.referenceModels.length > 0)) && (
-        <Card>
-          <CardHeader>
-            <button
-              onClick={() => setShowSources(!showSources)}
-              className="flex items-center justify-between w-full text-left"
-            >
-              <CardTitle className="text-base flex items-center gap-2">
-                <Globe className="h-4 w-4" />
-                Research Sources
-                <span className="text-xs font-normal text-muted-foreground">
-                  ({researchResult.sources.length} web + {researchResult.referenceModels.length} CAD refs)
-                </span>
-              </CardTitle>
-              {showSources ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              )}
-            </button>
-          </CardHeader>
-          {showSources && (
-            <CardContent className="space-y-4">
-              {researchResult.sources.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Web Sources</p>
-                  <ul className="space-y-1">
-                    {researchResult.sources.map((source, i) => (
-                      <li key={i} className="text-xs font-mono flex items-start gap-1.5">
-                        <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0 mt-0.5" />
-                        <a
-                          href={source.uri}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-electric-blue hover:underline truncate"
-                        >
-                          {source.title || source.uri}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
+              ) : reportViewMode === "markdown" ? (
+                <div className="border rounded-md p-4 bg-muted/30 max-h-[500px] overflow-y-auto">
+                  <Markdown content={editableReport} className="text-sm text-foreground" />
                 </div>
+              ) : (
+                <CadLabResearchReport report={editableReport} />
               )}
+              <p className="text-xs text-muted-foreground">
+                {editableReport.length.toLocaleString()} characters
+                {reportViewMode === "edit" && " · Edit dimensions before proceeding"}
+              </p>
             </CardContent>
+          </Card>
+
+          {/* Research Sources — collapsible */}
+          {researchResult?.success &&
+            ((researchResult.sources.length > 0) || (researchResult.referenceModels.length > 0)) && (
+            <Card>
+              <CardHeader>
+                <button
+                  onClick={() => setShowSources(!showSources)}
+                  className="flex items-center justify-between w-full text-left"
+                >
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    Research Sources
+                    <span className="text-xs font-normal text-muted-foreground">
+                      ({researchResult.sources.length} web + {researchResult.referenceModels.length} CAD refs)
+                    </span>
+                  </CardTitle>
+                  {showSources ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </button>
+              </CardHeader>
+              {showSources && (
+                <CardContent className="space-y-4">
+                  {/* Source credibility legend */}
+                  <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+                    <span className="font-medium">Type:</span>
+                    {(Object.entries(SOURCE_TYPE_CONFIG) as [SourceType, typeof SOURCE_TYPE_CONFIG[SourceType]][]).map(([key, cfg]) => {
+                      const Icon = cfg.icon
+                      return (
+                        <div key={key} className="flex items-center gap-1">
+                          <Icon className={cn("h-3 w-3", cfg.color)} />
+                          <span>{cfg.label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Classified source list */}
+                  {researchResult.sources.length > 0 && (
+                    <div className="space-y-1.5">
+                      {researchResult.sources.map((source, i) => {
+                        const sourceType = classifySource(source.uri, source.title || "")
+                        const cfg = SOURCE_TYPE_CONFIG[sourceType]
+                        const TypeIcon = cfg.icon
+                        return (
+                          <div key={i} className="flex items-start gap-2 text-xs">
+                            <TypeIcon className={cn("h-3 w-3 flex-shrink-0 mt-0.5", cfg.color)} />
+                            <a
+                              href={source.uri}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-electric-blue hover:underline truncate flex-1"
+                            >
+                              {source.title || source.uri}
+                            </a>
+                            <span className={cn("text-[10px] font-mono flex-shrink-0 px-1.5 py-0.5 rounded", cfg.color, "bg-muted/50")}>
+                              {cfg.label}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              )}
+            </Card>
           )}
-        </Card>
-      )}
 
-      {/* ── Auto-decomposing indicator ── */}
-      {hasResearch && modules.length === 0 && !isDecomposing && !isResearching && (
-        <Card className="border-international-orange/20">
-          <CardContent className="pt-6 flex items-center gap-3">
-            <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
-            <p className="text-sm text-muted-foreground">Preparing to map sub-assemblies...</p>
-          </CardContent>
-        </Card>
-      )}
+          {/* Error display */}
+          {researchResult && !researchResult.success && researchResult.error && (
+            <Card className="border-destructive/30">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-destructive font-mono">{researchResult.error}</div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-      {/* ── Proceed to Build (if modules exist but user is still on Research) ── */}
-      {hasResearch && modules.length > 0 && (
-        <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-foreground">
-                  {modules.length} sub-assemblies mapped
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Ready to generate parametric CAD for each module.
-                </p>
+          {/* ── Continue to Build — the main CTA ── */}
+          <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  {modules.length > 0 ? (
+                    <>
+                      <p className="text-sm font-semibold text-foreground">
+                        {modules.length} sub-assemblies mapped
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Ready to generate parametric CAD for each module.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold text-foreground">
+                        Ready to decompose into sub-assemblies
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        The system will map your product into manufacturable modules and generate CAD for each.
+                      </p>
+                    </>
+                  )}
+                </div>
+                <Button
+                  onClick={handleContinueToBuild}
+                  disabled={isAnyLoading || isDecomposing}
+                  className="gap-1.5"
+                >
+                  {isDecomposing ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Mapping...</>
+                  ) : (
+                    <>
+                      Continue to Build
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </Button>
               </div>
-              <Button onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
-                Continue to Build
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </>
       )}
+
+      {/* ── Reset Confirmation Dialog ── */}
+      <Dialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>Start Over?</DialogTitle>
+            <DialogDescription>
+              This will reset all research, modules, and generated CAD for this project. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowResetConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmReset}>
+              Start Over
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
