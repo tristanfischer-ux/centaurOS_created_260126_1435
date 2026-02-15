@@ -241,14 +241,16 @@ export function BriefSpecialistDialog({
                     console.warn("[BriefDialog] Could not get thread:", threadResult.error)
                 }
 
-                // Build cross-specialist context block
+                // Build cross-specialist context block with "I noticed" instructions
                 if (crossResult.data && crossResult.data.length > 0) {
                     const lines = crossResult.data.map((item) => {
-                        const name = getSpecialistById(item.specialistId)?.name ?? item.specialistId
-                        return `[${name}]: ${item.summary}`
+                        const otherSpec = getSpecialistById(item.specialistId)
+                        const name = otherSpec?.name ?? item.specialistId
+                        const title = otherSpec?.title ?? ""
+                        return `[${name}${title ? ` (${title})` : ""}]: ${item.summary}`
                     })
                     setCrossSpecialistContext(
-                        `Your colleagues have been working on:\n${lines.join("\n\n")}`
+                        `Your colleagues have been working on:\n${lines.join("\n\n")}\n\nIMPORTANT — "I noticed" pattern: If you see overlaps, synergies, or potential CONFLICTS between your work and theirs, PROACTIVELY flag them. Real colleagues catch these connections. Example: "I see ${crossResult.data[0] ? (getSpecialistById(crossResult.data[0].specialistId)?.name ?? "a colleague") : "a colleague"} has been working on something that connects to what we should discuss..."`
                     )
                 } else {
                     setCrossSpecialistContext("")
@@ -370,14 +372,40 @@ export function BriefSpecialistDialog({
             }
 
             const hasContextToReference = contextParts.length > 0
-            const greetingInstructions = hasContextToReference
-                ? `The founder is opening a conversation with you. Based on the context below, write a brief, proactive opening message (2-4 sentences). Reference specific details. Either:
-- Pick up where you left off and suggest a next step
-- Comment on what other specialists have been working on and connect it to your domain
-- Ask a pointed question that would advance their work
+            const hasCrossContext = !!crossSpecialistContext
+            const hasHistory = !!historyContext
 
-Stay in character as ${specialist.name}. Be concise, direct, and actionable. Jump straight into substance — no "Hi!" or "Welcome back!" greetings.`
-                : `A founder is meeting you for the first time. Write a brief, engaging opening (2-3 sentences) that:
+            // Build specific greeting instructions based on what context is available
+            let greetingInstructions: string
+            if (hasHistory && hasCrossContext) {
+                // Best case: we have both past conversation AND team context
+                greetingInstructions = `The founder is opening a conversation with you. You have BOTH previous conversation history AND knowledge of what other specialists have been working on.
+
+Write a proactive opening (2-4 sentences) that does ONE of these:
+1. **"I noticed something"**: If you spot a connection, overlap, or conflict between your domain and what other specialists discussed, FLAG IT. Example: "I noticed Nate has been working on enterprise pricing while we discussed SMB positioning — we should align on target segment."
+2. **Pick up where you left off**: Reference the last topic and suggest the logical next step.
+3. **Surface a recurring theme**: If the same topic keeps coming up, name it: "We keep coming back to pricing — maybe it's time to make a decision."
+
+CRITICAL: Be specific. Reference names, topics, and details from the context below. Generic openings are forbidden.
+Stay in character as ${specialist.name}. Jump straight into substance — no "Hi!" or "Welcome back!".`
+            } else if (hasHistory) {
+                greetingInstructions = `The founder is returning to continue working with you. Based on your conversation history below, write a proactive opening (2-3 sentences) that:
+- References what you discussed last time with specific details
+- Suggests a concrete next step or asks a follow-up question
+- Shows you remember and have been thinking about their situation
+
+Stay in character as ${specialist.name}. Be concise, direct, and actionable. Jump straight into substance — no greetings.`
+            } else if (hasCrossContext) {
+                greetingInstructions = `The founder is meeting you for the first time, BUT you can see what other specialists on the team have been working on.
+
+Write a proactive opening (2-3 sentences) that:
+- Introduces your perspective by connecting it to what other specialists discussed
+- Example: "I see Sam has been working on competitive strategy — from a finance perspective, here's what I'd want to stress-test..."
+- Asks ONE specific question that shows your expertise and connects to the team's work
+
+Stay in character as ${specialist.name}. Be warm but direct. No generic pleasantries.`
+            } else {
+                greetingInstructions = `A founder is meeting you for the first time. Write a brief, engaging opening (2-3 sentences) that:
 - Introduces your perspective and what you bring to the table
 - Asks ONE specific, thought-provoking question that shows your expertise
 - Makes the founder feel like they just gained a sharp advisor
@@ -385,6 +413,7 @@ Stay in character as ${specialist.name}. Be concise, direct, and actionable. Jum
 If company context is provided below, reference specific details and suggest 1-2 things you could help with right now. If no company context is provided, ask something that will help you quickly understand their situation.
 
 Stay in character as ${specialist.name}. Be warm but direct. No generic pleasantries.`
+            }
 
             const greetingPrompt = `You are ${specialist.name}, the ${specialist.title} specialist. ${specialist.workingStyle}
 
