@@ -41,6 +41,7 @@ You can also run the manual workflow:
 - Trigger with:
   - `apply_migration = true`
   - optional `run_release_verify = true`
+- Note: GitHub only allows workflow_dispatch for workflows present on the default branch. If this workflow only exists on a feature branch, merge first.
 
 Required repository secrets:
 

@@ -38,6 +38,7 @@ describe("release documentation consistency", () => {
     expect(qaReport).toContain("PGRST202")
     expect(qaReport).toContain("password authentication failed for user")
     expect(qaReport).toContain("JWT could not be decoded")
+    expect(qaReport).toContain("not found on the default branch")
     expect(qaReport).toContain("release-config-consistency.test.ts")
     expect(qaReport).toContain("manual-product-pass-results-consistency.test.ts")
     expect(qaReport).toContain("go-live-status-consistency.test.ts")

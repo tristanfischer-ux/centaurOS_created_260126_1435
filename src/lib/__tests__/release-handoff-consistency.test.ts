@@ -16,6 +16,7 @@ describe("release handoff consistency", () => {
     expect(handoffDoc).toContain("npx supabase db push")
     expect(handoffDoc).toContain("JWT could not be decoded")
     expect(handoffDoc).toContain("Path B — Manual SQL editor fallback")
+    expect(handoffDoc).toContain("default branch")
     expect(handoffDoc).toContain("20260215120000_stabilize_profiles_rls_no_recursion.sql")
     expect(handoffDoc).toContain("profiles_select_authenticated")
     expect(handoffDoc).toContain("profiles_update_own")

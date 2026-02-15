@@ -135,6 +135,7 @@ Status: **PASS** (all benchmark scenarios + smoke journey checks)
 - Attempting an `exec_sql` RPC fallback from this environment returns `PGRST202` (function not found), so migration application remains gated to authenticated CLI or manual SQL editor execution.
 - Attempting `npx supabase db push --db-url` with pooler URL + `SUPABASE_SERVICE_ROLE_KEY` also fails password auth (`FATAL: password authentication failed for user "postgres"`), confirming service-role keys are not DB password substitutes.
 - Attempting Supabase management SQL API (`/v1/projects/<ref>/database/query`) with `SUPABASE_SERVICE_ROLE_KEY` bearer auth returns `401` with `JWT could not be decoded`, confirming management endpoints require PAT-based auth context.
+- Attempting to trigger `forge-rfq-release-operations.yml` before it exists on the repository default branch returns `workflow ... not found on the default branch`; dispatch becomes available after merge.
 - During auth flows, some environments may log:
   - `Failed to fetch user profile: infinite recursion detected in policy for relation "profiles"`
 - A dedicated migration now exists to harden profiles RLS and remove recursive policy paths:
