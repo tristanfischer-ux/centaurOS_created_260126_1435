@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import { getModuleArtifactReadiness } from "@/lib/cad-lab-readiness"
+import { trackFeatureUse } from "@/hooks/useActivityTracker"
 
 interface CadLabDrawingPackageProps {
   projectName: string
@@ -279,6 +280,12 @@ export function CadLabDrawingPackage({
     link.download = `${projectName.replace(/\s+/g, "-").toLowerCase()}-drawing-package.json`
     link.click()
     URL.revokeObjectURL(url)
+    trackFeatureUse("cad_lab_package_manifest_downloaded", {
+      moduleCount: modules.length,
+      generatedModules: packageSummary.generatedModules.length,
+      quoteReadyModules: packageSummary.completeModules,
+      readinessPct: packageSummary.readinessPct,
+    })
   }
 
   const handleDownloadSupplierPacket = (): void => {
@@ -290,6 +297,12 @@ export function CadLabDrawingPackage({
     link.download = `${projectName.replace(/\s+/g, "-").toLowerCase()}-supplier-packet.md`
     link.click()
     URL.revokeObjectURL(url)
+    trackFeatureUse("cad_lab_supplier_packet_downloaded", {
+      moduleCount: modules.length,
+      generatedModules: packageSummary.generatedModules.length,
+      quoteReadyModules: packageSummary.completeModules,
+      readinessPct: packageSummary.readinessPct,
+    })
   }
 
   const handleDownloadModuleBomCsv = (): void => {
@@ -301,6 +314,21 @@ export function CadLabDrawingPackage({
     link.download = `${projectName.replace(/\s+/g, "-").toLowerCase()}-module-bom.csv`
     link.click()
     URL.revokeObjectURL(url)
+    trackFeatureUse("cad_lab_module_bom_downloaded", {
+      moduleCount: modules.length,
+      generatedModules: packageSummary.generatedModules.length,
+      quoteReadyModules: packageSummary.completeModules,
+      readinessPct: packageSummary.readinessPct,
+    })
+  }
+
+  const handleOpenManifest = (manifest: { moduleId: string; moduleName: string; url: string }): void => {
+    trackFeatureUse("cad_lab_manifest_opened", {
+      moduleId: manifest.moduleId,
+      moduleName: manifest.moduleName,
+      readinessPct: packageSummary.readinessPct,
+    })
+    window.open(manifest.url, "_blank", "noopener,noreferrer")
   }
 
   return (
@@ -379,7 +407,7 @@ export function CadLabDrawingPackage({
               {packageSummary.moduleManifests.map((manifest) => (
                 <button
                   key={manifest.moduleId}
-                  onClick={() => window.open(manifest.url, "_blank", "noopener,noreferrer")}
+                  onClick={() => handleOpenManifest(manifest)}
                   className="flex items-center justify-between gap-2 text-left p-2 border rounded-md hover:bg-muted/40 transition-colors"
                 >
                   <span className="text-xs text-foreground">{manifest.moduleName}</span>

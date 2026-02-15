@@ -6,7 +6,7 @@ This checklist defines the release gates for the Design-to-Quote flow and maps d
 
 Ship only when all of the following are true:
 
-- Golden benchmark suite passes (`3/3` benchmark cases).
+- Golden benchmark suite passes (`5/5` benchmark cases).
 - RFQ regression suite passes with attachment, scorecard, and blocker metadata checks.
 - No known blocker that prevents a user from creating an RFQ from generated CAD output.
 - Procurement handoff includes:
@@ -35,6 +35,20 @@ npm run test:forge-rfq
   - RFQ creation success ratio.
   - Quote-ready module ratio.
   - Attachment count distribution per RFQ.
+
+### Instrumentation events to verify during alpha
+
+The following activity events should appear for at least one internal demo run:
+
+- `cad_lab_rfq_create_attempt`
+- `cad_lab_rfq_created`
+- `cad_lab_rfq_create_failed` (only when testing failure paths)
+- `cad_lab_rfq_rebroadcast_attempt`
+- `cad_lab_rfq_rebroadcasted`
+- `cad_lab_package_manifest_downloaded`
+- `cad_lab_supplier_packet_downloaded`
+- `cad_lab_module_bom_downloaded`
+- `cad_lab_manifest_opened`
 
 ### Phase B — Design Partner Beta
 

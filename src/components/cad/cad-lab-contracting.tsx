@@ -43,6 +43,7 @@ import { computeRfqReadiness } from "./cad-lab-procurement-utils"
 import { createCadLabRfqAction } from "@/actions/cad-lab-rfq"
 import { getRFQDetail, getMatchedSuppliers, triggerRFQBroadcast } from "@/actions/rfq"
 import type { SupplierMatch } from "@/types/rfq"
+import { trackFeatureUse } from "@/hooks/useActivityTracker"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -461,20 +462,40 @@ export function CadLabContracting({
       return next
     })
     setExpandedDoc(type)
+    trackFeatureUse("cad_lab_contract_doc_generated", {
+      docType: type,
+      moduleCount: modules.length,
+      hasLinkedRfq: Boolean(createdRfqId),
+    })
   }
 
   const handleCopy = async (type: DocType): Promise<void> => {
     const text = generatedDocs.get(type)
     if (!text) return
     await navigator.clipboard.writeText(text)
+    trackFeatureUse("cad_lab_contract_doc_copied", {
+      docType: type,
+      moduleCount: modules.length,
+    })
     toast.success(`${DOC_TYPES.find((d) => d.id === type)?.name} copied to clipboard`)
   }
 
   const handleCreateMarketplaceRfq = async (): Promise<void> => {
     if (!canCreateRfq) {
+      trackFeatureUse("cad_lab_rfq_create_blocked", {
+        reason: createRfqBlockedReason || "unknown",
+        readinessScore: rfqReadiness.totalScore,
+        quoteReadyModules: rfqReadiness.quoteReadyModuleCount,
+      })
       toast.error(createRfqBlockedReason || "RFQ package is not ready yet.")
       return
     }
+    trackFeatureUse("cad_lab_rfq_create_attempt", {
+      readinessScore: rfqReadiness.totalScore,
+      quoteReadyModules: rfqReadiness.quoteReadyModuleCount,
+      moduleCount: modules.length,
+      hasProjectId: Boolean(projectId),
+    })
     setIsCreatingRfq(true)
     try {
       const res = await createCadLabRfqAction({
@@ -487,6 +508,10 @@ export function CadLabContracting({
       })
 
       if ("error" in res) {
+        trackFeatureUse("cad_lab_rfq_create_failed", {
+          reason: res.error,
+          readinessScore: rfqReadiness.totalScore,
+        })
         toast.error(res.error)
         return
       }
@@ -495,8 +520,17 @@ export function CadLabContracting({
       if (projectId && onRfqLinked) {
         await onRfqLinked(res.rfqId)
       }
+      trackFeatureUse("cad_lab_rfq_created", {
+        readinessScore: rfqReadiness.totalScore,
+        quoteReadyModules: rfqReadiness.quoteReadyModuleCount,
+        moduleCount: modules.length,
+      })
       toast.success("Marketplace RFQ created from drawing package")
     } catch (error) {
+      trackFeatureUse("cad_lab_rfq_create_failed", {
+        reason: error instanceof Error ? error.message : "unknown_error",
+        readinessScore: rfqReadiness.totalScore,
+      })
       toast.error(error instanceof Error ? error.message : "Failed to create RFQ")
     } finally {
       setIsCreatingRfq(false)
@@ -505,20 +539,42 @@ export function CadLabContracting({
 
   const handleRebroadcast = async (): Promise<void> => {
     if (!createdRfqId) return
+    trackFeatureUse("cad_lab_rfq_rebroadcast_attempt", {
+      hasRfq: true,
+      responseCount: rfqResponseCount,
+    })
     setIsRebroadcasting(true)
     try {
       const res = await triggerRFQBroadcast(createdRfqId)
       if (!res.success) {
+        trackFeatureUse("cad_lab_rfq_rebroadcast_failed", {
+          reason: res.error || "unknown",
+        })
         toast.error(res.error || "Failed to rebroadcast RFQ")
         return
       }
       setLastBroadcastCount(res.broadcast_count)
+      trackFeatureUse("cad_lab_rfq_rebroadcasted", {
+        broadcastCount: res.broadcast_count,
+      })
       toast.success(`RFQ rebroadcasted to ${res.broadcast_count} supplier(s)`)
     } catch (error) {
+      trackFeatureUse("cad_lab_rfq_rebroadcast_failed", {
+        reason: error instanceof Error ? error.message : "unknown_error",
+      })
       toast.error(error instanceof Error ? error.message : "Failed to rebroadcast RFQ")
     } finally {
       setIsRebroadcasting(false)
     }
+  }
+
+  const handleViewRfq = (): void => {
+    if (!createdRfqId) return
+    trackFeatureUse("cad_lab_rfq_view_opened", {
+      responseCount: rfqResponseCount,
+      status: rfqStatus || "unknown",
+    })
+    window.open(`/rfq/${createdRfqId}`, "_blank", "noopener,noreferrer")
   }
 
   const procurementStage = !createdRfqId
@@ -673,7 +729,7 @@ export function CadLabContracting({
                   variant="outline"
                   size="sm"
                   className="text-xs h-8"
-                  onClick={() => window.open(`/rfq/${createdRfqId}`, "_blank", "noopener,noreferrer")}
+                  onClick={handleViewRfq}
                 >
                   View RFQ
                   <ArrowRight className="h-3.5 w-3.5 ml-1" />
