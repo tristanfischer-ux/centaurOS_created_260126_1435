@@ -1,0 +1,50 @@
+# Forge Design → RFQ Regression Contracts
+
+This document summarizes the release-contract regression guards that protect critical Design-to-RFQ behavior from silent drift.
+
+## Why this exists
+
+As the release packet grows, some failures are best caught by low-cost contract tests (doc + config + payload guardrails) instead of relying only on end-to-end smoke checks.
+
+## Contract Guards in `npm run test:forge-rfq`
+
+### 1) Profiles RLS migration contract
+
+- Test: `profiles-rls-migration.test.ts`
+- Protects:
+  - canonical non-recursive policy names
+  - `auth.uid() = id` self-update constraints
+  - legacy recursive profiles policies remain explicitly dropped
+
+### 2) Release config contract
+
+- Test: `release-config-consistency.test.ts`
+- Protects:
+  - login-hero image quality whitelist (`qualities: [75, 90]`)
+  - non-deprecated Sentry Next.js config keys
+  - prevention of deprecated `disableLogger` reintroduction
+
+### 3) Release docs contract
+
+- Test: `release-docs-consistency.test.ts`
+- Protects:
+  - full release verify command references remain present
+  - migration auth prerequisite (`SUPABASE_ACCESS_TOKEN`) remains documented
+  - policy-expression SQL audit + manual SQL fallback instructions stay in rollout docs
+
+### 4) Telemetry event contract
+
+- Test: `telemetry-event-contract-consistency.test.ts`
+- Protects:
+  - emitted Cad Lab telemetry events stay aligned with telemetry contract documentation
+  - rollout alpha event checklist names remain synchronized with code + docs
+
+## Operational Usage
+
+Run:
+
+```bash
+npm run test:forge-rfq
+```
+
+This command now validates both product logic regressions and release-contract drift risks before staging or production rollout.
