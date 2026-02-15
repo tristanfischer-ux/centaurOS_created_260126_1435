@@ -358,6 +358,64 @@ describe("createCadLabRfqAction", () => {
     expect(payload.specifications?.quantity).toBe(3000)
   })
 
+  it("uses strongest quantity hint from mixed batch text", async () => {
+    mockedCreateNewRFQ.mockResolvedValue({
+      data: { id: "rfq-mixed-quantity" },
+      error: null,
+    })
+
+    const res = await createCadLabRfqAction({
+      projectName: "Mixed Quantity Parsing",
+      diagnosticAnswers: {
+        m1: {
+          batch_size: "pilot 100-300, ramp 2k, annual 5,000 units",
+          material: "Steel",
+        },
+      },
+      modules: [
+        {
+          id: "m1",
+          name: "Module A",
+          purpose: "A",
+          inputs: [],
+          outputs: [],
+          keyParts: [],
+          leadWeeks: 3,
+          description: "",
+          whyItMatters: "",
+          failureModes: [],
+          unknowns: [],
+          status: "generated",
+          result: {
+            success: true,
+            drawingPackage: {
+              revision: "A",
+              generatedAt: "2026-01-01T00:00:00.000Z",
+              title: "A",
+              manifestUrl: "https://example.com/a/manifest.json",
+              files: [
+                {
+                  name: "a.step",
+                  url: "https://example.com/a/a.step",
+                  mimeType: "application/step",
+                },
+                {
+                  name: "a.stl",
+                  url: "https://example.com/a/a.stl",
+                  mimeType: "model/stl",
+                },
+              ],
+            },
+          },
+        },
+      ],
+    })
+
+    expect(res).toEqual({ rfqId: "rfq-mixed-quantity" })
+    const payload = mockedCreateNewRFQ.mock.calls[0][0]
+    expect(payload.specifications?.quantity).toBe(5000)
+  })
+
   it("deduplicates and filters invalid artifact URLs", async () => {
     mockedCreateNewRFQ.mockResolvedValue({
       data: { id: "rfq-artifacts" },

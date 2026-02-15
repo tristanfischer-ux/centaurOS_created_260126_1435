@@ -41,16 +41,28 @@ function parseQuantityToken(value: string): number | undefined {
 
 function parseBatchQuantity(batch: string | undefined): number | undefined {
   if (!batch) return undefined
-  const range = batch.match(/(\d+(?:\.\d+)?(?:,\d{3})*\s*[kKmM]?)\s*[-–]\s*(\d+(?:\.\d+)?(?:,\d{3})*\s*[kKmM]?)/)
-  if (range) {
-    const min = parseQuantityToken(range[1])
-    const max = parseQuantityToken(range[2])
-    if (typeof min !== "number" || typeof max !== "number") return undefined
-    return Math.round((min + max) / 2)
+  const candidates: number[] = []
+  const rangePattern =
+    /(\d+(?:\.\d+)?(?:,\d{3})*\s*[kKmM]?)\s*[-–]\s*(\d+(?:\.\d+)?(?:,\d{3})*\s*[kKmM]?)/g
+
+  const rangeMatches = batch.matchAll(rangePattern)
+  for (const match of rangeMatches) {
+    const min = parseQuantityToken(match[1] || "")
+    const max = parseQuantityToken(match[2] || "")
+    if (typeof min === "number" && typeof max === "number") {
+      candidates.push(Math.round((min + max) / 2))
+    }
   }
-  const single = batch.match(/(\d+(?:\.\d+)?(?:,\d{3})*\s*[kKmM]?)/)
-  if (!single) return undefined
-  return parseQuantityToken(single[1])
+
+  const withoutRanges = batch.replace(rangePattern, " ")
+  const singleMatches = withoutRanges.matchAll(/(\d+(?:\.\d+)?(?:,\d{3})*\s*[kKmM]?)/g)
+  for (const match of singleMatches) {
+    const parsed = parseQuantityToken(match[1] || "")
+    if (typeof parsed === "number") candidates.push(parsed)
+  }
+
+  if (candidates.length === 0) return undefined
+  return Math.max(...candidates)
 }
 
 function computeModuleReadiness(
