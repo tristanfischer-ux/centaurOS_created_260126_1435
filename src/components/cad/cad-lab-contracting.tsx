@@ -18,7 +18,7 @@
 
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   FileSignature,
   Copy,
@@ -356,6 +356,50 @@ export function CadLabContracting({
   const [suggestedSuppliers, setSuggestedSuppliers] = useState<SupplierMatch[]>([])
   const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false)
 
+  const rfqReadiness = useMemo(() => {
+    const moduleCount = modules.length || 1
+    const generatedCount = modules.filter((mod) => mod.status === "generated").length
+    const diagnosticsComplete = modules.filter((mod) => {
+      const answers = diagnosticAnswers?.[mod.id] || {}
+      return Object.keys(answers).length >= 6
+    }).length
+    const artifactComplete = modules.filter((mod) => {
+      const files = mod.result?.drawingPackage?.files || []
+      const hasStep = files.some((file) => file.name.toLowerCase().endsWith(".step"))
+      const hasStl = files.some((file) => file.name.toLowerCase().endsWith(".stl"))
+      const hasManifest = Boolean(mod.result?.drawingPackage?.manifestUrl)
+      return hasStep && hasStl && hasManifest
+    }).length
+
+    const generationScore = generatedCount / moduleCount
+    const diagnosticsScore = diagnosticsComplete / moduleCount
+    const artifactsScore = artifactComplete / moduleCount
+    const totalScore = Math.round(
+      generationScore * 45 +
+      diagnosticsScore * 35 +
+      artifactsScore * 20,
+    )
+
+    const gaps: string[] = []
+    if (generatedCount < modules.length) {
+      gaps.push(`${modules.length - generatedCount} module(s) still need generated geometry`)
+    }
+    if (diagnosticsComplete < modules.length) {
+      gaps.push(`${modules.length - diagnosticsComplete} module(s) missing procurement diagnostics`)
+    }
+    if (artifactComplete < modules.length) {
+      gaps.push(`${modules.length - artifactComplete} module(s) missing full STEP/STL/manifest package`)
+    }
+
+    return {
+      totalScore,
+      generatedCount,
+      diagnosticsComplete,
+      artifactComplete,
+      gaps,
+    }
+  }, [modules, diagnosticAnswers])
+
   useEffect(() => {
     if (linkedRfqId) {
       setCreatedRfqId(linkedRfqId)
@@ -513,6 +557,47 @@ export function CadLabContracting({
           Generate contract documents from project specifications. Fill in buyer
           details, then generate RFQ, SOW, or NDA templates.
         </p>
+
+        <div className="rounded-lg border border-border/70 bg-muted/20 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-foreground">RFQ readiness score</p>
+            <span
+              className={cn(
+                "text-xs font-semibold",
+                rfqReadiness.totalScore >= 85
+                  ? "text-status-success"
+                  : rfqReadiness.totalScore >= 60
+                    ? "text-status-warning"
+                    : "text-status-error",
+              )}
+            >
+              {rfqReadiness.totalScore}%
+            </span>
+          </div>
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-500",
+                rfqReadiness.totalScore >= 85
+                  ? "bg-status-success"
+                  : rfqReadiness.totalScore >= 60
+                    ? "bg-status-warning"
+                    : "bg-status-error",
+              )}
+              style={{ width: `${rfqReadiness.totalScore}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Generated: {rfqReadiness.generatedCount}/{modules.length} • Diagnostics: {rfqReadiness.diagnosticsComplete}/{modules.length} • Artifacts: {rfqReadiness.artifactComplete}/{modules.length}
+          </p>
+          {rfqReadiness.gaps.length > 0 && (
+            <ul className="list-disc pl-4 space-y-1 text-[11px] text-muted-foreground">
+              {rfqReadiness.gaps.map((gap) => (
+                <li key={gap}>{gap}</li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="rounded-lg border border-border/70 bg-muted/30 p-3 space-y-2">
           <p className="text-xs font-semibold text-foreground">Procurement flow tracking</p>
