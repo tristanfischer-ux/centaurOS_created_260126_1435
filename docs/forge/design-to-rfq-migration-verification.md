@@ -14,6 +14,12 @@ If using CLI directly, ensure `SUPABASE_ACCESS_TOKEN` is available (or run `supa
 npx supabase db push
 ```
 
+Notes:
+
+- `SUPABASE_SERVICE_ROLE_KEY` is **not** a Supabase CLI access token and cannot be used for `supabase login`.
+- If `npx supabase db push` returns `Access token not provided`, authenticate with a personal access token (`sbp_...`) or use manual SQL execution below.
+- If your project does not expose an admin RPC like `exec_sql`, apply the migration through CLI auth or SQL editor; REST RPC fallback will not be available.
+
 If CLI auth is unavailable in your execution environment:
 
 1. Open Supabase SQL editor for the target project.
