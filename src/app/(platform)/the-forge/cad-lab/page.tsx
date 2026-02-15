@@ -243,6 +243,17 @@ export default function CadLabResearchPage(): React.ReactNode {
               <Search className="h-5 w-5" />
               Research &amp; Build
             </Button>
+
+            {/* Error from failed research attempt */}
+            {researchResult && !researchResult.success && researchResult.error && (
+              <div className="flex items-start gap-2.5 p-3 rounded-lg bg-status-error-light border border-destructive/20">
+                <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-destructive">Research failed</p>
+                  <p className="text-xs text-destructive/80 mt-0.5">{researchResult.error}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Template pills */}
