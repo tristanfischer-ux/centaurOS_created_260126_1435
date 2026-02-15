@@ -16,6 +16,7 @@ This packet is the final handoff bundle for launch readiness.
 - QA execution report: `docs/forge/design-to-rfq-qa-report.md`
 - Scenario matrix: `docs/forge/design-to-rfq-scenario-matrix.md`
 - Migration verification runbook: `docs/forge/design-to-rfq-migration-verification.md`
+- Release handoff runbook: `docs/forge/design-to-rfq-release-handoff.md`
 
 ## Release Gate Commands
 
@@ -66,6 +67,7 @@ Apply before rollout to eliminate profile policy recursion noise:
 - [ ] All release gate commands pass.
 - [ ] DB migration applied in target environment.
 - [ ] Profiles policy-expression SQL audit confirms no helper recursion (`get_my_foundry_id` / `is_active_user`).
+- [ ] Release handoff runbook executed in target environment.
 - [ ] Demo walkthrough executed once in staging.
 - [ ] 5-scenario manual product pass results artifact updated and attached.
 - [ ] Telemetry events visible in activity stream.
