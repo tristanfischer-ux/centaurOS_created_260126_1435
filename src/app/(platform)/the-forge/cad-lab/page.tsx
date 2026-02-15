@@ -266,10 +266,10 @@ export default function CadLabResearchPage(): React.ReactNode {
                 <button
                   key={t.id}
                   onClick={() => handleTemplateClick(t.subject)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-muted bg-card text-xs font-medium text-foreground hover:border-international-orange/50 hover:bg-international-orange-light/10 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-full border border-muted bg-card text-xs font-medium text-foreground hover:border-international-orange/50 hover:bg-international-orange-light/10 transition-all cursor-pointer"
                 >
                   {t.label}
-                  <span className="text-[10px] text-muted-foreground font-mono">{t.tag}</span>
+                  <span className="text-xs text-muted-foreground font-mono">{t.tag}</span>
                 </button>
               ))}
             </div>
@@ -298,7 +298,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
                         <Icon className="h-4 w-4" />
                       </div>
-                      <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
+                      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
                         {stage.label}
                       </span>
                     </div>
@@ -380,7 +380,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                   <button
                     onClick={() => setReportViewMode("structured")}
                     className={cn(
-                      "px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
+                      "px-2.5 py-2 min-h-[44px] text-xs font-medium rounded-md transition-colors",
                       reportViewMode === "structured"
                         ? "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
@@ -391,7 +391,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                   <button
                     onClick={() => setReportViewMode("markdown")}
                     className={cn(
-                      "px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
+                      "px-2.5 py-2 min-h-[44px] text-xs font-medium rounded-md transition-colors",
                       reportViewMode === "markdown"
                         ? "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
@@ -402,7 +402,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                   <button
                     onClick={() => setReportViewMode("edit")}
                     className={cn(
-                      "px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
+                      "px-2.5 py-2 min-h-[44px] text-xs font-medium rounded-md transition-colors flex items-center gap-1",
                       reportViewMode === "edit"
                         ? "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
@@ -493,7 +493,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                             >
                               {source.title || source.uri}
                             </a>
-                            <span className={cn("text-[10px] font-mono flex-shrink-0 px-1.5 py-0.5 rounded", cfg.color, "bg-muted/50")}>
+                            <span className={cn("text-xs font-mono flex-shrink-0 px-1.5 py-0.5 rounded", cfg.color, "bg-muted/50")}>
                               {cfg.label}
                             </span>
                           </div>

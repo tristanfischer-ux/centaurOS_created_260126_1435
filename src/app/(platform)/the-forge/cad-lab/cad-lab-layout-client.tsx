@@ -149,12 +149,12 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
                           {formatRelativeTime(p.updatedAt)}
                         </span>
                         {p.stage !== "new" && (
-                          <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">
+                          <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
                             {p.stage}
                           </span>
                         )}
                         {p.status === "active" && (
-                          <span className="text-[10px] font-mono bg-status-success-light text-status-success px-1.5 py-0.5 rounded">
+                          <span className="text-xs font-mono bg-status-success-light text-status-success px-1.5 py-0.5 rounded">
                             active
                           </span>
                         )}
@@ -163,7 +163,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 flex-shrink-0"
+                      className="h-8 w-8 min-h-[44px] min-w-[44px] flex-shrink-0"
                       onClick={() => handleDeleteProject(p.id)}
                       aria-label={`Delete ${p.subject}`}
                     >

@@ -351,7 +351,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                       {/* Pipeline steps — Interface → CAD → Done */}
                       <div className="flex items-center gap-1 flex-shrink-0">
                         {/* Step 1: Interface */}
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
                           stepIndex > 1 ? "bg-status-success-light text-status-success" :
                           stepIndex === 1 ? "bg-international-orange-light text-international-orange" :
                           isError ? "bg-status-error-light text-destructive" :
@@ -370,7 +370,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                         <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
 
                         {/* Step 2: CAD */}
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
                           stepIndex > 2 ? "bg-status-success-light text-status-success" :
                           stepIndex === 2 ? "bg-international-orange-light text-international-orange" :
                           isError && stepIndex >= 2 ? "bg-status-error-light text-destructive" :
@@ -389,7 +389,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                         <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
 
                         {/* Step 3: Complete */}
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
                           isDone ? "bg-status-success-light text-status-success" :
                           isError ? "bg-status-error-light text-destructive" :
                           "bg-muted text-muted-foreground"
@@ -526,7 +526,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                       </Button>
                     )}
                     {mod.status === "generated" && (
-                      <span className="text-[10px] text-status-success flex items-center gap-1 ml-auto">
+                      <span className="text-xs text-status-success flex items-center gap-1 ml-auto">
                         <CheckCircle2 className="h-3 w-3" /> Generated
                       </span>
                     )}
@@ -541,7 +541,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                       <p className="text-foreground">{mod.description}</p>
                       <div className="flex flex-wrap gap-1">
                         {mod.keyParts.map((part, i) => (
-                          <span key={i} className="bg-muted px-1.5 py-0.5 rounded font-mono text-[10px]">{part}</span>
+                          <span key={i} className="bg-muted px-1.5 py-0.5 rounded font-mono text-xs">{part}</span>
                         ))}
                       </div>
                       {mod.failureModes.length > 0 && (

@@ -58,7 +58,7 @@ export function MessageActions({
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 hover:bg-muted"
+          className="h-7 w-7 min-h-[44px] min-w-[44px] hover:bg-muted"
           onClick={onReplyInThread}
           title="Reply in thread"
           aria-label="Reply in thread"
@@ -73,7 +73,7 @@ export function MessageActions({
           variant="ghost"
           size="icon"
           className={cn(
-            'h-7 w-7 hover:bg-muted',
+            'h-7 w-7 min-h-[44px] min-w-[44px] hover:bg-muted',
             isStarred && 'text-status-warning'
           )}
           onClick={onToggleStar}
@@ -88,7 +88,7 @@ export function MessageActions({
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7 hover:bg-muted"
+        className="h-7 w-7 min-h-[44px] min-w-[44px] hover:bg-muted"
         onClick={handleCopy}
         title="Copy message"
         aria-label="Copy message"
@@ -101,7 +101,7 @@ export function MessageActions({
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 hover:bg-muted"
+          className="h-7 w-7 min-h-[44px] min-w-[44px] hover:bg-muted"
           onClick={onForward}
           title="Forward message"
           aria-label="Forward message"

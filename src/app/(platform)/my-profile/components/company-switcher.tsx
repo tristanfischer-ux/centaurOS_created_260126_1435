@@ -122,7 +122,7 @@ export function CompanySwitcher({
                           {foundry.foundryName}
                         </h3>
                         {foundry.isActive && (
-                          <span className="flex-shrink-0 flex items-center gap-1 text-[10px] font-semibold text-status-success uppercase tracking-wider">
+                          <span className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-status-success uppercase tracking-wider">
                             <Check className="h-3 w-3" />
                             Active
                           </span>
@@ -133,7 +133,7 @@ export function CompanySwitcher({
                       <div className="mt-1.5">
                         <span
                           className={cn(
-                            'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border',
+                            'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider border',
                             getRoleBadgeClasses(foundry.role)
                           )}
                         >
