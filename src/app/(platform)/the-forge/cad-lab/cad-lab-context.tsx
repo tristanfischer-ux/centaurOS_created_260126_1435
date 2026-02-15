@@ -35,6 +35,7 @@ import {
   createCadLabProject,
   saveCadLabResearch,
   saveCadLabModules,
+  saveCadLabProjectRfq,
   deleteCadLabProject,
   loadCadLabBatchStatus,
 } from "@/actions/cad-lab-projects"
@@ -57,6 +58,7 @@ export interface CadLabContextValue {
   // Project persistence
   projects: CadLabProjectSummary[]
   activeProjectId: string | null
+  linkedRfqId: string | null
   showProjects: boolean
   setShowProjects: (v: boolean) => void
   isLoadingProjects: boolean
@@ -65,6 +67,7 @@ export interface CadLabContextValue {
   refreshProjects: () => Promise<void>
   handleLoadProject: (projectId: string) => Promise<void>
   handleDeleteProject: (projectId: string) => Promise<void>
+  linkRfqToProject: (rfqId: string) => Promise<void>
 
   // Foundry sector
   sector: Sector | null
@@ -147,6 +150,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Project persistence state ──
   const [projects, setProjects] = useState<CadLabProjectSummary[]>([])
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
+  const [linkedRfqId, setLinkedRfqId] = useState<string | null>(null)
   const [showProjects, setShowProjects] = useState(false)
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -654,6 +658,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setResearchResult(null)
     setEditableReport("")
     setActiveProjectId(null)
+    setLinkedRfqId(null)
     setLastSaved(null)
     setDesignBrief({
       useCase: "",
@@ -684,6 +689,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setSubject(p.subject)
       setModelId(p.modelId)
       setActiveProjectId(p.id)
+      setLinkedRfqId(p.linkedRfqId)
 
       if (p.research) {
         setDesignBrief(p.research.designBrief ?? {
@@ -742,6 +748,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setProjects((prev) => prev.filter((p) => p.id !== projectId))
         if (activeProjectId === projectId) {
           setActiveProjectId(null)
+          setLinkedRfqId(null)
           setLastSaved(null)
         }
       }
@@ -749,6 +756,22 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       console.error("[CAD-LAB] Failed to delete project")
     }
   }, [activeProjectId])
+
+  // ── RFQ linkage ──
+  const linkRfqToProject = useCallback(async (rfqId: string) => {
+    if (!rfqId.trim()) return
+    setLinkedRfqId(rfqId)
+    if (!activeProjectId) return
+
+    const res = await saveCadLabProjectRfq(activeProjectId, rfqId)
+    if ("error" in res) {
+      console.error("[CAD-LAB] Failed to persist RFQ linkage:", res.error)
+      return
+    }
+
+    setLastSaved(new Date().toISOString())
+    await refreshProjects()
+  }, [activeProjectId, refreshProjects])
 
   // ── Download helper ──
   const handleDownload = useCallback((filename: string, base64Data: string, isBinary: boolean = true) => {
@@ -773,9 +796,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Context value ──
   const value: CadLabContextValue = {
-    projects, activeProjectId, showProjects, setShowProjects,
+    projects, activeProjectId, linkedRfqId, showProjects, setShowProjects,
     isLoadingProjects, isSaving, lastSaved,
-    refreshProjects, handleLoadProject, handleDeleteProject,
+    refreshProjects, handleLoadProject, handleDeleteProject, linkRfqToProject,
     sector,
     subject, setSubject, modelId, setModelId,
     designBrief, setDesignBrief, assumptionNotes, setAssumptionNotes, designReadinessPct,

@@ -67,6 +67,8 @@ export interface CadLabProjectData {
 
   /** Decomposed modules */
   modules: CadLabModule[] | null
+  /** Linked RFQ created from this project (if any) */
+  linkedRfqId: string | null
 
   createdAt: string
   updatedAt: string
@@ -149,6 +151,8 @@ export async function loadCadLabProject(
     const research = project.research as CadLabProjectData["research"]
     const result = project.result as CadLabProjectData["result"]
     const modules = (project.modules as CadLabModule[] | null) ?? null
+    const linkedRfqIdRaw = (project.result as Record<string, unknown> | null)?.procurement as { rfqId?: unknown } | undefined
+    const linkedRfqId = typeof linkedRfqIdRaw?.rfqId === "string" ? linkedRfqIdRaw.rfqId : null
 
     return {
       project: {
@@ -163,6 +167,7 @@ export async function loadCadLabProject(
         result,
         generatedCode: project.generated_code,
         modules,
+        linkedRfqId,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },
@@ -372,6 +377,61 @@ export async function saveCadLabModules(
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save modules:", error.message)
       return { error: `Failed to save modules: ${error.message}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Link Project to RFQ ─────────────────────────────────────────────
+
+/**
+ * Persists RFQ linkage metadata for a Cad Lab project.
+ *
+ * @param projectId - Project to update
+ * @param rfqId - Marketplace RFQ ID linked to this project
+ * @returns Success or error
+ */
+export async function saveCadLabProjectRfq(
+  projectId: string,
+  rfqId: string,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+    if (!rfqId.trim()) return { error: "RFQ ID required" }
+
+    const { data: current, error: loadError } = await supabase
+      .from("cad_lab_projects")
+      .select("result")
+      .eq("id", projectId)
+      .single()
+
+    if (loadError) {
+      return { error: `Failed to load project state: ${loadError.message}` }
+    }
+
+    const existingResult = (current?.result as Record<string, unknown> | null) ?? {}
+    const existingProcurement = (existingResult.procurement as Record<string, unknown> | undefined) ?? {}
+
+    const nextResult = {
+      ...existingResult,
+      procurement: {
+        ...existingProcurement,
+        rfqId: rfqId.trim(),
+        linkedAt: new Date().toISOString(),
+        stage: "rfq_created",
+      },
+    }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({
+        result: nextResult as unknown as Json,
+      })
+      .eq("id", projectId)
+
+    if (error) {
+      return { error: `Failed to save RFQ linkage: ${error.message}` }
     }
 
     return { success: true as const }

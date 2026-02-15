@@ -71,6 +71,7 @@ describe("createCadLabRfqAction", () => {
           unknowns: [],
           status: "generated",
           result: {
+            success: true,
             bbox: { xLen: 200, yLen: 180, zLen: 70 },
             massGrams: 350,
             drawingPackage: {

@@ -18,7 +18,7 @@
 
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   FileSignature,
   Copy,
@@ -40,6 +40,7 @@ import { toast } from "sonner"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
 import { createCadLabRfqAction } from "@/actions/cad-lab-rfq"
+import { getRFQDetail } from "@/actions/rfq"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -50,6 +51,12 @@ interface CadLabContractingProps {
   projectName: string
   /** Diagnostic answers per module */
   diagnosticAnswers?: DiagnosticAnswers
+  /** Active Cad Lab project ID */
+  projectId?: string | null
+  /** Existing RFQ linked to this project */
+  linkedRfqId?: string | null
+  /** Persist RFQ linkage */
+  onRfqLinked?: (rfqId: string) => Promise<void> | void
 }
 
 type DocType = "rfq" | "sow" | "nda"
@@ -323,6 +330,9 @@ export function CadLabContracting({
   modules,
   projectName,
   diagnosticAnswers,
+  projectId,
+  linkedRfqId,
+  onRfqLinked,
 }: CadLabContractingProps): React.ReactNode {
   const [buyerName, setBuyerName] = useState("")
   const [deadline, setDeadline] = useState("")
@@ -333,6 +343,43 @@ export function CadLabContracting({
   const [expandedDoc, setExpandedDoc] = useState<DocType | null>(null)
   const [isCreatingRfq, setIsCreatingRfq] = useState(false)
   const [createdRfqId, setCreatedRfqId] = useState<string | null>(null)
+  const [rfqStatus, setRfqStatus] = useState<string | null>(null)
+  const [rfqResponseCount, setRfqResponseCount] = useState(0)
+
+  useEffect(() => {
+    if (linkedRfqId) {
+      setCreatedRfqId(linkedRfqId)
+    }
+  }, [linkedRfqId])
+
+  useEffect(() => {
+    if (!createdRfqId) {
+      setRfqStatus(null)
+      setRfqResponseCount(0)
+      return
+    }
+
+    let isMounted = true
+
+    const fetchRfqDetails = async (): Promise<void> => {
+      try {
+        const detail = await getRFQDetail(createdRfqId)
+        if (!isMounted || detail.error || !detail.data) return
+
+        setRfqStatus(detail.data.status)
+        setRfqResponseCount(detail.data.response_count ?? 0)
+      } catch {
+        // best effort only
+      }
+    }
+
+    fetchRfqDetails()
+    const poll = window.setInterval(fetchRfqDetails, 20000)
+    return () => {
+      isMounted = false
+      window.clearInterval(poll)
+    }
+  }, [createdRfqId])
 
   const handleGenerate = (type: DocType): void => {
     let text: string
@@ -391,6 +438,9 @@ export function CadLabContracting({
       }
 
       setCreatedRfqId(res.rfqId)
+      if (projectId && onRfqLinked) {
+        await onRfqLinked(res.rfqId)
+      }
       toast.success("Marketplace RFQ created from drawing package")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create RFQ")
@@ -398,6 +448,21 @@ export function CadLabContracting({
       setIsCreatingRfq(false)
     }
   }
+
+  const procurementStage = !createdRfqId
+    ? "draft"
+    : rfqStatus === "Awarded"
+      ? "awarded"
+      : rfqResponseCount > 0
+        ? "responses"
+        : "rfq_created"
+  const procurementFlow = [
+    { key: "draft", label: "Draft package" },
+    { key: "rfq_created", label: "RFQ created" },
+    { key: "responses", label: "Supplier responses" },
+    { key: "awarded", label: "Awarded" },
+  ]
+  const currentStageIndex = procurementFlow.findIndex((step) => step.key === procurementStage)
 
   return (
     <Card>
@@ -419,6 +484,35 @@ export function CadLabContracting({
           Generate contract documents from project specifications. Fill in buyer
           details, then generate RFQ, SOW, or NDA templates.
         </p>
+
+        <div className="rounded-lg border border-border/70 bg-muted/30 p-3 space-y-2">
+          <p className="text-xs font-semibold text-foreground">Procurement flow tracking</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {procurementFlow.map((step, index) => {
+              const isActive = index <= currentStageIndex
+              return (
+                <span
+                  key={step.key}
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-medium",
+                    isActive
+                      ? "border-status-success/40 bg-status-success-light text-status-success"
+                      : "border-border bg-background text-muted-foreground"
+                  )}
+                >
+                  {step.label}
+                </span>
+              )
+            })}
+          </div>
+          {createdRfqId && (
+            <p className="text-[11px] text-muted-foreground">
+              RFQ <span className="font-mono">{createdRfqId.slice(0, 8)}…</span>
+              {rfqStatus ? ` • Status: ${rfqStatus}` : ""}
+              {rfqResponseCount > 0 ? ` • ${rfqResponseCount} response(s)` : ""}
+            </p>
+          )}
+        </div>
 
         <div className="rounded-lg border border-status-info/30 bg-status-info-light/20 p-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
