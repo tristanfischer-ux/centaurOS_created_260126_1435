@@ -140,7 +140,7 @@ export async function createDispute(
 
   // Check order status - can only dispute active orders
   const disputeableStatuses = ["accepted", "in_progress", "completed"]
-  if (!disputeableStatuses.includes(order.status)) {
+  if (!order.status || !disputeableStatuses.includes(order.status)) {
     return {
       data: null,
       error: `Cannot dispute orders with status: ${order.status}`,
@@ -235,10 +235,13 @@ export async function getDispute(
 
     if (!isParty) {
       // Check if user is the seller
+      if (!order?.seller_id) {
+        return { data: null, error: "Not authorized to view this dispute" }
+      }
       const { data: sellerProfile } = await supabase
         .from("provider_profiles")
         .select("user_id")
-        .eq("id", order?.seller_id)
+        .eq("id", order.seller_id)
         .single()
 
       if (sellerProfile?.user_id !== userId) {
@@ -754,7 +757,7 @@ export async function checkAutoResolution(
   }
 
   const daysSinceCreated = Math.floor(
-    (Date.now() - new Date(dispute.created_at).getTime()) / (1000 * 60 * 60 * 24)
+    (Date.now() - new Date(dispute.created_at ?? Date.now()).getTime()) / (1000 * 60 * 60 * 24)
   )
 
   // Check: No seller response after threshold
@@ -792,8 +795,8 @@ export async function checkAutoResolution(
   // Check: No evidence provided and dispute is vague
   if (
     AUTO_RESOLUTION_RULES.noEvidenceAutoReject &&
-    dispute.evidence_urls.length < AUTO_RESOLUTION_RULES.minEvidenceItems &&
-    dispute.reason.length < 50
+    (dispute.evidence_urls ?? []).length < AUTO_RESOLUTION_RULES.minEvidenceItems &&
+    (dispute.reason ?? '').length < 50
   ) {
     return {
       shouldAutoResolve: true,
@@ -848,7 +851,7 @@ export async function getDisputeStats(
     const status = d.status as DisputeStatus
     byStatus[status]++
 
-    if (d.resolved_at) {
+    if (d.resolved_at && d.created_at) {
       const days = Math.floor(
         (new Date(d.resolved_at).getTime() - new Date(d.created_at).getTime()) /
           (1000 * 60 * 60 * 24)

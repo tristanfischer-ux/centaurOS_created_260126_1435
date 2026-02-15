@@ -21,6 +21,7 @@ import {
   getSendBriefButton,
   sendMessage,
   waitForStreamComplete,
+  waitForGreetingComplete,
   skipIfUnauthenticated,
 } from './specialist-helpers'
 
@@ -169,7 +170,7 @@ test.describe('Specialist E2E Suite', () => {
       }
       await openSpecialistDialogByName(page, 'Sage')
       await sendMessage(page, 'What should we do for GTM?')
-      await waitForStreamComplete(page, 4000)
+      await waitForStreamComplete(page)
       const dialog = getSpecialistDialog(page)
       await expect(dialog.getByText('What should we do for GTM?')).toBeVisible({ timeout: 5000 })
       await expect(dialog.getByText(/beachhead market/)).toBeVisible({ timeout: 5000 })
@@ -185,7 +186,7 @@ test.describe('Specialist E2E Suite', () => {
       }
       await openSpecialistDialogByName(page, 'Cal')
       await sendMessage(page, 'Hello')
-      await waitForStreamComplete(page, 4000)
+      await waitForStreamComplete(page)
       const dialog = getSpecialistDialog(page)
       const text = await dialog.textContent()
       expect(text).not.toMatch(/<think>|<\/think>/)
@@ -201,15 +202,13 @@ test.describe('Specialist E2E Suite', () => {
       }
       await openSpecialistDialogByName(page, 'Finn')
       const dialog = getSpecialistDialog(page)
-      // Wait for greeting generation to finish — the hint text appears after loading
-      await page.waitForTimeout(2000)
-      const hasCountOrHint = await dialog.getByText(/character|⌘.*Enter/i).first().isVisible({ timeout: 5000 }).catch(() => false)
-      if (!hasCountOrHint) {
-        // Fallback: check if textarea itself is present (dialog loaded correctly)
-        const textarea = getChatTextarea(page)
-        await expect(textarea).toBeVisible({ timeout: 3000 })
-        test.skip(true, 'Character count/hint not visible — UI may have changed')
-      }
+      // Wait for greeting generation to finish — the hint text appears after loading.
+      // The greeting fires a request to /api/agents/execute which the mock intercepts.
+      // After it completes, isGeneratingGreeting becomes false and the character count appears.
+      // Character count shows "N characters" before any user message, or "⌘+Enter to send" after.
+      await expect(
+        dialog.getByText(/character|⌘.*Enter/i).first()
+      ).toBeVisible({ timeout: 10000 })
     })
   })
 
@@ -229,7 +228,7 @@ test.describe('Specialist E2E Suite', () => {
       }
       await openSpecialistDialogByName(page, 'Sage')
       await sendMessage(page, 'What about our runway?')
-      await waitForStreamComplete(page, 4000)
+      await waitForStreamComplete(page)
       await expect(page.getByText(/Recommended Next|Continue with/i).first()).toBeVisible({ timeout: 5000 })
       await expect(page.getByText('Finn').first()).toBeVisible({ timeout: 3000 })
     })
@@ -248,7 +247,7 @@ test.describe('Specialist E2E Suite', () => {
       }
       await openSpecialistDialogByName(page, 'Sage')
       await sendMessage(page, 'Runway?')
-      await waitForStreamComplete(page, 5000)
+      await waitForStreamComplete(page)
       // Look for the handoff button — it may be the "Recommended Next" section or "Continue with..." section
       const finnButton = page.locator('button').filter({ hasText: 'Finn' }).first()
       if (await finnButton.isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -285,7 +284,7 @@ test.describe('Specialist E2E Suite', () => {
       const textarea = getChatTextarea(page)
       await textarea.fill('Help me plan Q2')
       await getSendBriefButton(page).click()
-      await waitForStreamComplete(page, 4000)
+      await waitForStreamComplete(page)
       await expect(page.getByText('Suggested actions')).toBeVisible({ timeout: 5000 })
       await expect(page.getByText('Launch Q2 product update')).toBeVisible()
       await expect(page.getByRole('button', { name: /create all/i })).toBeVisible()
@@ -304,36 +303,40 @@ test.describe('Specialist E2E Suite', () => {
         return
       }
       const specialistBtn = page.getByRole('button', { name: /Plan my day with Cal|Strategy with Sage|Ask .+/i }).first()
-      if (!(await specialistBtn.isVisible({ timeout: 10000 }).catch(() => false))) {
-        test.skip(true, 'Specialist FAB not visible on /today')
-        return
-      }
+      await expect(specialistBtn).toBeVisible({ timeout: 10000 })
       await specialistBtn.click()
       await page.waitForTimeout(1000)
       const dialog = getSpecialistDialog(page)
       await expect(dialog).toBeVisible({ timeout: 5000 })
       await getChatTextarea(page).fill('Plan Q2')
       await getSendBriefButton(page).click()
-      await waitForStreamComplete(page, 5000)
+      await waitForStreamComplete(page)
       const createAllBtn = page.getByRole('button', { name: /create all/i })
-      if (!(await createAllBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-        test.skip(true, 'Create all button not visible — proposed actions may not have rendered')
+      await expect(createAllBtn).toBeVisible({ timeout: 5000 })
+      // Scroll the button into view and click it
+      await createAllBtn.scrollIntoViewIfNeeded()
+      await createAllBtn.click({ force: true })
+      // Verify the click registered — the button should show a loading spinner or become disabled
+      await page.waitForTimeout(500)
+      // Wait for the server action to process — this hits real Supabase.
+      // The loading spinner appears immediately, then either success or error.
+      // Accept any outcome — success toast, view links, error toast, or the
+      // "All items created" text — as long as the UI responded.
+      const successText = page.getByText(/item[s]? created|All items created|successfully/i)
+      const viewLink = page.getByRole('link', { name: /view/i })
+      const errorText = page.getByText(/error|failed|could not|must be signed in/i).first()
+      const hasResult = await Promise.race([
+        successText.waitFor({ state: 'visible', timeout: 25000 }).then(() => 'success').catch(() => null),
+        viewLink.waitFor({ state: 'visible', timeout: 25000 }).then(() => 'success').catch(() => null),
+        errorText.waitFor({ state: 'visible', timeout: 25000 }).then(() => 'error').catch(() => null),
+      ]).then((r) => r ?? 'timeout')
+      // Any response from the server action is acceptable — we're testing the UI flow.
+      // If it timed out, the server action may have hung — skip rather than fail.
+      if (hasResult === 'timeout') {
+        test.skip(true, 'Create all server action did not respond within 25s')
         return
       }
-      await createAllBtn.click()
-      // Wait for the server action to process — this hits real API
-      await page.waitForTimeout(8000)
-      const successToast = page.getByText(/item[s]? created|Created|successfully/i)
-      const viewLink = page.getByRole('link', { name: /view/i })
-      const errorMsg = page.getByText(/error|failed|could not/i)
-      const hasOutcome =
-        (await successToast.isVisible({ timeout: 8000 }).catch(() => false)) ||
-        (await viewLink.isVisible({ timeout: 3000 }).catch(() => false)) ||
-        (await errorMsg.first().isVisible({ timeout: 3000 }).catch(() => false))
-      // Accept any outcome — success, view link, or error — as long as the UI responded
-      if (!hasOutcome) {
-        test.skip(true, 'No visible outcome after Create all — server action may have timed out')
-      }
+      expect(['success', 'error']).toContain(hasResult)
     })
 
     test('Dismiss hides the suggested actions card', async ({ page }) => {
@@ -352,7 +355,7 @@ test.describe('Specialist E2E Suite', () => {
       await page.waitForTimeout(1000)
       await getChatTextarea(page).fill('Plan Q2')
       await getSendBriefButton(page).click()
-      await waitForStreamComplete(page, 4000)
+      await waitForStreamComplete(page)
       await expect(page.getByText('Suggested actions')).toBeVisible({ timeout: 5000 })
       await page.getByRole('button', { name: /dismiss/i }).click()
       await page.waitForTimeout(500)
@@ -497,10 +500,10 @@ test.describe('Specialist E2E Suite', () => {
       }
       await openSpecialistDialogByName(page, 'Cal')
       await sendMessage(page, 'First message')
-      await waitForStreamComplete(page, 3000)
+      await waitForStreamComplete(page)
       await mockSpecialistChat(page, { responseText: 'Second reply.' })
       await sendMessage(page, 'Second message')
-      await waitForStreamComplete(page, 3000)
+      await waitForStreamComplete(page)
       const dialog = getSpecialistDialog(page)
       await expect(dialog.getByText('First message')).toBeVisible()
       await expect(dialog.getByText('Second message')).toBeVisible()
@@ -520,23 +523,33 @@ test.describe('Specialist E2E Suite', () => {
       }
       await openSpecialistDialogByName(page, 'Finn')
       await sendMessage(page, 'Hi')
-      // Wait longer for stream to complete and UI to settle
-      await waitForStreamComplete(page, 6000)
+      // waitForStreamComplete waits for the "Copy last response" button to appear
+      await waitForStreamComplete(page)
+      // Also wait for greeting to fully complete so dialog is in stable state
+      await waitForGreetingComplete(page)
       const copyBtn = page.getByRole('button', { name: /Copy last response/i })
-      if (!(await copyBtn.isVisible({ timeout: 8000 }).catch(() => false))) {
-        test.skip(true, 'Copy button not shown — mock stream may not have set lastAssistantMessage')
-        return
-      }
+      await expect(copyBtn).toBeVisible({ timeout: 5000 })
       await copyBtn.click()
-      // The button text changes to "Copied" or a success toast appears
+      // The button text changes to "Copied" and/or a success toast appears.
+      // Wait a moment for the clipboard operation and React state update.
+      await page.waitForTimeout(500)
       const dialog = getSpecialistDialog(page)
+      const copiedBtn = dialog.getByRole('button', { name: 'Copied' })
+      const copiedToast = page.getByText('Copied to clipboard')
+      const failedToast = page.getByText('Failed to copy')
+      // Check for success indicators
       const hasCopied =
-        (await dialog.getByText('Copied').first().isVisible({ timeout: 5000 }).catch(() => false)) ||
-        (await page.getByText('Copied to clipboard').isVisible({ timeout: 3000 }).catch(() => false))
+        (await copiedBtn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false)) ||
+        (await copiedToast.waitFor({ state: 'visible', timeout: 2000 }).then(() => true).catch(() => false))
+      // If neither appeared, check if it failed
       if (!hasCopied) {
-        // Clipboard may still fail in some environments — skip gracefully
-        test.skip(true, 'Clipboard write may not be supported in this test environment')
+        const hasFailed = await failedToast.isVisible().catch(() => false)
+        if (hasFailed) {
+          test.skip(true, 'Clipboard API not available in this environment')
+          return
+        }
       }
+      expect(hasCopied).toBe(true)
     })
 
     test('New Topic clears conversation', async ({ page }) => {
@@ -549,20 +562,13 @@ test.describe('Specialist E2E Suite', () => {
       }
       await openSpecialistDialogByName(page, 'Priya')
       await sendMessage(page, 'Hello')
-      // Wait longer for stream to fully complete and isExecuting to become false
-      await waitForStreamComplete(page, 6000)
+      // waitForStreamComplete waits for "Copy last response" button = isExecuting is false
+      await waitForStreamComplete(page)
+      // "New Topic" button should now be visible and enabled.
+      // It's disabled when isExecuting || isGeneratingGreeting, so both must be false.
       const newTopicBtn = page.getByRole('button', { name: /New Topic/i })
-      const isVisible = await newTopicBtn.isVisible({ timeout: 3000 }).catch(() => false)
-      if (!isVisible) {
-        test.skip(true, 'New Topic button not visible')
-        return
-      }
-      // Wait for button to become enabled (isExecuting = false)
-      const isEnabled = await newTopicBtn.isEnabled({ timeout: 10000 }).catch(() => false)
-      if (!isEnabled) {
-        test.skip(true, 'New Topic button remained disabled — stream may not have completed')
-        return
-      }
+      await expect(newTopicBtn).toBeVisible({ timeout: 5000 })
+      await expect(newTopicBtn).toBeEnabled({ timeout: 10000 })
       await newTopicBtn.click()
       await page.waitForTimeout(500)
       const textarea = getChatTextarea(page)
@@ -570,8 +576,11 @@ test.describe('Specialist E2E Suite', () => {
     })
 
     test('History toggle shows past conversations panel', async ({ page }) => {
-      // History button only appears when threadId is set (after real API interaction).
-      // With mocked SSE, threadId may not be set. Send a real message first to create a thread.
+      // History button appears when threadId is set. threadId comes from
+      // getOrCreateSpecialistThread (a server action), which runs on dialog open
+      // and is NOT intercepted by page.route mocks. So it should work with real auth.
+      // We mock the chat to speed up the greeting generation.
+      await mockSpecialistChat(page, { responseText: 'Hello, how can I help?' })
       await page.goto('/agents')
       await page.waitForLoadState('networkidle')
       if (await skipIfUnauthenticated(page)) {
@@ -579,25 +588,47 @@ test.describe('Specialist E2E Suite', () => {
         return
       }
       await openSpecialistDialogByName(page, 'Max')
-      // Wait for dialog to fully load
-      await page.waitForTimeout(2000)
+      // Wait for greeting to complete (thread init + greeting generation)
+      await waitForGreetingComplete(page)
       const historyBtn = page.getByRole('button', { name: /Show conversation history/i })
-      if (!(await historyBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-        test.skip(true, 'History button not visible — threadId may not be set (requires real API)')
+      const isHistoryVisible = await historyBtn.waitFor({ state: 'visible', timeout: 8000 })
+        .then(() => true)
+        .catch(() => false)
+      if (!isHistoryVisible) {
+        test.skip(true, 'History button not visible — threadId may not be set')
         return
       }
       await historyBtn.click()
       await page.waitForTimeout(500)
-      const hasPastOrEmpty = await page.getByText(/Past conversations|No previous conversations/i).isVisible().catch(() => false)
-      expect(hasPastOrEmpty).toBe(true)
+      await expect(
+        page.getByText(/Past conversations|No previous conversations/i)
+      ).toBeVisible({ timeout: 5000 })
     })
 
     test('error response shows error state', async ({ page }) => {
+      // Track how many POST requests we've seen — let the greeting through, fail the user message.
+      // The greeting fires first on dialog open; the user message fires second.
+      let postCount = 0
       await page.route('**/api/agents/execute**', async (route) => {
-        if (route.request().method() === 'POST') {
-          await route.fulfill({ status: 500, body: 'Internal Server Error' })
-        } else {
+        if (route.request().method() !== 'POST') {
           await route.continue()
+          return
+        }
+        postCount++
+        if (postCount <= 1) {
+          // First POST = greeting generation — return a normal response so dialog loads
+          await route.fulfill({
+            status: 200,
+            headers: { 'Content-Type': 'text/event-stream', 'Connection': 'close' },
+            body: 'data: {"text":"Hello!"}\n\ndata: [DONE]\n\n',
+          })
+        } else {
+          // Second POST = user message — return error
+          await route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: 'Internal Server Error' }),
+          })
         }
       })
       await page.goto('/agents')
@@ -607,16 +638,15 @@ test.describe('Specialist E2E Suite', () => {
         return
       }
       await openSpecialistDialogByName(page, 'Sage')
+      // Wait for greeting to complete before sending user message
+      await page.waitForTimeout(3000)
       await sendMessage(page, 'Hello')
-      await page.waitForTimeout(5000)
+      // Wait for error to appear — check alert role and error text separately
       const dialog = getSpecialistDialog(page)
       const hasError =
-        (await dialog.locator('[role="alert"]').first().isVisible({ timeout: 5000 }).catch(() => false)) ||
+        (await dialog.locator('[role="alert"]').first().isVisible({ timeout: 10000 }).catch(() => false)) ||
         (await dialog.getByText(/error|something went wrong|failed|try again/i).first().isVisible({ timeout: 3000 }).catch(() => false))
-      // The UI should show some error feedback — if not, skip rather than fail
-      if (!hasError) {
-        test.skip(true, 'No visible error state — UI may handle 500 silently')
-      }
+      expect(hasError).toBe(true)
     })
   })
 
@@ -642,7 +672,7 @@ test.describe('Specialist E2E Suite', () => {
       }
       await openSpecialistDialogByName(page, 'Sage')
       await sendMessage(page, 'What is strategy?')
-      await waitForStreamComplete(page, 4000)
+      await waitForStreamComplete(page)
       const dialog = getSpecialistDialog(page)
       await dialog.screenshot({ path: `${SCREENSHOT_DIR}/dialog-with-response.png` })
     })

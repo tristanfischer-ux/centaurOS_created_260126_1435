@@ -92,6 +92,10 @@ export function buildExecuteSSEStream(options: MockChatOptions = {}): string {
 
 /**
  * Mock /api/agents/execute to return a configurable SSE stream.
+ *
+ * Uses Connection: close to ensure the browser properly closes the
+ * ReadableStream reader, which triggers the `done` flag and allows
+ * the dialog to exit isExecuting state.
  */
 export async function mockSpecialistChat(page: Page, options: MockChatOptions = {}): Promise<void> {
   await page.route('**/api/agents/execute**', async (route) => {
@@ -104,6 +108,7 @@ export async function mockSpecialistChat(page: Page, options: MockChatOptions = 
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
+        'Connection': 'close',
       },
       body: buildExecuteSSEStream(options),
     })
@@ -242,20 +247,75 @@ export function getSendBriefButton(page: Page) {
 }
 
 /**
+ * Wait for the greeting generation to complete.
+ * The greeting fires on dialog open and calls /api/agents/execute.
+ * When it completes, isGeneratingGreeting becomes false and the
+ * "catching up" spinner disappears.
+ *
+ * The greeting depends on thread initialization (a real server action),
+ * so it can take 5-15 seconds in total.
+ */
+export async function waitForGreetingComplete(page: Page, ms = 20000): Promise<void> {
+  // Wait for the "catching up" spinner to disappear
+  const spinner = page.getByText(/catching up|getting up to speed/i)
+  try {
+    // First wait for it to appear (greeting started) — it may already be visible
+    await spinner.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
+    // Then wait for it to disappear (greeting completed)
+    await spinner.waitFor({ state: 'hidden', timeout: ms })
+    // Small buffer for React state propagation
+    await page.waitForTimeout(300)
+  } catch {
+    // If spinner never appeared or didn't disappear, wait a fixed amount
+    await page.waitForTimeout(2000)
+  }
+}
+
+/**
  * Fill the chat textarea and send the message.
+ * Waits for greeting to complete first to avoid race conditions.
  */
 export async function sendMessage(page: Page, text: string): Promise<void> {
-  const dialog = getSpecialistDialog(page)
+  // Wait for greeting to complete before sending — otherwise isGeneratingGreeting
+  // stays true and buttons remain disabled
+  await waitForGreetingComplete(page)
   const textarea = getChatTextarea(page)
   await textarea.fill(text)
   await getSendBriefButton(page).click()
 }
 
 /**
- * Wait for streaming to complete (no guaranteed event; use timeout).
+ * Wait for streaming to complete by watching the "Copy last response" button.
+ *
+ * This button is only visible when:
+ *   - hasNonHistoricalMessages (user sent a message)
+ *   - !isExecuting (stream finished)
+ *   - lastAssistantMessage exists (response received)
+ *
+ * After sendMessage(), isExecuting becomes true and the button hides.
+ * When the stream finishes, isExecuting becomes false and the button reappears.
+ *
+ * Strategy: first wait for the button to disappear (stream started),
+ * then wait for it to reappear (stream finished).
  */
-export async function waitForStreamComplete(page: Page, ms = 4000): Promise<void> {
-  await page.waitForTimeout(ms)
+export async function waitForStreamComplete(page: Page, ms = 10000): Promise<void> {
+  const copyBtn = page.getByRole('button', { name: /Copy last response/i })
+  try {
+    // Phase 1: Wait for the button to disappear (isExecuting = true).
+    // It may already be hidden, or it may take a moment for React to re-render.
+    await copyBtn.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {
+      // If it was already hidden or never appeared, that's fine
+    })
+
+    // Phase 2: Wait for the button to reappear (isExecuting = false, response received).
+    await copyBtn.waitFor({ state: 'visible', timeout: ms })
+
+    // Small extra buffer for React state to propagate
+    await page.waitForTimeout(200)
+  } catch {
+    // Fallback: just wait the full duration
+    await page.waitForTimeout(ms)
+  }
 }
 
 /**

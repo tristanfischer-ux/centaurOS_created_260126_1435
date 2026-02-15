@@ -152,14 +152,14 @@ export async function createBankTransferRequest(
         id: request.id,
         userId: request.user_id,
         amount: request.amount,
-        currency: request.currency,
+        currency: request.currency ?? 'gbp',
         status: request.status as BankTransferStatus,
         stripePaymentIntentId: request.stripe_payment_intent_id,
         bankTransferInstructions: request.bank_transfer_instructions as unknown as BankTransferInstructions,
-        referenceNumber: request.reference_number,
+        referenceNumber: request.reference_number ?? '',
         expiresAt: request.expires_at,
         completedAt: request.completed_at,
-        createdAt: request.created_at,
+        createdAt: request.created_at ?? new Date().toISOString(),
       },
       instructions,
       error: null,
@@ -198,14 +198,14 @@ export async function getPendingBankTransfers(
       id: r.id,
       userId: r.user_id,
       amount: r.amount,
-      currency: r.currency,
+      currency: r.currency ?? 'gbp',
       status: r.status as BankTransferStatus,
       stripePaymentIntentId: r.stripe_payment_intent_id,
       bankTransferInstructions: r.bank_transfer_instructions as unknown as BankTransferInstructions,
-      referenceNumber: r.reference_number,
+      referenceNumber: r.reference_number ?? '',
       expiresAt: r.expires_at,
       completedAt: r.completed_at,
-      createdAt: r.created_at,
+      createdAt: r.created_at ?? new Date().toISOString(),
     }))
     
     return { requests, error: null }
@@ -239,14 +239,14 @@ export async function getBankTransferRequest(
         id: data.id,
         userId: data.user_id,
         amount: data.amount,
-        currency: data.currency,
+        currency: data.currency ?? 'gbp',
         status: data.status as BankTransferStatus,
         stripePaymentIntentId: data.stripe_payment_intent_id,
         bankTransferInstructions: data.bank_transfer_instructions as unknown as BankTransferInstructions,
-        referenceNumber: data.reference_number,
+        referenceNumber: data.reference_number ?? '',
         expiresAt: data.expires_at,
         completedAt: data.completed_at,
-        createdAt: data.created_at,
+        createdAt: data.created_at ?? new Date().toISOString(),
       },
       error: null,
     }
@@ -278,7 +278,7 @@ export async function cancelBankTransferRequest(
       return { success: false, error: 'Bank transfer request not found' }
     }
     
-    if (!['pending', 'awaiting_funds'].includes(request.status)) {
+    if (!request.status || !['pending', 'awaiting_funds'].includes(request.status)) {
       return { success: false, error: 'Cannot cancel this request' }
     }
     
@@ -417,7 +417,8 @@ function extractBankTransferInstructions(
   }
   
   return {
-    financialAddresses: (instructions.financial_addresses || []).map(addr => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    financialAddresses: (instructions.financial_addresses || []).map((addr: any) => ({
       type: addr.type,
       sortCode: addr.sort_code,
       accountNumber: addr.account_number,
