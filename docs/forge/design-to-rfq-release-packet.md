@@ -10,6 +10,7 @@ This packet is the final handoff bundle for launch readiness.
 - Telemetry event contract: `docs/forge/design-to-rfq-telemetry-events.md`
 - Regression contracts: `docs/forge/design-to-rfq-regression-contracts.md`
 - Product polish plan: `docs/forge/design-to-rfq-product-polish-plan.md`
+- Manual product pass checklist: `docs/forge/design-to-rfq-manual-product-pass.md`
 - QA execution report: `docs/forge/design-to-rfq-qa-report.md`
 - Scenario matrix: `docs/forge/design-to-rfq-scenario-matrix.md`
 - Migration verification runbook: `docs/forge/design-to-rfq-migration-verification.md`
