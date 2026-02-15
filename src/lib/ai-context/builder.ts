@@ -22,6 +22,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getInsightsSummary } from '@/lib/activity-intelligence/insights'
 import { ensureFreshProfile, formatProfileForAI } from '@/lib/intelligence/profile-builder'
 import { formatRecentInsightsForPrompt } from '@/lib/intelligence/insight-logger'
+import { getLatestBriefingFormatted } from '@/lib/agents/specialist-briefings'
 import type { CompanyProfile } from '@/types/foundry'
 import type { FoundryPurposeData } from '@/types/foundry'
 import {
@@ -44,6 +45,10 @@ export interface AIContextOptions {
   includeUserProfile?: boolean
   /** Include recent insight log for dedup (prevents repeating AI advice) */
   includeInsightHistory?: boolean
+  /** Include latest news briefing for this specialist (requires specialistId) */
+  includeBriefings?: boolean
+  /** Specialist ID when building context for a specific specialist (enables includeBriefings) */
+  specialistId?: string
 }
 
 /**
@@ -162,6 +167,18 @@ export async function buildAIContext(
         }
       } catch (err) {
         console.debug('[AIContextBuilder] Failed to load insight history:', err)
+      }
+    }
+
+    // 8. Latest news briefing for this specialist (when specialistId + includeBriefings)
+    if (options.includeBriefings && options.specialistId) {
+      try {
+        const briefing = await getLatestBriefingFormatted(supabase, options.specialistId)
+        if (briefing) {
+          sections.push(briefing)
+        }
+      } catch (err) {
+        console.debug('[AIContextBuilder] Failed to load specialist briefing:', err)
       }
     }
   } catch (err) {

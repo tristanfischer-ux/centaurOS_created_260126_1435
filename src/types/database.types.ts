@@ -10774,6 +10774,59 @@ export type Database = {
           },
         ]
       }
+      specialist_briefings: {
+        Row: {
+          briefing_type: string
+          created_at: string
+          domain_impact: string
+          estimated_cost_usd: number | null
+          foundry_id: string | null
+          headline_summary: string
+          id: string
+          raw_headlines: Json | null
+          specialist_id: string
+          tokens_in: number | null
+          tokens_out: number | null
+          watch_items: string
+        }
+        Insert: {
+          briefing_type: string
+          created_at?: string
+          domain_impact: string
+          estimated_cost_usd?: number | null
+          foundry_id?: string | null
+          headline_summary: string
+          id?: string
+          raw_headlines?: Json | null
+          specialist_id: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          watch_items: string
+        }
+        Update: {
+          briefing_type?: string
+          created_at?: string
+          domain_impact?: string
+          estimated_cost_usd?: number | null
+          foundry_id?: string | null
+          headline_summary?: string
+          id?: string
+          raw_headlines?: Json | null
+          specialist_id?: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          watch_items?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "specialist_briefings_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       standup_summaries: {
         Row: {
           blockers_summary: string | null

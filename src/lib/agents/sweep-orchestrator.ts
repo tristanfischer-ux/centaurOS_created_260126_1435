@@ -32,6 +32,7 @@ import { getBackgroundSweepPrompt } from './sweep-prompts'
 import { dispatchInsightNotifications } from './sweep-notifications'
 import { generateDecisionSupportPackage } from './sweep-synthesis'
 import { runAgenticActions } from './agentic-actions'
+import { getLatestBriefingFormatted } from './specialist-briefings'
 import type { AgentInsight } from '@/actions/agent-insights'
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -305,6 +306,12 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
     // 1. Build company context (using service client)
     const companyContext = await buildAIContextWithServiceClient(config.foundryId)
 
+    // 1b. Latest news briefing for this specialist (current events context)
+    const briefingBlock = await getLatestBriefingFormatted(supabase, config.specialistId)
+    const contextWithBriefing = briefingBlock
+      ? [companyContext, '\n\n', briefingBlock].join('')
+      : companyContext
+
     // 2. Build the sweep prompt
     const personalityPrompt = compilePersonalityPrompt(
       specialist.name,
@@ -322,7 +329,7 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
       'Only surface findings that are genuinely actionable or noteworthy.',
       'If nothing significant is found, return an empty insights array.',
       '\n' + sweepPrompt,
-      companyContext,
+      contextWithBriefing,
     ].join('\n')
 
     const userPrompt = [
