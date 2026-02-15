@@ -196,6 +196,13 @@ export async function POST(request: Request) {
     // 4. Build rich company context using the AI Context Builder
     const foundryId = await resolveFoundryId(supabase, user.id)
 
+    // 4a. Fetch user profile for identity context (so the agent knows who they're speaking with)
+    const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("full_name, role")
+        .eq("id", user.id)
+        .single()
+
     // 4b. Validate threadId belongs to user's foundry (IDOR prevention)
     if (threadId && foundryId) {
         const { data: thread } = await supabase
@@ -267,6 +274,26 @@ export async function POST(request: Request) {
                 specialistId,
             )
             systemPromptWithContext = personalityPrompt
+
+            // Proposed actions: allow specialist to suggest tasks/objectives
+            systemPromptWithContext += `
+
+## Suggesting Tasks and Objectives
+When your recommendation naturally includes concrete next steps (tasks or objectives the user could create), you may output them in a structured format so the user can create them with one click. In the same response where you explain your recommendation in normal prose, include an HTML comment block with valid JSON. The comment is invisible in the rendered message but enables the UI to show "Create" buttons.
+
+Format (use exactly this structure, no other keys):
+<!-- PROPOSED_ACTIONS
+[
+  { "type": "objective", "title": "Short objective title", "description": "Optional description" },
+  { "type": "task", "title": "Task title", "description": "Optional", "objectiveTitle": "Exact title of objective above if this task belongs under it" }
+]
+-->
+
+Rules:
+- Only include this block when you are actually recommending specific tasks or objectives to create. Do not add it to every message.
+- For tasks that belong under an objective in the same proposal, set "objectiveTitle" to the exact "title" of that objective so they can be linked.
+- Keep titles concise (under 200 chars for objectives, under 500 for tasks). Descriptions are optional.
+- The visible text of your response should still read naturally; the block is supplementary.`
         }
     }
 
@@ -282,6 +309,12 @@ export async function POST(request: Request) {
 - Distinguish between data the user provided, industry knowledge, and your estimates.
 - Flag assumptions explicitly. Never fabricate statistics.
 - End with clear next steps: who does what, by when.`
+
+    // User identity: address them by name
+    if (userProfile?.full_name) {
+        const roleSuffix = userProfile.role ? ` (${userProfile.role})` : ""
+        systemPromptWithContext += `\n\n## User Identity\nYou are speaking with ${userProfile.full_name}${roleSuffix}. Address them by name when natural.`
+    }
 
     // Founder preferences: learned communication style, trust level, pet peeves
     if (foundryId && specialistId && threadId) {
@@ -372,8 +405,9 @@ export async function POST(request: Request) {
     const memoryCallback = threadId && foundryId
         ? async (fullOutput: string) => {
             try {
-                // Strip internal NEXT_SPECIALIST directive before saving to history
-                const cleanOutput = fullOutput.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
+                // Strip internal directives before saving to history (NEXT_SPECIALIST, PROPOSED_ACTIONS)
+                let cleanOutput = fullOutput.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
+                cleanOutput = cleanOutput.replace(/<!--\s*PROPOSED_ACTIONS\s*[\s\S]*?\s*-->/gi, "").trim()
                 await addMemoryMessage(threadId!, foundryId, "assistant", cleanOutput || fullOutput)
 
                 // Track this interaction for trust level progression (fire-and-forget)

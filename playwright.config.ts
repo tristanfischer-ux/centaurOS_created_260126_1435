@@ -77,15 +77,27 @@ export default defineConfig({
       dependencies: ['auth-setup'],
       use: { ...devices['Desktop Chrome'] },
     },
+    // Specialist proposed actions (authenticated founder)
+    {
+      name: 'specialist-proposed-actions',
+      testMatch: /specialist-proposed-actions\.spec\.ts$/,
+      dependencies: ['auth-setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: path.join(authDir, 'founder.json'),
+      },
+    },
     // General tests (unauthenticated)
     {
       name: 'chromium',
-      testMatch: /(?<!qa-.*|auth\.setup|updates)\.spec\.ts$/,
+      testMatch:
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions)\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'Mobile Chrome',
-      testMatch: /(?<!qa-.*|auth\.setup|updates)\.spec\.ts$/,
+      testMatch:
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions)\.spec\.ts$/,
       use: { ...devices['Pixel 5'] },
     },
     // Smoke tests — lightweight page render checks used by npm run verify
@@ -102,10 +114,13 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  webServer:
+    process.env.PLAYWRIGHT_SKIP_WEB_SERVER === '1'
+      ? undefined
+      : {
+          command: 'npm run dev',
+          url: 'http://localhost:3000',
+          reuseExistingServer: !process.env.CI,
+          timeout: 120 * 1000,
+        },
 })

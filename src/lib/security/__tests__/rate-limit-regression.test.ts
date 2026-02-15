@@ -218,7 +218,7 @@ describe('message attachment authorization regressions', () => {
   it('tightens legacy message-attachments storage policies to conversation participants only', async () => {
     const migrationPath = path.join(
       process.cwd(),
-      'supabase/migrations/20260214134000_tighten_legacy_message_attachment_policies.sql'
+      'supabase/migrations/20260214150003_tighten_legacy_message_attachment_policies.sql'
     )
     const source = await readFile(migrationPath, 'utf-8')
 

@@ -22,6 +22,7 @@ import type {
     SpecialistState,
 } from "../conversation-engine"
 import { registerEngine } from "../conversation-engine"
+import { stripThinkTags, stripPartialThinkTags } from "@/lib/utils/strip-think-tags"
 
 // ─── SSE Parsing ─────────────────────────────────────────────────────────────
 
@@ -142,6 +143,7 @@ class TextChatEngine implements ConversationEngine {
 
             const decoder = new TextDecoder()
             let fullResponse = ""
+            let accumulatedVisible = ""
 
             while (true) {
                 const { done, value } = await reader.read()
@@ -152,8 +154,13 @@ class TextChatEngine implements ConversationEngine {
 
                 if (text) {
                     fullResponse += text
-                    this.setState("speaking")
-                    this.emit({ type: "text_chunk", text })
+                    const visibleNow = stripPartialThinkTags(fullResponse)
+                    if (visibleNow !== accumulatedVisible) {
+                        const newVisible = visibleNow.slice(accumulatedVisible.length)
+                        accumulatedVisible = visibleNow
+                        this.setState("speaking")
+                        this.emit({ type: "text_chunk", text: newVisible })
+                    }
                 }
             }
 
@@ -161,8 +168,9 @@ class TextChatEngine implements ConversationEngine {
                 fullResponse = "No response received. Please try again."
             }
 
-            // Parse specialist suggestion
-            const { cleanResponse, suggestion } = parseSpecialistSuggestion(fullResponse)
+            // Strip think tags and parse specialist suggestion
+            const responseWithoutThink = stripThinkTags(fullResponse)
+            const { cleanResponse, suggestion } = parseSpecialistSuggestion(responseWithoutThink)
 
             // Emit completed response
             this.emit({ type: "text_done", text: cleanResponse })

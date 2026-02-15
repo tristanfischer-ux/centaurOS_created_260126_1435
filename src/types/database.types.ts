@@ -1222,7 +1222,10 @@ export type Database = {
           created_by: string | null
           foundry_id: string
           id: string
+          last_interaction_at: string | null
           metadata: Json
+          total_interactions: number | null
+          trust_level: string | null
           updated_at: string
         }
         Insert: {
@@ -1232,7 +1235,10 @@ export type Database = {
           created_by?: string | null
           foundry_id: string
           id?: string
+          last_interaction_at?: string | null
           metadata?: Json
+          total_interactions?: number | null
+          trust_level?: string | null
           updated_at?: string
         }
         Update: {
@@ -1242,7 +1248,10 @@ export type Database = {
           created_by?: string | null
           foundry_id?: string
           id?: string
+          last_interaction_at?: string | null
           metadata?: Json
+          total_interactions?: number | null
+          trust_level?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4791,6 +4800,71 @@ export type Database = {
             columns: ["xray_scan_id"]
             isOneToOne: false
             referencedRelation: "xray_scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      founder_preferences: {
+        Row: {
+          celebration_style: string | null
+          created_at: string
+          decision_speed: string | null
+          format_preference: string | null
+          foundry_id: string
+          id: string
+          pet_peeves: Json | null
+          preferred_length: string | null
+          prefers_data: boolean | null
+          prefers_recommendation: boolean | null
+          tone_preference: string | null
+          total_corrections: number | null
+          total_interactions: number | null
+          updated_at: string
+          values_signals: Json | null
+          vocabulary: Json | null
+        }
+        Insert: {
+          celebration_style?: string | null
+          created_at?: string
+          decision_speed?: string | null
+          format_preference?: string | null
+          foundry_id: string
+          id?: string
+          pet_peeves?: Json | null
+          preferred_length?: string | null
+          prefers_data?: boolean | null
+          prefers_recommendation?: boolean | null
+          tone_preference?: string | null
+          total_corrections?: number | null
+          total_interactions?: number | null
+          updated_at?: string
+          values_signals?: Json | null
+          vocabulary?: Json | null
+        }
+        Update: {
+          celebration_style?: string | null
+          created_at?: string
+          decision_speed?: string | null
+          format_preference?: string | null
+          foundry_id?: string
+          id?: string
+          pet_peeves?: Json | null
+          preferred_length?: string | null
+          prefers_data?: boolean | null
+          prefers_recommendation?: boolean | null
+          tone_preference?: string | null
+          total_corrections?: number | null
+          total_interactions?: number | null
+          updated_at?: string
+          values_signals?: Json | null
+          vocabulary?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "founder_preferences_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: true
+            referencedRelation: "foundries"
             referencedColumns: ["id"]
           },
         ]
@@ -12878,6 +12952,10 @@ export type Database = {
         Returns: number
       }
       calculate_workload_score: { Args: { p_user_id: string }; Returns: number }
+      can_access_profile: {
+        Args: { target_profile_id: string }
+        Returns: boolean
+      }
       can_user_approve: {
         Args: { p_task_id: string; p_user_id: string }
         Returns: boolean

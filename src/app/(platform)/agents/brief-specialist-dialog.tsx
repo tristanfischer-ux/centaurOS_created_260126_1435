@@ -14,6 +14,7 @@ import {
     History, Mic, MicOff, Volume2, VolumeX, Sparkles, Brain,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { stripThinkTags, stripPartialThinkTags } from "@/lib/utils/strip-think-tags"
 import { toast } from "sonner"
 import { Markdown } from "@/components/ui/markdown"
 import { getPromptsByCategory } from "./lib/prompt-library"
@@ -25,6 +26,7 @@ import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import { useScreenContext } from "@/contexts/screen-context"
 import { SpecialistChatAvatar } from "@/components/specialists/specialist-presentation"
+import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { PromptTemplate } from "./lib/agent-types"
 import type { Specialist } from "./specialists-data"
 
@@ -98,12 +100,55 @@ function normalizeSpecialistError(error: string, specialistName: string): string
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/** Structured proposal from the Specialist for one-click creation (parsed from PROPOSED_ACTIONS block). */
+export interface ProposedAction {
+    type: "objective" | "task"
+    title: string
+    description?: string
+    /** For tasks: exact title of an objective in the same batch to link under. */
+    objectiveTitle?: string
+}
+
 interface ChatMessage {
     role: "user" | "assistant"
     content: string
     timestamp: Date
     /** Marks messages loaded from previous sessions (shown dimmer with separator) */
     historical?: boolean
+    /** Parsed from PROPOSED_ACTIONS in assistant messages; shown as inline approval cards. */
+    proposals?: ProposedAction[]
+}
+
+const PROPOSED_ACTIONS_REGEX = /<!--\s*PROPOSED_ACTIONS\s*([\s\S]*?)\s*-->/i
+
+/**
+ * Parse PROPOSED_ACTIONS JSON block from Specialist response. Returns empty array if none or invalid.
+ */
+function parseProposedActions(content: string): ProposedAction[] {
+    const match = content.match(PROPOSED_ACTIONS_REGEX)
+    if (!match || !match[1]) return []
+    try {
+        const raw = match[1].trim()
+        const parsed = JSON.parse(raw) as unknown
+        if (!Array.isArray(parsed)) return []
+        return parsed.filter(
+            (item): item is ProposedAction =>
+                typeof item === "object" &&
+                item !== null &&
+                typeof (item as ProposedAction).type === "string" &&
+                typeof (item as ProposedAction).title === "string" &&
+                ((item as ProposedAction).type === "objective" || (item as ProposedAction).type === "task")
+        )
+    } catch {
+        return []
+    }
+}
+
+/**
+ * Remove PROPOSED_ACTIONS HTML comment from content so it does not render in Markdown.
+ */
+function stripProposedActionsBlock(content: string): string {
+    return content.replace(PROPOSED_ACTIONS_REGEX, "").trim()
 }
 
 interface BriefSpecialistDialogProps {
@@ -492,8 +537,8 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
                     return
                 }
 
-                // Strip any NEXT_SPECIALIST recommendation from the greeting
-                const cleaned = fullResponse.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
+                // Strip think tags and NEXT_SPECIALIST recommendation from the greeting
+                const cleaned = stripThinkTags(fullResponse.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim())
 
                 const greetingMessage: ChatMessage = {
                     role: "assistant",
@@ -502,9 +547,9 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
                 }
                 setMessages((prev) => [...prev, greetingMessage])
 
-                // Auto-play greeting via TTS if voice is enabled
+                // Auto-play greeting via TTS if voice is enabled (chunked for faster start)
                 if (tts.voiceEnabled && specialist.voice) {
-                    tts.play(cleaned, specialist.voice).catch((err) => {
+                    tts.playChunked(cleaned, specialist.voice).catch((err) => {
                         console.warn("[BriefDialog] Greeting TTS failed:", err)
                     })
                 }
@@ -527,7 +572,7 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
         return () => {
             controller.abort()
         }
-    }, [isLoadingThread, open, specialist.id, specialist.name, specialist.title, specialist.workingStyle, specialist.voice, threadId, messages, crossSpecialistContext, tts.voiceEnabled])
+    }, [isLoadingThread, open, specialist.id, specialist.name, specialist.title, specialist.workingStyle, specialist.voice, threadId, messages, crossSpecialistContext, tts.voiceEnabled, tts.playChunked])
 
     // ─── Handlers ─────────────────────────────────────────────────────────
 
@@ -647,11 +692,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             }
                             if (parsed.text) {
                                 fullResponse += parsed.text
-                                setStreamingResponse(fullResponse)
+                                setStreamingResponse(stripPartialThinkTags(fullResponse))
                             }
                         } catch {
                             fullResponse += data
-                            setStreamingResponse(fullResponse)
+                            setStreamingResponse(stripPartialThinkTags(fullResponse))
                         }
                     }
                 }
@@ -667,13 +712,14 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 fullResponse = "No response received. Please try again."
             }
 
-            // Parse dynamic specialist recommendation from the response
-            const nextMatch = fullResponse.match(/NEXT_SPECIALIST:\s*(\S+)\s*\|\s*(.+)/i)
-            let displayResponse = fullResponse
+            // Strip think tags and parse dynamic specialist recommendation from the response
+            const responseWithoutThink = stripThinkTags(fullResponse)
+            const nextMatch = responseWithoutThink.match(/NEXT_SPECIALIST:\s*(\S+)\s*\|\s*(.+)/i)
+            let displayResponse = responseWithoutThink
             if (nextMatch) {
                 const [fullMatch, specId, reason] = nextMatch
                 // Strip the recommendation line from the displayed response
-                displayResponse = fullResponse.replace(fullMatch, "").trim()
+                displayResponse = responseWithoutThink.replace(fullMatch, "").trim()
                 if (specId && specId !== "none") {
                     setDynamicSuggestion({ specialistId: specId.trim(), reason: reason.trim() })
                 } else {
@@ -681,18 +727,23 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 }
             }
 
-            // Add assistant message to chat (with recommendation stripped)
+            // Parse PROPOSED_ACTIONS from response and strip the block from displayed content
+            const proposals = parseProposedActions(displayResponse)
+            displayResponse = stripProposedActionsBlock(displayResponse)
+
+            // Add assistant message to chat (with think tags, recommendation, and proposal block stripped)
             const assistantMessage: ChatMessage = {
                 role: "assistant",
                 content: displayResponse,
                 timestamp: new Date(),
+                ...(proposals.length > 0 ? { proposals } : {}),
             }
             setMessages((prev) => [...prev, assistantMessage])
             setStreamingResponse("")
 
-            // Auto-play TTS if voice output is enabled (use clean response)
+            // Auto-play TTS if voice output is enabled (chunked for faster time-to-first-audio)
             if (tts.voiceEnabled && specialist.voice) {
-                tts.play(displayResponse, specialist.voice).catch((err) => {
+                tts.playChunked(displayResponse, specialist.voice).catch((err) => {
                     console.warn("[BriefDialog] TTS playback failed:", err)
                 })
             }
@@ -729,7 +780,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             executeAbortRef.current = null
             setIsExecuting(false)
         }
-    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, tts.voiceEnabled, tts.warmUp, tts.play, deepThinkEnabled, serializeScreenContext])
+    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, tts.voiceEnabled, tts.warmUp, tts.playChunked, deepThinkEnabled, serializeScreenContext])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
@@ -1147,6 +1198,25 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     </div>
                                 )}
                             </div>
+                        )}
+
+                        {/* Proposed actions (tasks/objectives) from Specialist response */}
+                        {lastAssistantMessage && !isExecuting && lastAssistantMessage.proposals && lastAssistantMessage.proposals.length > 0 && (
+                            <ProposedActionsCard
+                                proposals={lastAssistantMessage.proposals}
+                                specialist={specialist}
+                                onDismiss={() => {
+                                    setMessages((prev) => {
+                                        const idx = prev.map((m, i) => ({ m, i }))
+                                            .reverse()
+                                            .find(({ m }) => m.role === "assistant" && !m.historical)?.i
+                                        if (idx === undefined || !prev[idx].proposals?.length) return prev
+                                        return prev.map((msg, i) =>
+                                            i === idx ? { ...msg, proposals: undefined } : msg
+                                        )
+                                    })
+                                }}
+                            />
                         )}
 
                         {/* Suggested Next Specialists (after at least one response) */}

@@ -502,10 +502,11 @@ describe('Task Actions', () => {
             expect(result2).toBeDefined()
         })
 
-        it('should require objective_id', async () => {
+        it('should allow empty objective_id (tasks without objectives)', async () => {
             const noObjectiveFormData = createMockFormData({ objective_id: '' })
             const result = await createTask(noObjectiveFormData)
-            expect(result.error).toContain('Objective')
+            // objective_id is optional — empty string is treated as undefined
+            expect(result.error).toBeUndefined()
         })
 
         it('should validate objective_id is a valid UUID', async () => {

@@ -22,7 +22,7 @@
 -- Create the founder_preferences table
 CREATE TABLE IF NOT EXISTS founder_preferences (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    foundry_id UUID NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
+    foundry_id TEXT NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
 
     -- Communication style preferences (learned from interactions)
     preferred_length TEXT DEFAULT 'balanced' CHECK (preferred_length IN ('brief', 'balanced', 'detailed')),
@@ -63,7 +63,7 @@ CREATE POLICY "Foundry members can view preferences"
     ON founder_preferences FOR SELECT
     USING (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = founder_preferences.foundry_id
             AND fm.user_id = auth.uid()
         )
@@ -75,7 +75,7 @@ CREATE POLICY "Founders can update preferences"
     ON founder_preferences FOR UPDATE
     USING (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = founder_preferences.foundry_id
             AND fm.user_id = auth.uid()
             AND fm.role IN ('Founder', 'Executive')
@@ -87,7 +87,7 @@ CREATE POLICY "Founders can insert preferences"
     ON founder_preferences FOR INSERT
     WITH CHECK (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = founder_preferences.foundry_id
             AND fm.user_id = auth.uid()
         )

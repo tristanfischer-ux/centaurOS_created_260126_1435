@@ -2,8 +2,18 @@
 
 import * as React from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn, getInitials } from "@/lib/utils"
 import { Bot } from "lucide-react"
+
+function formatRole(role: string): string {
+  if (role === "AI_Agent") return "AI Agent"
+  return role
+}
 
 /**
  * Role-based avatar colors for ForgeOS
@@ -54,6 +64,8 @@ export interface UserAvatarProps {
   className?: string
   /** Custom z-index for stacked avatars */
   style?: React.CSSProperties
+  /** Show name/role tooltip on hover. Default true. */
+  showTooltip?: boolean
 }
 
 const sizeClasses = {
@@ -109,12 +121,14 @@ export function UserAvatar({
   size = "md",
   className,
   style,
+  showTooltip = true,
 }: UserAvatarProps) {
   const isAI = role === "AI_Agent"
   const colors = getRoleColors(role)
   const initials = getInitials(name)
+  const hasTooltipContent = showTooltip && (name != null || role != null)
 
-  return (
+  const avatarElement = (
     <Avatar
       className={cn(
         sizeClasses[size],
@@ -156,6 +170,22 @@ export function UserAvatar({
       </AvatarFallback>
     </Avatar>
   )
+
+  if (hasTooltipContent) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{avatarElement}</TooltipTrigger>
+        <TooltipContent side="top" className="text-center">
+          <p className="font-medium">{name || "Unknown"}</p>
+          {role != null && role !== "" && (
+            <p className="text-muted-foreground">{formatRole(role)}</p>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  return avatarElement
 }
 
 /**
@@ -185,6 +215,8 @@ export interface UserAvatarStackProps {
   size?: UserAvatarProps["size"]
   /** Additional className */
   className?: string
+  /** Show name/role tooltips on hover. Default true. */
+  showTooltip?: boolean
 }
 
 export function UserAvatarStack({
@@ -192,9 +224,25 @@ export function UserAvatarStack({
   max = 4,
   size = "md",
   className,
+  showTooltip = true,
 }: UserAvatarStackProps) {
   const visibleUsers = users.slice(0, max)
-  const remainingCount = users.length - max
+  const remainingUsers = users.slice(max)
+  const remainingCount = remainingUsers.length
+
+  const overflowIndicator = (
+    <div
+      className={cn(
+        sizeClasses[size],
+        "rounded-full bg-muted text-muted-foreground flex items-center justify-center",
+        textSizeClasses[size],
+        "font-medium"
+      )}
+      style={{ zIndex: 0 }}
+    >
+      +{remainingCount}
+    </div>
+  )
 
   return (
     <div className={cn("flex -space-x-2", className)}>
@@ -206,21 +254,30 @@ export function UserAvatarStack({
           avatarUrl={user.avatarUrl}
           size={size}
           style={{ zIndex: 10 - index }}
+          showTooltip={showTooltip}
         />
       ))}
-      {remainingCount > 0 && (
-        <div
-          className={cn(
-            sizeClasses[size],
-            "rounded-full bg-muted text-muted-foreground flex items-center justify-center",
-            textSizeClasses[size],
-            "font-medium"
-          )}
-          style={{ zIndex: 0 }}
-        >
-          +{remainingCount}
-        </div>
-      )}
+      {remainingCount > 0 &&
+        (showTooltip && remainingUsers.some((u) => u.name != null || u.role != null) ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{overflowIndicator}</TooltipTrigger>
+            <TooltipContent side="top" className="text-center max-w-[200px]">
+              {remainingUsers.map((user, i) => (
+                <p key={user.id ?? i} className="font-medium">
+                  {user.name || "Unknown"}
+                  {user.role != null && user.role !== "" && (
+                    <span className="text-muted-foreground font-normal">
+                      {" "}
+                      · {formatRole(user.role)}
+                    </span>
+                  )}
+                </p>
+              ))}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          overflowIndicator
+        ))}
     </div>
   )
 }
