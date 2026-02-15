@@ -41,6 +41,7 @@ describe("release documentation consistency", () => {
     expect(qaReport).toContain("manual-product-pass-results-consistency.test.ts")
     expect(qaReport).toContain("go-live-status-consistency.test.ts")
     expect(qaReport).toContain("Five-scenario product pass outcome log")
+    expect(qaReport).toContain("latest local execution snapshot")
     expect(releasePacket).toContain("`npm run test:forge-rfq:contracts` passes.")
   })
 

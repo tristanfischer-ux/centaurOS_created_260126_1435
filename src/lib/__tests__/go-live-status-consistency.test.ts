@@ -18,6 +18,7 @@ describe("go-live status consistency", () => {
     expect(statusDoc).toContain("verify:forge-rfq-release")
     expect(statusDoc).toContain("Last verified at (UTC)")
     expect(statusDoc).toContain("Branch head at verification")
+    expect(statusDoc).toContain("Verification environment")
     expect(statusDoc).toContain("design-to-rfq-manual-product-pass-results.md")
     expect(statusDoc).toContain("SUPABASE_ACCESS_TOKEN")
     expect(statusDoc).toContain("20260215120000_stabilize_profiles_rls_no_recursion.sql")
