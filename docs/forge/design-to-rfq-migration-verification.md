@@ -27,6 +27,27 @@ Expected profiles policies include:
 
 Legacy policy names should not appear (e.g. `Active users can view profiles in their foundry`).
 
+## Verify Policy Expressions (No Recursive Helpers)
+
+Run:
+
+```sql
+select
+  policyname,
+  coalesce(qual, '') as using_expression,
+  coalesce(with_check, '') as with_check_expression
+from pg_policies
+where schemaname = 'public'
+  and tablename = 'profiles'
+order by policyname;
+```
+
+Expected:
+
+- no `get_my_foundry_id(` in any policy expression
+- no `is_active_user(` in any policy expression
+- `profiles_update_own` uses `auth.uid() = id` for both `USING` and `WITH CHECK`
+
 ## Runtime Verification
 
 1. Sign in as founder account.
