@@ -57,6 +57,19 @@ export async function fetchDailyPulseData(
         return null
     }
     
+    // Database RPC may return an error object (e.g. { error: 'User has no foundry' })
+    // instead of DailyPulseData when the user lacks a foundry association
+    if (data && typeof data === 'object' && 'error' in data) {
+        console.warn('[DailyPulse] RPC returned error:', (data as { error: string }).error)
+        return null
+    }
+    
+    // Validate expected shape before casting
+    if (!data || typeof data !== 'object' || !('foundry_id' in data)) {
+        console.warn('[DailyPulse] Unexpected data shape, skipping')
+        return null
+    }
+    
     return data as DailyPulseData
 }
 

@@ -376,22 +376,22 @@ export default function MarketingPage() {
               <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">
                 Platform
               </p>
-              <div className="flex flex-col gap-2.5 sm:gap-2">
+              <div className="flex flex-col gap-1 sm:gap-2">
                 <Link
                   href="/pricing"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Pricing
                 </Link>
                 <a
                   href={`${APP_DOMAIN}/login`}
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Login
                 </a>
                 <Link
                   href="/join/founder"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Get Started Free
                 </Link>
@@ -402,22 +402,22 @@ export default function MarketingPage() {
               <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">
                 Roles
               </p>
-              <div className="flex flex-col gap-2.5 sm:gap-2">
+              <div className="flex flex-col gap-1 sm:gap-2">
                 <Link
                   href="/join/founder"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Founders
                 </Link>
                 <Link
                   href="/join/executive"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Executives
                 </Link>
                 <Link
                   href="/join/apprentice"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Apprentices
                 </Link>
@@ -548,7 +548,7 @@ function HeroSection() {
           className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full"
         >
           <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
-          <span className="text-international-orange text-[10px] sm:text-xs font-mono uppercase tracking-widest">
+          <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
             Early Access &mdash; Founding Members Only
           </span>
         </motion.div>
@@ -671,14 +671,14 @@ function HeroSection() {
             <span>Also join as:</span>
             <Link
               href="/join/executive"
-              className="text-international-orange/80 hover:text-international-orange transition-colors uppercase tracking-wider"
+              className="text-international-orange/80 hover:text-international-orange transition-colors uppercase tracking-wider min-h-[44px] flex items-center"
             >
               Executive
             </Link>
             <span className="text-muted-foreground/40">|</span>
             <Link
               href="/join/apprentice"
-              className="text-international-orange/80 hover:text-international-orange transition-colors uppercase tracking-wider"
+              className="text-international-orange/80 hover:text-international-orange transition-colors uppercase tracking-wider min-h-[44px] flex items-center"
             >
               Apprentice
             </Link>
@@ -921,7 +921,7 @@ function SavingsCalculatorSection() {
                   max={15}
                   value={teamSize}
                   onChange={(e) => setTeamSize(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
+                  className="w-full h-2 py-3 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-8 [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-8 [&::-moz-range-thumb]:w-8 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
                   aria-label={`Team size: ${teamSize} engineers`}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -951,7 +951,7 @@ function SavingsCalculatorSection() {
                   step={500}
                   value={monthlyCost}
                   onChange={(e) => setMonthlyCost(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
+                  className="w-full h-2 py-3 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-8 [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-8 [&::-moz-range-thumb]:w-8 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
                   aria-label={`Monthly cost per engineer: £${monthlyCost.toLocaleString()}`}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -980,7 +980,7 @@ function SavingsCalculatorSection() {
                   max={24}
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
+                  className="w-full h-2 py-3 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-8 [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-8 [&::-moz-range-thumb]:w-8 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
                   aria-label={`Project duration: ${duration} months`}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -1008,24 +1008,24 @@ function SavingsCalculatorSection() {
               {/* Traditional vs Fractional comparison */}
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div className="rounded-xl bg-status-error-light p-4 sm:p-5 text-center">
-                  <p className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-destructive mb-1.5 sm:mb-2">
+                  <p className="text-xs font-mono uppercase tracking-widest text-destructive mb-1.5 sm:mb-2">
                     Traditional
                   </p>
                   <p className="text-xl sm:text-2xl md:text-3xl font-black text-destructive">
                     {formatCurrency(traditionalCost)}
                   </p>
-                  <p className="text-[10px] sm:text-xs text-destructive/70 mt-1">
+                  <p className="text-xs text-destructive/70 mt-1">
                     {traditionalWeeks} weeks
                   </p>
                 </div>
                 <div className="rounded-xl bg-status-success-light p-4 sm:p-5 text-center">
-                  <p className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-status-success mb-1.5 sm:mb-2">
+                  <p className="text-xs font-mono uppercase tracking-widest text-status-success mb-1.5 sm:mb-2">
                     Fractional
                   </p>
                   <p className="text-xl sm:text-2xl md:text-3xl font-black text-status-success">
                     {formatCurrency(fractionalCost)}
                   </p>
-                  <p className="text-[10px] sm:text-xs text-status-success/70 mt-1">
+                  <p className="text-xs text-status-success/70 mt-1">
                     ~{fractionalWeeks} weeks
                   </p>
                 </div>
@@ -1033,7 +1033,7 @@ function SavingsCalculatorSection() {
 
               {/* Savings highlight */}
               <div className="rounded-xl border-2 border-international-orange bg-international-orange/5 p-5 sm:p-6 text-center">
-                <p className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-international-orange mb-1.5 sm:mb-2">
+                <p className="text-xs font-mono uppercase tracking-widest text-international-orange mb-1.5 sm:mb-2">
                   You Save
                 </p>
                 <p className="text-3xl sm:text-4xl md:text-5xl font-black text-international-orange">
@@ -1373,7 +1373,7 @@ function PlatformCapabilitiesSection() {
               <p className="text-2xl sm:text-3xl md:text-4xl font-black text-international-orange mb-1">
                 {metric.value}
               </p>
-              <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground font-mono uppercase tracking-wider">
+              <p className="text-xs md:text-sm text-muted-foreground font-mono uppercase tracking-wider">
                 {metric.label}
               </p>
             </AnimatedCard>
@@ -1434,7 +1434,7 @@ function PlatformCapabilitiesSection() {
               </span>
             ))}
           </div>
-          <p className="text-[10px] sm:text-xs text-muted-foreground font-mono tracking-wider mb-5 sm:mb-6">
+          <p className="text-xs text-muted-foreground font-mono tracking-wider mb-5 sm:mb-6">
             + Welding, Brazing, Carbon Fibre, Nano-Imprint, Bio-Printing, and
             dozens more.
           </p>
@@ -1628,7 +1628,7 @@ function PricingPreviewSection() {
               }`}
             >
               {tier.highlight && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-international-orange text-white text-[10px] sm:text-xs font-mono font-bold tracking-widest uppercase px-3 sm:px-4 py-1 rounded-full whitespace-nowrap">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-international-orange text-white text-xs font-mono font-bold tracking-widest uppercase px-3 sm:px-4 py-1 rounded-full whitespace-nowrap">
                   Recommended
                 </span>
               )}
@@ -1798,7 +1798,7 @@ function FinalCTASection() {
             className="inline-flex items-center gap-2 mb-5 sm:mb-6 px-3 sm:px-4 py-2 border border-background/20 rounded-full"
           >
             <Zap className="h-4 w-4 text-international-orange" />
-            <span className="text-international-orange text-[10px] sm:text-xs font-mono uppercase tracking-widest">
+            <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
               Limited Founding Member Spots
             </span>
           </motion.div>

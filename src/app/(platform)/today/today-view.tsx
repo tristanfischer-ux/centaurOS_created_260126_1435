@@ -215,7 +215,7 @@ export function TodayView(): React.ReactElement {
                                 Unable to load your daily briefing
                             </p>
                             <p className="text-sm text-muted-foreground">
-                                Something went wrong fetching your data. Please try again.
+                                We couldn&apos;t fetch your data right now. Please try again.
                             </p>
                         </div>
                         <Button onClick={loadData} variant="outline" size="sm" className="gap-1.5">

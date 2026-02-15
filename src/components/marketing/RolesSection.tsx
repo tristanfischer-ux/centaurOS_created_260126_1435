@@ -135,7 +135,7 @@ export function RolesSection() {
               >
                 {/* Most Popular badge for Founder */}
                 {role.id === "founder" && (
-                  <span className="absolute top-0 left-0 right-0 bg-international-orange text-white text-[10px] sm:text-xs font-mono font-bold tracking-widest uppercase px-4 py-1.5 text-center z-10">
+                  <span className="absolute top-0 left-0 right-0 bg-international-orange text-white text-xs font-mono font-bold tracking-widest uppercase px-4 py-1.5 text-center z-10">
                     Most Popular
                   </span>
                 )}
