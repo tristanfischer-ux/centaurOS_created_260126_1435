@@ -7,7 +7,7 @@
  * Metric, InlineSvg, SvgView, FullscreenOverlay, and formatRelativeTime.
  */
 
-import { useRef, useEffect } from "react"
+import { useRef, useEffect, useCallback } from "react"
 import { STLViewer } from "@/components/cad/stl-viewer"
 import type { CadLabResult } from "@/lib/cad-lab-types"
 
@@ -179,6 +179,19 @@ export function FullscreenOverlay({
   result: CadLabResult
   onClose: () => void
 }): React.ReactNode {
+  // Listen for Escape key to close the overlay
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault()
+      onClose()
+    }
+  }, [onClose])
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [handleKeyDown])
+
   const svgMap: Record<string, string | undefined> = {
     iso: result.svgIso,
     exploded: result.svgExploded,

@@ -6,10 +6,11 @@
  * @description Five-stage pipeline stepper modeled on ForgeSubNav. Stages
  * unlock progressively: Research is always accessible, Build requires research
  * + modules, Analysis/Procurement/Review require at least one generated module.
- * Connector lines turn orange as stages complete.
+ * Connector lines turn orange as stages complete. Locked stages show a
+ * preview dialog explaining what they contain and how to unlock them.
  */
 
-import React from "react"
+import React, { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -19,9 +20,17 @@ import {
   ShoppingCart,
   ClipboardCheck,
   CheckCircle2,
+  Lock,
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { useCadLab } from "./cad-lab-context"
 
 // ─── Stage Definitions ───────────────────────────────────────────────
@@ -31,18 +40,69 @@ interface StageDefinition {
   label: string
   icon: LucideIcon
   href: string
+  /** Description shown in the locked-stage preview dialog */
+  description: string
+  /** What the user needs to do to unlock this stage */
+  unlockHint: string
+  /** Features that will be available when unlocked */
+  features: string[]
 }
 
 const STAGES: StageDefinition[] = [
-  { id: "research", label: "Research", icon: Search, href: "/the-forge/cad-lab" },
-  { id: "build", label: "Build", icon: Box, href: "/the-forge/cad-lab/build" },
-  { id: "analysis", label: "Analysis", icon: BarChart3, href: "/the-forge/cad-lab/analysis" },
-  { id: "procurement", label: "Procurement", icon: ShoppingCart, href: "/the-forge/cad-lab/procurement" },
-  { id: "review", label: "Review", icon: ClipboardCheck, href: "/the-forge/cad-lab/review" },
+  {
+    id: "research",
+    label: "Research",
+    icon: Search,
+    href: "/the-forge/cad-lab",
+    description: "AI-powered research using engineering databases and datasheets.",
+    unlockHint: "Always available",
+    features: ["Dimensional specifications", "Material candidates", "Reference designs", "Source citations"],
+  },
+  {
+    id: "build",
+    label: "Build",
+    icon: Box,
+    href: "/the-forge/cad-lab/build",
+    description: "Parametric CadQuery model generation for each sub-assembly.",
+    unlockHint: "Complete the Research stage first",
+    features: ["Module decomposition", "Parametric CAD code", "7 orthographic views", "STEP + STL exports"],
+  },
+  {
+    id: "analysis",
+    label: "Analysis",
+    icon: BarChart3,
+    href: "/the-forge/cad-lab/analysis",
+    description: "Engineering analysis dashboard with risk assessment.",
+    unlockHint: "Generate at least one module in the Build stage",
+    features: ["System mass & volume", "Manufacturing readiness grade", "Gantt timeline", "Risk register"],
+  },
+  {
+    id: "procurement",
+    label: "Procurement",
+    icon: ShoppingCart,
+    href: "/the-forge/cad-lab/procurement",
+    description: "Supply chain diagnostics and cost estimation.",
+    unlockHint: "Generate at least one module in the Build stage",
+    features: ["Manufacturing diagnostics", "Cost estimates", "Supply chain mapping", "Contracting tools"],
+  },
+  {
+    id: "review",
+    label: "Review",
+    icon: ClipboardCheck,
+    href: "/the-forge/cad-lab/review",
+    description: "Supplier-ready engineering review package.",
+    unlockHint: "Generate at least one module in the Build stage",
+    features: ["Review document", "Expert discipline matching", "Print & copy support", "Stakeholder summary"],
+  },
 ]
 
 /**
  * Determines which stages are unlocked based on current pipeline state.
+ *
+ * @param hasResearch - Whether research has been completed
+ * @param moduleCount - Total number of decomposed modules
+ * @param generatedCount - Number of modules with generated CAD
+ * @returns Access map with enabled/completed per stage
  */
 function getStageAccess(
   hasResearch: boolean,
@@ -59,91 +119,149 @@ function getStageAccess(
 }
 
 /**
- * CadLabNav — Pipeline stepper for The Forge multi-page flow.
+ * CadLabNav — Pipeline stepper with locked-stage preview dialogs.
  *
  * @description Shows 5 stages as connected circles with labels.
- * Disabled stages are muted and not clickable. Active stage glows orange.
- * Completed stages show a check icon with orange tint.
+ * Disabled stages open a preview dialog explaining what they contain.
+ * Active stage glows orange. Completed stages show a check icon.
  */
 export function CadLabNav({ className }: { className?: string }): React.ReactNode {
   const pathname = usePathname()
   const { hasResearch, modules, generatedModuleCount } = useCadLab()
+  const [previewStageId, setPreviewStageId] = useState<string | null>(null)
 
   const access = getStageAccess(hasResearch, modules.length, generatedModuleCount)
+  const previewStage = previewStageId ? STAGES.find((s) => s.id === previewStageId) : null
 
   return (
-    <nav
-      className={cn("flex items-center py-4 px-2 sm:px-4", className)}
-      aria-label="The Forge pipeline stages"
-    >
-      <div className="flex items-start w-full max-w-2xl mx-auto">
-        {STAGES.map((stage, index) => {
-          const { enabled, completed } = access[stage.id]
-          const isActive = stage.href === "/the-forge/cad-lab"
-            ? pathname === "/the-forge/cad-lab"
-            : pathname.startsWith(stage.href)
-          const Icon = stage.icon
+    <>
+      <nav
+        className={cn("flex items-center py-4 px-2 sm:px-4", className)}
+        aria-label="The Forge pipeline stages"
+      >
+        <div className="flex items-start w-full max-w-2xl mx-auto">
+          {STAGES.map((stage, index) => {
+            const { enabled, completed } = access[stage.id]
+            const isActive = stage.href === "/the-forge/cad-lab"
+              ? pathname === "/the-forge/cad-lab"
+              : pathname.startsWith(stage.href)
+            const Icon = stage.icon
 
-          // Connector line: orange if previous stage is completed
-          const prevStage = index > 0 ? STAGES[index - 1] : null
-          const prevCompleted = prevStage ? access[prevStage.id].completed : false
+            // Connector line: orange if previous stage is completed
+            const prevStage = index > 0 ? STAGES[index - 1] : null
+            const prevCompleted = prevStage ? access[prevStage.id].completed : false
 
-          return (
-            <React.Fragment key={stage.id}>
-              {/* Connector line */}
-              {index > 0 && (
-                <div
-                  className={cn(
-                    "h-0.5 flex-1 mt-[15px] sm:mt-[17px]",
-                    prevCompleted ? "bg-international-orange" : "bg-muted",
-                  )}
-                  aria-hidden
-                />
-              )}
-
-              {/* Stage node */}
-              {enabled ? (
-                <Link
-                  href={stage.href}
-                  className="flex flex-col items-center gap-1.5 transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-international-orange focus:ring-offset-2 rounded-sm"
-                  aria-label={`${stage.label}${isActive ? " (current stage)" : ""}${completed ? " (completed)" : ""}`}
-                  aria-current={isActive ? "step" : undefined}
-                >
+            return (
+              <React.Fragment key={stage.id}>
+                {/* Connector line */}
+                {index > 0 && (
                   <div
                     className={cn(
-                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors sm:h-9 sm:w-9",
-                      isActive && "bg-international-orange text-white shadow-[0_0_12px_rgba(255,69,0,0.4)]",
-                      completed && !isActive && "bg-orange-100 text-international-orange",
-                      !isActive && !completed && "bg-muted text-muted-foreground",
+                      "h-0.5 flex-1 mt-[15px] sm:mt-[17px]",
+                      prevCompleted ? "bg-international-orange" : "bg-muted",
                     )}
+                    aria-hidden
+                  />
+                )}
+
+                {/* Stage node */}
+                {enabled ? (
+                  <Link
+                    href={stage.href}
+                    className="flex flex-col items-center gap-1.5 transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-international-orange focus:ring-offset-2 rounded-sm"
+                    aria-label={`${stage.label}${isActive ? " (current stage)" : ""}${completed ? " (completed)" : ""}`}
+                    aria-current={isActive ? "step" : undefined}
                   >
-                    {completed && !isActive ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
-                  </div>
-                  <span
-                    className={cn(
-                      "hidden text-xs font-medium transition-colors sm:block whitespace-nowrap",
-                      isActive && "text-international-orange font-semibold",
-                      completed && !isActive && "text-international-orange",
-                      !isActive && !completed && "text-muted-foreground",
-                    )}
+                    <div
+                      className={cn(
+                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors sm:h-9 sm:w-9",
+                        isActive && "bg-international-orange text-white shadow-[0_0_12px_rgba(255,69,0,0.4)]",
+                        completed && !isActive && "bg-orange-100 text-international-orange",
+                        !isActive && !completed && "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {completed && !isActive ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                    </div>
+                    <span
+                      className={cn(
+                        "hidden text-xs font-medium transition-colors sm:block whitespace-nowrap",
+                        isActive && "text-international-orange font-semibold",
+                        completed && !isActive && "text-international-orange",
+                        !isActive && !completed && "text-muted-foreground",
+                      )}
+                    >
+                      {stage.label}
+                      {/* Module count badge for Build stage */}
+                      {stage.id === "build" && generatedModuleCount > 0 && modules.length > 0 && (
+                        <span className="ml-1 text-[9px] font-mono opacity-75">
+                          {generatedModuleCount}/{modules.length}
+                        </span>
+                      )}
+                    </span>
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => setPreviewStageId(stage.id)}
+                    className="flex flex-col items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity"
+                    aria-label={`${stage.label} (locked — click for preview)`}
                   >
-                    {stage.label}
-                  </span>
-                </Link>
-              ) : (
-                <div className="flex flex-col items-center gap-1.5 cursor-not-allowed" aria-disabled="true">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground/50 sm:h-9 sm:w-9">
-                    <Icon className="h-4 w-4" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground/50 sm:h-9 sm:w-9">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <span className="hidden text-xs font-medium text-muted-foreground/50 sm:block whitespace-nowrap">
+                      {stage.label}
+                    </span>
+                  </button>
+                )}
+              </React.Fragment>
+            )
+          })}
+        </div>
+      </nav>
+
+      {/* Locked-stage preview dialog */}
+      <Dialog open={previewStageId !== null} onOpenChange={(open) => { if (!open) setPreviewStageId(null) }}>
+        <DialogContent size="sm">
+          {previewStage && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <previewStage.icon className="h-5 w-5 text-muted-foreground" />
+                  {previewStage.label}
+                </DialogTitle>
+                <DialogDescription>
+                  {previewStage.description}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {/* Unlock hint */}
+                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/50 border border-muted">
+                  <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-medium text-foreground">How to unlock</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{previewStage.unlockHint}</p>
                   </div>
-                  <span className="hidden text-xs font-medium text-muted-foreground/50 sm:block whitespace-nowrap">
-                    {stage.label}
-                  </span>
                 </div>
-              )}
-            </React.Fragment>
-          )
-        })}
-      </div>
-    </nav>
+
+                {/* Features preview */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    What you&apos;ll get
+                  </p>
+                  <ul className="space-y-1.5">
+                    {previewStage.features.map((feature) => (
+                      <li key={feature} className="text-sm text-foreground flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-international-orange flex-shrink-0" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

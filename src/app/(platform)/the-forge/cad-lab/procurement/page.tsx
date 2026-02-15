@@ -9,14 +9,18 @@
  * Gate: redirects to /the-forge/cad-lab/build if no generated modules.
  */
 
-import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   ShoppingCart,
   ArrowLeft,
+  ArrowRight,
+  ClipboardCheck,
+  Box,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { EmptyState } from "@/components/ui/empty-state"
 import { CadLabDiagnostics } from "@/components/cad/cad-lab-diagnostics"
 import { CadLabSupplyChain } from "@/components/cad/cad-lab-supply-chain"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
@@ -32,14 +36,23 @@ export default function CadLabProcurementPage(): React.ReactNode {
     diagCompletedCount,
   } = useCadLab()
 
-  // Gate: need at least one generated module
-  useEffect(() => {
-    if (generatedModuleCount === 0) {
-      router.replace("/the-forge/cad-lab/build")
-    }
-  }, [generatedModuleCount, router])
-
-  if (generatedModuleCount === 0) return null
+  // Show empty state instead of redirect
+  if (generatedModuleCount === 0) {
+    return (
+      <div className="py-12">
+        <EmptyState
+          title="No modules generated yet"
+          description="Generate at least one module in the Build stage to access procurement diagnostics, cost estimates, and supply chain mapping."
+          action={
+            <Button onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
+              <Box className="h-4 w-4" />
+              Go to Build
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -68,6 +81,27 @@ export default function CadLabProcurementPage(): React.ReactNode {
       <CadLabSupplyChain modules={modules} diagnosticAnswers={diagnosticAnswers} />
       <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
       <CadLabContracting modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
+
+      {/* What's Next CTA */}
+      <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Next: Review Package
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Generate a supplier-ready engineering review package with expert discipline recommendations.
+              </p>
+            </div>
+            <Button onClick={() => router.push("/the-forge/cad-lab/review")} className="gap-1.5">
+              <ClipboardCheck className="h-4 w-4" />
+              Continue to Review
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
