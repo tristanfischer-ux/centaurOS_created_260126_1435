@@ -2,6 +2,12 @@
 
 This status page captures the current release readiness state for the Design → Drawings → RFQ rollout.
 
+## Verification Snapshot
+
+- Last verified at (UTC): `2026-02-15 15:41:53 UTC`
+- Branch head at verification: `f3b83ed6`
+- Verification command: `npm run verify:forge-rfq-release`
+
 ## Gate Status
 
 | Gate | Status | Evidence |
