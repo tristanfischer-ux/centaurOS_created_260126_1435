@@ -74,3 +74,9 @@ Checks:
 - [ ] Go-live status migration gate flipped from `⛔ PENDING` to `✅ PASS`
 - [ ] Release packet sign-off checklist migration items marked complete
 - [ ] QA report notes updated with migration closure reference
+
+## Linked Runbooks and Status Artifacts
+
+- Release handoff runbook: `docs/forge/design-to-rfq-release-handoff.md`
+- Go-live status tracker: `docs/forge/design-to-rfq-go-live-status.md`
+- Release packet checklist: `docs/forge/design-to-rfq-release-packet.md`

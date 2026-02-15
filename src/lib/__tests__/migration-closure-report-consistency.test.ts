@@ -19,5 +19,8 @@ describe("migration closure report consistency", () => {
     expect(closureReport).toContain("is_active_user(")
     expect(closureReport).toContain("npm run verify:forge-rfq-release")
     expect(closureReport).toContain("Go-live status migration gate flipped")
+    expect(closureReport).toContain("design-to-rfq-release-handoff.md")
+    expect(closureReport).toContain("design-to-rfq-go-live-status.md")
+    expect(closureReport).toContain("design-to-rfq-release-packet.md")
   })
 })
