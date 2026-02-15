@@ -1,10 +1,16 @@
 import { test, expect } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
 test.describe('Forge entrypoint routing', () => {
   const founderEmail = process.env.TEST_FOUNDER_EMAIL || 'demo.founder@forgeos.io'
   const founderPassword = process.env.TEST_FOUNDER_PASSWORD || 'DemoFounder2026!'
 
-  test('shows Design-to-RFQ lab as recommended path', async ({ page }) => {
+  async function loginIfNeeded(page: Page) {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('forgeos_onboarding_completed', 'true')
+      window.localStorage.setItem('forgeos_intent_selected', 'team_builder')
+    })
+
     await page.goto('/the-forge')
     await page.waitForLoadState('networkidle')
 
@@ -16,11 +22,27 @@ test.describe('Forge entrypoint routing', () => {
       await page.goto('/the-forge')
       await page.waitForLoadState('networkidle')
     }
+  }
+
+  test('shows Design-to-RFQ lab as recommended path', async ({ page }) => {
+    await loginIfNeeded(page)
 
     await expect(page.getByRole('heading', { name: 'Design-to-RFQ Lab' })).toBeVisible()
     await expect(page.getByText('Recommended path')).toBeVisible()
-    await expect(
-      page.getByRole('link', { name: /Open Design-to-RFQ Lab/i }),
-    ).toBeVisible()
+
+    const designToRfqLink = page.getByRole('link', { name: /Open Design-to-RFQ Lab/i })
+    await expect(designToRfqLink).toBeVisible()
+    await expect(designToRfqLink).toHaveAttribute('href', '/the-forge/cad-lab')
+
+    const legacyConceptLink = page.getByRole('link', { name: /Open Legacy Concept Flow/i })
+    await expect(legacyConceptLink).toBeVisible()
+    await expect(legacyConceptLink).toHaveAttribute('href', '/the-forge/new')
+  })
+
+  test('recommended CTA navigates into cad-lab flow', async ({ page }) => {
+    await loginIfNeeded(page)
+    await page.getByRole('link', { name: /Open Design-to-RFQ Lab/i }).click()
+    await page.waitForURL('**/the-forge/cad-lab')
+    await expect(page).toHaveURL(/\/the-forge\/cad-lab$/)
   })
 })
