@@ -21,6 +21,12 @@ This packet is the final handoff bundle for launch readiness.
 npm run test:forge-rfq
 ```
 
+Optional focused contract drift pre-check:
+
+```bash
+npm run test:forge-rfq:contracts
+```
+
 ### 2) E2E smoke for login + Cad Lab landing
 
 ```bash

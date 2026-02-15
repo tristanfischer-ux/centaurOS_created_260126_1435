@@ -28,6 +28,7 @@ Coverage includes:
 - `forge-route-consistency.test.ts`
 - `profiles-rls-migration.test.ts`
 - `release-config-consistency.test.ts`
+- `release-contract-script-consistency.test.ts`
 - `release-docs-consistency.test.ts`
 - `release-packet-consistency.test.ts`
 - `telemetry-event-contract-consistency.test.ts`

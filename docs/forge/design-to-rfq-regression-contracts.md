@@ -44,6 +44,12 @@ As the release packet grows, some failures are best caught by low-cost contract 
 Run:
 
 ```bash
+npm run test:forge-rfq:contracts
+```
+
+or as part of the full release gate:
+
+```bash
 npm run test:forge-rfq
 ```
 
