@@ -890,7 +890,7 @@ export async function requestPayout(
           currency: 'GBP',
           status: 'pending',
         })
-        .select()
+        .select('id, provider_id, amount, currency, requested_at')
         .single()
       
       if (error) {
