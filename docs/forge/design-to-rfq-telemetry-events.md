@@ -91,3 +91,13 @@ This document defines activity events emitted from Cad Lab Review and Procuremen
 - Supplier ops:
   - rebroadcast usage rate
   - post-broadcast response lift
+
+## Server-side Summary Action
+
+Use `getCadLabRfqTelemetrySummary(foundryId, days)` from `src/actions/activity-events.ts`
+to fetch an aggregated funnel snapshot for a foundry, including:
+
+- create attempt / blocked / failed / created totals
+- attempt-to-created conversion %
+- average readiness score and quote-ready module count at attempt time
+- top block reasons and failure reasons
