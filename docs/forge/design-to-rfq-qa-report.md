@@ -142,6 +142,7 @@ Status: **PASS** (all benchmark scenarios + smoke journey checks)
 - A dedicated migration now exists to harden profiles RLS and remove recursive policy paths:
   - `20260215120000_stabilize_profiles_rls_no_recursion.sql`
 - This migration should be applied before alpha rollout to eliminate the noisy profile recursion failure mode.
+- Migration closure evidence remains pending until `design-to-rfq-migration-closure-report.md` is populated with target-environment SQL verification outputs.
 
 ## Current QA Status
 

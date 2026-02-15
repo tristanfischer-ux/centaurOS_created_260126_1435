@@ -109,7 +109,9 @@ npm run verify:forge-rfq-release
    - refresh verification snapshot timestamp + commit hash
 2. Update release packet sign-off checklist:
    - mark migration and policy-audit checklist items complete
-3. Update manual product pass results artifact status if staging run generated new evidence.
+3. Update migration closure report:
+   - fill execution metadata + SQL verification output sections in `design-to-rfq-migration-closure-report.md`
+4. Update manual product pass results artifact status if staging run generated new evidence.
 
 ## Evidence to attach in release review
 

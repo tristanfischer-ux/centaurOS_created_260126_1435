@@ -20,6 +20,7 @@ describe("go-live status consistency", () => {
     expect(statusDoc).toContain("Branch head at verification")
     expect(statusDoc).toContain("Verification environment")
     expect(statusDoc).toContain("design-to-rfq-manual-product-pass-results.md")
+    expect(statusDoc).toContain("design-to-rfq-migration-closure-report.md")
     expect(statusDoc).toContain("design-to-rfq-release-handoff.md")
     expect(statusDoc).toContain("forge-rfq-release-operations.yml")
     expect(statusDoc).toContain("SUPABASE_ACCESS_TOKEN")

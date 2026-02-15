@@ -45,6 +45,7 @@ describe("release documentation consistency", () => {
     expect(qaReport).toContain("release-snapshot-consistency.test.ts")
     expect(qaReport).toContain("release-workflow-consistency.test.ts")
     expect(qaReport).toContain("migration-closure-report-consistency.test.ts")
+    expect(qaReport).toContain("design-to-rfq-migration-closure-report.md")
     expect(qaReport).toContain("release-handoff-consistency.test.ts")
     expect(qaReport).toContain("Five-scenario product pass outcome log")
     expect(qaReport).toContain("latest local execution snapshot")
