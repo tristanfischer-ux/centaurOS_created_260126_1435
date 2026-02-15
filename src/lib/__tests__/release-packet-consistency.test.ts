@@ -51,6 +51,7 @@ describe("release packet consistency", () => {
       "`npm run test:forge-rfq:contracts` passes.",
       "DB migration applied in target environment.",
       "Profiles policy-expression SQL audit confirms no helper recursion",
+      "Migration closure report artifact updated with SQL verification outputs.",
       "Release handoff runbook executed in target environment.",
       "5-scenario manual product pass results artifact updated and attached.",
       "No unresolved P0/P1 issues for RFQ creation flow.",

@@ -82,6 +82,13 @@ As the release packet grows, some failures are best caught by low-cost contract 
   - manual GitHub release-operations workflow retains verify + migration execution paths
   - required migration secrets and documentation references remain aligned
 
+### 11) Migration closure report contract
+
+- Test: `migration-closure-report-consistency.test.ts`
+- Protects:
+  - migration closure artifact keeps required SQL verification evidence sections
+  - release closure remains tied to explicit policy-expression checks and verify command output
+
 ## Operational Usage
 
 Run:
@@ -104,6 +111,7 @@ This command now validates both product logic regressions and release-contract d
 
 - `profiles-rls-migration.test.ts`
 - `manual-product-pass-results-consistency.test.ts`
+- `migration-closure-report-consistency.test.ts`
 - `go-live-status-consistency.test.ts`
 - `release-config-consistency.test.ts`
 - `release-docs-consistency.test.ts`

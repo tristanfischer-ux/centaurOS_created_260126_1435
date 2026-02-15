@@ -29,6 +29,7 @@ Coverage includes:
 - `forge-route-consistency.test.ts`
 - `go-live-status-consistency.test.ts`
 - `manual-product-pass-results-consistency.test.ts`
+- `migration-closure-report-consistency.test.ts`
 - `profiles-rls-migration.test.ts`
 - `release-config-consistency.test.ts`
 - `release-contract-script-consistency.test.ts`
