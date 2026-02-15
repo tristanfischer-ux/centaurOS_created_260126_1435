@@ -219,25 +219,25 @@ export async function dispatchInsightNotifications(
       if (shouldInApp) {
         for (const member of notifyMembers) {
           tasks.push(
-            supabase
-              .from('notifications')
-              .insert({
-                user_id: member.id,
-                type: `agent_insight_${insight.urgency}`,
-                title: inCharacterMessage.title,
-                message: inCharacterMessage.body,
-                link: `/agents?specialist=${insight.specialist_id}`,
-                metadata: {
-                  insight_id: insight.id,
-                  specialist_id: insight.specialist_id,
-                  urgency: insight.urgency,
-                  insight_type: insight.insight_type,
-                },
-              })
-              .then(() => {})
-              .catch(() => {
-                console.debug(`[SweepNotifications] In-app notification skipped for ${member.id}`)
-              })
+            Promise.resolve(
+              supabase
+                .from('notifications')
+                .insert({
+                  user_id: member.id,
+                  type: `agent_insight_${insight.urgency}`,
+                  title: inCharacterMessage.title,
+                  message: inCharacterMessage.body,
+                  link: `/agents?specialist=${insight.specialist_id}`,
+                  metadata: {
+                    insight_id: insight.id,
+                    specialist_id: insight.specialist_id,
+                    urgency: insight.urgency,
+                    insight_type: insight.insight_type,
+                  },
+                })
+            ).then(() => {}).catch(() => {
+              console.debug(`[SweepNotifications] In-app notification skipped for ${member.id}`)
+            })
           )
         }
       }

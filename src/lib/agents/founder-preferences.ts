@@ -25,6 +25,12 @@
 
 import { createClient } from "@/lib/supabase/server"
 
+// Type assertion helper — the founder_preferences table and new agent_memory_threads
+// columns may not be in the generated Supabase types until types are regenerated
+// after migration. These helpers provide type-safe wrappers around raw queries.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySupabaseClient = any
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface FounderPreferences {
@@ -87,7 +93,7 @@ export async function getFounderPreferences(
     foundryId: string,
 ): Promise<FounderPreferences> {
     try {
-        const supabase = await createClient()
+        const supabase: AnySupabaseClient = await createClient()
         const { data } = await supabase
             .from("founder_preferences")
             .select("*")
@@ -101,12 +107,12 @@ export async function getFounderPreferences(
             formatPreference: (data.format_preference as FounderPreferences["formatPreference"]) ?? "mixed",
             tonePreference: (data.tone_preference as FounderPreferences["tonePreference"]) ?? "conversational",
             decisionSpeed: (data.decision_speed as FounderPreferences["decisionSpeed"]) ?? "balanced",
-            prefersData: data.prefers_data ?? true,
-            prefersRecommendation: data.prefers_recommendation ?? true,
+            prefersData: (data.prefers_data as boolean) ?? true,
+            prefersRecommendation: (data.prefers_recommendation as boolean) ?? true,
             vocabulary: (data.vocabulary as string[]) ?? [],
             petPeeves: (data.pet_peeves as string[]) ?? [],
             valuesSignals: (data.values_signals as string[]) ?? [],
-            totalInteractions: data.total_interactions ?? 0,
+            totalInteractions: (data.total_interactions as number) ?? 0,
         }
     } catch (err) {
         console.warn("[founder-preferences] Failed to fetch:", {
@@ -128,7 +134,7 @@ export async function getSpecialistRelationship(
     foundryId: string,
 ): Promise<SpecialistRelationshipMeta> {
     try {
-        const supabase = await createClient()
+        const supabase: AnySupabaseClient = await createClient()
         const { data } = await supabase
             .from("agent_memory_threads")
             .select("trust_level, total_interactions, last_interaction_at")
@@ -138,8 +144,8 @@ export async function getSpecialistRelationship(
 
         return {
             trustLevel: (data?.trust_level as SpecialistRelationshipMeta["trustLevel"]) ?? "building",
-            totalInteractions: data?.total_interactions ?? 0,
-            lastInteractionAt: data?.last_interaction_at ?? null,
+            totalInteractions: (data?.total_interactions as number) ?? 0,
+            lastInteractionAt: (data?.last_interaction_at as string) ?? null,
         }
     } catch {
         return { trustLevel: "building", totalInteractions: 0, lastInteractionAt: null }
@@ -158,7 +164,7 @@ export async function recordInteraction(
     foundryId: string,
 ): Promise<void> {
     try {
-        const supabase = await createClient()
+        const supabase: AnySupabaseClient = await createClient()
 
         // Get current count
         const { data: thread } = await supabase
@@ -168,7 +174,7 @@ export async function recordInteraction(
             .eq("foundry_id", foundryId)
             .maybeSingle()
 
-        const currentCount = thread?.total_interactions ?? 0
+        const currentCount = (thread?.total_interactions as number) ?? 0
         const newCount = currentCount + 1
 
         // Calculate trust level based on interaction count
@@ -197,10 +203,10 @@ export async function recordInteraction(
             await supabase
                 .from("founder_preferences")
                 .update({
-                    total_interactions: (prefs.total_interactions ?? 0) + 1,
+                    total_interactions: ((prefs.total_interactions as number) ?? 0) + 1,
                     updated_at: new Date().toISOString(),
                 })
-                .eq("id", prefs.id)
+                .eq("id", prefs.id as string)
         } else {
             // Create preferences row if it doesn't exist yet
             await supabase
