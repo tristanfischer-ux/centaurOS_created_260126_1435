@@ -703,7 +703,7 @@ function HeroSection() {
         transition={{ delay: 2, duration: 0.6 }}
         className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1"
       >
-        <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest hidden sm:block">
+        <span className="text-xs text-muted-foreground font-mono uppercase tracking-widest hidden sm:block">
           Scroll
         </span>
         <motion.div

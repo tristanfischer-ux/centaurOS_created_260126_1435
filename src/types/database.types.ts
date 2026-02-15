@@ -1,3 +1,4 @@
+Initialising login role...
 export type Json =
   | string
   | number
@@ -5848,6 +5849,85 @@ export type Database = {
           },
         ]
       }
+      intelligence_reports: {
+        Row: {
+          created_at: string
+          foundry_id: string
+          id: string
+          implications: Json | null
+          is_read: boolean | null
+          recommended_actions: Json | null
+          source_id: string
+          specialist_id: string
+          summary: string
+          title: string
+          urgency: string
+        }
+        Insert: {
+          created_at?: string
+          foundry_id: string
+          id?: string
+          implications?: Json | null
+          is_read?: boolean | null
+          recommended_actions?: Json | null
+          source_id: string
+          specialist_id: string
+          summary: string
+          title: string
+          urgency?: string
+        }
+        Update: {
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          implications?: Json | null
+          is_read?: boolean | null
+          recommended_actions?: Json | null
+          source_id?: string
+          specialist_id?: string
+          summary?: string
+          title?: string
+          urgency?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intelligence_reports_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intelligence_sweep_log: {
+        Row: {
+          foundry_id: string
+          id: string
+          last_run_at: string
+          source_id: string
+        }
+        Insert: {
+          foundry_id: string
+          id?: string
+          last_run_at?: string
+          source_id: string
+        }
+        Update: {
+          foundry_id?: string
+          id?: string
+          last_run_at?: string
+          source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intelligence_sweep_log_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_domains: {
         Row: {
           ai_summary: string | null
@@ -11089,6 +11169,44 @@ export type Database = {
           },
         ]
       }
+      specialist_decision_journal: {
+        Row: {
+          context: string | null
+          created_at: string
+          decision: string
+          foundry_id: string
+          id: string
+          outcome: string | null
+          specialist_id: string
+        }
+        Insert: {
+          context?: string | null
+          created_at?: string
+          decision: string
+          foundry_id: string
+          id?: string
+          outcome?: string | null
+          specialist_id: string
+        }
+        Update: {
+          context?: string | null
+          created_at?: string
+          decision?: string
+          foundry_id?: string
+          id?: string
+          outcome?: string | null
+          specialist_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "specialist_decision_journal_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       standup_summaries: {
         Row: {
           blockers_summary: string | null
@@ -12451,6 +12569,30 @@ export type Database = {
           },
         ]
       }
+      telegram_outreach_log: {
+        Row: {
+          created_at: string
+          id: string
+          outreach_type: string
+          specialist_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          outreach_type: string
+          specialist_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          outreach_type?: string
+          specialist_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       telegram_preferences: {
         Row: {
           created_at: string | null
@@ -12526,6 +12668,38 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_specialist_sessions: {
+        Row: {
+          chat_id: string
+          foundry_id: string
+          specialist_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chat_id: string
+          foundry_id: string
+          specialist_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chat_id?: string
+          foundry_id?: string
+          specialist_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_specialist_sessions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
             referencedColumns: ["id"]
           },
         ]
@@ -13463,7 +13637,10 @@ export type Database = {
         Returns: Json
       }
       cleanup_expired_intents: { Args: never; Returns: number }
+      cleanup_expired_telegram_sessions: { Args: never; Returns: undefined }
       cleanup_old_activity_events: { Args: never; Returns: number }
+      cleanup_old_intelligence_reports: { Args: never; Returns: undefined }
+      cleanup_old_outreach_logs: { Args: never; Returns: undefined }
       clone_blueprint_from_template: {
         Args: {
           p_created_by?: string
@@ -15256,3 +15433,5 @@ export const Constants = {
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.7)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

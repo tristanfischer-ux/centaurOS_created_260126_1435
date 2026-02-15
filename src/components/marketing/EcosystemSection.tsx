@@ -100,7 +100,7 @@ export function EcosystemSection() {
                     <div className="h-8 w-8 rounded-lg bg-electric-blue-light flex items-center justify-center">
                       <Icon className="h-4 w-4 text-electric-blue" />
                     </div>
-                    <span className="text-[10px] sm:text-xs font-mono font-bold uppercase tracking-widest text-electric-blue">
+                    <span className="text-xs font-mono font-bold uppercase tracking-widest text-electric-blue">
                       {pillar.label}
                     </span>
                   </div>

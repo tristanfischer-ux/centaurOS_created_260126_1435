@@ -302,6 +302,82 @@ export async function requestAutoReport(
   }
 }
 
+// ─── Context-to-Specialist Mapping ──────────────────────────────────
+
+/**
+ * Maps page contexts to the specialist IDs most relevant for that page.
+ * Used by getContextualInsights to filter insights by page.
+ */
+const CONTEXT_SPECIALIST_MAP: Record<string, string[]> = {
+  objectives: ['strategist', 'chief-of-staff'],
+  strategy: ['strategist', 'chief-of-staff', 'finance-lead'],
+  tasks: ['chief-of-staff', 'vp-engineering', 'product-lead'],
+  team: ['hiring-team', 'chief-of-staff'],
+  finance: ['finance-lead', 'fundraising-advisor'],
+  forge: ['vp-manufacturing', 'vp-supply-chain', 'cto'],
+  marketplace: ['sales-lead', 'growth-marketer'],
+  today: ['chief-of-staff', 'strategist', 'finance-lead'],
+} satisfies Record<string, string[]>
+
+// ─── Contextual Queries ─────────────────────────────────────────────
+
+/**
+ * Fetches contextual insights for a specific page/context.
+ *
+ * @description Returns recent, non-dismissed insights relevant to the given
+ * page context. Context maps to specialist IDs via CONTEXT_SPECIALIST_MAP.
+ * Results are ordered by creation date (newest first).
+ *
+ * @param context - Page context (e.g., 'objectives', 'tasks', 'strategy', 'team', 'finance')
+ * @param limit - Maximum number of insights to return (default 3)
+ * @returns Array of specialist insights relevant to the context
+ *
+ * @security Requires authenticated user with foundry membership.
+ * RLS policies enforce foundry isolation.
+ */
+export async function getContextualInsights(
+  context: string,
+  limit: number = 3,
+): Promise<AgentInsight[]> {
+  const supabase = await createClient()
+
+  // AUTH: Get current user's foundry
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('foundry_id, active_foundry_id')
+    .eq('id', user.id)
+    .single()
+
+  const foundryId = profile?.active_foundry_id ?? profile?.foundry_id
+  if (!foundryId) return []
+
+  // Map page context to relevant specialist IDs
+  const relevantSpecialists = CONTEXT_SPECIALIST_MAP[context] ?? ['chief-of-staff']
+
+  const { data, error } = await supabase
+    .from('agent_insights')
+    .select('*')
+    .eq('foundry_id', foundryId)
+    .in('specialist_id', relevantSpecialists)
+    .eq('is_dismissed', false)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('[AgentInsights] Failed to fetch contextual insights:', {
+      context,
+      foundryId,
+      error: error.message,
+    })
+    return []
+  }
+
+  return (data ?? []) as AgentInsight[]
+}
+
 /**
  * Gets the count of unread insights for badge display.
  *

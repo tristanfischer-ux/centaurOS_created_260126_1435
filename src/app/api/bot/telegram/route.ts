@@ -46,6 +46,13 @@ import {
     generateHelpResponse,
     looksLikeObjective,
 } from '@/lib/telegram/ai-processor'
+import {
+    handleChatCommand,
+    handleAskCommand,
+    handleSpecialistMessage,
+    handleEndChat,
+    handleSpecialistList,
+} from '@/lib/telegram/specialist-chat'
 import { createObjectiveFromInput } from '@/actions/objective-from-input'
 import { calculateTaskDates } from '@/lib/objective-utils'
 
@@ -250,6 +257,50 @@ async function handleMessage(message: TelegramMessage) {
         return
     }
 
+    // /chat [specialist] [message] - Start specialist conversation
+    if (message.text?.startsWith('/chat') || message.text?.startsWith('/specialist')) {
+        const commandWord = message.text.startsWith('/specialist') ? '/specialist' : '/chat'
+        const args = message.text.slice(commandWord.length).trim()
+        if (!args) {
+            await handleSpecialistList(chatId)
+            return
+        }
+        const parts = args.split(/\s+/)
+        const specialistName = parts[0]
+        const initialMessage = parts.slice(1).join(' ') || undefined
+        await handleChatCommand(chatId, link.profile_id, link.foundry_id, specialistName, initialMessage)
+        return
+    }
+
+    // /ask [specialist] [question] - One-shot specialist question
+    if (message.text?.startsWith('/ask')) {
+        const args = message.text.slice(4).trim()
+        const parts = args.split(/\s+/)
+        if (parts.length < 2) {
+            await sendMessage({
+                chat_id: chatId,
+                text: 'Usage: /ask [specialist] [question]\n\nExample: /ask sage What should our Q2 strategy focus on?',
+            })
+            return
+        }
+        const specialistName = parts[0]
+        const question = parts.slice(1).join(' ')
+        await handleAskCommand(chatId, link.profile_id, link.foundry_id, specialistName, question)
+        return
+    }
+
+    // /endchat - End specialist conversation
+    if (message.text === '/endchat') {
+        await handleEndChat(chatId)
+        return
+    }
+
+    // /team - List all specialists
+    if (message.text === '/team') {
+        await handleSpecialistList(chatId)
+        return
+    }
+
     // Check if user is in editing mode (has pending intent being edited)
     const { data: editingIntent } = await supabase
         .from('pending_intents')
@@ -266,7 +317,38 @@ async function handleMessage(message: TelegramMessage) {
         return
     }
 
+    // Check for active specialist chat session before processing as objective
+    if (message.text) {
+        const isSpecialistChat = await handleSpecialistMessage(
+            chatId,
+            link.profile_id,
+            link.foundry_id,
+            message.text,
+        )
+        if (isSpecialistChat) return
+    }
+
     // Process new message (text or voice)
+
+    // For voice messages, check specialist session BEFORE objective processing
+    if (message.voice || message.audio) {
+        const voiceFileId = message.voice?.file_id || message.audio?.file_id
+        if (voiceFileId) {
+            const voiceFile = await getFile(voiceFileId)
+            if (voiceFile.file_path) {
+                const voiceBuffer = await downloadFile(voiceFile.file_path)
+                const voiceMimeType = message.voice?.mime_type || message.audio?.mime_type || 'audio/ogg'
+
+                // Check if voice message is for an active specialist chat
+                const { handleSpecialistVoiceMessage } = await import('@/lib/telegram/specialist-chat')
+                const isSpecialistVoice = await handleSpecialistVoiceMessage(
+                    chatId, link.profile_id, link.foundry_id, voiceBuffer, voiceMimeType,
+                )
+                if (isSpecialistVoice) return
+            }
+        }
+    }
+
     const processingMsg = await sendProcessingMessage(chatId)
 
     try {
@@ -1406,7 +1488,14 @@ async function handleSettingsCommand(chatId: number, profileId: string) {
  * Handle /help command
  */
 async function handleHelpCommand(chatId: number) {
-    const helpText = `🤖 <b>ForgeOS Telegram Bot</b>
+    const helpText = `<b>ForgeOS Telegram Bot</b>
+
+<b>💬 Specialist Chat</b>
+/chat [name] - Start chatting with a specialist
+/chat [name] [message] - Chat with initial message
+/ask [name] [question] - Quick one-shot question
+/endchat - End specialist conversation
+/team - See all available specialists
 
 <b>📋 Task Management</b>
 /tasks - View your task list

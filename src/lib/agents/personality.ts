@@ -333,7 +333,130 @@ CRITICAL: STAY IN CHARACTER AS ${name.split(",")[0].toUpperCase()}
 - Your blind spot is "${backstory.blindSpot.slice(0, 80)}" — let this show naturally sometimes.
 - If you catch yourself sounding like a generic AI assistant, STOP and rewrite in your voice.`)
 
+    // ── Few-Shot Voice Examples (shows the model what this specialist sounds like) ──
+    if (writingStyle) {
+        const fewShotBlock = compileFewShotExamples(name, writingStyle, voice, strongOpinions)
+        sections.push(fewShotBlock)
+    }
+
     return sections.join("\n\n")
+}
+
+/**
+ * Generates few-shot voice examples that show the model what this specialist
+ * sounds like. These examples are more powerful than instructions because
+ * they demonstrate the voice rather than describe it.
+ *
+ * @description Produces a block of concrete examples — opening moves, closing
+ * moves, signature phrases, strong opinion stances, and structure preferences —
+ * so the LLM can pattern-match on the specialist's voice rather than
+ * interpreting abstract style instructions.
+ *
+ * @param name - Specialist display name (e.g., "Max Velocity, the Growth specialist")
+ * @param writingStyle - Writing style definition with openingMove, closingMove, etc.
+ * @param voice - Voice definition with signaturePhrases
+ * @param strongOpinions - Optional strong opinions for conviction surfacing
+ * @returns Formatted few-shot examples block
+ */
+function compileFewShotExamples(
+    name: string,
+    writingStyle: AgentWritingStyle,
+    voice: AgentVoice,
+    strongOpinions?: StrongOpinion[],
+): string {
+    const firstName = name.split(",")[0].trim()
+    const lines: string[] = [
+        `EXAMPLES OF HOW ${firstName.toUpperCase()} SOUNDS (match this voice):`,
+        "",
+    ]
+
+    // Opening move example
+    lines.push(`When asked about a new topic, ${firstName} opens like this:`)
+    lines.push(`"${writingStyle.openingMove}"`)
+    lines.push("")
+
+    // Closing move example
+    lines.push(`${firstName} always closes with:`)
+    lines.push(`"${writingStyle.closingMove}"`)
+    lines.push("")
+
+    // Signature phrase usage
+    if (voice.signaturePhrases.length > 0) {
+        lines.push(`Phrases that are unmistakably ${firstName}:`)
+        for (const phrase of voice.signaturePhrases.slice(0, 3)) {
+            lines.push(`- "${phrase}"`)
+        }
+        lines.push("")
+    }
+
+    // Strong opinion surfacing instruction
+    if (strongOpinions && strongOpinions.length > 0) {
+        const highConviction = strongOpinions.filter(o => o.conviction === "high")
+        if (highConviction.length > 0) {
+            lines.push(`When these topics come up, ${firstName} speaks with CONVICTION (not neutrally):`)
+            for (const op of highConviction) {
+                lines.push(`- On "${op.topic}": "${op.position}"`)
+            }
+            lines.push(`${firstName} does NOT hedge on these topics. They state their position clearly and defend it.`)
+            lines.push("")
+        }
+    }
+
+    // Structure preference reinforcement
+    const structureExamples: Record<AgentWritingStyle["structurePreference"], string> = {
+        bullets: `${firstName} defaults to bullet points. Even when explaining complex ideas, they break them into scannable lists.`,
+        narrative: `${firstName} writes in flowing paragraphs. They build arguments through narrative, connecting ideas with transitions.`,
+        tables: `${firstName} reaches for tables instinctively. Comparisons, options, scenarios — they all become tables.`,
+        mixed: `${firstName} mixes formats freely — bullets for actions, tables for comparisons, short paragraphs for context.`,
+    }
+    lines.push(structureExamples[writingStyle.structurePreference])
+
+    return lines.join("\n")
+}
+
+/**
+ * Compiles cross-specialist relationship awareness into the prompt.
+ *
+ * @description When a specialist knows about recent work by other specialists,
+ * they can reference it naturally: "I know Max told you to move fast,
+ * but I think we need more data." This creates realistic team dynamics
+ * where specialists agree, disagree, build on, or challenge each other.
+ *
+ * @param specialistName - Current specialist's display name
+ * @param relationships - Relationship definitions keyed by other specialist IDs
+ * @param recentCrossSpecialistContext - Recent context from other specialists (optional)
+ * @returns Formatted relationship awareness block, or empty string if no data
+ */
+export function compileRelationshipContext(
+    specialistName: string,
+    relationships: Partial<Record<string, SpecialistRelationship>> | undefined,
+    recentCrossSpecialistContext?: string,
+): string {
+    if (!relationships && !recentCrossSpecialistContext) return ""
+
+    const lines: string[] = ["## Your Team Relationships"]
+
+    if (relationships) {
+        const entries = Object.entries(relationships)
+        if (entries.length > 0) {
+            lines.push("You work with these colleagues. Reference them naturally when relevant:")
+            for (const [_id, rel] of entries) {
+                if (rel) {
+                    lines.push(`- ${rel.pattern}`)
+                }
+            }
+            lines.push("")
+        }
+    }
+
+    if (recentCrossSpecialistContext) {
+        lines.push("RECENT CONTEXT FROM OTHER SPECIALISTS (reference naturally if relevant):")
+        lines.push(recentCrossSpecialistContext)
+        lines.push("")
+        lines.push(`Use this to create natural team dynamics: agree, disagree, build on, or challenge what your colleagues said — based on your actual relationship with them.`)
+    }
+
+    return lines.join("\n")
 }
 
 /**

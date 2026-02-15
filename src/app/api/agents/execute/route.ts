@@ -13,6 +13,7 @@ import {
 } from "@/lib/agent-memory"
 import { buildAIContext } from "@/lib/ai-context/builder"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
 import { compilePersonalityPrompt } from "@/lib/agents/personality"
 import { compileTemporalPrompt } from "@/lib/agents/temporal-context"
 import { compileEmotionalPrompt } from "@/lib/agents/emotional-context"
@@ -275,6 +276,21 @@ export async function POST(request: Request) {
             )
             systemPromptWithContext = personalityPrompt
 
+            // Inject relationship awareness for cross-specialist dynamics
+            if (specialist.personality.relationships) {
+                const { compileRelationshipContext } = await import("@/lib/agents/personality")
+                const relationshipBlock = compileRelationshipContext(
+                    specialist.name,
+                    specialist.personality.relationships,
+                    typeof customSystemPromptSuffix === "string" && customSystemPromptSuffix.includes("CROSS_SPECIALIST_CONTEXT")
+                        ? customSystemPromptSuffix
+                        : undefined,
+                )
+                if (relationshipBlock) {
+                    systemPromptWithContext += `\n\n${relationshipBlock}`
+                }
+            }
+
             // Proposed actions: allow specialist to suggest tasks/objectives
             systemPromptWithContext += `
 
@@ -294,6 +310,23 @@ Rules:
 - For tasks that belong under an objective in the same proposal, set "objectiveTitle" to the exact "title" of that objective so they can be linked.
 - Keep titles concise (under 200 chars for objectives, under 500 for tasks). Descriptions are optional.
 - The visible text of your response should still read naturally; the block is supplementary.`
+
+            // Workflow capabilities: let the specialist know what they can produce
+            const { getSpecialistWorkflows } = await import("@/lib/agents/specialist-workflows")
+            const workflows = getSpecialistWorkflows(specialistId as SpecialistId)
+            if (workflows.length > 0) {
+                const workflowList = workflows
+                    .map(
+                        (w) =>
+                            `- "${w.name}": ${w.description} (triggered by phrases like: ${w.triggers.slice(0, 2).join(", ")})`,
+                    )
+                    .join("\n")
+                systemPromptWithContext += `\n\n## Your Executable Workflows
+You can produce these deliverables when the founder asks. Mention them naturally when relevant:
+${workflowList}
+
+When the founder triggers one of these (e.g., "draft the plan", "run the numbers"), produce the full deliverable in your response. Don't just outline it — actually write it out completely and thoroughly.`
+            }
         }
     }
 
@@ -335,6 +368,58 @@ Rules:
         } catch (err) {
             // Non-critical — proceed without preferences
             console.warn("[agents/execute] Could not load founder preferences:", err)
+        }
+    }
+
+    // Specialist emotional state and relationship depth
+    if (foundryId && threadId && specialistId) {
+        try {
+            const { getSpecialistState, compileSpecialistStatePrompt } = await import("@/lib/agents/specialist-state")
+            const specialist = getSpecialistById(specialistId)
+            const { emotional, relationship } = await getSpecialistState(threadId, foundryId)
+            const stateBlock = compileSpecialistStatePrompt(emotional, relationship, specialist?.name ?? specialistId)
+            if (stateBlock) {
+                systemPromptWithContext += `\n\n${stateBlock}`
+            }
+        } catch (err) {
+            // Non-critical — proceed without state context
+            console.warn("[agents/execute] Could not load specialist state:", err)
+        }
+    }
+
+    // Decision journal: past decisions for "remember when" references
+    if (foundryId && specialistId) {
+        try {
+            const { getRecentDecisions, compileDecisionJournalPrompt, detectDecisionPatterns } = await import("@/lib/agents/decision-journal")
+            const decisions = await getRecentDecisions(foundryId, specialistId, 10)
+            const journalBlock = compileDecisionJournalPrompt(decisions)
+            if (journalBlock) {
+                systemPromptWithContext += `\n\n${journalBlock}`
+            }
+            // Add pattern recognition for deep relationships
+            const allDecisions = await getRecentDecisions(foundryId, undefined, 50)
+            const patterns = detectDecisionPatterns(allDecisions)
+            if (patterns.length > 0) {
+                systemPromptWithContext += `\n\n## Founder Decision Patterns\n${patterns.join('\n')}`
+            }
+        } catch (err) {
+            console.warn("[agents/execute] Could not load decision journal:", err)
+        }
+    }
+
+    // External intelligence: recent reports from monitoring sweeps
+    if (foundryId && specialistId) {
+        try {
+            const { getRecentIntelligenceReports } = await import("@/lib/agents/intelligence-sweep-orchestrator")
+            const { compileIntelligencePrompt } = await import("@/lib/agents/external-intelligence")
+            const reports = await getRecentIntelligenceReports(foundryId, 3, specialistId)
+            const intelligenceBlock = compileIntelligencePrompt(reports, specialistId as SpecialistId)
+            if (intelligenceBlock) {
+                systemPromptWithContext += `\n\n${intelligenceBlock}`
+            }
+        } catch (err) {
+            // Non-critical: intelligence context is supplementary
+            console.warn("[agents/execute] Failed to load intelligence context:", err)
         }
     }
 
@@ -409,6 +494,18 @@ Rules:
                 let cleanOutput = fullOutput.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
                 cleanOutput = cleanOutput.replace(/<!--\s*PROPOSED_ACTIONS\s*[\s\S]*?\s*-->/gi, "").trim()
                 await addMemoryMessage(threadId!, foundryId, "assistant", cleanOutput || fullOutput)
+
+                // Detect and record decisions from the user's message
+                try {
+                    const { containsDecisionSignal, extractDecisionSummary, recordDecision } = await import("@/lib/agents/decision-journal")
+                    const userMsg = input.trim() || finalPrompt.slice(0, 500)
+                    if (containsDecisionSignal(userMsg) && specialistId) {
+                        const summary = extractDecisionSummary(userMsg, fullOutput.slice(0, 500))
+                        await recordDecision(foundryId, specialistId, summary, userMsg.slice(0, 500))
+                    }
+                } catch {
+                    // Non-critical — decision tracking is supplementary
+                }
 
                 // Track this interaction for trust level progression (fire-and-forget)
                 recordInteraction(threadId!, foundryId).catch((err) => {

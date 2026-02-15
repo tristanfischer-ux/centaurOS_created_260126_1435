@@ -107,7 +107,7 @@ export function PlatformShowcaseSection() {
                   <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-electric-blue-light flex items-center justify-center">
                     <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-electric-blue" />
                   </div>
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                  <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                     {feature.forRole}
                   </span>
                 </div>
