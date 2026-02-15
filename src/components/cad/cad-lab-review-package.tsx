@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
+import { computeCadLabQualityScorecard } from "@/lib/cad-lab-quality-scorecard"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -208,6 +209,16 @@ export function CadLabReviewPackage({
     }
   }, [modules])
 
+  const qualityScorecard = useMemo(
+    () => computeCadLabQualityScorecard(modules, diagnosticAnswers || {}),
+    [modules, diagnosticAnswers],
+  )
+  const researchSummary = useMemo(() => {
+    const trimmed = researchReport?.trim()
+    if (!trimmed) return null
+    return trimmed.length > 360 ? `${trimmed.slice(0, 357)}...` : trimmed
+  }, [researchReport])
+
   const handleCopy = async (): Promise<void> => {
     const text = generatePlainText(modules, projectName, diagnosticAnswers)
     await navigator.clipboard.writeText(text)
@@ -257,6 +268,11 @@ export function CadLabReviewPackage({
             Engineering Review — {modules.length} modules,{" "}
             {metrics.generated} with CAD generated
           </p>
+          {researchSummary && (
+            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+              {researchSummary}
+            </p>
+          )}
         </div>
 
         {/* System metrics grid */}
@@ -286,6 +302,59 @@ export function CadLabReviewPackage({
             value={`${metrics.totalRisks + metrics.totalUnknowns}`}
             highlight={metrics.totalRisks > 0}
           />
+        </div>
+
+        <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
+              Quality Scorecard
+            </h3>
+            <span
+              className={cn(
+                "text-xs font-semibold",
+                qualityScorecard.overallScore >= 80
+                  ? "text-status-success"
+                  : qualityScorecard.overallScore >= 60
+                    ? "text-status-warning"
+                    : "text-status-error",
+              )}
+            >
+              {qualityScorecard.overallScore}% overall
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <ReviewMetric
+              icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+              label="CAD Validity"
+              value={`${qualityScorecard.cadValidityScore}%`}
+              highlight={qualityScorecard.cadValidityScore < 70}
+            />
+            <ReviewMetric
+              icon={<FileText className="h-3.5 w-3.5" />}
+              label="Drawing Completeness"
+              value={`${qualityScorecard.drawingCompletenessScore}%`}
+              highlight={qualityScorecard.drawingCompletenessScore < 70}
+            />
+            <ReviewMetric
+              icon={<ShieldAlert className="h-3.5 w-3.5" />}
+              label="RFQ Readiness"
+              value={`${qualityScorecard.rfqReadinessScore}%`}
+              highlight={qualityScorecard.rfqReadinessScore < 70}
+            />
+            <ReviewMetric
+              icon={<AlertTriangle className="h-3.5 w-3.5" />}
+              label="Open Blockers"
+              value={`${qualityScorecard.blockers.length}`}
+              highlight={qualityScorecard.blockers.length > 0}
+            />
+          </div>
+          {qualityScorecard.blockers.length > 0 && (
+            <ul className="list-disc pl-4 space-y-1 text-[11px] text-muted-foreground">
+              {qualityScorecard.blockers.map((blocker) => (
+                <li key={blocker}>{blocker}</li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Per-module summaries */}
