@@ -3,9 +3,20 @@
 import OpenAI from 'openai'
 // import pdf from 'pdf-parse'
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
-})
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 export type ExtractedTask = {
     title: string
@@ -28,6 +39,11 @@ export type AnalysisResult = {
 
 export async function analyzeBusinessPlan(formData: FormData): Promise<AnalysisResult> {
     try {
+        const openai = getOpenAIClient()
+        if (!openai) {
+            return { success: false, error: 'AI analysis service is not configured' }
+        }
+
         const file = formData.get('file') as File
         const textInput = formData.get('text') as string
 

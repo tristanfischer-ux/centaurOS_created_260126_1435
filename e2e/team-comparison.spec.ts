@@ -1,7 +1,11 @@
 import { test, expect } from '@playwright/test'
+import { FOUNDER_STORAGE, dismissOnboarding } from './auth-storage'
 
 test.describe('Team Member Comparison', () => {
+  test.use({ storageState: FOUNDER_STORAGE })
+
   test.beforeEach(async ({ page }) => {
+    await dismissOnboarding(page)
     // Assumes test user is already authenticated
     await page.goto('/team')
     await page.waitForLoadState('networkidle')
@@ -9,7 +13,7 @@ test.describe('Team Member Comparison', () => {
 
   test('@critical: can select and compare team members', async ({ page }) => {
     // Wait for team page to load
-    await expect(page.locator('text=Team')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Team' }).first()).toBeVisible()
 
     // Find and click on compare buttons for at least 2 members
     const compareButtons = page.locator('[title*="comparison"], [aria-label*="comparison"], [title*="compare"]')

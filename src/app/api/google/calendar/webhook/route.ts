@@ -25,7 +25,7 @@ import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
 export async function POST(req: NextRequest): Promise<NextResponse> {
     // SECURITY: IP-based rate limit on webhook endpoint
     const ip = getClientIP(req.headers)
-    const ipLimit = await rateLimit('webhook', `webhook:${ip}`)
+    const ipLimit = await rateLimit('webhook', `google-calendar-webhook:${ip}`)
     if (!ipLimit.success) {
         return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
     }

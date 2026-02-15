@@ -33,12 +33,13 @@ jobs:
         run: npm ci
 
       - name: Security audit
-        run: npm audit --audit-level=high
-        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=low
 
-      - name: Type Check
-        run: npm run typecheck
-        continue-on-error: true  # TODO: Remove once pre-existing type errors are resolved
+      - name: Security Type Check
+        run: npm run typecheck:security
+
+      - name: Type Check (No Regressions)
+        run: npm run typecheck:baseline
 
       - name: Run Linter
         run: npm run lint
@@ -52,11 +53,11 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E Tests (Critical Paths)
-        run: npm run test:e2e -- --project=chromium --grep="@critical"
+        run: |
+          npm run test:e2e -- --project=auth-setup
+          npm run test:e2e -- --project=chromium --grep="@critical"
         env:
           CI: true
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

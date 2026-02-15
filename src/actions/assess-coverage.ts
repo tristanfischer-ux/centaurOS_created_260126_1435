@@ -13,9 +13,20 @@ import {
 import { withAuth } from '@/lib/server-action-utils'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
-})
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 /**
  * Analyzes a foundry's business context and suggests coverage status for each business function.
@@ -26,6 +37,11 @@ export async function assessCoverage(
     input: GapAssessmentInput
 ): Promise<{ result?: GapAssessmentResult; error?: string }> {
     return withAuth(async ({ user }) => {
+        const openai = getOpenAIClient()
+        if (!openai) {
+            return { error: 'AI coverage analysis service is not configured' }
+        }
+
         // SECURITY: Rate limit AI calls to prevent cost abuse
         const rateLimitError = await checkRateLimit('aiAnalysis', `ai:${user.id}`)
         if (rateLimitError) return { error: rateLimitError }
@@ -186,6 +202,11 @@ export async function assessSingleFunction(
     foundryContext: string
 ): Promise<{ suggestion?: { status: CoverageStatus; priority: GapPriority; reasoning: string }; error?: string }> {
     return withAuth(async ({ user }) => {
+        const openai = getOpenAIClient()
+        if (!openai) {
+            return { error: 'AI single-function assessment service is not configured' }
+        }
+
         // SECURITY: Rate limit AI calls to prevent cost abuse
         const rateLimitError = await checkRateLimit('aiAnalysis', `ai:${user.id}`)
         if (rateLimitError) return { error: rateLimitError }

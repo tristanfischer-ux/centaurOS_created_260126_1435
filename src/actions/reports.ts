@@ -21,6 +21,7 @@ import { generateWeeklyInsights } from '@/lib/reports/insights'
 import { generateWeeklySummary } from '@/lib/reports/summary-generator'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { isValidSlackWebhookUrl } from '@/lib/security/url-validation'
 
 // ========================
 // Daily Pulse Actions
@@ -91,6 +92,24 @@ export interface WeeklyRollupResult {
     error?: string
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null
+}
+
+function isWeeklyRollupData(value: unknown): value is WeeklyRollupData {
+    if (!isRecord(value)) {
+        return false
+    }
+
+    return (
+        isRecord(value.period)
+        && isRecord(value.stats)
+        && isRecord(value.previous_week)
+        && Array.isArray(value.top_completers)
+        && Array.isArray(value.objectives_progress)
+    )
+}
+
 /**
  * Get the weekly rollup report for the user's foundry
  */
@@ -121,7 +140,7 @@ export async function getWeeklyRollup(weekStart?: string): Promise<WeeklyRollupR
         const { data, error } = await supabase
             .rpc('get_weekly_rollup', {
                 p_foundry_id: foundryId,
-                p_week_start: weekStart || null
+                p_week_start: weekStart ?? undefined
             })
         
         if (error) {
@@ -129,7 +148,13 @@ export async function getWeeklyRollup(weekStart?: string): Promise<WeeklyRollupR
             return { success: false, error: sanitizeErrorMessage(error) }
         }
         
-        const report = data as WeeklyRollupData
+        // VALIDATION: Enforce expected RPC payload shape before use.
+        if (!isWeeklyRollupData(data)) {
+            console.error('Weekly rollup payload did not match expected shape')
+            return { success: false, error: 'Failed to parse weekly rollup report' }
+        }
+
+        const report = data
         
         // Calculate trends
         const trends = calculateWeeklyTrends(
@@ -143,9 +168,7 @@ export async function getWeeklyRollup(weekStart?: string): Promise<WeeklyRollupR
         const insights = generateWeeklyInsights(report, userRole)
         
         // Generate summary
-        const topPerformer = report.top_completers.length > 0 
-            ? report.top_completers[0].full_name 
-            : null
+        const topPerformer = report.top_completers[0]?.full_name ?? null
         const atRiskObjectives = report.objectives_progress.filter(o => {
             const remaining = o.tasks_remaining || 0
             return o.progress < 50 && remaining > 5
@@ -181,6 +204,20 @@ export interface MonthlySummaryResult {
     error?: string
 }
 
+function isMonthlySummaryData(value: unknown): value is MonthlySummaryData {
+    if (!isRecord(value)) {
+        return false
+    }
+
+    return (
+        isRecord(value.period)
+        && isRecord(value.stats)
+        && isRecord(value.previous_month)
+        && Array.isArray(value.top_contributors)
+        && Array.isArray(value.completion_rate_timeline)
+    )
+}
+
 /**
  * Get the monthly summary report for the user's foundry
  */
@@ -202,7 +239,7 @@ export async function getMonthlySummary(month?: string): Promise<MonthlySummaryR
         const { data, error } = await supabase
             .rpc('get_monthly_summary', {
                 p_foundry_id: foundryId,
-                p_month: month || null
+                p_month: month ?? undefined
             })
         
         if (error) {
@@ -210,7 +247,13 @@ export async function getMonthlySummary(month?: string): Promise<MonthlySummaryR
             return { success: false, error: sanitizeErrorMessage(error) }
         }
         
-        const report = data as MonthlySummaryData
+        // VALIDATION: Enforce expected RPC payload shape before use.
+        if (!isMonthlySummaryData(data)) {
+            console.error('Monthly summary payload did not match expected shape')
+            return { success: false, error: 'Failed to parse monthly summary report' }
+        }
+
+        const report = data
         
         // Import summary generator
         const { generateMonthlySummary: genSummary } = await import('@/lib/reports/summary-generator')
@@ -219,7 +262,7 @@ export async function getMonthlySummary(month?: string): Promise<MonthlySummaryR
             report.stats.tasks_completed,
             report.previous_month.tasks_completed,
             report.stats.objectives_completed,
-            report.period.month_name
+            report.period.month_name ?? 'Current month'
         )
         
         return {
@@ -307,12 +350,51 @@ export async function updateReportPreferences(
         if (!user) {
             return { success: false, error: 'Not authenticated' }
         }
+
+        const normalizedPreferences: Partial<Omit<ReportPreferences, 'id' | 'profile_id'>> = {
+            ...preferences,
+            ...(typeof preferences.slack_webhook_url === 'string'
+                ? { slack_webhook_url: preferences.slack_webhook_url.trim() }
+                : {}),
+        }
+
+        // SECURITY: Load existing preference values to validate effective Slack settings.
+        const { data: existingPreferences, error: existingPreferencesError } = await supabase
+            .from('report_preferences')
+            .select('slack_enabled, slack_webhook_url')
+            .eq('profile_id', user.id)
+            .maybeSingle()
+
+        if (existingPreferencesError && existingPreferencesError.code !== 'PGRST116') {
+            console.error('Failed to load existing report preferences:', existingPreferencesError)
+            return { success: false, error: sanitizeErrorMessage(existingPreferencesError) }
+        }
+
+        const effectiveSlackEnabled =
+            normalizedPreferences.slack_enabled
+            ?? existingPreferences?.slack_enabled
+            ?? false
+
+        const effectiveSlackWebhook =
+            normalizedPreferences.slack_webhook_url !== undefined
+                ? normalizedPreferences.slack_webhook_url
+                : (existingPreferences?.slack_webhook_url ?? null)
+
+        // SECURITY: Prevent SSRF by validating stored webhook destination.
+        if (effectiveSlackWebhook && !isValidSlackWebhookUrl(effectiveSlackWebhook)) {
+            return { success: false, error: 'Slack webhook URL must be a valid Slack incoming webhook endpoint.' }
+        }
+
+        // VALIDATION: Enabling Slack delivery requires a webhook URL.
+        if (effectiveSlackEnabled && !effectiveSlackWebhook) {
+            return { success: false, error: 'Slack webhook URL is required when Slack reports are enabled.' }
+        }
         
         const { error } = await supabase
             .from('report_preferences')
             .upsert({
                 profile_id: user.id,
-                ...preferences,
+                ...normalizedPreferences,
                 updated_at: new Date().toISOString()
             }, {
                 onConflict: 'profile_id'

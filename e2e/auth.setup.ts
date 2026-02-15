@@ -59,8 +59,8 @@ async function loginAsPlatformUser(
   await page.fill('input[type="email"]', email)
   await page.fill('input[type="password"]', password)
   
-  // Submit form
-  await page.click('button:has-text("Access Foundry")')
+  // Submit form (copy-safe selector; login CTA text may change)
+  await page.getByRole('button', { name: /enter the forge|access foundry|sign in|log in/i }).click()
   
   // Wait for redirect to a platform page (today, dashboard, or updates)
   await page.waitForURL(/\/(today|dashboard|updates|new-objectives|new-tasks)/, { timeout: 30000 })
@@ -102,8 +102,8 @@ async function loginAsSupplier(
   await page.fill('input[type="email"]', email)
   await page.fill('input[type="password"]', password)
   
-  // Submit form
-  await page.click('button:has-text("Access Foundry")')
+  // Submit form (copy-safe selector; login CTA text may change)
+  await page.getByRole('button', { name: /enter the forge|access foundry|sign in|log in/i }).click()
   
   // Supplier accounts redirect to supplier-portal
   await page.waitForURL('**/supplier-portal**', { timeout: 30000 })

@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { Database } from '@/types/database.types'
 import { rateLimit } from '@/lib/security/rate-limit'
-import { aiGuard } from '@/lib/ai/guard'
 
 // SECURITY: Zod schema for input validation
 const ForgeMatchRequestSchema = z.object({
@@ -12,12 +10,6 @@ const ForgeMatchRequestSchema = z.object({
 })
 
 // Types for the API
-type Profile = Database['public']['Tables']['profiles']['Row']
-type MarketplaceListing = Database['public']['Tables']['marketplace_listings']['Row']
-
-interface ForgeMatchRequest {
-    memberId: string
-}
 
 interface AISuggestion {
     listingId: string
@@ -40,14 +32,42 @@ interface ErrorResponse {
     error: string
 }
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
-})
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 export async function POST(
     request: NextRequest
 ): Promise<NextResponse<ForgeMatchResponse | ErrorResponse>> {
     try {
+        // SECURITY: Fail closed when OpenAI key is not configured.
+        if (!process.env.OPENAI_API_KEY) {
+            console.error('[ForgeMatchAPI] OPENAI_API_KEY is not configured')
+            return NextResponse.json(
+                { error: 'Forge matching service is not configured' },
+                { status: 503 }
+            )
+        }
+
+        const openai = getOpenAIClient()
+        if (!openai) {
+            return NextResponse.json(
+                { error: 'Forge matching service is not configured' },
+                { status: 503 }
+            )
+        }
+
         // Create Supabase client and authenticate
         const supabase = await createClient()
         const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -60,7 +80,7 @@ export async function POST(
         }
 
         // SECURITY: Rate limit AI endpoints (10 requests per minute per user)
-        const rateLimitResult = await rateLimit('api', `forge-match:${user.id}`, { limit: 10, window: 60 })
+        const rateLimitResult = await rateLimit('api', `forge-match:${user.id}`, { limit: 10, window: 60 * 1000 })
         if (!rateLimitResult.success) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Please wait before requesting more matches.' },

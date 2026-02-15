@@ -57,15 +57,28 @@ FAILED=false
 echo -e "${BOLD}Tier 1: Static Analysis${NC}"
 echo ""
 
-# TypeScript type checking
-echo -e "  ${CYAN}→${NC} Running TypeScript type check..."
-TYPECHECK_OUTPUT=$(npm run typecheck 2>&1)
-TYPECHECK_EXIT=$?
-echo "$TYPECHECK_OUTPUT" | tail -5
-if [ $TYPECHECK_EXIT -eq 0 ]; then
-  echo -e "  ${GREEN}✓${NC} TypeScript: passed"
+# Security-focused type checking
+echo -e "  ${CYAN}→${NC} Running security TypeScript check..."
+SECURITY_TYPECHECK_OUTPUT=$(npm run typecheck:security 2>&1)
+SECURITY_TYPECHECK_EXIT=$?
+echo "$SECURITY_TYPECHECK_OUTPUT" | tail -5
+if [ $SECURITY_TYPECHECK_EXIT -eq 0 ]; then
+  echo -e "  ${GREEN}✓${NC} Security TypeScript: passed"
 else
-  echo -e "  ${RED}✗${NC} TypeScript: failed — fix type errors before committing"
+  echo -e "  ${RED}✗${NC} Security TypeScript: failed — fix security-path type errors before committing"
+  FAILED=true
+fi
+echo ""
+
+# Baseline TypeScript regression check
+echo -e "  ${CYAN}→${NC} Running baseline TypeScript regression check..."
+BASELINE_TYPECHECK_OUTPUT=$(npm run typecheck:baseline 2>&1)
+BASELINE_TYPECHECK_EXIT=$?
+echo "$BASELINE_TYPECHECK_OUTPUT" | tail -5
+if [ $BASELINE_TYPECHECK_EXIT -eq 0 ]; then
+  echo -e "  ${GREEN}✓${NC} Baseline TypeScript: passed (no new errors)"
+else
+  echo -e "  ${RED}✗${NC} Baseline TypeScript: failed — new type errors introduced"
   FAILED=true
 fi
 echo ""

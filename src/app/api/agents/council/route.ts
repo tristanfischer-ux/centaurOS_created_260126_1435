@@ -201,14 +201,10 @@ async function executeSpecialist(
     threadId: string | undefined,
     prompt: string,
     input: string,
-    cookieHeader: string | null
+    cookieHeader: string | null,
+    internalApiOrigin: string
 ): Promise<string> {
-    const baseUrl =
-        process.env.NEXT_PUBLIC_BASE_URL ||
-        (typeof process.env.VERCEL_URL === 'string'
-            ? `https://${process.env.VERCEL_URL}`
-            : 'http://localhost:3000')
-    const url = `${baseUrl}/api/agents/execute`
+    const url = new URL('/api/agents/execute', internalApiOrigin).toString()
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (cookieHeader) headers['Cookie'] = cookieHeader
@@ -276,7 +272,7 @@ export async function POST(request: NextRequest) {
         // Rate limit — council triggers 12+ LLM calls per request
         const rateLimitResult = await rateLimit('api', `council:${user.id}`, {
             limit: 5,
-            window: 3600,
+            window: 3600 * 1000,
         })
         if (!rateLimitResult.success) {
             return NextResponse.json(
@@ -315,6 +311,9 @@ export async function POST(request: NextRequest) {
         }
 
         const cookieHeader = request.headers.get('cookie')
+        // SECURITY: Resolve internal execute endpoint from this request origin
+        // to prevent environment-driven egress/cookie forwarding to external hosts.
+        const internalApiOrigin = request.nextUrl.origin
 
         // Run debate rounds
         const debateEntries: DebateTranscriptEntry[] = []
@@ -348,7 +347,8 @@ export async function POST(request: NextRequest) {
                         threadIds[specialist.id],
                         enrichedPrompt,
                         topic,
-                        cookieHeader
+                        cookieHeader,
+                        internalApiOrigin
                     )
 
                     debateEntries.push({
@@ -386,6 +386,6 @@ export async function POST(request: NextRequest) {
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'
         console.error('[Council] Error:', message)
-        return NextResponse.json({ error: message }, { status: 500 })
+        return NextResponse.json({ error: 'Council execution failed' }, { status: 500 })
     }
 }

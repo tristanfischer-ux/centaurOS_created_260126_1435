@@ -16,51 +16,48 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { 
     generateDailyPulseReport, 
     formatDailyPulseForTelegram,
     formatDailyPulseForSlack
 } from '@/lib/reports'
-
-// Get admin client for cron operations
-function getAdminClient() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!url || !serviceKey) {
-        throw new Error('Missing Supabase configuration')
-    }
-
-    return createClient(url, serviceKey, {
-        auth: { autoRefreshToken: false, persistSession: false }
-    })
-}
+import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
+import { isValidSlackWebhookUrl, sanitizeUrlForLogging } from '@/lib/security/url-validation'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // Verify cron secret to prevent unauthorized access
-function verifyCronSecret(req: NextRequest): boolean {
+function verifyCronSecret(req: NextRequest): NextResponse | null {
     const cronSecret = process.env.CRON_SECRET
-    
-    // In production, require the secret
+
+    // SECURITY: Fail closed when CRON_SECRET is missing.
     if (!cronSecret) {
-        if (process.env.NODE_ENV === 'production') {
-            console.error('[SECURITY] CRON_SECRET not configured in production!')
-            return false
-        }
-        return true // Allow in development
+        console.error('[SECURITY] CRON_SECRET not configured')
+        return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })
     }
 
     const authHeader = req.headers.get('authorization')
-    return authHeader === `Bearer ${cronSecret}`
-}
-
-export async function GET(req: NextRequest) {
-    // Verify authorization
-    if (!verifyCronSecret(req)) {
+    if (authHeader !== `Bearer ${cronSecret}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = getAdminClient()
+    return null
+}
+
+export async function GET(req: NextRequest) {
+    const ip = getClientIP(req.headers)
+    const ipLimit = await rateLimit('webhook', `cron-daily-reports:${ip}`)
+    if (!ipLimit.success) {
+        return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
+    // Verify authorization
+    const authFailure = verifyCronSecret(req)
+    if (authFailure) {
+        return authFailure
+    }
+
+    // SECURITY: Service-role client is required for unattended cron execution.
+    const supabase = createAdminClient()
     let sent = 0
     let failed = 0
 
@@ -162,14 +159,38 @@ export async function GET(req: NextRequest) {
                 
                 // Send via Slack
                 if (pref.slack_enabled && pref.slack_webhook_url) {
+                    // SECURITY: Validate webhook URL before making outbound request.
+                    if (!isValidSlackWebhookUrl(pref.slack_webhook_url)) {
+                        console.warn('[Cron] Skipping invalid Slack webhook URL:', {
+                            profileId: pref.profile_id,
+                            webhook: sanitizeUrlForLogging(pref.slack_webhook_url),
+                        })
+                        failed++
+                        continue
+                    }
+
                     const slackPayload = formatDailyPulseForSlack(report)
-                    
-                    await fetch(pref.slack_webhook_url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(slackPayload)
-                    })
-                    sent++
+
+                    const controller = new AbortController()
+                    const timeout = setTimeout(() => controller.abort(), 10_000)
+
+                    try {
+                        const slackResponse = await fetch(pref.slack_webhook_url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(slackPayload),
+                            redirect: 'error',
+                            signal: controller.signal,
+                        })
+
+                        if (!slackResponse.ok) {
+                            throw new Error(`Slack webhook returned status ${slackResponse.status}`)
+                        }
+
+                        sent++
+                    } finally {
+                        clearTimeout(timeout)
+                    }
                 }
                 
                 // Email would be handled here if implemented
@@ -190,11 +211,13 @@ export async function GET(req: NextRequest) {
             timestamp: new Date().toISOString()
         })
     } catch (error) {
-        console.error('[Cron] Daily reports error:', error)
+        console.error('[Cron] Daily reports error:', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+        })
         
         return NextResponse.json({
             success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: 'Daily reports job failed',
             sent,
             failed
         }, { status: 500 })

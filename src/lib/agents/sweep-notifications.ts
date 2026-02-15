@@ -219,8 +219,8 @@ export async function dispatchInsightNotifications(
       if (shouldInApp) {
         for (const member of notifyMembers) {
           tasks.push(
-            Promise.resolve(
-              supabase
+            (async () => {
+              const { error } = await supabase
                 .from('notifications')
                 .insert({
                   user_id: member.id,
@@ -235,9 +235,11 @@ export async function dispatchInsightNotifications(
                     insight_type: insight.insight_type,
                   },
                 })
-            ).then(() => {}).catch(() => {
-              console.debug(`[SweepNotifications] In-app notification skipped for ${member.id}`)
-            })
+
+              if (error) {
+                console.debug(`[SweepNotifications] In-app notification skipped for ${member.id}`)
+              }
+            })()
           )
         }
       }
@@ -248,20 +250,24 @@ export async function dispatchInsightNotifications(
 
         for (const member of notifyMembers) {
           tasks.push(
-            pushNotificationToTelegram({
-              user_id: member.id,
-              type: 'agent_insight',
-              title: telegramTitle,
-              message: inCharacterMessage.body,
-              link: `/agents?specialist=${insight.specialist_id}`,
-              metadata: {
-                insight_id: insight.id,
-                specialist_id: insight.specialist_id,
-                urgency: insight.urgency,
-              },
-            }).catch(err => {
-              console.debug(`[SweepNotifications] Telegram push failed for ${member.id}:`, err)
-            })
+            (async () => {
+              try {
+                await pushNotificationToTelegram({
+                  user_id: member.id,
+                  type: 'agent_insight',
+                  title: telegramTitle,
+                  message: inCharacterMessage.body,
+                  link: `/agents?specialist=${insight.specialist_id}`,
+                  metadata: {
+                    insight_id: insight.id,
+                    specialist_id: insight.specialist_id,
+                    urgency: insight.urgency,
+                  },
+                })
+              } catch (err) {
+                console.debug(`[SweepNotifications] Telegram push failed for ${member.id}:`, err)
+              }
+            })()
           )
         }
       }

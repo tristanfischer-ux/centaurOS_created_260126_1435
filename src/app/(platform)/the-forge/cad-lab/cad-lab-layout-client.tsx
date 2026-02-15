@@ -9,6 +9,8 @@
  * (a server component that also exports maxDuration).
  */
 
+import { useState, useEffect } from "react"
+import { usePathname } from "next/navigation"
 import {
   Loader2,
   FolderOpen,
@@ -195,7 +197,38 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
         subject={subject}
       />
 
-      {/* ── Page content (sub-route) ── */}
+      {/* ── Page content (sub-route) with fade transition ── */}
+      <PageTransition>
+        {children}
+      </PageTransition>
+    </div>
+  )
+}
+
+/**
+ * PageTransition — subtle fade-in when navigating between pipeline stages.
+ *
+ * @description Resets opacity to 0 on pathname change, then fades to 1.
+ * Reinforces the linear pipeline flow without heavy CSS.
+ */
+function PageTransition({ children }: { children: React.ReactNode }): React.ReactNode {
+  const pathname = usePathname()
+  const [isVisible, setIsVisible] = useState(true)
+
+  useEffect(() => {
+    // On pathname change, briefly hide then show
+    setIsVisible(false)
+    const timer = requestAnimationFrame(() => {
+      setIsVisible(true)
+    })
+    return () => cancelAnimationFrame(timer)
+  }, [pathname])
+
+  return (
+    <div
+      className="transition-opacity duration-200 ease-out"
+      style={{ opacity: isVisible ? 1 : 0 }}
+    >
       {children}
     </div>
   )

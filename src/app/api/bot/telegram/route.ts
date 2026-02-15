@@ -4,8 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { TelegramUpdate, TelegramMessage, TelegramCallbackQuery, ParsedObjective } from '@/lib/telegram/types'
 import {
     sendMessage,
@@ -49,6 +49,8 @@ import {
 import { createObjectiveFromInput } from '@/actions/objective-from-input'
 import { calculateTaskDates } from '@/lib/objective-utils'
 
+const getAdminClient = createAdminClient
+
 /**
  * Helper to extract objective title from Supabase join result
  * Handles both array and single object returns from the query
@@ -61,52 +63,41 @@ function getObjectiveTitle(objectives: unknown): string | undefined {
     return (objectives as { title?: string })?.title
 }
 
-// Use service role for webhook operations (bypasses RLS)
-function getAdminClient() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!url || !serviceKey) {
-        throw new Error('Missing Supabase configuration')
-    }
-
-    return createClient(url, serviceKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-    })
-}
-
-// Verify webhook secret (REQUIRED in production)
-function verifyWebhookSecret(req: NextRequest): boolean {
+// Verify webhook secret (required in all environments).
+function verifyWebhookSecret(req: NextRequest): NextResponse | null {
     const secret = process.env.TELEGRAM_WEBHOOK_SECRET
-    
-    // SECURITY: Require webhook secret in production to prevent unauthorized access
+
+    // SECURITY: Fail closed when secret is not configured.
     if (!secret) {
-        if (process.env.NODE_ENV === 'production') {
-            console.error('[SECURITY] TELEGRAM_WEBHOOK_SECRET not configured in production!')
-            return false
-        }
-        // Allow in development only with warning
-        console.warn('[DEV] TELEGRAM_WEBHOOK_SECRET not configured - allowing request in development')
-        return true
+        console.error('[SECURITY] TELEGRAM_WEBHOOK_SECRET not configured')
+        return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 })
     }
 
     const providedSecret = req.headers.get('X-Telegram-Bot-Api-Secret-Token')
-    return providedSecret === secret
+    const authHeader = req.headers.get('authorization')
+
+    // SECURITY: Telegram POST uses the secret-token header. Allow bearer auth for manual checks.
+    if (providedSecret === secret || authHeader === `Bearer ${secret}`) {
+        return null
+    }
+
+    return NextResponse.json({ ok: false }, { status: 403 })
 }
 
 export async function POST(req: NextRequest) {
     try {
-        // Verify webhook secret
-        if (!verifyWebhookSecret(req)) {
-            console.warn('Invalid webhook secret')
-            return NextResponse.json({ ok: false }, { status: 403 })
-        }
-
         // SECURITY: IP-based rate limit on webhook endpoint
         const ip = getClientIP(req.headers)
-        const ipLimit = await rateLimit('webhook', `webhook:${ip}`)
+        const ipLimit = await rateLimit('webhook', `telegram-webhook:${ip}`)
         if (!ipLimit.success) {
             return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+        }
+
+        // Verify webhook secret
+        const authFailure = verifyWebhookSecret(req)
+        if (authFailure) {
+            console.warn('Invalid webhook secret')
+            return authFailure
         }
 
         const update: TelegramUpdate = await req.json()
@@ -726,7 +717,7 @@ async function handleConfirm(
         await editMessage({
             chat_id: chatId,
             message_id: messageId,
-            text: `❌ Failed to create objective: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again.`,
+            text: '❌ Failed to create objective. Please try again.',
             reply_markup: createConfirmationKeyboard(intent.id),
         })
     }
@@ -927,7 +918,7 @@ async function handleEditResponse(
  * Get foundry ID for a profile
  */
 async function getFoundryId(
-    supabase: ReturnType<typeof getAdminClient>,
+    supabase: ReturnType<typeof createAdminClient>,
     profileId: string
 ): Promise<string> {
     const { data } = await supabase
@@ -2004,7 +1995,18 @@ async function handleSettingsToggleCallback(
     }
 }
 
-// GET endpoint for webhook verification (Telegram doesn't use this, but good to have)
-export async function GET() {
+// GET endpoint for webhook verification checks.
+export async function GET(req: NextRequest) {
+    const ip = getClientIP(req.headers)
+    const ipLimit = await rateLimit('webhook', `telegram-webhook:${ip}`)
+    if (!ipLimit.success) {
+        return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+    }
+
+    const authFailure = verifyWebhookSecret(req)
+    if (authFailure) {
+        return authFailure
+    }
+
     return NextResponse.json({ status: 'ok', service: 'ForgeOS Telegram Bot' })
 }
