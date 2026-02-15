@@ -33,6 +33,7 @@ Coverage includes:
 - `release-config-consistency.test.ts`
 - `release-contract-script-consistency.test.ts`
 - `release-docs-consistency.test.ts`
+- `release-handoff-consistency.test.ts`
 - `release-packet-consistency.test.ts`
 - `release-verify-script-consistency.test.ts`
 - `scenario-matrix-consistency.test.ts`

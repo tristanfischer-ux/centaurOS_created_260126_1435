@@ -24,9 +24,11 @@ This status page captures the current release readiness state for the Design →
 
 - **Pending external action:** apply `20260215120000_stabilize_profiles_rls_no_recursion.sql` in target environment.
 - Current runtime lacks Supabase CLI PAT auth; documented fallback is manual SQL execution in Supabase dashboard.
+- Execute `docs/forge/design-to-rfq-release-handoff.md` in staging/target to close migration and sign-off gates.
 
 ## Immediate Next Action
 
-1. Apply migration in staging via authenticated runner/dashboard.
-2. Re-run `npm run verify:forge-rfq-release` in staging environment.
-3. Mark release packet sign-off checklist items complete.
+1. Execute `docs/forge/design-to-rfq-release-handoff.md` in staging/target environment.
+2. Apply migration in staging via authenticated runner/dashboard.
+3. Re-run `npm run verify:forge-rfq-release` in staging environment.
+4. Mark release packet sign-off checklist items complete.

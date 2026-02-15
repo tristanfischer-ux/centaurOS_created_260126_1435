@@ -60,6 +60,14 @@ As the release packet grows, some failures are best caught by low-cost contract 
   - current branch go-live status document tracks all critical release gates
   - migration blocker remains explicit until target environment migration is applied
 
+### 8) Release handoff contract
+
+- Test: `release-handoff-consistency.test.ts`
+- Protects:
+  - migration-closure runbook retains both authenticated CLI and manual SQL fallback paths
+  - policy-expression verification + post-migration verify gate instructions remain explicit
+  - release closure handoff continues to require flipping go-live migration gate from pending to pass
+
 ## Operational Usage
 
 Run:
@@ -85,6 +93,7 @@ This command now validates both product logic regressions and release-contract d
 - `go-live-status-consistency.test.ts`
 - `release-config-consistency.test.ts`
 - `release-docs-consistency.test.ts`
+- `release-handoff-consistency.test.ts`
 - `release-packet-consistency.test.ts`
 - `release-verify-script-consistency.test.ts`
 - `scenario-matrix-consistency.test.ts`
