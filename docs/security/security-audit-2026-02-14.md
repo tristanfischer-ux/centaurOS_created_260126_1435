@@ -327,6 +327,9 @@ service-unavailable behavior.
 
 - `verifyWebhookSecret(...)` now fail-closes with 503 when `TELEGRAM_WEBHOOK_SECRET` is missing.
 - Applied secret validation to both `POST` and `GET` handlers.
+- Added webhook IP throttling for both handlers:
+  - `rateLimit('webhook', \`telegram-webhook:${ip}\`)`
+  - explicit `429` when limit is exceeded.
 - Added bearer fallback auth path for operational checks.
 - Removed internal error-detail echo in objective creation failure responses.
 - Standardized privileged DB access to shared helper:

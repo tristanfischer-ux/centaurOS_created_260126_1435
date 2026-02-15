@@ -25,6 +25,45 @@ const FILE_ERROR_REGEX = /^(.*)\((\d+),(\d+)\): error TS(\d+): (.*)$/
 const GLOBAL_ERROR_REGEX = /^error TS(\d+): (.*)$/
 
 /**
+ * @description Normalizes compiler diagnostics to reduce message-shape churn.
+ * @param {string} code - TypeScript diagnostic code (without TS prefix).
+ * @param {string} message - Raw diagnostic message.
+ * @returns {string} Normalized message signature.
+ */
+function normalizeDiagnosticMessage(code, message) {
+  const compact = message.replace(/\s+/g, ' ').trim()
+
+  if (
+    compact.startsWith('Argument of type')
+    && compact.includes(' is not assignable to parameter of type ')
+  ) {
+    return 'Argument of type is not assignable to parameter of type.'
+  }
+
+  if (
+    compact.startsWith('Type ')
+    && compact.includes(' is not assignable to type ')
+  ) {
+    return 'Type is not assignable to type.'
+  }
+
+  if (code === '2339') {
+    const propertyMatch = compact.match(/^Property '([^']+)' does not exist on type .+$/)
+    if (propertyMatch) {
+      return `Property '${propertyMatch[1]}' does not exist on type.`
+    }
+  }
+
+  if (code === '2367') {
+    return 'This comparison appears to be unintentional because compared types have no overlap.'
+  }
+
+  return compact
+    .replace(/"[^"]{30,}"/g, '"__TYPE__"')
+    .replace(/'[^']{30,}'/g, "'__TYPE__'")
+}
+
+/**
  * @description Converts tsc output into stable error signatures.
  * @param {string} rawOutput - Raw stdout/stderr from TypeScript compiler.
  * @returns {string[]} Sorted, unique error signatures.
@@ -43,7 +82,7 @@ function parseTypecheckErrors(rawOutput) {
     if (fileMatch) {
       const [, rawFilePath, , , code, message] = fileMatch
       const normalizedPath = rawFilePath.replace(/\\/g, '/')
-      const normalizedMessage = message.replace(/\s+/g, ' ').trim()
+      const normalizedMessage = normalizeDiagnosticMessage(code, message)
       signatures.add(`${normalizedPath}|TS${code}|${normalizedMessage}`)
       continue
     }
@@ -51,7 +90,7 @@ function parseTypecheckErrors(rawOutput) {
     const globalMatch = trimmed.match(GLOBAL_ERROR_REGEX)
     if (globalMatch) {
       const [, code, message] = globalMatch
-      const normalizedMessage = message.replace(/\s+/g, ' ').trim()
+      const normalizedMessage = normalizeDiagnosticMessage(code, message)
       signatures.add(`__global__|TS${code}|${normalizedMessage}`)
     }
   }

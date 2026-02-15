@@ -86,18 +86,18 @@ function verifyWebhookSecret(req: NextRequest): NextResponse | null {
 
 export async function POST(req: NextRequest) {
     try {
+        // SECURITY: IP-based rate limit on webhook endpoint
+        const ip = getClientIP(req.headers)
+        const ipLimit = await rateLimit('webhook', `telegram-webhook:${ip}`)
+        if (!ipLimit.success) {
+            return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+        }
+
         // Verify webhook secret
         const authFailure = verifyWebhookSecret(req)
         if (authFailure) {
             console.warn('Invalid webhook secret')
             return authFailure
-        }
-
-        // SECURITY: IP-based rate limit on webhook endpoint
-        const ip = getClientIP(req.headers)
-        const ipLimit = await rateLimit('webhook', `webhook:${ip}`)
-        if (!ipLimit.success) {
-            return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
         }
 
         const update: TelegramUpdate = await req.json()
@@ -1997,6 +1997,12 @@ async function handleSettingsToggleCallback(
 
 // GET endpoint for webhook verification checks.
 export async function GET(req: NextRequest) {
+    const ip = getClientIP(req.headers)
+    const ipLimit = await rateLimit('webhook', `telegram-webhook:${ip}`)
+    if (!ipLimit.success) {
+        return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+    }
+
     const authFailure = verifyWebhookSecret(req)
     if (authFailure) {
         return authFailure

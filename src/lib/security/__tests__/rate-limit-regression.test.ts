@@ -172,6 +172,8 @@ describe('cron authorization hardening regressions', () => {
     expect(source).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
     expect(source).toContain('const getAdminClient = createAdminClient')
     expect(source).not.toContain("import { createClient } from '@supabase/supabase-js'")
+    expect(source).toContain("await rateLimit('webhook', `telegram-webhook:${ip}`)")
+    expect(source).toContain("return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })")
     expect(source).toContain('if (!secret)')
     expect(source).toContain("return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 })")
     expect(source).toContain('export async function GET(req: NextRequest)')
