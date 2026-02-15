@@ -4,11 +4,13 @@
  * @file cad-lab-layout-client.tsx — Client-side layout wrapper for The Forge.
  *
  * @description Renders the CadLabProvider, persistent header with project
- * picker, pipeline stepper navigation, progress overlay, and milestone
+ * picker Dialog, pipeline stepper navigation, progress overlay, and milestone
  * celebration banners. This client component is referenced by layout.tsx
  * (a server component that also exports maxDuration).
  */
 
+import { useState, useEffect } from "react"
+import { usePathname } from "next/navigation"
 import {
   Loader2,
   FolderOpen,
@@ -20,7 +22,12 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { CadLabProgress } from "@/components/cad/cad-lab-progress"
 import { CadLabMilestone } from "@/components/cad/cad-lab-milestone"
 import { SECTOR_LABELS } from "@/types/foundry"
@@ -101,29 +108,24 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
         </p>
       </div>
 
-      {/* ── Project list panel ── */}
-      {showProjects && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <FolderOpen className="h-4 w-4" />
-                Saved Projects
-              </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setShowProjects(false)}>
-                Close
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
+      {/* ── Project Browser Dialog ── */}
+      <Dialog open={showProjects} onOpenChange={setShowProjects}>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderOpen className="h-4 w-4" />
+              Saved Projects
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
             {isLoadingProjects ? (
-              <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+              <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading projects...
               </div>
             ) : projects.length === 0 ? (
-              <div className="text-center py-8">
-                <Plus className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No saved projects yet.</p>
+              <div className="text-center py-12">
+                <Plus className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm font-medium text-foreground">No saved projects yet</p>
                 <p className="text-xs text-muted-foreground mt-1">Research a product to create your first project.</p>
               </div>
             ) : (
@@ -131,14 +133,17 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
                 {projects.map((p) => (
                   <div
                     key={p.id}
-                    className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors"
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
                   >
                     <button
-                      onClick={() => handleLoadProject(p.id)}
+                      onClick={() => {
+                        handleLoadProject(p.id)
+                        setShowProjects(false)
+                      }}
                       className="flex-1 text-left min-w-0"
                     >
                       <p className="text-sm font-medium text-foreground truncate">{p.subject}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {formatRelativeTime(p.updatedAt)}
@@ -158,7 +163,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 flex-shrink-0"
+                      className="h-8 w-8 min-h-[44px] min-w-[44px] flex-shrink-0"
                       onClick={() => handleDeleteProject(p.id)}
                       aria-label={`Delete ${p.subject}`}
                     >
@@ -168,9 +173,9 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Pipeline stepper nav ── */}
       <CadLabNav />
@@ -192,7 +197,38 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
         subject={subject}
       />
 
-      {/* ── Page content (sub-route) ── */}
+      {/* ── Page content (sub-route) with fade transition ── */}
+      <PageTransition>
+        {children}
+      </PageTransition>
+    </div>
+  )
+}
+
+/**
+ * PageTransition — subtle fade-in when navigating between pipeline stages.
+ *
+ * @description Resets opacity to 0 on pathname change, then fades to 1.
+ * Reinforces the linear pipeline flow without heavy CSS.
+ */
+function PageTransition({ children }: { children: React.ReactNode }): React.ReactNode {
+  const pathname = usePathname()
+  const [isVisible, setIsVisible] = useState(true)
+
+  useEffect(() => {
+    // On pathname change, briefly hide then show
+    setIsVisible(false)
+    const timer = requestAnimationFrame(() => {
+      setIsVisible(true)
+    })
+    return () => cancelAnimationFrame(timer)
+  }, [pathname])
+
+  return (
+    <div
+      className="transition-opacity duration-200 ease-out"
+      style={{ opacity: isVisible ? 1 : 0 }}
+    >
       {children}
     </div>
   )

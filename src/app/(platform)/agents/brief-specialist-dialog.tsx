@@ -9,11 +9,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
-    Loader2, Send, AlertCircle, Copy, Check, Eye,
-    MessageSquareQuote, ArrowRight, Clock,
+    Loader2, Send, AlertCircle, Copy, Check, Eye, AlertTriangle,
+    MessageSquareQuote, ArrowRight, Clock, ChevronDown, ChevronUp,
     History, Mic, MicOff, Volume2, VolumeX, Sparkles, Brain,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { stripThinkTags, stripPartialThinkTags } from "@/lib/utils/strip-think-tags"
 import { toast } from "sonner"
 import { Markdown } from "@/components/ui/markdown"
 import { getPromptsByCategory } from "./lib/prompt-library"
@@ -25,6 +26,7 @@ import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import { useScreenContext } from "@/contexts/screen-context"
 import { SpecialistChatAvatar } from "@/components/specialists/specialist-presentation"
+import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { PromptTemplate } from "./lib/agent-types"
 import type { Specialist } from "./specialists-data"
 
@@ -38,14 +40,20 @@ const ENABLE_ADVANCED_MODES = typeof window !== "undefined"
     && process.env.NEXT_PUBLIC_ENABLE_VOICE_AVATAR === "true"
 
 // ─── Specialist Model Configuration ───────────────────────────────────────────
-// Centralizes model choices so upgrades are a one-line change.
-// MiniMax M2.5 provides frontier-quality reasoning at ~100x lower cost than
-// Claude Opus 4.6. Uses their OpenAI-compatible API at api.minimax.io/v1.
+// Per-specialist model tiers: "claude" for high-stakes reasoning (strategy,
+// finance, legal, CTO, chief of staff) and "minimax" for high-volume work
+// (marketing, sales, HR, engineering, manufacturing, supply chain, etc.).
+// Each specialist declares its tier in specialists-data.ts via `modelTier`.
 
-const SPECIALIST_MODELS = {
-    greeting: { providerId: "minimax", modelId: "MiniMax-M2.5" },
-    conversation: { providerId: "minimax", modelId: "MiniMax-M2.5" },
+const MODEL_TIERS = {
+    claude: { providerId: "anthropic", modelId: "claude-opus-4-6" },
+    minimax: { providerId: "minimax", modelId: "MiniMax-M2.5" },
 } as const
+
+/** Resolve the provider + model for a specialist based on their declared tier. */
+function getSpecialistModel(specialist: Specialist): { providerId: string; modelId: string } {
+    return MODEL_TIERS[specialist.modelTier]
+}
 
 const DEEP_THINK_STORAGE_KEY = "forgeOS-specialist-deep-think"
 
@@ -98,12 +106,55 @@ function normalizeSpecialistError(error: string, specialistName: string): string
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/** Structured proposal from the Specialist for one-click creation (parsed from PROPOSED_ACTIONS block). */
+export interface ProposedAction {
+    type: "objective" | "task"
+    title: string
+    description?: string
+    /** For tasks: exact title of an objective in the same batch to link under. */
+    objectiveTitle?: string
+}
+
 interface ChatMessage {
     role: "user" | "assistant"
     content: string
     timestamp: Date
     /** Marks messages loaded from previous sessions (shown dimmer with separator) */
     historical?: boolean
+    /** Parsed from PROPOSED_ACTIONS in assistant messages; shown as inline approval cards. */
+    proposals?: ProposedAction[]
+}
+
+const PROPOSED_ACTIONS_REGEX = /<!--\s*PROPOSED_ACTIONS\s*([\s\S]*?)\s*-->/i
+
+/**
+ * Parse PROPOSED_ACTIONS JSON block from Specialist response. Returns empty array if none or invalid.
+ */
+function parseProposedActions(content: string): ProposedAction[] {
+    const match = content.match(PROPOSED_ACTIONS_REGEX)
+    if (!match || !match[1]) return []
+    try {
+        const raw = match[1].trim()
+        const parsed = JSON.parse(raw) as unknown
+        if (!Array.isArray(parsed)) return []
+        return parsed.filter(
+            (item): item is ProposedAction =>
+                typeof item === "object" &&
+                item !== null &&
+                typeof (item as ProposedAction).type === "string" &&
+                typeof (item as ProposedAction).title === "string" &&
+                ((item as ProposedAction).type === "objective" || (item as ProposedAction).type === "task")
+        )
+    } catch {
+        return []
+    }
+}
+
+/**
+ * Remove PROPOSED_ACTIONS HTML comment from content so it does not render in Markdown.
+ */
+function stripProposedActionsBlock(content: string): string {
+    return content.replace(PROPOSED_ACTIONS_REGEX, "").trim()
 }
 
 interface BriefSpecialistDialogProps {
@@ -164,6 +215,16 @@ export function BriefSpecialistDialog({
     } | null>(null)
 
     const [isGeneratingGreeting, setIsGeneratingGreeting] = useState(false)
+    const [thinkingPhaseIndex, setThinkingPhaseIndex] = useState(0)
+    const [isHandoffBriefingExpanded, setIsHandoffBriefingExpanded] = useState(true)
+    /** When set, the next greeting should acknowledge this previous topic and re-engage */
+    const [newTopicPreviousSummary, setNewTopicPreviousSummary] = useState<string | null>(null)
+    /** Dynamic conversation starters generated from company context for first-time users */
+    const [dynamicStarters, setDynamicStarters] = useState<string[] | null>(null)
+    /** Whether urgency was detected in the user's last message */
+    const [isUrgentMessage, setIsUrgentMessage] = useState(false)
+    /** Tension detected between this specialist and another */
+    const [tensionCard, setTensionCard] = useState<{ specialistId: string; description: string } | null>(null)
     const [isPlayingIntroVideo, setIsPlayingIntroVideo] = useState(false)
     const [introVideoUrl, setIntroVideoUrl] = useState<string | null>(null)
     const [deepThinkEnabled, setDeepThinkEnabled] = useState(() => {
@@ -184,6 +245,24 @@ export function BriefSpecialistDialog({
     const introVideoPlayedRef = useRef(false)
     /** AbortController for in-flight execute request — aborted when dialog closes or specialist changes */
     const executeAbortRef = useRef<AbortController | null>(null)
+
+    // Derived: true when the AI response is actively streaming visible text
+    const isStreaming = isExecuting && streamingResponse.length > 0
+
+    // ─── Progressive Thinking Phases ──────────────────────────────────────
+    // Cycles through personality-specific thinking messages at 0s, 3s, 8s
+    useEffect(() => {
+        if (!isExecuting || isStreaming) {
+            setThinkingPhaseIndex(0)
+            return
+        }
+        const phase2Timer = setTimeout(() => setThinkingPhaseIndex(1), 3000)
+        const phase3Timer = setTimeout(() => setThinkingPhaseIndex(2), 8000)
+        return () => {
+            clearTimeout(phase2Timer)
+            clearTimeout(phase3Timer)
+        }
+    }, [isExecuting, isStreaming])
 
     // ─── Screen Awareness ─────────────────────────────────────────────────
     const { serializeScreenContext, screenContext } = useScreenContext()
@@ -241,14 +320,16 @@ export function BriefSpecialistDialog({
                     console.warn("[BriefDialog] Could not get thread:", threadResult.error)
                 }
 
-                // Build cross-specialist context block
+                // Build cross-specialist context block with "I noticed" instructions
                 if (crossResult.data && crossResult.data.length > 0) {
                     const lines = crossResult.data.map((item) => {
-                        const name = getSpecialistById(item.specialistId)?.name ?? item.specialistId
-                        return `[${name}]: ${item.summary}`
+                        const otherSpec = getSpecialistById(item.specialistId)
+                        const name = otherSpec?.name ?? item.specialistId
+                        const title = otherSpec?.title ?? ""
+                        return `[${name}${title ? ` (${title})` : ""}]: ${item.summary}`
                     })
                     setCrossSpecialistContext(
-                        `Your colleagues have been working on:\n${lines.join("\n\n")}`
+                        `Your colleagues have been working on:\n${lines.join("\n\n")}\n\nIMPORTANT — "I noticed" pattern: If you see overlaps, synergies, or potential CONFLICTS between your work and theirs, PROACTIVELY flag them. Real colleagues catch these connections. Example: "I see ${crossResult.data[0] ? (getSpecialistById(crossResult.data[0].specialistId)?.name ?? "a colleague") : "a colleague"} has been working on something that connects to what we should discuss..."`
                     )
                 } else {
                     setCrossSpecialistContext("")
@@ -370,21 +451,80 @@ export function BriefSpecialistDialog({
             }
 
             const hasContextToReference = contextParts.length > 0
-            const greetingInstructions = hasContextToReference
-                ? `The founder is opening a conversation with you. Based on the context below, write a brief, proactive opening message (2-4 sentences). Reference specific details. Either:
-- Pick up where you left off and suggest a next step
-- Comment on what other specialists have been working on and connect it to your domain
-- Ask a pointed question that would advance their work
+            const hasCrossContext = !!crossSpecialistContext
+            const hasHistory = !!historyContext
 
-Stay in character as ${specialist.name}. Be concise, direct, and actionable. Jump straight into substance — no "Hi!" or "Welcome back!" greetings.`
-                : `A founder is meeting you for the first time. Write a brief, engaging opening (2-3 sentences) that:
+            // Calculate time since last conversation for re-engagement awareness
+            const lastHistoryMessage = historyMessages.length > 0
+                ? historyMessages[historyMessages.length - 1]
+                : null
+            const daysSinceLastChat = lastHistoryMessage
+                ? Math.floor((Date.now() - new Date(lastHistoryMessage.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+                : null
+
+            const timeGapContext = daysSinceLastChat !== null && daysSinceLastChat >= 3
+                ? `\n\nIMPORTANT TIME CONTEXT: It has been ${daysSinceLastChat} day${daysSinceLastChat === 1 ? "" : "s"} since your last conversation with this founder. Acknowledge the gap naturally — ask if they've made progress on what you discussed, or note that you've been thinking about their situation since then. Don't be dramatic about it, just show you're aware time has passed. Example: "It's been a couple of weeks since we talked about [topic] — have you had a chance to move on that?"`
+                : ""
+
+            // Build specific greeting instructions based on what context is available
+            let greetingInstructions: string
+            if (newTopicPreviousSummary) {
+                // "New Topic" variant — the user just cleared a conversation, re-engage naturally
+                greetingInstructions = `The founder just finished discussing "${newTopicPreviousSummary}" with you and wants to move to a new topic.
+
+Write a brief re-engagement (1-2 sentences) that:
+- Briefly acknowledges you covered the previous topic (don't repeat the whole thing)
+- Invites the next topic with energy — "What else is on your mind?" or something in your own voice
+- Feels like a natural transition, NOT a reset
+
+Stay in character as ${specialist.name}. Be warm and direct. Example tone: "Good — that's handled. What's next?"`
+                // Clear it so the next greeting is back to normal
+                setNewTopicPreviousSummary(null)
+            } else if (hasHistory && hasCrossContext) {
+                // Best case: we have both past conversation AND team context
+                greetingInstructions = `The founder is opening a conversation with you. You have BOTH previous conversation history AND knowledge of what other specialists have been working on.
+
+Write a proactive opening (2-4 sentences) that does ONE of these:
+1. **"I noticed something"**: If you spot a connection, overlap, or conflict between your domain and what other specialists discussed, FLAG IT. Example: "I noticed Sal has been working on enterprise pricing while we discussed SMB positioning — we should align on target segment."
+2. **Pick up where you left off**: Reference the last topic and suggest the logical next step.
+3. **Surface a recurring theme**: If the same topic keeps coming up, name it: "We keep coming back to pricing — maybe it's time to make a decision."
+
+CRITICAL: Be specific. Reference names, topics, and details from the context below. Generic openings are forbidden.
+Stay in character as ${specialist.name}. Jump straight into substance — no "Hi!" or "Welcome back!".${timeGapContext}`
+            } else if (hasHistory) {
+                greetingInstructions = `The founder is returning to continue working with you. Based on your conversation history below, write a proactive opening (2-3 sentences) that:
+- References what you discussed last time with specific details
+- Suggests a concrete next step or asks a follow-up question
+- Shows you remember and have been thinking about their situation
+
+Stay in character as ${specialist.name}. Be concise, direct, and actionable. Jump straight into substance — no greetings.${timeGapContext}`
+            } else if (hasCrossContext) {
+                greetingInstructions = `The founder is meeting you for the first time, BUT you can see what other specialists on the team have been working on.
+
+Write a proactive opening (2-3 sentences) that:
+- Introduces your perspective by connecting it to what other specialists discussed
+- Example: "I see Sage has been working on competitive strategy — from a finance perspective, here's what I'd want to stress-test..."
+- Asks ONE specific question that shows your expertise and connects to the team's work
+
+Stay in character as ${specialist.name}. Be warm but direct. No generic pleasantries.`
+            } else {
+                greetingInstructions = `A founder is meeting you for the first time. Write a brief, engaging opening (2-3 sentences) that:
 - Introduces your perspective and what you bring to the table
 - Asks ONE specific, thought-provoking question that shows your expertise
 - Makes the founder feel like they just gained a sharp advisor
 
 If company context is provided below, reference specific details and suggest 1-2 things you could help with right now. If no company context is provided, ask something that will help you quickly understand their situation.
 
-Stay in character as ${specialist.name}. Be warm but direct. No generic pleasantries.`
+Stay in character as ${specialist.name}. Be warm but direct. No generic pleasantries.
+
+IMPORTANT: After your opening message, on a new line, output exactly 3 conversation starter questions the founder could ask you, in this exact format:
+STARTERS:
+- [first specific question they could ask you, based on company context if available]
+- [second specific question]
+- [third specific question]
+
+Make these specific and contextual, not generic. If you know the company context, tailor them. For example, instead of "Help me with pricing strategy", write "Should we price our widget at $99 or $199 for SMBs?"`
+            }
 
             const greetingPrompt = `You are ${specialist.name}, the ${specialist.title} specialist. ${specialist.workingStyle}
 
@@ -401,8 +541,8 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
                     body: JSON.stringify({
                         prompt: greetingPrompt,
                         input: "Generate a proactive opening message.",
-                        providerId: SPECIALIST_MODELS.greeting.providerId,
-                        modelId: SPECIALIST_MODELS.greeting.modelId,
+                        providerId: getSpecialistModel(specialist).providerId,
+                        modelId: getSpecialistModel(specialist).modelId,
                         threadId: threadId ?? undefined,
                         specialistId: specialist.id,
                     }),
@@ -463,8 +603,23 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
                     return
                 }
 
-                // Strip any NEXT_SPECIALIST recommendation from the greeting
-                const cleaned = fullResponse.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
+                // Strip think tags and NEXT_SPECIALIST recommendation from the greeting
+                let cleaned = stripThinkTags(fullResponse.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim())
+
+                // Extract dynamic conversation starters (STARTERS: block) if present
+                const startersMatch = cleaned.match(/STARTERS:\s*\n((?:\s*-\s*.+\n?)+)/i)
+                if (startersMatch) {
+                    const parsedStarters = startersMatch[1]
+                        .split("\n")
+                        .map((line) => line.replace(/^\s*-\s*/, "").trim())
+                        .filter((s) => s.length > 0)
+                        .slice(0, 3)
+                    if (parsedStarters.length > 0) {
+                        setDynamicStarters(parsedStarters)
+                    }
+                    // Remove the STARTERS block from the visible greeting
+                    cleaned = cleaned.replace(/STARTERS:\s*\n((?:\s*-\s*.+\n?)+)/i, "").trim()
+                }
 
                 const greetingMessage: ChatMessage = {
                     role: "assistant",
@@ -473,9 +628,9 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
                 }
                 setMessages((prev) => [...prev, greetingMessage])
 
-                // Auto-play greeting via TTS if voice is enabled
+                // Auto-play greeting via TTS if voice is enabled (chunked for faster start)
                 if (tts.voiceEnabled && specialist.voice) {
-                    tts.play(cleaned, specialist.voice).catch((err) => {
+                    tts.playChunked(cleaned, specialist.voice).catch((err) => {
                         console.warn("[BriefDialog] Greeting TTS failed:", err)
                     })
                 }
@@ -490,7 +645,10 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
                 }
                 setMessages((prev) => [...prev, fallback])
             } finally {
-                if (!signal.aborted) setIsGeneratingGreeting(false)
+                // Always reset isGeneratingGreeting, even if aborted.
+                // The guard `greetingGeneratedRef.current` prevents re-generation,
+                // but we must clear the loading state so the UI is not stuck.
+                setIsGeneratingGreeting(false)
             }
         }
 
@@ -498,7 +656,7 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
         return () => {
             controller.abort()
         }
-    }, [isLoadingThread, open, specialist.id, specialist.name, specialist.title, specialist.workingStyle, specialist.voice, threadId, messages, crossSpecialistContext, tts.voiceEnabled])
+    }, [isLoadingThread, open, specialist.id, specialist.name, specialist.title, specialist.workingStyle, specialist.voice, threadId, messages, crossSpecialistContext, tts.voiceEnabled, tts.playChunked])
 
     // ─── Handlers ─────────────────────────────────────────────────────────
 
@@ -528,6 +686,10 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
         setError(null)
         setDynamicSuggestion(null)
 
+        // Detect urgency in user message for visual feedback
+        const urgencySignals = /!{2,}|HELP|URGENT|ASAP|EMERGENCY|CRISIS|CRITICAL/i
+        setIsUrgentMessage(urgencySignals.test(userInput))
+
         // Build the prompt with specialist personality, cross-specialist context, screen awareness, and handoff
         const systemExtras: string[] = []
 
@@ -544,7 +706,13 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
         if (crossSpecialistContext) {
             systemExtras.push(`\n\n## Team Context\n${crossSpecialistContext}
 
-IMPORTANT: If you notice overlaps, synergies, or potential conflicts between your advice and what your colleagues have been working on, proactively mention them. For example: "I notice the Sales Lead has been working on pricing — my recommendation here has implications for that discussion..." This helps the founder connect the dots across their team.`)
+IMPORTANT: If you notice overlaps, synergies, or potential conflicts between your advice and what your colleagues have been working on, proactively mention them. For example: "I notice the Sales Lead has been working on pricing — my recommendation here has implications for that discussion..." This helps the founder connect the dots across their team.
+
+Additionally, if your recommendation DISAGREES with or TENSIONS with another specialist's recent work, add this on its own line after your response (before NEXT_SPECIALIST):
+
+TENSION: [other_specialist_id] | [brief description of the disagreement, e.g. "Sage recommended aggressive expansion, but current cash flow suggests caution"]
+
+Only include TENSION if there's a genuine conflict of perspective. Don't force it.`)
         }
 
         // Dynamic specialist recommendation: ask the AI to suggest who to talk to next
@@ -575,8 +743,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 body: JSON.stringify({
                     prompt: promptTemplate,
                     input: userInput,
-                    providerId: SPECIALIST_MODELS.conversation.providerId,
-                    modelId: SPECIALIST_MODELS.conversation.modelId,
+                    providerId: getSpecialistModel(specialist).providerId,
+                    modelId: getSpecialistModel(specialist).modelId,
                     modality: "text",
                     threadId: threadId ?? undefined,
                     specialistId: specialist.id,
@@ -618,11 +786,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             }
                             if (parsed.text) {
                                 fullResponse += parsed.text
-                                setStreamingResponse(fullResponse)
+                                setStreamingResponse(stripPartialThinkTags(fullResponse))
                             }
                         } catch {
                             fullResponse += data
-                            setStreamingResponse(fullResponse)
+                            setStreamingResponse(stripPartialThinkTags(fullResponse))
                         }
                     }
                 }
@@ -638,13 +806,14 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 fullResponse = "No response received. Please try again."
             }
 
-            // Parse dynamic specialist recommendation from the response
-            const nextMatch = fullResponse.match(/NEXT_SPECIALIST:\s*(\S+)\s*\|\s*(.+)/i)
-            let displayResponse = fullResponse
+            // Strip think tags and parse dynamic specialist recommendation from the response
+            const responseWithoutThink = stripThinkTags(fullResponse)
+            const nextMatch = responseWithoutThink.match(/NEXT_SPECIALIST:\s*(\S+)\s*\|\s*(.+)/i)
+            let displayResponse = responseWithoutThink
             if (nextMatch) {
                 const [fullMatch, specId, reason] = nextMatch
                 // Strip the recommendation line from the displayed response
-                displayResponse = fullResponse.replace(fullMatch, "").trim()
+                displayResponse = responseWithoutThink.replace(fullMatch, "").trim()
                 if (specId && specId !== "none") {
                     setDynamicSuggestion({ specialistId: specId.trim(), reason: reason.trim() })
                 } else {
@@ -652,18 +821,35 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 }
             }
 
-            // Add assistant message to chat (with recommendation stripped)
+            // Parse TENSION marker from response (cross-specialist disagreements)
+            const tensionMatch = displayResponse.match(/TENSION:\s*(\S+)\s*\|\s*(.+)/i)
+            if (tensionMatch) {
+                const [tensionFullMatch, tensionSpecId, tensionDesc] = tensionMatch
+                displayResponse = displayResponse.replace(tensionFullMatch, "").trim()
+                if (tensionSpecId && tensionDesc) {
+                    setTensionCard({ specialistId: tensionSpecId.trim(), description: tensionDesc.trim() })
+                }
+            } else {
+                setTensionCard(null)
+            }
+
+            // Parse PROPOSED_ACTIONS from response and strip the block from displayed content
+            const proposals = parseProposedActions(displayResponse)
+            displayResponse = stripProposedActionsBlock(displayResponse)
+
+            // Add assistant message to chat (with think tags, recommendation, and proposal block stripped)
             const assistantMessage: ChatMessage = {
                 role: "assistant",
                 content: displayResponse,
                 timestamp: new Date(),
+                ...(proposals.length > 0 ? { proposals } : {}),
             }
             setMessages((prev) => [...prev, assistantMessage])
             setStreamingResponse("")
 
-            // Auto-play TTS if voice output is enabled (use clean response)
+            // Auto-play TTS if voice output is enabled (chunked for faster time-to-first-audio)
             if (tts.voiceEnabled && specialist.voice) {
-                tts.play(displayResponse, specialist.voice).catch((err) => {
+                tts.playChunked(displayResponse, specialist.voice).catch((err) => {
                     console.warn("[BriefDialog] TTS playback failed:", err)
                 })
             }
@@ -699,8 +885,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
         } finally {
             executeAbortRef.current = null
             setIsExecuting(false)
+            setIsUrgentMessage(false)
         }
-    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, tts.voiceEnabled, tts.warmUp, tts.play, deepThinkEnabled, serializeScreenContext])
+    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, tts.voiceEnabled, tts.warmUp, tts.playChunked, deepThinkEnabled, serializeScreenContext])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
@@ -723,28 +910,45 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
     }, [])
 
     const handleSwitchSpecialist = useCallback((id: string) => {
-        // Build handoff context from recent conversation
+        // Build rich handoff context that feels like a real colleague briefing
+        const targetSpec = getSpecialistById(id)
         let handoff: string | undefined
         if (messages.length > 0) {
-            const firstUserMsg = messages.find((m) => m.role === "user")
-            const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
+            const userMessages = messages.filter((m) => m.role === "user" && !m.historical)
+            const assistantMessages = messages.filter((m) => m.role === "assistant" && !m.historical)
+            const lastAssistant = assistantMessages[assistantMessages.length - 1]
+            const firstUserMsg = userMessages[0]
+
+            // Build a natural handoff that feels like a colleague briefing you
             const parts: string[] = [
-                `Handoff from ${specialist.name}:`,
+                `## Handoff from ${specialist.name} (${specialist.title})`,
+                "",
+                `${specialist.name} just finished working with the founder on this topic and is bringing you in because your expertise is needed next.`,
             ]
+
             if (firstUserMsg) {
-                parts.push(`The user was discussing: "${firstUserMsg.content.slice(0, 300)}"`)
+                parts.push(`\n**What the founder originally asked about:**\n"${firstUserMsg.content.slice(0, 400)}"`)
             }
+
             if (lastAssistant) {
-                parts.push(`Key points covered:\n${lastAssistant.content.slice(0, 500)}`)
+                parts.push(`\n**Key points ${specialist.name} covered:**\n${lastAssistant.content.slice(0, 600)}`)
             }
-            parts.push("\nThe user has been referred to you to continue this work. Acknowledge the handoff briefly and build on what was discussed.")
-            handoff = parts.join("\n\n")
+
+            // Check if the referring specialist has a relationship defined with the target
+            const relationship = specialist.personality.relationships?.[id]
+            if (relationship && targetSpec) {
+                parts.push(`\n**Your working relationship with ${specialist.name}:** ${relationship.pattern}`)
+            }
+
+            parts.push(`\n**Your job:** Pick up where ${specialist.name} left off. Don't repeat what was already covered — BUILD on it. Start substantively as if ${specialist.name} just briefed you in the hallway. The founder doesn't want to re-explain.`)
+
+            handoff = parts.join("\n")
         }
 
         onOpenChange(false)
         // Small delay to let dialog close animation finish
         setTimeout(() => onSwitchSpecialist?.(id, handoff), 200)
-    }, [onOpenChange, onSwitchSpecialist, messages, specialist.name])
+    }, [onOpenChange, onSwitchSpecialist, messages, specialist])
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -774,7 +978,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
     const hasNonHistoricalMessages = messages.some((m) => !m.historical)
     const hasConversation = hasNonHistoricalMessages || isGeneratingGreeting
     const hasHistoricalMessages = messages.some((m) => m.historical)
-    const isStreaming = isExecuting && streamingResponse.length > 0
+    // isStreaming is declared earlier (before the useEffect that depends on it)
     const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant" && !m.historical)
 
     return (
@@ -977,6 +1181,34 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 className="flex-1 min-h-0 overflow-y-auto space-y-4 mb-4 pr-1"
                                 style={{ maxHeight: "45vh" }}
                             >
+                                {/* Handoff Briefing Card — shows what context was passed from referring specialist */}
+                                {referredBy && handoffContext && (
+                                    <div className="rounded-lg border border-international-orange/20 bg-international-orange/5 overflow-hidden mb-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsHandoffBriefingExpanded((prev) => !prev)}
+                                            className="flex items-center justify-between w-full px-3 py-2 text-xs font-medium text-international-orange hover:bg-international-orange/10 transition-colors"
+                                        >
+                                            <span className="flex items-center gap-1.5">
+                                                <ArrowRight className="h-3 w-3" />
+                                                Briefed by {referredBy}
+                                            </span>
+                                            {isHandoffBriefingExpanded ? (
+                                                <ChevronUp className="h-3 w-3" />
+                                            ) : (
+                                                <ChevronDown className="h-3 w-3" />
+                                            )}
+                                        </button>
+                                        {isHandoffBriefingExpanded && (
+                                            <div className="px-3 pb-2.5 text-xs text-muted-foreground leading-relaxed border-t border-international-orange/10 pt-2">
+                                                {handoffContext.length > 400
+                                                    ? handoffContext.slice(0, 400) + "..."
+                                                    : handoffContext
+                                                }
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 {messages.map((msg, i) => {
                                     const isLastAssistant = msg.role === "assistant" && !msg.historical && i === messages.length - 1
                                     const isFirstHistorical = msg.historical && i === 0
@@ -1048,25 +1280,44 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     </div>
                                 )}
 
-                                {/* Typing indicator */}
+                                {/* Typing indicator — personality-specific thinking message */}
                                 {(isExecuting && !isStreaming) && (
                                     <div className="flex gap-3 justify-start">
-                                        <div className="flex-shrink-0 h-7 w-7 rounded-full bg-muted mt-1" />
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
+                                        <div className={cn("flex-shrink-0 mt-1", isUrgentMessage && "ring-2 ring-international-orange ring-offset-1 rounded-full")}>
+                                            <SpecialistChatAvatar
+                                                specialist={specialist}
+                                                state="thinking"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-3 transition-opacity duration-300">
                                             {deepThinkEnabled ? (
                                                 <Brain className="h-4 w-4 animate-pulse text-international-orange" />
+                                            ) : isUrgentMessage ? (
+                                                <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
                                             ) : (
                                                 <Loader2 className="h-4 w-4 animate-spin" />
                                             )}
-                                            {deepThinkEnabled
-                                                ? `${specialist.name} is analyzing deeply...`
-                                                : `${specialist.name} is thinking...`
-                                            }
+                                            <span key={`${thinkingPhaseIndex}-${isUrgentMessage}`} className="animate-in fade-in duration-300">
+                                                {deepThinkEnabled
+                                                    ? `${specialist.name} is analyzing deeply...`
+                                                    : isUrgentMessage
+                                                        ? thinkingPhaseIndex === 0
+                                                            ? `${specialist.name}: On it. Prioritizing this now.`
+                                                            : thinkingPhaseIndex === 1
+                                                                ? `${specialist.name}: Working through the critical path...`
+                                                                : `${specialist.name}: Almost there — focused recommendation incoming.`
+                                                        : specialist.thinkingPhases
+                                                            ? `${specialist.name}: ${specialist.thinkingPhases[thinkingPhaseIndex] ?? specialist.thinkingPhases[0]}`
+                                                            : specialist.thinkingIndicator
+                                                                ? `${specialist.name}: ${specialist.thinkingIndicator}`
+                                                                : `${specialist.name} is thinking...`
+                                                }
+                                            </span>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Greeting generation indicator */}
+                                {/* Greeting generation indicator — shows specialist reviewing context */}
                                 {isGeneratingGreeting && !isExecuting && (
                                     <div className="flex gap-3 justify-start">
                                         <div className="flex-shrink-0 mt-1">
@@ -1075,13 +1326,44 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 state="thinking"
                                             />
                                         </div>
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                            {specialist.name} is reviewing your context...
+                                        <div className="flex flex-col gap-1 py-3">
+                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                {specialist.name} is catching up...
+                                            </div>
+                                            {hasHistoricalMessages && (
+                                                <p className="text-xs text-muted-foreground/70 ml-6">
+                                                    Reviewing your previous conversation and team updates
+                                                </p>
+                                            )}
+                                            {!hasHistoricalMessages && crossSpecialistContext && (
+                                                <p className="text-xs text-muted-foreground/70 ml-6">
+                                                    Checking what the team has been working on
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 )}
                             </div>
+                        )}
+
+                        {/* Proposed actions (tasks/objectives) from Specialist response */}
+                        {lastAssistantMessage && !isExecuting && lastAssistantMessage.proposals && lastAssistantMessage.proposals.length > 0 && (
+                            <ProposedActionsCard
+                                proposals={lastAssistantMessage.proposals}
+                                specialist={specialist}
+                                onDismiss={() => {
+                                    setMessages((prev) => {
+                                        const idx = prev.map((m, i) => ({ m, i }))
+                                            .reverse()
+                                            .find(({ m }) => m.role === "assistant" && !m.historical)?.i
+                                        if (idx === undefined || !prev[idx].proposals?.length) return prev
+                                        return prev.map((msg, i) =>
+                                            i === idx ? { ...msg, proposals: undefined } : msg
+                                        )
+                                    })
+                                }}
+                            />
                         )}
 
                         {/* Suggested Next Specialists (after at least one response) */}
@@ -1120,6 +1402,34 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             )
                         })()}
 
+                        {/* Different Perspective Card — surfaces tensions between specialists */}
+                        {lastAssistantMessage && !isExecuting && tensionCard && (() => {
+                            const tensionSpecialist = getSpecialistById(tensionCard.specialistId)
+                            if (!tensionSpecialist) return null
+                            return (
+                                <div className="mb-4 p-3 rounded-lg bg-status-warning-light border border-status-warning/30">
+                                    <div className="flex items-start gap-2.5">
+                                        <AlertTriangle className="h-4 w-4 text-status-warning flex-shrink-0 mt-0.5" />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-xs font-medium text-foreground mb-1">
+                                                Different perspective from {tensionSpecialist.name}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground leading-relaxed">
+                                                {tensionCard.description}
+                                            </p>
+                                            <button
+                                                onClick={() => handleSwitchSpecialist(tensionSpecialist.id)}
+                                                className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-status-warning hover:text-foreground transition-colors"
+                                            >
+                                                Hear {tensionSpecialist.name}&apos;s side
+                                                <ArrowRight className="h-3 w-3" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })()}
+
                         {/* Static fallback suggestions (only if no dynamic recommendation) */}
                         {lastAssistantMessage && !isExecuting && !dynamicSuggestion && suggestedSpecialists.length > 0 && (
                             <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-muted/50">
@@ -1152,7 +1462,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             </div>
                         )}
 
-                        {/* First-meeting card: avatar, tagline, and conversation starters */}
+                        {/* Intro card: conversation starters (history-based for returning users, highlights for new) */}
                         {!hasConversation && !hasHistoricalMessages && (
                             <div className="mb-4 p-4 rounded-lg bg-muted/30 border border-muted space-y-4">
                                 <div className="flex items-start gap-3">
@@ -1174,30 +1484,91 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         )}
                                     </div>
                                 </div>
-                                {specialist.highlights.length > 0 && (
+                                {(dynamicStarters || specialist.highlights.length > 0) && (
                                     <>
                                         <p className="text-xs font-medium text-muted-foreground">
-                                            Start with a topic
+                                            {dynamicStarters ? "Ask me about..." : "Start with a topic"}
                                         </p>
                                         <div className="flex flex-wrap gap-2">
-                                            {specialist.highlights.map((highlight) => (
+                                            {(dynamicStarters ?? specialist.highlights).map((starter) => (
                                                 <button
-                                                    key={highlight}
+                                                    key={starter}
                                                     type="button"
-                                                    onClick={() => handleStarterClick(highlight)}
+                                                    onClick={() => {
+                                                        if (dynamicStarters) {
+                                                            setBriefText(starter)
+                                                        } else {
+                                                            handleStarterClick(starter)
+                                                        }
+                                                        setError(null)
+                                                        textareaRef.current?.focus()
+                                                    }}
                                                     disabled={isExecuting}
                                                     className={cn(
-                                                        "inline-flex items-center rounded-md border border-muted bg-background px-3 py-1.5 text-sm font-medium text-foreground",
-                                                        "hover:border-international-orange/50 hover:bg-muted/50 transition-colors",
-                                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-2"
+                                                        "inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium text-foreground text-left",
+                                                        dynamicStarters
+                                                            ? "border-international-orange/20 bg-international-orange/5 hover:border-international-orange/40"
+                                                            : "border-muted bg-background hover:border-international-orange/50 hover:bg-muted/50",
+                                                        "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-2"
                                                     )}
                                                 >
-                                                    {highlight}
+                                                    {dynamicStarters ? (
+                                                        <Sparkles className="h-3 w-3 mr-1.5 text-international-orange flex-shrink-0" />
+                                                    ) : null}
+                                                    {starter}
                                                 </button>
                                             ))}
                                         </div>
                                     </>
                                 )}
+                            </div>
+                        )}
+                        {/* Returning user card: history-based conversation starters */}
+                        {!hasConversation && hasHistoricalMessages && !isGeneratingGreeting && (
+                            <div className="mb-4 p-4 rounded-lg bg-muted/30 border border-muted space-y-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="flex-shrink-0">
+                                        <SpecialistChatAvatar specialist={specialist} state="idle" />
+                                    </div>
+                                    <div className="min-w-0 flex-1 pt-0.5">
+                                        <p className="text-sm text-muted-foreground">
+                                            Pick up where you left off, or start something new.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {/* Generate history-based starters from previous user messages */}
+                                    {(() => {
+                                        const pastUserMsgs = historyMessages
+                                            .filter(m => m.role === "user")
+                                            .slice(-3)
+                                            .map(m => m.content.slice(0, 60) + (m.content.length > 60 ? "..." : ""))
+                                        const starters = pastUserMsgs.length > 0
+                                            ? [`Follow up on: "${pastUserMsgs[pastUserMsgs.length - 1]}"`, ...specialist.highlights.slice(0, 3)]
+                                            : specialist.highlights.slice(0, 4)
+                                        return starters.map((starter) => (
+                                            <button
+                                                key={starter}
+                                                type="button"
+                                                onClick={() => {
+                                                    setBriefText(starter.startsWith("Follow up") ? "" : `Help me with ${starter}`)
+                                                    setError(null)
+                                                    textareaRef.current?.focus()
+                                                }}
+                                                disabled={isExecuting}
+                                                className={cn(
+                                                    "inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium text-foreground",
+                                                    starter.startsWith("Follow up")
+                                                        ? "border-international-orange/30 bg-international-orange/5 hover:border-international-orange/50"
+                                                        : "border-muted bg-background hover:border-international-orange/50 hover:bg-muted/50",
+                                                    "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-2"
+                                                )}
+                                            >
+                                                {starter}
+                                            </button>
+                                        ))
+                                    })()}
+                                </div>
                             </div>
                         )}
 
@@ -1376,6 +1747,18 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 onClick={() => {
                                     const hasUserMessages = messages.some((m) => m.role === "user" && !m.historical)
                                     if (hasUserMessages && !isExecuting) {
+                                        // Generate a quick conversation summary before clearing
+                                        const userMsgs = messages.filter((m) => m.role === "user" && !m.historical)
+                                        const assistMsgs = messages.filter((m) => m.role === "assistant" && !m.historical)
+                                        if (userMsgs.length > 0 && assistMsgs.length > 0) {
+                                            const topicSummary = userMsgs[0].content.slice(0, 80)
+                                            const keyPoints = assistMsgs.length
+                                            toast.success(`${specialist.name}: Got it. We covered "${topicSummary}${topicSummary.length >= 80 ? "..." : ""}" — ${keyPoints} exchange${keyPoints > 1 ? "s" : ""}. It's saved to Deliverables. Ready for the next topic.`, {
+                                                duration: 4000,
+                                            })
+                                            // Save topic summary for the re-engagement greeting
+                                            setNewTopicPreviousSummary(topicSummary)
+                                        }
                                         // Start a new topic (clear non-historical messages but keep thread)
                                         setMessages((prev) => prev.filter((m) => m.historical))
                                         setSelectedPrompt(null)

@@ -145,12 +145,96 @@ export interface CompanyProfile {
   website: string | null
   /** Primary business model */
   business_model: BusinessModel | null
+  /** User-provided competitor names or website URLs (free text, one per entry) */
+  competitors: string[] | null
 
   // Metadata
   /** ISO timestamp of last update */
   updatedAt: string
   /** User ID who last edited */
   updatedBy: string
+}
+
+// --- Company Intelligence (enriched data from website scraping + competitor analysis) ---
+
+/** A product or service offered by the company, extracted from website */
+export interface CompanyIntelProduct {
+  /** Product/service name */
+  name: string
+  /** Brief description */
+  description: string
+}
+
+/** A competitor identified through analysis or user input */
+export interface CompanyIntelCompetitor {
+  /** Competitor company name */
+  name: string
+  /** Competitor website URL */
+  website: string
+  /** Brief description of what they do */
+  description: string
+  /** Key differentiator vs. the user's company */
+  differentiator: string
+}
+
+/** A team member bio extracted from website or LinkedIn enrichment */
+export interface CompanyIntelTeamBio {
+  /** Team member name */
+  name: string
+  /** Their role/title */
+  role: string
+  /** Brief bio */
+  bio: string
+}
+
+/**
+ * Enriched company intelligence stored in foundries.company_intel JSONB column.
+ * Populated by the website scraper, AI summarizer, and competitor discovery pipeline.
+ * Read by the AI Context Builder to give specialists deeper company understanding.
+ */
+export interface CompanyIntelligence {
+  // Website-extracted data
+  /** AI-generated summary of the company based on website content */
+  website_summary: string | null
+  /** Products and services offered */
+  products_services: CompanyIntelProduct[] | null
+  /** Who the company sells to */
+  target_customers: string | null
+  /** Core value proposition from website copy */
+  value_proposition: string | null
+  /** Team bios found on website */
+  team_bios: CompanyIntelTeamBio[] | null
+  /** Pricing model if detected */
+  pricing_model: string | null
+
+  // Competitive intelligence
+  /** Known competitors with analysis */
+  competitors: CompanyIntelCompetitor[] | null
+
+  // Founder enrichment
+  /** Enriched founder background (from LinkedIn or manual input) */
+  founder_background: string | null
+
+  // Metadata
+  /** ISO timestamp of last enrichment run */
+  last_enriched_at: string | null
+  /** What triggered the last enrichment */
+  enrichment_source: 'website' | 'linkedin' | 'manual' | 'competitor_scan' | null
+}
+
+// --- Professional Background (stored on profiles table) ---
+
+/**
+ * Structured professional background data stored in profiles.professional_background JSONB.
+ * Entered by the user, consumed by AI Context Builder for personalized advice.
+ */
+export interface ProfessionalBackground {
+  /** Career overview — what they've done and where */
+  summary: string | null
+  /** Companies they've worked at previously */
+  previous_companies: string | null
+  /** Educational background */
+  education: string | null
 }
 
 /** Display labels for enum values */

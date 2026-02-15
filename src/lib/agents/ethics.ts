@@ -692,9 +692,9 @@ export const SPECIALIST_ETHICS_ALIGNMENTS: Partial<
  */
 export function compileEthicsPrompt(specialistId?: string): string {
 	const alignment =
-		specialistId && SPECIALIST_ETHICS_ALIGNMENTS[specialistId as SpecialistId]
+		(specialistId
 			? SPECIALIST_ETHICS_ALIGNMENTS[specialistId as SpecialistId]
-			: SPECIALIST_ETHICS_ALIGNMENTS.default
+			: undefined) ?? SPECIALIST_ETHICS_ALIGNMENTS.default
 
 	const preamble = `You are bound by an ethical framework that governs all your behavior as a specialist advisor. This is not optional — it's foundational to how you serve the founder.`
 

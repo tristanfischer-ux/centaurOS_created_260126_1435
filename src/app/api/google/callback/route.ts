@@ -18,6 +18,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createOAuth2Client } from '@/lib/google/client'
 import { saveGoogleToken } from '@/lib/google/tokens'
+import { verifySignedOAuthState } from '@/lib/security/oauth-state'
+import { rateLimit } from '@/lib/security/rate-limit'
 import { google } from 'googleapis'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -49,13 +51,29 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         )
     }
 
-    // SECURITY: Validate state parameter to prevent CSRF
-    let stateData: { userId: string; foundryId: string }
-    try {
-        const decoded = Buffer.from(stateParam, 'base64url').toString('utf-8')
-        stateData = JSON.parse(decoded)
-    } catch {
-        console.error('[GoogleCallback] Invalid state parameter')
+    // SECURITY: Throttle callback handling per user to reduce replay abuse.
+    const rateLimitResult = await rateLimit('api', `google-callback:${user.id}`, {
+        limit: 30,
+        window: 10 * 60 * 1000,
+    })
+    if (!rateLimitResult.success) {
+        return NextResponse.redirect(
+            new URL('/settings/integrations?error=rate_limited', req.nextUrl.origin)
+        )
+    }
+
+    // SECURITY: Validate signed state parameter to prevent CSRF/tampering.
+    const oauthStateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET
+    if (!oauthStateSecret) {
+        console.error('[GoogleCallback] Missing OAuth state signing secret')
+        return NextResponse.redirect(
+            new URL('/settings/integrations?error=oauth_not_configured', req.nextUrl.origin)
+        )
+    }
+
+    const stateData = verifySignedOAuthState(stateParam, oauthStateSecret, 10 * 60 * 1000)
+    if (!stateData) {
+        console.error('[GoogleCallback] Invalid or expired state parameter')
         return NextResponse.redirect(
             new URL('/settings/integrations?error=invalid_state', req.nextUrl.origin)
         )
@@ -69,6 +87,24 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         })
         return NextResponse.redirect(
             new URL('/settings/integrations?error=user_mismatch', req.nextUrl.origin)
+        )
+    }
+
+    // AUTH: Ensure user belongs to state-scoped foundry to prevent context tampering.
+    const { data: membership } = await supabase
+        .from('foundry_memberships')
+        .select('foundry_id')
+        .eq('user_id', user.id)
+        .eq('foundry_id', stateData.foundryId)
+        .maybeSingle()
+
+    if (!membership) {
+        console.error('[GoogleCallback] State foundry mismatch for user:', {
+            userId: user.id,
+            foundryId: stateData.foundryId,
+        })
+        return NextResponse.redirect(
+            new URL('/settings/integrations?error=foundry_mismatch', req.nextUrl.origin)
         )
     }
 

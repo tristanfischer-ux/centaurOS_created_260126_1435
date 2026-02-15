@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Building2,
   Users,
@@ -41,6 +42,7 @@ import {
   ChevronRight,
   Loader2,
   AlertCircle,
+  Swords,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { updateCompanyProfile } from '@/actions/foundry'
@@ -103,6 +105,7 @@ export function CompanyProfileDialog({
     location: initialData?.location ?? null,
     website: initialData?.website ?? null,
     business_model: initialData?.business_model ?? null,
+    competitors: initialData?.competitors ?? null,
   })
 
   const updateField = <K extends keyof CompanyProfile>(
@@ -141,6 +144,7 @@ export function CompanyProfileDialog({
           location: formData.location ?? null,
           website: formData.website ?? null,
           business_model: formData.business_model ?? null,
+          competitors: formData.competitors ?? null,
           updatedAt: new Date().toISOString(),
           updatedBy: userId,
         }
@@ -242,8 +246,10 @@ export function CompanyProfileDialog({
             <StepBusiness
               businessModel={formData.business_model ?? null}
               revenueRange={formData.revenue_range ?? null}
+              competitors={formData.competitors ?? null}
               onBusinessModelChange={(v) => updateField('business_model', v)}
               onRevenueRangeChange={(v) => updateField('revenue_range', v)}
+              onCompetitorsChange={(v) => updateField('competitors', v)}
             />
           )}
 
@@ -437,20 +443,24 @@ function StepBasics({
 function StepBusiness({
   businessModel,
   revenueRange,
+  competitors,
   onBusinessModelChange,
   onRevenueRangeChange,
+  onCompetitorsChange,
 }: {
   businessModel: BusinessModel | null
   revenueRange: RevenueRange | null
+  competitors: string[] | null
   onBusinessModelChange: (v: BusinessModel) => void
   onRevenueRangeChange: (v: RevenueRange) => void
+  onCompetitorsChange: (v: string[] | null) => void
 }) {
   return (
     <div className="space-y-5">
       <div>
-        <h3 className="text-lg font-semibold mb-1">Business Model & Revenue</h3>
+        <h3 className="text-lg font-semibold mb-1">Business Model & Market</h3>
         <p className="text-sm text-muted-foreground">
-          This helps us tailor recommendations to your business type.
+          This helps us tailor recommendations to your business type and competitive landscape.
         </p>
       </div>
 
@@ -494,6 +504,30 @@ function StepBusiness({
             )}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="competitors">
+          <Swords className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+          Key competitors
+        </Label>
+        <Textarea
+          id="competitors"
+          placeholder={"e.g. Acme Corp, https://widgetco.com, FastWidget\n\nOne per line — company names or website URLs"}
+          value={(competitors ?? []).join('\n')}
+          onChange={(e) => {
+            const lines = e.target.value
+              .split('\n')
+              .map(l => l.trim())
+              .filter(l => l.length > 0)
+            onCompetitorsChange(lines.length > 0 ? lines : null)
+          }}
+          rows={3}
+          className="resize-none"
+        />
+        <p className="text-xs text-muted-foreground">
+          Your specialists will use this to give you competitive insights and differentiated advice.
+        </p>
       </div>
     </div>
   )
@@ -570,6 +604,7 @@ function StepReview({ formData, sector }: { formData: Partial<CompanyProfile>; s
     { label: 'Revenue', value: formData.revenue_range ? REVENUE_RANGE_LABELS[formData.revenue_range] : null },
     { label: 'Funding stage', value: formData.funding_status ? FUNDING_STATUS_LABELS[formData.funding_status] : null },
     { label: 'Seeking funding', value: formData.seeking_funding ? 'Yes' : 'No' },
+    { label: 'Competitors', value: formData.competitors && formData.competitors.length > 0 ? formData.competitors.join(', ') : null },
   ]
 
   const filledCount = items.filter((i) => i.value && i.value !== 'No').length

@@ -16,24 +16,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { escapeHtml } from '@/lib/security/sanitize'
 import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
 
 const INBOUND_WEBHOOK_SECRET = process.env.EMAIL_INBOUND_WEBHOOK_SECRET
-
-/**
- * Creates an admin Supabase client for webhook processing.
- * Webhooks can't use user sessions, so service role is required.
- */
-function getAdminClient() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url || !serviceKey) return null
-    return createAdminClient(url, serviceKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-    })
-}
 
 /**
  * POST handler for inbound email webhooks.
@@ -50,7 +37,7 @@ function getAdminClient() {
 export async function POST(req: NextRequest): Promise<NextResponse> {
     // SECURITY: IP-based rate limit on webhook endpoint
     const ip = getClientIP(req.headers)
-    const ipLimit = await rateLimit('webhook', `webhook:${ip}`)
+    const ipLimit = await rateLimit('webhook', `email-inbound:${ip}`)
     if (!ipLimit.success) {
         return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
     }
@@ -67,9 +54,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const admin = getAdminClient()
-    if (!admin) {
-        console.error('[EmailInbound] Admin client not available')
+    let admin
+    try {
+        admin = createAdminClient()
+    } catch (error) {
+        console.error('[EmailInbound] Admin client initialization failed:', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+        })
         return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
     }
 
@@ -91,9 +82,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // SECURITY: Normalize sender identity before any routing/authorization logic.
+    const senderEmail = (payload.from.match(/<(.+?)>/)?.[1] || payload.from).trim().toLowerCase()
+    if (!senderEmail.includes('@')) {
+        return NextResponse.json({ error: 'Invalid sender address' }, { status: 400 })
+    }
+
+    // SECURITY: Add sender-scoped rate limiting in addition to IP throttling.
+    const senderLimit = await rateLimit('webhook', `email-inbound-sender:${senderEmail}`, {
+        limit: 30,
+        window: 60 * 60 * 1000,
+    })
+    if (!senderLimit.success) {
+        return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+    }
+
     // Extract the user token from the "to" address
     // Format: tasks+{user_id_prefix}@fractionalforge.app
-    const toMatch = payload.to.match(/tasks\+([a-zA-Z0-9_-]+)@/)
+    const toMatch = payload.to.match(/tasks\+([a-f0-9]{8})@/i)
     if (!toMatch) {
         console.warn('[EmailInbound] Invalid to address format:', payload.to)
         return NextResponse.json({ error: 'Invalid recipient address' }, { status: 400 })
@@ -107,9 +113,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .from('profiles')
         .select('id, foundry_id, email')
         .like('id', `${userToken}%`)
-        .limit(1)
+        .limit(2)
 
-    if (profileError || !profiles || profiles.length === 0) {
+    if (profileError || !profiles || profiles.length !== 1) {
         console.warn('[EmailInbound] No user found for token:', userToken)
         return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
@@ -118,8 +124,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // SECURITY: Verify the sender email matches the user's email
     // This prevents others from creating tasks in someone's account
-    const senderEmail = payload.from.match(/<(.+?)>/)?.[1] || payload.from
-    if (senderEmail.toLowerCase() !== profile.email?.toLowerCase()) {
+    if (senderEmail !== profile.email?.toLowerCase()) {
         console.warn('[EmailInbound] Sender mismatch:', {
             sender: senderEmail,
             expected: profile.email,
@@ -133,6 +138,41 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         payload.text || payload.html || ''
     ).substring(0, 2000)
 
+    // Resolve objective context (tasks.objective_id is required by schema)
+    let objectiveId: string | null = null
+
+    const { data: defaultObjective } = await admin
+        .from('objectives')
+        .select('id')
+        .eq('foundry_id', profile.foundry_id)
+        .eq('title', 'No objective set')
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle()
+
+    objectiveId = defaultObjective?.id ?? null
+
+    if (!objectiveId) {
+        const { data: fallbackObjective } = await admin
+            .from('objectives')
+            .select('id')
+            .eq('foundry_id', profile.foundry_id)
+            .eq('is_ghost', false)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        objectiveId = fallbackObjective?.id ?? null
+    }
+
+    if (!objectiveId) {
+        return NextResponse.json(
+            { error: 'No objectives available for task creation' },
+            { status: 400 }
+        )
+    }
+
     // Create the task
     const { data: task, error: taskError } = await admin
         .from('tasks')
@@ -140,6 +180,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             foundry_id: profile.foundry_id,
             title,
             description: description || null,
+            objective_id: objectiveId,
             creator_id: profile.id,
             assignee_id: profile.id,
             status: 'Pending',

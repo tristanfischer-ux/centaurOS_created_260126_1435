@@ -9,14 +9,18 @@
  * Gate: redirects to /the-forge/cad-lab/build if no generated modules.
  */
 
-import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   ClipboardCheck,
   ArrowLeft,
+  CheckCircle2,
+  Download,
+  Box,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { EmptyState } from "@/components/ui/empty-state"
 import { CadLabReviewPackage } from "@/components/cad/cad-lab-review-package"
 import { CadLabPeople } from "@/components/cad/cad-lab-people"
 import { CadLabDrawingPackage } from "@/components/cad/cad-lab-drawing-package"
@@ -30,14 +34,23 @@ export default function CadLabReviewPage(): React.ReactNode {
     editableReport, diagnosticAnswers,
   } = useCadLab()
 
-  // Gate: need at least one generated module
-  useEffect(() => {
-    if (generatedModuleCount === 0) {
-      router.replace("/the-forge/cad-lab/build")
-    }
-  }, [generatedModuleCount, router])
-
-  if (generatedModuleCount === 0) return null
+  // Show empty state instead of redirect
+  if (generatedModuleCount === 0) {
+    return (
+      <div className="py-12">
+        <EmptyState
+          title="No modules generated yet"
+          description="Generate at least one module in the Build stage to create a supplier-ready review package with expert discipline recommendations."
+          action={
+            <Button onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
+              <Box className="h-4 w-4" />
+              Go to Build
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -60,6 +73,32 @@ export default function CadLabReviewPage(): React.ReactNode {
       <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
       <CadLabDrawingPackage modules={modules} projectName={subject} />
       <CadLabPeople modules={modules} diagnosticAnswers={diagnosticAnswers} />
+
+      {/* Pipeline Complete */}
+      <Card className="border-status-success/30 bg-gradient-to-r from-status-success-light/20 to-background">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-light">
+                <CheckCircle2 className="h-5 w-5 text-status-success" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Pipeline Complete
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Your engineering package for &quot;{subject}&quot; is ready. Copy the review package above to share with stakeholders,
+                  or go back to Build to download individual STEP + STL files.
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
+              <Download className="h-4 w-4" />
+              Back to Downloads
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

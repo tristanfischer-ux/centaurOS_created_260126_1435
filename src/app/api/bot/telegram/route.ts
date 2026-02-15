@@ -4,8 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { TelegramUpdate, TelegramMessage, TelegramCallbackQuery, ParsedObjective } from '@/lib/telegram/types'
 import {
     sendMessage,
@@ -46,8 +46,17 @@ import {
     generateHelpResponse,
     looksLikeObjective,
 } from '@/lib/telegram/ai-processor'
+import {
+    handleChatCommand,
+    handleAskCommand,
+    handleSpecialistMessage,
+    handleEndChat,
+    handleSpecialistList,
+} from '@/lib/telegram/specialist-chat'
 import { createObjectiveFromInput } from '@/actions/objective-from-input'
 import { calculateTaskDates } from '@/lib/objective-utils'
+
+const getAdminClient = createAdminClient
 
 /**
  * Helper to extract objective title from Supabase join result
@@ -61,52 +70,41 @@ function getObjectiveTitle(objectives: unknown): string | undefined {
     return (objectives as { title?: string })?.title
 }
 
-// Use service role for webhook operations (bypasses RLS)
-function getAdminClient() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!url || !serviceKey) {
-        throw new Error('Missing Supabase configuration')
-    }
-
-    return createClient(url, serviceKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-    })
-}
-
-// Verify webhook secret (REQUIRED in production)
-function verifyWebhookSecret(req: NextRequest): boolean {
+// Verify webhook secret (required in all environments).
+function verifyWebhookSecret(req: NextRequest): NextResponse | null {
     const secret = process.env.TELEGRAM_WEBHOOK_SECRET
-    
-    // SECURITY: Require webhook secret in production to prevent unauthorized access
+
+    // SECURITY: Fail closed when secret is not configured.
     if (!secret) {
-        if (process.env.NODE_ENV === 'production') {
-            console.error('[SECURITY] TELEGRAM_WEBHOOK_SECRET not configured in production!')
-            return false
-        }
-        // Allow in development only with warning
-        console.warn('[DEV] TELEGRAM_WEBHOOK_SECRET not configured - allowing request in development')
-        return true
+        console.error('[SECURITY] TELEGRAM_WEBHOOK_SECRET not configured')
+        return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 })
     }
 
     const providedSecret = req.headers.get('X-Telegram-Bot-Api-Secret-Token')
-    return providedSecret === secret
+    const authHeader = req.headers.get('authorization')
+
+    // SECURITY: Telegram POST uses the secret-token header. Allow bearer auth for manual checks.
+    if (providedSecret === secret || authHeader === `Bearer ${secret}`) {
+        return null
+    }
+
+    return NextResponse.json({ ok: false }, { status: 403 })
 }
 
 export async function POST(req: NextRequest) {
     try {
-        // Verify webhook secret
-        if (!verifyWebhookSecret(req)) {
-            console.warn('Invalid webhook secret')
-            return NextResponse.json({ ok: false }, { status: 403 })
-        }
-
         // SECURITY: IP-based rate limit on webhook endpoint
         const ip = getClientIP(req.headers)
-        const ipLimit = await rateLimit('webhook', `webhook:${ip}`)
+        const ipLimit = await rateLimit('webhook', `telegram-webhook:${ip}`)
         if (!ipLimit.success) {
             return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+        }
+
+        // Verify webhook secret
+        const authFailure = verifyWebhookSecret(req)
+        if (authFailure) {
+            console.warn('Invalid webhook secret')
+            return authFailure
         }
 
         const update: TelegramUpdate = await req.json()
@@ -259,6 +257,50 @@ async function handleMessage(message: TelegramMessage) {
         return
     }
 
+    // /chat [specialist] [message] - Start specialist conversation
+    if (message.text?.startsWith('/chat') || message.text?.startsWith('/specialist')) {
+        const commandWord = message.text.startsWith('/specialist') ? '/specialist' : '/chat'
+        const args = message.text.slice(commandWord.length).trim()
+        if (!args) {
+            await handleSpecialistList(chatId)
+            return
+        }
+        const parts = args.split(/\s+/)
+        const specialistName = parts[0]
+        const initialMessage = parts.slice(1).join(' ') || undefined
+        await handleChatCommand(chatId, link.profile_id, link.foundry_id, specialistName, initialMessage)
+        return
+    }
+
+    // /ask [specialist] [question] - One-shot specialist question
+    if (message.text?.startsWith('/ask')) {
+        const args = message.text.slice(4).trim()
+        const parts = args.split(/\s+/)
+        if (parts.length < 2) {
+            await sendMessage({
+                chat_id: chatId,
+                text: 'Usage: /ask [specialist] [question]\n\nExample: /ask sage What should our Q2 strategy focus on?',
+            })
+            return
+        }
+        const specialistName = parts[0]
+        const question = parts.slice(1).join(' ')
+        await handleAskCommand(chatId, link.profile_id, link.foundry_id, specialistName, question)
+        return
+    }
+
+    // /endchat - End specialist conversation
+    if (message.text === '/endchat') {
+        await handleEndChat(chatId)
+        return
+    }
+
+    // /team - List all specialists
+    if (message.text === '/team') {
+        await handleSpecialistList(chatId)
+        return
+    }
+
     // Check if user is in editing mode (has pending intent being edited)
     const { data: editingIntent } = await supabase
         .from('pending_intents')
@@ -275,7 +317,38 @@ async function handleMessage(message: TelegramMessage) {
         return
     }
 
+    // Check for active specialist chat session before processing as objective
+    if (message.text) {
+        const isSpecialistChat = await handleSpecialistMessage(
+            chatId,
+            link.profile_id,
+            link.foundry_id,
+            message.text,
+        )
+        if (isSpecialistChat) return
+    }
+
     // Process new message (text or voice)
+
+    // For voice messages, check specialist session BEFORE objective processing
+    if (message.voice || message.audio) {
+        const voiceFileId = message.voice?.file_id || message.audio?.file_id
+        if (voiceFileId) {
+            const voiceFile = await getFile(voiceFileId)
+            if (voiceFile.file_path) {
+                const voiceBuffer = await downloadFile(voiceFile.file_path)
+                const voiceMimeType = message.voice?.mime_type || message.audio?.mime_type || 'audio/ogg'
+
+                // Check if voice message is for an active specialist chat
+                const { handleSpecialistVoiceMessage } = await import('@/lib/telegram/specialist-chat')
+                const isSpecialistVoice = await handleSpecialistVoiceMessage(
+                    chatId, link.profile_id, link.foundry_id, voiceBuffer, voiceMimeType,
+                )
+                if (isSpecialistVoice) return
+            }
+        }
+    }
+
     const processingMsg = await sendProcessingMessage(chatId)
 
     try {
@@ -726,7 +799,7 @@ async function handleConfirm(
         await editMessage({
             chat_id: chatId,
             message_id: messageId,
-            text: `❌ Failed to create objective: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again.`,
+            text: '❌ Failed to create objective. Please try again.',
             reply_markup: createConfirmationKeyboard(intent.id),
         })
     }
@@ -927,7 +1000,7 @@ async function handleEditResponse(
  * Get foundry ID for a profile
  */
 async function getFoundryId(
-    supabase: ReturnType<typeof getAdminClient>,
+    supabase: ReturnType<typeof createAdminClient>,
     profileId: string
 ): Promise<string> {
     const { data } = await supabase
@@ -1415,7 +1488,14 @@ async function handleSettingsCommand(chatId: number, profileId: string) {
  * Handle /help command
  */
 async function handleHelpCommand(chatId: number) {
-    const helpText = `🤖 <b>ForgeOS Telegram Bot</b>
+    const helpText = `<b>ForgeOS Telegram Bot</b>
+
+<b>💬 Specialist Chat</b>
+/chat [name] - Start chatting with a specialist
+/chat [name] [message] - Chat with initial message
+/ask [name] [question] - Quick one-shot question
+/endchat - End specialist conversation
+/team - See all available specialists
 
 <b>📋 Task Management</b>
 /tasks - View your task list
@@ -2004,7 +2084,18 @@ async function handleSettingsToggleCallback(
     }
 }
 
-// GET endpoint for webhook verification (Telegram doesn't use this, but good to have)
-export async function GET() {
+// GET endpoint for webhook verification checks.
+export async function GET(req: NextRequest) {
+    const ip = getClientIP(req.headers)
+    const ipLimit = await rateLimit('webhook', `telegram-webhook:${ip}`)
+    if (!ipLimit.success) {
+        return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+    }
+
+    const authFailure = verifyWebhookSecret(req)
+    if (authFailure) {
+        return authFailure
+    }
+
     return NextResponse.json({ status: 'ok', service: 'ForgeOS Telegram Bot' })
 }

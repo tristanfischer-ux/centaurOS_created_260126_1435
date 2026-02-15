@@ -64,9 +64,15 @@ import { EditFunctionsDialog } from './components/edit-functions-dialog'
 import { FullProfileView } from '@/components/team/full-profile-view'
 import { FullTaskView } from '@/components/tasks/full-task-view'
 import { TeamComparisonBar } from '@/components/team/team-comparison-bar'
+import dynamic from 'next/dynamic'
+import { Skeleton } from '@/components/ui/skeleton'
 import { TeamComparisonModal } from '@/components/team/team-comparison-modal'
-import { TeamAnalytics } from '@/components/team/team-analytics'
 import { TeamMemberCard, type CardSize } from '@/components/team/team-member-card'
+
+const TeamAnalytics = dynamic(
+  () => import('@/components/team/team-analytics').then((m) => ({ default: m.TeamAnalytics })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[400px] rounded-lg" /> },
+)
 
 import { useTeamData } from './hooks/use-team-data'
 import type { TeamViewMode, BusinessFunction } from './types'

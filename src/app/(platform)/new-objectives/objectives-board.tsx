@@ -32,9 +32,15 @@ import { ObjectiveDetailPanel } from './objective-detail-panel'
 import { ObjectivesTreeView } from './objectives-tree-view'
 import { getStrategyColor } from './strategy-colors'
 import { CreateObjectiveDialog } from '../objectives/create-objective-dialog'
+import dynamic from 'next/dynamic'
 import { EditObjectiveDialog } from '@/components/objectives/edit-objective-dialog'
-import { ObjectivesGanttView } from './gantt-view'
+import { Skeleton } from '@/components/ui/skeleton'
 import { TaskDetailPanel } from '../new-tasks/task-detail-panel'
+
+const ObjectivesGanttView = dynamic(
+  () => import('./gantt-view').then((m) => ({ default: m.ObjectivesGanttView })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[500px] rounded-lg" /> },
+)
 import { deleteObjective } from '@/actions/objectives'
 import { toast } from 'sonner'
 import { WeeklyDigestPanel } from './weekly-digest'
@@ -382,8 +388,8 @@ export function ObjectivesBoard({
               },
             }}
             specialistId="strategist"
-            specialistName="Sam"
-            label="Plan with Sam"
+            specialistName="Sage"
+            label="Plan with Sage"
           />
           {strategicObjectives.length > 0 && (
             <Link

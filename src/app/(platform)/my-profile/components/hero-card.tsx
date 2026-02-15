@@ -212,7 +212,7 @@ export function HeroCard({
                     href={linkedinUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                     aria-label="LinkedIn profile"
                   >
                     <Linkedin className="h-4 w-4" />
@@ -223,7 +223,7 @@ export function HeroCard({
                     href={websiteUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                     aria-label="Personal website"
                   >
                     <Globe className="h-4 w-4" />

@@ -45,7 +45,7 @@ export function FounderRecruitsBanner(): React.ReactElement | null {
 
           <button
             onClick={() => setIsDismissed(true)}
-            className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            className="text-muted-foreground hover:text-foreground transition-colors shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Dismiss banner"
           >
             <X className="h-4 w-4" />

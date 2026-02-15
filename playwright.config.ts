@@ -77,16 +77,54 @@ export default defineConfig({
       dependencies: ['auth-setup'],
       use: { ...devices['Desktop Chrome'] },
     },
+    // Specialist proposed actions (authenticated founder)
+    {
+      name: 'specialist-proposed-actions',
+      testMatch: /specialist-proposed-actions\.spec\.ts$/,
+      dependencies: ['auth-setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: path.join(authDir, 'founder.json'),
+      },
+    },
+    // Specialist full E2E suite (authenticated founder).
+    // No auth-setup dependency so suite can run when supplier auth fails; run auth-setup once to create founder.json.
+    {
+      name: 'specialist-suite',
+      testMatch: /specialist-full-suite\.spec\.ts$/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: path.join(authDir, 'founder.json'),
+      },
+    },
     // General tests (unauthenticated)
     {
       name: 'chromium',
-      testMatch: /(?<!qa-.*|auth\.setup|updates)\.spec\.ts$/,
+      testMatch:
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite)\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'Mobile Chrome',
-      testMatch: /(?<!qa-.*|auth\.setup|updates)\.spec\.ts$/,
+      testMatch:
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite)\.spec\.ts$/,
       use: { ...devices['Pixel 5'] },
+    },
+    // Mobile Delight Audit — iPhone 14 Pro viewport, Founder auth
+    // No auth-setup dependency; run auth-setup once manually to create founder.json
+    {
+      name: 'mobile-delight',
+      testMatch: /mobile-delight-audit\.spec\.ts$/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+        storageState: path.join(authDir, 'founder.json'),
+        video: 'on',
+        screenshot: 'on',
+        trace: 'on-first-retry',
+      },
     },
     // Smoke tests — lightweight page render checks used by npm run verify
     {
@@ -102,10 +140,13 @@ export default defineConfig({
       },
     },
   ],
-  webServer: process.env.CI ? undefined : {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: true,
-    timeout: 120 * 1000,
-  },
+  webServer:
+    process.env.PLAYWRIGHT_SKIP_WEB_SERVER === '1'
+      ? undefined
+      : {
+          command: 'npm run dev',
+          url: 'http://localhost:3000',
+          reuseExistingServer: !process.env.CI,
+          timeout: 120 * 1000,
+        },
 })

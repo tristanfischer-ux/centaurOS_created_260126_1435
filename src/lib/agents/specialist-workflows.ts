@@ -1,0 +1,678 @@
+/**
+ * @file specialist-workflows.ts
+ *
+ * @description Defines executable workflows that specialists can perform.
+ * When a user says "Draft it for me" or "Run the numbers", the specialist
+ * doesn't just advise -- they produce a deliverable.
+ *
+ * Each workflow has:
+ * - A trigger phrase (how the user invokes it)
+ * - A specialist who owns it
+ * - A prompt template that produces the deliverable
+ * - An output format (document, table, list, etc.)
+ *
+ * @related
+ * - Specialists: src/app/(platform)/agents/specialists-data.ts
+ * - Execute route: src/app/api/agents/execute/route.ts
+ * - Deliverables: src/actions/agent-artifacts.ts
+ */
+
+import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+
+// ─── Types ──────────────────────────────────────────────────────────
+
+/** Output format for a workflow deliverable */
+export type WorkflowOutputFormat =
+    | "document"
+    | "table"
+    | "list"
+    | "analysis"
+    | "email"
+    | "plan"
+
+/** Defines an executable workflow owned by a specialist */
+export interface SpecialistWorkflow {
+    /** Unique workflow identifier */
+    id: string
+    /** Display name shown to the user */
+    name: string
+    /** Brief description of what this workflow produces */
+    description: string
+    /** The specialist who owns this workflow */
+    specialistId: SpecialistId
+    /** Trigger phrases that invoke this workflow */
+    triggers: string[]
+    /** The prompt template ({{context}} is replaced with conversation context) */
+    promptTemplate: string
+    /** Expected output format */
+    outputFormat: WorkflowOutputFormat
+    /** Whether to auto-save to deliverables */
+    autoSave: boolean
+    /** Icon name from lucide-react */
+    icon: string
+}
+
+// ─── Workflow Definitions ───────────────────────────────────────────
+
+export const SPECIALIST_WORKFLOWS: SpecialistWorkflow[] = [
+    // ── Strategy (Sage) ──────────────────────────────────────────
+    {
+        id: "draft-strategic-plan",
+        name: "Draft Strategic Plan",
+        description: "Produces a full strategic plan document based on your conversation",
+        specialistId: "strategist",
+        triggers: [
+            "draft the plan",
+            "write the strategy",
+            "draft strategic plan",
+            "create a strategy document",
+        ],
+        promptTemplate: `Based on our conversation, produce a complete strategic plan document. Structure it as:
+
+## Executive Summary
+One paragraph capturing the core strategy.
+
+## Strategic Priorities (Top 3)
+For each priority:
+- What: Clear description
+- Why: Strategic rationale
+- How: Key initiatives
+- Success metric: How we'll know it's working
+- Timeline: When we expect results
+
+## Key Assumptions
+What must be true for this strategy to work.
+
+## Risks & Mitigations
+Top 3 risks and how to address them.
+
+## Next Steps (This Week)
+3-5 concrete actions that start immediately.
+
+Context from our conversation:
+{{context}}
+
+Write this as a polished, ready-to-share document. Be specific and actionable.`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "FileText",
+    },
+    {
+        id: "competitive-analysis",
+        name: "Competitive Analysis",
+        description: "Produces a structured competitive landscape analysis",
+        specialistId: "strategist",
+        triggers: [
+            "analyze competitors",
+            "competitive analysis",
+            "competitive landscape",
+            "map the competition",
+        ],
+        promptTemplate: `Based on our conversation, produce a competitive analysis document.
+
+## Market Overview
+Brief description of the market and key dynamics.
+
+## Competitor Matrix
+| Competitor | Positioning | Strengths | Weaknesses | Threat Level |
+|---|---|---|---|---|
+(Fill in based on what we discussed)
+
+## Our Differentiation
+What makes us different and why it matters.
+
+## Competitive Risks
+Where we're vulnerable and what to do about it.
+
+## Strategic Recommendations
+3 specific moves to strengthen our competitive position.
+
+Context from our conversation:
+{{context}}`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "Target",
+    },
+
+    // ── Finance (Finn) ───────────────────────────────────────────
+    {
+        id: "financial-model",
+        name: "Run the Numbers",
+        description: "Produces a financial scenario analysis with tables",
+        specialistId: "finance-lead",
+        triggers: [
+            "run the numbers",
+            "financial model",
+            "model the scenarios",
+            "build a forecast",
+        ],
+        promptTemplate: `Based on our conversation, produce a financial analysis.
+
+## Current Financial Position
+Key metrics: revenue, burn rate, runway, growth rate.
+
+## Scenario Analysis
+| Scenario | Revenue (6mo) | Burn Rate | Runway | Key Assumption |
+|---|---|---|---|---|
+| Conservative | | | | |
+| Base Case | | | | |
+| Optimistic | | | | |
+
+## Unit Economics
+| Metric | Current | Target | Gap |
+|---|---|---|---|
+| CAC | | | |
+| LTV | | | |
+| LTV:CAC | | | |
+| Payback Period | | | |
+
+## Sensitivity Analysis
+What happens if key assumptions change by +/- 20%.
+
+## Recommendations
+3 specific financial actions to take this month.
+
+Context from our conversation:
+{{context}}
+
+Use ranges where data is uncertain. Label all assumptions explicitly.`,
+        outputFormat: "analysis",
+        autoSave: true,
+        icon: "Calculator",
+    },
+    {
+        id: "budget-template",
+        name: "Create Budget",
+        description: "Produces a structured budget template",
+        specialistId: "finance-lead",
+        triggers: ["create a budget", "budget template", "build the budget"],
+        promptTemplate: `Based on our conversation, produce a budget template.
+
+## Monthly Budget Overview
+| Category | Monthly Budget | Notes |
+|---|---|---|
+| People (salaries, contractors) | | |
+| Technology (hosting, tools, licenses) | | |
+| Marketing (ads, content, events) | | |
+| Operations (office, insurance, legal) | | |
+| R&D (prototyping, testing) | | |
+| **Total** | | |
+
+## Budget Allocation by Priority
+Show how spending aligns with strategic priorities.
+
+## Cost Optimization Opportunities
+Where we can save without sacrificing growth.
+
+## Cash Flow Projection (Next 6 Months)
+Monthly in/out with running balance.
+
+Context from our conversation:
+{{context}}`,
+        outputFormat: "table",
+        autoSave: true,
+        icon: "PiggyBank",
+    },
+
+    // ── Product (Priya) ──────────────────────────────────────────
+    {
+        id: "write-prd",
+        name: "Write PRD",
+        description: "Produces a product requirements document",
+        specialistId: "product-lead",
+        triggers: [
+            "write the prd",
+            "create a prd",
+            "product requirements",
+            "write requirements",
+        ],
+        promptTemplate: `Based on our conversation, produce a Product Requirements Document.
+
+## Problem Statement
+What problem are we solving and for whom?
+
+## User Stories
+For each key user story:
+- As a [user type], I want to [action] so that [benefit]
+- Acceptance criteria (specific, testable)
+
+## Requirements
+### Must-Have (P0)
+- [ ] Requirement with clear acceptance criteria
+
+### Should-Have (P1)
+- [ ] Requirement with clear acceptance criteria
+
+### Nice-to-Have (P2)
+- [ ] Requirement with clear acceptance criteria
+
+## Scope - What's NOT Included
+Explicit list of what we're cutting and why.
+
+## Success Metrics
+How we'll know this worked.
+
+## Technical Considerations
+Any constraints or dependencies engineering should know about.
+
+## Timeline
+Estimated phases and milestones.
+
+Context from our conversation:
+{{context}}`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "ClipboardList",
+    },
+
+    // ── Sales (Sal) ──────────────────────────────────────────────
+    {
+        id: "outreach-sequence",
+        name: "Write Outreach Sequence",
+        description: "Produces copy-paste-ready cold outreach emails",
+        specialistId: "sales-lead",
+        triggers: [
+            "write the outreach",
+            "create outreach sequence",
+            "draft the emails",
+            "cold email sequence",
+        ],
+        promptTemplate: `Based on our conversation, produce a 3-email cold outreach sequence.
+
+## Email 1: Initial Outreach
+**Subject line:** [Compelling, personalized]
+**Body:** [Short, value-focused, ends with soft CTA]
+
+## Email 2: Follow-up (Day 3)
+**Subject line:** [Reference to Email 1]
+**Body:** [Add new value angle, social proof, stronger CTA]
+
+## Email 3: Break-up (Day 7)
+**Subject line:** [Creates urgency without being pushy]
+**Body:** [Final value prop, clear CTA, graceful close]
+
+## Personalization Guide
+How to customize each email for different prospect types.
+
+## Expected Metrics
+| Metric | Target |
+|---|---|
+| Open Rate | |
+| Reply Rate | |
+| Meeting Book Rate | |
+
+## Objection Handlers
+Top 3 likely objections and how to respond.
+
+Context from our conversation:
+{{context}}
+
+Make these copy-paste ready. Real language, not corporate speak.`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "Mail",
+    },
+
+    // ── Marketing (Mia) ─────────────────────────────────────────
+    {
+        id: "content-calendar",
+        name: "Create Content Calendar",
+        description: "Produces a structured content calendar with topics and channels",
+        specialistId: "growth-marketer",
+        triggers: [
+            "create content calendar",
+            "content plan",
+            "content strategy",
+            "plan the content",
+        ],
+        promptTemplate: `Based on our conversation, produce a 4-week content calendar.
+
+## Content Strategy Summary
+What we're trying to achieve and who we're targeting.
+
+## Week-by-Week Calendar
+| Week | Day | Channel | Content Type | Topic | CTA | Owner |
+|---|---|---|---|---|---|---|
+| 1 | Mon | | | | | |
+| 1 | Wed | | | | | |
+| 1 | Fri | | | | | |
+(Continue for 4 weeks)
+
+## Content Themes
+3 recurring themes that tie everything together.
+
+## Distribution Strategy
+How each piece gets amplified beyond the initial post.
+
+## Measurement Plan
+| Metric | Baseline | Target | How to Measure |
+|---|---|---|---|
+
+Context from our conversation:
+{{context}}`,
+        outputFormat: "table",
+        autoSave: true,
+        icon: "Calendar",
+    },
+
+    // ── HR (Harper) ──────────────────────────────────────────────
+    {
+        id: "job-description",
+        name: "Write Job Description",
+        description: "Produces a compelling job description with scorecard",
+        specialistId: "hiring-team",
+        triggers: [
+            "write the job description",
+            "create job posting",
+            "draft the jd",
+            "job description",
+        ],
+        promptTemplate: `Based on our conversation, produce a job description and interview scorecard.
+
+## Job Description
+
+### [Role Title]
+**Location:** [Remote/Hybrid/Office]
+**Type:** [Full-time/Part-time/Contract]
+
+### About the Role
+[2-3 paragraphs: what the role does, why it matters, what success looks like]
+
+### What You'll Do
+- [Specific responsibility with impact]
+(5-7 items)
+
+### What You Bring
+**Must-Have:**
+- [Specific, measurable requirement]
+
+**Nice-to-Have:**
+- [Differentiating skill]
+
+### What We Offer
+- [Compelling benefit]
+
+---
+
+## Interview Scorecard
+
+| Dimension | Weight | 1 (Below) | 3 (Meets) | 5 (Exceeds) |
+|---|---|---|---|---|
+| [Technical Skill] | | | | |
+| [Culture Fit] | | | | |
+| [Communication] | | | | |
+| [Problem Solving] | | | | |
+
+## 90-Day Success Criteria
+What does success look like in the first 90 days?
+
+Context from our conversation:
+{{context}}`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "UserPlus",
+    },
+
+    // ── Legal (Leo) ──────────────────────────────────────────────
+    {
+        id: "contract-review",
+        name: "Review Contract",
+        description: "Produces a structured contract review with risk flags",
+        specialistId: "legal-counsel",
+        triggers: [
+            "review the contract",
+            "contract review",
+            "check this agreement",
+            "review this document",
+        ],
+        promptTemplate: `Based on our conversation, produce a contract review.
+
+## Contract Summary
+What this agreement covers in plain language.
+
+## Key Terms
+| Term | What It Says | What It Means | Risk Level |
+|---|---|---|---|
+(Extract key clauses)
+
+## Risk Flags
+### 🔴 High Risk (Address Before Signing)
+- [Issue and recommendation]
+
+### 🟡 Medium Risk (Negotiate If Possible)
+- [Issue and recommendation]
+
+### 🟢 Acceptable
+- [Clause and why it's fine]
+
+## Missing Protections
+What SHOULD be in this contract but isn't.
+
+## Negotiation Recommendations
+Top 3 changes to request, in order of importance.
+
+## Disclaimer
+This is general guidance, not legal advice. Consult a qualified attorney before signing.
+
+Context from our conversation:
+{{context}}`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "Scale",
+    },
+
+    // ── Chief of Staff (Cal) ─────────────────────────────────────
+    {
+        id: "meeting-prep",
+        name: "Prepare Meeting Brief",
+        description: "Produces a meeting preparation document",
+        specialistId: "chief-of-staff",
+        triggers: [
+            "prep the meeting",
+            "meeting prep",
+            "prepare for the meeting",
+            "meeting brief",
+        ],
+        promptTemplate: `Based on our conversation, produce a meeting preparation brief.
+
+## Meeting Brief
+
+### Context
+What this meeting is about and why it matters.
+
+### Your Objectives
+What you want to achieve in this meeting (max 3).
+
+### Key Points to Make
+Structured talking points with supporting data.
+
+### Anticipated Questions
+| Likely Question | Recommended Response |
+|---|---|
+(Top 5 questions)
+
+### Decision Points
+What decisions need to be made in this meeting.
+
+### Red Lines
+What you should NOT agree to and why.
+
+### Follow-Up Actions
+What should happen after this meeting.
+
+Context from our conversation:
+{{context}}`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "ClipboardCheck",
+    },
+
+    // ── Manufacturing (Fang) ─────────────────────────────────────
+    {
+        id: "supplier-comparison",
+        name: "Compare Suppliers",
+        description: "Produces a structured supplier comparison matrix",
+        specialistId: "vp-manufacturing",
+        triggers: [
+            "compare suppliers",
+            "supplier comparison",
+            "find factories",
+            "compare manufacturers",
+        ],
+        promptTemplate: `Based on our conversation, produce a supplier comparison.
+
+## Requirements Summary
+What we need manufactured, volumes, and timeline.
+
+## Supplier Comparison Matrix
+| Criteria | Supplier A | Supplier B | Supplier C |
+|---|---|---|---|
+| Location | | | |
+| Capability Match | | | |
+| Lead Time | | | |
+| MOQ | | | |
+| Unit Cost (est.) | | | |
+| Quality Certs | | | |
+| Communication | | | |
+| Risk Level | | | |
+
+## Recommendation
+Which supplier to proceed with and why.
+
+## Risk Mitigation
+Backup plan if primary supplier fails.
+
+## Next Steps
+1. [Action with timeline]
+
+Context from our conversation:
+{{context}}`,
+        outputFormat: "table",
+        autoSave: true,
+        icon: "Factory",
+    },
+
+    // ── Fundraising (Fiona) ──────────────────────────────────────
+    {
+        id: "pitch-narrative",
+        name: "Draft Pitch Narrative",
+        description: "Produces a compelling investor pitch narrative",
+        specialistId: "fundraising-advisor",
+        triggers: [
+            "draft the pitch",
+            "write the pitch",
+            "pitch narrative",
+            "investor story",
+        ],
+        promptTemplate: `Based on our conversation, produce a pitch narrative.
+
+## The Hook (First 90 Seconds)
+The opening that makes investors lean in.
+
+## The Problem
+What's broken and why it matters now.
+
+## The Solution
+What we've built and why it's different.
+
+## The Market
+How big is the opportunity (TAM/SAM/SOM).
+
+## Traction
+What we've achieved so far (metrics, milestones).
+
+## Business Model
+How we make money and unit economics.
+
+## The Team
+Why this team wins.
+
+## The Ask
+What we're raising and what we'll do with it.
+
+## Why Now
+Why this company needs to exist today.
+
+## Tough Questions & Answers
+| Question | Answer |
+|---|---|
+(Top 5 investor questions)
+
+Context from our conversation:
+{{context}}
+
+Write this as a compelling narrative, not a list. Make investors feel the opportunity.`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "Presentation",
+    },
+]
+
+// ─── Workflow Detection ─────────────────────────────────────────────
+
+/**
+ * Detects if a user message triggers a specialist workflow.
+ *
+ * @description Scans the user's message for trigger phrases that match
+ * workflows owned by the current specialist. Returns the first matching
+ * workflow, or null if no match is found.
+ *
+ * @param message - The user's message to scan for triggers
+ * @param specialistId - The current specialist ID to scope workflow matching
+ * @returns The matching workflow, or null if no match
+ */
+export function detectWorkflowTrigger(
+    message: string,
+    specialistId: SpecialistId,
+): SpecialistWorkflow | null {
+    const normalized = message.toLowerCase().trim()
+
+    // Only match workflows for the current specialist
+    const specialistWorkflows = SPECIALIST_WORKFLOWS.filter(
+        (w) => w.specialistId === specialistId,
+    )
+
+    for (const workflow of specialistWorkflows) {
+        for (const trigger of workflow.triggers) {
+            if (normalized.includes(trigger.toLowerCase())) {
+                return workflow
+            }
+        }
+    }
+
+    return null
+}
+
+/**
+ * Gets all available workflows for a specialist.
+ *
+ * @description Returns the complete list of workflows that a given
+ * specialist can execute. Used to populate the workflow menu in the UI
+ * and to inform the specialist's system prompt about its capabilities.
+ *
+ * @param specialistId - The specialist ID to look up
+ * @returns Array of workflows available for this specialist
+ */
+export function getSpecialistWorkflows(
+    specialistId: SpecialistId,
+): SpecialistWorkflow[] {
+    return SPECIALIST_WORKFLOWS.filter((w) => w.specialistId === specialistId)
+}
+
+/**
+ * Builds the workflow execution prompt by injecting conversation context.
+ *
+ * @description Takes a workflow's prompt template and replaces the
+ * {{context}} placeholder with the actual conversation context. This
+ * produces the final prompt that gets sent to the AI provider.
+ *
+ * @param workflow - The workflow to execute
+ * @param conversationContext - Recent conversation context to inject
+ * @returns The complete prompt ready for execution
+ */
+export function buildWorkflowPrompt(
+    workflow: SpecialistWorkflow,
+    conversationContext: string,
+): string {
+    return workflow.promptTemplate.replace("{{context}}", conversationContext)
+}

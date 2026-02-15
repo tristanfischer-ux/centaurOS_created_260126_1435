@@ -143,8 +143,8 @@ export function TodayView(): React.ReactElement {
         const pulseData = pulse?.data as DailyPulseData | undefined
         const parts: string[] = ['Viewing the daily briefing page.']
         if (briefing?.narrative) parts.push(briefing.narrative)
-        if (pulseData) {
-            parts.push(`${pulseData.personal.tasks_due_today} tasks due today, ${pulseData.blockers.length} blockers, ${pulseData.pending_approvals.length} pending approvals.`)
+        if (pulseData?.personal && Array.isArray(pulseData.blockers) && Array.isArray(pulseData.pending_approvals)) {
+            parts.push(`${pulseData.personal.tasks_due_today ?? 0} tasks due today, ${pulseData.blockers.length} blockers, ${pulseData.pending_approvals.length} pending approvals.`)
         }
         if (strategyHealth.length > 0) {
             const atRisk = strategyHealth.filter(s => s.health === 'at-risk').length
@@ -215,7 +215,7 @@ export function TodayView(): React.ReactElement {
                                 Unable to load your daily briefing
                             </p>
                             <p className="text-sm text-muted-foreground">
-                                Something went wrong fetching your data. Please try again.
+                                We couldn&apos;t fetch your data right now. Please try again.
                             </p>
                         </div>
                         <Button onClick={loadData} variant="outline" size="sm" className="gap-1.5">
@@ -270,7 +270,7 @@ export function TodayView(): React.ReactElement {
                         </div>
 
                         {/* Quick Stats with Trends */}
-                        {pulseData && (
+                        {pulseData?.personal && (
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                                 <AnimatedStatCard
                                     label="Completed"
@@ -392,7 +392,7 @@ export function TodayView(): React.ReactElement {
             </motion.div>
 
             {/* Blockers Section */}
-            {pulseData && pulseData.blockers.length > 0 && (
+            {pulseData && Array.isArray(pulseData.blockers) && pulseData.blockers.length > 0 && (
                 <motion.div
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -403,7 +403,7 @@ export function TodayView(): React.ReactElement {
             )}
 
             {/* Pending Approvals Section */}
-            {pulseData && pulseData.pending_approvals.length > 0 && (
+            {pulseData && Array.isArray(pulseData.pending_approvals) && pulseData.pending_approvals.length > 0 && (
                 <motion.div
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -494,9 +494,9 @@ export function TodayView(): React.ReactElement {
                                     description: 'Quick strategy pulse — where should I focus?',
                                 }}
                                 specialistId="strategist"
-                                specialistName="Sam"
+                                specialistName="Sage"
                                 variant="chip"
-                                label="Strategy with Sam"
+                                label="Strategy with Sage"
                             />
                             <AskSpecialistButton
                                 context={{

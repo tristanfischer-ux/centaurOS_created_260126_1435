@@ -26,6 +26,9 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+
+  // Required for Docker runner image (copies .next/standalone)
+  output: "standalone",
   
   // Disable X-Powered-By header for security
   poweredByHeader: false,

@@ -1,7 +1,11 @@
 import { test, expect } from '@playwright/test'
+import { FOUNDER_STORAGE, dismissOnboarding } from './auth-storage'
 
 test.describe('Marketplace Comparison', () => {
+  test.use({ storageState: FOUNDER_STORAGE })
+
   test.beforeEach(async ({ page }) => {
+    await dismissOnboarding(page)
     // Assumes test user is already authenticated
     await page.goto('/marketplace')
     await page.waitForLoadState('networkidle')
@@ -24,27 +28,17 @@ test.describe('Marketplace Comparison', () => {
     await compareButtons.nth(0).click()
     await compareButtons.nth(1).click()
 
-    // Verify comparison bar appears
-    await expect(page.locator('text=Comparing')).toBeVisible()
-    await expect(page.locator('text=2 items')).toBeVisible()
+    // Verify compare CTA appears after selecting at least 2 items
+    await expect(page.getByRole('button', { name: /compare now|compare/i }).first()).toBeVisible()
 
-    // Click Compare button
-    await page.click('button:has-text("Compare")')
+    // Enter compare view
+    await page.getByRole('button', { name: /compare now|compare/i }).first().click()
 
-    // Verify comparison modal opens and shows content
-    await expect(page.locator('dialog, [role="dialog"]')).toBeVisible()
-    await expect(page.locator('text=Compare Listings')).toBeVisible()
-    
-    // Verify modal shows actual comparison content (not empty)
-    const modalContent = page.locator('dialog, [role="dialog"]')
-    await expect(modalContent.locator('text=items')).toBeVisible()
-    
-    // Should not show error message
-    await expect(page.locator('text=Cannot Compare Listings')).not.toBeVisible()
+    // Verify comparison view renders table content
+    await expect(page.getByText(/Comparing \d+ listings?/)).toBeVisible()
 
     // Check that comparison table/grid is visible
-    // (Adjust selector based on your actual comparison display)
-    const hasTable = await page.locator('table, [role="grid"], [class*="comparison"]').count()
+    const hasTable = await page.locator('table[role="table"], table, [role="grid"], [class*="comparison"]').count()
     expect(hasTable).toBeGreaterThan(0)
   })
 

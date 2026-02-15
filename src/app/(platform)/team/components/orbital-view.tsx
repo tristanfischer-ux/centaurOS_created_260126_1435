@@ -23,11 +23,11 @@ import type { TeamDataResult } from '../hooks/use-team-data'
 // ── Primary specialist per function (one per slice for clean orbital ring) ───
 // Only these 7 specialists appear on the diagram; others remain on /agents.
 const PRIMARY_SPECIALIST_MAP: Record<string, FunctionId> = {
-  'strategist':       'product',     // Sam — most senior for Product
+  'strategist':       'product',     // Sage — most senior for Product
   'chief-of-staff':   'operations',  // Cal — most senior for Operations
-  'finance-lead':     'finance',     // Eli — most senior for Finance
+  'finance-lead':     'finance',     // Finn — most senior for Finance
   'legal-counsel':    'legal',       // Leo — most senior for Legal
-  'sales-lead':       'sales',       // Nate — sole Sales specialist
+  'sales-lead':       'sales',       // Sal — sole Sales specialist
   'growth-marketer':  'marketing',   // Mia — sole Marketing specialist
   'hiring-team':      'hr',          // Harper — sole HR specialist
 }
@@ -44,7 +44,7 @@ interface OrbitalViewProps {
 /**
  * Derives a two-letter initial from a single first name.
  *
- * @param name - A short name like "Sam" or "Priya"
+ * @param name - A short name like "Sage" or "Priya"
  * @returns The first letter capitalised (e.g. "Sa", "Pr")
  */
 function nameToInitials(name: string): string {

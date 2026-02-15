@@ -206,7 +206,7 @@ export function UpdatesThreadPanel({
 
           <Link
             href={linkHref}
-            className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
             title={`Open in ${isTask ? 'Tasks' : isConversation ? 'Inbox' : 'Objectives'}`}
           >
             <ExternalLink className="h-4 w-4" />
@@ -308,7 +308,7 @@ export function UpdatesThreadPanel({
             size="sm"
             onClick={handleReply}
             disabled={!replyContent.trim() || isSending}
-            className="bg-international-orange hover:bg-international-orange-hover flex-shrink-0"
+            className="bg-international-orange hover:bg-international-orange-hover flex-shrink-0 min-h-[44px] min-w-[44px]"
           >
             {isSending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -317,7 +317,7 @@ export function UpdatesThreadPanel({
             )}
           </Button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1 pl-1">
+        <p className="text-xs text-muted-foreground mt-1 pl-1">
           Press Cmd+Enter to send
         </p>
       </div>

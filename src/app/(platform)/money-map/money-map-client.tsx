@@ -20,11 +20,19 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { typography, spacing } from '@/lib/design-system'
 
-// Money Map components
-import { MoneyMapSankey } from '@/components/money-map/sankey-chart'
+import dynamic from 'next/dynamic'
+
+// Money Map components — chart-heavy components loaded lazily
+const MoneyMapSankey = dynamic(
+  () => import('@/components/money-map/sankey-chart').then((m) => ({ default: m.MoneyMapSankey })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[400px] rounded-lg" /> },
+)
+const CostBreakdownChart = dynamic(
+  () => import('@/components/money-map/cost-breakdown-chart').then((m) => ({ default: m.CostBreakdownChart })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[300px] rounded-lg" /> },
+)
 import { MoneyMapSummaryCards } from '@/components/money-map/summary-cards'
 import { ProfitabilityTable } from '@/components/money-map/profitability-table'
-import { CostBreakdownChart } from '@/components/money-map/cost-breakdown-chart'
 import { MoneyMapInputPanel } from '@/components/money-map/input-panel'
 import { RevenueStreamDialog } from '@/components/money-map/revenue-stream-dialog'
 import { SnapshotDialog } from '@/components/money-map/snapshot-dialog'

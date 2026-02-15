@@ -97,8 +97,8 @@ export function ViewToggle({
               "inline-flex items-center justify-center rounded-lg transition-all duration-200 font-medium",
               // Size — icon-only vs text+icon vs text-only
               hasLabel
-                ? "h-8 px-3 text-xs gap-1.5"
-                : "h-8 w-8 p-0",
+                ? "h-8 min-h-[44px] px-3 text-xs gap-1.5"
+                : "h-8 w-8 min-h-[44px] min-w-[44px] p-0",
               // Active / inactive
               isActive
                 ? "bg-international-orange/10 text-international-orange shadow-sm"

@@ -664,9 +664,9 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                                                     },
                                                 }}
                                                 specialistId="strategist"
-                                                specialistName="Sam"
+                                                specialistName="Sage"
                                                 variant="chip"
-                                                label="Not sure? Talk to Sam first"
+                                                label="Not sure? Talk to Sage first"
                                             />
                                         </div>
                                     </div>

@@ -20,6 +20,7 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
+import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 import type { Database } from '@/types/database.types'
 
 /** Maps role names to the env-var keys holding test credentials. */
@@ -60,6 +61,36 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // SECURITY: Hard block in production — returns 404, not 403, to leak nothing
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  // SECURITY: Require explicit opt-in for dev-login support.
+  if (process.env.ALLOW_DEV_LOGIN !== 'true') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  // SECURITY: Require shared secret for development auto-login endpoint.
+  const devLoginSecret = process.env.DEV_LOGIN_SECRET
+  if (!devLoginSecret) {
+    console.error('[DEV-LOGIN] DEV_LOGIN_SECRET is not configured')
+    return NextResponse.json({ error: 'Dev login secret not configured' }, { status: 503 })
+  }
+
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${devLoginSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // SECURITY: Rate limit endpoint to reduce credential abuse in dev/test environments.
+  const ip = getClientIP(request.headers)
+  const rateLimitResult = await rateLimit('api', `dev-login:${ip}`, {
+    limit: 20,
+    window: 60 * 1000,
+  })
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please wait before retrying dev login.' },
+      { status: 429 },
+    )
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -130,7 +161,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (error) {
     console.error('[DEV-LOGIN] Sign-in failed:', { role, email, error: error.message })
     return NextResponse.json(
-      { error: 'Login failed', details: error.message, role, email },
+      { error: 'Login failed' },
       { status: 401 },
     )
   }

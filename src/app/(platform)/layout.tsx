@@ -57,36 +57,39 @@ export default async function PlatformLayout({
     let foundryLogoUrl: string | null = null;
     let hasAdminAccess = false;
 
+    // PERF: Fetch foundry details and admin permissions in parallel
+    // (previously sequential — saved ~50-100ms)
     if (profile?.foundry_id) {
         foundryId = profile.foundry_id;
-        const { data: foundry, error: foundryError } = await supabase
-            .from("foundries")
-            .select("name, logo_url")
-            .eq("id", profile.foundry_id)
-            .maybeSingle();
 
-        if (foundryError) {
-            console.error("Failed to fetch foundry:", foundryError.message);
+        const needsAdminCheck = profile.role !== "Founder";
+
+        const [foundryResult, adminPermResult] = await Promise.all([
+            supabase
+                .from("foundries")
+                .select("name, logo_url")
+                .eq("id", profile.foundry_id)
+                .maybeSingle(),
+            needsAdminCheck
+                ? supabase
+                    .from("foundry_admin_permissions")
+                    .select("id")
+                    .eq("foundry_id", profile.foundry_id)
+                    .eq("profile_id", user.id)
+                    .maybeSingle()
+                : Promise.resolve({ data: null, error: null }),
+        ]);
+
+        if (foundryResult.error) {
+            console.error("Failed to fetch foundry:", foundryResult.error.message);
         }
 
-        if (foundry) {
-            foundryName = foundry.name;
-            foundryLogoUrl = foundry.logo_url || null;
+        if (foundryResult.data) {
+            foundryName = foundryResult.data.name;
+            foundryLogoUrl = foundryResult.data.logo_url || null;
         }
 
-        // Check for admin permissions (non-Founders only)
-        // Note: foundry_admin_permissions table is new and may not be in generated types yet
-        if (profile.role !== "Founder") {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { data: adminPerm } = await supabase
-                .from("foundry_admin_permissions")
-                .select("id")
-                .eq("foundry_id", profile.foundry_id)
-                .eq("profile_id", user.id)
-                .maybeSingle();
-            
-            hasAdminAccess = !!adminPerm;
-        }
+        hasAdminAccess = !!adminPermResult.data;
     }
 
     // Resolve the active foundry display name from multi-foundry data
@@ -105,7 +108,7 @@ export default async function PlatformLayout({
                         <MobileZoomControl />
                         <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} />
                         <ZoomableContent className="flex-1 overflow-y-auto bg-background">
-                            <main className="p-4 sm:p-6 lg:p-8 pb-32 sm:pb-8">
+                            <main className="p-4 pt-14 sm:p-6 lg:p-8 pb-32 sm:pb-8">
                                 <WelcomeBackBanner userName={profile?.full_name || user.email || "builder"} />
                                 <ErrorBoundary>
                                     {children}

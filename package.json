@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "typecheck:baseline": "node scripts/check-typecheck-baseline.mjs",
+    "typecheck:baseline:update": "node scripts/check-typecheck-baseline.mjs --update",
+    "typecheck:security": "tsc --noEmit -p tsconfig.security.json",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "test:forge-rfq": "jest --runTestsByPath src/actions/__tests__/cad-lab-rfq-golden-benchmarks.test.ts src/actions/__tests__/cad-lab-rfq.test.ts src/lib/__tests__/cad-lab-quality-scorecard.test.ts src/lib/__tests__/cad-lab-readiness.test.ts src/lib/__tests__/forge-route-consistency.test.ts src/lib/__tests__/go-live-status-consistency.test.ts src/lib/__tests__/manual-product-pass-results-consistency.test.ts src/lib/__tests__/migration-closure-report-consistency.test.ts src/lib/__tests__/profiles-rls-migration.test.ts src/lib/__tests__/profiles-rls-verification-script-consistency.test.ts src/lib/__tests__/release-config-consistency.test.ts src/lib/__tests__/release-contract-script-consistency.test.ts src/lib/__tests__/release-docs-consistency.test.ts src/lib/__tests__/release-handoff-consistency.test.ts src/lib/__tests__/release-packet-consistency.test.ts src/lib/__tests__/release-snapshot-consistency.test.ts src/lib/__tests__/release-verify-script-consistency.test.ts src/lib/__tests__/release-workflow-consistency.test.ts src/lib/__tests__/scenario-matrix-consistency.test.ts src/lib/__tests__/telemetry-event-contract-consistency.test.ts \"src/app/(platform)/the-forge/components/__tests__/forge-project-list.test.tsx\" src/components/__tests__/MobileNav.test.tsx src/components/cad/__tests__/cad-lab-procurement-utils.test.ts",
@@ -21,6 +24,7 @@
     "test:e2e:gallery": "node scripts/generate-video-gallery.mjs && open test-results/video-walkthroughs.html",
     "verify": "bash scripts/verify.sh",
     "verify:static": "bash scripts/verify.sh --static",
+    "analyze": "ANALYZE=true next build --webpack",
     "prepare": "husky"
   },
   "dependencies": {
@@ -75,9 +79,10 @@
     "html2pdf.js": "^0.14.0",
     "lucide-react": "^0.563.0",
     "mobile-drag-drop": "^3.0.0-rc.0",
-    "next": "16.1.4",
+    "next": "^16.1.6",
     "next-pwa": "^5.6.0",
     "next-themes": "^0.4.6",
+    "node-html-parser": "^7.0.2",
     "openai": "^6.16.0",
     "pdf-parse": "^2.4.5",
     "pptxgenjs": "^4.0.1",
@@ -89,6 +94,7 @@
     "react-markdown": "^10.1.0",
     "recharts": "^3.7.0",
     "resend": "^6.9.1",
+    "rss-parser": "^3.13.0",
     "sonner": "^2.0.7",
     "stripe": "^17.7.0",
     "tailwind-merge": "^3.4.0",
@@ -100,7 +106,18 @@
   },
   "overrides": {
     "react": "$react",
-    "react-dom": "$react-dom"
+    "react-dom": "$react-dom",
+    "@excalidraw/excalidraw": {
+      "nanoid": "3.3.8"
+    },
+    "@excalidraw/mermaid-to-excalidraw": {
+      "mermaid": "10.9.4",
+      "nanoid": "5.0.9"
+    },
+    "mermaid@10.9.4": {
+      "dompurify": "3.2.4"
+    },
+    "dompurify": "3.2.4"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.2.0",
@@ -119,7 +136,7 @@
     "@types/three": "^0.182.0",
     "dotenv": "^17.2.3",
     "eslint": "^9",
-    "eslint-config-next": "16.1.4",
+    "eslint-config-next": "^16.1.6",
     "husky": "^9.1.7",
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.2.0",

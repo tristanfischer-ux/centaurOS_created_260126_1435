@@ -17,7 +17,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { MessageSquare } from "lucide-react"
+import { MessageSquare, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-dialog"
@@ -45,12 +45,41 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
     referredBy: null,
   })
   const [mounted, setMounted] = useState(false)
+  const [hasUnreadInsights, setHasUnreadInsights] = useState(false)
 
   // Entrance delay to avoid flash on navigation
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 200)
     return () => clearTimeout(t)
   }, [])
+
+  // Check for unread specialist insights periodically (lightweight poll)
+  useEffect(() => {
+    let cancelled = false
+
+    async function checkInsights(): Promise<void> {
+      try {
+        // Dynamic import to avoid SSR issues and keep bundle light
+        const { getUnreadInsightCount } = await import("@/actions/agent-insights")
+        const count = await getUnreadInsightCount()
+        if (!cancelled) {
+          setHasUnreadInsights(count > 0)
+        }
+      } catch {
+        // Non-critical — silently ignore
+      }
+    }
+
+    // Check once on mount after a delay, then every 5 minutes
+    const initialTimer = setTimeout(checkInsights, 3000)
+    const interval = setInterval(checkInsights, 5 * 60 * 1000)
+
+    return () => {
+      cancelled = true
+      clearTimeout(initialTimer)
+      clearInterval(interval)
+    }
+  }, [pathname]) // Re-check when navigating
 
   const { specialistId } = useMemo(
     () => getSpecialistForRoute(pathname ?? "/"),
@@ -114,14 +143,19 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
           <TooltipTrigger asChild>
             <button
               type="button"
-              onClick={openDialog}
-              aria-label={`Ask ${specialist.name} - ${specialist.title}`}
+              onClick={() => {
+                openDialog()
+                // Clear the indicator when the user opens the dialog
+                setHasUnreadInsights(false)
+              }}
+              aria-label={`Ask ${specialist.name} - ${specialist.title}${hasUnreadInsights ? " (has new insights)" : ""}`}
               className={cn(
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
                 "bg-background border shadow-lg",
                 "hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 "transition-transform duration-200",
                 dialogOpen && "ring-2 ring-international-orange ring-offset-2",
+                hasUnreadInsights && !dialogOpen && "ring-2 ring-international-orange/50 ring-offset-1",
               )}
             >
               {specialist.avatarImage ? (
@@ -137,10 +171,19 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
               ) : (
                 <MessageSquare className="h-5 w-5 text-muted-foreground" />
               )}
+              {/* Proactive insight indicator — subtle sparkle when specialist has something to share */}
+              {hasUnreadInsights && !dialogOpen && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-international-orange shadow-sm">
+                  <Sparkles className="h-2.5 w-2.5 text-white animate-pulse" />
+                </span>
+              )}
             </button>
           </TooltipTrigger>
           <TooltipContent side="left">
-            Ask {specialist.name} — {specialist.title}
+            {hasUnreadInsights
+              ? `${specialist.name} has something to share`
+              : `Ask ${specialist.name} — ${specialist.title}`
+            }
           </TooltipContent>
         </Tooltip>
       </div>

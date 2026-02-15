@@ -30,7 +30,7 @@ const badgeVariants = cva(
           "bg-international-orange/10 text-international-orange font-mono uppercase tracking-wider",
       },
       size: {
-        sm: "text-[10px] px-2 py-0.5",
+        sm: "text-xs px-2 py-0.5",
         md: "text-xs px-2.5 py-0.5",
         lg: "text-sm px-3 py-1",
       },

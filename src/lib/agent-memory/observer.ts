@@ -27,6 +27,12 @@ Compress the conversation messages below into structured observation log entries
 - 🟡 MEDIUM: Project details, questions asked, tool results, recommendations given, workflow context
 - 🟢 LOW: Minor details, uncertain observations, pleasantries
 
+## Special Categories (use these tags when detected)
+- 🎯 RECURRING: A topic the user has asked about multiple times — note the recurrence
+- 💡 PREFERENCE: A communication preference signal (e.g., asked for shorter answers, prefers bullets, likes/dislikes a specific approach)
+- ⚡ CORRECTION: User corrected the assistant or expressed dissatisfaction with the output
+- 🔄 FOLLOW_UP: Something the user committed to doing or revisiting later — note what and estimated when
+
 ## Rules
 1. User assertions → 🔴 HIGH priority. User questions → 🟡 MEDIUM priority.
 2. One observation per distinct event or fact. Don't combine unrelated items.
@@ -37,6 +43,9 @@ Compress the conversation messages below into structured observation log entries
 7. When a user references a future date (e.g. "next Tuesday"), include the estimated actual date.
 8. When information supersedes previous info, note the update explicitly.
 9. For workflow outputs, summarize the key deliverable, not the full content.
+10. ALWAYS look for preference signals: if the user says "make it shorter", "just give me the recommendation", "I prefer tables", or expresses frustration with the format — tag it with 💡 PREFERENCE.
+11. ALWAYS look for corrections: if the user says "that's not what I meant", "no", or pushes back — tag it with ⚡ CORRECTION.
+12. ALWAYS look for recurring themes: if the same topic appears in multiple conversations — tag it with 🎯 RECURRING.
 
 ## Output Format
 Return ONLY the observation entries in this format:
@@ -45,6 +54,10 @@ Date: YYYY-MM-DD
 - 🔴 (HH:MM) [observation text]
 - 🟡 (HH:MM) [observation text]
 - 🟢 (HH:MM) [observation text]
+- 💡 (HH:MM) PREFERENCE: [what was preferred/disliked]
+- ⚡ (HH:MM) CORRECTION: [what was corrected]
+- 🎯 (HH:MM) RECURRING: [topic that keeps coming up]
+- 🔄 (HH:MM) FOLLOW_UP: [commitment + estimated date]
 
 Date: YYYY-MM-DD
 - ...

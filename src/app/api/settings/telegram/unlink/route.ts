@@ -4,18 +4,8 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { rateLimit } from '@/lib/security/rate-limit'
-
-// Admin client for messaging_links table (not in types yet)
-function getAdminClient() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url || !serviceKey) throw new Error('Missing Supabase config')
-    return createAdminClient(url, serviceKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-    })
-}
 
 export async function POST() {
     try {
@@ -35,7 +25,7 @@ export async function POST() {
             )
         }
 
-        const admin = getAdminClient()
+        const admin = createAdminClient()
 
         // Delete the messaging link
         const { error } = await admin

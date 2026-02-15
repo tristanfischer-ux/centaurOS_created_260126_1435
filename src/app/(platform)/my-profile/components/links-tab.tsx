@@ -148,7 +148,7 @@ function LinkRow({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-muted-foreground hover:text-foreground transition-colors"
+        className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
         aria-label={`Open ${label}`}
       >
         <ExternalLink className="h-4 w-4" />

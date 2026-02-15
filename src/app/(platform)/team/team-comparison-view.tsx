@@ -49,9 +49,15 @@ import { usePresenceContext } from "@/components/PresenceProvider"
 import { PresenceIndicator } from "@/components/PresenceIndicator"
 import { TeamComparisonBar } from "@/components/team/team-comparison-bar"
 import { TeamComparisonModal } from "@/components/team/team-comparison-modal"
+import dynamic from "next/dynamic"
+import { Skeleton } from "@/components/ui/skeleton"
 import { TeamMemberCard, CardSize } from "@/components/team/team-member-card"
-import { TeamAnalytics } from "@/components/team/team-analytics"
 import { FullTaskView } from "@/components/tasks/full-task-view"
+
+const TeamAnalytics = dynamic(
+  () => import("@/components/team/team-analytics").then((m) => ({ default: m.TeamAnalytics })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[400px] rounded-lg" /> },
+)
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 

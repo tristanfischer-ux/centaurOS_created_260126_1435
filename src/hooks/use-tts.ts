@@ -23,6 +23,31 @@ function getStoredVoiceEnabled(): boolean {
     return stored === null ? true : stored === "true"
 }
 
+/** Strip markdown for TTS — headers, bullets, bold, code, etc. */
+function stripMarkdownForTTS(text: string): string {
+    return text
+        .replace(/^#{1,6}\s+/gm, "")
+        .replace(/\*\*(.+?)\*\*/g, "$1")
+        .replace(/\*(.+?)\*/g, "$1")
+        .replace(/`(.+?)`/g, "$1")
+        .replace(/```[\s\S]*?```/g, " ")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/^[-*]\s+/gm, "")
+        .replace(/^\d+\.\s+/gm, "")
+        .replace(/^>\s+/gm, "")
+        .replace(/\n{2,}/g, ". ")
+        .replace(/\s+/g, " ")
+        .trim()
+}
+
+/** Split text into sentence-sized chunks for chunked TTS. */
+function splitIntoSentences(text: string): string[] {
+    const trimmed = text.trim()
+    if (!trimmed) return []
+    const parts = trimmed.split(/(?<=[.!?])\s+/)
+    return parts.filter((p) => p.trim().length > 0)
+}
+
 export interface UseTtsReturn {
     /** Whether voice output is enabled */
     voiceEnabled: boolean
@@ -34,6 +59,11 @@ export interface UseTtsReturn {
     isPlaying: boolean
     /** Play the given text with the given voice */
     play: (text: string, voice: string) => Promise<void>
+    /**
+     * Play text in sentence-sized chunks for faster time-to-first-audio.
+     * First sentence plays immediately after synthesis; subsequent chunks play in sequence.
+     */
+    playChunked: (text: string, voice: string) => Promise<void>
     /** Stop any currently playing audio */
     stop: () => void
     /**
@@ -205,6 +235,106 @@ export function useTts(): UseTtsReturn {
         }
     }, [stopPlayback])
 
+    /**
+     * Play text in sentence-sized chunks. First chunk plays as soon as synthesized;
+     * reduces perceived delay vs. synthesizing and playing the full response at once.
+     */
+    const playChunked = useCallback(
+        async (text: string, voice: string): Promise<void> => {
+            stopPlayback()
+
+            const clean = stripMarkdownForTTS(text)
+            if (!clean.trim()) return
+
+            const chunks = splitIntoSentences(clean)
+            if (chunks.length === 0) return
+
+            if (!audioContextRef.current) {
+                audioContextRef.current = new AudioContext()
+            }
+            const ctx = audioContextRef.current
+            if (ctx.state === "suspended") {
+                try {
+                    await ctx.resume()
+                } catch {
+                    console.warn("[TTS] AudioContext resume failed — playback may not work")
+                    return
+                }
+            }
+
+            const controller = new AbortController()
+            abortRef.current = controller
+
+            const fetchAudio = async (chunkText: string): Promise<ArrayBuffer | null> => {
+                const res = await fetch("/api/agents/tts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text: chunkText, voice }),
+                    signal: controller.signal,
+                })
+                if (!res.ok) return null
+                return res.arrayBuffer()
+            }
+
+            const playBuffer = (buffer: ArrayBuffer): Promise<void> =>
+                new Promise((resolve, reject) => {
+                    if (controller.signal.aborted) {
+                        resolve()
+                        return
+                    }
+                    ctx.decodeAudioData(buffer)
+                        .then((audioBuffer) => {
+                            if (controller.signal.aborted) {
+                                resolve()
+                                return
+                            }
+                            const source = ctx.createBufferSource()
+                            source.buffer = audioBuffer
+                            source.connect(ctx.destination)
+                            sourceNodeRef.current = source
+                            source.onended = () => {
+                                sourceNodeRef.current = null
+                                resolve()
+                            }
+                            source.start()
+                        })
+                        .catch(reject)
+                })
+
+            try {
+                for (let i = 0; i < chunks.length; i++) {
+                    if (controller.signal.aborted) return
+
+                    const chunk = chunks[i].trim()
+                    if (!chunk) continue
+
+                    setIsLoading(true)
+                    const buffer = await fetchAudio(chunk)
+                    if (controller.signal.aborted) return
+                    if (!buffer) {
+                        console.warn("[TTS] Chunk fetch failed:", i)
+                        continue
+                    }
+
+                    setIsLoading(false)
+                    setIsPlaying(true)
+                    await playBuffer(buffer)
+                    setIsPlaying(false)
+
+                    if (controller.signal.aborted) return
+                }
+            } catch (err) {
+                if (err instanceof Error && err.name === "AbortError") return
+                console.warn("[TTS] PlayChunked failed:", err instanceof Error ? err.message : err)
+            } finally {
+                abortRef.current = null
+                setIsLoading(false)
+                setIsPlaying(false)
+            }
+        },
+        [stopPlayback],
+    )
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
@@ -230,6 +360,7 @@ export function useTts(): UseTtsReturn {
         isLoading,
         isPlaying,
         play,
+        playChunked,
         stop: stopPlayback,
         warmUp,
     }

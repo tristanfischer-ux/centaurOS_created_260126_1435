@@ -213,6 +213,17 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [progressLines, setProgressLines] = useState<string[]>([])
   const [milestone, setMilestone] = useState<MilestoneType>(null)
 
+  // ── Browser notification helper ──
+  const sendNotification = useCallback((title: string, body: string) => {
+    try {
+      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        new Notification(title, { body, icon: "/favicon.ico" })
+      }
+    } catch {
+      // Non-critical — notification API not available
+    }
+  }, [])
+
   // ── Computed ──
   const hasResearch = !!(researchResult?.success && editableReport.trim().length > 0)
   const readinessFields = [
@@ -480,6 +491,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setProgressLines([])
     addProgressLine(`Starting pipeline for ${pending.length} modules...`)
 
+    // Request notification permission so we can alert when done
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => { /* Non-critical */ })
+    }
+
     // Initialize progress UI — mark all non-generated as queued
     const progress: Record<string, "queued" | "interface" | "generating" | "done" | "error"> = {}
     for (const mod of modules) {
@@ -584,13 +600,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if (errorCount === 0) {
         setMilestone("batch")
         addProgressLine(`All ${pending.length} modules generated successfully.`)
+        sendNotification("The Forge — All Modules Generated", `${pending.length} modules for "${subject}" are ready. View results now.`)
       } else {
         addProgressLine(
           `Batch finished — ${completedCount - (modules.length - pending.length)}/${pending.length} modules generated, ${errorCount} failed.`,
         )
       }
     }
-  }, [modules, isBatchRunning, activeProjectId, addProgressLine])
+  }, [modules, isBatchRunning, activeProjectId, addProgressLine, sendNotification, subject])
 
   // ── Research ──
   const handleResearch = useCallback(async () => {

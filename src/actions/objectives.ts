@@ -266,7 +266,7 @@ export async function createObjective(formData: FormData) {
         revalidatePath('/new-objectives')
         revalidatePath('/tasks')
         revalidatePath('/new-tasks')
-        return { success: true }
+        return { success: true, objectiveId: objective.id }
     })
 }
 

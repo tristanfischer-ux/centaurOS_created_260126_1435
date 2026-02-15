@@ -11,13 +11,11 @@ import {
   AnimatePresence,
 } from "framer-motion";
 import {
-  fadeInUp,
   fadeInScale,
   heroHeadline,
   heroTagline,
   buttonHover,
   buttonTap,
-  AnimatedHeader,
   StaggerContainer,
   AnimatedCard,
   AnimatedSection,
@@ -49,6 +47,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { RolesSection } from "@/components/marketing/RolesSection";
+import { GuildSection } from "@/components/marketing/GuildSection";
+import { PlatformShowcaseSection } from "@/components/marketing/PlatformShowcaseSection";
+import { EcosystemSection } from "@/components/marketing/EcosystemSection";
+import { TrustSection } from "@/components/marketing/TrustSection";
 
 // Domain configuration
 const APP_DOMAIN =
@@ -120,6 +123,22 @@ export default function MarketingPage() {
     return () => window.removeEventListener("scroll", handleFloatingCTA);
   }, []);
 
+  // Scroll to hash on initial load and when hash changes (e.g. Link to /#guild)
+  useEffect(() => {
+    const scrollToHash = (): void => {
+      const hash = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
+      if (!hash) return;
+      const el = document.getElementById(hash);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    const timeoutId = setTimeout(scrollToHash, 100);
+    window.addEventListener("hashchange", scrollToHash);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener("hashchange", scrollToHash);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Skip Navigation - Accessibility */}
@@ -146,41 +165,41 @@ export default function MarketingPage() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <a
-              href="#problem"
+            <Link
+              href="/#roles"
+              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
+            >
+              Roles
+            </Link>
+            <Link
+              href="/#problem"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               Why Us
-            </a>
-            <a
-              href="#solution"
+            </Link>
+            <Link
+              href="/#guild"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
-              Solution
-            </a>
-            <a
-              href="#how-it-works"
+              Guild
+            </Link>
+            <Link
+              href="/#how-it-works"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               Getting Started
-            </a>
+            </Link>
             <Link
               href="/pricing"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               Pricing
             </Link>
-            <a
-              href="#faq"
+            <Link
+              href="/#faq"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               FAQ
-            </a>
-            <Link
-              href="/techniques"
-              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
-            >
-              Techniques
             </Link>
             <a
               href={`${APP_DOMAIN}/login`}
@@ -249,27 +268,21 @@ export default function MarketingPage() {
                     Get Started Free
                   </Link>
                   {[
-                    { href: "#problem", label: "Why Us" },
-                    { href: "#solution", label: "Solution" },
-                    { href: "#how-it-works", label: "Getting Started" },
-                    { href: "#faq", label: "FAQ" },
+                    { href: "/#roles", label: "Roles" },
+                    { href: "/#problem", label: "Why Us" },
+                    { href: "/#guild", label: "Guild" },
+                    { href: "/#how-it-works", label: "Getting Started" },
+                    { href: "/#faq", label: "FAQ" },
                   ].map((item) => (
-                    <a
+                    <Link
                       key={item.href}
                       href={item.href}
                       className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50 last:border-b-0"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {item.label}
-                    </a>
+                    </Link>
                   ))}
-                  <Link
-                    href="/techniques"
-                    className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Techniques
-                  </Link>
                   <Link
                     href="/pricing"
                     className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50"
@@ -294,6 +307,7 @@ export default function MarketingPage() {
       {/* ── Main Content ── */}
       <main id="main-content">
         <HeroSection />
+        <RolesSection />
         <ProblemSection />
         <Suspense fallback={
           <div className="py-16 px-4">
@@ -308,8 +322,12 @@ export default function MarketingPage() {
           <SavingsCalculatorSection />
         </Suspense>
         <SolutionSection />
+        <PlatformShowcaseSection />
         <HowItWorksSection />
+        <GuildSection />
+        <EcosystemSection />
         <HowAProjectWorksSection />
+        <TrustSection />
         <PlatformCapabilitiesSection />
         <PricingPreviewSection />
         <FAQSection />
@@ -327,10 +345,10 @@ export default function MarketingPage() {
             className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-t border-muted px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
           >
             <Link
-              href="/join/founder"
+              href="/#roles"
               className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full"
             >
-              Get Started Free
+              Choose Your Path
               <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
@@ -358,22 +376,22 @@ export default function MarketingPage() {
               <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">
                 Platform
               </p>
-              <div className="flex flex-col gap-2.5 sm:gap-2">
+              <div className="flex flex-col gap-1 sm:gap-2">
                 <Link
                   href="/pricing"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Pricing
                 </Link>
                 <a
                   href={`${APP_DOMAIN}/login`}
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Login
                 </a>
                 <Link
                   href="/join/founder"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Get Started Free
                 </Link>
@@ -384,22 +402,22 @@ export default function MarketingPage() {
               <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">
                 Roles
               </p>
-              <div className="flex flex-col gap-2.5 sm:gap-2">
+              <div className="flex flex-col gap-1 sm:gap-2">
                 <Link
                   href="/join/founder"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Founders
                 </Link>
                 <Link
                   href="/join/executive"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Executives
                 </Link>
                 <Link
                   href="/join/apprentice"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Apprentices
                 </Link>
@@ -530,7 +548,7 @@ function HeroSection() {
           className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full"
         >
           <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
-          <span className="text-international-orange text-[10px] sm:text-xs font-mono uppercase tracking-widest">
+          <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
             Early Access &mdash; Founding Members Only
           </span>
         </motion.div>
@@ -628,24 +646,43 @@ function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.6 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto"
+          className="flex flex-col items-center gap-4 w-full sm:w-auto"
         >
-          <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
-            <Link
-              href="/join/founder"
-              className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto"
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
+              <Link
+                href="/join/founder"
+                className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto"
+              >
+                Start as Founder
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </motion.div>
+            <a
+              href="#roles"
+              className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
             >
-              Get Started Free
-              <ArrowRight className="h-4 w-4" />
+              Choose Your Path
+              <ChevronDown className="h-4 w-4" />
+            </a>
+          </div>
+          {/* Secondary role links */}
+          <div className="flex items-center gap-4 text-xs font-mono text-muted-foreground">
+            <span>Also join as:</span>
+            <Link
+              href="/join/executive"
+              className="text-international-orange/80 hover:text-international-orange transition-colors uppercase tracking-wider min-h-[44px] flex items-center"
+            >
+              Executive
             </Link>
-          </motion.div>
-          <a
-            href="#how-it-works"
-            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
-          >
-            See How It Works
-            <ChevronDown className="h-4 w-4" />
-          </a>
+            <span className="text-muted-foreground/40">|</span>
+            <Link
+              href="/join/apprentice"
+              className="text-international-orange/80 hover:text-international-orange transition-colors uppercase tracking-wider min-h-[44px] flex items-center"
+            >
+              Apprentice
+            </Link>
+          </div>
         </motion.div>
 
         {/* Version line */}
@@ -666,7 +703,7 @@ function HeroSection() {
         transition={{ delay: 2, duration: 0.6 }}
         className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1"
       >
-        <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest hidden sm:block">
+        <span className="text-xs text-muted-foreground font-mono uppercase tracking-widest hidden sm:block">
           Scroll
         </span>
         <motion.div
@@ -753,21 +790,22 @@ function ProblemSection() {
           })}
         </StaggerContainer>
 
-        {/* Comparison image — taller aspect ratio on mobile for readability */}
+        {/* Comparison image — labels are HTML, not baked into the image */}
         <AnimatedSection className="mt-10 sm:mt-12 md:mt-20" delay={0.2}>
           <div className="relative w-full aspect-[3/2] sm:aspect-[2.2/1] rounded-lg sm:rounded-xl overflow-hidden border">
             <Image
               src="/images/problem-comparison.png"
-              alt="Comparison: 18 months of traditional hardware development versus 6 weeks with Fractional Forge"
+              alt="Comparison: traditional hardware development versus the fractional model with Fractional Forge"
               fill
               className="object-cover"
               sizes="(max-width: 640px) 100vw, (max-width: 768px) 100vw, 1200px"
               loading="lazy"
             />
           </div>
-          <p className="text-center text-xs text-muted-foreground mt-3 sm:mt-4 font-mono tracking-wider">
-            Traditional Development vs. The Fractional Model
-          </p>
+          <div className="flex justify-between text-xs text-muted-foreground mt-3 sm:mt-4 font-mono tracking-wider px-1">
+            <span>Traditional Development</span>
+            <span>The Fractional Model</span>
+          </div>
         </AnimatedSection>
       </div>
     </section>
@@ -883,7 +921,7 @@ function SavingsCalculatorSection() {
                   max={15}
                   value={teamSize}
                   onChange={(e) => setTeamSize(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
+                  className="w-full h-2 py-3 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-8 [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-8 [&::-moz-range-thumb]:w-8 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
                   aria-label={`Team size: ${teamSize} engineers`}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -913,7 +951,7 @@ function SavingsCalculatorSection() {
                   step={500}
                   value={monthlyCost}
                   onChange={(e) => setMonthlyCost(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
+                  className="w-full h-2 py-3 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-8 [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-8 [&::-moz-range-thumb]:w-8 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
                   aria-label={`Monthly cost per engineer: £${monthlyCost.toLocaleString()}`}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -942,7 +980,7 @@ function SavingsCalculatorSection() {
                   max={24}
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
-                  className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
+                  className="w-full h-2 py-3 bg-muted rounded-full appearance-none cursor-pointer accent-international-orange [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-8 [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-international-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-8 [&::-moz-range-thumb]:w-8 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-international-orange [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
                   aria-label={`Project duration: ${duration} months`}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -970,24 +1008,24 @@ function SavingsCalculatorSection() {
               {/* Traditional vs Fractional comparison */}
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div className="rounded-xl bg-status-error-light p-4 sm:p-5 text-center">
-                  <p className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-destructive mb-1.5 sm:mb-2">
+                  <p className="text-xs font-mono uppercase tracking-widest text-destructive mb-1.5 sm:mb-2">
                     Traditional
                   </p>
                   <p className="text-xl sm:text-2xl md:text-3xl font-black text-destructive">
                     {formatCurrency(traditionalCost)}
                   </p>
-                  <p className="text-[10px] sm:text-xs text-destructive/70 mt-1">
+                  <p className="text-xs text-destructive/70 mt-1">
                     {traditionalWeeks} weeks
                   </p>
                 </div>
                 <div className="rounded-xl bg-status-success-light p-4 sm:p-5 text-center">
-                  <p className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-status-success mb-1.5 sm:mb-2">
+                  <p className="text-xs font-mono uppercase tracking-widest text-status-success mb-1.5 sm:mb-2">
                     Fractional
                   </p>
                   <p className="text-xl sm:text-2xl md:text-3xl font-black text-status-success">
                     {formatCurrency(fractionalCost)}
                   </p>
-                  <p className="text-[10px] sm:text-xs text-status-success/70 mt-1">
+                  <p className="text-xs text-status-success/70 mt-1">
                     ~{fractionalWeeks} weeks
                   </p>
                 </div>
@@ -995,7 +1033,7 @@ function SavingsCalculatorSection() {
 
               {/* Savings highlight */}
               <div className="rounded-xl border-2 border-international-orange bg-international-orange/5 p-5 sm:p-6 text-center">
-                <p className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-international-orange mb-1.5 sm:mb-2">
+                <p className="text-xs font-mono uppercase tracking-widest text-international-orange mb-1.5 sm:mb-2">
                   You Save
                 </p>
                 <p className="text-3xl sm:text-4xl md:text-5xl font-black text-international-orange">
@@ -1118,7 +1156,7 @@ function SolutionSection() {
       icon: Wrench,
       title: "Operating System",
       description:
-        "ForgeOS coordinates your fractional team, tracks objectives, manages suppliers, and keeps everyone aligned. The glue that makes fractional work.",
+        "ForgeOS coordinates your fractional team, tracks objectives, manages suppliers, and keeps everyone aligned — the system that makes fractional collaboration work.",
     },
   ] as const;
 
@@ -1335,7 +1373,7 @@ function PlatformCapabilitiesSection() {
               <p className="text-2xl sm:text-3xl md:text-4xl font-black text-international-orange mb-1">
                 {metric.value}
               </p>
-              <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground font-mono uppercase tracking-wider">
+              <p className="text-xs md:text-sm text-muted-foreground font-mono uppercase tracking-wider">
                 {metric.label}
               </p>
             </AnimatedCard>
@@ -1396,7 +1434,7 @@ function PlatformCapabilitiesSection() {
               </span>
             ))}
           </div>
-          <p className="text-[10px] sm:text-xs text-muted-foreground font-mono tracking-wider mb-5 sm:mb-6">
+          <p className="text-xs text-muted-foreground font-mono tracking-wider mb-5 sm:mb-6">
             + Welding, Brazing, Carbon Fibre, Nano-Imprint, Bio-Printing, and
             dozens more.
           </p>
@@ -1431,10 +1469,10 @@ function HowItWorksSection() {
     {
       number: "01",
       icon: UserCheck,
-      title: "Sign Up",
+      title: "Choose Your Role",
       description:
-        "Create your free account in under a minute. No application, no waitlist — just pick your role and you're in. Founding members get early access pricing locked in forever.",
-      cta: { label: "Get Started Free", href: "/join/founder" },
+        "Are you a Founder launching a hardware company? An Executive with expertise to deploy? An Apprentice ready to learn? Pick your path and create your free account in under a minute.",
+      cta: { label: "Choose Your Path", href: "#roles" },
     },
     {
       number: "02",
@@ -1590,7 +1628,7 @@ function PricingPreviewSection() {
               }`}
             >
               {tier.highlight && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-international-orange text-white text-[10px] sm:text-xs font-mono font-bold tracking-widest uppercase px-3 sm:px-4 py-1 rounded-full whitespace-nowrap">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-international-orange text-white text-xs font-mono font-bold tracking-widest uppercase px-3 sm:px-4 py-1 rounded-full whitespace-nowrap">
                   Recommended
                 </span>
               )}
@@ -1678,9 +1716,19 @@ function FAQSection() {
         "The platform starts free. Paid plans start at £49/month for growing ventures. On top of the subscription, there's a 10% platform fee on marketplace transactions (manufacturing orders, retainer payments). No hidden fees. Cancel anytime.",
     },
     {
-      question: "What if I'm not a founder? Can I still join?",
+      question: "What's the difference between Founder, Executive, and Apprentice?",
       answer:
-        "Absolutely. We have three roles: Founders (who need things built), Executives (senior engineers who provide fractional expertise), and Apprentices (emerging talent paired with executives for accelerated learning). Each role has its own signup path.",
+        "Founders bring vision and capital — they need hardware built. Executives are senior professionals who deploy their expertise fractionally across multiple ventures. Apprentices are ambitious early-career people who get paired with executives for structured mentorship while shipping real projects. Each role has its own signup path and experience inside the platform.",
+    },
+    {
+      question: "How does the Guild work?",
+      answer:
+        "The Guild is our community hub. It hosts events, workshops, and networking sessions. Executives mentor apprentices through structured programmes. Apprentices build portfolios of real work. Founders connect with people who can help. It's the human side of making hardware fast — because tools alone don't ship products, people do.",
+    },
+    {
+      question: "How do Executives get paid?",
+      answer:
+        "Executives set their own rates and work through retainer agreements managed on the platform. Payment is handled through Stripe Connect — secure, transparent, and automatic. You can work with multiple startups simultaneously, choosing your own level of engagement.",
     },
     {
       question: "How quickly can I go from idea to prototype?",
@@ -1750,40 +1798,60 @@ function FinalCTASection() {
             className="inline-flex items-center gap-2 mb-5 sm:mb-6 px-3 sm:px-4 py-2 border border-background/20 rounded-full"
           >
             <Zap className="h-4 w-4 text-international-orange" />
-            <span className="text-international-orange text-[10px] sm:text-xs font-mono uppercase tracking-widest">
+            <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
               Limited Founding Member Spots
             </span>
           </motion.div>
 
           <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Ready to Build Hardware
-            <br className="hidden sm:block" /> at Software Speed?
+            Ready to Make Manufacturing
+            <br className="hidden sm:block" /> as Fast as Software?
           </h2>
           <p className="text-background/70 text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-8 sm:mb-10">
-            Founding members get early access pricing locked in forever,
-            direct product influence, and priority matching with our best
-            executives. Don&apos;t wait for the waitlist.
+            Whether you&apos;re launching a hardware company, deploying your expertise
+            fractionally, or starting your career — there&apos;s a seat at the forge.
+            Founding members get early access pricing locked in forever.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
-            <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
+          {/* Three role CTAs */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-2xl mx-auto mb-6">
+            <motion.div whileHover={buttonHover} whileTap={buttonTap}>
               <Link
                 href="/join/founder"
-                className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto"
+                className="flex flex-col items-center justify-center gap-1 bg-international-orange hover:bg-international-orange-hover text-white px-6 py-4 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
               >
-                Get Started Free
-                <ArrowRight className="h-4 w-4" />
+                <Rocket className="h-4 w-4 mb-1" />
+                Start as Founder
               </Link>
             </motion.div>
-            <a
-              href={`${APP_DOMAIN}/login`}
-              className="inline-flex items-center gap-2 text-background/60 hover:text-background text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
-            >
-              Already a member? Login
-            </a>
+            <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+              <Link
+                href="/join/executive"
+                className="flex flex-col items-center justify-center gap-1 border border-background/30 hover:bg-background/10 text-background px-6 py-4 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
+              >
+                <UserCheck className="h-4 w-4 mb-1" />
+                Join as Executive
+              </Link>
+            </motion.div>
+            <motion.div whileHover={buttonHover} whileTap={buttonTap}>
+              <Link
+                href="/join/apprentice"
+                className="flex flex-col items-center justify-center gap-1 border border-background/30 hover:bg-background/10 text-background px-6 py-4 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
+              >
+                <Users className="h-4 w-4 mb-1" />
+                Enter the Guild
+              </Link>
+            </motion.div>
           </div>
 
-          <p className="mt-6 sm:mt-8 text-xs text-background/60 font-mono tracking-wider">
+          <a
+            href={`${APP_DOMAIN}/login`}
+            className="inline-flex items-center gap-2 text-background/60 hover:text-background text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
+          >
+            Already a member? Login
+          </a>
+
+          <p className="mt-4 sm:mt-6 text-xs text-background/60 font-mono tracking-wider">
             No credit card required. Start free. Cancel anytime.
           </p>
         </AnimatedSection>

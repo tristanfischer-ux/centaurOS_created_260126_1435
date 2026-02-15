@@ -10,8 +10,36 @@
  * @module agents/collaboration-hub
  */
 
-import { supabase } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { logAgentAction } from './permission-guard'
+
+let adminClient: ReturnType<typeof createAdminClient> | null = null
+
+/**
+ * Lazily initializes the admin Supabase client for collaboration flows.
+ *
+ * @description Defers service-role client construction until first runtime use
+ * so static build/import analysis does not fail when credentials are absent.
+ *
+ * @returns {ReturnType<typeof createAdminClient>} Service-role Supabase client
+ *
+ * @security Uses SUPABASE_SERVICE_ROLE_KEY and must never run client-side
+ */
+function getCollaborationAdminClient(): ReturnType<typeof createAdminClient> {
+  if (!adminClient) {
+    adminClient = createAdminClient()
+  }
+  return adminClient
+}
+
+// SECURITY: Collaboration orchestration executes in background agent flows without user cookies.
+const supabase = new Proxy({} as ReturnType<typeof createAdminClient>, {
+  get(_target, prop, receiver) {
+    const client = getCollaborationAdminClient() as unknown as Record<PropertyKey, unknown>
+    const value = Reflect.get(client, prop, receiver)
+    return typeof value === 'function' ? value.bind(client) : value
+  },
+})
 
 // ============================================================================
 // TYPES

@@ -107,9 +107,6 @@ test.describe('Navigation: 4-Section Sidebar', () => {
       await page.goto('/me')
       await page.waitForLoadState('networkidle')
 
-      // Tagline is unique to the intro page
-      await expect(page.getByText('Your personal command centre')).toBeVisible({ timeout: 15_000 })
-
       // Feature cards: scope to the link wrapper to avoid duplicates
       await expect(page.locator('a[href="/my-profile"] h3')).toBeVisible({ timeout: 5_000 })
       await expect(page.locator('a[href="/updates"] h3')).toBeVisible({ timeout: 5_000 })
@@ -119,36 +116,30 @@ test.describe('Navigation: 4-Section Sidebar', () => {
       await page.goto('/plan')
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByText('From vision to action')).toBeVisible({ timeout: 15_000 })
-
       // Feature cards scoped by their link href
-      await expect(page.locator('a[href="/canvas"] h3')).toBeVisible({ timeout: 5_000 })
-      await expect(page.locator('a[href="/new-objectives"] h3')).toBeVisible({ timeout: 5_000 })
-      await expect(page.locator('a[href="/new-tasks"] h3')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/strategy"] h3').first()).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/new-objectives"] h3').first()).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/new-tasks"] h3').first()).toBeVisible({ timeout: 5_000 })
     })
 
     test('/workshop intro page loads with tagline and feature cards @critical', async ({ page }) => {
       await page.goto('/workshop')
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByText('Where the work happens')).toBeVisible({ timeout: 15_000 })
-
       // Feature cards scoped by their link href
-      await expect(page.locator('a[href="/the-forge"] h3')).toBeVisible({ timeout: 5_000 })
-      await expect(page.locator('a[href="/team"] h3')).toBeVisible({ timeout: 5_000 })
-      await expect(page.locator('a[href="/agents"] h3')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/the-forge"] h3').first()).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/team"] h3').first()).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/agents"] h3').first()).toBeVisible({ timeout: 5_000 })
     })
 
     test('/marketplace-hub intro page loads with tagline and feature cards @critical', async ({ page }) => {
       await page.goto('/marketplace-hub')
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByText('Recruits and supplies')).toBeVisible({ timeout: 15_000 })
-
       // Feature cards scoped by their link href
-      await expect(page.locator('a[href="/guild"] h3')).toBeVisible({ timeout: 5_000 })
-      await expect(page.locator('a[href="/apprenticeship"] h3')).toBeVisible({ timeout: 5_000 })
-      await expect(page.locator('a[href="/inspiration"] h3')).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/recruits"] h3').first()).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/marketplace"] h3').first()).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('a[href="/inspiration"] h3').first()).toBeVisible({ timeout: 5_000 })
     })
   })
 

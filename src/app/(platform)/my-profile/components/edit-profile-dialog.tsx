@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
-  User, FileText, Linkedin, Phone,
+  User, FileText, Linkedin, Phone, Briefcase,
   ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -31,6 +31,7 @@ import { typography } from '@/lib/design-system'
 
 const STEPS = [
   { id: 'basics' as const, title: 'Name & Bio', icon: User },
+  { id: 'background' as const, title: 'Background', icon: Briefcase },
   { id: 'contact' as const, title: 'Contact & Links', icon: Linkedin },
 ]
 
@@ -48,6 +49,11 @@ interface EditProfileDialogProps {
     bio: string | null
     phone_number: string | null
     linkedin_url: string | null
+    professional_background: {
+      summary?: string | null
+      previous_companies?: string | null
+      education?: string | null
+    } | null
   }
 }
 
@@ -56,6 +62,9 @@ interface FormState {
   bio: string
   phoneNumber: string
   linkedinUrl: string
+  backgroundSummary: string
+  previousCompanies: string
+  education: string
 }
 
 export function EditProfileDialog({
@@ -68,11 +77,15 @@ export function EditProfileDialog({
   const [currentStep, setCurrentStep] = useState<StepId>('basics')
   const [error, setError] = useState<string | null>(null)
 
+  const bg = profile.professional_background
   const [formState, setFormState] = useState<FormState>({
     fullName: profile.full_name || '',
     bio: profile.bio || '',
     phoneNumber: profile.phone_number || '',
     linkedinUrl: profile.linkedin_url || '',
+    backgroundSummary: bg?.summary || '',
+    previousCompanies: bg?.previous_companies || '',
+    education: bg?.education || '',
   })
 
   const currentStepIndex = STEPS.findIndex(s => s.id === currentStep)
@@ -138,11 +151,20 @@ export function EditProfileDialog({
     if (!validateStep(currentStep)) return
 
     startTransition(async () => {
+      // Build professional background JSONB (only if any field has content)
+      const hasBg = formState.backgroundSummary.trim() || formState.previousCompanies.trim() || formState.education.trim()
+      const professionalBackground = hasBg ? {
+        summary: formState.backgroundSummary.trim() || null,
+        previous_companies: formState.previousCompanies.trim() || null,
+        education: formState.education.trim() || null,
+      } : null
+
       const result = await updateBasicProfile({
         fullName: formState.fullName.trim(),
         bio: formState.bio.trim() || null,
         phoneNumber: formState.phoneNumber.trim() || null,
         linkedinUrl: formState.linkedinUrl.trim() || null,
+        professionalBackground,
       })
 
       if (result.success) {
@@ -210,6 +232,16 @@ export function EditProfileDialog({
               bio={formState.bio}
               onNameChange={(v) => updateField('fullName', v)}
               onBioChange={(v) => updateField('bio', v)}
+            />
+          )}
+          {currentStep === 'background' && (
+            <StepBackground
+              summary={formState.backgroundSummary}
+              previousCompanies={formState.previousCompanies}
+              education={formState.education}
+              onSummaryChange={(v) => updateField('backgroundSummary', v)}
+              onCompaniesChange={(v) => updateField('previousCompanies', v)}
+              onEducationChange={(v) => updateField('education', v)}
             />
           )}
           {currentStep === 'contact' && (
@@ -329,6 +361,76 @@ function StepNameBio({
           <p className={typography.wizardCharacterCount}>
             {bio.length} / 2000 characters
           </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StepBackground({
+  summary,
+  previousCompanies,
+  education,
+  onSummaryChange,
+  onCompaniesChange,
+  onEducationChange,
+}: {
+  summary: string
+  previousCompanies: string
+  education: string
+  onSummaryChange: (v: string) => void
+  onCompaniesChange: (v: string) => void
+  onEducationChange: (v: string) => void
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className={typography.wizardStepTitle}>What&apos;s your professional background?</h3>
+        <p className={typography.wizardStepDescription}>
+          This helps your specialists give you deeply personalized advice tailored to your
+          experience and domain expertise. All fields are optional.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-bg-summary" className="flex items-center gap-1.5">
+            <Briefcase className="h-3 w-3" /> Career summary
+          </Label>
+          <Textarea
+            id="edit-bg-summary"
+            value={summary}
+            onChange={(e) => onSummaryChange(e.target.value)}
+            placeholder="e.g. 12 years in aerospace manufacturing. Started as a design engineer at Rolls-Royce, led supply chain optimization at Airbus, then founded my own company."
+            rows={4}
+            maxLength={500}
+          />
+          <p className="text-xs text-muted-foreground">
+            {summary.length} / 500 characters
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="edit-bg-companies">Previous companies</Label>
+          <Input
+            id="edit-bg-companies"
+            value={previousCompanies}
+            onChange={(e) => onCompaniesChange(e.target.value)}
+            placeholder="e.g. Rolls-Royce, Airbus, Boeing"
+          />
+          <p className="text-xs text-muted-foreground">
+            Companies you&apos;ve worked at — helps specialists understand your network and industry experience.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="edit-bg-education">Education</Label>
+          <Input
+            id="edit-bg-education"
+            value={education}
+            onChange={(e) => onEducationChange(e.target.value)}
+            placeholder="e.g. MSc Mechanical Engineering, Imperial College London"
+          />
         </div>
       </div>
     </div>

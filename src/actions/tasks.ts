@@ -236,7 +236,7 @@ export async function createTask(formData: FormData) {
       const rawData = {
           title: title || '',
           description: description?.trim() || undefined,
-          objectiveId: objectiveId?.trim() || '',
+          objectiveId: objectiveId?.trim() ? objectiveId.trim() : undefined,
           assigneeIds: assigneeIds.filter(id => id), // Filter out empty strings
           deadline: endDate?.trim() ? endDate.trim() : null,
           riskLevel: (riskLevelRaw as RiskLevel) || 'Medium',
@@ -263,7 +263,7 @@ export async function createTask(formData: FormData) {
                   foundry_id: foundryId,
                   title: validatedTitle.trim(),
                   description: validatedDescription || null,
-                  objective_id: validatedObjectiveId,
+                  objective_id: validatedObjectiveId ?? null,
                   creator_id: user.id,
                   assignee_id: validatedAssigneeIds[0], // Primary assignee
                   start_date: startDate || null,
@@ -390,7 +390,7 @@ export async function createTask(formData: FormData) {
 
       revalidatePath('/tasks')
       revalidatePath('/new-tasks')
-      return { success: true }
+      return { success: true, taskId: data.id }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       console.error('[CreateTask] Unhandled error in createTask:', {

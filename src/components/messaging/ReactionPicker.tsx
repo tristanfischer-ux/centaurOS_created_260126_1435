@@ -65,7 +65,7 @@ export function ReactionPicker({
           <Button
             variant="ghost"
             size="sm"
-            className={cn("h-7 w-7 p-0", className)}
+            className={cn("h-7 w-7 min-h-[44px] min-w-[44px] p-0", className)}
             aria-label="Add reaction"
           >
             <SmilePlus className="h-4 w-4 text-muted-foreground" />
@@ -171,7 +171,7 @@ export function QuickReactionBar({
           key={emoji}
           onClick={() => onSelect(emoji)}
           className={cn(
-            "h-7 w-7 flex items-center justify-center rounded",
+            "h-7 w-7 min-h-[44px] min-w-[44px] flex items-center justify-center rounded",
             "text-base hover:bg-muted transition-colors"
           )}
           aria-label={`React with ${emoji}`}
@@ -182,7 +182,7 @@ export function QuickReactionBar({
       <ReactionPicker
         onSelect={onSelect}
         trigger={
-          <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted transition-colors">
+          <button className="h-7 w-7 min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-muted transition-colors">
             <SmilePlus className="h-4 w-4 text-muted-foreground" />
           </button>
         }

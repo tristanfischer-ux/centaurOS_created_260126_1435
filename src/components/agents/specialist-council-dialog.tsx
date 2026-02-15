@@ -38,6 +38,8 @@ import {
     Scale,
     Target,
     Lightbulb,
+    ClipboardList,
+    ArrowRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -335,6 +337,68 @@ export function SpecialistCouncilDialog({
                                         </div>
                                     ))}
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Action Items */}
+                        {result.report.action_items && result.report.action_items.length > 0 && (
+                            <div className="space-y-3">
+                                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                                    <ClipboardList className="h-4 w-4 text-international-orange" />
+                                    Action Items
+                                </h3>
+                                <div className="space-y-2">
+                                    {result.report.action_items.map((item, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="flex items-start gap-3 border rounded-lg p-3"
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-foreground">
+                                                    {item.action}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    Owner: {item.owner}
+                                                </p>
+                                            </div>
+                                            <Badge
+                                                variant={
+                                                    item.priority === 'high'
+                                                        ? 'destructive'
+                                                        : item.priority === 'medium'
+                                                        ? 'warning'
+                                                        : 'secondary'
+                                                }
+                                                className="flex-shrink-0"
+                                            >
+                                                {item.priority}
+                                            </Badge>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Next Steps */}
+                        {result.report.next_steps && result.report.next_steps.length > 0 && (
+                            <div className="space-y-3">
+                                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                                    <ArrowRight className="h-4 w-4 text-electric-blue" />
+                                    Your Next Steps
+                                </h3>
+                                <ol className="space-y-2">
+                                    {result.report.next_steps.map((step, idx) => (
+                                        <li
+                                            key={idx}
+                                            className="flex items-start gap-3 text-sm"
+                                        >
+                                            <span className="flex items-center justify-center h-6 w-6 rounded-full bg-electric-blue/10 text-electric-blue text-xs font-semibold flex-shrink-0">
+                                                {idx + 1}
+                                            </span>
+                                            <span className="text-foreground pt-0.5">{step}</span>
+                                        </li>
+                                    ))}
+                                </ol>
                             </div>
                         )}
                     </div>

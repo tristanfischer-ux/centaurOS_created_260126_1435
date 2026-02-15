@@ -100,7 +100,7 @@ function LoginForm(): React.ReactNode {
             className="w-full max-w-sm mx-auto space-y-8 relative z-10"
         >
             <motion.div variants={formItemVariants} className="space-y-2">
-                <a href={marketingDomain} className="inline-block mb-8 group">
+                <a href={marketingDomain} className="inline-flex items-center min-h-[44px] mb-8 group">
                     <span className="text-xs font-bold tracking-[0.3em] uppercase text-muted-foreground group-hover:text-international-orange transition-colors">
                         &larr; Return to Site
                     </span>

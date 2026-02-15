@@ -13,7 +13,16 @@ import {
 } from "@/lib/agent-memory"
 import { buildAIContext } from "@/lib/ai-context/builder"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
 import { compilePersonalityPrompt } from "@/lib/agents/personality"
+import { compileTemporalPrompt } from "@/lib/agents/temporal-context"
+import { compileEmotionalPrompt } from "@/lib/agents/emotional-context"
+import {
+    getFounderPreferences,
+    getSpecialistRelationship,
+    compileFounderPreferencesPrompt,
+    recordInteraction,
+} from "@/lib/agents/founder-preferences"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -76,7 +85,7 @@ export async function POST(request: Request) {
     }
 
     // SECURITY: Rate limit to prevent API cost abuse (AI calls are expensive)
-    const rateLimitResult = await rateLimit('api', `agent-execute:${user.id}`, { limit: 30, window: 3600 })
+    const rateLimitResult = await rateLimit('api', `agent-execute:${user.id}`, { limit: 30, window: 3600 * 1000 })
     if (!rateLimitResult.success) {
         return NextResponse.json(
             { error: "Rate limit exceeded. Please wait before running more AI agents." },
@@ -188,6 +197,13 @@ export async function POST(request: Request) {
     // 4. Build rich company context using the AI Context Builder
     const foundryId = await resolveFoundryId(supabase, user.id)
 
+    // 4a. Fetch user profile for identity context (so the agent knows who they're speaking with)
+    const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("full_name, role")
+        .eq("id", user.id)
+        .single()
+
     // 4b. Validate threadId belongs to user's foundry (IDOR prevention)
     if (threadId && foundryId) {
         const { data: thread } = await supabase
@@ -242,11 +258,13 @@ export async function POST(request: Request) {
         }
     }
 
-    // Build system prompt: base + personality + company context + memory + custom suffix
-    let systemPromptWithContext = SYSTEM_PROMPT
+    // Build system prompt: personality FIRST (identity leads), then context layers.
+    // Structure: personality → temporal → emotional → company → memory → custom suffix
+    // This ensures the specialist's identity is the dominant instruction, not a footnote.
 
-    // Inject specialist personality prompt between base system prompt and company context.
-    // This gives the agent a distinct voice, backstory, and behavioral patterns.
+    let systemPromptWithContext = ""
+
+    // Inject specialist personality FIRST — identity leads, everything else is context.
     if (specialistId) {
         const specialist = getSpecialistById(specialistId)
         if (specialist) {
@@ -254,9 +272,179 @@ export async function POST(request: Request) {
                 `${specialist.name}, the ${specialist.title} specialist`,
                 specialist.personality,
                 specialist.description,
+                specialistId,
             )
-            systemPromptWithContext += `\n\n## Your Identity & Personality\n${personalityPrompt}`
+            systemPromptWithContext = personalityPrompt
+
+            // Inject relationship awareness for cross-specialist dynamics
+            if (specialist.personality.relationships) {
+                const { compileRelationshipContext } = await import("@/lib/agents/personality")
+                const relationshipBlock = compileRelationshipContext(
+                    specialist.name,
+                    specialist.personality.relationships,
+                    typeof customSystemPromptSuffix === "string" && customSystemPromptSuffix.includes("CROSS_SPECIALIST_CONTEXT")
+                        ? customSystemPromptSuffix
+                        : undefined,
+                )
+                if (relationshipBlock) {
+                    systemPromptWithContext += `\n\n${relationshipBlock}`
+                }
+            }
+
+            // Proposed actions: allow specialist to suggest tasks/objectives
+            systemPromptWithContext += `
+
+## Suggesting Tasks and Objectives
+When your recommendation naturally includes concrete next steps (tasks or objectives the user could create), you may output them in a structured format so the user can create them with one click. In the same response where you explain your recommendation in normal prose, include an HTML comment block with valid JSON. The comment is invisible in the rendered message but enables the UI to show "Create" buttons.
+
+Format (use exactly this structure, no other keys):
+<!-- PROPOSED_ACTIONS
+[
+  { "type": "objective", "title": "Short objective title", "description": "Optional description" },
+  { "type": "task", "title": "Task title", "description": "Optional", "objectiveTitle": "Exact title of objective above if this task belongs under it" }
+]
+-->
+
+Rules:
+- Only include this block when you are actually recommending specific tasks or objectives to create. Do not add it to every message.
+- For tasks that belong under an objective in the same proposal, set "objectiveTitle" to the exact "title" of that objective so they can be linked.
+- Keep titles concise (under 200 chars for objectives, under 500 for tasks). Descriptions are optional.
+- The visible text of your response should still read naturally; the block is supplementary.`
+
+            // Workflow capabilities: let the specialist know what they can produce
+            const { getSpecialistWorkflows } = await import("@/lib/agents/specialist-workflows")
+            const workflows = getSpecialistWorkflows(specialistId as SpecialistId)
+            if (workflows.length > 0) {
+                const workflowList = workflows
+                    .map(
+                        (w) =>
+                            `- "${w.name}": ${w.description} (triggered by phrases like: ${w.triggers.slice(0, 2).join(", ")})`,
+                    )
+                    .join("\n")
+                systemPromptWithContext += `\n\n## Your Executable Workflows
+You can produce these deliverables when the founder asks. Mention them naturally when relevant:
+${workflowList}
+
+When the founder triggers one of these (e.g., "draft the plan", "run the numbers"), produce the full deliverable in your response. Don't just outline it — actually write it out completely and thoroughly.`
+            }
         }
+    }
+
+    // If no specialist, fall back to generic system prompt
+    if (!systemPromptWithContext) {
+        systemPromptWithContext = SYSTEM_PROMPT
+    }
+
+    // Add core business standards (condensed — the specialist personality already
+    // covers most of the behavioral guidance)
+    systemPromptWithContext += `\n\n## Response Standards
+- Be direct and actionable. Use markdown: headers, tables, bullets.
+- Distinguish between data the user provided, industry knowledge, and your estimates.
+- Flag assumptions explicitly. Never fabricate statistics.
+- End with clear next steps: who does what, by when.`
+
+    // User identity: address them by name
+    if (userProfile?.full_name) {
+        const roleSuffix = userProfile.role ? ` (${userProfile.role})` : ""
+        systemPromptWithContext += `\n\n## User Identity\nYou are speaking with ${userProfile.full_name}${roleSuffix}. Address them by name when natural.`
+    }
+
+    // Founder preferences: learned communication style, trust level, pet peeves
+    if (foundryId && specialistId && threadId) {
+        try {
+            const [founderPrefs, specialistRel] = await Promise.all([
+                getFounderPreferences(foundryId),
+                getSpecialistRelationship(threadId, foundryId),
+            ])
+            const specialist = getSpecialistById(specialistId)
+            const prefsBlock = compileFounderPreferencesPrompt(
+                founderPrefs,
+                specialistRel,
+                specialist?.name ?? specialistId,
+            )
+            if (prefsBlock) {
+                systemPromptWithContext += `\n\n${prefsBlock}`
+            }
+        } catch (err) {
+            // Non-critical — proceed without preferences
+            console.warn("[agents/execute] Could not load founder preferences:", err)
+        }
+    }
+
+    // Specialist emotional state and relationship depth
+    if (foundryId && threadId && specialistId) {
+        try {
+            const { getSpecialistState, compileSpecialistStatePrompt } = await import("@/lib/agents/specialist-state")
+            const specialist = getSpecialistById(specialistId)
+            const { emotional, relationship } = await getSpecialistState(threadId, foundryId)
+            const stateBlock = compileSpecialistStatePrompt(emotional, relationship, specialist?.name ?? specialistId)
+            if (stateBlock) {
+                systemPromptWithContext += `\n\n${stateBlock}`
+            }
+        } catch (err) {
+            // Non-critical — proceed without state context
+            console.warn("[agents/execute] Could not load specialist state:", err)
+        }
+    }
+
+    // Decision journal: past decisions for "remember when" references
+    if (foundryId && specialistId) {
+        try {
+            const { getRecentDecisions, compileDecisionJournalPrompt, detectDecisionPatterns } = await import("@/lib/agents/decision-journal")
+            const decisions = await getRecentDecisions(foundryId, specialistId, 10)
+            const journalBlock = compileDecisionJournalPrompt(decisions)
+            if (journalBlock) {
+                systemPromptWithContext += `\n\n${journalBlock}`
+            }
+            // Add pattern recognition for deep relationships
+            const allDecisions = await getRecentDecisions(foundryId, undefined, 50)
+            const patterns = detectDecisionPatterns(allDecisions)
+            if (patterns.length > 0) {
+                systemPromptWithContext += `\n\n## Founder Decision Patterns\n${patterns.join('\n')}`
+            }
+        } catch (err) {
+            console.warn("[agents/execute] Could not load decision journal:", err)
+        }
+    }
+
+    // External intelligence: recent reports from monitoring sweeps
+    if (foundryId && specialistId) {
+        try {
+            const { getRecentIntelligenceReports } = await import("@/lib/agents/intelligence-sweep-orchestrator")
+            const { compileIntelligencePrompt } = await import("@/lib/agents/external-intelligence")
+            const reports = await getRecentIntelligenceReports(foundryId, 3, specialistId)
+            const intelligenceBlock = compileIntelligencePrompt(reports, specialistId as SpecialistId)
+            if (intelligenceBlock) {
+                systemPromptWithContext += `\n\n${intelligenceBlock}`
+            }
+        } catch (err) {
+            // Non-critical: intelligence context is supplementary
+            console.warn("[agents/execute] Failed to load intelligence context:", err)
+        }
+    }
+
+    // Temporal awareness: what time/day it is, how to adjust behavior
+    // Also includes milestone awareness if we know when the foundry was created
+    let foundryCreatedAt: string | null = null
+    if (foundryId) {
+        try {
+            const { data: foundryData } = await supabase
+                .from("foundries")
+                .select("created_at")
+                .eq("id", foundryId)
+                .single()
+            foundryCreatedAt = foundryData?.created_at ?? null
+        } catch {
+            // Non-critical
+        }
+    }
+    const temporalBlock = compileTemporalPrompt(undefined, foundryCreatedAt)
+    systemPromptWithContext += `\n\n${temporalBlock}`
+
+    // Emotional awareness: detect founder's emotional state from their message
+    const emotionalBlock = compileEmotionalPrompt(input)
+    if (emotionalBlock) {
+        systemPromptWithContext += `\n\n${emotionalBlock}`
     }
 
     if (companyContext) {
@@ -298,15 +486,33 @@ export async function POST(request: Request) {
         }
     }
 
-    // Memory callback: record assistant response and process memory after streaming
+    // Memory callback: record assistant response, process memory, and track interaction
     const memoryCallback = threadId && foundryId
         ? async (fullOutput: string) => {
             try {
-                // Strip internal NEXT_SPECIALIST directive before saving to history
-                const cleanOutput = fullOutput.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
+                // Strip internal directives before saving to history (NEXT_SPECIALIST, PROPOSED_ACTIONS)
+                let cleanOutput = fullOutput.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
+                cleanOutput = cleanOutput.replace(/<!--\s*PROPOSED_ACTIONS\s*[\s\S]*?\s*-->/gi, "").trim()
                 await addMemoryMessage(threadId!, foundryId, "assistant", cleanOutput || fullOutput)
+
+                // Detect and record decisions from the user's message
+                try {
+                    const { containsDecisionSignal, extractDecisionSummary, recordDecision } = await import("@/lib/agents/decision-journal")
+                    const userMsg = input.trim() || finalPrompt.slice(0, 500)
+                    if (containsDecisionSignal(userMsg) && specialistId) {
+                        const summary = extractDecisionSummary(userMsg, fullOutput.slice(0, 500))
+                        await recordDecision(foundryId, specialistId, summary, userMsg.slice(0, 500))
+                    }
+                } catch {
+                    // Non-critical — decision tracking is supplementary
+                }
+
+                // Track this interaction for trust level progression (fire-and-forget)
+                recordInteraction(threadId!, foundryId).catch((err) => {
+                    console.warn("[agents/execute] Failed to record interaction:", err)
+                })
+
                 // Process memory asynchronously (observe/reflect if thresholds hit)
-                // Fire-and-forget — don't block the response
                 processMemory(threadId!, foundryId).catch((err) => {
                     console.warn("[agents/execute] Memory processing failed:", err)
                 })
@@ -349,8 +555,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `Unsupported modality: ${modality}` }, { status: 400 })
     } catch (err) {
         console.error(`[agents/execute] ${providerId}/${modality} error:`, err)
-        const message = err instanceof Error ? err.message : "Failed to execute prompt"
-        return NextResponse.json({ error: message }, { status: 500 })
+        return NextResponse.json(
+            { error: "Failed to execute prompt" },
+            { status: 500 }
+        )
     }
 }
 
@@ -413,16 +621,18 @@ async function handleTextStreaming(
                         }
                     },
                     onError(error) {
+                        const safeErrorMessage = "Stream interrupted"
+                        console.error("[agents/execute] stream error:", error)
                         controller.enqueue(
-                            encoder.encode(`data: ${JSON.stringify({ error })}\n\n`)
+                            encoder.encode(`data: ${JSON.stringify({ error: safeErrorMessage })}\n\n`)
                         )
                         controller.close()
                     },
                 })
             } catch (err) {
-                const message = err instanceof Error ? err.message : "Stream interrupted"
+                console.error("[agents/execute] stream setup failed:", err)
                 controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ error: message })}\n\n`)
+                    encoder.encode(`data: ${JSON.stringify({ error: "Stream interrupted" })}\n\n`)
                 )
                 controller.close()
             }

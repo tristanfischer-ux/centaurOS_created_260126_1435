@@ -3,9 +3,9 @@
 /**
  * @file strategy-health-review.tsx
  *
- * @description A compact card that shows Sam's (Strategy specialist) proactive
+ * @description A compact card that shows Sage's (Strategy specialist) proactive
  * assessment of the company's strategic health. Renders as a summary card
- * with a one-click "Discuss with Sam" button to dive deeper.
+ * with a one-click "Discuss with Sage" button to dive deeper.
  *
  * This doesn't call the AI API -- it generates a local summary from
  * pillar data and invites the user to start a conversation for deeper analysis.
@@ -33,7 +33,7 @@ interface StrategyHealthReviewProps {
 }
 
 /**
- * Generates a brief, opinionated insight from Sam based on pillar health data.
+ * Generates a brief, opinionated insight from Sage based on pillar health data.
  */
 function generateInsight(pillars: StrategyPillarSummary[]): {
   message: string
@@ -82,10 +82,10 @@ function generateInsight(pillars: StrategyPillarSummary[]): {
 }
 
 /**
- * StrategyHealthReview -- Sam's proactive strategy assessment card.
+ * StrategyHealthReview -- Sage's proactive strategy assessment card.
  *
  * @description Shows a brief insight based on pillar data with a
- * one-click button to start a deeper conversation with Sam.
+ * one-click button to start a deeper conversation with Sage.
  */
 export function StrategyHealthReview({ pillars, purposeSummary, className }: StrategyHealthReviewProps) {
   const insight = useMemo(() => generateInsight(pillars), [pillars])
@@ -93,7 +93,7 @@ export function StrategyHealthReview({ pillars, purposeSummary, className }: Str
   const context: SpecialistContext = {
     type: 'strategy',
     title: 'Strategy Health Review',
-    description: 'Sam is reviewing the overall health of your strategic pillars.',
+    description: 'Sage is reviewing the overall health of your strategic pillars.',
     metadata: {
       purposeSummary: purposeSummary ?? undefined,
       objectives: pillars.map(p => ({
@@ -133,11 +133,11 @@ export function StrategyHealthReview({ pillars, purposeSummary, className }: Str
     <Card className={cn('rounded-xl border', config.bg, config.border, className)}>
       <CardContent className="pt-5 pb-4">
         <div className="flex items-start gap-4">
-          {/* Sam's avatar */}
+          {/* Sage's avatar */}
           <div className="relative h-10 w-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
             <Image
               src="/images/specialists/strategist.png"
-              alt="Sam"
+              alt="Sage"
               fill
               className="object-cover"
               sizes="40px"
@@ -147,7 +147,7 @@ export function StrategyHealthReview({ pillars, purposeSummary, className }: Str
           <div className="flex-1 min-w-0 space-y-2">
             {/* Header */}
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">Sam&apos;s Take</span>
+              <span className="text-sm font-semibold text-foreground">Sage&apos;s Take</span>
               <SeverityIcon className={cn('h-3.5 w-3.5', config.iconColor)} />
             </div>
 
@@ -160,9 +160,9 @@ export function StrategyHealthReview({ pillars, purposeSummary, className }: Str
             <AskSpecialistButton
               context={context}
               specialistId="strategist"
-              specialistName="Sam"
+              specialistName="Sage"
               variant="chip"
-              label="Discuss with Sam"
+              label="Discuss with Sage"
             />
           </div>
         </div>
