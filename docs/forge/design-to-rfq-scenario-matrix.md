@@ -1,4 +1,4 @@
-# Forge Design → RFQ Scenario Matrix (3–5 Product QA Set)
+# Forge Design → RFQ Scenario Matrix (5 Product QA Set)
 
 This matrix defines representative product scenarios for final product QA.
 
