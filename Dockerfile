@@ -15,6 +15,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
+# Increase Node heap for webpack production build in CI/Docker
+ENV NODE_OPTIONS=--max-old-space-size=6144
 # Dummy values for build-time only (actual values provided at runtime)
 ENV NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-key
