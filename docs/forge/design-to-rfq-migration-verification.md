@@ -19,6 +19,7 @@ Notes:
 - `SUPABASE_SERVICE_ROLE_KEY` is **not** a Supabase CLI access token and cannot be used for `supabase login`.
 - If `npx supabase db push` returns `Access token not provided`, authenticate with a personal access token (`sbp_...`) or use manual SQL execution below.
 - If your project does not expose an admin RPC like `exec_sql`, apply the migration through CLI auth or SQL editor; REST RPC fallback will not be available.
+- `SUPABASE_SERVICE_ROLE_KEY` is also **not** the database password for pooler `--db-url` auth; attempting `db push --db-url` with it fails password authentication.
 
 If CLI auth is unavailable in your execution environment:
 

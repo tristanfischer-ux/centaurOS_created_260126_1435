@@ -129,6 +129,7 @@ Status: **PASS** (all benchmark scenarios + smoke journey checks)
 - Running `npx supabase db push` from this workspace currently requires a Supabase access token (`SUPABASE_ACCESS_TOKEN`) not present in runtime env. Apply the migration via authenticated deployment runner/dashboard if CLI auth is unavailable.
 - Attempting `supabase login` with `SUPABASE_SERVICE_ROLE_KEY` is invalid (CLI expects a personal access token format like `sbp_...`), so service-role credentials are not a substitute for migration CLI auth.
 - Attempting an `exec_sql` RPC fallback from this environment returns `PGRST202` (function not found), so migration application remains gated to authenticated CLI or manual SQL editor execution.
+- Attempting `npx supabase db push --db-url` with pooler URL + `SUPABASE_SERVICE_ROLE_KEY` also fails password auth (`FATAL: password authentication failed for user "postgres"`), confirming service-role keys are not DB password substitutes.
 - During auth flows, some environments may log:
   - `Failed to fetch user profile: infinite recursion detected in policy for relation "profiles"`
 - A dedicated migration now exists to harden profiles RLS and remove recursive policy paths:
