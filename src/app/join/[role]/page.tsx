@@ -745,9 +745,9 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
 
                             <p className="text-xs text-center text-muted-foreground">
                                 By {config.isApplication ? "applying" : "joining"}, you agree to our{" "}
-                                <Link href="#" className="underline hover:text-foreground transition-colors">Terms of Service</Link>{" "}
+                                <Link href="/terms" className="underline hover:text-foreground transition-colors">Terms of Service</Link>{" "}
                                 and{" "}
-                                <Link href="#" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
+                                <Link href="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
                             </p>
                         </motion.div>
                     </div>

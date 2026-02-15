@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Sparkles,
   ArrowRight,
+  ArrowLeft,
   Zap,
   Users,
   ShoppingBag,
@@ -45,20 +46,34 @@ export function PricingContent() {
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation bar */}
-      <nav className="border-b border-muted py-4 px-6">
+      <nav className="sticky top-0 z-40 border-b border-muted bg-background py-3 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Link href="/" className="text-lg font-display font-semibold text-foreground">
-            ForgeOS
-          </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Link
+              href="/"
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px]"
+              aria-label="Back to home"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Home</span>
+            </Link>
+            <span className="text-muted-foreground/30">|</span>
+            <Link href="/" className="text-lg font-display font-semibold text-foreground">
+              ForgeOS
+            </Link>
+          </div>
+          <div className="flex items-center gap-3 sm:gap-6">
+            <span className="text-sm font-medium text-international-orange">
+              Pricing
+            </span>
             <Link
               href="/login"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:inline"
             >
               Sign In
             </Link>
             <Button asChild size="sm" className="bg-international-orange hover:bg-international-orange-hover">
-              <Link href="/join">Get Started</Link>
+              <Link href="/join/founder">Get Started</Link>
             </Button>
           </div>
         </div>
@@ -269,6 +284,17 @@ export function PricingContent() {
           </p>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-muted py-6 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+          <p>&copy; {new Date().getFullYear()} Fractional Forge Ltd. All rights reserved.</p>
+          <div className="flex items-center gap-4">
+            <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

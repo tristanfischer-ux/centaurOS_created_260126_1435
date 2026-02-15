@@ -33,7 +33,6 @@ import {
   ChevronDown,
   ArrowRight,
   CheckCircle2,
-  Zap,
   Factory,
   Share2,
   Check,
@@ -324,14 +323,13 @@ export default function MarketingPage() {
         <SolutionSection />
         <PlatformShowcaseSection />
         <HowItWorksSection />
+        <PricingPreviewSection />
         <GuildSection />
         <EcosystemSection />
         <HowAProjectWorksSection />
         <TrustSection />
         <PlatformCapabilitiesSection />
-        <PricingPreviewSection />
         <FAQSection />
-        <FinalCTASection />
       </main>
 
       {/* ── Floating Mobile CTA — appears after scrolling past hero ── */}
@@ -430,9 +428,23 @@ export default function MarketingPage() {
               &copy; {new Date().getFullYear()} Fractional Forge Ltd. All rights
               reserved.
             </p>
-            <p className="text-xs text-muted-foreground font-mono tracking-wider">
-              Build Faster. Burn Less.
-            </p>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <Link
+                href="/terms"
+                className="hover:text-foreground transition-colors min-h-[44px] flex items-center"
+              >
+                Terms
+              </Link>
+              <Link
+                href="/privacy"
+                className="hover:text-foreground transition-colors min-h-[44px] flex items-center"
+              >
+                Privacy
+              </Link>
+              <span className="font-mono tracking-wider">
+                Build Faster. Burn Less.
+              </span>
+            </div>
           </div>
         </div>
       </footer>
@@ -666,23 +678,6 @@ function HeroSection() {
               <ChevronDown className="h-4 w-4" />
             </a>
           </div>
-          {/* Secondary role links */}
-          <div className="flex items-center gap-4 text-xs font-mono text-muted-foreground">
-            <span>Also join as:</span>
-            <Link
-              href="/join/executive"
-              className="text-international-orange/80 hover:text-international-orange transition-colors uppercase tracking-wider min-h-[44px] flex items-center"
-            >
-              Executive
-            </Link>
-            <span className="text-muted-foreground/40">|</span>
-            <Link
-              href="/join/apprentice"
-              className="text-international-orange/80 hover:text-international-orange transition-colors uppercase tracking-wider min-h-[44px] flex items-center"
-            >
-              Apprentice
-            </Link>
-          </div>
         </motion.div>
 
         {/* Version line */}
@@ -797,7 +792,7 @@ function ProblemSection() {
               src="/images/problem-comparison.png"
               alt="Comparison: traditional hardware development versus the fractional model with Fractional Forge"
               fill
-              className="object-cover"
+              className="object-cover object-[55%_center]"
               sizes="(max-width: 640px) 100vw, (max-width: 768px) 100vw, 1200px"
               loading="lazy"
             />
@@ -1026,7 +1021,7 @@ function SavingsCalculatorSection() {
                     {formatCurrency(fractionalCost)}
                   </p>
                   <p className="text-xs text-status-success/70 mt-1">
-                    ~{fractionalWeeks} weeks
+                    {fractionalWeeks} weeks
                   </p>
                 </div>
               </div>
@@ -1780,82 +1775,3 @@ function FAQSection() {
   );
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * SECTION 9 — FINAL CTA
- * Last chance to convert. Urgency + value reminder.
- * ════════════════════════════════════════════════════════════════════════ */
-
-function FinalCTASection() {
-  return (
-    <section className="py-12 sm:py-16 md:py-28 bg-foreground text-background">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-        <AnimatedSection>
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeInScale}
-            className="inline-flex items-center gap-2 mb-5 sm:mb-6 px-3 sm:px-4 py-2 border border-background/20 rounded-full"
-          >
-            <Zap className="h-4 w-4 text-international-orange" />
-            <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
-              Limited Founding Member Spots
-            </span>
-          </motion.div>
-
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Ready to Make Manufacturing
-            <br className="hidden sm:block" /> as Fast as Software?
-          </h2>
-          <p className="text-background/70 text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-8 sm:mb-10">
-            Whether you&apos;re launching a hardware company, deploying your expertise
-            fractionally, or starting your career — there&apos;s a seat at the forge.
-            Founding members get early access pricing locked in forever.
-          </p>
-
-          {/* Three role CTAs */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-2xl mx-auto mb-6">
-            <motion.div whileHover={buttonHover} whileTap={buttonTap}>
-              <Link
-                href="/join/founder"
-                className="flex flex-col items-center justify-center gap-1 bg-international-orange hover:bg-international-orange-hover text-white px-6 py-4 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
-              >
-                <Rocket className="h-4 w-4 mb-1" />
-                Start as Founder
-              </Link>
-            </motion.div>
-            <motion.div whileHover={buttonHover} whileTap={buttonTap}>
-              <Link
-                href="/join/executive"
-                className="flex flex-col items-center justify-center gap-1 border border-background/30 hover:bg-background/10 text-background px-6 py-4 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
-              >
-                <UserCheck className="h-4 w-4 mb-1" />
-                Join as Executive
-              </Link>
-            </motion.div>
-            <motion.div whileHover={buttonHover} whileTap={buttonTap}>
-              <Link
-                href="/join/apprentice"
-                className="flex flex-col items-center justify-center gap-1 border border-background/30 hover:bg-background/10 text-background px-6 py-4 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
-              >
-                <Users className="h-4 w-4 mb-1" />
-                Enter the Guild
-              </Link>
-            </motion.div>
-          </div>
-
-          <a
-            href={`${APP_DOMAIN}/login`}
-            className="inline-flex items-center gap-2 text-background/60 hover:text-background text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
-          >
-            Already a member? Login
-          </a>
-
-          <p className="mt-4 sm:mt-6 text-xs text-background/60 font-mono tracking-wider">
-            No credit card required. Start free. Cancel anytime.
-          </p>
-        </AnimatedSection>
-      </div>
-    </section>
-  );
-}

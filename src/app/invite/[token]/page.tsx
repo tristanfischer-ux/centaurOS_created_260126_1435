@@ -333,9 +333,9 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
 
             <p className="text-xs text-center text-muted-foreground">
               By joining, you agree to our{" "}
-              <Link href="#" className="underline hover:text-foreground">Terms of Service</Link>{" "}
+              <Link href="/terms" className="underline hover:text-foreground">Terms of Service</Link>{" "}
               and{" "}
-              <Link href="#" className="underline hover:text-foreground">Privacy Policy</Link>.
+              <Link href="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
             </p>
           </div>
         </div>
