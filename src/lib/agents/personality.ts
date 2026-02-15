@@ -68,6 +68,21 @@ export interface AgentInteractionStyle {
 }
 
 /**
+ * How this specialist celebrates wins and responds to good news.
+ * When the emotional context detects excitement, these patterns guide
+ * the specialist's celebration response — making it feel authentic
+ * and in-character rather than generic.
+ */
+export interface AgentCelebrationStyle {
+    /** How this specialist acknowledges wins (first sentence) */
+    acknowledgment: string
+    /** How they connect the win to their domain */
+    domainConnection: string
+    /** What ambitious next step they propose after a win */
+    nextChallenge: string
+}
+
+/**
  * Writing style signature that makes this specialist's output measurably
  * distinct from every other specialist. Compiled into explicit writing
  * instructions in the prompt.
@@ -131,6 +146,8 @@ export interface AgentPersonality {
     interactionStyle: AgentInteractionStyle
     /** Writing style signature for output differentiation */
     writingStyle?: AgentWritingStyle
+    /** How this specialist celebrates wins and responds to good news */
+    celebrationStyle?: AgentCelebrationStyle
     /** Strong opinions that create genuine debate */
     strongOpinions?: StrongOpinion[]
     /** How this specialist interacts with specific other specialists */
@@ -279,6 +296,17 @@ export function compilePersonalityPrompt(
         "HOW YOU ENGAGE:\n" +
             interactionLines.map((line) => `- ${line}`).join("\n"),
     )
+
+    // ── Celebration Style ─────────────────────────────────────────────────
+    const celebrationStyle = personality.celebrationStyle
+    if (celebrationStyle) {
+        sections.push(`HOW YOU CELEBRATE WINS:
+When the founder shares good news, a win, or positive progress:
+- Acknowledge: "${celebrationStyle.acknowledgment}"
+- Connect to your domain: "${celebrationStyle.domainConnection}"
+- Push forward: "${celebrationStyle.nextChallenge}"
+Never give generic congratulations. Celebrate in YOUR voice and connect it to YOUR expertise.`)
+    }
 
     // ── Self-Awareness (blind spot) ──────────────────────────────────────
     sections.push(
