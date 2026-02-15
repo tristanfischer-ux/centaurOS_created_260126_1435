@@ -41,7 +41,7 @@ import type { CadLabDesignBrief, CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
 import { computeRfqReadiness } from "./cad-lab-procurement-utils"
 import { createCadLabRfqAction } from "@/actions/cad-lab-rfq"
-import { getRFQDetail, getMatchedSuppliers } from "@/actions/rfq"
+import { getRFQDetail, getMatchedSuppliers, triggerRFQBroadcast } from "@/actions/rfq"
 import type { SupplierMatch } from "@/types/rfq"
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -362,6 +362,8 @@ export function CadLabContracting({
   const [rfqResponseCount, setRfqResponseCount] = useState(0)
   const [suggestedSuppliers, setSuggestedSuppliers] = useState<SupplierMatch[]>([])
   const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false)
+  const [isRebroadcasting, setIsRebroadcasting] = useState(false)
+  const [lastBroadcastCount, setLastBroadcastCount] = useState<number | null>(null)
 
   const rfqReadiness = useMemo(
     () => computeRfqReadiness(modules, diagnosticAnswers),
@@ -498,6 +500,24 @@ export function CadLabContracting({
       toast.error(error instanceof Error ? error.message : "Failed to create RFQ")
     } finally {
       setIsCreatingRfq(false)
+    }
+  }
+
+  const handleRebroadcast = async (): Promise<void> => {
+    if (!createdRfqId) return
+    setIsRebroadcasting(true)
+    try {
+      const res = await triggerRFQBroadcast(createdRfqId)
+      if (!res.success) {
+        toast.error(res.error || "Failed to rebroadcast RFQ")
+        return
+      }
+      setLastBroadcastCount(res.broadcast_count)
+      toast.success(`RFQ rebroadcasted to ${res.broadcast_count} supplier(s)`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to rebroadcast RFQ")
+    } finally {
+      setIsRebroadcasting(false)
     }
   }
 
@@ -639,21 +659,37 @@ export function CadLabContracting({
               {isCreatingRfq ? "Creating RFQ..." : "Create Marketplace RFQ"}
             </Button>
             {createdRfqId && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs h-8"
-                onClick={() => window.open(`/rfq/${createdRfqId}`, "_blank", "noopener,noreferrer")}
-              >
-                View RFQ
-                <ArrowRight className="h-3.5 w-3.5 ml-1" />
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8"
+                  onClick={handleRebroadcast}
+                  disabled={isRebroadcasting}
+                >
+                  {isRebroadcasting ? "Broadcasting..." : "Re-broadcast"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8"
+                  onClick={() => window.open(`/rfq/${createdRfqId}`, "_blank", "noopener,noreferrer")}
+                >
+                  View RFQ
+                  <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </>
             )}
           </div>
         </div>
         {!canCreateRfq && (
           <p className="text-[11px] text-status-warning -mt-1">
             {createRfqBlockedReason}
+          </p>
+        )}
+        {createdRfqId && lastBroadcastCount !== null && (
+          <p className="text-[11px] text-muted-foreground -mt-1">
+            Last rebroadcast reached {lastBroadcastCount} supplier(s).
           </p>
         )}
 
