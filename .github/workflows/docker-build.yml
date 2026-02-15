@@ -58,8 +58,6 @@ jobs:
           npm run test:e2e -- --project=chromium --grep="@critical"
         env:
           CI: true
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
