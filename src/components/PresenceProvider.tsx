@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, ReactNode } from 'react'
+import { createContext, useContext, ReactNode, useMemo } from 'react'
 import { usePresence, type UserPresence, type PresenceStatus } from '@/hooks/usePresence'
 
 interface PresenceContextType {
@@ -50,8 +50,24 @@ export function PresenceProvider({ children }: PresenceProviderProps) {
     awayTimeout: 300000 // 5 minutes
   })
 
+  // Memoize context value to prevent cascading re-renders
+  // Only create new object when actual presence data changes
+  const contextValue = useMemo(() => presence, [
+    presence.myPresence,
+    presence.teamPresence,
+    presence.isConnected,
+    presence.goOnline,
+    presence.goAway,
+    presence.goFocus,
+    presence.goOffline,
+    presence.setWorkingOn,
+    presence.recordActivity,
+    presence.getPresenceForUser,
+    presence.refreshTeamPresence
+  ])
+
   return (
-    <PresenceContext.Provider value={presence}>
+    <PresenceContext.Provider value={contextValue}>
       {children}
     </PresenceContext.Provider>
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, memo } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { formatDistanceToNow, format } from "date-fns"
@@ -135,7 +135,7 @@ interface FullTaskViewProps {
     teams?: { id: string; name: string }[]
 }
 
-export function FullTaskView({ open, onOpenChange, task, members, currentUserId, teams = [] }: FullTaskViewProps) {
+function FullTaskViewComponent({ open, onOpenChange, task, members, currentUserId, teams = [] }: FullTaskViewProps) {
     const router = useRouter()
     const [comments, setComments] = useState<Comment[]>([])
     const [history, setHistory] = useState<TaskHistoryItem[]>([])
@@ -516,6 +516,28 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
     const humanNotes = comments.filter(c => !c.is_system_log)
     const systemLogs = comments.filter(c => c.is_system_log)
 
+    // Memoize team members array for AddReviewGateDialog to prevent inline object creation
+    const teamMembersForReviewGates = useMemo(
+        () => members.map(m => ({ id: m.id, full_name: m.full_name, role: m.role })),
+        [members]
+    )
+
+    // Memoize members array for MentionText to prevent inline object creation
+    const membersForMentions = useMemo(
+        () => members.map(m => ({ id: m.id, full_name: m.full_name })),
+        [members]
+    )
+
+    // Memoize combined and sorted activity log entries to prevent inline array creation
+    const combinedActivityLog = useMemo(() => {
+        return [
+            ...history.map(h => ({ type: 'history' as const, item: h, date: new Date(h.created_at || 0) })),
+            ...systemLogs.map(s => ({ type: 'log' as const, item: s, date: new Date(s.created_at) }))
+        ]
+            .sort((a, b) => b.date.getTime() - a.date.getTime())
+            .slice(0, 20)
+    }, [history, systemLogs])
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent size="lg" className="w-full h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
@@ -687,7 +709,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
                                     )}
                                     <AddReviewGateDialog
                                         taskId={task.id}
-                                        teamMembers={members.map(m => ({ id: m.id, full_name: m.full_name, role: m.role }))}
+                                        teamMembers={teamMembersForReviewGates}
                                         onCreated={async () => {
                                             const { getReviewGatesForTask } = await import("@/actions/review-gates")
                                             const res = await getReviewGatesForTask(task.id)
@@ -1074,10 +1096,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
                                                     <div className="text-sm text-foreground">
                                                         <MentionText 
                                                             content={comment.content} 
-                                                            members={members.map(m => ({
-                                                                id: m.id,
-                                                                full_name: m.full_name
-                                                            }))}
+                                                            members={membersForMentions}
                                                         />
                                                     </div>
                                                 </div>
@@ -1108,13 +1127,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
                                 <div className="bg-muted rounded-lg p-4">
                                     <div className="relative border-l-2 border ml-2 space-y-3">
                                         {/* Combine and sort history and system logs by date */}
-                                        {[
-                                            ...history.map(h => ({ type: 'history' as const, item: h, date: new Date(h.created_at || 0) })),
-                                            ...systemLogs.map(s => ({ type: 'log' as const, item: s, date: new Date(s.created_at) }))
-                                        ]
-                                            .sort((a, b) => b.date.getTime() - a.date.getTime())
-                                            .slice(0, 20)
-                                            .map((entry, i) => (
+                                        {combinedActivityLog.map((entry, i) => (
                                                 <div key={`${entry.type}-${entry.type === 'history' ? entry.item.id : entry.item.id}`} className="relative pl-6">
                                                     <div className={cn(
                                                         "absolute -left-[5px] top-1.5 h-2 w-2 rounded-full",
@@ -1156,3 +1169,5 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
         </Dialog>
     )
 }
+
+export const FullTaskView = memo(FullTaskViewComponent)

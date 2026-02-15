@@ -20,7 +20,7 @@
 
 "use client"
 
-import React from "react"
+import React, { memo } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -141,7 +141,7 @@ interface SidebarProps {
     userFoundries?: FoundryInfo[]
 }
 
-export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, userRole, isCompanyAdmin, userFoundries }: SidebarProps) {
+function SidebarComponent({ foundryName, foundryId, foundryLogoUrl, userName, userRole, isCompanyAdmin, userFoundries }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { setZoom } = useZoomContext()
@@ -400,3 +400,5 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
         </div>
     )
 }
+
+export const Sidebar = memo(SidebarComponent)
