@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 test.describe('Forge navigation route', () => {
+  test.describe.configure({ mode: 'serial' })
+
   const founderEmail = process.env.TEST_FOUNDER_EMAIL || 'demo.founder@forgeos.io'
   const founderPassword = process.env.TEST_FOUNDER_PASSWORD || 'DemoFounder2026!'
 
@@ -29,6 +31,7 @@ test.describe('Forge navigation route', () => {
     await expect(forgeLink).toBeVisible()
     await expect(forgeLink).toHaveAttribute('href', '/the-forge')
     await forgeLink.click()
+    await page.waitForURL('**/the-forge', { timeout: 15000 })
     await expect(page).toHaveURL(/\/the-forge$/)
 
     await page.goto('/plan')
@@ -38,6 +41,7 @@ test.describe('Forge navigation route', () => {
     })
     await expect(planForgeSpotlightLink).toHaveAttribute('href', '/the-forge')
     await planForgeSpotlightLink.click()
+    await page.waitForURL('**/the-forge', { timeout: 15000 })
     await expect(page).toHaveURL(/\/the-forge$/)
 
     await page.goto('/workshop')
@@ -47,6 +51,23 @@ test.describe('Forge navigation route', () => {
     })
     await expect(workshopForgeSpotlightLink).toHaveAttribute('href', '/the-forge')
     await workshopForgeSpotlightLink.click()
+    await page.waitForURL('**/the-forge', { timeout: 15000 })
+    await expect(page).toHaveURL(/\/the-forge$/)
+  })
+
+  test('mobile More menu routes Forge to /the-forge', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await loginIfNeeded(page)
+
+    const moreButton = page.getByRole('button', { name: /^More$/i })
+    await expect(moreButton).toBeVisible()
+    await moreButton.click()
+
+    const forgeMenuItem = page.getByRole('menuitem', { name: /^The Forge$/i })
+    await expect(forgeMenuItem).toBeVisible()
+    await forgeMenuItem.click()
+
+    await page.waitForURL('**/the-forge', { timeout: 15000 })
     await expect(page).toHaveURL(/\/the-forge$/)
   })
 })

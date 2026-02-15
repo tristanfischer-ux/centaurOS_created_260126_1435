@@ -88,6 +88,7 @@ Validated:
 - Plan section Forge spotlight routes to `/the-forge`
 - Workshop section Forge spotlight routes to `/the-forge`
 - each Forge discovery link is click-tested to land on `/the-forge`
+- mobile **More** menu routes The Forge to `/the-forge`
 - canonical entrypoint consistently exposes Design-to-RFQ recommendation card
 
 ## Notes

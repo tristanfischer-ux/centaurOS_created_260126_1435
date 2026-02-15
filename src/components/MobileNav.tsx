@@ -111,19 +111,21 @@ export function MobileNav() {
     const renderDropdownItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }> }) => {
         const isActive = isRouteActive(pathname, item.href)
         return (
-            <DropdownMenuItem key={item.name} asChild>
-                <Link
-                    href={item.href}
-                    className={cn(
-                        "flex items-center justify-between gap-2 cursor-pointer w-full",
-                        isActive && "text-international-orange"
-                    )}
-                >
-                    <span className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4" />
-                        {item.name}
-                    </span>
-                </Link>
+            <DropdownMenuItem
+                key={item.name}
+                onSelect={(event) => {
+                    event.preventDefault()
+                    router.push(item.href)
+                }}
+                className={cn(
+                    "flex items-center justify-between gap-2 cursor-pointer w-full",
+                    isActive && "text-international-orange"
+                )}
+            >
+                <span className="flex items-center gap-2">
+                    <item.icon className="h-4 w-4" />
+                    {item.name}
+                </span>
             </DropdownMenuItem>
         )
     }
@@ -199,17 +201,18 @@ export function MobileNav() {
                         <DropdownMenuSeparator />
 
                         {/* Settings + Sign Out */}
-                        <DropdownMenuItem asChild>
-                            <Link
-                                href="/settings"
-                                className={cn(
-                                    "flex items-center gap-2 cursor-pointer w-full",
-                                    isRouteActive(pathname, "/settings") && "text-international-orange"
-                                )}
-                            >
-                                <Settings className="h-4 w-4" />
-                                Settings
-                            </Link>
+                        <DropdownMenuItem
+                            onSelect={(event) => {
+                                event.preventDefault()
+                                router.push("/settings")
+                            }}
+                            className={cn(
+                                "flex items-center gap-2 cursor-pointer w-full",
+                                isRouteActive(pathname, "/settings") && "text-international-orange"
+                            )}
+                        >
+                            <Settings className="h-4 w-4" />
+                            Settings
                         </DropdownMenuItem>
 
                         <DropdownMenuItem asChild>
