@@ -88,11 +88,13 @@ describe('cron authorization hardening regressions', () => {
     ])
 
     expect(permissionGuardSource).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
-    expect(permissionGuardSource).toContain('const supabase = createAdminClient()')
+    expect(permissionGuardSource).toContain('function getPermissionGuardAdminClient()')
+    expect(permissionGuardSource).toContain('const supabase = new Proxy')
     expect(permissionGuardSource).not.toContain("import { supabase } from '@/lib/supabase/server'")
 
     expect(collaborationHubSource).toContain("import { createAdminClient } from '@/lib/supabase/admin'")
-    expect(collaborationHubSource).toContain('const supabase = createAdminClient()')
+    expect(collaborationHubSource).toContain('function getCollaborationAdminClient()')
+    expect(collaborationHubSource).toContain('const supabase = new Proxy')
     expect(collaborationHubSource).not.toContain("import { supabase } from '@/lib/supabase/server'")
   })
 
