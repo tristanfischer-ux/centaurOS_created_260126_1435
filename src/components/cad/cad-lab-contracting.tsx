@@ -40,7 +40,8 @@ import { toast } from "sonner"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
 import { createCadLabRfqAction } from "@/actions/cad-lab-rfq"
-import { getRFQDetail } from "@/actions/rfq"
+import { getRFQDetail, getMatchedSuppliers } from "@/actions/rfq"
+import type { SupplierMatch } from "@/types/rfq"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -101,7 +102,9 @@ function generateRfq(
   diagnosticAnswers?: DiagnosticAnswers,
   buyerName?: string,
   deadline?: string,
-  specialTerms?: string
+  specialTerms?: string,
+  rfqId?: string,
+  rfqStatus?: string,
 ): string {
   const date = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
@@ -117,6 +120,8 @@ function generateRfq(
   lines.push(`Date: ${date}`)
   if (buyerName) lines.push(`Buyer: ${buyerName}`)
   if (deadline) lines.push(`Submission Deadline: ${deadline}`)
+  if (rfqId) lines.push(`Marketplace RFQ ID: ${rfqId}`)
+  if (rfqStatus) lines.push(`Marketplace Status: ${rfqStatus}`)
   lines.push(`Modules: ${modules.length}`)
   lines.push("")
 
@@ -181,7 +186,8 @@ function generateSow(
   projectName: string,
   modules: CadLabModule[],
   diagnosticAnswers?: DiagnosticAnswers,
-  buyerName?: string
+  buyerName?: string,
+  rfqId?: string,
 ): string {
   const date = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
@@ -197,6 +203,7 @@ function generateSow(
   lines.push(`Project: ${projectName}`)
   lines.push(`Date: ${date}`)
   if (buyerName) lines.push(`Client: ${buyerName}`)
+  if (rfqId) lines.push(`Marketplace RFQ Reference: ${rfqId}`)
   lines.push("")
 
   lines.push("1. SCOPE")
@@ -250,7 +257,7 @@ function generateSow(
 /**
  * Generates a mutual NDA template.
  */
-function generateNda(projectName: string, buyerName?: string): string {
+function generateNda(projectName: string, buyerName?: string, rfqId?: string): string {
   const date = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -263,6 +270,7 @@ function generateNda(projectName: string, buyerName?: string): string {
   lines.push("")
   lines.push(`Date: ${date}`)
   lines.push(`Project: ${projectName}`)
+  if (rfqId) lines.push(`RFQ Reference: ${rfqId}`)
   lines.push("")
   lines.push("BETWEEN:")
   lines.push(`  Party A (Discloser): ${buyerName || "[BUYER NAME]"}`)
@@ -345,6 +353,8 @@ export function CadLabContracting({
   const [createdRfqId, setCreatedRfqId] = useState<string | null>(null)
   const [rfqStatus, setRfqStatus] = useState<string | null>(null)
   const [rfqResponseCount, setRfqResponseCount] = useState(0)
+  const [suggestedSuppliers, setSuggestedSuppliers] = useState<SupplierMatch[]>([])
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false)
 
   useEffect(() => {
     if (linkedRfqId) {
@@ -356,25 +366,37 @@ export function CadLabContracting({
     if (!createdRfqId) {
       setRfqStatus(null)
       setRfqResponseCount(0)
+      setSuggestedSuppliers([])
       return
     }
 
     let isMounted = true
 
-    const fetchRfqDetails = async (): Promise<void> => {
+    const fetchRfqContext = async (): Promise<void> => {
       try {
-        const detail = await getRFQDetail(createdRfqId)
-        if (!isMounted || detail.error || !detail.data) return
+        setIsLoadingSuppliers(true)
+        const [detail, matches] = await Promise.all([
+          getRFQDetail(createdRfqId),
+          getMatchedSuppliers(createdRfqId),
+        ])
 
-        setRfqStatus(detail.data.status)
-        setRfqResponseCount(detail.data.response_count ?? 0)
+        if (!isMounted) return
+        if (!detail.error && detail.data) {
+          setRfqStatus(detail.data.status)
+          setRfqResponseCount(detail.data.response_count ?? 0)
+        }
+        if (!matches.error) {
+          setSuggestedSuppliers(matches.data.slice(0, 5))
+        }
       } catch {
         // best effort only
+      } finally {
+        if (isMounted) setIsLoadingSuppliers(false)
       }
     }
 
-    fetchRfqDetails()
-    const poll = window.setInterval(fetchRfqDetails, 20000)
+    fetchRfqContext()
+    const poll = window.setInterval(fetchRfqContext, 20000)
     return () => {
       isMounted = false
       window.clearInterval(poll)
@@ -391,7 +413,9 @@ export function CadLabContracting({
           diagnosticAnswers,
           buyerName || undefined,
           deadline || undefined,
-          specialTerms || undefined
+          specialTerms || undefined,
+          createdRfqId || undefined,
+          rfqStatus || undefined,
         )
         break
       case "sow":
@@ -399,11 +423,16 @@ export function CadLabContracting({
           projectName,
           modules,
           diagnosticAnswers,
-          buyerName || undefined
+          buyerName || undefined,
+          createdRfqId || undefined,
         )
         break
       case "nda":
-        text = generateNda(projectName, buyerName || undefined)
+        text = generateNda(
+          projectName,
+          buyerName || undefined,
+          createdRfqId || undefined,
+        )
         break
     }
 
@@ -544,6 +573,47 @@ export function CadLabContracting({
             )}
           </div>
         </div>
+
+        {createdRfqId && (
+          <div className="rounded-lg border border-border/70 bg-muted/20 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-foreground">Suggested suppliers</p>
+              <span className="text-[10px] text-muted-foreground">
+                {isLoadingSuppliers ? "Refreshing…" : `${suggestedSuppliers.length} match(es)`}
+              </span>
+            </div>
+            {suggestedSuppliers.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                No supplier matches yet. As responses arrive, this list will populate.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {suggestedSuppliers.map((supplier) => (
+                  <div
+                    key={supplier.provider_id}
+                    className="flex items-start justify-between rounded-md border bg-background px-2.5 py-2"
+                  >
+                    <div>
+                      <p className="text-xs font-medium text-foreground">
+                        {supplier.full_name || "Unnamed supplier"}
+                      </p>
+                      {supplier.match_reasons.length > 0 && (
+                        <p className="text-[10px] text-muted-foreground">
+                          {supplier.match_reasons.slice(0, 2).join(" • ")}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-semibold text-status-info">
+                      {supplier.match_score > 1
+                        ? `${supplier.match_score.toFixed(0)}%`
+                        : `${(supplier.match_score * 100).toFixed(0)}%`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Buyer details form */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
