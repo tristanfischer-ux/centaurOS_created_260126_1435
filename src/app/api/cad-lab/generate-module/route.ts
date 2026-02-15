@@ -15,6 +15,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { generateCadLabInterface, generateCadLabModel } from "@/actions/cad-lab"
 import type { CadLabModule, ClaudeModelId } from "@/lib/cad-lab-types"
 import type { Json } from "@/types/database.types"
@@ -40,6 +41,70 @@ interface GenerateModuleSuccess {
 interface GenerateModuleError {
   error: string
   moduleId?: string
+}
+
+const CAD_LAB_STORAGE_BUCKET = "xray-images"
+
+interface UploadedCadAsset {
+  name: string
+  url: string
+  mimeType: string
+  sizeKb?: number
+}
+
+async function uploadCadAsset(
+  projectId: string,
+  moduleId: string,
+  filename: string,
+  mimeType: string,
+  base64Data: string,
+): Promise<{ url: string; sizeKb: number }> {
+  const admin = createAdminClient()
+  const buffer = Buffer.from(base64Data, "base64")
+  const path = `cad-lab/${projectId}/${moduleId}/${filename}`
+
+  const { error } = await admin.storage
+    .from(CAD_LAB_STORAGE_BUCKET)
+    .upload(path, buffer, { contentType: mimeType, upsert: true })
+
+  if (error) throw new Error(`Failed to upload ${filename}: ${error.message}`)
+
+  const { data: publicUrl } = admin.storage
+    .from(CAD_LAB_STORAGE_BUCKET)
+    .getPublicUrl(path)
+
+  return {
+    url: publicUrl.publicUrl,
+    sizeKb: Math.round(buffer.length / 1024),
+  }
+}
+
+async function uploadDrawingManifest(
+  projectId: string,
+  moduleId: string,
+  manifest: Record<string, unknown>,
+): Promise<string | undefined> {
+  const admin = createAdminClient()
+  const path = `cad-lab/${projectId}/${moduleId}/drawing-manifest.json`
+  const content = Buffer.from(JSON.stringify(manifest, null, 2), "utf-8")
+
+  const { error } = await admin.storage
+    .from(CAD_LAB_STORAGE_BUCKET)
+    .upload(path, content, {
+      contentType: "application/json",
+      upsert: true,
+    })
+
+  if (error) {
+    console.warn("[CAD-LAB-MODULE] Failed to upload drawing manifest:", error.message)
+    return undefined
+  }
+
+  const { data: publicUrl } = admin.storage
+    .from(CAD_LAB_STORAGE_BUCKET)
+    .getPublicUrl(path)
+
+  return publicUrl.publicUrl
 }
 
 /**
@@ -163,11 +228,84 @@ export async function POST(request: Request): Promise<NextResponse<GenerateModul
       localMod.interfaceDefinition || "",
       modelIdVal,
     )
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { stlData, stepData, ...resultWithoutBinary } = res
+
+    const packageFiles: UploadedCadAsset[] = []
+    let stepUrl: string | undefined
+    let stlUrl: string | undefined
+
+    if (stepData) {
+      try {
+        const uploaded = await uploadCadAsset(
+          projectId,
+          localMod.id,
+          `${localMod.id}.step`,
+          "application/step",
+          stepData,
+        )
+        stepUrl = uploaded.url
+        packageFiles.push({
+          name: `${localMod.id}.step`,
+          url: uploaded.url,
+          mimeType: "application/step",
+          sizeKb: uploaded.sizeKb,
+        })
+      } catch (uploadErr) {
+        console.warn("[CAD-LAB-MODULE] STEP upload failed:", uploadErr instanceof Error ? uploadErr.message : uploadErr)
+      }
+    }
+
+    if (stlData) {
+      try {
+        const uploaded = await uploadCadAsset(
+          projectId,
+          localMod.id,
+          `${localMod.id}.stl`,
+          "model/stl",
+          stlData,
+        )
+        stlUrl = uploaded.url
+        packageFiles.push({
+          name: `${localMod.id}.stl`,
+          url: uploaded.url,
+          mimeType: "model/stl",
+          sizeKb: uploaded.sizeKb,
+        })
+      } catch (uploadErr) {
+        console.warn("[CAD-LAB-MODULE] STL upload failed:", uploadErr instanceof Error ? uploadErr.message : uploadErr)
+      }
+    }
+
+    const manifestPayload = {
+      projectId,
+      moduleId: localMod.id,
+      moduleName: localMod.name,
+      generatedAt: new Date().toISOString(),
+      revision: "A",
+      envelopeMm: res.bbox,
+      massGrams: res.massGrams,
+      processHints: {
+        printable: res.dfm?.printable ?? null,
+        compatiblePrinters: res.dfm?.compatiblePrinters ?? [],
+      },
+      files: packageFiles,
+    }
+    const manifestUrl = await uploadDrawingManifest(projectId, localMod.id, manifestPayload)
+
     localMod = {
       ...localMod,
-      result: resultWithoutBinary,
+      result: {
+        ...resultWithoutBinary,
+        stepUrl,
+        stlUrl,
+        drawingPackage: {
+          revision: "A",
+          generatedAt: manifestPayload.generatedAt,
+          title: `${localMod.name} Drawing Package`,
+          manifestUrl,
+          files: packageFiles,
+        },
+      },
       code: res.code,
       status: "generated" as const,
     }

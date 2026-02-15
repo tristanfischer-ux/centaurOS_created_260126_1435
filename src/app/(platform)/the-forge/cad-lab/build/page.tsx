@@ -18,7 +18,6 @@ import {
   Code2,
   Timer,
   Zap,
-  FileText,
   CheckCircle2,
   AlertTriangle,
   ChevronDown,
@@ -62,7 +61,7 @@ export default function CadLabBuildPage(): React.ReactNode {
   const {
     hasResearch, isAnyLoading,
     subject, editableReport,
-    modules, setModules, expandedModuleId, setExpandedModuleId,
+    modules, expandedModuleId, setExpandedModuleId,
     activeModuleId,
     isDecomposing, handleDecompose,
     handleModuleGenerate, handleGenerateAllModules,
@@ -70,7 +69,6 @@ export default function CadLabBuildPage(): React.ReactNode {
     generatedModuleCount,
     diagCompletedCount,
     handleDownload,
-    setMilestone,
   } = useCadLab()
 
   // Local UI state for result viewing
@@ -691,6 +689,15 @@ function ModuleResultsView({
   moduleId: string
   onDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
 }): React.ReactNode {
+  const handleDownloadFromUrl = (url: string, filename: string): void => {
+    const link = document.createElement("a")
+    link.href = url
+    link.download = filename
+    link.target = "_blank"
+    link.rel = "noopener noreferrer"
+    link.click()
+  }
+
   return (
     <div className="space-y-4 pt-2">
       {/* Views */}
@@ -701,13 +708,27 @@ function ModuleResultsView({
               <Box className="h-3.5 w-3.5" /> Views — {moduleName}
             </p>
             <div className="flex items-center gap-1.5">
-              {result.stepData && (
-                <Button variant="outline" size="sm" onClick={() => onDownload(`${moduleName}.step`, result.stepData!, false)} className="gap-1 text-xs h-7">
+              {(result.stepData || result.stepUrl) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => result.stepData
+                    ? onDownload(`${moduleName}.step`, result.stepData!, false)
+                    : result.stepUrl && handleDownloadFromUrl(result.stepUrl, `${moduleName}.step`)}
+                  className="gap-1 text-xs h-7"
+                >
                   <Download className="h-3 w-3" /> STEP
                 </Button>
               )}
-              {result.stlData && (
-                <Button variant="outline" size="sm" onClick={() => onDownload(`${moduleName}.stl`, result.stlData!)} className="gap-1 text-xs h-7">
+              {(result.stlData || result.stlUrl) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => result.stlData
+                    ? onDownload(`${moduleName}.stl`, result.stlData!)
+                    : result.stlUrl && handleDownloadFromUrl(result.stlUrl, `${moduleName}.stl`)}
+                  className="gap-1 text-xs h-7"
+                >
                   <Download className="h-3 w-3" /> STL
                 </Button>
               )}

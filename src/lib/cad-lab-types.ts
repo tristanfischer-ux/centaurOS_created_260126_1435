@@ -89,10 +89,14 @@ export interface CadLabResult {
   svgExploded?: string
   /** Base64-encoded STEP file for download */
   stepData?: string
+  /** Persistent STEP file URL for procurement attachments */
+  stepUrl?: string
   /** STEP file size in KB */
   stepSize?: number
   /** Base64-encoded STL data for 3D viewer */
   stlData?: string
+  /** Persistent STL file URL for procurement attachments */
+  stlUrl?: string
   /** STL file size in KB */
   stlSize?: number
   /** Bounding box dimensions in mm */
@@ -117,6 +121,19 @@ export interface CadLabResult {
   interfaceDefinition?: string
   /** Post-execution validation warnings */
   validationWarnings?: string[]
+  /** Optional drawing/package metadata for procurement handoff */
+  drawingPackage?: {
+    revision: string
+    generatedAt: string
+    title: string
+    manifestUrl?: string
+    files: Array<{
+      name: string
+      url: string
+      mimeType: string
+      sizeKb?: number
+    }>
+  }
 }
 
 /** Result from Step 2: Interface Definition generation */

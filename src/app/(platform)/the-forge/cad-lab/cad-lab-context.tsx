@@ -26,7 +26,6 @@ import { createClient } from "@/lib/supabase/client"
 import {
   runCadLabResearch,
   generateCadLabInterface,
-  generateCadLabModelSmart,
   decomposeIntoModules,
   prefillDiagnostics,
 } from "@/actions/cad-lab"
@@ -339,11 +338,25 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
     } else {
       try {
-        const res = await generateCadLabModelSmart(`${mod.name} — ${mod.purpose}`, moduleResearchText, mod.interfaceDefinition || "", modelId)
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { stlData, stepData, ...resultWithoutBinary } = res
+        if (!activeProjectId) throw new Error("Project not initialized")
+
+        const response = await fetch("/api/cad-lab/generate-module", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: activeProjectId,
+            moduleId,
+          }),
+        })
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({ error: "Unknown error" })) as { error?: string }
+          throw new Error(errBody.error || `HTTP ${response.status}`)
+        }
+
+        const data = await response.json() as { done: boolean; module: CadLabModule }
         const updated = modules.map((m) =>
-          m.id === moduleId ? { ...m, result: resultWithoutBinary, code: res.code, status: "generated" as const } : m,
+          m.id === moduleId ? data.module : m,
         )
         setModules(updated)
         if (activeProjectId) {
