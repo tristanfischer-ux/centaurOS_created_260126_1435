@@ -45,6 +45,11 @@ Includes:
 npm run verify:forge-rfq-release
 ```
 
+Includes:
+- contract drift guard suite
+- full RFQ regression suite
+- E2E smoke chain
+
 ## Required Database Migration
 
 Apply before rollout to eliminate profile policy recursion noise:

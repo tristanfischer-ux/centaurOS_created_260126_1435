@@ -32,6 +32,7 @@ Coverage includes:
 - `release-contract-script-consistency.test.ts`
 - `release-docs-consistency.test.ts`
 - `release-packet-consistency.test.ts`
+- `release-verify-script-consistency.test.ts`
 - `telemetry-event-contract-consistency.test.ts`
 - `forge-project-list.test.tsx`
 - `MobileNav.test.tsx`
