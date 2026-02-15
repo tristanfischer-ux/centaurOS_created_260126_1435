@@ -39,6 +39,13 @@ As the release packet grows, some failures are best caught by low-cost contract 
   - emitted Cad Lab telemetry events stay aligned with telemetry contract documentation
   - rollout alpha event checklist names remain synchronized with code + docs
 
+### 5) Scenario matrix contract
+
+- Test: `scenario-matrix-consistency.test.ts`
+- Protects:
+  - QA scenario matrix stays aligned with golden benchmark fixtures
+  - documented scenario count remains synchronized with benchmark set size
+
 ## Operational Usage
 
 Run:
@@ -64,4 +71,5 @@ This command now validates both product logic regressions and release-contract d
 - `release-docs-consistency.test.ts`
 - `release-packet-consistency.test.ts`
 - `release-verify-script-consistency.test.ts`
+- `scenario-matrix-consistency.test.ts`
 - `telemetry-event-contract-consistency.test.ts`
