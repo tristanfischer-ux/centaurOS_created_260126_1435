@@ -20,6 +20,12 @@ describe("release documentation consistency", () => {
     "forge",
     "design-to-rfq-migration-verification.md",
   )
+  const rolloutChecklistPath = path.join(
+    process.cwd(),
+    "docs",
+    "forge",
+    "design-to-rfq-rollout-checklist.md",
+  )
 
   it("tracks full release verification and migration auth prerequisites", () => {
     const qaReport = fs.readFileSync(qaReportPath, "utf8")
@@ -32,11 +38,14 @@ describe("release documentation consistency", () => {
   it("keeps profiles recursion policy-expression audit in release docs", () => {
     const releasePacket = fs.readFileSync(releasePacketPath, "utf8")
     const migrationRunbook = fs.readFileSync(migrationRunbookPath, "utf8")
+    const rolloutChecklist = fs.readFileSync(rolloutChecklistPath, "utf8")
 
     expect(releasePacket).toContain("policy-expression SQL audit")
+    expect(releasePacket).toContain("design-to-rfq-regression-contracts.md")
     expect(migrationRunbook).toContain("Verify Policy Expressions")
     expect(migrationRunbook).toContain("get_my_foundry_id(")
     expect(migrationRunbook).toContain("is_active_user(")
     expect(migrationRunbook).toContain("Execute the SQL manually")
+    expect(rolloutChecklist).toContain("manual SQL execution")
   })
 })
