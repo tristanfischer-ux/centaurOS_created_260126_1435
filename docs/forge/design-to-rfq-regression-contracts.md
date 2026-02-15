@@ -56,3 +56,12 @@ npm run test:forge-rfq
 This command now validates both product logic regressions and release-contract drift risks before staging or production rollout.
 
 `npm run verify:forge-rfq-release` now executes this contract suite first before running the full regression + E2E smoke chain.
+
+## Focused Contract Suite Inventory (`test:forge-rfq:contracts`)
+
+- `profiles-rls-migration.test.ts`
+- `release-config-consistency.test.ts`
+- `release-docs-consistency.test.ts`
+- `release-packet-consistency.test.ts`
+- `release-verify-script-consistency.test.ts`
+- `telemetry-event-contract-consistency.test.ts`
