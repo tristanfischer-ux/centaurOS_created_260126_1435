@@ -1048,26 +1048,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     </div>
                                 )}
 
-                                {/* Typing indicator */}
+                                {/* Typing indicator — personality-specific thinking message */}
                                 {(isExecuting && !isStreaming) && (
-                                    <div className="flex gap-3 justify-start">
-                                        <div className="flex-shrink-0 h-7 w-7 rounded-full bg-muted mt-1" />
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
-                                            {deepThinkEnabled ? (
-                                                <Brain className="h-4 w-4 animate-pulse text-international-orange" />
-                                            ) : (
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                            )}
-                                            {deepThinkEnabled
-                                                ? `${specialist.name} is analyzing deeply...`
-                                                : `${specialist.name} is thinking...`
-                                            }
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Greeting generation indicator */}
-                                {isGeneratingGreeting && !isExecuting && (
                                     <div className="flex gap-3 justify-start">
                                         <div className="flex-shrink-0 mt-1">
                                             <SpecialistChatAvatar
@@ -1076,8 +1058,45 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                             />
                                         </div>
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                            {specialist.name} is reviewing your context...
+                                            {deepThinkEnabled ? (
+                                                <Brain className="h-4 w-4 animate-pulse text-international-orange" />
+                                            ) : (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            )}
+                                            {deepThinkEnabled
+                                                ? `${specialist.name} is analyzing deeply...`
+                                                : specialist.thinkingIndicator
+                                                    ? `${specialist.name}: ${specialist.thinkingIndicator}`
+                                                    : `${specialist.name} is thinking...`
+                                            }
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Greeting generation indicator — shows specialist reviewing context */}
+                                {isGeneratingGreeting && !isExecuting && (
+                                    <div className="flex gap-3 justify-start">
+                                        <div className="flex-shrink-0 mt-1">
+                                            <SpecialistChatAvatar
+                                                specialist={specialist}
+                                                state="thinking"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-1 py-3">
+                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                {specialist.name} is catching up...
+                                            </div>
+                                            {hasHistoricalMessages && (
+                                                <p className="text-xs text-muted-foreground/70 ml-6">
+                                                    Reviewing your previous conversation and team updates
+                                                </p>
+                                            )}
+                                            {!hasHistoricalMessages && crossSpecialistContext && (
+                                                <p className="text-xs text-muted-foreground/70 ml-6">
+                                                    Checking what the team has been working on
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -1152,7 +1171,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             </div>
                         )}
 
-                        {/* First-meeting card: avatar, tagline, and conversation starters */}
+                        {/* Intro card: conversation starters (history-based for returning users, highlights for new) */}
                         {!hasConversation && !hasHistoricalMessages && (
                             <div className="mb-4 p-4 rounded-lg bg-muted/30 border border-muted space-y-4">
                                 <div className="flex items-start gap-3">
@@ -1198,6 +1217,54 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         </div>
                                     </>
                                 )}
+                            </div>
+                        )}
+                        {/* Returning user card: history-based conversation starters */}
+                        {!hasConversation && hasHistoricalMessages && !isGeneratingGreeting && (
+                            <div className="mb-4 p-4 rounded-lg bg-muted/30 border border-muted space-y-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="flex-shrink-0">
+                                        <SpecialistChatAvatar specialist={specialist} state="idle" />
+                                    </div>
+                                    <div className="min-w-0 flex-1 pt-0.5">
+                                        <p className="text-sm text-muted-foreground">
+                                            Pick up where you left off, or start something new.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {/* Generate history-based starters from previous user messages */}
+                                    {(() => {
+                                        const pastUserMsgs = historyMessages
+                                            .filter(m => m.role === "user")
+                                            .slice(-3)
+                                            .map(m => m.content.slice(0, 60) + (m.content.length > 60 ? "..." : ""))
+                                        const starters = pastUserMsgs.length > 0
+                                            ? [`Follow up on: "${pastUserMsgs[pastUserMsgs.length - 1]}"`, ...specialist.highlights.slice(0, 3)]
+                                            : specialist.highlights.slice(0, 4)
+                                        return starters.map((starter) => (
+                                            <button
+                                                key={starter}
+                                                type="button"
+                                                onClick={() => {
+                                                    setBriefText(starter.startsWith("Follow up") ? "" : `Help me with ${starter}`)
+                                                    setError(null)
+                                                    textareaRef.current?.focus()
+                                                }}
+                                                disabled={isExecuting}
+                                                className={cn(
+                                                    "inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium text-foreground",
+                                                    starter.startsWith("Follow up")
+                                                        ? "border-international-orange/30 bg-international-orange/5 hover:border-international-orange/50"
+                                                        : "border-muted bg-background hover:border-international-orange/50 hover:bg-muted/50",
+                                                    "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-2"
+                                                )}
+                                            >
+                                                {starter}
+                                            </button>
+                                        ))
+                                    })()}
+                                </div>
                             </div>
                         )}
 

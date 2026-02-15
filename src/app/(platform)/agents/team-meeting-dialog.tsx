@@ -1225,8 +1225,11 @@ export function TeamMeetingDialog({
                                     {streamingContent ? (
                                         <Markdown content={streamingContent} className="text-sm" />
                                     ) : (
-                                        <p className="text-sm text-muted-foreground">
-                                            {currentSpecialist.name} is thinking...
+                                        <p className="text-sm text-muted-foreground italic">
+                                            {currentSpecialist.thinkingIndicator
+                                                ? `${currentSpecialist.name}: ${currentSpecialist.thinkingIndicator}`
+                                                : `${currentSpecialist.name} is thinking...`
+                                            }
                                         </p>
                                     )}
                                 </div>
