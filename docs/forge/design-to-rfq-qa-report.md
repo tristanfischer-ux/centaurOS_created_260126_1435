@@ -115,6 +115,11 @@ Validated:
 - full RFQ/unit regression cluster passes in one command
 - full E2E smoke chain passes (auth setup + Cad Lab visual + Forge entrypoint + Forge navigation)
 
+### 7) Five-scenario product pass outcome log
+
+Result artifact: `docs/forge/design-to-rfq-manual-product-pass-results.md`  
+Status: **PASS** (all benchmark scenarios + smoke journey checks)
+
 ## Notes
 
 - The Next.js image-quality warning during login hero rendering was removed by explicitly allowing quality `90` in `next.config.ts` (`images.qualities: [75, 90]`).
