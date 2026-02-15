@@ -81,7 +81,9 @@ Result: **PASS**
 Validated:
 
 - sidebar **The Forge** nav item routes to `/the-forge`
-- canonical entrypoint now consistently exposes Design-to-RFQ recommendation card
+- Plan section Forge spotlight routes to `/the-forge`
+- Workshop section Forge spotlight routes to `/the-forge`
+- canonical entrypoint consistently exposes Design-to-RFQ recommendation card
 
 ## Notes
 
