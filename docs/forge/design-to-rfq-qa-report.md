@@ -29,6 +29,7 @@ Coverage includes:
 - `profiles-rls-migration.test.ts`
 - `release-config-consistency.test.ts`
 - `release-docs-consistency.test.ts`
+- `release-packet-consistency.test.ts`
 - `telemetry-event-contract-consistency.test.ts`
 - `forge-project-list.test.tsx`
 - `MobileNav.test.tsx`
