@@ -22,7 +22,10 @@ Run these before each release candidate:
 npm run test:forge-rfq:contracts
 npm run test:forge-rfq
 npm run test:forge-rfq:e2e-smoke
+npm run verify:forge-rfq-release
 ```
+
+Treat `npm run verify:forge-rfq-release` as the final one-command gate for release readiness evidence.
 
 Database migration prerequisite (profiles RLS stabilization) must be applied either via authenticated Supabase CLI (`npx supabase db push`) or via manual SQL execution in Supabase dashboard when CLI auth tokens are unavailable.
 
@@ -92,3 +95,4 @@ Rollback rollout level if any trigger is detected:
   - benchmark suite results
   - RFQ conversion metrics
   - supplier response quality notes
+  - latest manual product-pass results artifact status

@@ -59,5 +59,7 @@ describe("release documentation consistency", () => {
     expect(migrationRunbook).toContain("exec_sql")
     expect(migrationRunbook).toContain("Execute the SQL manually")
     expect(rolloutChecklist).toContain("manual SQL execution")
+    expect(rolloutChecklist).toContain("npm run verify:forge-rfq-release")
+    expect(rolloutChecklist).toContain("manual product-pass results artifact status")
   })
 })
