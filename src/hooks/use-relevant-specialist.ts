@@ -26,7 +26,7 @@ interface DomainRule {
 const DOMAIN_RULES: DomainRule[] = [
   {
     specialistId: 'cto',
-    specialistName: 'Zara',
+    specialistName: 'Max',
     keywords: [
       'technology', 'tech stack', 'architecture', 'infrastructure', 'software',
       'first principles', 'delete', 'optimize', 'scalability', 'platform',
@@ -38,7 +38,7 @@ const DOMAIN_RULES: DomainRule[] = [
   },
   {
     specialistId: 'vp-engineering',
-    specialistName: 'Dev',
+    specialistName: 'Jian',
     keywords: [
       'engineering', 'developer', 'team', 'velocity', 'sprint', 'scrum',
       'agile', 'deployment', 'deploy', 'ci cd', 'code review', 'quality',
@@ -49,7 +49,7 @@ const DOMAIN_RULES: DomainRule[] = [
   },
   {
     specialistId: 'vp-manufacturing',
-    specialistName: 'Kai',
+    specialistName: 'Fang',
     keywords: [
       'manufacturing', 'production', 'factory', 'dfm', 'design for manufacturing',
       'first article', 'pilot', 'scale up', 'yield', 'quality', 'qc', 'qa',
@@ -61,7 +61,7 @@ const DOMAIN_RULES: DomainRule[] = [
   },
   {
     specialistId: 'vp-supply-chain',
-    specialistName: 'Suki',
+    specialistName: 'Chase',
     keywords: [
       'supply chain', 'procurement', 'sourcing', 'vendor', 'supplier',
       'logistics', 'lead time', 'inventory', 'stock', 'procure', 'purchase',
@@ -92,7 +92,7 @@ const DOMAIN_RULES: DomainRule[] = [
   },
   {
     specialistId: 'sales-lead',
-    specialistName: 'Nate',
+    specialistName: 'Sal',
     keywords: [
       'sales', 'revenue', 'pipeline', 'deal', 'close', 'prospect',
       'outreach', 'cold email', 'proposal', 'pricing', 'quota', 'crm',
@@ -102,7 +102,7 @@ const DOMAIN_RULES: DomainRule[] = [
   },
   {
     specialistId: 'finance-lead',
-    specialistName: 'Eli',
+    specialistName: 'Finn',
     keywords: [
       'finance', 'budget', 'runway', 'p&l', 'cost', 'revenue model',
       'cash flow', 'burn rate', 'financial', 'accounting', 'tax',
@@ -155,7 +155,7 @@ const DOMAIN_RULES: DomainRule[] = [
 /** Default specialist when no domain keywords match */
 const DEFAULT_SPECIALIST = {
   specialistId: 'strategist',
-  specialistName: 'Sam',
+  specialistName: 'Sage',
 } as const
 
 // ─── Scoring logic ───────────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ interface RelevantSpecialistResult {
  *   'Increase Q3 revenue by 40%',
  *   'Build outbound sales pipeline and close enterprise deals'
  * )
- * // Returns { specialistId: 'sales-lead', specialistName: 'Nate', isDefault: false }
+ * // Returns { specialistId: 'sales-lead', specialistName: 'Sal', isDefault: false }
  */
 export function useRelevantSpecialist(
   title: string,

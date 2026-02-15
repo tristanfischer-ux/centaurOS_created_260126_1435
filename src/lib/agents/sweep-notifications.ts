@@ -38,8 +38,8 @@ interface NotificationPreferences {
  * Generates a notification that sounds like the specialist is reaching out
  * as a colleague, not as an automated system.
  *
- * @description Instead of "Sam: Market analysis complete", generates
- * "💬 Sam: Hey — I've been looking at your competitive landscape and
+ * @description Instead of "Sage: Market analysis complete", generates
+ * "💬 Sage: Hey — I've been looking at your competitive landscape and
  * noticed something that changes the picture. Got 5 minutes?"
  *
  * Uses the specialist's tagline, tone, and signature style to create

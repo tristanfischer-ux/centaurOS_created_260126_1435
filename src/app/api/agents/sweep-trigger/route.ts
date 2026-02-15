@@ -7,9 +7,9 @@
  * triggers specific specialists based on the data change type.
  *
  * Event → Specialist Mapping:
- * - objective_created/updated → Sam (strategy) + Priya (product)
+ * - objective_created/updated → Sage (strategy) + Priya (product)
  * - task_overdue → Cal (chief of staff) + domain specialist
- * - financial_data_updated → Eli (finance) + Fiona (fundraising)
+ * - financial_data_updated → Finn (finance) + Fiona (fundraising)
  * - team_member_added → Harper (HR)
  * - contract_expiring → Leo (legal)
  *

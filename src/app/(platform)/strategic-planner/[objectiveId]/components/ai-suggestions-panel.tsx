@@ -148,9 +148,9 @@ export function AISuggestionsPanel({
             },
           }}
           specialistId="strategist"
-          specialistName="Sam"
+          specialistName="Sage"
           variant="button"
-          label="Discuss with Sam"
+          label="Discuss with Sage"
         />
       </div>
     </div>

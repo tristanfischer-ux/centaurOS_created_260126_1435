@@ -166,7 +166,7 @@ export interface AgentPersonality {
  * The output is behavioral instruction, not biographical narration. Every
  * backstory element gets translated into "how this agent should behave."
  *
- * @param name - The agent's display name (e.g., "Strategist", "Sam")
+ * @param name - The agent's display name (e.g., "Strategist", "Sage")
  * @param personality - The full personality definition
  * @param domainContext - Optional domain-specific context (e.g., specialist description)
  * @param specialistId - Optional specialist ID for ethics alignment (e.g., "strategist", "cto")

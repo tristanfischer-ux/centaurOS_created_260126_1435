@@ -371,16 +371,16 @@ class AvatarEngine implements ConversationEngine {
  * PLACEHOLDER: Replace with actual HeyGen avatar IDs once created.
  */
 const SPECIALIST_AVATAR_MAP: Partial<Record<SpecialistId, string>> = {
-    strategist: "avatar_sam_placeholder",        // Sam
-    cto: "avatar_zara_placeholder",              // Zara
-    "vp-engineering": "avatar_dev_placeholder",  // Dev
-    "vp-manufacturing": "avatar_kai_placeholder", // Kai
-    "vp-supply-chain": "avatar_suki_placeholder", // Suki
+    strategist: "avatar_sage_placeholder",        // Sage
+    cto: "avatar_max_placeholder",                // Max
+    "vp-engineering": "avatar_jian_placeholder",  // Jian
+    "vp-manufacturing": "avatar_fang_placeholder", // Fang
+    "vp-supply-chain": "avatar_chase_placeholder", // Chase
     "product-lead": "avatar_priya_placeholder",  // Priya
     "growth-marketer": "avatar_mia_placeholder", // Mia
-    "sales-lead": "avatar_nate_placeholder",     // Nate
+    "sales-lead": "avatar_sal_placeholder",       // Sal
     "chief-of-staff": "avatar_cal_placeholder",  // Cal
-    "finance-lead": "avatar_eli_placeholder",    // Eli
+    "finance-lead": "avatar_finn_placeholder",   // Finn
     "fundraising-advisor": "avatar_fiona_placeholder", // Fiona
     "hiring-team": "avatar_harper_placeholder",  // Harper
     "legal-counsel": "avatar_leo_placeholder",   // Leo

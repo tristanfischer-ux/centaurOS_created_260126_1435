@@ -7,9 +7,9 @@
  * alignment, and collaboration patterns that feel like a real team.
  *
  * Instead of polite strangers, specialists have working relationships:
- * - Sam pushes for bold moves; Eli asks "can we afford it?"
- * - Zara wants to delete features; Priya wants to add them
- * - Nate and Mia are the revenue machine — pipeline + closing
+ * - Sage pushes for bold moves; Finn asks "can we afford it?"
+ * - Max wants to delete features; Priya wants to add them
+ * - Sal and Mia are the revenue machine — pipeline + closing
  *
  * @related
  * - Specialist definitions: src/app/(platform)/agents/specialists-data.ts
@@ -26,9 +26,9 @@ import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
  *
  * @description Generates a prompt block that tells the specialist how they
  * relate to each other participant. This creates natural dynamics:
- * - "Sam and I think alike on first principles" → aligned, builds on ideas
- * - "Eli keeps me honest on numbers" → creative tension, respectful pushback
- * - "I set direction; Dev executes" → complementary, delegation patterns
+ * - "Sage and I think alike on first principles" → aligned, builds on ideas
+ * - "Finn keeps me honest on numbers" → creative tension, respectful pushback
+ * - "I set direction; Jian executes" → complementary, delegation patterns
  *
  * @param specialistId - The specialist being prompted
  * @param participantIds - All specialist IDs in this conversation

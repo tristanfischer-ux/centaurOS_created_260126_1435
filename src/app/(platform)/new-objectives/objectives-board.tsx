@@ -382,8 +382,8 @@ export function ObjectivesBoard({
               },
             }}
             specialistId="strategist"
-            specialistName="Sam"
-            label="Plan with Sam"
+            specialistName="Sage"
+            label="Plan with Sage"
           />
           {strategicObjectives.length > 0 && (
             <Link

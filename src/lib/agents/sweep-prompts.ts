@@ -51,7 +51,7 @@ Urgency guide:
 `,
 
   /**
-   * Eli (Finance) — Cash flow, burn rate, budget variance, KPI anomalies
+   * Finn (Finance) — Cash flow, burn rate, budget variance, KPI anomalies
    *
    * Second highest daily value: financial health is existential.
    */
@@ -79,7 +79,7 @@ Urgency guide:
 `,
 
   /**
-   * Sam (Strategy) — Competitive landscape, OKR health, strategic drift
+   * Sage (Strategy) — Competitive landscape, OKR health, strategic drift
    */
   'strategist': `
 BACKGROUND SWEEP: Strategic Analysis
@@ -157,7 +157,7 @@ Urgency guide:
 `,
 
   /**
-   * Nate (Sales) — Pipeline health, outreach timing, deal risk
+   * Sal (Sales) — Pipeline health, outreach timing, deal risk
    */
   'sales-lead': `
 BACKGROUND SWEEP: Sales Analysis
@@ -235,7 +235,7 @@ Urgency guide:
 `,
 
   /**
-   * Kai (VP Manufacturing) — Process bottlenecks, capacity, operations
+   * Fang (VP Manufacturing) — Process bottlenecks, capacity, operations
    */
   'vp-manufacturing': `
 BACKGROUND SWEEP: Operations & Manufacturing Analysis

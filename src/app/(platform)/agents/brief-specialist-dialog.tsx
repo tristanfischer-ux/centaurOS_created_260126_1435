@@ -40,14 +40,20 @@ const ENABLE_ADVANCED_MODES = typeof window !== "undefined"
     && process.env.NEXT_PUBLIC_ENABLE_VOICE_AVATAR === "true"
 
 // ─── Specialist Model Configuration ───────────────────────────────────────────
-// Centralizes model choices so upgrades are a one-line change.
-// MiniMax M2.5 provides frontier-quality reasoning at ~100x lower cost than
-// Claude Opus 4.6. Uses their OpenAI-compatible API at api.minimax.io/v1.
+// Per-specialist model tiers: "claude" for high-stakes reasoning (strategy,
+// finance, legal, CTO, chief of staff) and "minimax" for high-volume work
+// (marketing, sales, HR, engineering, manufacturing, supply chain, etc.).
+// Each specialist declares its tier in specialists-data.ts via `modelTier`.
 
-const SPECIALIST_MODELS = {
-    greeting: { providerId: "minimax", modelId: "MiniMax-M2.5" },
-    conversation: { providerId: "minimax", modelId: "MiniMax-M2.5" },
+const MODEL_TIERS = {
+    claude: { providerId: "anthropic", modelId: "claude-opus-4-6" },
+    minimax: { providerId: "minimax", modelId: "MiniMax-M2.5" },
 } as const
+
+/** Resolve the provider + model for a specialist based on their declared tier. */
+function getSpecialistModel(specialist: Specialist): { providerId: string; modelId: string } {
+    return MODEL_TIERS[specialist.modelTier]
+}
 
 const DEEP_THINK_STORAGE_KEY = "forgeOS-specialist-deep-think"
 
@@ -427,7 +433,7 @@ export function BriefSpecialistDialog({
                 greetingInstructions = `The founder is opening a conversation with you. You have BOTH previous conversation history AND knowledge of what other specialists have been working on.
 
 Write a proactive opening (2-4 sentences) that does ONE of these:
-1. **"I noticed something"**: If you spot a connection, overlap, or conflict between your domain and what other specialists discussed, FLAG IT. Example: "I noticed Nate has been working on enterprise pricing while we discussed SMB positioning — we should align on target segment."
+1. **"I noticed something"**: If you spot a connection, overlap, or conflict between your domain and what other specialists discussed, FLAG IT. Example: "I noticed Sal has been working on enterprise pricing while we discussed SMB positioning — we should align on target segment."
 2. **Pick up where you left off**: Reference the last topic and suggest the logical next step.
 3. **Surface a recurring theme**: If the same topic keeps coming up, name it: "We keep coming back to pricing — maybe it's time to make a decision."
 
@@ -445,7 +451,7 @@ Stay in character as ${specialist.name}. Be concise, direct, and actionable. Jum
 
 Write a proactive opening (2-3 sentences) that:
 - Introduces your perspective by connecting it to what other specialists discussed
-- Example: "I see Sam has been working on competitive strategy — from a finance perspective, here's what I'd want to stress-test..."
+- Example: "I see Sage has been working on competitive strategy — from a finance perspective, here's what I'd want to stress-test..."
 - Asks ONE specific question that shows your expertise and connects to the team's work
 
 Stay in character as ${specialist.name}. Be warm but direct. No generic pleasantries.`
@@ -475,8 +481,8 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
                     body: JSON.stringify({
                         prompt: greetingPrompt,
                         input: "Generate a proactive opening message.",
-                        providerId: SPECIALIST_MODELS.greeting.providerId,
-                        modelId: SPECIALIST_MODELS.greeting.modelId,
+                        providerId: getSpecialistModel(specialist).providerId,
+                        modelId: getSpecialistModel(specialist).modelId,
                         threadId: threadId ?? undefined,
                         specialistId: specialist.id,
                     }),
@@ -649,8 +655,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 body: JSON.stringify({
                     prompt: promptTemplate,
                     input: userInput,
-                    providerId: SPECIALIST_MODELS.conversation.providerId,
-                    modelId: SPECIALIST_MODELS.conversation.modelId,
+                    providerId: getSpecialistModel(specialist).providerId,
+                    modelId: getSpecialistModel(specialist).modelId,
                     modality: "text",
                     threadId: threadId ?? undefined,
                     specialistId: specialist.id,

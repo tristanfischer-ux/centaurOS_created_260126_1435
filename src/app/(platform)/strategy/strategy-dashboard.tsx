@@ -236,7 +236,7 @@ export function StrategyDashboard({
               },
             }}
             specialistId="strategist"
-            specialistName="Sam"
+            specialistName="Sage"
             label="Discuss Strategy"
           />
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
@@ -313,7 +313,7 @@ export function StrategyDashboard({
             </div>
           )}
 
-          {/* Sam's Strategy Health Review */}
+          {/* Sage's Strategy Health Review */}
           <StrategyHealthReview
             pillars={pillars.map(p => ({
               title: p.title,

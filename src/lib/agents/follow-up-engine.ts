@@ -103,7 +103,7 @@ export function extractFollowUps(
  * an overdue commitment.
  *
  * @description Each specialist has their own way of following up.
- * Sam is direct, Eli asks about the numbers, Nate asks about pipeline
+ * Sage is direct, Finn asks about the numbers, Sal asks about pipeline
  * results. This makes follow-ups feel like a real colleague checking in.
  *
  * @param specialistId - Which specialist is following up

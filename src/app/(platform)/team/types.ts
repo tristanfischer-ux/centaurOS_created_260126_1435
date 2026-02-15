@@ -60,7 +60,7 @@ export interface TeamMember {
 export interface SpecialistNode {
   /** Unique specialist ID (matches specialists-data.ts) */
   id: string
-  /** Human name (e.g. "Sam") */
+  /** Human name (e.g. "Sage") */
   name: string
   /** Two-letter initials for the avatar circle */
   initials: string

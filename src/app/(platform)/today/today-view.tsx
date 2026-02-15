@@ -494,9 +494,9 @@ export function TodayView(): React.ReactElement {
                                     description: 'Quick strategy pulse — where should I focus?',
                                 }}
                                 specialistId="strategist"
-                                specialistName="Sam"
+                                specialistName="Sage"
                                 variant="chip"
-                                label="Strategy with Sam"
+                                label="Strategy with Sage"
                             />
                             <AskSpecialistButton
                                 context={{
