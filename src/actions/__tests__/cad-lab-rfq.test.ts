@@ -224,6 +224,13 @@ describe("createCadLabRfqAction", () => {
     expect(payload.specifications?.description).toContain(
       "Frame: Diagnostics incomplete",
     )
+    expect(payload.specifications?.description).toContain(
+      "Quality scorecard — CAD 75%, Drawings 100%, RFQ 65%, Overall 80%",
+    )
+    expect(payload.specifications?.description).toContain("Scorecard blockers:")
+    expect(payload.specifications?.description).toContain(
+      "1 generated module(s) missing DFM analysis",
+    )
     expect(payload.specifications?.custom_fields?.module_blockers).toEqual([
       {
         moduleId: "frame",
@@ -231,6 +238,16 @@ describe("createCadLabRfqAction", () => {
         blockers: ["Diagnostics incomplete"],
       },
     ])
+    expect(payload.specifications?.custom_fields?.quality_scorecard).toEqual({
+      cadValidityScore: 75,
+      drawingCompletenessScore: 100,
+      rfqReadinessScore: 65,
+      overallScore: 80,
+      blockers: [
+        "1 generated module(s) missing DFM analysis",
+        "1 module(s) missing procurement diagnostics",
+      ],
+    })
     expect(payload.specifications?.custom_fields?.readiness_checks).toEqual([
       {
         moduleId: "frame",
@@ -448,5 +465,15 @@ describe("createCadLabRfqAction", () => {
         blockers: ["Diagnostics incomplete"],
       },
     ])
+    expect(payload.specifications?.custom_fields?.quality_scorecard).toEqual({
+      cadValidityScore: 50,
+      drawingCompletenessScore: 100,
+      rfqReadinessScore: 65,
+      overallScore: 72,
+      blockers: [
+        "2 generated module(s) missing DFM analysis",
+        "2 module(s) missing procurement diagnostics",
+      ],
+    })
   })
 })

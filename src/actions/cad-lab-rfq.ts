@@ -15,6 +15,7 @@ import {
   getModuleArtifactReadiness,
   isDiagnosticsComplete,
 } from "@/lib/cad-lab-readiness"
+import { computeCadLabQualityScorecard } from "@/lib/cad-lab-quality-scorecard"
 
 interface CreateCadLabRfqInput {
   projectName: string
@@ -102,6 +103,10 @@ export async function createCadLabRfqAction(
   const overallReadinessScore = Math.round(
     moduleReadiness.reduce((sum, module) => sum + module.scorePct, 0) /
       moduleReadiness.length,
+  )
+  const qualityScorecard = computeCadLabQualityScorecard(
+    input.modules,
+    input.diagnosticAnswers,
   )
   const quoteReadyModuleCount = moduleReadiness.filter(
     (module) => module.hasStep && module.hasStl && module.hasManifest,
@@ -201,6 +206,7 @@ export async function createCadLabRfqAction(
     `${generatedModules.length} generated module(s) included with drawing manifests and CAD artifacts.`,
     `Overall package readiness score: ${overallReadinessScore}%`,
     `Quote-ready modules: ${quoteReadyModuleCount}/${generatedModules.length}`,
+    `Quality scorecard — CAD ${qualityScorecard.cadValidityScore}%, Drawings ${qualityScorecard.drawingCompletenessScore}%, RFQ ${qualityScorecard.rfqReadinessScore}%, Overall ${qualityScorecard.overallScore}%`,
     "",
     "Module summary:",
     ...moduleSpecs.map((module, idx) =>
@@ -224,6 +230,15 @@ export async function createCadLabRfqAction(
           ...moduleBlockers.map(
             (module, idx) =>
               `${idx + 1}. ${module.moduleName}: ${module.blockers.join("; ")}`,
+          ),
+        ]
+      : []),
+    ...(qualityScorecard.blockers.length > 0
+      ? [
+          "",
+          "Scorecard blockers:",
+          ...qualityScorecard.blockers.map(
+            (blocker, idx) => `${idx + 1}. ${blocker}`,
           ),
         ]
       : []),
@@ -263,6 +278,7 @@ export async function createCadLabRfqAction(
         assumption_notes: input.assumptionNotes?.trim() || null,
         readiness_checks: moduleReadiness,
         module_blockers: moduleBlockers,
+        quality_scorecard: qualityScorecard,
         modules: moduleSpecs,
       },
     },
