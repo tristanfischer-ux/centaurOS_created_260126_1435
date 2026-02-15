@@ -2,8 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { BuyerDashboard } from "@/components/analytics/BuyerDashboard"
+import dynamic from "next/dynamic"
+import { Skeleton } from "@/components/ui/skeleton"
 import { getBuyerDashboardAnalytics } from "@/actions/analytics"
+
+const BuyerDashboard = dynamic(
+  () => import("@/components/analytics/BuyerDashboard").then((m) => ({ default: m.BuyerDashboard })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[600px] rounded-lg" /> },
+)
 import { BuyerAnalytics, AnalyticsPeriod } from "@/types/analytics"
 
 /**

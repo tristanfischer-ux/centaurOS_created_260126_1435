@@ -2,8 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { SupplierDashboard as SupplierAnalyticsDashboard } from "@/components/analytics/SupplierDashboard"
+import dynamic from "next/dynamic"
+import { Skeleton } from "@/components/ui/skeleton"
 import { getSupplierDashboardAnalytics } from "@/actions/analytics"
+
+const SupplierAnalyticsDashboard = dynamic(
+  () => import("@/components/analytics/SupplierDashboard").then((m) => ({ default: m.SupplierDashboard })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[600px] rounded-lg" /> },
+)
 import { SupplierAnalytics, AnalyticsPeriod } from "@/types/analytics"
 import { typography } from "@/lib/design-system"
 

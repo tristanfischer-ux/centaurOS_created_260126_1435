@@ -35,9 +35,15 @@ import { cn } from "@/lib/utils"
 
 import { getStrategicPlanOverview } from "@/actions/strategic-planner"
 import type { StrategicPlanOverview, CanvasGrouping, CanvasViewMode } from "@/types/strategic-planner"
+import dynamic from "next/dynamic"
+import { Skeleton } from "@/components/ui/skeleton"
 import { StrategicCanvas } from "./components/strategic-canvas"
-import { StrategicGantt } from "./components/strategic-gantt"
 import { ResourcesPanel } from "./components/resources-panel"
+
+const StrategicGantt = dynamic(
+  () => import("./components/strategic-gantt").then((m) => ({ default: m.StrategicGantt })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[500px] rounded-lg" /> },
+)
 import { RisksPanel } from "./components/risks-panel"
 import { AISuggestionsPanel } from "./components/ai-suggestions-panel"
 

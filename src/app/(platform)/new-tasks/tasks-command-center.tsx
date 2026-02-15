@@ -21,9 +21,15 @@ import { BoardView } from './board-view'
 import { ListView } from './list-view'
 import { TaskDetailPanel } from './task-detail-panel'
 import { CreateTaskDialog } from '../tasks/create-task-dialog'
+import dynamic from 'next/dynamic'
 import { EditTaskDialog } from '@/components/tasks/edit-task-dialog'
-import { TasksGanttView } from './gantt-view'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useRegisterScreenContext } from '@/contexts/screen-context'
+
+const TasksGanttView = dynamic(
+  () => import('./gantt-view').then((m) => ({ default: m.TasksGanttView })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[500px] rounded-lg" /> },
+)
 import type { TaskWithData, Member, Team } from './types'
 
 const LARGE_BREAKPOINT = 1280

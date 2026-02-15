@@ -40,8 +40,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import dynamic from "next/dynamic"
 import { Markdown } from "@/components/ui/markdown"
-import { STLViewer } from "@/components/cad/stl-viewer"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const STLViewer = dynamic(
+  () => import("@/components/cad/stl-viewer").then((m) => ({ default: m.STLViewer })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[400px] rounded-lg" /> },
+)
 
 import {
   searchWebDimensions,

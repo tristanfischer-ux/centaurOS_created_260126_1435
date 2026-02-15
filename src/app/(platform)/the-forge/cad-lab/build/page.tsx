@@ -43,9 +43,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import dynamic from "next/dynamic"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { STLViewer } from "@/components/cad/stl-viewer"
+import { Skeleton } from "@/components/ui/skeleton"
 import { CadLabWhileYouWait } from "@/components/cad/cad-lab-while-you-wait"
+
+const STLViewer = dynamic(
+  () => import("@/components/cad/stl-viewer").then((m) => ({ default: m.STLViewer })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[400px] rounded-lg" /> },
+)
 import type { CadLabResult } from "@/lib/cad-lab-types"
 
 import { useCadLab } from "../cad-lab-context"

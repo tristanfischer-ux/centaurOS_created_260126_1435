@@ -5,9 +5,15 @@ import { DashboardHero } from '@/components/dashboard/dashboard-hero'
 import { PriorityQueue } from '@/components/dashboard/priority-queue'
 import { ObjectiveCards } from '@/components/dashboard/objective-cards'
 import { TeamPulse } from '@/components/dashboard/team-pulse'
+import dynamic from 'next/dynamic'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
-import { ProductivityChart } from '@/components/dashboard/productivity-chart'
+import { Skeleton } from '@/components/ui/skeleton'
 import { RecommendedForYou } from '@/components/dashboard/recommended-for-you'
+
+const ProductivityChart = dynamic(
+  () => import('@/components/dashboard/productivity-chart').then((m) => ({ default: m.ProductivityChart })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[300px] rounded-lg" /> },
+)
 import { FoundingMemberCard } from '@/components/dashboard/founding-member-card'
 import { UnreadUpdatesCard } from '@/components/dashboard/unread-updates-card'
 

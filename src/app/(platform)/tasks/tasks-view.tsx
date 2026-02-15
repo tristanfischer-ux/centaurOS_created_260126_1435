@@ -69,9 +69,21 @@ import {
 } from "@/components/ui/alert-dialog"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Progress } from "@/components/ui/progress"
+import dynamic from "next/dynamic"
 import { getStatusBadgeClass } from "@/lib/status-colors"
-import { GanttView, JoinedTask } from "@/components/timeline/GanttView"
-import { TasksAnalytics } from "@/components/tasks/tasks-analytics"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const TasksAnalytics = dynamic(
+  () => import("@/components/tasks/tasks-analytics").then((m) => ({ default: m.TasksAnalytics })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[400px] rounded-lg" /> },
+)
+
+import type { JoinedTask } from "@/components/timeline/GanttView"
+
+const GanttView = dynamic(
+  () => import("@/components/timeline/GanttView").then((m) => ({ default: m.GanttView })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[500px] rounded-lg" /> },
+)
 
 // Task type - extended from database type with joined relations
 // Must match TaskCard's Task type for compatibility

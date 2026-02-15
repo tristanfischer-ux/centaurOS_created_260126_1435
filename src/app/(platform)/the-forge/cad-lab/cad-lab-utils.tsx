@@ -8,8 +8,14 @@
  */
 
 import { useRef, useEffect, useCallback } from "react"
-import { STLViewer } from "@/components/cad/stl-viewer"
+import dynamic from "next/dynamic"
 import type { CadLabResult } from "@/lib/cad-lab-types"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const STLViewer = dynamic(
+  () => import("@/components/cad/stl-viewer").then((m) => ({ default: m.STLViewer })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-full rounded-lg" /> },
+)
 
 // ─── Metric ──────────────────────────────────────────────────────────
 

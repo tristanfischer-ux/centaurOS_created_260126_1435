@@ -2,8 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { AdminDashboard } from "@/components/analytics/AdminDashboard"
+import dynamic from "next/dynamic"
+import { Skeleton } from "@/components/ui/skeleton"
 import { getAdminAnalytics } from "@/actions/analytics"
+
+const AdminDashboard = dynamic(
+  () => import("@/components/analytics/AdminDashboard").then((m) => ({ default: m.AdminDashboard })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[600px] rounded-lg" /> },
+)
 import { PlatformAnalytics, AnalyticsPeriod } from "@/types/analytics"
 
 export default function AdminAnalyticsPage() {
