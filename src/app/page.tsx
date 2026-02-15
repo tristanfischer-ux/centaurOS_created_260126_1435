@@ -123,6 +123,22 @@ export default function MarketingPage() {
     return () => window.removeEventListener("scroll", handleFloatingCTA);
   }, []);
 
+  // Scroll to hash on initial load and when hash changes (e.g. Link to /#guild)
+  useEffect(() => {
+    const scrollToHash = (): void => {
+      const hash = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
+      if (!hash) return;
+      const el = document.getElementById(hash);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    const timeoutId = setTimeout(scrollToHash, 100);
+    window.addEventListener("hashchange", scrollToHash);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener("hashchange", scrollToHash);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Skip Navigation - Accessibility */}
@@ -149,42 +165,48 @@ export default function MarketingPage() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <a
-              href="#roles"
+            <Link
+              href="/#roles"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               Roles
-            </a>
-            <a
-              href="#problem"
+            </Link>
+            <Link
+              href="/#problem"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               Why Us
-            </a>
-            <a
-              href="#guild"
+            </Link>
+            <Link
+              href="/#guild"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               Guild
-            </a>
-            <a
-              href="#how-it-works"
+            </Link>
+            <Link
+              href="/#how-it-works"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               Getting Started
-            </a>
+            </Link>
+            <Link
+              href="/techniques"
+              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
+            >
+              Techniques
+            </Link>
             <Link
               href="/pricing"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               Pricing
             </Link>
-            <a
-              href="#faq"
+            <Link
+              href="/#faq"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               FAQ
-            </a>
+            </Link>
             <a
               href={`${APP_DOMAIN}/login`}
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
@@ -252,20 +274,21 @@ export default function MarketingPage() {
                     Get Started Free
                   </Link>
                   {[
-                    { href: "#roles", label: "Roles" },
-                    { href: "#problem", label: "Why Us" },
-                    { href: "#guild", label: "Guild" },
-                    { href: "#how-it-works", label: "Getting Started" },
-                    { href: "#faq", label: "FAQ" },
+                    { href: "/#roles", label: "Roles" },
+                    { href: "/#problem", label: "Why Us" },
+                    { href: "/#guild", label: "Guild" },
+                    { href: "/#how-it-works", label: "Getting Started" },
+                    { href: "/techniques", label: "Techniques" },
+                    { href: "/#faq", label: "FAQ" },
                   ].map((item) => (
-                    <a
+                    <Link
                       key={item.href}
                       href={item.href}
                       className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50 last:border-b-0"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {item.label}
-                    </a>
+                    </Link>
                   ))}
                   <Link
                     href="/pricing"
@@ -329,7 +352,7 @@ export default function MarketingPage() {
             className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-t border-muted px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
           >
             <Link
-              href="#roles"
+              href="/#roles"
               className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full"
             >
               Choose Your Path
