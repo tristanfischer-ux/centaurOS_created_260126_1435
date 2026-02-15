@@ -23,6 +23,7 @@ import type {
   CadLabInterfaceResult,
   CadLabDecompositionResult,
   CadLabModule,
+  CadLabDesignBrief,
 } from "@/lib/cad-lab-types"
 import { generateFromGrammar } from "@/actions/cad-grammar"
 import { checkRateLimit } from "@/lib/security/rate-limit"
@@ -351,6 +352,28 @@ function extractCode(text: string): string {
   return text.trim()
 }
 
+/**
+ * Extracts explicit assumption lines for user-facing confidence reporting.
+ */
+function extractAssumptions(
+  interfaceDefinition: string,
+  code: string,
+): string[] {
+  const assumptionLines = new Set<string>()
+
+  const patterns = [/RESOLVED:\s*(.+)/gi, /ASSUMPTION:\s*(.+)/gi, /ASSUME(?:D)?\s*[:\-]\s*(.+)/gi]
+  const sourceText = `${interfaceDefinition}\n${code}`
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null
+    while ((match = pattern.exec(sourceText)) !== null) {
+      const value = match[1]?.trim()
+      if (value) assumptionLines.add(value)
+    }
+  }
+
+  return Array.from(assumptionLines).slice(0, 12)
+}
+
 // ─── Research Synthesis Prompt ────────────────────────────────────────
 
 const RESEARCH_SYNTHESIS_PROMPT = `You are a senior mechanical engineer preparing a research brief for a 3D CAD modelling project. Your job is to synthesize raw research data into a precise, structured engineering specification.
@@ -402,6 +425,26 @@ RULES:
 
 // ─── Step 1: Research (exported) ─────────────────────────────────────
 
+function formatDesignBriefForPrompt(
+  designBrief?: CadLabDesignBrief,
+  assumptionNotes?: string,
+): string {
+  if (!designBrief && !assumptionNotes?.trim()) return ""
+
+  const lines = [
+    "DESIGN INTAKE CONSTRAINTS (prioritise these when selecting references and dimensions):",
+    designBrief?.useCase ? `- Use case: ${designBrief.useCase}` : null,
+    designBrief?.targetProcess ? `- Target process: ${designBrief.targetProcess}` : null,
+    designBrief?.targetMaterial ? `- Target material: ${designBrief.targetMaterial}` : null,
+    designBrief?.toleranceTarget ? `- Tolerance target: ${designBrief.toleranceTarget}` : null,
+    designBrief?.quantityTarget ? `- Quantity target: ${designBrief.quantityTarget}` : null,
+    designBrief?.complianceNotes ? `- Compliance/certification: ${designBrief.complianceNotes}` : null,
+    assumptionNotes?.trim() ? `- User assumptions: ${assumptionNotes.trim()}` : null,
+  ].filter(Boolean)
+
+  return `\n\n${lines.join("\n")}`
+}
+
 /**
  * Runs standalone research for a product: web search + CAD model search + Claude synthesis.
  *
@@ -419,6 +462,10 @@ RULES:
  */
 export async function runCadLabResearch(
   description: string,
+  options?: {
+    designBrief?: CadLabDesignBrief
+    assumptionNotes?: string
+  },
 ): Promise<CadLabResearchResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -435,6 +482,8 @@ export async function runCadLabResearch(
     console.info("[THE-FORGE] Step 1: Research — web search + CAD model search...")
 
     // 1. Run Gemini + Google Search and Thingiverse in parallel
+    const intakeContext = formatDesignBriefForPrompt(options?.designBrief, options?.assumptionNotes)
+
     const [webResult, cadResult] = await Promise.allSettled([
       callGeminiWithSearch(
         `Find the real-world specifications for: ${description}
@@ -451,7 +500,7 @@ I need precise engineering dimensions for 3D CAD modelling. Search for:
 
 Format your response as a structured specification sheet with exact numbers in millimetres. If a dimension is approximate, say so. If you find conflicting specs from different sources, list both.
 
-Do NOT guess dimensions. Only include measurements you found from real sources.`,
+Do NOT guess dimensions. Only include measurements you found from real sources.${intakeContext}`,
       ),
       searchCadModels(description),
     ])
@@ -495,6 +544,8 @@ Do NOT guess dimensions. Only include measurements you found from real sources.`
       sources: webSources,
       referenceModels,
       researchTime: Date.now() - start,
+      designBrief: options?.designBrief,
+      assumptionNotes: options?.assumptionNotes,
     }
   } catch (error) {
     console.error("[THE-FORGE] Step 1 failed:", error instanceof Error ? error.message : error)
@@ -505,6 +556,8 @@ Do NOT guess dimensions. Only include measurements you found from real sources.`
       sources: [],
       referenceModels: [],
       researchTime: Date.now() - start,
+      designBrief: options?.designBrief,
+      assumptionNotes: options?.assumptionNotes,
     }
   }
 }
@@ -714,11 +767,11 @@ EXECUTION ENVIRONMENT RULES:
 - Output ONLY the Python code inside a single \`\`\`python code fence. No explanations before or after.
 
 SELF-CONTAINED CODE (CRITICAL — violating this crashes execution):
-- Your script MUST be 100% self-contained. Every function you call MUST be defined with \`def\` in YOUR script.
-- Do NOT call external component library functions like kitchen_base_cabinet(), composite_front_door(), brushless_motor_outrunner(), bed_frame(), shower_tray(), casement_window(), etc.
-- These library functions are NOT available in the execution sandbox. If even ONE undefined function is called, the script crashes with NameError and produces NO output at all.
-- Build ALL geometry from scratch in your own make_*() functions using cq.Workplane primitives (.box(), .cylinder(), .extrude(), .cut(), etc.).
-- PRE-FLIGHT CHECK: Before outputting code, mentally trace every function call in your script and verify it has a matching \`def\` statement. If you find any call to a function you did not define, remove it or replace it with inline geometry.
+- Your script MUST be executable with no unresolved names.
+- You MAY call component-library functions that appear in the provided "COMPONENT LIBRARY" list.
+- Any non-library helper function you call MUST be defined with \`def\` in YOUR script.
+- If a needed part is not in the library, build it with your own make_*() function using cq.Workplane primitives (.box(), .cylinder(), .extrude(), .cut(), etc.).
+- PRE-FLIGHT CHECK: Before outputting code, mentally trace every function call and verify it is either (a) in the provided library list or (b) defined in your script.
 
 Z-COORDINATE / VERTICAL POSITION SANITY (prevents doubled heights):
 - When positioning components vertically, use EXACTLY ONE reference frame. Either:
@@ -751,7 +804,7 @@ Generate the complete CadQuery Python code following the methodology. The code m
 4. Create a make_*() function for EACH component — each must build REAL geometry, no stubs
 5. For complex models (20+ components): use cq.Assembly() at the top level, .union() only in small sub-groups
 6. For simpler models: use the .union() assembly pattern
-7. CRITICAL: Every function you call MUST be defined with \`def\` in your script. Do NOT call external library functions.
+7. CRITICAL: Every function you call MUST either come from the provided component library list OR be defined with \`def\` in your script.
 8. Verify all z-positions add up: the highest point should match the expected total height
 9. Assign the final assembly to a variable called "result"
 10. Create "result_exploded" showing all components spread apart along Z for an exploded view (wrap in try/except)
@@ -763,6 +816,7 @@ If the research report or interface definition contains any unresolved questions
     totalTokensOut += codeResult.tokensOut
 
     let finalCode = extractCode(codeResult.text)
+    const assumptions = extractAssumptions(interfaceDefinition, finalCode)
 
     // Safety: strip any export/print/os calls that slipped through
     finalCode = finalCode
@@ -808,6 +862,7 @@ If the research report or interface definition contains any unresolved questions
         tokensIn: totalTokensIn,
         tokensOut: totalTokensOut,
         modelUsed: modelId,
+        assumptions,
       }
     }
 
@@ -916,6 +971,7 @@ If the research report or interface definition contains any unresolved questions
       modelUsed: modelId,
       interfaceDefinition,
       validationWarnings: warnings.length > 0 ? warnings : undefined,
+      assumptions: assumptions.length > 0 ? assumptions : undefined,
       error: modalResult.error ?? undefined,
     }
   } catch (err) {

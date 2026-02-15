@@ -734,8 +734,9 @@ CODE QUALITY REQUIREMENTS:
 
 SELF-CONTAINED CODE (CRITICAL — violating this crashes execution):
 - Your script MUST be 100% self-contained. Every function you call MUST be defined with \`def\` in YOUR script.
-- Do NOT call external component library functions like kitchen_base_cabinet(), composite_front_door(), brushless_motor_outrunner(), bed_frame(), shower_tray(), casement_window(), etc.
-- These library functions may NOT be available in the execution sandbox. If even ONE undefined function is called, the script crashes with NameError and produces NO output at all.
+- You MAY call component-library functions that appear in the provided "COMPONENT LIBRARY" list.
+- Any non-library helper function you call MUST be defined with \`def\` in your script.
+- If even one called function is neither in the library list nor defined in the script, execution will fail with NameError.
 - Build ALL geometry from scratch in your own make_*() functions using cq.Workplane primitives (.box(), .cylinder(), .extrude(), .cut(), etc.).
 - The ONLY allowed imports are: \`import cadquery as cq\` and \`import math\`.
 - Before writing the final code, mentally trace every function call and verify it has a matching \`def\` in your script.`
@@ -759,7 +760,7 @@ Generate the FULL CadQuery Python code. Requirements:
 6. For buildings: use cq.Assembly() at the top level. Use .union() only within small sub-groups (max 10). For non-buildings: use the union assembly pattern.
 7. Include validation checks that verify dimensional constraints
 8. The LAST line MUST be: result = assy.toCompound() (for Assembly) or result = assy (for Workplane)
-9. CRITICAL: Your code must be 100% self-contained. Every function you call must be defined with def in your script. Do NOT call external library functions.
+9. CRITICAL: Every function you call must either come from the provided component library list OR be defined with def in your script.
 
 This code will be executed in a CadQuery sandbox. The "result" variable must be a cq.Workplane or cq.Compound containing the complete assembled model. If using cq.Assembly(), call .toCompound() to convert it.`,
       "claude-opus-4-6",
@@ -1002,7 +1003,7 @@ function validateGeneratedCode(code: string): string[] {
   if (undefinedCalls.length > 0) {
     warnings.push(
       `Undefined function calls detected (will crash with NameError): ${undefinedCalls.join(", ")}. `
-      + `Every function called must be defined with def in the script.`
+      + `Each call must either be a known component-library function or be defined with def in the script.`
     )
   }
 

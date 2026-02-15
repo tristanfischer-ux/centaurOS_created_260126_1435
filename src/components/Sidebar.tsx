@@ -20,7 +20,7 @@
 
 "use client"
 
-import React, { memo } from "react"
+import React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -58,7 +58,6 @@ import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 import { SectionHeader } from "@/components/sidebar/SectionHeader"
 import { useSectionNewBadges } from "@/hooks/useSectionNewBadge"
-import { MARKETPLACE_SUPPLIES_START_INDEX } from "@/lib/features/section-registry"
 import { signOut } from "@/actions/auth"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 
@@ -98,7 +97,7 @@ const planNavigation = [
 // Section 3: "Workshop" — Where the work happens
 // ─────────────────────────────────────────────────────────────────────────────
 const workshopNavigation = [
-    { name: "The Forge", href: "/the-forge/cad-lab", icon: Flame, tooltip: "Turn any product idea into manufacturing-ready parametric CAD in minutes" },
+    { name: "The Forge", href: "/the-forge", icon: Flame, tooltip: "Design-to-RFQ workspace: guided intake, CAD, drawing packs, and supplier handoff" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Specialists", href: "/agents", icon: UsersRound, tooltip: "Your on-demand team of experts — brief them on anything" },
     { name: "Deliverables", href: "/agents/artifacts", icon: FileOutput, tooltip: "Documents, reports, and deliverables from your specialists" },
@@ -141,7 +140,7 @@ interface SidebarProps {
     userFoundries?: FoundryInfo[]
 }
 
-function SidebarComponent({ foundryName, foundryId, foundryLogoUrl, userName, userRole, isCompanyAdmin, userFoundries }: SidebarProps) {
+export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, userRole, userFoundries }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { setZoom } = useZoomContext()
@@ -400,5 +399,3 @@ function SidebarComponent({ foundryName, foundryId, foundryLogoUrl, userName, us
         </div>
     )
 }
-
-export const Sidebar = memo(SidebarComponent)

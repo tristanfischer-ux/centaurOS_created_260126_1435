@@ -36,6 +36,7 @@ const nextConfig: NextConfig = {
   // Image optimization: serve modern formats with long cache TTL
   images: {
     formats: ["image/avif", "image/webp"],
+    qualities: [75, 90],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
   },
 
@@ -147,9 +148,12 @@ export default withSentryConfig(analyzeBundles(withPWA(nextConfig)), {
     deleteSourcemapsAfterUpload: true,
   },
 
-  // Automatically tree-shake Sentry logger statements
-  disableLogger: true,
-
-  // Enables automatic instrumentation of Vercel Cron Monitors
-  automaticVercelMonitors: true,
+  webpack: {
+    // Automatically tree-shake Sentry logger statements
+    treeshake: {
+      removeDebugLogging: true,
+    },
+    // Enables automatic instrumentation of Vercel Cron Monitors
+    automaticVercelMonitors: true,
+  },
 });

@@ -1,4 +1,4 @@
-import { test as setup, expect } from '@playwright/test'
+import { test as setup } from '@playwright/test'
 import {
   EXECUTIVE_STORAGE,
   FOUNDER_STORAGE,
@@ -59,8 +59,8 @@ async function loginAsPlatformUser(
   await page.fill('input[type="email"]', email)
   await page.fill('input[type="password"]', password)
   
-  // Submit form (copy-safe selector; login CTA text may change)
-  await page.getByRole('button', { name: /enter the forge|access foundry|sign in|log in/i }).click()
+  // Submit form
+  await page.getByRole('button', { name: /enter the forge|access foundry/i }).click()
   
   // Wait for redirect to a platform page (today, dashboard, or updates)
   await page.waitForURL(/\/(today|dashboard|updates|new-objectives|new-tasks)/, { timeout: 30000 })
@@ -102,18 +102,18 @@ async function loginAsSupplier(
   await page.fill('input[type="email"]', email)
   await page.fill('input[type="password"]', password)
   
-  // Submit form (copy-safe selector; login CTA text may change)
-  await page.getByRole('button', { name: /enter the forge|access foundry|sign in|log in/i }).click()
+  // Submit form
+  await page.getByRole('button', { name: /enter the forge|access foundry/i }).click()
   
-  // Supplier accounts redirect to supplier-portal
-  await page.waitForURL('**/supplier-portal**', { timeout: 30000 })
+  // Supplier users may land in supplier portal or general platform routing
+  await page.waitForURL(/\/(supplier-portal|today|dashboard|updates|new-objectives|new-tasks)/, { timeout: 30000 })
   
   // Dismiss all onboarding modals so walkthrough videos show the real app
   await dismissAllOnboardingModals(page)
   
   // Reload so the dismissed state takes effect before saving
   await page.reload()
-  await page.waitForURL('**/supplier-portal**', { timeout: 15000 })
+  await page.waitForURL(/\/(supplier-portal|today|dashboard|updates|new-objectives|new-tasks)/, { timeout: 15000 })
   
   // Save auth state (includes cookies + localStorage with onboarding flags)
   await page.context().storageState({ path: storagePath })

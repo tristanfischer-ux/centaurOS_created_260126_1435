@@ -286,7 +286,7 @@ export async function updateCompanyProfile(
     try {
       const { data, error: rpcError } = await supabase.rpc('update_company_profile', {
         p_foundry_id: foundryId,
-        p_company_profile: profileData as unknown as Record<string, unknown>,
+        p_company_profile: profileData as unknown as Json,
       })
 
       if (rpcError) {

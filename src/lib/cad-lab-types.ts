@@ -15,6 +15,22 @@ export const CLAUDE_MODELS = [
 
 export type ClaudeModelId = (typeof CLAUDE_MODELS)[number]["id"]
 
+/** Structured intake fields captured before research/generation */
+export interface CadLabDesignBrief {
+  /** What the user is building this for */
+  useCase: string
+  /** Preferred manufacturing process */
+  targetProcess: string
+  /** Preferred material family */
+  targetMaterial: string
+  /** Critical tolerance requirement */
+  toleranceTarget: string
+  /** Expected production scale */
+  quantityTarget: string
+  /** Compliance / certification notes */
+  complianceNotes: string
+}
+
 /** DFM (Design for Manufacturability) analysis result */
 export interface CadLabDfmResult {
   /** Whether the part is printable on common FDM printers */
@@ -73,10 +89,14 @@ export interface CadLabResult {
   svgExploded?: string
   /** Base64-encoded STEP file for download */
   stepData?: string
+  /** Persistent STEP file URL for procurement attachments */
+  stepUrl?: string
   /** STEP file size in KB */
   stepSize?: number
   /** Base64-encoded STL data for 3D viewer */
   stlData?: string
+  /** Persistent STL file URL for procurement attachments */
+  stlUrl?: string
   /** STL file size in KB */
   stlSize?: number
   /** Bounding box dimensions in mm */
@@ -101,6 +121,21 @@ export interface CadLabResult {
   interfaceDefinition?: string
   /** Post-execution validation warnings */
   validationWarnings?: string[]
+  /** Assumptions inferred or resolved during generation */
+  assumptions?: string[]
+  /** Optional drawing/package metadata for procurement handoff */
+  drawingPackage?: {
+    revision: string
+    generatedAt: string
+    title: string
+    manifestUrl?: string
+    files: Array<{
+      name: string
+      url: string
+      mimeType: string
+      sizeKb?: number
+    }>
+  }
 }
 
 /** Result from Step 2: Interface Definition generation */
@@ -188,4 +223,8 @@ export interface CadLabResearchResult {
   referenceModels: Array<{ name: string; url: string; thumbnail?: string }>
   /** Time taken for the research step in ms */
   researchTime: number
+  /** Structured design brief used to guide research */
+  designBrief?: CadLabDesignBrief
+  /** Explicit assumptions provided by the user */
+  assumptionNotes?: string
 }

@@ -18,7 +18,7 @@
 
 "use client"
 
-import { useState, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   FileSignature,
   Copy,
@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ArrowRight,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -36,8 +37,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { CadLabDesignBrief, CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
+import { computeRfqReadiness } from "./cad-lab-procurement-utils"
+import { createCadLabRfqAction } from "@/actions/cad-lab-rfq"
+import { getRFQDetail, getMatchedSuppliers, triggerRFQBroadcast } from "@/actions/rfq"
+import type { SupplierMatch } from "@/types/rfq"
+import { trackFeatureUse } from "@/hooks/useActivityTracker"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -48,6 +54,16 @@ interface CadLabContractingProps {
   projectName: string
   /** Diagnostic answers per module */
   diagnosticAnswers?: DiagnosticAnswers
+  /** Active Cad Lab project ID */
+  projectId?: string | null
+  /** Existing RFQ linked to this project */
+  linkedRfqId?: string | null
+  /** Persist RFQ linkage */
+  onRfqLinked?: (rfqId: string) => Promise<void> | void
+  /** Structured design brief captured in research stage */
+  designBrief?: CadLabDesignBrief
+  /** Optional assumptions entered by user */
+  assumptionNotes?: string
 }
 
 type DocType = "rfq" | "sow" | "nda"
@@ -92,7 +108,9 @@ function generateRfq(
   diagnosticAnswers?: DiagnosticAnswers,
   buyerName?: string,
   deadline?: string,
-  specialTerms?: string
+  specialTerms?: string,
+  rfqId?: string,
+  rfqStatus?: string,
 ): string {
   const date = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
@@ -108,6 +126,8 @@ function generateRfq(
   lines.push(`Date: ${date}`)
   if (buyerName) lines.push(`Buyer: ${buyerName}`)
   if (deadline) lines.push(`Submission Deadline: ${deadline}`)
+  if (rfqId) lines.push(`Marketplace RFQ ID: ${rfqId}`)
+  if (rfqStatus) lines.push(`Marketplace Status: ${rfqStatus}`)
   lines.push(`Modules: ${modules.length}`)
   lines.push("")
 
@@ -172,7 +192,8 @@ function generateSow(
   projectName: string,
   modules: CadLabModule[],
   diagnosticAnswers?: DiagnosticAnswers,
-  buyerName?: string
+  buyerName?: string,
+  rfqId?: string,
 ): string {
   const date = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
@@ -188,6 +209,7 @@ function generateSow(
   lines.push(`Project: ${projectName}`)
   lines.push(`Date: ${date}`)
   if (buyerName) lines.push(`Client: ${buyerName}`)
+  if (rfqId) lines.push(`Marketplace RFQ Reference: ${rfqId}`)
   lines.push("")
 
   lines.push("1. SCOPE")
@@ -241,7 +263,7 @@ function generateSow(
 /**
  * Generates a mutual NDA template.
  */
-function generateNda(projectName: string, buyerName?: string): string {
+function generateNda(projectName: string, buyerName?: string, rfqId?: string): string {
   const date = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -254,6 +276,7 @@ function generateNda(projectName: string, buyerName?: string): string {
   lines.push("")
   lines.push(`Date: ${date}`)
   lines.push(`Project: ${projectName}`)
+  if (rfqId) lines.push(`RFQ Reference: ${rfqId}`)
   lines.push("")
   lines.push("BETWEEN:")
   lines.push(`  Party A (Discloser): ${buyerName || "[BUYER NAME]"}`)
@@ -321,6 +344,11 @@ export function CadLabContracting({
   modules,
   projectName,
   diagnosticAnswers,
+  projectId,
+  linkedRfqId,
+  onRfqLinked,
+  designBrief,
+  assumptionNotes,
 }: CadLabContractingProps): React.ReactNode {
   const [buyerName, setBuyerName] = useState("")
   const [deadline, setDeadline] = useState("")
@@ -329,6 +357,71 @@ export function CadLabContracting({
     Map<DocType, string>
   >(new Map())
   const [expandedDoc, setExpandedDoc] = useState<DocType | null>(null)
+  const [isCreatingRfq, setIsCreatingRfq] = useState(false)
+  const [createdRfqId, setCreatedRfqId] = useState<string | null>(null)
+  const [rfqStatus, setRfqStatus] = useState<string | null>(null)
+  const [rfqResponseCount, setRfqResponseCount] = useState(0)
+  const [suggestedSuppliers, setSuggestedSuppliers] = useState<SupplierMatch[]>([])
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false)
+  const [isRebroadcasting, setIsRebroadcasting] = useState(false)
+  const [lastBroadcastCount, setLastBroadcastCount] = useState<number | null>(null)
+
+  const rfqReadiness = useMemo(
+    () => computeRfqReadiness(modules, diagnosticAnswers),
+    [modules, diagnosticAnswers],
+  )
+  const canCreateRfq =
+    rfqReadiness.quoteReadyModuleCount > 0
+  const createRfqBlockedReason = !canCreateRfq
+    ? "At least one module must be quote-ready (generated + STEP/STL/manifest) before RFQ creation."
+    : null
+
+  useEffect(() => {
+    if (linkedRfqId) {
+      setCreatedRfqId(linkedRfqId)
+    }
+  }, [linkedRfqId])
+
+  useEffect(() => {
+    if (!createdRfqId) {
+      setRfqStatus(null)
+      setRfqResponseCount(0)
+      setSuggestedSuppliers([])
+      return
+    }
+
+    let isMounted = true
+
+    const fetchRfqContext = async (): Promise<void> => {
+      try {
+        setIsLoadingSuppliers(true)
+        const [detail, matches] = await Promise.all([
+          getRFQDetail(createdRfqId),
+          getMatchedSuppliers(createdRfqId),
+        ])
+
+        if (!isMounted) return
+        if (!detail.error && detail.data) {
+          setRfqStatus(detail.data.status)
+          setRfqResponseCount(detail.data.response_count ?? 0)
+        }
+        if (!matches.error) {
+          setSuggestedSuppliers(matches.data.slice(0, 5))
+        }
+      } catch {
+        // best effort only
+      } finally {
+        if (isMounted) setIsLoadingSuppliers(false)
+      }
+    }
+
+    fetchRfqContext()
+    const poll = window.setInterval(fetchRfqContext, 20000)
+    return () => {
+      isMounted = false
+      window.clearInterval(poll)
+    }
+  }, [createdRfqId])
 
   const handleGenerate = (type: DocType): void => {
     let text: string
@@ -340,7 +433,9 @@ export function CadLabContracting({
           diagnosticAnswers,
           buyerName || undefined,
           deadline || undefined,
-          specialTerms || undefined
+          specialTerms || undefined,
+          createdRfqId || undefined,
+          rfqStatus || undefined,
         )
         break
       case "sow":
@@ -348,11 +443,16 @@ export function CadLabContracting({
           projectName,
           modules,
           diagnosticAnswers,
-          buyerName || undefined
+          buyerName || undefined,
+          createdRfqId || undefined,
         )
         break
       case "nda":
-        text = generateNda(projectName, buyerName || undefined)
+        text = generateNda(
+          projectName,
+          buyerName || undefined,
+          createdRfqId || undefined,
+        )
         break
     }
 
@@ -362,14 +462,135 @@ export function CadLabContracting({
       return next
     })
     setExpandedDoc(type)
+    trackFeatureUse("cad_lab_contract_doc_generated", {
+      docType: type,
+      moduleCount: modules.length,
+      hasLinkedRfq: Boolean(createdRfqId),
+    })
   }
 
   const handleCopy = async (type: DocType): Promise<void> => {
     const text = generatedDocs.get(type)
     if (!text) return
     await navigator.clipboard.writeText(text)
+    trackFeatureUse("cad_lab_contract_doc_copied", {
+      docType: type,
+      moduleCount: modules.length,
+    })
     toast.success(`${DOC_TYPES.find((d) => d.id === type)?.name} copied to clipboard`)
   }
+
+  const handleCreateMarketplaceRfq = async (): Promise<void> => {
+    if (!canCreateRfq) {
+      trackFeatureUse("cad_lab_rfq_create_blocked", {
+        reason: createRfqBlockedReason || "unknown",
+        readinessScore: rfqReadiness.totalScore,
+        quoteReadyModules: rfqReadiness.quoteReadyModuleCount,
+      })
+      toast.error(createRfqBlockedReason || "RFQ package is not ready yet.")
+      return
+    }
+    trackFeatureUse("cad_lab_rfq_create_attempt", {
+      readinessScore: rfqReadiness.totalScore,
+      quoteReadyModules: rfqReadiness.quoteReadyModuleCount,
+      moduleCount: modules.length,
+      hasProjectId: Boolean(projectId),
+    })
+    setIsCreatingRfq(true)
+    try {
+      const res = await createCadLabRfqAction({
+        projectName,
+        modules,
+        diagnosticAnswers: diagnosticAnswers || {},
+        deadline: deadline || undefined,
+        designBrief,
+        assumptionNotes,
+      })
+
+      if ("error" in res) {
+        trackFeatureUse("cad_lab_rfq_create_failed", {
+          reason: res.error,
+          readinessScore: rfqReadiness.totalScore,
+        })
+        toast.error(res.error)
+        return
+      }
+
+      setCreatedRfqId(res.rfqId)
+      if (projectId && onRfqLinked) {
+        await onRfqLinked(res.rfqId)
+      }
+      trackFeatureUse("cad_lab_rfq_created", {
+        readinessScore: rfqReadiness.totalScore,
+        quoteReadyModules: rfqReadiness.quoteReadyModuleCount,
+        moduleCount: modules.length,
+      })
+      toast.success("Marketplace RFQ created from drawing package")
+    } catch (error) {
+      trackFeatureUse("cad_lab_rfq_create_failed", {
+        reason: error instanceof Error ? error.message : "unknown_error",
+        readinessScore: rfqReadiness.totalScore,
+      })
+      toast.error(error instanceof Error ? error.message : "Failed to create RFQ")
+    } finally {
+      setIsCreatingRfq(false)
+    }
+  }
+
+  const handleRebroadcast = async (): Promise<void> => {
+    if (!createdRfqId) return
+    trackFeatureUse("cad_lab_rfq_rebroadcast_attempt", {
+      hasRfq: true,
+      responseCount: rfqResponseCount,
+    })
+    setIsRebroadcasting(true)
+    try {
+      const res = await triggerRFQBroadcast(createdRfqId)
+      if (!res.success) {
+        trackFeatureUse("cad_lab_rfq_rebroadcast_failed", {
+          reason: res.error || "unknown",
+        })
+        toast.error(res.error || "Failed to rebroadcast RFQ")
+        return
+      }
+      setLastBroadcastCount(res.broadcast_count)
+      trackFeatureUse("cad_lab_rfq_rebroadcasted", {
+        broadcastCount: res.broadcast_count,
+      })
+      toast.success(`RFQ rebroadcasted to ${res.broadcast_count} supplier(s)`)
+    } catch (error) {
+      trackFeatureUse("cad_lab_rfq_rebroadcast_failed", {
+        reason: error instanceof Error ? error.message : "unknown_error",
+      })
+      toast.error(error instanceof Error ? error.message : "Failed to rebroadcast RFQ")
+    } finally {
+      setIsRebroadcasting(false)
+    }
+  }
+
+  const handleViewRfq = (): void => {
+    if (!createdRfqId) return
+    trackFeatureUse("cad_lab_rfq_view_opened", {
+      responseCount: rfqResponseCount,
+      status: rfqStatus || "unknown",
+    })
+    window.open(`/rfq/${createdRfqId}`, "_blank", "noopener,noreferrer")
+  }
+
+  const procurementStage = !createdRfqId
+    ? "draft"
+    : rfqStatus === "Awarded"
+      ? "awarded"
+      : rfqResponseCount > 0
+        ? "responses"
+        : "rfq_created"
+  const procurementFlow = [
+    { key: "draft", label: "Draft package" },
+    { key: "rfq_created", label: "RFQ created" },
+    { key: "responses", label: "Supplier responses" },
+    { key: "awarded", label: "Awarded" },
+  ]
+  const currentStageIndex = procurementFlow.findIndex((step) => step.key === procurementStage)
 
   return (
     <Card>
@@ -391,6 +612,183 @@ export function CadLabContracting({
           Generate contract documents from project specifications. Fill in buyer
           details, then generate RFQ, SOW, or NDA templates.
         </p>
+
+        <div className="rounded-lg border border-border/70 bg-muted/20 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-foreground">RFQ readiness score</p>
+            <span
+              className={cn(
+                "text-xs font-semibold",
+                rfqReadiness.totalScore >= 85
+                  ? "text-status-success"
+                  : rfqReadiness.totalScore >= 60
+                    ? "text-status-warning"
+                    : "text-status-error",
+              )}
+            >
+              {rfqReadiness.totalScore}%
+            </span>
+          </div>
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-500",
+                rfqReadiness.totalScore >= 85
+                  ? "bg-status-success"
+                  : rfqReadiness.totalScore >= 60
+                    ? "bg-status-warning"
+                    : "bg-status-error",
+              )}
+              style={{ width: `${rfqReadiness.totalScore}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Generated: {rfqReadiness.generatedCount}/{modules.length} • Diagnostics: {rfqReadiness.diagnosticsComplete}/{modules.length} • Artifacts: {rfqReadiness.artifactComplete}/{modules.length} • Quote-ready: {rfqReadiness.quoteReadyModuleCount}/{modules.length}
+          </p>
+          {rfqReadiness.gaps.length > 0 && (
+            <ul className="list-disc pl-4 space-y-1 text-[11px] text-muted-foreground">
+              {rfqReadiness.gaps.map((gap) => (
+                <li key={gap}>{gap}</li>
+              ))}
+            </ul>
+          )}
+          {rfqReadiness.moduleDetails.some((module) => module.quoteReady === false) && (
+            <div className="border-t pt-2 space-y-1">
+              <p className="text-[11px] font-medium text-foreground">Module blockers</p>
+              {rfqReadiness.moduleDetails
+                .filter((module) => !module.quoteReady)
+                .slice(0, 4)
+                .map((module) => (
+                  <p key={module.moduleId} className="text-[11px] text-muted-foreground">
+                    {module.moduleName}: {module.generated ? "missing " : "not generated; missing "}
+                    {module.missingArtifacts.join(", ")}
+                  </p>
+                ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-border/70 bg-muted/30 p-3 space-y-2">
+          <p className="text-xs font-semibold text-foreground">Procurement flow tracking</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {procurementFlow.map((step, index) => {
+              const isActive = index <= currentStageIndex
+              return (
+                <span
+                  key={step.key}
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-medium",
+                    isActive
+                      ? "border-status-success/40 bg-status-success-light text-status-success"
+                      : "border-border bg-background text-muted-foreground"
+                  )}
+                >
+                  {step.label}
+                </span>
+              )
+            })}
+          </div>
+          {createdRfqId && (
+            <p className="text-[11px] text-muted-foreground">
+              RFQ <span className="font-mono">{createdRfqId.slice(0, 8)}…</span>
+              {rfqStatus ? ` • Status: ${rfqStatus}` : ""}
+              {rfqResponseCount > 0 ? ` • ${rfqResponseCount} response(s)` : ""}
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-status-info/30 bg-status-info-light/20 p-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold text-foreground">One-click supplier handoff</p>
+            <p className="text-[11px] text-muted-foreground">
+              Create a live Marketplace RFQ prefilled with module diagnostics and drawing artifacts.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              className="text-xs h-8"
+              onClick={handleCreateMarketplaceRfq}
+              disabled={isCreatingRfq || !canCreateRfq}
+            >
+              {isCreatingRfq ? "Creating RFQ..." : "Create Marketplace RFQ"}
+            </Button>
+            {createdRfqId && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8"
+                  onClick={handleRebroadcast}
+                  disabled={isRebroadcasting}
+                >
+                  {isRebroadcasting ? "Broadcasting..." : "Re-broadcast"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8"
+                  onClick={handleViewRfq}
+                >
+                  View RFQ
+                  <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+        {!canCreateRfq && (
+          <p className="text-[11px] text-status-warning -mt-1">
+            {createRfqBlockedReason}
+          </p>
+        )}
+        {createdRfqId && lastBroadcastCount !== null && (
+          <p className="text-[11px] text-muted-foreground -mt-1">
+            Last rebroadcast reached {lastBroadcastCount} supplier(s).
+          </p>
+        )}
+
+        {createdRfqId && (
+          <div className="rounded-lg border border-border/70 bg-muted/20 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-foreground">Suggested suppliers</p>
+              <span className="text-[10px] text-muted-foreground">
+                {isLoadingSuppliers ? "Refreshing…" : `${suggestedSuppliers.length} match(es)`}
+              </span>
+            </div>
+            {suggestedSuppliers.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                No supplier matches yet. As responses arrive, this list will populate.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {suggestedSuppliers.map((supplier) => (
+                  <div
+                    key={supplier.provider_id}
+                    className="flex items-start justify-between rounded-md border bg-background px-2.5 py-2"
+                  >
+                    <div>
+                      <p className="text-xs font-medium text-foreground">
+                        {supplier.full_name || "Unnamed supplier"}
+                      </p>
+                      {supplier.match_reasons.length > 0 && (
+                        <p className="text-[10px] text-muted-foreground">
+                          {supplier.match_reasons.slice(0, 2).join(" • ")}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-semibold text-status-info">
+                      {supplier.match_score > 1
+                        ? `${supplier.match_score.toFixed(0)}%`
+                        : `${(supplier.match_score * 100).toFixed(0)}%`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Buyer details form */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
