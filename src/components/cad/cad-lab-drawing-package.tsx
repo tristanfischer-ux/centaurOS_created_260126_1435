@@ -38,6 +38,25 @@ export interface DrawingPackageSummary {
   readinessPct: number
 }
 
+export interface DrawingPackageManifestPayload {
+  source: "the-forge-cad-lab"
+  projectName: string
+  generatedAt: string
+  generatedModuleCount: number
+  quoteReadyModuleCount: number
+  packageReadinessPct: number
+  modules: Array<{
+    id: string
+    name: string
+    purpose: string
+    envelopeMm: CadLabModule["result"] extends { bbox: infer B } ? B | null : null
+    massGrams: number | null
+    drawingPackage: CadLabModule["result"] extends { drawingPackage: infer D } ? D | null : null
+  }>
+  files: PackageFileEntry[]
+  moduleCoverage: ModuleArtifactCoverage[]
+}
+
 export interface ModuleArtifactCoverage {
   moduleId: string
   moduleName: string
@@ -223,6 +242,31 @@ export function buildModuleBomCsv(
   return [header.join(","), ...rows].join("\n")
 }
 
+export function buildProjectManifestPayload(
+  projectName: string,
+  packageSummary: DrawingPackageSummary,
+  generatedAt: string = new Date().toISOString(),
+): DrawingPackageManifestPayload {
+  return {
+    source: "the-forge-cad-lab",
+    projectName,
+    generatedAt,
+    generatedModuleCount: packageSummary.generatedModules.length,
+    quoteReadyModuleCount: packageSummary.completeModules,
+    packageReadinessPct: packageSummary.readinessPct,
+    modules: packageSummary.generatedModules.map((mod) => ({
+      id: mod.id,
+      name: mod.name,
+      purpose: mod.purpose,
+      envelopeMm: mod.result?.bbox ?? null,
+      massGrams: mod.result?.massGrams ?? null,
+      drawingPackage: mod.result?.drawingPackage ?? null,
+    })),
+    files: packageSummary.files,
+    moduleCoverage: packageSummary.moduleCoverage,
+  }
+}
+
 export function CadLabDrawingPackage({
   projectName,
   modules,
@@ -233,22 +277,7 @@ export function CadLabDrawingPackage({
   )
 
   const handleDownloadProjectManifest = (): void => {
-    const payload = {
-      source: "the-forge-cad-lab",
-      projectName,
-      generatedAt: new Date().toISOString(),
-      generatedModuleCount: packageSummary.generatedModules.length,
-      packageReadinessPct: packageSummary.readinessPct,
-      modules: packageSummary.generatedModules.map((mod) => ({
-        id: mod.id,
-        name: mod.name,
-        purpose: mod.purpose,
-        envelopeMm: mod.result?.bbox ?? null,
-        massGrams: mod.result?.massGrams ?? null,
-        drawingPackage: mod.result?.drawingPackage ?? null,
-      })),
-      files: packageSummary.files,
-    }
+    const payload = buildProjectManifestPayload(projectName, packageSummary)
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
@@ -302,7 +331,7 @@ export function CadLabDrawingPackage({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
           <Metric label="Generated modules" value={`${packageSummary.generatedModules.length}/${modules.length}`} />
-          <Metric label="Complete CAD packs" value={`${packageSummary.completeModules}/${packageSummary.generatedModules.length || 0}`} />
+          <Metric label="Quote-ready modules" value={`${packageSummary.completeModules}/${packageSummary.generatedModules.length || 0}`} />
           <Metric label="Artifact files" value={`${packageSummary.files.length}`} />
         </div>
 

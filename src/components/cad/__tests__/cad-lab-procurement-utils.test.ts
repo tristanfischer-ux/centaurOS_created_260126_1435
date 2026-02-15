@@ -5,6 +5,7 @@ import {
   buildDrawingPackageSummary,
   buildSupplierPacketMarkdown,
   buildModuleBomCsv,
+  buildProjectManifestPayload,
 } from "@/components/cad/cad-lab-drawing-package"
 
 function makeModule(overrides: Partial<CadLabModule>): CadLabModule {
@@ -216,5 +217,26 @@ describe("Cad Lab procurement utility functions", () => {
     expect(csv).toContain("\"frame\",\"Frame\",\"arm\"")
     expect(csv).toContain("\"bracket\",\"Bracket\",\"module-assembly\"")
     expect(csv).toContain(",\"67\",\"STL\"")
+  })
+
+  it("builds project manifest payload with coverage metadata", () => {
+    const summary = buildDrawingPackageSummary(modules)
+    const payload = buildProjectManifestPayload(
+      "Autonomous Rover Chassis",
+      summary,
+      "2026-02-01T10:00:00.000Z",
+    )
+
+    expect(payload).toMatchObject({
+      source: "the-forge-cad-lab",
+      projectName: "Autonomous Rover Chassis",
+      generatedAt: "2026-02-01T10:00:00.000Z",
+      generatedModuleCount: 2,
+      quoteReadyModuleCount: 1,
+      packageReadinessPct: 50,
+    })
+    expect(payload.moduleCoverage).toHaveLength(2)
+    expect(payload.modules).toHaveLength(2)
+    expect(payload.files).toHaveLength(3)
   })
 })
