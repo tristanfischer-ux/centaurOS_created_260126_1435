@@ -29,10 +29,13 @@ describe("release documentation consistency", () => {
 
   it("tracks full release verification and migration auth prerequisites", () => {
     const qaReport = fs.readFileSync(qaReportPath, "utf8")
+    const releasePacket = fs.readFileSync(releasePacketPath, "utf8")
 
     expect(qaReport).toContain("npm run verify:forge-rfq-release")
+    expect(qaReport).toContain("npm run test:forge-rfq:contracts")
     expect(qaReport).toContain("SUPABASE_ACCESS_TOKEN")
     expect(qaReport).toContain("release-config-consistency.test.ts")
+    expect(releasePacket).toContain("`npm run test:forge-rfq:contracts` passes.")
   })
 
   it("keeps profiles recursion policy-expression audit in release docs", () => {

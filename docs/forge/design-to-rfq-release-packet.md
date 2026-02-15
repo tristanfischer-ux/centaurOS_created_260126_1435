@@ -58,6 +58,7 @@ Apply before rollout to eliminate profile policy recursion noise:
 
 ## Sign-off Checklist
 
+- [ ] `npm run test:forge-rfq:contracts` passes.
 - [ ] All release gate commands pass.
 - [ ] DB migration applied in target environment.
 - [ ] Profiles policy-expression SQL audit confirms no helper recursion (`get_my_foundry_id` / `is_active_user`).
