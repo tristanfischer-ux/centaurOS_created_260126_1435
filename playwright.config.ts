@@ -87,17 +87,27 @@ export default defineConfig({
         storageState: path.join(authDir, 'founder.json'),
       },
     },
+    // Specialist full E2E suite (authenticated founder).
+    // No auth-setup dependency so suite can run when supplier auth fails; run auth-setup once to create founder.json.
+    {
+      name: 'specialist-suite',
+      testMatch: /specialist-full-suite\.spec\.ts$/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: path.join(authDir, 'founder.json'),
+      },
+    },
     // General tests (unauthenticated)
     {
       name: 'chromium',
       testMatch:
-        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions)\.spec\.ts$/,
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite)\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'Mobile Chrome',
       testMatch:
-        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions)\.spec\.ts$/,
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite)\.spec\.ts$/,
       use: { ...devices['Pixel 5'] },
     },
     // Smoke tests — lightweight page render checks used by npm run verify
