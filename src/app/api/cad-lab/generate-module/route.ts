@@ -17,6 +17,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { generateCadLabInterface, generateCadLabModelSmart } from "@/actions/cad-lab"
+import { rateLimit } from "@/lib/security/rate-limit"
 import type { CadLabModule, ClaudeModelId } from "@/lib/cad-lab-types"
 import type { Json } from "@/types/database.types"
 
@@ -125,6 +126,18 @@ export async function POST(request: Request): Promise<NextResponse<GenerateModul
   } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  // SECURITY: Rate limit expensive AI/CAD module generation to control abuse and cost.
+  const rateLimitResult = await rateLimit('api', `cad-lab-module:${user.id}`, {
+    limit: 30,
+    window: 60 * 60 * 1000,
+  })
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded. Please wait before generating more modules." },
+      { status: 429 },
+    )
   }
 
   // VALIDATION: Parse request body
