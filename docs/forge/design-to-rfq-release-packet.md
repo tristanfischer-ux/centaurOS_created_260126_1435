@@ -9,6 +9,7 @@ This packet is the final handoff bundle for launch readiness.
 - Changelog: `docs/forge/design-to-rfq-changelog.md`
 - Telemetry event contract: `docs/forge/design-to-rfq-telemetry-events.md`
 - QA execution report: `docs/forge/design-to-rfq-qa-report.md`
+- Scenario matrix: `docs/forge/design-to-rfq-scenario-matrix.md`
 
 ## Release Gate Commands
 
