@@ -174,7 +174,7 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                   >
                     <div
                       className={cn(
-                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors sm:h-9 sm:w-9",
+                        "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors sm:h-9 sm:w-9",
                         isActive && "bg-international-orange text-white shadow-[0_0_12px_rgba(255,69,0,0.4)]",
                         completed && !isActive && "bg-orange-100 text-international-orange",
                         !isActive && !completed && "bg-muted text-muted-foreground",
@@ -205,7 +205,7 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                     className="flex flex-col items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity"
                     aria-label={`${stage.label} (locked — click for preview)`}
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground/50 sm:h-9 sm:w-9">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground/50 sm:h-9 sm:w-9">
                       <Icon className="h-4 w-4" />
                     </div>
                     <span className="hidden text-xs font-medium text-muted-foreground/50 sm:block whitespace-nowrap">

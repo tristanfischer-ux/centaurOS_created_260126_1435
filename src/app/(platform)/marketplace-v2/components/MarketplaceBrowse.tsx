@@ -173,7 +173,7 @@ export function MarketplaceBrowse({
                                 }
                             }}
                             className={cn(
-                                'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+                                'flex items-center gap-2 px-4 py-2.5 min-h-[44px] text-sm font-medium border-b-2 -mb-px transition-colors',
                                 isActive
                                     ? 'border-international-orange text-foreground'
                                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30'

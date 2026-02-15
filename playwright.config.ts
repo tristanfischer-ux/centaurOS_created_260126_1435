@@ -110,6 +110,22 @@ export default defineConfig({
         /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite)\.spec\.ts$/,
       use: { ...devices['Pixel 5'] },
     },
+    // Mobile Delight Audit — iPhone 14 Pro viewport, Founder auth
+    // No auth-setup dependency; run auth-setup once manually to create founder.json
+    {
+      name: 'mobile-delight',
+      testMatch: /mobile-delight-audit\.spec\.ts$/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+        storageState: path.join(authDir, 'founder.json'),
+        video: 'on',
+        screenshot: 'on',
+        trace: 'on-first-retry',
+      },
+    },
     // Smoke tests — lightweight page render checks used by npm run verify
     {
       name: 'smoke',

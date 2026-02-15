@@ -26,7 +26,14 @@ export default async function UpdatesPage() {
 
   const foundryId = await getFoundryIdCached()
   if (!foundryId) {
-    redirect('/login')
+    return (
+      <div className="p-8">
+        <h1 className="font-bold mb-2 text-destructive">No Foundry Found</h1>
+        <p className="text-muted-foreground">
+          No foundry associated with your account. Please contact support.
+        </p>
+      </div>
+    )
   }
 
   // Fetch initial activity feed

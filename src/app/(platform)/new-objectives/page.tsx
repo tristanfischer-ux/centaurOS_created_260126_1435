@@ -19,7 +19,14 @@ export default async function NewObjectivesPage() {
     .single()
 
   if (!profile) {
-    redirect('/login')
+    return (
+      <div className="p-8">
+        <h1 className="font-bold mb-2 text-destructive">Profile Not Found</h1>
+        <p className="text-muted-foreground">
+          Unable to load your profile. Please try refreshing or contact support.
+        </p>
+      </div>
+    )
   }
 
   // Fetch all objectives (strategic + regular) in one query
