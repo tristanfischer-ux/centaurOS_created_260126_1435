@@ -22,6 +22,18 @@ export async function GET() {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // SECURITY: Rate limit QA test-run listing to reduce admin endpoint abuse.
+    const listRateLimit = await rateLimit('api', `qa-tests-list:${user.id}`, {
+      limit: 60,
+      window: 60 * 1000,
+    })
+    if (!listRateLimit.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please wait before refreshing test runs.' },
+        { status: 429 }
+      )
+    }
     
     // Check admin access
     const hasAccess = await isAdmin(user.id)

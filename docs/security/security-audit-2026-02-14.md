@@ -453,6 +453,10 @@ trigger throttling and built callback URLs from environment-derived base URLs.
   - key: `qa-tests-trigger:${user.id}`
   - limit: `10`
   - window: `60 * 60 * 1000` (1 hour)
+- Added per-admin list throttling for recent test-run polling:
+  - key: `qa-tests-list:${user.id}`
+  - limit: `60`
+  - window: `60 * 1000` (1 minute)
 - Derived callback URL from `request.nextUrl.origin` instead of environment base URL.
 - Added fail-closed `QA_CALLBACK_SECRET` configuration guard before dispatch.
 - Added regression assertion in:

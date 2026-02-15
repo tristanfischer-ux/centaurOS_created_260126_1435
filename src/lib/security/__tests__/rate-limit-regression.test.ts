@@ -411,6 +411,8 @@ describe('qa test trigger hardening regressions', () => {
     const routePath = path.join(process.cwd(), 'src/app/api/admin/qa-tests/route.ts')
     const source = await readFile(routePath, 'utf-8')
 
+    expect(source).toContain("await rateLimit('api', `qa-tests-list:${user.id}`")
+    expect(source).toContain('Rate limit exceeded. Please wait before refreshing test runs.')
     expect(source).toContain("await rateLimit('api', `qa-tests-trigger:${user.id}`")
     expect(source).toContain('window: 60 * 60 * 1000')
     expect(source).toContain("new URL('/api/admin/qa-tests/callback', request.nextUrl.origin)")
