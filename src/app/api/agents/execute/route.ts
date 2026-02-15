@@ -16,6 +16,12 @@ import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import { compilePersonalityPrompt } from "@/lib/agents/personality"
 import { compileTemporalPrompt } from "@/lib/agents/temporal-context"
 import { compileEmotionalPrompt } from "@/lib/agents/emotional-context"
+import {
+    getFounderPreferences,
+    getSpecialistRelationship,
+    compileFounderPreferencesPrompt,
+    recordInteraction,
+} from "@/lib/agents/founder-preferences"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -277,6 +283,28 @@ export async function POST(request: Request) {
 - Flag assumptions explicitly. Never fabricate statistics.
 - End with clear next steps: who does what, by when.`
 
+    // Founder preferences: learned communication style, trust level, pet peeves
+    if (foundryId && specialistId && threadId) {
+        try {
+            const [founderPrefs, specialistRel] = await Promise.all([
+                getFounderPreferences(foundryId),
+                getSpecialistRelationship(threadId, foundryId),
+            ])
+            const specialist = getSpecialistById(specialistId)
+            const prefsBlock = compileFounderPreferencesPrompt(
+                founderPrefs,
+                specialistRel,
+                specialist?.name ?? specialistId,
+            )
+            if (prefsBlock) {
+                systemPromptWithContext += `\n\n${prefsBlock}`
+            }
+        } catch (err) {
+            // Non-critical — proceed without preferences
+            console.warn("[agents/execute] Could not load founder preferences:", err)
+        }
+    }
+
     // Temporal awareness: what time/day it is, how to adjust behavior
     const temporalBlock = compileTemporalPrompt()
     systemPromptWithContext += `\n\n${temporalBlock}`
@@ -326,15 +354,20 @@ export async function POST(request: Request) {
         }
     }
 
-    // Memory callback: record assistant response and process memory after streaming
+    // Memory callback: record assistant response, process memory, and track interaction
     const memoryCallback = threadId && foundryId
         ? async (fullOutput: string) => {
             try {
                 // Strip internal NEXT_SPECIALIST directive before saving to history
                 const cleanOutput = fullOutput.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
                 await addMemoryMessage(threadId!, foundryId, "assistant", cleanOutput || fullOutput)
+
+                // Track this interaction for trust level progression (fire-and-forget)
+                recordInteraction(threadId!, foundryId).catch((err) => {
+                    console.warn("[agents/execute] Failed to record interaction:", err)
+                })
+
                 // Process memory asynchronously (observe/reflect if thresholds hit)
-                // Fire-and-forget — don't block the response
                 processMemory(threadId!, foundryId).catch((err) => {
                     console.warn("[agents/execute] Memory processing failed:", err)
                 })
