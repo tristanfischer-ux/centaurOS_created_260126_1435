@@ -20,6 +20,7 @@ Notes:
 - If `npx supabase db push` returns `Access token not provided`, authenticate with a personal access token (`sbp_...`) or use manual SQL execution below.
 - If your project does not expose an admin RPC like `exec_sql`, apply the migration through CLI auth or SQL editor; REST RPC fallback will not be available.
 - `SUPABASE_SERVICE_ROLE_KEY` is also **not** the database password for pooler `--db-url` auth; attempting `db push --db-url` with it fails password authentication.
+- Supabase management SQL API with `SUPABASE_SERVICE_ROLE_KEY` bearer auth fails (`401`, `JWT could not be decoded`); management endpoints also require a proper PAT context.
 
 If CLI auth is unavailable in your execution environment:
 
