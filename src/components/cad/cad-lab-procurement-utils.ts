@@ -1,5 +1,9 @@
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
+import {
+  getModuleArtifactReadiness,
+  REQUIRED_DIAGNOSTIC_KEYS,
+} from "@/lib/cad-lab-readiness"
 
 export interface RfqReadinessSummary {
   totalScore: number
@@ -20,15 +24,6 @@ export interface ModuleReadinessDetail {
   quoteReady: boolean
 }
 
-const REQUIRED_DIAGNOSTIC_KEYS = [
-  "mfg_process",
-  "material",
-  "tolerance",
-  "finish",
-  "batch_size",
-  "environment",
-] as const
-
 export function computeRfqReadiness(
   modules: CadLabModule[],
   diagnosticAnswers?: DiagnosticAnswers,
@@ -42,14 +37,8 @@ export function computeRfqReadiness(
       return typeof value !== "string" || value.trim().length === 0
     })
 
-    const files = mod.result?.drawingPackage?.files || []
-    const hasStep = files.some((file) => file.name.toLowerCase().endsWith(".step"))
-    const hasStl = files.some((file) => file.name.toLowerCase().endsWith(".stl"))
-    const hasManifest = Boolean(mod.result?.drawingPackage?.manifestUrl)
-    const missingArtifacts: string[] = []
-    if (!hasStep) missingArtifacts.push("STEP")
-    if (!hasStl) missingArtifacts.push("STL")
-    if (!hasManifest) missingArtifacts.push("Manifest")
+    const artifactReadiness = getModuleArtifactReadiness(mod)
+    const missingArtifacts = artifactReadiness.missingArtifacts
 
     return {
       moduleId: mod.id,

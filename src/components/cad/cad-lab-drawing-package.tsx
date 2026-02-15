@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import type { CadLabModule } from "@/lib/cad-lab-types"
+import { getModuleArtifactReadiness } from "@/lib/cad-lab-readiness"
 
 interface CadLabDrawingPackageProps {
   projectName: string
@@ -78,16 +79,8 @@ function csvCell(value: string): string {
 }
 
 export function getModuleArtifactCoverage(mod: CadLabModule): ModuleArtifactCoverage {
-  const files = mod.result?.drawingPackage?.files || []
-  const hasStep = files.some((file) => file.name.toLowerCase().endsWith(".step"))
-  const hasStl = files.some((file) => file.name.toLowerCase().endsWith(".stl"))
-  const hasManifest = Boolean(mod.result?.drawingPackage?.manifestUrl)
-  const coverageParts = [hasStep, hasStl, hasManifest].filter(Boolean).length
-  const scorePct = Math.round((coverageParts / 3) * 100)
-  const missingArtifacts: string[] = []
-  if (!hasStep) missingArtifacts.push("STEP")
-  if (!hasStl) missingArtifacts.push("STL")
-  if (!hasManifest) missingArtifacts.push("Manifest")
+  const artifactReadiness = getModuleArtifactReadiness(mod)
+  const { hasStep, hasStl, hasManifest, scorePct, missingArtifacts } = artifactReadiness
 
   return {
     moduleId: mod.id,

@@ -11,6 +11,10 @@
 
 import { createNewRFQ } from "@/actions/rfq"
 import type { CadLabDesignBrief, CadLabModule } from "@/lib/cad-lab-types"
+import {
+  getModuleArtifactReadiness,
+  isDiagnosticsComplete,
+} from "@/lib/cad-lab-readiness"
 
 interface CreateCadLabRfqInput {
   projectName: string
@@ -20,15 +24,6 @@ interface CreateCadLabRfqInput {
   designBrief?: CadLabDesignBrief
   assumptionNotes?: string
 }
-
-const REQUIRED_DIAGNOSTIC_KEYS = [
-  "mfg_process",
-  "material",
-  "tolerance",
-  "finish",
-  "batch_size",
-  "environment",
-] as const
 
 function parseQuantityToken(value: string): number | undefined {
   const normalized = value.trim().toLowerCase().replace(/,/g, "")
@@ -68,15 +63,9 @@ function computeModuleReadiness(
   scorePct: number
 } {
   const diag = diagnosticAnswers[module.id] || {}
-  const diagnosticsComplete = REQUIRED_DIAGNOSTIC_KEYS.every((key) => {
-    const value = diag[key]
-    return typeof value === "string" && value.trim().length > 0
-  })
-
-  const files = module.result?.drawingPackage?.files ?? []
-  const hasStep = files.some((file) => file.name.toLowerCase().endsWith(".step"))
-  const hasStl = files.some((file) => file.name.toLowerCase().endsWith(".stl"))
-  const hasManifest = Boolean(module.result?.drawingPackage?.manifestUrl)
+  const diagnosticsComplete = isDiagnosticsComplete(diag)
+  const artifactReadiness = getModuleArtifactReadiness(module)
+  const { hasStep, hasStl, hasManifest } = artifactReadiness
 
   const scorePct = Math.round(
     (diagnosticsComplete ? 40 : 0) +
