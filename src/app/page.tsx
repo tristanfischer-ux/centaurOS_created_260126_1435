@@ -774,21 +774,22 @@ function ProblemSection() {
           })}
         </StaggerContainer>
 
-        {/* Comparison image — taller aspect ratio on mobile for readability */}
+        {/* Comparison image — labels are HTML, not baked into the image */}
         <AnimatedSection className="mt-10 sm:mt-12 md:mt-20" delay={0.2}>
           <div className="relative w-full aspect-[3/2] sm:aspect-[2.2/1] rounded-lg sm:rounded-xl overflow-hidden border">
             <Image
               src="/images/problem-comparison.png"
-              alt="Comparison: 18 months of traditional hardware development versus 6 weeks with Fractional Forge"
+              alt="Comparison: traditional hardware development versus the fractional model with Fractional Forge"
               fill
               className="object-cover"
               sizes="(max-width: 640px) 100vw, (max-width: 768px) 100vw, 1200px"
               loading="lazy"
             />
           </div>
-          <p className="text-center text-xs text-muted-foreground mt-3 sm:mt-4 font-mono tracking-wider">
-            Traditional Development vs. The Fractional Model
-          </p>
+          <div className="flex justify-between text-xs text-muted-foreground mt-3 sm:mt-4 font-mono tracking-wider px-1">
+            <span>Traditional Development</span>
+            <span>The Fractional Model</span>
+          </div>
         </AnimatedSection>
       </div>
     </section>
