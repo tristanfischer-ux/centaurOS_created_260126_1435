@@ -13,6 +13,9 @@ Move the release from **migration pending** to **go-live ready** in the target e
   - `supabase/migrations/20260215120000_stabilize_profiles_rls_no_recursion.sql`
 - Latest local gate evidence already captured:
   - `npm run verify:forge-rfq-release` PASS
+- Auth caveat:
+  - `SUPABASE_SERVICE_ROLE_KEY` is not valid for Supabase management SQL API auth (`/database/query` returns `401` / `JWT could not be decoded`).
+  - use PAT-backed CLI auth or manual SQL editor fallback.
 
 ## Path A — Authenticated Supabase CLI (preferred)
 
