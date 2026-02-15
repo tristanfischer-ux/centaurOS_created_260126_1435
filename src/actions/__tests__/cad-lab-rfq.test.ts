@@ -68,7 +68,52 @@ describe("createCadLabRfqAction", () => {
 
     expect(res).toEqual({
       error:
-        "No CAD artifacts found. Generate STEP/STL outputs and drawing manifests before creating an RFQ.",
+        "RFQ package is incomplete. At least one module must include STEP, STL, and drawing manifest artifacts.",
+    })
+    expect(mockedCreateNewRFQ).not.toHaveBeenCalled()
+  })
+
+  it("rejects when artifacts exist but no module is quote-ready", async () => {
+    const res = await createCadLabRfqAction({
+      projectName: "Missing STL Project",
+      modules: [
+        {
+          id: "m1",
+          name: "Module 1",
+          purpose: "Has step only",
+          inputs: [],
+          outputs: [],
+          keyParts: [],
+          leadWeeks: 4,
+          description: "",
+          whyItMatters: "",
+          failureModes: [],
+          unknowns: [],
+          status: "generated",
+          result: {
+            success: true,
+            drawingPackage: {
+              revision: "A",
+              generatedAt: "2026-01-01T00:00:00.000Z",
+              title: "Module Package",
+              manifestUrl: "https://example.com/m1/manifest.json",
+              files: [
+                {
+                  name: "m1.step",
+                  url: "https://example.com/m1/m1.step",
+                  mimeType: "application/step",
+                },
+              ],
+            },
+          },
+        },
+      ],
+      diagnosticAnswers: {},
+    })
+
+    expect(res).toEqual({
+      error:
+        "RFQ package is incomplete. At least one module must include STEP, STL, and drawing manifest artifacts.",
     })
     expect(mockedCreateNewRFQ).not.toHaveBeenCalled()
   })
@@ -146,6 +191,7 @@ describe("createCadLabRfqAction", () => {
     expect(payload.specifications?.materials).toEqual(["Aluminium"])
     expect(payload.specifications?.quantity).toBe(550)
     expect(payload.specifications?.custom_fields?.package_readiness_score_pct).toBe(60)
+    expect(payload.specifications?.custom_fields?.quote_ready_module_count).toBe(1)
     expect(payload.specifications?.custom_fields?.readiness_checks).toEqual([
       {
         moduleId: "frame",
@@ -204,6 +250,11 @@ describe("createCadLabRfqAction", () => {
                   url: "https://example.com/a/a.step",
                   mimeType: "application/step",
                 },
+                {
+                  name: "a.stl",
+                  url: "https://example.com/a/a.stl",
+                  mimeType: "model/stl",
+                },
               ],
             },
           },
@@ -234,6 +285,11 @@ describe("createCadLabRfqAction", () => {
                   url: "https://example.com/b/b.step",
                   mimeType: "application/step",
                 },
+                {
+                  name: "b.stl",
+                  url: "https://example.com/b/b.stl",
+                  mimeType: "model/stl",
+                },
               ],
             },
           },
@@ -244,5 +300,102 @@ describe("createCadLabRfqAction", () => {
     expect(res).toEqual({ rfqId: "rfq-quantity" })
     const payload = mockedCreateNewRFQ.mock.calls[0][0]
     expect(payload.specifications?.quantity).toBe(3000)
+  })
+
+  it("deduplicates and filters invalid artifact URLs", async () => {
+    mockedCreateNewRFQ.mockResolvedValue({
+      data: { id: "rfq-artifacts" },
+      error: null,
+    })
+
+    const res = await createCadLabRfqAction({
+      projectName: "Artifact URL Hygiene",
+      diagnosticAnswers: {},
+      modules: [
+        {
+          id: "m1",
+          name: "Module A",
+          purpose: "A",
+          inputs: [],
+          outputs: [],
+          keyParts: [],
+          leadWeeks: 3,
+          description: "",
+          whyItMatters: "",
+          failureModes: [],
+          unknowns: [],
+          status: "generated",
+          result: {
+            success: true,
+            drawingPackage: {
+              revision: "A",
+              generatedAt: "2026-01-01T00:00:00.000Z",
+              title: "A",
+              manifestUrl: "https://example.com/shared/manifest.json",
+              files: [
+                {
+                  name: "a.step",
+                  url: "https://example.com/shared/model.step",
+                  mimeType: "application/step",
+                },
+                {
+                  name: "a.stl",
+                  url: "https://example.com/shared/model.stl",
+                  mimeType: "model/stl",
+                },
+                {
+                  name: "invalid.stl",
+                  url: "blob:local-preview",
+                  mimeType: "model/stl",
+                },
+              ],
+            },
+          },
+        },
+        {
+          id: "m2",
+          name: "Module B",
+          purpose: "B",
+          inputs: [],
+          outputs: [],
+          keyParts: [],
+          leadWeeks: 3,
+          description: "",
+          whyItMatters: "",
+          failureModes: [],
+          unknowns: [],
+          status: "generated",
+          result: {
+            success: true,
+            drawingPackage: {
+              revision: "A",
+              generatedAt: "2026-01-01T00:00:00.000Z",
+              title: "B",
+              manifestUrl: "https://example.com/shared/manifest.json",
+              files: [
+                {
+                  name: "b.step",
+                  url: "https://example.com/shared/model.step",
+                  mimeType: "application/step",
+                },
+                {
+                  name: "b.stl",
+                  url: "https://example.com/shared/model.stl",
+                  mimeType: "model/stl",
+                },
+              ],
+            },
+          },
+        },
+      ],
+    })
+
+    expect(res).toEqual({ rfqId: "rfq-artifacts" })
+    const payload = mockedCreateNewRFQ.mock.calls[0][0]
+    expect(payload.specifications?.attachments).toEqual([
+      "https://example.com/shared/model.step",
+      "https://example.com/shared/model.stl",
+      "https://example.com/shared/manifest.json",
+    ])
   })
 })

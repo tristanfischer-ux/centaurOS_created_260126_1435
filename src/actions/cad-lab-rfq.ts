@@ -103,20 +103,6 @@ export async function createCadLabRfqAction(
     return { error: "At least one generated module is required before creating an RFQ." }
   }
 
-  const artifactUrls = generatedModules.flatMap((module) => {
-    const files = module.result?.drawingPackage?.files ?? []
-    const manifest = module.result?.drawingPackage?.manifestUrl
-    const urls = files.map((f) => f.url)
-    return manifest ? [...urls, manifest] : urls
-  })
-
-  if (artifactUrls.length === 0) {
-    return {
-      error:
-        "No CAD artifacts found. Generate STEP/STL outputs and drawing manifests before creating an RFQ.",
-    }
-  }
-
   const moduleReadiness = generatedModules.map((module) => ({
     moduleId: module.id,
     moduleName: module.name,
@@ -126,6 +112,34 @@ export async function createCadLabRfqAction(
     moduleReadiness.reduce((sum, module) => sum + module.scorePct, 0) /
       moduleReadiness.length,
   )
+  const quoteReadyModuleCount = moduleReadiness.filter(
+    (module) => module.hasStep && module.hasStl && module.hasManifest,
+  ).length
+  if (quoteReadyModuleCount === 0) {
+    return {
+      error:
+        "RFQ package is incomplete. At least one module must include STEP, STL, and drawing manifest artifacts.",
+    }
+  }
+
+  const artifactUrlsRaw = generatedModules.flatMap((module) => {
+    const files = module.result?.drawingPackage?.files ?? []
+    const manifest = module.result?.drawingPackage?.manifestUrl
+    const urls = files.map((f) => f.url)
+    return manifest ? [...urls, manifest] : urls
+  })
+  const artifactUrls = Array.from(
+    new Set(
+      artifactUrlsRaw.filter((url) => /^https?:\/\//i.test(url)),
+    ),
+  )
+
+  if (artifactUrls.length === 0) {
+    return {
+      error:
+        "No CAD artifacts found. Generate STEP/STL outputs and drawing manifests before creating an RFQ.",
+    }
+  }
 
   const moduleSpecs = generatedModules.map((module) => {
     const diag = input.diagnosticAnswers[module.id] || {}
@@ -167,6 +181,7 @@ export async function createCadLabRfqAction(
     `Forge-generated RFQ package for project "${input.projectName}".`,
     `${generatedModules.length} generated module(s) included with drawing manifests and CAD artifacts.`,
     `Overall package readiness score: ${overallReadinessScore}%`,
+    `Quote-ready modules: ${quoteReadyModuleCount}/${generatedModules.length}`,
     "",
     "Module summary:",
     ...moduleSpecs.map((module, idx) =>
@@ -203,6 +218,7 @@ export async function createCadLabRfqAction(
         project_name: input.projectName,
         module_count: generatedModules.length,
         package_readiness_score_pct: overallReadinessScore,
+        quote_ready_module_count: quoteReadyModuleCount,
         readiness_checks: moduleReadiness,
         modules: moduleSpecs,
       },
