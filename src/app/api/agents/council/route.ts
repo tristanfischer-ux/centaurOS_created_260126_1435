@@ -17,6 +17,7 @@ import { rateLimit } from '@/lib/security/rate-limit'
 import { SPECIALISTS } from '@/app/(platform)/agents/specialists-data'
 import { synthesizeCouncilDebate, type DebateTranscriptEntry } from '@/lib/agents/sweep-synthesis'
 import { getOrCreateSpecialistThread } from '@/actions/agent-memory'
+import { compileInterSpecialistDynamics } from '@/lib/agents/relationship-matrix'
 
 // Model configuration
 const PROVIDER_ID = 'anthropic'
@@ -329,10 +330,22 @@ export async function POST(request: NextRequest) {
                         round
                     )
 
+                    // Build inter-specialist dynamics for council debate
+                    const dynamicsBlock = compileInterSpecialistDynamics(
+                        specialist.id,
+                        selectedSpecialists.map(s => s.id),
+                        topic,
+                    )
+
+                    // Append dynamics to the prompt if available
+                    const enrichedPrompt = dynamicsBlock
+                        ? `${prompt}\n\n${dynamicsBlock}`
+                        : prompt
+
                     const response = await executeSpecialist(
                         specialist,
                         threadIds[specialist.id],
-                        prompt,
+                        enrichedPrompt,
                         topic,
                         cookieHeader,
                         internalApiOrigin

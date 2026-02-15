@@ -32,6 +32,117 @@ interface NotificationPreferences {
   notify_digest_telegram: boolean
 }
 
+// ─── In-Character Notification Formatting ───────────────────────────
+
+/**
+ * Generates a notification that sounds like the specialist is reaching out
+ * as a colleague, not as an automated system.
+ *
+ * @description Instead of "Sam: Market analysis complete", generates
+ * "💬 Sam: Hey — I've been looking at your competitive landscape and
+ * noticed something that changes the picture. Got 5 minutes?"
+ *
+ * Uses the specialist's tagline, tone, and signature style to create
+ * notifications that feel personal and proactive.
+ *
+ * @param specialist - The specialist data (may be undefined if not found)
+ * @param specialistName - Fallback name if specialist data not available
+ * @param insight - The insight being notified about
+ * @returns Formatted title and body for the notification
+ */
+function formatInCharacterNotification(
+    specialist: (typeof SPECIALISTS)[number] | undefined,
+    specialistName: string,
+    insight: AgentInsight,
+): { title: string; body: string } {
+    if (!specialist) {
+        return {
+            title: `💬 ${specialistName}: ${insight.title}`,
+            body: insight.body.slice(0, 200),
+        }
+    }
+
+    // Generate an in-character opening based on urgency
+    let opening: string
+    switch (insight.urgency) {
+        case "critical":
+            opening = getCriticalOpening(specialist)
+            break
+        case "important":
+            opening = getImportantOpening(specialist)
+            break
+        default:
+            opening = getInformationalOpening(specialist)
+    }
+
+    // Build the notification body: in-character opening + insight summary
+    const insightSummary = insight.body.length > 150
+        ? insight.body.slice(0, 147) + "..."
+        : insight.body
+
+    return {
+        title: `💬 ${specialist.name}: ${opening}`,
+        body: insightSummary,
+    }
+}
+
+/**
+ * Critical urgency openers — each specialist has a unique "drop what you're doing" voice.
+ */
+function getCriticalOpening(specialist: (typeof SPECIALISTS)[number]): string {
+    const openers: Record<string, string> = {
+        strategist: "I need to flag something — this changes our competitive position.",
+        cto: "Stop. There's a technical risk we need to address right now.",
+        "vp-engineering": "We have a velocity blocker that's cascading. Let's talk.",
+        "vp-manufacturing": "Production risk alert — this could affect our timeline.",
+        "vp-supply-chain": "Supply chain issue detected. We need a backup plan today.",
+        "product-lead": "The user data is telling us something we can't ignore.",
+        "growth-marketer": "Our growth metrics just showed something unexpected.",
+        "sales-lead": "Revenue risk — we need to address this before it hits pipeline.",
+        "chief-of-staff": "I want to flag something that's falling through the cracks.",
+        "finance-lead": "The numbers just told me something you need to hear.",
+        "fundraising-advisor": "Investor landscape shift — this affects your raise timeline.",
+        "hiring-team": "People situation that needs your attention today.",
+        "legal-counsel": "Legal risk identified. This is time-sensitive.",
+    }
+    return openers[specialist.id] ?? "Something urgent came up — can we talk?"
+}
+
+/**
+ * Important urgency openers — the "when you have a minute" voice.
+ */
+function getImportantOpening(specialist: (typeof SPECIALISTS)[number]): string {
+    const openers: Record<string, string> = {
+        strategist: "I've been thinking about our strategy — noticed something.",
+        cto: "Found something in the technical landscape worth discussing.",
+        "vp-engineering": "Saw a pattern in our build velocity. Worth a 5-min chat.",
+        "vp-manufacturing": "Spotted something in our production pipeline.",
+        "vp-supply-chain": "Quick heads up on a sourcing opportunity.",
+        "product-lead": "User feedback pattern I want to walk you through.",
+        "growth-marketer": "Marketing insight I think you'll find interesting.",
+        "sales-lead": "Pipeline observation — think we have an opportunity here.",
+        "chief-of-staff": "Something I noticed across the team this week.",
+        "finance-lead": "Financial pattern worth discussing when you have time.",
+        "fundraising-advisor": "Fundraising market update — relevant to us.",
+        "hiring-team": "Team observation I want to share with you.",
+        "legal-counsel": "Something legal I want to make sure we're ahead of.",
+    }
+    return openers[specialist.id] ?? "I noticed something worth discussing."
+}
+
+/**
+ * Informational openers — the "FYI" voice.
+ */
+function getInformationalOpening(specialist: (typeof SPECIALISTS)[number]): string {
+    const openers: Record<string, string> = {
+        strategist: "Quick strategic note for your radar.",
+        cto: "Technical update — no action needed, just awareness.",
+        "chief-of-staff": "Weekly observation for your context.",
+        "finance-lead": "Financial snapshot update.",
+    }
+    return openers[specialist.id] ?? "Quick update for your context."
+}
+
 // ─── Notification Dispatch ──────────────────────────────────────────
 
 /**
@@ -98,6 +209,13 @@ export async function dispatchInsightNotifications(
         (insight.urgency === 'critical' && preferences.notify_critical_in_app) ||
         (insight.urgency === 'important' && preferences.notify_important_in_app)
 
+      // Generate in-character notification message that feels like a colleague reaching out
+      const inCharacterMessage = formatInCharacterNotification(
+        specialist,
+        specialistName,
+        insight,
+      )
+
       if (shouldInApp) {
         for (const member of notifyMembers) {
           tasks.push(
@@ -107,9 +225,9 @@ export async function dispatchInsightNotifications(
                 .insert({
                   user_id: member.id,
                   type: `agent_insight_${insight.urgency}`,
-                  title: `${specialistName}: ${insight.title}`,
-                  message: insight.body.slice(0, 200),
-                  link: '/today',
+                  title: inCharacterMessage.title,
+                  message: inCharacterMessage.body,
+                  link: `/agents?specialist=${insight.specialist_id}`,
                   metadata: {
                     insight_id: insight.id,
                     specialist_id: insight.specialist_id,
@@ -128,7 +246,7 @@ export async function dispatchInsightNotifications(
 
       if (shouldTelegram) {
         const urgencyEmoji = insight.urgency === 'critical' ? '🔴' : '🟡'
-        const telegramTitle = `${urgencyEmoji} ${specialistName}: ${insight.title}`
+        const telegramTitle = `${urgencyEmoji} ${inCharacterMessage.title}`
 
         for (const member of notifyMembers) {
           tasks.push(
@@ -138,8 +256,8 @@ export async function dispatchInsightNotifications(
                   user_id: member.id,
                   type: 'agent_insight',
                   title: telegramTitle,
-                  message: insight.body.slice(0, 300),
-                  link: '/today',
+                  message: inCharacterMessage.body,
+                  link: `/agents?specialist=${insight.specialist_id}`,
                   metadata: {
                     insight_id: insight.id,
                     specialist_id: insight.specialist_id,

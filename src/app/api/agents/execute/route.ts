@@ -14,6 +14,14 @@ import {
 import { buildAIContext } from "@/lib/ai-context/builder"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import { compilePersonalityPrompt } from "@/lib/agents/personality"
+import { compileTemporalPrompt } from "@/lib/agents/temporal-context"
+import { compileEmotionalPrompt } from "@/lib/agents/emotional-context"
+import {
+    getFounderPreferences,
+    getSpecialistRelationship,
+    compileFounderPreferencesPrompt,
+    recordInteraction,
+} from "@/lib/agents/founder-preferences"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -242,11 +250,13 @@ export async function POST(request: Request) {
         }
     }
 
-    // Build system prompt: base + personality + company context + memory + custom suffix
-    let systemPromptWithContext = SYSTEM_PROMPT
+    // Build system prompt: personality FIRST (identity leads), then context layers.
+    // Structure: personality → temporal → emotional → company → memory → custom suffix
+    // This ensures the specialist's identity is the dominant instruction, not a footnote.
 
-    // Inject specialist personality prompt between base system prompt and company context.
-    // This gives the agent a distinct voice, backstory, and behavioral patterns.
+    let systemPromptWithContext = ""
+
+    // Inject specialist personality FIRST — identity leads, everything else is context.
     if (specialistId) {
         const specialist = getSpecialistById(specialistId)
         if (specialist) {
@@ -254,9 +264,69 @@ export async function POST(request: Request) {
                 `${specialist.name}, the ${specialist.title} specialist`,
                 specialist.personality,
                 specialist.description,
+                specialistId,
             )
-            systemPromptWithContext += `\n\n## Your Identity & Personality\n${personalityPrompt}`
+            systemPromptWithContext = personalityPrompt
         }
+    }
+
+    // If no specialist, fall back to generic system prompt
+    if (!systemPromptWithContext) {
+        systemPromptWithContext = SYSTEM_PROMPT
+    }
+
+    // Add core business standards (condensed — the specialist personality already
+    // covers most of the behavioral guidance)
+    systemPromptWithContext += `\n\n## Response Standards
+- Be direct and actionable. Use markdown: headers, tables, bullets.
+- Distinguish between data the user provided, industry knowledge, and your estimates.
+- Flag assumptions explicitly. Never fabricate statistics.
+- End with clear next steps: who does what, by when.`
+
+    // Founder preferences: learned communication style, trust level, pet peeves
+    if (foundryId && specialistId && threadId) {
+        try {
+            const [founderPrefs, specialistRel] = await Promise.all([
+                getFounderPreferences(foundryId),
+                getSpecialistRelationship(threadId, foundryId),
+            ])
+            const specialist = getSpecialistById(specialistId)
+            const prefsBlock = compileFounderPreferencesPrompt(
+                founderPrefs,
+                specialistRel,
+                specialist?.name ?? specialistId,
+            )
+            if (prefsBlock) {
+                systemPromptWithContext += `\n\n${prefsBlock}`
+            }
+        } catch (err) {
+            // Non-critical — proceed without preferences
+            console.warn("[agents/execute] Could not load founder preferences:", err)
+        }
+    }
+
+    // Temporal awareness: what time/day it is, how to adjust behavior
+    // Also includes milestone awareness if we know when the foundry was created
+    let foundryCreatedAt: string | null = null
+    if (foundryId) {
+        try {
+            const { data: foundryData } = await supabase
+                .from("foundries")
+                .select("created_at")
+                .eq("id", foundryId)
+                .single()
+            foundryCreatedAt = foundryData?.created_at ?? null
+        } catch {
+            // Non-critical
+        }
+    }
+    const temporalBlock = compileTemporalPrompt(undefined, foundryCreatedAt)
+    systemPromptWithContext += `\n\n${temporalBlock}`
+
+    // Emotional awareness: detect founder's emotional state from their message
+    const emotionalBlock = compileEmotionalPrompt(input)
+    if (emotionalBlock) {
+        systemPromptWithContext += `\n\n${emotionalBlock}`
     }
 
     if (companyContext) {
@@ -298,15 +368,20 @@ export async function POST(request: Request) {
         }
     }
 
-    // Memory callback: record assistant response and process memory after streaming
+    // Memory callback: record assistant response, process memory, and track interaction
     const memoryCallback = threadId && foundryId
         ? async (fullOutput: string) => {
             try {
                 // Strip internal NEXT_SPECIALIST directive before saving to history
                 const cleanOutput = fullOutput.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
                 await addMemoryMessage(threadId!, foundryId, "assistant", cleanOutput || fullOutput)
+
+                // Track this interaction for trust level progression (fire-and-forget)
+                recordInteraction(threadId!, foundryId).catch((err) => {
+                    console.warn("[agents/execute] Failed to record interaction:", err)
+                })
+
                 // Process memory asynchronously (observe/reflect if thresholds hit)
-                // Fire-and-forget — don't block the response
                 processMemory(threadId!, foundryId).catch((err) => {
                     console.warn("[agents/execute] Memory processing failed:", err)
                 })

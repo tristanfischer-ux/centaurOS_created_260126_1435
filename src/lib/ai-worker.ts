@@ -2,7 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
 import { escapeHtml } from '@/lib/security/sanitize'
 import { buildAIContext } from '@/lib/ai-context/builder'
-import { compileArchetypePrompt } from '@/lib/agents/personality'
+import { compilePersonalityPrompt, compileArchetypePrompt } from '@/lib/agents/personality'
+import { getRelevantSpecialist } from '@/hooks/use-relevant-specialist'
+import { getSpecialistById } from '@/app/(platform)/agents/specialists-data'
+import { compileTemporalPrompt } from '@/lib/agents/temporal-context'
 import type { ArchetypeId } from '@/lib/agents/archetypes'
 
 export async function runAIWorker(taskId: string, assigneeId: string) {
@@ -61,15 +64,41 @@ export async function runAIWorker(taskId: string, assigneeId: string) {
             }
         }
 
-        // Infer archetype from agent name for richer personality.
-        // Legal/compliance agents get "guardian"; all others default to "operator".
+        // Match the task to the most relevant specialist for richer personality.
+        // Falls back to archetype-only prompt if no specialist matches.
         const agentName = profile.full_name || 'AI Agent'
-        const isLegalAgent = agentName.toLowerCase().includes('legal') || agentName.toLowerCase().includes('compliance')
-        const archetypeId: ArchetypeId = isLegalAgent ? 'guardian' : 'operator'
-        const personalityBlock = compileArchetypePrompt(agentName, archetypeId)
+        const taskContext = `${sanitizedTaskTitle} ${sanitizedTaskDescription} ${sanitizedObjectiveTitle}`
+        const relevantSpec = getRelevantSpecialist(taskContext)
+        
+        let personalityBlock: string
+        if (!relevantSpec.isDefault) {
+            // Full specialist personality — writing style, celebration, strong opinions, etc.
+            const specialist = getSpecialistById(relevantSpec.specialistId)
+            if (specialist) {
+                personalityBlock = compilePersonalityPrompt(
+                    `${specialist.name}, the ${specialist.title} specialist (executing a task on behalf of the founder)`,
+                    specialist.personality,
+                    specialist.description,
+                    specialist.id,
+                )
+            } else {
+                const archetypeId: ArchetypeId = 'operator'
+                personalityBlock = compileArchetypePrompt(agentName, archetypeId)
+            }
+        } else {
+            // Fallback: infer archetype from agent name
+            const isLegalAgent = agentName.toLowerCase().includes('legal') || agentName.toLowerCase().includes('compliance')
+            const archetypeId: ArchetypeId = isLegalAgent ? 'guardian' : 'operator'
+            personalityBlock = compileArchetypePrompt(agentName, archetypeId)
+        }
+
+        // Temporal awareness for contextual tone
+        const temporalBlock = compileTemporalPrompt()
 
         // SECURITY: Use clear system/user separation to mitigate prompt injection
         const systemPrompt = `${personalityBlock}
+
+${temporalBlock}
 
 ${businessContext}
 

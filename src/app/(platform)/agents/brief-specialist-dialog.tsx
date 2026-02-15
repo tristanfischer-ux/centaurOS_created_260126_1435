@@ -241,14 +241,16 @@ export function BriefSpecialistDialog({
                     console.warn("[BriefDialog] Could not get thread:", threadResult.error)
                 }
 
-                // Build cross-specialist context block
+                // Build cross-specialist context block with "I noticed" instructions
                 if (crossResult.data && crossResult.data.length > 0) {
                     const lines = crossResult.data.map((item) => {
-                        const name = getSpecialistById(item.specialistId)?.name ?? item.specialistId
-                        return `[${name}]: ${item.summary}`
+                        const otherSpec = getSpecialistById(item.specialistId)
+                        const name = otherSpec?.name ?? item.specialistId
+                        const title = otherSpec?.title ?? ""
+                        return `[${name}${title ? ` (${title})` : ""}]: ${item.summary}`
                     })
                     setCrossSpecialistContext(
-                        `Your colleagues have been working on:\n${lines.join("\n\n")}`
+                        `Your colleagues have been working on:\n${lines.join("\n\n")}\n\nIMPORTANT — "I noticed" pattern: If you see overlaps, synergies, or potential CONFLICTS between your work and theirs, PROACTIVELY flag them. Real colleagues catch these connections. Example: "I see ${crossResult.data[0] ? (getSpecialistById(crossResult.data[0].specialistId)?.name ?? "a colleague") : "a colleague"} has been working on something that connects to what we should discuss..."`
                     )
                 } else {
                     setCrossSpecialistContext("")
@@ -370,14 +372,40 @@ export function BriefSpecialistDialog({
             }
 
             const hasContextToReference = contextParts.length > 0
-            const greetingInstructions = hasContextToReference
-                ? `The founder is opening a conversation with you. Based on the context below, write a brief, proactive opening message (2-4 sentences). Reference specific details. Either:
-- Pick up where you left off and suggest a next step
-- Comment on what other specialists have been working on and connect it to your domain
-- Ask a pointed question that would advance their work
+            const hasCrossContext = !!crossSpecialistContext
+            const hasHistory = !!historyContext
 
-Stay in character as ${specialist.name}. Be concise, direct, and actionable. Jump straight into substance — no "Hi!" or "Welcome back!" greetings.`
-                : `A founder is meeting you for the first time. Write a brief, engaging opening (2-3 sentences) that:
+            // Build specific greeting instructions based on what context is available
+            let greetingInstructions: string
+            if (hasHistory && hasCrossContext) {
+                // Best case: we have both past conversation AND team context
+                greetingInstructions = `The founder is opening a conversation with you. You have BOTH previous conversation history AND knowledge of what other specialists have been working on.
+
+Write a proactive opening (2-4 sentences) that does ONE of these:
+1. **"I noticed something"**: If you spot a connection, overlap, or conflict between your domain and what other specialists discussed, FLAG IT. Example: "I noticed Nate has been working on enterprise pricing while we discussed SMB positioning — we should align on target segment."
+2. **Pick up where you left off**: Reference the last topic and suggest the logical next step.
+3. **Surface a recurring theme**: If the same topic keeps coming up, name it: "We keep coming back to pricing — maybe it's time to make a decision."
+
+CRITICAL: Be specific. Reference names, topics, and details from the context below. Generic openings are forbidden.
+Stay in character as ${specialist.name}. Jump straight into substance — no "Hi!" or "Welcome back!".`
+            } else if (hasHistory) {
+                greetingInstructions = `The founder is returning to continue working with you. Based on your conversation history below, write a proactive opening (2-3 sentences) that:
+- References what you discussed last time with specific details
+- Suggests a concrete next step or asks a follow-up question
+- Shows you remember and have been thinking about their situation
+
+Stay in character as ${specialist.name}. Be concise, direct, and actionable. Jump straight into substance — no greetings.`
+            } else if (hasCrossContext) {
+                greetingInstructions = `The founder is meeting you for the first time, BUT you can see what other specialists on the team have been working on.
+
+Write a proactive opening (2-3 sentences) that:
+- Introduces your perspective by connecting it to what other specialists discussed
+- Example: "I see Sam has been working on competitive strategy — from a finance perspective, here's what I'd want to stress-test..."
+- Asks ONE specific question that shows your expertise and connects to the team's work
+
+Stay in character as ${specialist.name}. Be warm but direct. No generic pleasantries.`
+            } else {
+                greetingInstructions = `A founder is meeting you for the first time. Write a brief, engaging opening (2-3 sentences) that:
 - Introduces your perspective and what you bring to the table
 - Asks ONE specific, thought-provoking question that shows your expertise
 - Makes the founder feel like they just gained a sharp advisor
@@ -385,6 +413,7 @@ Stay in character as ${specialist.name}. Be concise, direct, and actionable. Jum
 If company context is provided below, reference specific details and suggest 1-2 things you could help with right now. If no company context is provided, ask something that will help you quickly understand their situation.
 
 Stay in character as ${specialist.name}. Be warm but direct. No generic pleasantries.`
+            }
 
             const greetingPrompt = `You are ${specialist.name}, the ${specialist.title} specialist. ${specialist.workingStyle}
 
@@ -723,28 +752,45 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
     }, [])
 
     const handleSwitchSpecialist = useCallback((id: string) => {
-        // Build handoff context from recent conversation
+        // Build rich handoff context that feels like a real colleague briefing
+        const targetSpec = getSpecialistById(id)
         let handoff: string | undefined
         if (messages.length > 0) {
-            const firstUserMsg = messages.find((m) => m.role === "user")
-            const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
+            const userMessages = messages.filter((m) => m.role === "user" && !m.historical)
+            const assistantMessages = messages.filter((m) => m.role === "assistant" && !m.historical)
+            const lastAssistant = assistantMessages[assistantMessages.length - 1]
+            const firstUserMsg = userMessages[0]
+
+            // Build a natural handoff that feels like a colleague briefing you
             const parts: string[] = [
-                `Handoff from ${specialist.name}:`,
+                `## Handoff from ${specialist.name} (${specialist.title})`,
+                "",
+                `${specialist.name} just finished working with the founder on this topic and is bringing you in because your expertise is needed next.`,
             ]
+
             if (firstUserMsg) {
-                parts.push(`The user was discussing: "${firstUserMsg.content.slice(0, 300)}"`)
+                parts.push(`\n**What the founder originally asked about:**\n"${firstUserMsg.content.slice(0, 400)}"`)
             }
+
             if (lastAssistant) {
-                parts.push(`Key points covered:\n${lastAssistant.content.slice(0, 500)}`)
+                parts.push(`\n**Key points ${specialist.name} covered:**\n${lastAssistant.content.slice(0, 600)}`)
             }
-            parts.push("\nThe user has been referred to you to continue this work. Acknowledge the handoff briefly and build on what was discussed.")
-            handoff = parts.join("\n\n")
+
+            // Check if the referring specialist has a relationship defined with the target
+            const relationship = specialist.personality.relationships?.[id]
+            if (relationship && targetSpec) {
+                parts.push(`\n**Your working relationship with ${specialist.name}:** ${relationship.pattern}`)
+            }
+
+            parts.push(`\n**Your job:** Pick up where ${specialist.name} left off. Don't repeat what was already covered — BUILD on it. Start substantively as if ${specialist.name} just briefed you in the hallway. The founder doesn't want to re-explain.`)
+
+            handoff = parts.join("\n")
         }
 
         onOpenChange(false)
         // Small delay to let dialog close animation finish
         setTimeout(() => onSwitchSpecialist?.(id, handoff), 200)
-    }, [onOpenChange, onSwitchSpecialist, messages, specialist.name])
+    }, [onOpenChange, onSwitchSpecialist, messages, specialist])
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -1048,26 +1094,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     </div>
                                 )}
 
-                                {/* Typing indicator */}
+                                {/* Typing indicator — personality-specific thinking message */}
                                 {(isExecuting && !isStreaming) && (
-                                    <div className="flex gap-3 justify-start">
-                                        <div className="flex-shrink-0 h-7 w-7 rounded-full bg-muted mt-1" />
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
-                                            {deepThinkEnabled ? (
-                                                <Brain className="h-4 w-4 animate-pulse text-international-orange" />
-                                            ) : (
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                            )}
-                                            {deepThinkEnabled
-                                                ? `${specialist.name} is analyzing deeply...`
-                                                : `${specialist.name} is thinking...`
-                                            }
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Greeting generation indicator */}
-                                {isGeneratingGreeting && !isExecuting && (
                                     <div className="flex gap-3 justify-start">
                                         <div className="flex-shrink-0 mt-1">
                                             <SpecialistChatAvatar
@@ -1076,8 +1104,45 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                             />
                                         </div>
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                            {specialist.name} is reviewing your context...
+                                            {deepThinkEnabled ? (
+                                                <Brain className="h-4 w-4 animate-pulse text-international-orange" />
+                                            ) : (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            )}
+                                            {deepThinkEnabled
+                                                ? `${specialist.name} is analyzing deeply...`
+                                                : specialist.thinkingIndicator
+                                                    ? `${specialist.name}: ${specialist.thinkingIndicator}`
+                                                    : `${specialist.name} is thinking...`
+                                            }
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Greeting generation indicator — shows specialist reviewing context */}
+                                {isGeneratingGreeting && !isExecuting && (
+                                    <div className="flex gap-3 justify-start">
+                                        <div className="flex-shrink-0 mt-1">
+                                            <SpecialistChatAvatar
+                                                specialist={specialist}
+                                                state="thinking"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-1 py-3">
+                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                {specialist.name} is catching up...
+                                            </div>
+                                            {hasHistoricalMessages && (
+                                                <p className="text-xs text-muted-foreground/70 ml-6">
+                                                    Reviewing your previous conversation and team updates
+                                                </p>
+                                            )}
+                                            {!hasHistoricalMessages && crossSpecialistContext && (
+                                                <p className="text-xs text-muted-foreground/70 ml-6">
+                                                    Checking what the team has been working on
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -1152,7 +1217,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             </div>
                         )}
 
-                        {/* First-meeting card: avatar, tagline, and conversation starters */}
+                        {/* Intro card: conversation starters (history-based for returning users, highlights for new) */}
                         {!hasConversation && !hasHistoricalMessages && (
                             <div className="mb-4 p-4 rounded-lg bg-muted/30 border border-muted space-y-4">
                                 <div className="flex items-start gap-3">
@@ -1198,6 +1263,54 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         </div>
                                     </>
                                 )}
+                            </div>
+                        )}
+                        {/* Returning user card: history-based conversation starters */}
+                        {!hasConversation && hasHistoricalMessages && !isGeneratingGreeting && (
+                            <div className="mb-4 p-4 rounded-lg bg-muted/30 border border-muted space-y-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="flex-shrink-0">
+                                        <SpecialistChatAvatar specialist={specialist} state="idle" />
+                                    </div>
+                                    <div className="min-w-0 flex-1 pt-0.5">
+                                        <p className="text-sm text-muted-foreground">
+                                            Pick up where you left off, or start something new.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {/* Generate history-based starters from previous user messages */}
+                                    {(() => {
+                                        const pastUserMsgs = historyMessages
+                                            .filter(m => m.role === "user")
+                                            .slice(-3)
+                                            .map(m => m.content.slice(0, 60) + (m.content.length > 60 ? "..." : ""))
+                                        const starters = pastUserMsgs.length > 0
+                                            ? [`Follow up on: "${pastUserMsgs[pastUserMsgs.length - 1]}"`, ...specialist.highlights.slice(0, 3)]
+                                            : specialist.highlights.slice(0, 4)
+                                        return starters.map((starter) => (
+                                            <button
+                                                key={starter}
+                                                type="button"
+                                                onClick={() => {
+                                                    setBriefText(starter.startsWith("Follow up") ? "" : `Help me with ${starter}`)
+                                                    setError(null)
+                                                    textareaRef.current?.focus()
+                                                }}
+                                                disabled={isExecuting}
+                                                className={cn(
+                                                    "inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium text-foreground",
+                                                    starter.startsWith("Follow up")
+                                                        ? "border-international-orange/30 bg-international-orange/5 hover:border-international-orange/50"
+                                                        : "border-muted bg-background hover:border-international-orange/50 hover:bg-muted/50",
+                                                    "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-2"
+                                                )}
+                                            >
+                                                {starter}
+                                            </button>
+                                        ))
+                                    })()}
+                                </div>
                             </div>
                         )}
 
@@ -1376,6 +1489,16 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 onClick={() => {
                                     const hasUserMessages = messages.some((m) => m.role === "user" && !m.historical)
                                     if (hasUserMessages && !isExecuting) {
+                                        // Generate a quick conversation summary before clearing
+                                        const userMsgs = messages.filter((m) => m.role === "user" && !m.historical)
+                                        const assistMsgs = messages.filter((m) => m.role === "assistant" && !m.historical)
+                                        if (userMsgs.length > 0 && assistMsgs.length > 0) {
+                                            const topicSummary = userMsgs[0].content.slice(0, 80)
+                                            const keyPoints = assistMsgs.length
+                                            toast.success(`${specialist.name}: Got it. We covered "${topicSummary}${topicSummary.length >= 80 ? "..." : ""}" — ${keyPoints} exchange${keyPoints > 1 ? "s" : ""}. It's saved to Deliverables. Ready for the next topic.`, {
+                                                duration: 4000,
+                                            })
+                                        }
                                         // Start a new topic (clear non-historical messages but keep thread)
                                         setMessages((prev) => prev.filter((m) => m.historical))
                                         setSelectedPrompt(null)
