@@ -28,16 +28,31 @@ const REQUIRED_DIAGNOSTIC_KEYS = [
   "environment",
 ] as const
 
+function parseQuantityToken(value: string): number | undefined {
+  const normalized = value.trim().toLowerCase().replace(/,/g, "")
+  const match = normalized.match(/^(\d+(?:\.\d+)?)([km]?)$/)
+  if (!match) return undefined
+
+  const num = Number(match[1])
+  if (!Number.isFinite(num)) return undefined
+  const suffix = match[2]
+  if (suffix === "k") return Math.round(num * 1_000)
+  if (suffix === "m") return Math.round(num * 1_000_000)
+  return Math.round(num)
+}
+
 function parseBatchQuantity(batch: string | undefined): number | undefined {
   if (!batch) return undefined
-  const range = batch.match(/(\d+)\s*[-–]\s*(\d+)/)
+  const range = batch.match(/(\d+(?:\.\d+)?(?:,\d{3})*\s*[kKmM]?)\s*[-–]\s*(\d+(?:\.\d+)?(?:,\d{3})*\s*[kKmM]?)/)
   if (range) {
-    const min = Number(range[1])
-    const max = Number(range[2])
+    const min = parseQuantityToken(range[1])
+    const max = parseQuantityToken(range[2])
+    if (typeof min !== "number" || typeof max !== "number") return undefined
     return Math.round((min + max) / 2)
   }
-  const single = batch.match(/(\d+)/)
-  return single ? Number(single[1]) : undefined
+  const single = batch.match(/(\d+(?:\.\d+)?(?:,\d{3})*\s*[kKmM]?)/)
+  if (!single) return undefined
+  return parseQuantityToken(single[1])
 }
 
 function computeModuleReadiness(

@@ -158,4 +158,91 @@ describe("createCadLabRfqAction", () => {
       },
     ])
   })
+
+  it("parses batch ranges with commas and suffixes", async () => {
+    mockedCreateNewRFQ.mockResolvedValue({
+      data: { id: "rfq-quantity" },
+      error: null,
+    })
+
+    const res = await createCadLabRfqAction({
+      projectName: "Batch Quantity Parsing",
+      diagnosticAnswers: {
+        m1: {
+          batch_size: "1,000-5,000",
+          material: "Steel",
+        },
+        m2: {
+          batch_size: "2k-4k",
+          material: "Steel",
+        },
+      },
+      modules: [
+        {
+          id: "m1",
+          name: "Module A",
+          purpose: "A",
+          inputs: [],
+          outputs: [],
+          keyParts: [],
+          leadWeeks: 3,
+          description: "",
+          whyItMatters: "",
+          failureModes: [],
+          unknowns: [],
+          status: "generated",
+          result: {
+            success: true,
+            drawingPackage: {
+              revision: "A",
+              generatedAt: "2026-01-01T00:00:00.000Z",
+              title: "A",
+              manifestUrl: "https://example.com/a/manifest.json",
+              files: [
+                {
+                  name: "a.step",
+                  url: "https://example.com/a/a.step",
+                  mimeType: "application/step",
+                },
+              ],
+            },
+          },
+        },
+        {
+          id: "m2",
+          name: "Module B",
+          purpose: "B",
+          inputs: [],
+          outputs: [],
+          keyParts: [],
+          leadWeeks: 3,
+          description: "",
+          whyItMatters: "",
+          failureModes: [],
+          unknowns: [],
+          status: "generated",
+          result: {
+            success: true,
+            drawingPackage: {
+              revision: "A",
+              generatedAt: "2026-01-01T00:00:00.000Z",
+              title: "B",
+              manifestUrl: "https://example.com/b/manifest.json",
+              files: [
+                {
+                  name: "b.step",
+                  url: "https://example.com/b/b.step",
+                  mimeType: "application/step",
+                },
+              ],
+            },
+          },
+        },
+      ],
+    })
+
+    expect(res).toEqual({ rfqId: "rfq-quantity" })
+    const payload = mockedCreateNewRFQ.mock.calls[0][0]
+    expect(payload.specifications?.quantity).toBe(3000)
+  })
 })
