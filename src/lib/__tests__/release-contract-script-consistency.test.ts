@@ -22,6 +22,7 @@ describe("release contract script consistency", () => {
     expect(contractScript).toContain("manual-product-pass-results-consistency.test.ts")
     expect(contractScript).toContain("migration-closure-report-consistency.test.ts")
     expect(contractScript).toContain("release-config-consistency.test.ts")
+    expect(contractScript).toContain("profiles-rls-verification-script-consistency.test.ts")
     expect(contractScript).toContain("release-docs-consistency.test.ts")
     expect(contractScript).toContain("release-handoff-consistency.test.ts")
     expect(contractScript).toContain("release-packet-consistency.test.ts")

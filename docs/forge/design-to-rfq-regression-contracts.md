@@ -89,6 +89,13 @@ As the release packet grows, some failures are best caught by low-cost contract 
   - migration closure artifact keeps required SQL verification evidence sections
   - release closure remains tied to explicit policy-expression checks and verify command output
 
+### 12) Profiles RLS verification script contract
+
+- Test: `profiles-rls-verification-script-consistency.test.ts`
+- Protects:
+  - canonical SQL verification script retains policy-name and policy-expression checks
+  - non-recursive helper constraints remain explicitly encoded for operators
+
 ## Operational Usage
 
 Run:
@@ -110,6 +117,7 @@ This command now validates both product logic regressions and release-contract d
 ## Focused Contract Suite Inventory (`test:forge-rfq:contracts`)
 
 - `profiles-rls-migration.test.ts`
+- `profiles-rls-verification-script-consistency.test.ts`
 - `manual-product-pass-results-consistency.test.ts`
 - `migration-closure-report-consistency.test.ts`
 - `go-live-status-consistency.test.ts`

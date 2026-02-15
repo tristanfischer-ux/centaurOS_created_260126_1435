@@ -60,7 +60,7 @@ Use this path when CLI PAT auth is unavailable in the runtime environment.
 
 ## Mandatory Post-Apply Verification
 
-Run policy checks in SQL editor:
+Run policy checks in SQL editor (copy from `docs/forge/profiles-rls-verification.sql` if preferred):
 
 ```sql
 select policyname, permissive, roles, cmd

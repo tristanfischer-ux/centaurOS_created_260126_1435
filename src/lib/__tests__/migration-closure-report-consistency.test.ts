@@ -22,5 +22,6 @@ describe("migration closure report consistency", () => {
     expect(closureReport).toContain("design-to-rfq-release-handoff.md")
     expect(closureReport).toContain("design-to-rfq-go-live-status.md")
     expect(closureReport).toContain("design-to-rfq-release-packet.md")
+    expect(closureReport).toContain("profiles-rls-verification.sql")
   })
 })

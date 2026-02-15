@@ -26,5 +26,6 @@ describe("release handoff consistency", () => {
     expect(handoffDoc).toContain("set migration gate from `⛔ PENDING` to `✅ PASS`")
     expect(handoffDoc).toContain("design-to-rfq-migration-closure-report.md")
     expect(handoffDoc).toContain("fill execution metadata + SQL verification output sections")
+    expect(handoffDoc).toContain("profiles-rls-verification.sql")
   })
 })

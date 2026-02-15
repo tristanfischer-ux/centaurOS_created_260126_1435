@@ -31,6 +31,8 @@ If CLI auth is unavailable in your execution environment:
 
 ## Verify Policies in SQL
 
+Use `docs/forge/profiles-rls-verification.sql` as the canonical query source (or run the statements below directly).
+
 Run in SQL editor:
 
 ```sql
@@ -50,7 +52,7 @@ Legacy policy names should not appear (e.g. `Active users can view profiles in t
 
 ## Verify Policy Expressions (No Recursive Helpers)
 
-Run:
+Run (or execute from `docs/forge/profiles-rls-verification.sql`):
 
 ```sql
 select

@@ -80,3 +80,4 @@ Checks:
 - Release handoff runbook: `docs/forge/design-to-rfq-release-handoff.md`
 - Go-live status tracker: `docs/forge/design-to-rfq-go-live-status.md`
 - Release packet checklist: `docs/forge/design-to-rfq-release-packet.md`
+- SQL verification query file: `docs/forge/profiles-rls-verification.sql`

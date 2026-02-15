@@ -31,6 +31,7 @@ Coverage includes:
 - `manual-product-pass-results-consistency.test.ts`
 - `migration-closure-report-consistency.test.ts`
 - `profiles-rls-migration.test.ts`
+- `profiles-rls-verification-script-consistency.test.ts`
 - `release-config-consistency.test.ts`
 - `release-contract-script-consistency.test.ts`
 - `release-docs-consistency.test.ts`
