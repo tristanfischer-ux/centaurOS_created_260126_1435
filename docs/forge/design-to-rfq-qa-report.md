@@ -27,6 +27,7 @@ Coverage includes:
 - `cad-lab-readiness.test.ts`
 - `forge-route-consistency.test.ts`
 - `forge-project-list.test.tsx`
+- `MobileNav.test.tsx`
 - `cad-lab-procurement-utils.test.ts`
 
 ### 2) CAD Lab visual smoke (Playwright)
