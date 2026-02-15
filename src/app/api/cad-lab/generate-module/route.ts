@@ -16,7 +16,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { generateCadLabInterface, generateCadLabModel } from "@/actions/cad-lab"
+import { generateCadLabInterface, generateCadLabModelSmart } from "@/actions/cad-lab"
 import type { CadLabModule, ClaudeModelId } from "@/lib/cad-lab-types"
 import type { Json } from "@/types/database.types"
 
@@ -222,7 +222,7 @@ export async function POST(request: Request): Promise<NextResponse<GenerateModul
       localMod.moduleResearch ||
       `Module: ${localMod.name}\nPurpose: ${localMod.purpose}\nKey Parts: ${localMod.keyParts.join(", ")}\nDescription: ${localMod.description}\n\nFrom parent research:\n${researchReport}`
 
-    const res = await generateCadLabModel(
+    const res = await generateCadLabModelSmart(
       `${localMod.name} — ${localMod.purpose}`,
       cadResearch,
       localMod.interfaceDefinition || "",

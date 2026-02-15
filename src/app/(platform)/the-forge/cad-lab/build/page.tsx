@@ -829,6 +829,21 @@ function ModuleResultsView({
         </div>
       )}
 
+      {/* Assumptions */}
+      {result.assumptions && result.assumptions.length > 0 && (
+        <div className="border rounded-md p-3 space-y-2">
+          <p className="text-xs font-semibold text-foreground">Resolved Assumptions</p>
+          <ul className="space-y-1">
+            {result.assumptions.map((assumption, idx) => (
+              <li key={`${assumption}-${idx}`} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                <Info className="h-3 w-3 text-status-info flex-shrink-0 mt-0.5" />
+                {assumption}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Code */}
       {code && (
         <div className="border rounded-md">

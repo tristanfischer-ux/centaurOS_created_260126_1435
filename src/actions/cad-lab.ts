@@ -352,6 +352,28 @@ function extractCode(text: string): string {
   return text.trim()
 }
 
+/**
+ * Extracts explicit assumption lines for user-facing confidence reporting.
+ */
+function extractAssumptions(
+  interfaceDefinition: string,
+  code: string,
+): string[] {
+  const assumptionLines = new Set<string>()
+
+  const patterns = [/RESOLVED:\s*(.+)/gi, /ASSUMPTION:\s*(.+)/gi, /ASSUME(?:D)?\s*[:\-]\s*(.+)/gi]
+  const sourceText = `${interfaceDefinition}\n${code}`
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null
+    while ((match = pattern.exec(sourceText)) !== null) {
+      const value = match[1]?.trim()
+      if (value) assumptionLines.add(value)
+    }
+  }
+
+  return Array.from(assumptionLines).slice(0, 12)
+}
+
 // ─── Research Synthesis Prompt ────────────────────────────────────────
 
 const RESEARCH_SYNTHESIS_PROMPT = `You are a senior mechanical engineer preparing a research brief for a 3D CAD modelling project. Your job is to synthesize raw research data into a precise, structured engineering specification.
@@ -745,11 +767,11 @@ EXECUTION ENVIRONMENT RULES:
 - Output ONLY the Python code inside a single \`\`\`python code fence. No explanations before or after.
 
 SELF-CONTAINED CODE (CRITICAL — violating this crashes execution):
-- Your script MUST be 100% self-contained. Every function you call MUST be defined with \`def\` in YOUR script.
-- Do NOT call external component library functions like kitchen_base_cabinet(), composite_front_door(), brushless_motor_outrunner(), bed_frame(), shower_tray(), casement_window(), etc.
-- These library functions are NOT available in the execution sandbox. If even ONE undefined function is called, the script crashes with NameError and produces NO output at all.
-- Build ALL geometry from scratch in your own make_*() functions using cq.Workplane primitives (.box(), .cylinder(), .extrude(), .cut(), etc.).
-- PRE-FLIGHT CHECK: Before outputting code, mentally trace every function call in your script and verify it has a matching \`def\` statement. If you find any call to a function you did not define, remove it or replace it with inline geometry.
+- Your script MUST be executable with no unresolved names.
+- You MAY call component-library functions that appear in the provided "COMPONENT LIBRARY" list.
+- Any non-library helper function you call MUST be defined with \`def\` in YOUR script.
+- If a needed part is not in the library, build it with your own make_*() function using cq.Workplane primitives (.box(), .cylinder(), .extrude(), .cut(), etc.).
+- PRE-FLIGHT CHECK: Before outputting code, mentally trace every function call and verify it is either (a) in the provided library list or (b) defined in your script.
 
 Z-COORDINATE / VERTICAL POSITION SANITY (prevents doubled heights):
 - When positioning components vertically, use EXACTLY ONE reference frame. Either:
@@ -782,7 +804,7 @@ Generate the complete CadQuery Python code following the methodology. The code m
 4. Create a make_*() function for EACH component — each must build REAL geometry, no stubs
 5. For complex models (20+ components): use cq.Assembly() at the top level, .union() only in small sub-groups
 6. For simpler models: use the .union() assembly pattern
-7. CRITICAL: Every function you call MUST be defined with \`def\` in your script. Do NOT call external library functions.
+7. CRITICAL: Every function you call MUST either come from the provided component library list OR be defined with \`def\` in your script.
 8. Verify all z-positions add up: the highest point should match the expected total height
 9. Assign the final assembly to a variable called "result"
 10. Create "result_exploded" showing all components spread apart along Z for an exploded view (wrap in try/except)
@@ -794,6 +816,7 @@ If the research report or interface definition contains any unresolved questions
     totalTokensOut += codeResult.tokensOut
 
     let finalCode = extractCode(codeResult.text)
+    const assumptions = extractAssumptions(interfaceDefinition, finalCode)
 
     // Safety: strip any export/print/os calls that slipped through
     finalCode = finalCode
@@ -839,6 +862,7 @@ If the research report or interface definition contains any unresolved questions
         tokensIn: totalTokensIn,
         tokensOut: totalTokensOut,
         modelUsed: modelId,
+        assumptions,
       }
     }
 
@@ -947,6 +971,7 @@ If the research report or interface definition contains any unresolved questions
       modelUsed: modelId,
       interfaceDefinition,
       validationWarnings: warnings.length > 0 ? warnings : undefined,
+      assumptions: assumptions.length > 0 ? assumptions : undefined,
       error: modalResult.error ?? undefined,
     }
   } catch (err) {

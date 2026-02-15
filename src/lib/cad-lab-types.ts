@@ -121,6 +121,8 @@ export interface CadLabResult {
   interfaceDefinition?: string
   /** Post-execution validation warnings */
   validationWarnings?: string[]
+  /** Assumptions inferred or resolved during generation */
+  assumptions?: string[]
   /** Optional drawing/package metadata for procurement handoff */
   drawingPackage?: {
     revision: string

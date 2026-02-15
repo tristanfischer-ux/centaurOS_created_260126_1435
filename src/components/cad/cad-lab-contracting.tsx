@@ -18,7 +18,7 @@
 
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import {
   FileSignature,
   Copy,
@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ArrowRight,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -38,6 +39,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
+import { createCadLabRfqAction } from "@/actions/cad-lab-rfq"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -329,6 +331,8 @@ export function CadLabContracting({
     Map<DocType, string>
   >(new Map())
   const [expandedDoc, setExpandedDoc] = useState<DocType | null>(null)
+  const [isCreatingRfq, setIsCreatingRfq] = useState(false)
+  const [createdRfqId, setCreatedRfqId] = useState<string | null>(null)
 
   const handleGenerate = (type: DocType): void => {
     let text: string
@@ -371,6 +375,30 @@ export function CadLabContracting({
     toast.success(`${DOC_TYPES.find((d) => d.id === type)?.name} copied to clipboard`)
   }
 
+  const handleCreateMarketplaceRfq = async (): Promise<void> => {
+    setIsCreatingRfq(true)
+    try {
+      const res = await createCadLabRfqAction({
+        projectName,
+        modules,
+        diagnosticAnswers: diagnosticAnswers || {},
+        deadline: deadline || undefined,
+      })
+
+      if ("error" in res) {
+        toast.error(res.error)
+        return
+      }
+
+      setCreatedRfqId(res.rfqId)
+      toast.success("Marketplace RFQ created from drawing package")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create RFQ")
+    } finally {
+      setIsCreatingRfq(false)
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -391,6 +419,37 @@ export function CadLabContracting({
           Generate contract documents from project specifications. Fill in buyer
           details, then generate RFQ, SOW, or NDA templates.
         </p>
+
+        <div className="rounded-lg border border-status-info/30 bg-status-info-light/20 p-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold text-foreground">One-click supplier handoff</p>
+            <p className="text-[11px] text-muted-foreground">
+              Create a live Marketplace RFQ prefilled with module diagnostics and drawing artifacts.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              className="text-xs h-8"
+              onClick={handleCreateMarketplaceRfq}
+              disabled={isCreatingRfq}
+            >
+              {isCreatingRfq ? "Creating RFQ..." : "Create Marketplace RFQ"}
+            </Button>
+            {createdRfqId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-8"
+                onClick={() => window.open(`/rfq/${createdRfqId}`, "_blank", "noopener,noreferrer")}
+              >
+                View RFQ
+                <ArrowRight className="h-3.5 w-3.5 ml-1" />
+              </Button>
+            )}
+          </div>
+        </div>
 
         {/* Buyer details form */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

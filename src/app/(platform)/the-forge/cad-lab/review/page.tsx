@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { CadLabReviewPackage } from "@/components/cad/cad-lab-review-package"
 import { CadLabPeople } from "@/components/cad/cad-lab-people"
+import { CadLabDrawingPackage } from "@/components/cad/cad-lab-drawing-package"
 
 import { useCadLab } from "../cad-lab-context"
 
@@ -57,6 +58,7 @@ export default function CadLabReviewPage(): React.ReactNode {
       </div>
 
       <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
+      <CadLabDrawingPackage modules={modules} projectName={subject} />
       <CadLabPeople modules={modules} diagnosticAnswers={diagnosticAnswers} />
     </div>
   )

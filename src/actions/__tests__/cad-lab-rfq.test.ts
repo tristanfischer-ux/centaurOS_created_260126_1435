@@ -1,0 +1,116 @@
+import { createCadLabRfqAction } from "../cad-lab-rfq"
+
+jest.mock("../rfq", () => ({
+  createNewRFQ: jest.fn(),
+}))
+
+import { createNewRFQ } from "../rfq"
+
+const mockedCreateNewRFQ = createNewRFQ as jest.MockedFunction<typeof createNewRFQ>
+
+describe("createCadLabRfqAction", () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it("rejects when no generated modules exist", async () => {
+    const res = await createCadLabRfqAction({
+      projectName: "Test Project",
+      modules: [
+        {
+          id: "m1",
+          name: "Module 1",
+          purpose: "Pending",
+          inputs: [],
+          outputs: [],
+          keyParts: [],
+          leadWeeks: 4,
+          description: "",
+          whyItMatters: "",
+          failureModes: [],
+          unknowns: [],
+          status: "pending",
+        },
+      ],
+      diagnosticAnswers: {},
+    })
+
+    expect(res).toEqual({
+      error: "At least one generated module is required before creating an RFQ.",
+    })
+    expect(mockedCreateNewRFQ).not.toHaveBeenCalled()
+  })
+
+  it("builds RFQ payload from drawing package artifacts", async () => {
+    mockedCreateNewRFQ.mockResolvedValue({
+      data: { id: "rfq-123" },
+      error: null,
+    })
+
+    const res = await createCadLabRfqAction({
+      projectName: "Orbital Drone Frame",
+      deadline: "2027-01-15",
+      diagnosticAnswers: {
+        frame: {
+          material: "Aluminium",
+          batch_size: "100-1000 (pilot)",
+        },
+      },
+      modules: [
+        {
+          id: "frame",
+          name: "Frame",
+          purpose: "Load-bearing structure",
+          inputs: ["power"],
+          outputs: ["mount points"],
+          keyParts: ["arm", "hub"],
+          leadWeeks: 6,
+          description: "frame",
+          whyItMatters: "critical",
+          failureModes: [],
+          unknowns: [],
+          status: "generated",
+          result: {
+            bbox: { xLen: 200, yLen: 180, zLen: 70 },
+            massGrams: 350,
+            drawingPackage: {
+              revision: "A",
+              generatedAt: "2026-01-01T00:00:00.000Z",
+              title: "Frame Drawing Package",
+              manifestUrl: "https://example.com/manifest.json",
+              files: [
+                {
+                  name: "frame.step",
+                  url: "https://example.com/frame.step",
+                  mimeType: "application/step",
+                  sizeKb: 512,
+                },
+                {
+                  name: "frame.stl",
+                  url: "https://example.com/frame.stl",
+                  mimeType: "model/stl",
+                  sizeKb: 256,
+                },
+              ],
+            },
+          },
+        },
+      ],
+    })
+
+    expect(res).toEqual({ rfqId: "rfq-123" })
+    expect(mockedCreateNewRFQ).toHaveBeenCalledTimes(1)
+
+    const payload = mockedCreateNewRFQ.mock.calls[0][0]
+    expect(payload.title).toContain("Orbital Drone Frame")
+    expect(payload.rfq_type).toBe("custom")
+    expect(payload.category).toBe("Custom Manufacturing")
+    expect(payload.specifications?.attachments).toEqual([
+      "https://example.com/frame.step",
+      "https://example.com/frame.stl",
+      "https://example.com/manifest.json",
+    ])
+    expect(payload.specifications?.materials).toEqual(["Aluminium"])
+    expect(payload.specifications?.quantity).toBe(550)
+  })
+})
