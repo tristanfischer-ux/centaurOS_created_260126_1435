@@ -118,7 +118,7 @@ Validated:
 
 - full RFQ/unit regression cluster passes in one command
 - full E2E smoke chain passes (auth setup + Cad Lab visual + Forge entrypoint + Forge navigation)
-- latest local execution snapshot: `2026-02-15 16:10:12 UTC` on commit `4d6b010f`
+- latest local execution snapshot: `2026-02-15 16:28:38 UTC` on commit `4b30ec29`
 
 ### 7) Five-scenario product pass outcome log
 
