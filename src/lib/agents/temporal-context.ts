@@ -211,9 +211,78 @@ export function buildTemporalContext(now?: Date): TemporalContext {
  * into the specialist system prompt.
  *
  * @param context - Optional pre-built temporal context (builds fresh if omitted)
+ * @param foundryCreatedAt - Optional ISO date string of when the foundry was created (for milestone awareness)
  * @returns Formatted prompt block string
  */
-export function compileTemporalPrompt(context?: TemporalContext): string {
+export function compileTemporalPrompt(
+    context?: TemporalContext,
+    foundryCreatedAt?: string | null,
+): string {
     const ctx = context ?? buildTemporalContext()
-    return `## Temporal Awareness\n${ctx.behavioralGuidance}`
+    let prompt = `## Temporal Awareness\n${ctx.behavioralGuidance}`
+
+    // 6.3: Milestone/anniversary awareness
+    if (foundryCreatedAt) {
+        const milestoneNote = getMilestoneNote(ctx.timestamp, new Date(foundryCreatedAt))
+        if (milestoneNote) {
+            prompt += `\n${milestoneNote}`
+        }
+    }
+
+    return prompt
+}
+
+// ─── Milestone Awareness ────────────────────────────────────────────────────
+
+/**
+ * Checks if the current date is near a company milestone and returns
+ * a contextual note the specialist can weave into conversation.
+ *
+ * @description Detects:
+ * - First week (just started)
+ * - 1 month anniversary
+ * - 3 month anniversary (first quarter)
+ * - 6 month anniversary (half year)
+ * - 1 year anniversary
+ * - Multi-year anniversaries
+ *
+ * @param now - Current date
+ * @param foundryCreated - When the foundry was created
+ * @returns Milestone note for the prompt, or empty string
+ */
+function getMilestoneNote(now: Date, foundryCreated: Date): string {
+    const diffMs = now.getTime() - foundryCreated.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffDays < 0) return ""
+
+    // First week
+    if (diffDays <= 7) {
+        return "This is the founder's first week. They're just getting started — be especially welcoming and encouraging. Help them feel like they made a great decision."
+    }
+
+    // Check for anniversary milestones (within ±3 days)
+    const milestones = [
+        { days: 30, label: "1 month", note: "It's been about a month since the founder started. Acknowledge the milestone naturally if relevant — 'You've been at this for a month now. Here's what I've noticed about your progress...'" },
+        { days: 90, label: "3 months", note: "It's the founder's 3-month mark — first quarter complete. If it feels natural, acknowledge their progress and help them reflect on what's working and what needs to change for the next quarter." },
+        { days: 180, label: "6 months", note: "Half a year in. If relevant, help the founder take stock: what's been accomplished, what's shifted, what's the next 6-month vision." },
+        { days: 365, label: "1 year", note: "This is the founder's one-year anniversary. That's a significant milestone — acknowledge it warmly if it feels natural. Reflect on how far they've come and what the next year could look like." },
+    ]
+
+    for (const milestone of milestones) {
+        if (Math.abs(diffDays - milestone.days) <= 3) {
+            return milestone.note
+        }
+    }
+
+    // Multi-year anniversaries
+    if (diffDays > 365) {
+        const years = Math.floor(diffDays / 365)
+        const daysIntoYear = diffDays % 365
+        if (daysIntoYear <= 3 || daysIntoYear >= 362) {
+            return `The founder has been building for about ${years} year${years > 1 ? "s" : ""}. If it comes up naturally, acknowledge the journey.`
+        }
+    }
+
+    return ""
 }

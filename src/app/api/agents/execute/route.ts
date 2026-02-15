@@ -306,7 +306,21 @@ export async function POST(request: Request) {
     }
 
     // Temporal awareness: what time/day it is, how to adjust behavior
-    const temporalBlock = compileTemporalPrompt()
+    // Also includes milestone awareness if we know when the foundry was created
+    let foundryCreatedAt: string | null = null
+    if (foundryId) {
+        try {
+            const { data: foundryData } = await supabase
+                .from("foundries")
+                .select("created_at")
+                .eq("id", foundryId)
+                .single()
+            foundryCreatedAt = foundryData?.created_at ?? null
+        } catch {
+            // Non-critical
+        }
+    }
+    const temporalBlock = compileTemporalPrompt(undefined, foundryCreatedAt)
     systemPromptWithContext += `\n\n${temporalBlock}`
 
     // Emotional awareness: detect founder's emotional state from their message
