@@ -218,6 +218,19 @@ describe("createCadLabRfqAction", () => {
     expect(payload.specifications?.description).toContain(
       "- Assumptions: Arm interfaces follow v2 mounting pattern",
     )
+    expect(payload.specifications?.description).toContain(
+      "Outstanding blockers:",
+    )
+    expect(payload.specifications?.description).toContain(
+      "Frame: Diagnostics incomplete",
+    )
+    expect(payload.specifications?.custom_fields?.module_blockers).toEqual([
+      {
+        moduleId: "frame",
+        moduleName: "Frame",
+        blockers: ["Diagnostics incomplete"],
+      },
+    ])
     expect(payload.specifications?.custom_fields?.readiness_checks).toEqual([
       {
         moduleId: "frame",
@@ -422,6 +435,18 @@ describe("createCadLabRfqAction", () => {
       "https://example.com/shared/model.step",
       "https://example.com/shared/model.stl",
       "https://example.com/shared/manifest.json",
+    ])
+    expect(payload.specifications?.custom_fields?.module_blockers).toEqual([
+      {
+        moduleId: "m1",
+        moduleName: "Module A",
+        blockers: ["Diagnostics incomplete"],
+      },
+      {
+        moduleId: "m2",
+        moduleName: "Module B",
+        blockers: ["Diagnostics incomplete"],
+      },
     ])
   })
 })

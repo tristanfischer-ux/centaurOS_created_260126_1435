@@ -134,6 +134,7 @@ export async function createCadLabRfqAction(
 
   const moduleSpecs = generatedModules.map((module) => {
     const diag = input.diagnosticAnswers[module.id] || {}
+    const readiness = moduleReadiness.find((m) => m.moduleId === module.id)
     return {
       id: module.id,
       name: module.name,
@@ -148,9 +149,36 @@ export async function createCadLabRfqAction(
       batchSize: diag.batch_size || null,
       environment: diag.environment || null,
       leadWeeks: module.leadWeeks,
+      readiness: readiness
+        ? {
+            scorePct: readiness.scorePct,
+            diagnosticsComplete: readiness.diagnosticsComplete,
+            hasStep: readiness.hasStep,
+            hasStl: readiness.hasStl,
+            hasManifest: readiness.hasManifest,
+          }
+        : null,
       drawingPackage: module.result?.drawingPackage ?? null,
     }
   })
+  const moduleBlockers = moduleReadiness
+    .filter(
+      (module) =>
+        !module.diagnosticsComplete ||
+        !module.hasStep ||
+        !module.hasStl ||
+        !module.hasManifest,
+    )
+    .map((module) => ({
+      moduleId: module.moduleId,
+      moduleName: module.moduleName,
+      blockers: [
+        ...(!module.diagnosticsComplete ? ["Diagnostics incomplete"] : []),
+        ...(!module.hasStep ? ["Missing STEP"] : []),
+        ...(!module.hasStl ? ["Missing STL"] : []),
+        ...(!module.hasManifest ? ["Missing manifest"] : []),
+      ],
+    }))
 
   const quantityHints = generatedModules
     .map((module) => parseBatchQuantity(input.diagnosticAnswers[module.id]?.batch_size))
@@ -189,6 +217,16 @@ export async function createCadLabRfqAction(
       ].join(", ")
       return `${idx + 1}. ${module.moduleName} — ${module.scorePct}% (${checks})`
     }),
+    ...(moduleBlockers.length > 0
+      ? [
+          "",
+          "Outstanding blockers:",
+          ...moduleBlockers.map(
+            (module, idx) =>
+              `${idx + 1}. ${module.moduleName}: ${module.blockers.join("; ")}`,
+          ),
+        ]
+      : []),
     "",
     "Design intent:",
     `- Use case: ${input.designBrief?.useCase?.trim() || "Not specified"}`,
@@ -224,6 +262,7 @@ export async function createCadLabRfqAction(
         design_brief: input.designBrief || null,
         assumption_notes: input.assumptionNotes?.trim() || null,
         readiness_checks: moduleReadiness,
+        module_blockers: moduleBlockers,
         modules: moduleSpecs,
       },
     },
