@@ -59,7 +59,12 @@ import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 import { SectionHeader } from "@/components/sidebar/SectionHeader"
 import { useSectionNewBadges } from "@/hooks/useSectionNewBadge"
 import { signOut } from "@/actions/auth"
+import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
+import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedChecklist"
+import { VideoWalkthrough } from "@/components/ui/video-walkthrough"
+import { VIDEOS } from "@/lib/video-urls"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 /**
  * Determines if a navigation item should be marked as active.
@@ -138,9 +143,11 @@ interface SidebarProps {
     userRole?: string
     isCompanyAdmin?: boolean
     userFoundries?: FoundryInfo[]
+    /** Onboarding data from profiles.onboarding_data for the Getting Started checklist */
+    onboardingData?: Record<string, unknown>
 }
 
-export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, userRole, userFoundries }: SidebarProps) {
+export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, userRole, userFoundries, onboardingData }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { setZoom } = useZoomContext()
@@ -148,6 +155,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false)
     const [feedbackFeatureName, setFeedbackFeatureName] = React.useState<string | undefined>(undefined)
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
+    const [isVideoModalOpen, setIsVideoModalOpen] = React.useState(false)
 
     const openFeedback = (featureName?: string) => {
         setFeedbackFeatureName(featureName)
@@ -348,6 +356,23 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                     </button>
                 </form>
 
+                {/* Getting Started Checklist */}
+                {onboardingData && !(onboardingData as OnboardingData).checklist_dismissed && !(onboardingData as OnboardingData).checklist_completed_at && (
+                    <div className="border-t border-slate-100 pt-3">
+                        <GettingStartedChecklist
+                            userRole={userRole}
+                            onboardingData={onboardingData as OnboardingData}
+                            onItemComplete={async (key: string) => {
+                                await updateOnboardingData({ [key]: true })
+                            }}
+                            onDismiss={async () => {
+                                await updateOnboardingData({ checklist_dismissed: true })
+                            }}
+                            onPlayVideo={() => setIsVideoModalOpen(true)}
+                        />
+                    </div>
+                )}
+
                 {/* Zoom Control */}
                 <div className="flex justify-center">
                     <ZoomControl onZoomChange={setZoom} />
@@ -396,6 +421,30 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 onCreateObjective={handleCaptureObjective}
                 onCreateTask={handleCaptureTask}
             />
+
+            {/* Platform Overview Video Modal */}
+            <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
+                <DialogContent size="lg" className="gap-0 p-0 overflow-hidden" aria-describedby={undefined}>
+                    <DialogHeader className="sr-only">
+                        <DialogTitle>Platform Overview</DialogTitle>
+                    </DialogHeader>
+                    <div className="relative aspect-video w-full">
+                        {VIDEOS.platformOverview.videoUrl ? (
+                            <video
+                                src={VIDEOS.platformOverview.videoUrl}
+                                poster={VIDEOS.platformOverview.thumbnailUrl}
+                                controls
+                                playsInline
+                                autoPlay
+                                className="absolute inset-0 h-full w-full object-contain bg-foreground/5"
+                                aria-label="Platform Overview"
+                            >
+                                <track kind="captions" />
+                            </video>
+                        ) : null}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

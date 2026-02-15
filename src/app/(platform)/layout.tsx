@@ -40,7 +40,7 @@ export default async function PlatformLayout({
     const [profileResult, userFoundries] = await Promise.all([
         supabase
             .from("profiles")
-            .select("foundry_id, active_foundry_id, full_name, role, account_type")
+            .select("foundry_id, active_foundry_id, full_name, role, account_type, onboarding_data")
             .eq("id", user.id)
             .single(),
         getUserFoundries(),
@@ -106,7 +106,7 @@ export default async function PlatformLayout({
                         <CommandPalette />
                         <KeyboardShortcutsDialog />
                         <MobileZoomControl />
-                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} />
+                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} />
                         <ZoomableContent className="flex-1 overflow-y-auto bg-background">
                             <main className="p-4 pt-14 sm:p-6 lg:p-8 pb-32 sm:pb-8">
                                 <WelcomeBackBanner userName={profile?.full_name || user.email || "builder"} />

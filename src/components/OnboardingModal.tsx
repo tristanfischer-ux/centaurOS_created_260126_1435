@@ -18,6 +18,8 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { ConfettiCelebration } from '@/components/onboarding/ConfettiCelebration'
+import { VideoWalkthrough } from '@/components/ui/video-walkthrough'
+import { VIDEOS } from '@/lib/video-urls'
 
 const ONBOARDING_KEY = 'forgeos_onboarding_completed'
 const INTENT_SELECTED_KEY = 'forgeos_intent_selected'
@@ -556,10 +558,27 @@ export function OnboardingModal({ userRole, accountType: initialAccountType }: O
                     </motion.p>
                   </div>
 
+                  {/* Platform Overview Video */}
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.8 }}
+                    transition={{ delay: 0.7 }}
+                    className="max-w-sm mx-auto"
+                  >
+                    <VideoWalkthrough
+                      videoUrl={VIDEOS.platformOverview.videoUrl}
+                      thumbnailUrl={VIDEOS.platformOverview.thumbnailUrl}
+                      title="Quick Platform Tour"
+                      description="60 seconds to see everything ForgeOS can do"
+                      duration={VIDEOS.platformOverview.duration}
+                      mode="modal"
+                    />
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.9 }}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >

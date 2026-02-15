@@ -185,7 +185,7 @@ export async function createApprenticeTrainingTasks() {
  * Marketplace Onboarding Functions
  */
 
-interface OnboardingData {
+export interface OnboardingData {
   marketplace_tour_completed?: boolean
   marketplace_tour_skipped?: boolean
   first_marketplace_action?: string
@@ -193,6 +193,127 @@ interface OnboardingData {
   first_marketplace_action_listing_id?: string
   dashboard_tour_completed?: boolean
   guild_tour_completed?: boolean
+  /** Getting Started Checklist fields */
+  checklist_dismissed?: boolean
+  checklist_completed_at?: string
+  checklist_profile_completed?: boolean
+  checklist_video_watched?: boolean
+  checklist_objective_created?: boolean
+  checklist_team_member_added?: boolean
+  checklist_marketplace_explored?: boolean
+  checklist_forge_project_created?: boolean
+  /** Milestone tracking */
+  milestones_shown?: string[]
+}
+
+/**
+ * Generic updater for onboarding_data JSONB field.
+ *
+ * @description Merges the provided partial data into the user's existing
+ * onboarding_data. Safe for concurrent writes since it reads current state
+ * first then merges.
+ *
+ * @param updates - Partial data to merge into onboarding_data
+ * @returns Success or error
+ *
+ * @security Requires authenticated user, updates only own profile
+ */
+export async function updateOnboardingData(
+  updates: Partial<OnboardingData>
+): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Unauthorized' }
+
+  // Read current onboarding data
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('onboarding_data')
+    .eq('id', user.id)
+    .single()
+
+  const currentData = (profile?.onboarding_data as OnboardingData) || {}
+  const updatedData: OnboardingData = {
+    ...currentData,
+    ...updates,
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      onboarding_data: updatedData as any,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', user.id)
+
+  if (error) {
+    console.error('[Onboarding] Failed to update onboarding data:', {
+      userId: user.id,
+      error: error.message,
+    })
+    return { error: error.message }
+  }
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+/**
+ * Record that a milestone celebration was shown to the user.
+ *
+ * @description Appends the milestone ID to the milestones_shown array
+ * in onboarding_data so it won't trigger again.
+ *
+ * @param milestoneId - The ID of the milestone that was shown
+ * @returns Success or error
+ *
+ * @security Only updates own profile
+ */
+export async function recordMilestoneShown(
+  milestoneId: string
+): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Unauthorized' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('onboarding_data')
+    .eq('id', user.id)
+    .single()
+
+  const currentData = (profile?.onboarding_data as OnboardingData) || {}
+  const currentMilestones = currentData.milestones_shown || []
+
+  // Don't duplicate
+  if (currentMilestones.includes(milestoneId)) {
+    return { success: true }
+  }
+
+  return updateOnboardingData({
+    milestones_shown: [...currentMilestones, milestoneId],
+  })
+}
+
+/**
+ * Record a page visit for the onboarding system.
+ *
+ * @description Tracks which pages the user has visited so the onboarding
+ * system can show contextual tips and celebrate exploration milestones.
+ *
+ * @param pageKey - The page key (e.g., 'today', 'tasks', 'marketplace')
+ * @returns Success or error
+ *
+ * @security Only updates own profile
+ */
+export async function recordPageVisit(
+  pageKey: string
+): Promise<{ success?: boolean; error?: string }> {
+  const key = `visited_${pageKey}` as keyof OnboardingData
+  return updateOnboardingData({ [key]: true } as Partial<OnboardingData>)
 }
 
 /**
