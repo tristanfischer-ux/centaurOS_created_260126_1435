@@ -37,6 +37,7 @@ Coverage includes:
 - `release-packet-consistency.test.ts`
 - `release-snapshot-consistency.test.ts`
 - `release-verify-script-consistency.test.ts`
+- `release-workflow-consistency.test.ts`
 - `scenario-matrix-consistency.test.ts`
 - `telemetry-event-contract-consistency.test.ts`
 - `forge-project-list.test.tsx`

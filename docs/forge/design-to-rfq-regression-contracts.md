@@ -75,6 +75,13 @@ As the release packet grows, some failures are best caught by low-cost contract 
   - go-live status verification snapshot stays synchronized with QA report snapshot
   - release timestamp + commit evidence do not drift across launch artifacts
 
+### 10) Release workflow consistency contract
+
+- Test: `release-workflow-consistency.test.ts`
+- Protects:
+  - manual GitHub release-operations workflow retains verify + migration execution paths
+  - required migration secrets and documentation references remain aligned
+
 ## Operational Usage
 
 Run:
@@ -104,5 +111,6 @@ This command now validates both product logic regressions and release-contract d
 - `release-packet-consistency.test.ts`
 - `release-snapshot-consistency.test.ts`
 - `release-verify-script-consistency.test.ts`
+- `release-workflow-consistency.test.ts`
 - `scenario-matrix-consistency.test.ts`
 - `telemetry-event-contract-consistency.test.ts`

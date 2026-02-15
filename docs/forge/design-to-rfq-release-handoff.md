@@ -33,6 +33,21 @@ Move the release from **migration pending** to **go-live ready** in the target e
 
 3. Confirm migration applied successfully (no auth errors, no SQL failures).
 
+## Path A2 — GitHub Actions migration runner (optional)
+
+You can also run the manual workflow:
+
+- `.github/workflows/forge-rfq-release-operations.yml`
+- Trigger with:
+  - `apply_migration = true`
+  - optional `run_release_verify = true`
+
+Required repository secrets:
+
+- `SUPABASE_ACCESS_TOKEN`
+- `SUPABASE_PROJECT_REF`
+- `SUPABASE_DB_PASSWORD`
+
 ## Path B — Manual SQL editor fallback
 
 Use this path when CLI PAT auth is unavailable in the runtime environment.

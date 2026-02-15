@@ -55,6 +55,10 @@ Includes:
 - full RFQ regression suite
 - E2E smoke chain
 
+Optional GitHub Actions runner for staged release ops:
+
+- `.github/workflows/forge-rfq-release-operations.yml`
+
 ## Required Database Migration
 
 Apply before rollout to eliminate profile policy recursion noise:

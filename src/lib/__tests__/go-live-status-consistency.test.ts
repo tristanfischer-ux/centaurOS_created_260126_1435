@@ -21,6 +21,7 @@ describe("go-live status consistency", () => {
     expect(statusDoc).toContain("Verification environment")
     expect(statusDoc).toContain("design-to-rfq-manual-product-pass-results.md")
     expect(statusDoc).toContain("design-to-rfq-release-handoff.md")
+    expect(statusDoc).toContain("forge-rfq-release-operations.yml")
     expect(statusDoc).toContain("SUPABASE_ACCESS_TOKEN")
     expect(statusDoc).toContain("20260215120000_stabilize_profiles_rls_no_recursion.sql")
     expect(statusDoc).toContain("⛔ PENDING")

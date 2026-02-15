@@ -1,0 +1,91 @@
+name: Forge RFQ Release Operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_release_verify:
+        description: Run full release verification bundle
+        required: true
+        default: true
+        type: boolean
+      apply_migration:
+        description: Apply profiles RLS stabilization migration
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  verify-release:
+    if: ${{ inputs.run_release_verify }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Forge RFQ release verification
+        run: npm run verify:forge-rfq-release
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TEST_FOUNDER_EMAIL: ${{ secrets.TEST_FOUNDER_EMAIL }}
+          TEST_FOUNDER_PASSWORD: ${{ secrets.TEST_FOUNDER_PASSWORD }}
+          TEST_EXECUTIVE_EMAIL: ${{ secrets.TEST_EXECUTIVE_EMAIL }}
+          TEST_EXECUTIVE_PASSWORD: ${{ secrets.TEST_EXECUTIVE_PASSWORD }}
+          TEST_APPRENTICE_EMAIL: ${{ secrets.TEST_APPRENTICE_EMAIL }}
+          TEST_APPRENTICE_PASSWORD: ${{ secrets.TEST_APPRENTICE_PASSWORD }}
+          TEST_SUPPLIER_EMAIL: ${{ secrets.TEST_SUPPLIER_EMAIL }}
+          TEST_SUPPLIER_PASSWORD: ${{ secrets.TEST_SUPPLIER_PASSWORD }}
+
+  apply-profiles-migration:
+    if: ${{ inputs.apply_migration }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Validate migration secrets
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          missing=0
+          for key in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF SUPABASE_DB_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing required secret: ${key}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Apply profiles RLS stabilization migration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          npx supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" --yes
+          npx supabase db push --linked --yes

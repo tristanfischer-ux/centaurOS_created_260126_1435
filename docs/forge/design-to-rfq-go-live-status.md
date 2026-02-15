@@ -30,5 +30,6 @@ This status page captures the current release readiness state for the Design →
 
 1. Execute `docs/forge/design-to-rfq-release-handoff.md` in staging/target environment.
 2. Apply migration in staging via authenticated runner/dashboard.
-3. Re-run `npm run verify:forge-rfq-release` in staging environment.
-4. Mark release packet sign-off checklist items complete.
+3. Optionally trigger `.github/workflows/forge-rfq-release-operations.yml` with `apply_migration=true` for managed CI execution.
+4. Re-run `npm run verify:forge-rfq-release` in staging environment.
+5. Mark release packet sign-off checklist items complete.
