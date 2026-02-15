@@ -24,6 +24,11 @@ npm run test:forge-rfq
 npm run test:forge-rfq:e2e-smoke
 ```
 
+Includes:
+- auth setup state generation
+- Cad Lab landing smoke
+- Forge entrypoint recommendation smoke
+
 ### 3) One-command release verification
 
 ```bash

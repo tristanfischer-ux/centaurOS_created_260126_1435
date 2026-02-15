@@ -56,6 +56,20 @@ Validated:
 - resilient submit selectors (`Enter the Forge`/legacy text)
 - supplier redirect handling for both supplier portal and platform landing routes
 
+### 4) Forge entrypoint clarity smoke (Playwright)
+
+```bash
+npm run test:e2e -- e2e/forge-entrypoint.spec.ts --project=chromium
+```
+
+Result: **PASS**
+
+Validated:
+
+- `/the-forge` surfaces **Design-to-RFQ Lab** as the recommended path
+- direct CTA to `/the-forge/cad-lab` is visible
+- recommendation remains visible even when legacy project list enters error state
+
 ## Notes
 
 - During auth flows, some environments may log:
@@ -70,3 +84,4 @@ Validated:
 - Benchmark suite gates (5 scenarios): ✅
 - Cad Lab landing/login smoke path: ✅
 - Playwright auth setup robustness: ✅
+- Forge entrypoint clarity check: ✅

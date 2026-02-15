@@ -14,7 +14,7 @@
 import React from "react"
 import Link from "next/link"
 
-import { Plus } from "lucide-react"
+import { ArrowRight, Sparkles, Plus } from "lucide-react"
 
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
@@ -40,6 +40,7 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
     return (
       <div className="space-y-8">
         <PageHeader />
+        <CadLabEntrypoint />
         <p className="text-sm text-destructive">{result.error}</p>
       </div>
     )
@@ -50,6 +51,7 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
   return (
     <div className="space-y-8">
       <PageHeader projectCount={scans.length} />
+      <CadLabEntrypoint />
 
       {scans.length === 0 ? (
         <EmptyState
@@ -71,6 +73,37 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function CadLabEntrypoint(): React.ReactNode {
+  return (
+    <div className="rounded-xl border border-international-orange/30 bg-gradient-to-r from-international-orange-light/30 via-background to-background p-5">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1.5">
+          <p className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-semibold text-international-orange">
+            <Sparkles className="h-3.5 w-3.5" />
+            Recommended path
+          </p>
+          <h2 className="text-lg font-semibold text-foreground">Design-to-RFQ Lab</h2>
+          <p className="text-sm text-muted-foreground max-w-2xl">
+            Start here for the end-to-end flow: guided design intake, CAD generation,
+            supplier packet exports, and one-click Marketplace RFQ creation.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild className="whitespace-nowrap">
+            <Link href="/the-forge/cad-lab">
+              Open Design-to-RFQ Lab
+              <ArrowRight className="h-4 w-4 ml-1.5" />
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="whitespace-nowrap">
+            <Link href="/the-forge/new">Open Legacy Concept Flow</Link>
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
