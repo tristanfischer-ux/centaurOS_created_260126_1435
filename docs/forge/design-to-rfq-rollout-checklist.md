@@ -1,0 +1,79 @@
+# Forge Design → Drawings → RFQ Rollout Checklist
+
+This checklist defines the release gates for the Design-to-Quote flow and maps directly to the quality outcomes in the plan.
+
+## 1) Release Success Criteria
+
+Ship only when all of the following are true:
+
+- Golden benchmark suite passes (`3/3` benchmark cases).
+- RFQ regression suite passes with attachment, scorecard, and blocker metadata checks.
+- No known blocker that prevents a user from creating an RFQ from generated CAD output.
+- Procurement handoff includes:
+  - STEP, STL, and manifest coverage for at least one quote-ready module.
+  - Design brief + assumptions in RFQ payload metadata.
+  - Readability of supplier-facing RFQ description.
+
+## 2) Required Automated Test Commands
+
+Run these before each release candidate:
+
+```bash
+npm run test -- src/actions/__tests__/cad-lab-rfq-golden-benchmarks.test.ts
+npm run test -- src/actions/__tests__/cad-lab-rfq.test.ts
+npm run test -- src/lib/__tests__/cad-lab-quality-scorecard.test.ts src/lib/__tests__/cad-lab-readiness.test.ts
+npm run test -- src/components/cad/__tests__/cad-lab-procurement-utils.test.ts
+```
+
+## 3) Rollout Phases
+
+### Phase A — Internal Alpha
+
+- Audience: internal product + engineering.
+- Gate:
+  - Execute full benchmark suite.
+  - Manually validate one full run from Research → Build → Review → Procurement.
+  - Verify RFQ record appears in Marketplace and can be opened from Forge.
+- Telemetry review:
+  - RFQ creation success ratio.
+  - Quote-ready module ratio.
+  - Attachment count distribution per RFQ.
+
+### Phase B — Design Partner Beta
+
+- Audience: selected pilot customers with supplier workflows.
+- Gate:
+  - Zero P0/P1 defects in alpha backlog.
+  - At least `80%` of beta projects reach RFQ created state without support intervention.
+- Telemetry review:
+  - Supplier response count within 7 days.
+  - Clarification-loop rate (RFQ comments requesting missing CAD info).
+  - Re-broadcast usage and incremental supplier reach.
+
+### Phase C — Gradual Public Release
+
+- Audience: percentage-based rollout to Forge users.
+- Gate:
+  - Beta metrics stable over a 2-week window.
+  - No regression in CAD generation success rate.
+- Monitoring:
+  - End-to-end conversion: design start → RFQ created.
+  - Stage-level drop-off (Research, Build, Review, Procurement).
+  - Quality scorecard distribution over time.
+
+## 4) Rollback Triggers
+
+Rollback rollout level if any trigger is detected:
+
+- RFQ creation failure rate increases by >10% absolute from baseline.
+- Quote-ready module count falls below baseline for 3 consecutive days.
+- Marketplace RFQ attachments missing/invalid in production incidents.
+
+## 5) Operational Ownership
+
+- Engineering owner: Forge platform team (generation + procurement integration).
+- Product owner: Forge PM (flow adoption + quality outcomes).
+- Weekly review packet should include:
+  - benchmark suite results
+  - RFQ conversion metrics
+  - supplier response quality notes
