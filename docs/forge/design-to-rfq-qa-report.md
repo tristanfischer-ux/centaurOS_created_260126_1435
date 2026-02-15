@@ -94,9 +94,23 @@ Validated:
 - mobile **More** menu routes Settings to `/settings`
 - canonical entrypoint consistently exposes Design-to-RFQ recommendation card
 
+### 6) Full release verification bundle
+
+```bash
+npm run verify:forge-rfq-release
+```
+
+Result: **PASS**
+
+Validated:
+
+- full RFQ/unit regression cluster passes in one command
+- full E2E smoke chain passes (auth setup + Cad Lab visual + Forge entrypoint + Forge navigation)
+
 ## Notes
 
 - The Next.js image-quality warning during login hero rendering was removed by explicitly allowing quality `90` in `next.config.ts` (`images.qualities: [75, 90]`).
+- Running `npx supabase db push` from this workspace currently requires a Supabase access token (`SUPABASE_ACCESS_TOKEN`) not present in runtime env. Apply the migration via authenticated deployment runner/dashboard if CLI auth is unavailable.
 - During auth flows, some environments may log:
   - `Failed to fetch user profile: infinite recursion detected in policy for relation "profiles"`
 - A dedicated migration now exists to harden profiles RLS and remove recursive policy paths:

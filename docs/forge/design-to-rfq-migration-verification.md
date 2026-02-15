@@ -8,6 +8,12 @@ This runbook verifies deployment of:
 
 Use your normal migration pipeline (Supabase CLI / deployment runner) and ensure this migration is included.
 
+If using CLI directly, ensure `SUPABASE_ACCESS_TOKEN` is available (or run `supabase login`) before:
+
+```bash
+npx supabase db push
+```
+
 ## Verify Policies in SQL
 
 Run in SQL editor:
