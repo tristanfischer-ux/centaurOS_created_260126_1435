@@ -33,6 +33,7 @@ const nextConfig: NextConfig = {
   // Image optimization: serve modern formats with long cache TTL
   images: {
     formats: ["image/avif", "image/webp"],
+    qualities: [75, 90],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
   },
 

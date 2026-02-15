@@ -96,6 +96,7 @@ Validated:
 
 ## Notes
 
+- The Next.js image-quality warning during login hero rendering was removed by explicitly allowing quality `90` in `next.config.ts` (`images.qualities: [75, 90]`).
 - During auth flows, some environments may log:
   - `Failed to fetch user profile: infinite recursion detected in policy for relation "profiles"`
 - A dedicated migration now exists to harden profiles RLS and remove recursive policy paths:
