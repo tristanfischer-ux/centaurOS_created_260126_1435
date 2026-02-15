@@ -26,6 +26,7 @@ Coverage includes:
 - `cad-lab-quality-scorecard.test.ts`
 - `cad-lab-readiness.test.ts`
 - `forge-route-consistency.test.ts`
+- `profiles-rls-migration.test.ts`
 - `forge-project-list.test.tsx`
 - `MobileNav.test.tsx`
 - `cad-lab-procurement-utils.test.ts`
