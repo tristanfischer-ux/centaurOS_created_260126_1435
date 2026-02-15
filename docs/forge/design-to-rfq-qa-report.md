@@ -35,6 +35,7 @@ Coverage includes:
 - `release-docs-consistency.test.ts`
 - `release-handoff-consistency.test.ts`
 - `release-packet-consistency.test.ts`
+- `release-snapshot-consistency.test.ts`
 - `release-verify-script-consistency.test.ts`
 - `scenario-matrix-consistency.test.ts`
 - `telemetry-event-contract-consistency.test.ts`
