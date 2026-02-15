@@ -6,6 +6,11 @@ test.describe('Forge navigation route', () => {
   const founderPassword = process.env.TEST_FOUNDER_PASSWORD || 'DemoFounder2026!'
 
   async function loginIfNeeded(page: Page) {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('forgeos_onboarding_completed', 'true')
+      window.localStorage.setItem('forgeos_intent_selected', 'team_builder')
+    })
+
     await page.goto('/today')
     await page.waitForLoadState('networkidle')
 
@@ -23,6 +28,8 @@ test.describe('Forge navigation route', () => {
     const forgeLink = page.getByRole('link', { name: 'The Forge' }).first()
     await expect(forgeLink).toBeVisible()
     await expect(forgeLink).toHaveAttribute('href', '/the-forge')
+    await forgeLink.click()
+    await expect(page).toHaveURL(/\/the-forge$/)
 
     await page.goto('/plan')
     await page.waitForLoadState('networkidle')
@@ -30,6 +37,8 @@ test.describe('Forge navigation route', () => {
       name: /Design physical products\? Try The Forge/i,
     })
     await expect(planForgeSpotlightLink).toHaveAttribute('href', '/the-forge')
+    await planForgeSpotlightLink.click()
+    await expect(page).toHaveURL(/\/the-forge$/)
 
     await page.goto('/workshop')
     await page.waitForLoadState('networkidle')
@@ -37,5 +46,7 @@ test.describe('Forge navigation route', () => {
       name: /Design physical products\? Try The Forge/i,
     })
     await expect(workshopForgeSpotlightLink).toHaveAttribute('href', '/the-forge')
+    await workshopForgeSpotlightLink.click()
+    await expect(page).toHaveURL(/\/the-forge$/)
   })
 })

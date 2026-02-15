@@ -85,6 +85,7 @@ Validated:
 - sidebar **The Forge** nav item routes to `/the-forge`
 - Plan section Forge spotlight routes to `/the-forge`
 - Workshop section Forge spotlight routes to `/the-forge`
+- each Forge discovery link is click-tested to land on `/the-forge`
 - canonical entrypoint consistently exposes Design-to-RFQ recommendation card
 
 ## Notes
