@@ -4,8 +4,8 @@ This status page captures the current release readiness state for the Design →
 
 ## Verification Snapshot
 
-- Last verified at (UTC): `2026-02-15 16:44:03 UTC`
-- Branch head at verification: `7c8198c4`
+- Last verified at (UTC): `2026-02-15 16:54:04 UTC`
+- Branch head at verification: `252f9d0b`
 - Verification command: `npm run verify:forge-rfq-release`
 - Verification environment: `SUPABASE_ACCESS_TOKEN=missing` (migration apply remains blocked in this runtime)
 
