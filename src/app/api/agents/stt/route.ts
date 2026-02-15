@@ -19,15 +19,20 @@ import OpenAI, { toFile } from "openai"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { aiGuard } from "@/lib/ai/guard"
 
-// SECURITY: Fail fast if OpenAI API key is not configured
-const apiKey = process.env.OPENAI_API_KEY
-if (!apiKey && process.env.NODE_ENV === "production") {
-    console.error("[CRITICAL] OPENAI_API_KEY not configured in production!")
-}
+let openaiClient: OpenAI | null = null
 
-const openai = new OpenAI({
-    apiKey: apiKey || "dummy-key-for-build",
-})
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 /** Maximum audio file size (25MB — OpenAI's limit) */
 const MAX_AUDIO_SIZE = 25 * 1024 * 1024
@@ -73,6 +78,14 @@ export async function POST(req: NextRequest): Promise<Response> {
             )
         }
 
+        const openai = getOpenAIClient()
+        if (!openai) {
+            return NextResponse.json(
+                { error: "Service temporarily unavailable" },
+                { status: 503 }
+            )
+        }
+
         const supabase = await createClient()
 
         // AUTH: Verify user is authenticated and within AI limits
@@ -82,7 +95,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         // SECURITY: Rate limit to prevent cost abuse (30 per minute per user)
         const rateLimitResult = await rateLimit("api", `stt:${guard.userId}`, {
             limit: 30,
-            window: 60,
+            window: 60 * 1000,
         })
         if (!rateLimitResult.success) {
             return NextResponse.json(

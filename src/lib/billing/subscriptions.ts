@@ -22,6 +22,11 @@ export type {
 } from './plans'
 
 import type { SubscriptionTier } from './plans'
+import type {
+  SubscriptionPlan,
+  SubscriptionStatus,
+  UserSubscription,
+} from './plans'
 import { SUBSCRIPTION_PLANS } from './plans'
 
 // ==========================================
@@ -52,18 +57,26 @@ export async function getUserSubscription(userId: string): Promise<{
       // User has no subscription (free tier)
       return { subscription: null, error: null }
     }
+
+    if (!data.current_period_start || !data.current_period_end || !data.created_at || !data.updated_at) {
+      console.error('[Subscriptions] Invalid subscription record missing period timestamps:', {
+        subscriptionId: data.id,
+        userId,
+      })
+      return { subscription: null, error: 'Subscription record is incomplete' }
+    }
     
     return {
       subscription: {
         id: data.id,
         userId: data.user_id,
-        stripeSubscriptionId: data.stripe_subscription_id,
-        stripeCustomerId: data.stripe_customer_id,
+        stripeSubscriptionId: data.stripe_subscription_id ?? '',
+        stripeCustomerId: data.stripe_customer_id ?? '',
         tier: data.tier as SubscriptionTier,
         status: data.status as SubscriptionStatus,
         currentPeriodStart: data.current_period_start,
         currentPeriodEnd: data.current_period_end,
-        cancelAtPeriodEnd: data.cancel_at_period_end,
+        cancelAtPeriodEnd: data.cancel_at_period_end ?? false,
         trialEnd: data.trial_end,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
@@ -329,9 +342,11 @@ export async function handleSubscriptionEvent(
 /**
  * Check if user has access to a feature based on their subscription
  */
+type SubscriptionLimitKey = Exclude<keyof SubscriptionPlan['limits'], 'maxConversationMode'>
+
 export async function checkSubscriptionLimit(
   userId: string,
-  feature: keyof SubscriptionPlan['limits']
+  feature: SubscriptionLimitKey
 ): Promise<{ allowed: boolean; currentTier: SubscriptionTier; limit?: number }> {
   const { subscription } = await getUserSubscription(userId)
   

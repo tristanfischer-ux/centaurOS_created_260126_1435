@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isAdmin } from '@/lib/admin/access'
+import { rateLimit } from '@/lib/security/rate-limit'
 import type { QATestEnvironment, TriggerQATestResponse } from '@/types/qa.types'
 
 // GitHub API configuration
@@ -12,7 +13,7 @@ const GITHUB_WORKFLOW_FILE = 'qa-day-in-life.yml'
  * GET /api/admin/qa-tests
  * List recent QA test runs
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient()
     
@@ -20,6 +21,18 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // SECURITY: Rate limit QA test-run listing to reduce admin endpoint abuse.
+    const listRateLimit = await rateLimit('api', `qa-tests-list:${user.id}`, {
+      limit: 60,
+      window: 60 * 1000,
+    })
+    if (!listRateLimit.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please wait before refreshing test runs.' },
+        { status: 429 }
+      )
     }
     
     // Check admin access
@@ -78,6 +91,18 @@ export async function POST(request: NextRequest) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+
+    // SECURITY: Rate limit QA workflow triggers to avoid GitHub Actions abuse.
+    const rateLimitResult = await rateLimit('api', `qa-tests-trigger:${user.id}`, {
+      limit: 10,
+      window: 60 * 60 * 1000,
+    })
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please wait before triggering QA tests again.' },
+        { status: 429 }
+      )
+    }
     
     // Parse request body
     const body = await request.json()
@@ -114,9 +139,17 @@ export async function POST(request: NextRequest) {
     }
     
     // Build callback URL for GitHub to report results
-    const { getBaseUrl } = await import('@/lib/domains')
-    const baseUrl = getBaseUrl()
-    const callbackUrl = `${baseUrl}/api/admin/qa-tests/callback?test_run_id=${testRun.id}`
+    // SECURITY: Use request origin to avoid env-misrouted callback targets.
+    const callbackUrl = new URL('/api/admin/qa-tests/callback', request.nextUrl.origin)
+    callbackUrl.searchParams.set('test_run_id', testRun.id)
+
+    // SECURITY: Callback route is secret-protected; fail closed if unset.
+    if (!process.env.QA_CALLBACK_SECRET) {
+      return NextResponse.json(
+        { error: 'QA callback secret is not configured' },
+        { status: 503 }
+      )
+    }
     
     // Trigger GitHub Actions workflow
     let githubRunId: string | undefined
@@ -137,7 +170,7 @@ export async function POST(request: NextRequest) {
               inputs: {
                 environment,
                 triggered_by: profile.full_name || user.email || 'Admin',
-                callback_url: callbackUrl,
+                callback_url: callbackUrl.toString(),
               },
             }),
           }

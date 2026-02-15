@@ -6,6 +6,7 @@
  */
 
 import { sanitizeForLogging } from './sanitize'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export type SecurityEventType =
     | 'LOGIN_SUCCESS'
@@ -41,6 +42,51 @@ export interface SecurityEvent {
     success: boolean
     details?: Record<string, unknown>
     severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+}
+
+/**
+ * Persist a security event to the immutable audit table.
+ *
+ * @description Writes events to `security_audit_log` via the database RPC
+ * function so that forensic records survive process restarts and log rotation.
+ * Failures are logged but never thrown to avoid impacting auth flows.
+ *
+ * @param {SecurityEvent} event - Sanitized security event payload.
+ * @returns {Promise<void>} Resolves after persistence attempt.
+ *
+ * @security Uses service-role Supabase client on server only.
+ * @audit Writes to public.security_audit_log through insert_security_audit_log.
+ */
+async function persistSecurityEvent(event: SecurityEvent): Promise<void> {
+    try {
+        const adminClient = createAdminClient()
+        const { error } = await adminClient.rpc('insert_security_audit_log', {
+            p_event_type: event.type,
+            p_user_id: event.userId ?? null,
+            p_email: event.email ?? null,
+            p_ip_address: event.ipAddress ?? null,
+            p_user_agent: event.userAgent ?? null,
+            p_resource: event.resource ?? null,
+            p_action: event.action ?? null,
+            p_success: event.success,
+            p_severity: event.severity,
+            p_details: event.details ?? null,
+        })
+
+        if (error) {
+            console.error('[SECURITY] Failed to persist audit log event:', {
+                type: event.type,
+                severity: event.severity,
+                error: error.message,
+            })
+        }
+    } catch (error) {
+        console.error('[SECURITY] Audit log persistence error:', {
+            type: event.type,
+            severity: event.severity,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        })
+    }
 }
 
 /**
@@ -135,9 +181,8 @@ export async function logSecurityEvent(params: {
         console.log(logMessage)
     }
 
-    // TODO(TECH-DEBT): Integrate with production logging service (DataDog, etc.)
-    // - CloudWatch: await cloudwatch.putLogEvents(...)
-    // - Database: await supabase.from('security_audit_log').insert(event)
+    // AUDIT: Persist to immutable security audit table.
+    await persistSecurityEvent(event)
 }
 
 /**

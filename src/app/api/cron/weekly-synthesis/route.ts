@@ -16,29 +16,31 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runWeeklySynthesis } from '@/lib/agents/sweep-synthesis'
+import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 
 /**
  * Verifies the cron secret to prevent unauthorized access.
  *
  * @param req - Incoming request
- * @returns true if authorized, false otherwise
+ * @returns Unauthorized/configuration response when invalid; otherwise null.
  *
- * @security In production, CRON_SECRET is required. In development, allows open access.
+ * @security Fail-closed in all environments when CRON_SECRET is missing.
  */
-function verifyCronSecret(req: NextRequest): boolean {
+function verifyCronSecret(req: NextRequest): NextResponse | null {
   const cronSecret = process.env.CRON_SECRET
 
-  // SECURITY: In production, require the secret
+  // SECURITY: Fail closed when cron secret is not configured.
   if (!cronSecret) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error('[SECURITY] CRON_SECRET not configured in production!')
-      return false
-    }
-    return true // Allow in development
+    console.error('[SECURITY] CRON_SECRET not configured')
+    return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })
   }
 
   const authHeader = req.headers.get('authorization')
-  return authHeader === `Bearer ${cronSecret}`
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  return null
 }
 
 /**
@@ -48,9 +50,16 @@ function verifyCronSecret(req: NextRequest): boolean {
  * Cal produces unified executive briefs for all active foundries.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  const ip = getClientIP(req.headers)
+  const ipLimit = await rateLimit('webhook', `cron-weekly-synthesis:${ip}`)
+  if (!ipLimit.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   // AUTH: Verify cron authorization
-  if (!verifyCronSecret(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const authFailure = verifyCronSecret(req)
+  if (authFailure) {
+    return authFailure
   }
 
   try {
@@ -73,11 +82,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    console.error('[Cron] Weekly synthesis error:', error)
+    console.error('[Cron] Weekly synthesis error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
 
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: 'Weekly synthesis job failed',
     }, { status: 500 })
   }
 }

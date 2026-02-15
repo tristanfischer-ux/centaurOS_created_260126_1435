@@ -4,17 +4,8 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
-
-// Admin client for messaging_links table (not in types yet)
-function getAdminClient() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url || !serviceKey) throw new Error('Missing Supabase config')
-    return createAdminClient(url, serviceKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-    })
-}
+import { createAdminClient } from '@/lib/supabase/admin'
+import { rateLimit } from '@/lib/security/rate-limit'
 
 export async function GET() {
     try {
@@ -25,7 +16,19 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const admin = getAdminClient()
+        // SECURITY: Rate limit link status checks to reduce abuse/enumeration.
+        const rateLimitResult = await rateLimit('api', `telegram-check-link:${user.id}`, {
+            limit: 60,
+            window: 60 * 1000,
+        })
+        if (!rateLimitResult.success) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Please wait before checking again.' },
+                { status: 429 }
+            )
+        }
+
+        const admin = createAdminClient()
 
         // Check for verified link
         const { data: link } = await admin

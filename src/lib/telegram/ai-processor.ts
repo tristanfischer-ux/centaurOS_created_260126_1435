@@ -8,15 +8,20 @@ import { z } from 'zod'
 import { zodResponseFormat } from 'openai/helpers/zod'
 import { ParsedObjective } from './types'
 
-// SECURITY: Fail fast if OpenAI API key is not configured in production
-const apiKey = process.env.OPENAI_API_KEY
-if (!apiKey && process.env.NODE_ENV === 'production') {
-    console.error('[CRITICAL] OPENAI_API_KEY not configured in production!')
-}
+let openaiClient: OpenAI | null = null
 
-const openai = new OpenAI({
-    apiKey: apiKey || 'dummy-key-for-build', // Build-time only fallback
-})
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 // Zod schema for objective extraction
 const TaskSchema = z.object({
@@ -37,6 +42,11 @@ const ObjectiveSchema = z.object({
  * Transcribe voice message using OpenAI Whisper
  */
 export async function transcribeVoice(audioBuffer: ArrayBuffer, mimeType: string): Promise<string> {
+    const openai = getOpenAIClient()
+    if (!openai) {
+        throw new Error('AI service not configured')
+    }
+
     // Convert ArrayBuffer to File object for OpenAI API
     const blob = new Blob([audioBuffer], { type: mimeType })
     const file = new File([blob], 'voice.ogg', { type: mimeType })
@@ -54,8 +64,8 @@ export async function transcribeVoice(audioBuffer: ArrayBuffer, mimeType: string
  * SECURITY: User input is treated as data, not instructions
  */
 export async function parseTextToObjective(text: string): Promise<ParsedObjective> {
-    // SECURITY: Check if OpenAI is configured
-    if (!process.env.OPENAI_API_KEY) {
+    const openai = getOpenAIClient()
+    if (!openai) {
         throw new Error('AI service not configured')
     }
     
@@ -127,6 +137,11 @@ export async function refineObjective(
     userFeedback: string,
     editType: 'title' | 'description' | 'tasks' | 'task'
 ): Promise<ParsedObjective> {
+    const openai = getOpenAIClient()
+    if (!openai) {
+        throw new Error('AI service not configured')
+    }
+
     // @ts-expect-error types for beta.chat.completions.parse are conflicting
     const completion = await openai.beta.chat.completions.parse({
         model: 'gpt-4o-2024-08-06',
@@ -162,6 +177,11 @@ Maintain all other fields unless the feedback specifically requires changes to t
  * Simple text response for when we can't parse an objective
  */
 export async function generateHelpResponse(text: string): Promise<string> {
+    const openai = getOpenAIClient()
+    if (!openai) {
+        throw new Error('AI service not configured')
+    }
+
     const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [

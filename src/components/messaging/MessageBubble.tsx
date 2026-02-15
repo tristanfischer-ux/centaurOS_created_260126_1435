@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { UserAvatar } from '@/components/ui/user-avatar'
-import { Check, CheckCheck, FileIcon, AlertCircle, MessageSquare, Download, Image as ImageIcon } from 'lucide-react'
+import { Check, CheckCheck, AlertCircle, MessageSquare, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import { sanitizeHref } from '@/lib/security/url-validation'
@@ -14,7 +14,7 @@ import { PinnedIndicator } from './PinnedIndicator'
 import { MessageActions } from './MessageActions'
 import type { ReactionGroup } from '@/actions/reactions'
 import { formatDistanceToNow } from 'date-fns'
-import { isImageFile, getFileIcon } from '@/lib/file-upload'
+import { getFileIcon } from '@/lib/file-upload'
 import Image from 'next/image'
 import '@/components/messaging/message-animations.css'
 
@@ -67,33 +67,80 @@ function formatTime(dateString: string): string {
   }
 }
 
-function getInitials(name: string | null, email: string): string {
-  if (name) {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
-  return email.slice(0, 2).toUpperCase()
-}
-
 /**
  * File attachment display component
  */
 function FileAttachment({ 
   fileUrl, 
   fileName, 
-  isOwn 
+  isOwn,
+  messageId,
+  conversationId,
 }: { 
   fileUrl: string
   fileName: string
   isOwn: boolean
+  messageId: string
+  conversationId: string
 }) {
-  const safeUrl = sanitizeHref(fileUrl)
-  if (safeUrl === '#') {
-    return <span className="text-sm">Invalid file</span>
+  const [safeUrl, setSafeUrl] = useState<string | null>(null)
+  const [isResolving, setIsResolving] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+
+    const resolveFileUrl = async (): Promise<void> => {
+      setIsResolving(true)
+      try {
+        const response = await fetch('/api/messages/file-url', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fileRef: fileUrl,
+            conversationId,
+            messageId,
+          }),
+        })
+
+        if (!response.ok) {
+          if (isMounted) {
+            setSafeUrl(null)
+          }
+          return
+        }
+
+        const payload = (await response.json()) as { url?: string }
+        const sanitized = sanitizeHref(payload.url || '#')
+
+        if (isMounted) {
+          setSafeUrl(sanitized === '#' ? null : sanitized)
+        }
+      } catch {
+        if (isMounted) {
+          setSafeUrl(null)
+        }
+      } finally {
+        if (isMounted) {
+          setIsResolving(false)
+        }
+      }
+    }
+
+    resolveFileUrl()
+
+    return () => {
+      isMounted = false
+    }
+  }, [fileUrl, conversationId, messageId])
+
+  if (isResolving) {
+    return <span className="text-sm text-muted-foreground">Loading file...</span>
+  }
+
+  if (!safeUrl) {
+    return <span className="text-sm">Attachment unavailable</span>
   }
   
   // Detect file type from URL or name
@@ -197,7 +244,6 @@ export function MessageBubble({
   const sender = message.sender
   const isSystem = message.message_type === 'system'
   const isFile = message.message_type === 'file'
-  const hasReplies = replyCount > 0
   
   const handleToggleReaction = (emoji: string) => {
     onToggleReaction?.(emoji)
@@ -312,6 +358,8 @@ export function MessageBubble({
                 fileUrl={message.file_url}
                 fileName={message.content || 'Attachment'}
                 isOwn={isOwn}
+                messageId={message.id}
+                conversationId={message.conversation_id}
               />
             ) : (
               <p className="text-sm whitespace-pre-wrap">{message.content}</p>

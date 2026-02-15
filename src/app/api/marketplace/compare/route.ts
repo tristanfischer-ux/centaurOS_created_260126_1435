@@ -25,15 +25,20 @@ const CompareRequestSchema = z.object({
     }).optional(),
 });
 
-// Validate API key at runtime rather than using dummy fallback
-const apiKey = process.env.OPENAI_API_KEY;
-if (!apiKey && process.env.NODE_ENV === 'production') {
-    console.error('OPENAI_API_KEY is required in production');
-}
+let openaiClient: OpenAI | null = null
 
-const openai = new OpenAI({
-    apiKey: apiKey || 'sk-placeholder-for-build-only',
-});
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 // Types for the comparison request/response
 export interface MarketplaceListingInput {
@@ -73,6 +78,14 @@ export async function POST(req: NextRequest) {
                 { status: 503 }
             );
         }
+
+        const openai = getOpenAIClient()
+        if (!openai) {
+            return NextResponse.json(
+                { error: "AI comparison service is not configured" },
+                { status: 503 }
+            );
+        }
         
         const supabase = await createClient()
         const guard = await aiGuard(supabase, 'comparison_assistant')
@@ -80,7 +93,7 @@ export async function POST(req: NextRequest) {
         const user = { id: guard.userId }
 
         // SECURITY: Rate limit to prevent OpenAI cost abuse (5 requests per minute per user)
-        const rateLimitResult = await rateLimit('api', `compare:${user.id}`, { limit: 5, window: 60 })
+        const rateLimitResult = await rateLimit('api', `compare:${user.id}`, { limit: 5, window: 60 * 1000 })
         if (!rateLimitResult.success) {
             return NextResponse.json(
                 { error: "Rate limit exceeded. Please wait before comparing again." },

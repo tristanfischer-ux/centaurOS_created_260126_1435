@@ -18,6 +18,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { createOAuth2Client } from '@/lib/google/client'
 import { getScopesForFeatures } from '@/lib/google/scopes'
+import { buildOAuthStatePayload, createSignedOAuthState } from '@/lib/security/oauth-state'
+import { rateLimit } from '@/lib/security/rate-limit'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
     // AUTH: Verify the user is authenticated
@@ -26,6 +28,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // SECURITY: Limit OAuth connect initiations per user to reduce abuse.
+    const rateLimitResult = await rateLimit('api', `google-connect:${user.id}`, {
+        limit: 20,
+        window: 10 * 60 * 1000,
+    })
+    if (!rateLimitResult.success) {
+        return NextResponse.json(
+            { error: 'Rate limit exceeded. Please try again shortly.' },
+            { status: 429 }
+        )
     }
 
     const foundryId = await getFoundryIdCached()
@@ -47,9 +61,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     const oauth2Client = createOAuth2Client(redirectUri)
 
-    // SECURITY: State parameter encodes user+foundry for CSRF protection
-    const state = JSON.stringify({ userId: user.id, foundryId })
-    const stateEncoded = Buffer.from(state).toString('base64url')
+    // SECURITY: Sign OAuth state to prevent tampering between connect and callback.
+    const oauthStateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET
+    if (!oauthStateSecret) {
+        console.error('[GoogleConnect] Missing OAuth state signing secret')
+        return NextResponse.json({ error: 'OAuth state signing not configured' }, { status: 503 })
+    }
+
+    const statePayload = buildOAuthStatePayload({ userId: user.id, foundryId })
+    const stateEncoded = createSignedOAuthState(statePayload, oauthStateSecret)
 
     const authUrl = oauth2Client.generateAuthUrl({
         access_type: 'offline',

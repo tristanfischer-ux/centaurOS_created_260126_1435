@@ -4,7 +4,7 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { rateLimit } from '@/lib/security/rate-limit'
 
 // SECURITY: Use cryptographically secure random number generation
@@ -17,16 +17,6 @@ function generateVerificationCode(): string {
         .join('')
 }
 
-// Admin client for messaging_links table (not in types yet)
-function getAdminClient() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url || !serviceKey) throw new Error('Missing Supabase config')
-    return createAdminClient(url, serviceKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-    })
-}
-
 export async function POST() {
     try {
         const supabase = await createClient()
@@ -37,7 +27,7 @@ export async function POST() {
         }
 
         // SECURITY: Rate limit code generation (3 codes per 15 minutes per user)
-        const rateLimitResult = await rateLimit('api', `telegram-code:${user.id}`, { limit: 3, window: 900 })
+        const rateLimitResult = await rateLimit('api', `telegram-code:${user.id}`, { limit: 3, window: 900 * 1000 })
         if (!rateLimitResult.success) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Please wait before generating another code.' },
@@ -56,7 +46,7 @@ export async function POST() {
             return NextResponse.json({ error: 'User not in a foundry' }, { status: 403 })
         }
 
-        const admin = getAdminClient()
+        const admin = createAdminClient()
 
         // Generate new code
         const code = generateVerificationCode()

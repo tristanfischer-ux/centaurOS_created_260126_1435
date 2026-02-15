@@ -140,7 +140,7 @@ async function generateOpenAIImage(opts: ImageGenerationOptions): Promise<ImageG
         response_format: "url",
     })
 
-    const url = response.data[0]?.url
+    const url = response.data?.[0]?.url
     if (!url) throw new Error("No image URL returned")
     return { imageUrl: url }
 }

@@ -145,6 +145,62 @@ export function sanitizeUrlForLogging(url: string): string {
 }
 
 /**
+ * Validates a Slack incoming webhook URL.
+ *
+ * @description Ensures the webhook points to Slack-controlled domains over HTTPS,
+ * uses the expected `/services/` path prefix, and does not contain credentials.
+ * This prevents SSRF by rejecting arbitrary outbound destinations.
+ *
+ * @param {string | null | undefined} url - Candidate webhook URL.
+ * @returns {boolean} True when the URL is a valid Slack webhook URL.
+ *
+ * @security Restricts outbound webhook destinations to trusted Slack hosts only.
+ */
+export function isValidSlackWebhookUrl(url: string | null | undefined): boolean {
+    if (!url || typeof url !== 'string') {
+        return false
+    }
+
+    const trimmedUrl = url.trim()
+    if (!trimmedUrl) {
+        return false
+    }
+
+    try {
+        const parsed = new URL(trimmedUrl)
+        const hostname = parsed.hostname.toLowerCase()
+        const allowedHosts = new Set([
+            'hooks.slack.com',
+            'hooks.slack-gov.com',
+        ])
+
+        if (parsed.protocol !== 'https:') {
+            return false
+        }
+
+        if (!allowedHosts.has(hostname)) {
+            return false
+        }
+
+        if (!parsed.pathname.startsWith('/services/')) {
+            return false
+        }
+
+        if (parsed.username || parsed.password) {
+            return false
+        }
+
+        if (isBlockedHostname(hostname)) {
+            return false
+        }
+
+        return true
+    } catch {
+        return false
+    }
+}
+
+/**
  * Sanitize a URL for use in href attributes (XSS prevention)
  * Returns '#' for invalid or potentially dangerous URLs
  * 

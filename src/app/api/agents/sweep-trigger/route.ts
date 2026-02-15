@@ -19,6 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { executeSingleSweep } from '@/lib/agents/sweep-orchestrator'
+import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -85,19 +86,21 @@ const EVENT_SPECIALIST_MAP: Record<string, string[]> = {
  *
  * @security Accepts either CRON_SECRET or a dedicated WEBHOOK_SECRET
  */
-function verifyWebhookAuth(req: NextRequest): boolean {
+function verifyWebhookAuth(req: NextRequest): NextResponse | null {
   const webhookSecret = process.env.WEBHOOK_SECRET ?? process.env.CRON_SECRET
 
+  // SECURITY: Fail closed when no secret is configured.
   if (!webhookSecret) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error('[SECURITY] No webhook secret configured in production!')
-      return false
-    }
-    return true // Allow in development
+    console.error('[SECURITY] No webhook secret configured')
+    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 503 })
   }
 
   const authHeader = req.headers.get('authorization')
-  return authHeader === `Bearer ${webhookSecret}`
+  if (authHeader !== `Bearer ${webhookSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  return null
 }
 
 // ─── Route Handler ──────────────────────────────────────────────────
@@ -109,9 +112,16 @@ function verifyWebhookAuth(req: NextRequest): boolean {
  * determines which specialists should run, and dispatches targeted sweeps.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const ip = getClientIP(req.headers)
+  const ipLimit = await rateLimit('webhook', `sweep-trigger:${ip}`)
+  if (!ipLimit.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   // AUTH: Verify webhook authorization
-  if (!verifyWebhookAuth(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const authFailure = verifyWebhookAuth(req)
+  if (authFailure) {
+    return authFailure
   }
 
   try {
@@ -175,10 +185,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    console.error('[SweepTrigger] Error:', error)
+    console.error('[SweepTrigger] Error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: 'Sweep trigger failed',
     }, { status: 500 })
   }
 }

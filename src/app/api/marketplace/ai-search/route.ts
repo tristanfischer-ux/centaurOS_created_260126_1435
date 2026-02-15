@@ -7,9 +7,20 @@ import { rateLimit } from "@/lib/security/rate-limit";
 import { buildAIContext } from "@/lib/ai-context/builder";
 import { aiGuard } from "@/lib/ai/guard";
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
-});
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        return null
+    }
+
+    if (!openaiClient) {
+        openaiClient = new OpenAI({ apiKey })
+    }
+
+    return openaiClient
+}
 
 // Marketplace categories
 const MarketplaceCategory = z.enum(["People", "Products", "Services"]);
@@ -82,24 +93,25 @@ interface AISearchRequest {
     query: string;
 }
 
-// Response types
-interface AISearchSuccessResponse {
-    success: true;
-    filters: MarketplaceFilters;
-    explanation: string;
-    confidence: "high" | "medium" | "low";
-    alternativeCategories?: Array<"People" | "Products" | "Services">;
-}
-
-interface AISearchErrorResponse {
-    success: false;
-    error: string;
-}
-
-type AISearchResponse = AISearchSuccessResponse | AISearchErrorResponse;
-
-export async function POST(req: NextRequest): Promise<NextResponse<AISearchResponse>> {
+export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
+        // SECURITY: Fail closed when OpenAI key is not configured.
+        if (!process.env.OPENAI_API_KEY) {
+            console.error('[AISearchAPI] OPENAI_API_KEY is not configured')
+            return NextResponse.json(
+                { success: false, error: 'AI search service is not configured' },
+                { status: 503 }
+            )
+        }
+
+        const openai = getOpenAIClient()
+        if (!openai) {
+            return NextResponse.json(
+                { success: false, error: 'AI search service is not configured' },
+                { status: 503 }
+            )
+        }
+
         // AUTH + AI LIMIT: Check subscription tier AI limits
         const supabase = await createClient()
         const guard = await aiGuard(supabase, 'ai_search')
@@ -108,7 +120,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AISearchRespo
         const user = { id: guard.userId }
 
         // SECURITY: Rate limit to prevent OpenAI cost abuse (10 requests per minute per user)
-        const rateLimitResult = await rateLimit('api', `ai-search:${user.id}`, { limit: 10, window: 60 })
+        const rateLimitResult = await rateLimit('api', `ai-search:${user.id}`, { limit: 10, window: 60 * 1000 })
         if (!rateLimitResult.success) {
             return NextResponse.json(
                 { success: false, error: "Rate limit exceeded. Please wait before searching again." },
