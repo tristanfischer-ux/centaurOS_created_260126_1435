@@ -58,9 +58,11 @@ Validated:
 
 ## Notes
 
-- During auth flows, environment logs repeatedly report:
+- During auth flows, some environments may log:
   - `Failed to fetch user profile: infinite recursion detected in policy for relation "profiles"`
-- Despite those logs, auth setup and CAD Lab smoke tests complete successfully in this environment.
+- A dedicated migration now exists to harden profiles RLS and remove recursive policy paths:
+  - `20260215120000_stabilize_profiles_rls_no_recursion.sql`
+- This migration should be applied before alpha rollout to eliminate the noisy profile recursion failure mode.
 
 ## Current QA Status
 
