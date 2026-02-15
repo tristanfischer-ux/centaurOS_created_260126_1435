@@ -110,6 +110,7 @@ Validated:
 ## Notes
 
 - The Next.js image-quality warning during login hero rendering was removed by explicitly allowing quality `90` in `next.config.ts` (`images.qualities: [75, 90]`).
+- Sentry Next.js deprecation warnings were removed by migrating to the current config keys (`webpack.treeshake.removeDebugLogging` and `webpack.automaticVercelMonitors`) in `next.config.ts`.
 - Running `npx supabase db push` from this workspace currently requires a Supabase access token (`SUPABASE_ACCESS_TOKEN`) not present in runtime env. Apply the migration via authenticated deployment runner/dashboard if CLI auth is unavailable.
 - During auth flows, some environments may log:
   - `Failed to fetch user profile: infinite recursion detected in policy for relation "profiles"`
