@@ -30,6 +30,7 @@ export default function CadLabProcurementPage(): React.ReactNode {
     modules, generatedModuleCount, subject,
     diagnosticAnswers, setDiagnosticAnswers, aiPrefilled,
     diagCompletedCount, activeProjectId, linkedRfqId, linkRfqToProject,
+    designBrief, assumptionNotes,
   } = useCadLab()
 
   // Gate: need at least one generated module
@@ -74,6 +75,8 @@ export default function CadLabProcurementPage(): React.ReactNode {
         projectId={activeProjectId}
         linkedRfqId={linkedRfqId}
         onRfqLinked={linkRfqToProject}
+        designBrief={designBrief}
+        assumptionNotes={assumptionNotes}
       />
     </div>
   )

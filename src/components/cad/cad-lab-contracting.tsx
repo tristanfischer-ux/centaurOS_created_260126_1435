@@ -37,7 +37,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { CadLabDesignBrief, CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
 import { computeRfqReadiness } from "./cad-lab-procurement-utils"
 import { createCadLabRfqAction } from "@/actions/cad-lab-rfq"
@@ -59,6 +59,10 @@ interface CadLabContractingProps {
   linkedRfqId?: string | null
   /** Persist RFQ linkage */
   onRfqLinked?: (rfqId: string) => Promise<void> | void
+  /** Structured design brief captured in research stage */
+  designBrief?: CadLabDesignBrief
+  /** Optional assumptions entered by user */
+  assumptionNotes?: string
 }
 
 type DocType = "rfq" | "sow" | "nda"
@@ -342,6 +346,8 @@ export function CadLabContracting({
   projectId,
   linkedRfqId,
   onRfqLinked,
+  designBrief,
+  assumptionNotes,
 }: CadLabContractingProps): React.ReactNode {
   const [buyerName, setBuyerName] = useState("")
   const [deadline, setDeadline] = useState("")
@@ -474,6 +480,8 @@ export function CadLabContracting({
         modules,
         diagnosticAnswers: diagnosticAnswers || {},
         deadline: deadline || undefined,
+        designBrief,
+        assumptionNotes,
       })
 
       if ("error" in res) {

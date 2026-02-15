@@ -127,6 +127,15 @@ describe("createCadLabRfqAction", () => {
     const res = await createCadLabRfqAction({
       projectName: "Orbital Drone Frame",
       deadline: "2027-01-15",
+      designBrief: {
+        useCase: "High-speed aerial frame",
+        targetProcess: "CNC machining",
+        targetMaterial: "Aluminium 6061",
+        toleranceTarget: "±0.1 mm",
+        quantityTarget: "100-1000",
+        complianceNotes: "RoHS",
+      },
+      assumptionNotes: "Arm interfaces follow v2 mounting pattern",
       diagnosticAnswers: {
         frame: {
           material: "Aluminium",
@@ -192,6 +201,23 @@ describe("createCadLabRfqAction", () => {
     expect(payload.specifications?.quantity).toBe(550)
     expect(payload.specifications?.custom_fields?.package_readiness_score_pct).toBe(60)
     expect(payload.specifications?.custom_fields?.quote_ready_module_count).toBe(1)
+    expect(payload.specifications?.custom_fields?.design_brief).toEqual({
+      useCase: "High-speed aerial frame",
+      targetProcess: "CNC machining",
+      targetMaterial: "Aluminium 6061",
+      toleranceTarget: "±0.1 mm",
+      quantityTarget: "100-1000",
+      complianceNotes: "RoHS",
+    })
+    expect(payload.specifications?.custom_fields?.assumption_notes).toBe(
+      "Arm interfaces follow v2 mounting pattern",
+    )
+    expect(payload.specifications?.description).toContain(
+      "- Use case: High-speed aerial frame",
+    )
+    expect(payload.specifications?.description).toContain(
+      "- Assumptions: Arm interfaces follow v2 mounting pattern",
+    )
     expect(payload.specifications?.custom_fields?.readiness_checks).toEqual([
       {
         moduleId: "frame",

@@ -10,13 +10,15 @@
  */
 
 import { createNewRFQ } from "@/actions/rfq"
-import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { CadLabDesignBrief, CadLabModule } from "@/lib/cad-lab-types"
 
 interface CreateCadLabRfqInput {
   projectName: string
   modules: CadLabModule[]
   diagnosticAnswers: Record<string, Record<string, string>>
   deadline?: string
+  designBrief?: CadLabDesignBrief
+  assumptionNotes?: string
 }
 
 const REQUIRED_DIAGNOSTIC_KEYS = [
@@ -199,6 +201,17 @@ export async function createCadLabRfqAction(
       return `${idx + 1}. ${module.moduleName} — ${module.scorePct}% (${checks})`
     }),
     "",
+    "Design intent:",
+    `- Use case: ${input.designBrief?.useCase?.trim() || "Not specified"}`,
+    `- Target process: ${input.designBrief?.targetProcess?.trim() || "Not specified"}`,
+    `- Target material: ${input.designBrief?.targetMaterial?.trim() || "Not specified"}`,
+    `- Tolerance target: ${input.designBrief?.toleranceTarget?.trim() || "Not specified"}`,
+    `- Quantity target: ${input.designBrief?.quantityTarget?.trim() || "Not specified"}`,
+    `- Compliance notes: ${input.designBrief?.complianceNotes?.trim() || "Not specified"}`,
+    input.assumptionNotes?.trim()
+      ? `- Assumptions: ${input.assumptionNotes.trim()}`
+      : "- Assumptions: None recorded",
+    "",
     "Suppliers should review attached drawing manifests and CAD artifacts before quoting.",
   ]
 
@@ -219,6 +232,8 @@ export async function createCadLabRfqAction(
         module_count: generatedModules.length,
         package_readiness_score_pct: overallReadinessScore,
         quote_ready_module_count: quoteReadyModuleCount,
+        design_brief: input.designBrief || null,
+        assumption_notes: input.assumptionNotes?.trim() || null,
         readiness_checks: moduleReadiness,
         modules: moduleSpecs,
       },
