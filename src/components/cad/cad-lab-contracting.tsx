@@ -361,6 +361,12 @@ export function CadLabContracting({
     () => computeRfqReadiness(modules, diagnosticAnswers),
     [modules, diagnosticAnswers],
   )
+  const canCreateRfq =
+    rfqReadiness.generatedCount > 0 &&
+    rfqReadiness.artifactComplete > 0
+  const createRfqBlockedReason = !canCreateRfq
+    ? "Generate at least one module with STEP/STL/manifest artifacts before creating an RFQ."
+    : null
 
   useEffect(() => {
     if (linkedRfqId) {
@@ -458,6 +464,10 @@ export function CadLabContracting({
   }
 
   const handleCreateMarketplaceRfq = async (): Promise<void> => {
+    if (!canCreateRfq) {
+      toast.error(createRfqBlockedReason || "RFQ package is not ready yet.")
+      return
+    }
     setIsCreatingRfq(true)
     try {
       const res = await createCadLabRfqAction({
@@ -603,7 +613,7 @@ export function CadLabContracting({
               size="sm"
               className="text-xs h-8"
               onClick={handleCreateMarketplaceRfq}
-              disabled={isCreatingRfq}
+              disabled={isCreatingRfq || !canCreateRfq}
             >
               {isCreatingRfq ? "Creating RFQ..." : "Create Marketplace RFQ"}
             </Button>
@@ -620,6 +630,11 @@ export function CadLabContracting({
             )}
           </div>
         </div>
+        {!canCreateRfq && (
+          <p className="text-[11px] text-status-warning -mt-1">
+            {createRfqBlockedReason}
+          </p>
+        )}
 
         {createdRfqId && (
           <div className="rounded-lg border border-border/70 bg-muted/20 p-3 space-y-2">
