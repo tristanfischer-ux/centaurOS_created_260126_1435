@@ -45,6 +45,7 @@ describe("release documentation consistency", () => {
 
     expect(releasePacket).toContain("policy-expression SQL audit")
     expect(releasePacket).toContain("design-to-rfq-regression-contracts.md")
+    expect(releasePacket).toContain("design-to-rfq-product-polish-plan.md")
     expect(migrationRunbook).toContain("Verify Policy Expressions")
     expect(migrationRunbook).toContain("get_my_foundry_id(")
     expect(migrationRunbook).toContain("is_active_user(")
