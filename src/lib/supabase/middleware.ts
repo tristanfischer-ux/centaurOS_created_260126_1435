@@ -90,85 +90,79 @@ export async function updateSession(request: NextRequest) {
         return false
     })
 
-    // Special handling for app domain root: authenticated users go to their portal
-    if ((hostname.includes('fractionalforge.app') || hostname.includes('forgeos.io')) && pathname === '/') {
-        if (user) {
-            // Check user's account type and active foundry to determine redirect
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('account_type, active_foundry_id')
-                .eq('id', user.id)
-                .single()
-            
-            const redirectUrl = request.nextUrl.clone()
-            
-            // Suppliers go to supplier portal
-            if (profile?.account_type === 'supplier') {
-                redirectUrl.pathname = '/supplier-portal'
-                return NextResponse.redirect(redirectUrl)
-            }
-            
-            // Check foundry membership count for multi-foundry users
-            const { count } = await supabase
-                .from('foundry_memberships')
-                .select('*', { count: 'exact', head: true })
-                .eq('user_id', user.id)
-            
-            const foundryCount = count || 0
-            
-            // Multiple foundries without active selection - show picker
-            if (foundryCount > 1 && !profile?.active_foundry_id) {
-                redirectUrl.pathname = '/workspace-picker'
-                return NextResponse.redirect(redirectUrl)
-            }
-            
-            // Otherwise go to dashboard (or last visited page from cookie)
-            const lastVisited = request.cookies.get('forge-last-path')?.value
-            redirectUrl.pathname = lastVisited && lastVisited !== '/' && lastVisited !== '/dashboard' ? lastVisited : '/today'
-            return NextResponse.redirect(redirectUrl)
-        }
-        // User not logged in, let middleware below handle redirect to marketing
-    }
-
+    // ── Unauthenticated users ──────────────────────────────────────────
     if (!user && !isPublicRoute) {
-        // no user, redirect to login page
         const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://fractionalforge.app'
         const loginUrl = new URL('/login', appDomain)
         return NextResponse.redirect(loginUrl)
     }
 
-    // Security: Check if user is deactivated (is_active = false)
-    // This happens when a user is offboarded or their access is revoked
+    // ── Authenticated user routing ──────────────────────────────────────
+    // PERF: Single profile query covers root redirect, deactivation check,
+    // admin gating, and supplier routing. Only runs for authenticated users
+    // on non-public routes (skipped for API routes, static assets, etc.)
     if (user && !isPublicRoute) {
+        const isAppDomainRoot = (hostname.includes('fractionalforge.app') || hostname.includes('forgeos.io')) && pathname === '/'
+        const needsAdminCheck = COMPANY_ADMIN_ROUTES.some(route => pathname.startsWith(route))
+
+        // Single profile query — select all fields needed for every check
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('role, is_active, account_type')
+            .select('role, is_active, account_type, active_foundry_id')
             .eq('id', user.id)
             .single()
-        
+
         // RED TEAM FIX: Handle case where profile doesn't exist yet (new user)
-        // This can happen during signup flow - allow them through
+        // This can happen during signup flow — allow them through
         if (profileError && profileError.code !== 'PGRST116') {
-            // Real error, not just "no rows returned"
             console.error(`[MIDDLEWARE] Failed to fetch profile for user ${user.id}:`, profileError)
-            // Allow through rather than blocking - RLS will handle data access
+            // Allow through rather than blocking — RLS will handle data access
         }
-        
-        // Check if user has been deactivated
+
+        // SECURITY: Check if user has been deactivated
         if (profile && profile.is_active === false) {
-            // User has been deactivated - redirect to access revoked page
             console.warn(`[SECURITY] Deactivated user ${user.id} attempted to access ${pathname}`)
             const revokedUrl = request.nextUrl.clone()
             revokedUrl.pathname = '/access-revoked'
             return NextResponse.redirect(revokedUrl)
         }
 
-        // Security: Check company admin routes require Founder/Executive role
-        if (profile && COMPANY_ADMIN_ROUTES.some(route => pathname.startsWith(route))) {
+        // App domain root: redirect authenticated users to their portal
+        if (isAppDomainRoot && profile) {
+            const redirectUrl = request.nextUrl.clone()
+
+            // Suppliers go to supplier portal
+            if (profile.account_type === 'supplier') {
+                redirectUrl.pathname = '/supplier-portal'
+                return NextResponse.redirect(redirectUrl)
+            }
+
+            // PERF: Foundry membership count only runs for root "/" redirect
+            // (not on every page load like before)
+            const { count } = await supabase
+                .from('foundry_memberships')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id)
+
+            const foundryCount = count || 0
+
+            // Multiple foundries without active selection — show picker
+            if (foundryCount > 1 && !profile.active_foundry_id) {
+                redirectUrl.pathname = '/workspace-picker'
+                return NextResponse.redirect(redirectUrl)
+            }
+
+            // Otherwise go to last visited page or /today
+            const lastVisited = request.cookies.get('forge-last-path')?.value
+            redirectUrl.pathname = lastVisited && lastVisited !== '/' && lastVisited !== '/dashboard' ? lastVisited : '/today'
+            return NextResponse.redirect(redirectUrl)
+        }
+
+        // SECURITY: Check company admin routes require Founder/Executive role
+        if (profile && needsAdminCheck) {
             const isCompanyAdmin = profile.role === 'Executive' || profile.role === 'Founder'
 
             if (!isCompanyAdmin) {
-                // User doesn't have company admin access - redirect with error
                 console.warn(`[SECURITY] Non-admin user ${user.id} attempted to access ${pathname}`)
                 const redirectUrl = request.nextUrl.clone()
                 redirectUrl.pathname = '/timeline'
@@ -178,30 +172,26 @@ export async function updateSession(request: NextRequest) {
         }
 
         // Route suppliers to supplier portal for platform-only routes
-        // Suppliers can access: /supplier-portal/*, /marketplace, /help, /settings
         if (profile?.account_type === 'supplier') {
             const supplierAllowedRoutes = [
                 '/supplier-portal',
                 '/marketplace',
                 '/help',
-                '/rfq', // Allow viewing RFQs
-                '/profile', // Public profiles
+                '/rfq',
+                '/profile',
             ]
-            
-            const isAllowedForSupplier = supplierAllowedRoutes.some(route => 
+
+            const isAllowedForSupplier = supplierAllowedRoutes.some(route =>
                 pathname === route || pathname.startsWith(`${route}/`)
             )
-            
+
             if (!isAllowedForSupplier && !pathname.startsWith('/api/')) {
-                // Check for potential redirect loop by examining referer
                 const referer = request.headers.get('referer')
                 if (referer?.includes('/supplier-portal')) {
-                    // Already tried supplier-portal, don't redirect back (prevents loop)
                     console.warn('[Middleware] Potential redirect loop detected for supplier, allowing access to:', pathname)
                     return response
                 }
-                
-                // Supplier trying to access platform routes - redirect to supplier portal
+
                 const redirectUrl = request.nextUrl.clone()
                 redirectUrl.pathname = '/supplier-portal'
                 return NextResponse.redirect(redirectUrl)
