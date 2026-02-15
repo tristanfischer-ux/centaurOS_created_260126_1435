@@ -41,6 +41,38 @@ describe("createCadLabRfqAction", () => {
     expect(mockedCreateNewRFQ).not.toHaveBeenCalled()
   })
 
+  it("rejects when generated modules have no CAD artifacts", async () => {
+    const res = await createCadLabRfqAction({
+      projectName: "Artifactless Project",
+      modules: [
+        {
+          id: "m1",
+          name: "Module 1",
+          purpose: "Generated but no files",
+          inputs: [],
+          outputs: [],
+          keyParts: [],
+          leadWeeks: 4,
+          description: "",
+          whyItMatters: "",
+          failureModes: [],
+          unknowns: [],
+          status: "generated",
+          result: {
+            success: true,
+          },
+        },
+      ],
+      diagnosticAnswers: {},
+    })
+
+    expect(res).toEqual({
+      error:
+        "No CAD artifacts found. Generate STEP/STL outputs and drawing manifests before creating an RFQ.",
+    })
+    expect(mockedCreateNewRFQ).not.toHaveBeenCalled()
+  })
+
   it("builds RFQ payload from drawing package artifacts", async () => {
     mockedCreateNewRFQ.mockResolvedValue({
       data: { id: "rfq-123" },
@@ -113,5 +145,17 @@ describe("createCadLabRfqAction", () => {
     ])
     expect(payload.specifications?.materials).toEqual(["Aluminium"])
     expect(payload.specifications?.quantity).toBe(550)
+    expect(payload.specifications?.custom_fields?.package_readiness_score_pct).toBe(60)
+    expect(payload.specifications?.custom_fields?.readiness_checks).toEqual([
+      {
+        moduleId: "frame",
+        moduleName: "Frame",
+        diagnosticsComplete: false,
+        hasStep: true,
+        hasStl: true,
+        hasManifest: true,
+        scorePct: 60,
+      },
+    ])
   })
 })

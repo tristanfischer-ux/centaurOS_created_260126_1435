@@ -19,6 +19,15 @@ interface CreateCadLabRfqInput {
   deadline?: string
 }
 
+const REQUIRED_DIAGNOSTIC_KEYS = [
+  "mfg_process",
+  "material",
+  "tolerance",
+  "finish",
+  "batch_size",
+  "environment",
+] as const
+
 function parseBatchQuantity(batch: string | undefined): number | undefined {
   if (!batch) return undefined
   const range = batch.match(/(\d+)\s*[-–]\s*(\d+)/)
@@ -29,6 +38,43 @@ function parseBatchQuantity(batch: string | undefined): number | undefined {
   }
   const single = batch.match(/(\d+)/)
   return single ? Number(single[1]) : undefined
+}
+
+function computeModuleReadiness(
+  module: CadLabModule,
+  diagnosticAnswers: Record<string, Record<string, string>>,
+): {
+  diagnosticsComplete: boolean
+  hasStep: boolean
+  hasStl: boolean
+  hasManifest: boolean
+  scorePct: number
+} {
+  const diag = diagnosticAnswers[module.id] || {}
+  const diagnosticsComplete = REQUIRED_DIAGNOSTIC_KEYS.every((key) => {
+    const value = diag[key]
+    return typeof value === "string" && value.trim().length > 0
+  })
+
+  const files = module.result?.drawingPackage?.files ?? []
+  const hasStep = files.some((file) => file.name.toLowerCase().endsWith(".step"))
+  const hasStl = files.some((file) => file.name.toLowerCase().endsWith(".stl"))
+  const hasManifest = Boolean(module.result?.drawingPackage?.manifestUrl)
+
+  const scorePct = Math.round(
+    (diagnosticsComplete ? 40 : 0) +
+      (hasStep ? 20 : 0) +
+      (hasStl ? 20 : 0) +
+      (hasManifest ? 20 : 0),
+  )
+
+  return {
+    diagnosticsComplete,
+    hasStep,
+    hasStl,
+    hasManifest,
+    scorePct,
+  }
 }
 
 /**
@@ -48,6 +94,23 @@ export async function createCadLabRfqAction(
     const urls = files.map((f) => f.url)
     return manifest ? [...urls, manifest] : urls
   })
+
+  if (artifactUrls.length === 0) {
+    return {
+      error:
+        "No CAD artifacts found. Generate STEP/STL outputs and drawing manifests before creating an RFQ.",
+    }
+  }
+
+  const moduleReadiness = generatedModules.map((module) => ({
+    moduleId: module.id,
+    moduleName: module.name,
+    ...computeModuleReadiness(module, input.diagnosticAnswers),
+  }))
+  const overallReadinessScore = Math.round(
+    moduleReadiness.reduce((sum, module) => sum + module.scorePct, 0) /
+      moduleReadiness.length,
+  )
 
   const moduleSpecs = generatedModules.map((module) => {
     const diag = input.diagnosticAnswers[module.id] || {}
@@ -88,11 +151,23 @@ export async function createCadLabRfqAction(
   const descriptionLines = [
     `Forge-generated RFQ package for project "${input.projectName}".`,
     `${generatedModules.length} generated module(s) included with drawing manifests and CAD artifacts.`,
+    `Overall package readiness score: ${overallReadinessScore}%`,
     "",
     "Module summary:",
     ...moduleSpecs.map((module, idx) =>
       `${idx + 1}. ${module.name} — ${module.purpose} | Lead ${module.leadWeeks}w | Envelope ${module.envelopeMm ? `${module.envelopeMm.xLen}×${module.envelopeMm.yLen}×${module.envelopeMm.zLen} mm` : "TBD"}`,
     ),
+    "",
+    "Readiness checks:",
+    ...moduleReadiness.map((module, idx) => {
+      const checks = [
+        module.diagnosticsComplete ? "diagnostics✓" : "diagnostics✗",
+        module.hasStep ? "step✓" : "step✗",
+        module.hasStl ? "stl✓" : "stl✗",
+        module.hasManifest ? "manifest✓" : "manifest✗",
+      ].join(", ")
+      return `${idx + 1}. ${module.moduleName} — ${module.scorePct}% (${checks})`
+    }),
     "",
     "Suppliers should review attached drawing manifests and CAD artifacts before quoting.",
   ]
@@ -112,6 +187,8 @@ export async function createCadLabRfqAction(
         source: "the-forge-cad-lab",
         project_name: input.projectName,
         module_count: generatedModules.length,
+        package_readiness_score_pct: overallReadinessScore,
+        readiness_checks: moduleReadiness,
         modules: moduleSpecs,
       },
     },
