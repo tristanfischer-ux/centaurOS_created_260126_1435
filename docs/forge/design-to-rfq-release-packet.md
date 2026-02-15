@@ -30,6 +30,7 @@ Includes:
 - auth setup state generation
 - Cad Lab landing smoke
 - Forge entrypoint recommendation smoke
+- Forge sidebar navigation route smoke
 
 ### 3) One-command release verification
 

@@ -20,6 +20,7 @@ Run these before each release candidate:
 
 ```bash
 npm run test:forge-rfq
+npm run test:forge-rfq:e2e-smoke
 ```
 
 ## 3) Rollout Phases

@@ -26,7 +26,6 @@ import {
     Lightbulb,
     Bell,
     UsersRound,
-    UserCircle,
     UserSearch,
     LogOut,
     Waypoints,
@@ -74,7 +73,7 @@ const planMoreNavigation = [
 
 // "More" dropdown — Workshop section
 const workshopMoreNavigation = [
-    { name: "The Forge", href: "/the-forge/cad-lab", icon: Flame },
+    { name: "The Forge", href: "/the-forge", icon: Flame },
     { name: "Team", href: "/team", icon: Users },
     { name: "Specialists", href: "/agents", icon: UsersRound },
 ]

@@ -70,6 +70,19 @@ Validated:
 - direct CTA to `/the-forge/cad-lab` is visible
 - recommendation remains visible even when legacy project list enters error state
 
+### 5) Forge navigation link smoke (Playwright)
+
+```bash
+npm run test:e2e -- e2e/forge-navigation-link.spec.ts --project=chromium
+```
+
+Result: **PASS**
+
+Validated:
+
+- sidebar **The Forge** nav item routes to `/the-forge`
+- canonical entrypoint now consistently exposes Design-to-RFQ recommendation card
+
 ## Notes
 
 - During auth flows, some environments may log:
@@ -85,3 +98,4 @@ Validated:
 - Cad Lab landing/login smoke path: ✅
 - Playwright auth setup robustness: ✅
 - Forge entrypoint clarity check: ✅
+- Forge navigation route check: ✅
