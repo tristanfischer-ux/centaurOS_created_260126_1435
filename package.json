@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "test:forge-rfq": "jest src/actions/__tests__/cad-lab-rfq-golden-benchmarks.test.ts src/actions/__tests__/cad-lab-rfq.test.ts src/lib/__tests__/cad-lab-quality-scorecard.test.ts src/lib/__tests__/cad-lab-readiness.test.ts src/components/cad/__tests__/cad-lab-procurement-utils.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",

@@ -19,10 +19,7 @@ Ship only when all of the following are true:
 Run these before each release candidate:
 
 ```bash
-npm run test -- src/actions/__tests__/cad-lab-rfq-golden-benchmarks.test.ts
-npm run test -- src/actions/__tests__/cad-lab-rfq.test.ts
-npm run test -- src/lib/__tests__/cad-lab-quality-scorecard.test.ts src/lib/__tests__/cad-lab-readiness.test.ts
-npm run test -- src/components/cad/__tests__/cad-lab-procurement-utils.test.ts
+npm run test:forge-rfq
 ```
 
 ## 3) Rollout Phases
