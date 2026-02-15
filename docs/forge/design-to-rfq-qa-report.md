@@ -28,6 +28,7 @@ Coverage includes:
 - `forge-route-consistency.test.ts`
 - `profiles-rls-migration.test.ts`
 - `release-config-consistency.test.ts`
+- `release-docs-consistency.test.ts`
 - `forge-project-list.test.tsx`
 - `MobileNav.test.tsx`
 - `cad-lab-procurement-utils.test.ts`
