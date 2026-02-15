@@ -23,6 +23,8 @@ npm run test:forge-rfq
 npm run test:forge-rfq:e2e-smoke
 ```
 
+Database migration prerequisite (profiles RLS stabilization) must be applied either via authenticated Supabase CLI (`npx supabase db push`) or via manual SQL execution in Supabase dashboard when CLI auth tokens are unavailable.
+
 ## 3) Rollout Phases
 
 ### Phase A — Internal Alpha

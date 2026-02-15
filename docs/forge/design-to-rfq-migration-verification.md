@@ -14,6 +14,13 @@ If using CLI directly, ensure `SUPABASE_ACCESS_TOKEN` is available (or run `supa
 npx supabase db push
 ```
 
+If CLI auth is unavailable in your execution environment:
+
+1. Open Supabase SQL editor for the target project.
+2. Paste the contents of:
+   - `supabase/migrations/20260215120000_stabilize_profiles_rls_no_recursion.sql`
+3. Execute the SQL manually.
+
 ## Verify Policies in SQL
 
 Run in SQL editor:

@@ -37,5 +37,6 @@ describe("release documentation consistency", () => {
     expect(migrationRunbook).toContain("Verify Policy Expressions")
     expect(migrationRunbook).toContain("get_my_foundry_id(")
     expect(migrationRunbook).toContain("is_active_user(")
+    expect(migrationRunbook).toContain("Execute the SQL manually")
   })
 })
