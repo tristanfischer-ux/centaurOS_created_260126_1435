@@ -571,6 +571,12 @@ export async function generateDecisionSupportPackage(
 /**
  * Result from synthesizing a specialist council debate
  */
+export interface CouncilActionItem {
+  action: string
+  owner: string
+  priority: 'high' | 'medium' | 'low'
+}
+
 export interface CouncilReport {
   executive_summary: string
   positions: Array<{
@@ -590,6 +596,10 @@ export interface CouncilReport {
     supporters: string[]
     rationale: string
   }>
+  /** Concrete action items extracted from the debate with ownership and priority */
+  action_items: CouncilActionItem[]
+  /** Ordered next steps for the founder to take immediately */
+  next_steps: string[]
 }
 
 /**
@@ -687,6 +697,8 @@ export async function synthesizeCouncilDebate(
       consensus: [],
       recommendations: [],
       decision_options: [],
+      action_items: [],
+      next_steps: [],
     }
   }
 
@@ -722,6 +734,8 @@ function buildCouncilSystemPrompt(): string {
     '3. HIGHLIGHTS areas of consensus',
     '4. PROVIDES 2-3 clear recommendations',
     '5. PRESENTS decision options for the founder to weigh in on',
+    '6. EXTRACTS concrete action items with who should own each one',
+    '7. LISTS ordered next steps the founder should take immediately',
     '',
     'Be direct and opinionated. The founder needs clarity, not hedging.',
     'If specialists disagree, surface that tension — don\'t smooth it over.',
@@ -740,7 +754,11 @@ function buildCouncilSystemPrompt(): string {
     '  "recommendations": ["Recommendation 1", "Recommendation 2", "Recommendation 3"],',
     '  "decision_options": [',
     '    { "option": "Option description", "supporters": ["Specialist A", "Specialist B"], "rationale": "Why this option" }',
-    '  ]',
+    '  ],',
+    '  "action_items": [',
+    '    { "action": "Specific task to execute", "owner": "Role or specialist best suited (e.g. CTO, Finance Lead, Founder)", "priority": "high|medium|low" }',
+    '  ],',
+    '  "next_steps": ["Step 1 the founder should take first", "Step 2 to follow", "Step 3"]',
     '}',
     '```',
   ].join('\n')

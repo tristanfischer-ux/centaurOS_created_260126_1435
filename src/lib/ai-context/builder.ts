@@ -5,10 +5,14 @@
  * and behavioral context into a structured string for AI system prompts.
  * 
  * Collects:
- * 1. Company profile (foundries.company_profile)
- * 2. Purpose / mission / vision (foundries.purpose_data)
- * 3. Activity insights (aggregated from activity_events)
- * 4. Active objectives summary
+ * 1. Company identity (name, sector, website)
+ * 2. Company profile (foundries.company_profile)
+ * 3. Purpose / mission / vision + strategic questionnaire
+ * 4. Founder professional profile (bio, skills, expertise)
+ * 5. Team composition
+ * 6. Activity insights (aggregated from activity_events)
+ * 7. Active objectives summary
+ * 8. Company intelligence (website analysis, competitors) when available
  * 
  * The output is a formatted text block that can be injected into any AI prompt
  * to make responses more relevant to the user's specific company context.
@@ -30,7 +34,9 @@ import {
   REVENUE_RANGE_LABELS,
   FUNDING_STATUS_LABELS,
   BUSINESS_MODEL_LABELS,
+  SECTOR_LABELS,
 } from '@/types/foundry'
+import type { Sector, CompanyIntelligence } from '@/types/foundry'
 
 // Per-request cache to avoid re-fetching within the same server request
 let cachedContext: { key: string; value: string; timestamp: number } | null = null
@@ -85,24 +91,48 @@ export async function buildAIContext(
       purpose_data?: FoundryPurposeData | null
     } | null
 
-    // 2. Company Profile section
-    const profile = foundry?.company_profile
-    if (profile) {
+    // 1b. Fetch additional foundry columns not returned by the RPC
+    const { data: foundryExtras } = await supabase
+      .from('foundries')
+      .select('sector, industry, stage, company_intel')
+      .eq('id', foundryId)
+      .single()
+
+    // ── 2. Company Identity (name, sector, website) ──────────────────
+    const companyName = foundry?.name
+    const companyProfile = foundry?.company_profile
+    const sectorKey = foundryExtras?.sector as Sector | null
+
+    const identityParts: string[] = []
+    if (companyName) {
+      const sectorLabel = sectorKey ? SECTOR_LABELS[sectorKey] : null
+      identityParts.push(sectorLabel ? `Company: ${companyName} (${sectorLabel})` : `Company: ${companyName}`)
+    }
+    if (foundryExtras?.industry) identityParts.push(`Industry: ${foundryExtras.industry}`)
+    if (foundryExtras?.stage) identityParts.push(`Stage: ${foundryExtras.stage}`)
+    if (companyProfile?.website) identityParts.push(`Website: ${companyProfile.website}`)
+
+    if (identityParts.length > 0) {
+      sections.push(identityParts.join('\n'))
+    }
+
+    // ── 3. Company Profile (size, model, revenue, funding) ───────────
+    if (companyProfile) {
       const details: string[] = []
-      if (profile.employee_count) details.push(`Team size: ${EMPLOYEE_COUNT_LABELS[profile.employee_count]}`)
-      if (profile.business_model) details.push(`Business model: ${BUSINESS_MODEL_LABELS[profile.business_model]}`)
-      if (profile.revenue_range) details.push(`Revenue: ${REVENUE_RANGE_LABELS[profile.revenue_range]}`)
-      if (profile.funding_status) details.push(`Funding: ${FUNDING_STATUS_LABELS[profile.funding_status]}`)
-      if (profile.seeking_funding) details.push('Currently seeking funding')
-      if (profile.location) details.push(`Location: ${profile.location}`)
-      if (profile.founded_year) details.push(`Founded: ${profile.founded_year}`)
+      if (companyProfile.employee_count) details.push(`Team size: ${EMPLOYEE_COUNT_LABELS[companyProfile.employee_count]}`)
+      if (companyProfile.business_model) details.push(`Business model: ${BUSINESS_MODEL_LABELS[companyProfile.business_model]}`)
+      if (companyProfile.revenue_range) details.push(`Revenue: ${REVENUE_RANGE_LABELS[companyProfile.revenue_range]}`)
+      if (companyProfile.funding_status) details.push(`Funding: ${FUNDING_STATUS_LABELS[companyProfile.funding_status]}`)
+      if (companyProfile.seeking_funding) details.push('Currently seeking funding')
+      if (companyProfile.location) details.push(`Location: ${companyProfile.location}`)
+      if (companyProfile.founded_year) details.push(`Founded: ${companyProfile.founded_year}`)
 
       if (details.length > 0) {
         sections.push(`Company profile:\n${details.join('\n')}`)
       }
     }
 
-    // 3. Purpose / Mission / Vision
+    // ── 4. Purpose / Mission / Vision + Strategic Questionnaire ──────
     const purpose = foundry?.purpose_data
     if (purpose) {
       const purposeParts: string[] = []
@@ -113,9 +143,132 @@ export async function buildAIContext(
       if (purposeParts.length > 0) {
         sections.push(purposeParts.join('\n'))
       }
+
+      // Inject the richer questionnaire responses — these give specialists
+      // much deeper understanding than the synthesized one-liners above
+      const q = purpose.questionnaire
+      if (q) {
+        const stratParts: string[] = []
+        if (q.problemSolved) stratParts.push(`Problem we solve: ${q.problemSolved}`)
+        if (q.whoServed) stratParts.push(`Who we serve: ${q.whoServed}`)
+        if (q.uniqueValue) stratParts.push(`What makes us unique: ${q.uniqueValue}`)
+        if (q.fiveYearVision) stratParts.push(`5-year vision: ${q.fiveYearVision}`)
+        if (q.whyExists) stratParts.push(`Why we exist: ${q.whyExists}`)
+
+        if (stratParts.length > 0) {
+          sections.push(`Strategic context:\n${stratParts.join('\n')}`)
+        }
+      }
     }
 
-    // 4. Activity insights (optional)
+    // ── 5. Founder / Current User Profile ────────────────────────────
+    // Gives specialists the founder's professional identity, not just a first name
+    try {
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('full_name, headline, bio, expertise_areas, skills, industries, years_experience, linkedin_url, role, professional_background')
+        .eq('id', userId)
+        .single()
+
+      if (userProfile) {
+        const founderParts: string[] = []
+        if (userProfile.full_name) {
+          const roleStr = userProfile.role ? ` (${userProfile.role})` : ''
+          founderParts.push(`Name: ${userProfile.full_name}${roleStr}`)
+        }
+        if (userProfile.headline) founderParts.push(`Title: ${userProfile.headline}`)
+        if (userProfile.bio) founderParts.push(`Bio: ${userProfile.bio}`)
+        if (userProfile.years_experience) founderParts.push(`Experience: ${userProfile.years_experience} years`)
+        if (userProfile.expertise_areas && userProfile.expertise_areas.length > 0) {
+          founderParts.push(`Expertise: ${userProfile.expertise_areas.join(', ')}`)
+        }
+        if (userProfile.skills && userProfile.skills.length > 0) {
+          founderParts.push(`Skills: ${userProfile.skills.join(', ')}`)
+        }
+        if (userProfile.industries && userProfile.industries.length > 0) {
+          founderParts.push(`Industry background: ${userProfile.industries.join(', ')}`)
+        }
+        if (userProfile.linkedin_url) founderParts.push(`LinkedIn: ${userProfile.linkedin_url}`)
+
+        // Professional background (structured data from profile wizard)
+        const bg = userProfile.professional_background as {
+          summary?: string | null
+          previous_companies?: string | null
+          education?: string | null
+        } | null
+        if (bg) {
+          if (bg.summary) founderParts.push(`Career summary: ${bg.summary}`)
+          if (bg.previous_companies) founderParts.push(`Previous companies: ${bg.previous_companies}`)
+          if (bg.education) founderParts.push(`Education: ${bg.education}`)
+        }
+
+        if (founderParts.length > 0) {
+          sections.push(`Founder profile:\n${founderParts.join('\n')}`)
+        }
+      }
+    } catch (err) {
+      console.debug('[AIContextBuilder] Failed to load founder profile:', err)
+    }
+
+    // ── 6. Team Composition ──────────────────────────────────────────
+    // Lightweight team summary so specialists know who's on the team
+    try {
+      const { data: teamMembers } = await supabase
+        .from('profiles')
+        .select('full_name, role, headline')
+        .or(`foundry_id.eq.${foundryId},active_foundry_id.eq.${foundryId}`)
+        .neq('id', userId) // Exclude current user (already covered above)
+        .eq('is_active', true)
+        .limit(20)
+
+      if (teamMembers && teamMembers.length > 0) {
+        const memberLines = teamMembers.map(m => {
+          const name = m.full_name ?? 'Unknown'
+          const role = m.role ?? 'Member'
+          const headline = m.headline ? ` — ${m.headline}` : ''
+          return `- ${name} (${role})${headline}`
+        })
+        sections.push(`Team (${teamMembers.length} members):\n${memberLines.join('\n')}`)
+      }
+    } catch (err) {
+      console.debug('[AIContextBuilder] Failed to load team members:', err)
+    }
+
+    // ── 7. Company Intelligence (website analysis, competitors) ──────
+    // Enriched data from website scraping and competitor analysis
+    const companyIntel = foundryExtras?.company_intel as CompanyIntelligence | null
+    if (companyIntel) {
+      const intelParts: string[] = []
+
+      if (companyIntel.website_summary) {
+        intelParts.push(`Website analysis: ${companyIntel.website_summary}`)
+      }
+      if (companyIntel.products_services && companyIntel.products_services.length > 0) {
+        const productLines = companyIntel.products_services.map(p => `  - ${p.name}: ${p.description}`)
+        intelParts.push(`Products/Services:\n${productLines.join('\n')}`)
+      }
+      if (companyIntel.target_customers) {
+        intelParts.push(`Target customers: ${companyIntel.target_customers}`)
+      }
+      if (companyIntel.value_proposition) {
+        intelParts.push(`Value proposition: ${companyIntel.value_proposition}`)
+      }
+      if (companyIntel.competitors && companyIntel.competitors.length > 0) {
+        const compLines = companyIntel.competitors.map(c =>
+          `  - ${c.name} (${c.website}): ${c.description}. Differentiator: ${c.differentiator}`
+        )
+        intelParts.push(`Competitive landscape:\n${compLines.join('\n')}`)
+      }
+      if (companyIntel.founder_background) {
+        intelParts.push(`Founder background (enriched): ${companyIntel.founder_background}`)
+      }
+
+      if (intelParts.length > 0) {
+        sections.push(`Company intelligence:\n${intelParts.join('\n')}`)
+      }
+    }
+
+    // ── 8. Activity insights (optional) ────────────────────────────
     if (options.includeActivity) {
       const activitySummary = await getInsightsSummary(foundryId)
       if (activitySummary) {
@@ -123,7 +276,7 @@ export async function buildAIContext(
       }
     }
 
-    // 5. Active objectives (optional)
+    // ── 9. Active objectives (optional) ──────────────────────────────
     if (options.includeObjectives) {
       const { data: objectives } = await supabase
         .from('objectives')
@@ -143,22 +296,22 @@ export async function buildAIContext(
       }
     }
 
-    // 6. User intelligence profile (patterns, productivity, blockers)
+    // ── 10. User intelligence profile (patterns, productivity) ───────
     if (options.includeUserProfile) {
       try {
-        const profile = await ensureFreshProfile(userId, foundryId)
-        if (profile) {
-          const profileText = formatProfileForAI(profile)
+        const intelligenceProfile = await ensureFreshProfile(userId, foundryId)
+        if (intelligenceProfile) {
+          const profileText = formatProfileForAI(intelligenceProfile)
           if (profileText) {
             sections.push(profileText.trim())
           }
         }
       } catch (err) {
-        console.debug('[AIContextBuilder] Failed to load user profile:', err)
+        console.debug('[AIContextBuilder] Failed to load user intelligence profile:', err)
       }
     }
 
-    // 7. Recent insight history (for deduplication)
+    // ── 11. Recent insight history (for deduplication) ───────────────
     if (options.includeInsightHistory) {
       try {
         const insightHistory = await formatRecentInsightsForPrompt(userId, foundryId)
@@ -170,7 +323,7 @@ export async function buildAIContext(
       }
     }
 
-    // 8. Latest news briefing for this specialist (when specialistId + includeBriefings)
+    // ── 12. Latest news briefing for specialist ──────────────────────
     if (options.includeBriefings && options.specialistId) {
       try {
         const briefing = await getLatestBriefingFormatted(supabase, options.specialistId)

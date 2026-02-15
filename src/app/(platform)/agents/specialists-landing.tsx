@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowRight, Layers, Users, MessageSquare, ChevronDown, ChevronRight } from "lucide-react"
+import { ArrowRight, Layers, Users, MessageSquare, ChevronDown, ChevronRight, Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -15,6 +15,11 @@ import { BriefSpecialistDialog } from "./brief-specialist-dialog"
 import { TeamMeetingDialog } from "./team-meeting-dialog"
 import { SpecialistCouncilDialog } from "@/components/agents/specialist-council-dialog"
 import { MeetingHistory } from "./meeting-history"
+import { getSpecialistActivities } from "@/actions/agent-memory"
+import type { SpecialistActivity } from "@/actions/agent-memory"
+import { getInsightFeed } from "@/actions/agent-insights"
+import type { AgentInsight } from "@/actions/agent-insights"
+import { getSpecialistById } from "./specialists-data"
 
 /**
  * Organises specialists into a hierarchical org chart structure.
@@ -66,6 +71,24 @@ export function SpecialistsLanding({
     const [handoffContext, setHandoffContext] = useState<string | null>(null)
     const [referredByName, setReferredByName] = useState<string | null>(null)
     const [showOrgChart, setShowOrgChart] = useState(false)
+    const [specialistActivities, setSpecialistActivities] = useState<Record<string, SpecialistActivity>>({})
+    const [unreadInsights, setUnreadInsights] = useState<AgentInsight[]>([])
+    const [showCatchUp, setShowCatchUp] = useState(true)
+
+    // Fetch specialist activity data and unread insights for catch-up card
+    useEffect(() => {
+        getSpecialistActivities().then((result) => {
+            if (result.data) setSpecialistActivities(result.data)
+        })
+        getInsightFeed(5).then((result) => {
+            const allUnread = [
+                ...result.critical.filter((i) => !i.is_read),
+                ...result.important.filter((i) => !i.is_read),
+                ...result.informational.filter((i) => !i.is_read),
+            ].slice(0, 5)
+            setUnreadInsights(allUnread)
+        })
+    }, [])
 
     // Auto-open specialist from URL query param (e.g. /agents?specialist=strategist)
     useEffect(() => {
@@ -237,6 +260,74 @@ export function SpecialistsLanding({
                 </motion.div>
             )}
 
+            {/* ── Catch-Up Card — shows when specialists have unread insights ── */}
+            {showCatchUp && unreadInsights.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                >
+                    <Card className="border-international-orange/20 bg-international-orange/5 rounded-xl overflow-hidden">
+                        <CardContent className="pt-5 pb-4">
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="h-4 w-4 text-international-orange" />
+                                    <h3 className="font-display font-semibold text-foreground text-sm">
+                                        While you were away
+                                    </h3>
+                                    <span className="text-xs text-muted-foreground">
+                                        {unreadInsights.length} update{unreadInsights.length !== 1 ? "s" : ""}
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCatchUp(false)}
+                                    className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                                    aria-label="Dismiss catch-up card"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
+                            <div className="space-y-2">
+                                {unreadInsights.map((insight) => {
+                                    const specialist = getSpecialistById(insight.specialist_id)
+                                    return (
+                                        <button
+                                            key={insight.id}
+                                            type="button"
+                                            onClick={() => {
+                                                if (specialist) handleBrief(specialist.id)
+                                            }}
+                                            className="flex items-start gap-2.5 w-full text-left p-2 rounded-md hover:bg-background/60 transition-colors group"
+                                        >
+                                            <div className={cn(
+                                                "h-2 w-2 rounded-full mt-1.5 flex-shrink-0",
+                                                insight.urgency === "critical" ? "bg-destructive" :
+                                                insight.urgency === "important" ? "bg-status-warning" :
+                                                "bg-status-info"
+                                            )} />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm text-foreground font-medium leading-snug">
+                                                    {specialist ? (
+                                                        <span className="text-international-orange">{specialist.name}</span>
+                                                    ) : null}
+                                                    {specialist ? " " : ""}
+                                                    {insight.title}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                                    {insight.body.slice(0, 100)}
+                                                </p>
+                                            </div>
+                                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-international-orange flex-shrink-0 mt-1 transition-colors" />
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </motion.div>
+            )}
+
             {/* ── Specialist Grid ──────────────────────────────────────── */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {SPECIALISTS.map((specialist, idx) => (
@@ -246,6 +337,7 @@ export function SpecialistsLanding({
                         capabilityCount={capabilityCounts[specialist.id] ?? 0}
                         onBrief={handleBrief}
                         index={idx}
+                        activity={specialistActivities[specialist.id]}
                     />
                 ))}
             </div>

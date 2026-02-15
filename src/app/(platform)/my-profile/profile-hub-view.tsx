@@ -222,6 +222,11 @@ export function ProfileHubView({ data, foundries, telegramLink, botUsername, enr
             bio: profile.bio,
             phone_number: profile.phone_number,
             linkedin_url: profile.linkedin_url,
+            professional_background: profile.professional_background as {
+              summary?: string | null
+              previous_companies?: string | null
+              education?: string | null
+            } | null,
           }}
         />
       )}

@@ -392,3 +392,89 @@ export async function getSpecialistThreadHistory(
         return { data: null, error: 'Internal error' }
     }
 }
+
+/**
+ * Activity summary for a specialist (used on landing page cards).
+ */
+export interface SpecialistActivity {
+    specialistId: string
+    lastMessageAt: string | null
+    lastTopic: string | null
+}
+
+/**
+ * Fetches activity data for all specialists -- last conversation timestamp
+ * and last topic discussed. Used to show relationship indicators on cards.
+ *
+ * @returns Map of specialistId to activity data
+ *
+ * @security Requires authenticated user with foundry membership (RLS enforced)
+ */
+export async function getSpecialistActivities(): Promise<{
+    data: Record<string, SpecialistActivity> | null
+    error: string | null
+}> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+            return { data: null, error: 'Unauthorized' }
+        }
+
+        const foundryId = await getFoundryIdCached()
+        if (!foundryId) {
+            return { data: null, error: 'No active foundry' }
+        }
+
+        // Fetch all specialist threads
+        const { data: threads } = await supabase
+            .from('agent_memory_threads')
+            .select('id, context_id')
+            .eq('foundry_id', foundryId)
+            .eq('context_type', 'specialist')
+
+        if (!threads || threads.length === 0) {
+            return { data: {}, error: null }
+        }
+
+        const threadIds = threads.map((t) => t.id)
+
+        // Fetch last user message from each thread (for topic + timestamp)
+        const { data: messages } = await supabase
+            .from('agent_memory_messages')
+            .select('thread_id, content, created_at')
+            .in('thread_id', threadIds)
+            .eq('role', 'user')
+            .order('created_at', { ascending: false })
+
+        // Build map: threadId -> contextId (specialistId)
+        const threadToSpecialist: Record<string, string> = {}
+        for (const t of threads) {
+            threadToSpecialist[t.id] = t.context_id as string
+        }
+
+        // Group by specialist, take most recent
+        const result: Record<string, SpecialistActivity> = {}
+        const seen = new Set<string>()
+
+        for (const msg of messages ?? []) {
+            const specialistId = threadToSpecialist[msg.thread_id as string]
+            if (!specialistId || seen.has(specialistId)) continue
+            seen.add(specialistId)
+
+            const content = msg.content as string
+            result[specialistId] = {
+                specialistId,
+                lastMessageAt: msg.created_at as string,
+                lastTopic: content.length > 60 ? content.slice(0, 60) + "..." : content,
+            }
+        }
+
+        return { data: result, error: null }
+    } catch (err) {
+        console.error('[agent-memory] Failed to fetch specialist activities:', {
+            error: err instanceof Error ? err.message : 'Unknown error',
+        })
+        return { data: null, error: 'Internal error' }
+    }
+}

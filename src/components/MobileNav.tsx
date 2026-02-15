@@ -131,16 +131,17 @@ export function MobileNav() {
 
     return (
         <>
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] sm:hidden pb-safe px-safe">
+        <div data-testid="mobile-nav" className="fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] sm:hidden pb-safe px-safe">
             {/* Floating "+" FAB centered above the nav bar */}
             <button
                 onClick={() => setIsQuickCaptureOpen(true)}
+                data-testid="mobile-fab"
                 className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-background shadow-lg hover:bg-international-orange-hover transition-colors active:scale-95"
                 aria-label="Capture an idea"
             >
                 <Plus className="h-5 w-5" />
             </button>
-            <div className="flex justify-around items-center h-16">
+            <div data-testid="mobile-nav-items" className="flex justify-around items-center h-16">
                 {mainNavigation.map((item) => {
                     const isActive = isRouteActive(pathname, item.href)
                     return (
@@ -153,7 +154,7 @@ export function MobileNav() {
                             )}
                         >
                             <item.icon className={cn("h-5 w-5 shrink-0", isActive && "fill-current")} />
-                            <span className="text-[10px] xs:text-xs font-medium truncate max-w-[48px] xs:max-w-none">
+                            <span className="text-xs font-medium truncate max-w-[48px] xs:max-w-none">
                                 <span className="xs:hidden">{item.shortName}</span>
                                 <span className="hidden xs:inline">{item.name}</span>
                             </span>
@@ -171,7 +172,7 @@ export function MobileNav() {
                             )}
                         >
                             <MoreHorizontal className={cn("h-5 w-5 shrink-0", allMoreItems.some(item => isRouteActive(pathname, item.href)) && "fill-current")} />
-                            <span className="text-[10px] xs:text-xs font-medium">More</span>
+                            <span className="text-xs font-medium">More</span>
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe w-56">

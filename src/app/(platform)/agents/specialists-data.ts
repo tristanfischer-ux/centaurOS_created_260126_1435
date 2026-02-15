@@ -95,6 +95,8 @@ export interface Specialist {
     ethicsAlignment?: string
     /** Custom thinking indicator text shown while the specialist is processing */
     thinkingIndicator: string
+    /** Progressive thinking phases shown at 0s, 3s, and 8s while waiting for a response */
+    thinkingPhases: [string, string, string]
     /** AI model tier: "claude" for high-stakes reasoning, "minimax" for high-volume work */
     modelTier: "claude" | "minimax"
 }
@@ -190,6 +192,11 @@ export const SPECIALISTS: Specialist[] = [
         inspiredBy: "Jeff Bezos",
         ethicsAlignment: "strategist",
         thinkingIndicator: "Cutting through the noise...",
+        thinkingPhases: [
+            "Cutting through the noise...",
+            "Narrowing to what matters...",
+            "Almost there — one strong recommendation coming.",
+        ],
         modelTier: "claude",
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -282,6 +289,11 @@ export const SPECIALISTS: Specialist[] = [
         inspiredBy: "Elon Musk + Jensen Huang",
         ethicsAlignment: "cto",
         thinkingIndicator: "Applying first principles...",
+        thinkingPhases: [
+            "Applying first principles...",
+            "Stripping away the unnecessary...",
+            "Found the simplest path — writing it up.",
+        ],
         modelTier: "claude",
     },
     {
@@ -368,6 +380,11 @@ export const SPECIALISTS: Specialist[] = [
         reportsTo: "cto",
         inspiredBy: "Andy Grove",
         thinkingIndicator: "Breaking this into shippable pieces...",
+        thinkingPhases: [
+            "Breaking this into shippable pieces...",
+            "Estimating velocity and timeline...",
+            "Sprint plan taking shape — almost ready.",
+        ],
         modelTier: "minimax",
     },
     {
@@ -454,6 +471,11 @@ export const SPECIALISTS: Specialist[] = [
         reportsTo: "cto",
         inspiredBy: "Taiichi Ohno + Elon Musk",
         thinkingIndicator: "Mapping the production path...",
+        thinkingPhases: [
+            "Mapping the production path...",
+            "Checking yields and tolerances...",
+            "Path from prototype to volume is clear — writing it up.",
+        ],
         modelTier: "minimax",
     },
     {
@@ -539,6 +561,11 @@ export const SPECIALISTS: Specialist[] = [
         reportsTo: "cto",
         inspiredBy: "Tim Cook",
         thinkingIndicator: "Checking lead times and backups...",
+        thinkingPhases: [
+            "Checking lead times and backups...",
+            "Evaluating contingency options...",
+            "Supply strategy locked in — finalizing recommendations.",
+        ],
         modelTier: "minimax",
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -630,6 +657,11 @@ export const SPECIALISTS: Specialist[] = [
         reportsTo: "cto",
         inspiredBy: "Steve Jobs",
         thinkingIndicator: "Separating must-haves from nice-to-haves...",
+        thinkingPhases: [
+            "Separating must-haves from nice-to-haves...",
+            "Defining acceptance criteria...",
+            "Scope is tight — writing the recommendation.",
+        ],
         modelTier: "minimax",
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -720,6 +752,11 @@ export const SPECIALISTS: Specialist[] = [
         inspiredBy: "Seth Godin",
         ethicsAlignment: "marketing",
         thinkingIndicator: "Mapping this to the funnel...",
+        thinkingPhases: [
+            "Mapping this to the funnel...",
+            "Connecting creative to conversion...",
+            "Strategy and tactics aligned — here it comes.",
+        ],
         modelTier: "minimax",
     },
     {
@@ -808,6 +845,11 @@ export const SPECIALISTS: Specialist[] = [
         inspiredBy: "Marc Benioff",
         ethicsAlignment: "sales",
         thinkingIndicator: "Calculating pipeline impact...",
+        thinkingPhases: [
+            "Calculating pipeline impact...",
+            "Building the playbook...",
+            "Scripts and numbers ready — let's close this.",
+        ],
         modelTier: "minimax",
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -899,6 +941,11 @@ export const SPECIALISTS: Specialist[] = [
         inspiredBy: "Sheryl Sandberg",
         ethicsAlignment: "chief-of-staff",
         thinkingIndicator: "Scanning across all workstreams...",
+        thinkingPhases: [
+            "Scanning across all workstreams...",
+            "Connecting dots between teams...",
+            "Priority stack is clear — here's what matters most.",
+        ],
         modelTier: "claude",
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -991,6 +1038,11 @@ export const SPECIALISTS: Specialist[] = [
         inspiredBy: "Charlie Munger",
         ethicsAlignment: "finance",
         thinkingIndicator: "Running the numbers...",
+        thinkingPhases: [
+            "Running the numbers...",
+            "Stress-testing assumptions...",
+            "Building your financial picture.",
+        ],
         modelTier: "claude",
     },
     {
@@ -1077,6 +1129,11 @@ export const SPECIALISTS: Specialist[] = [
         reportsTo: "finance-lead",
         inspiredBy: "Ben Horowitz",
         thinkingIndicator: "Crafting the investor narrative...",
+        thinkingPhases: [
+            "Crafting the investor narrative...",
+            "Pressure-testing the weak spots...",
+            "The story is coming together — almost there.",
+        ],
         modelTier: "minimax",
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -1168,6 +1225,11 @@ export const SPECIALISTS: Specialist[] = [
         inspiredBy: "Patty McCord",
         ethicsAlignment: "people",
         thinkingIndicator: "Thinking about the people side...",
+        thinkingPhases: [
+            "Thinking about the people side...",
+            "Considering team dynamics and culture fit...",
+            "Practical plan ready — no corporate fluff.",
+        ],
         modelTier: "minimax",
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -1259,6 +1321,11 @@ export const SPECIALISTS: Specialist[] = [
         inspiredBy: "David Boies",
         ethicsAlignment: "legal",
         thinkingIndicator: "Assessing the legal landscape...",
+        thinkingPhases: [
+            "Assessing the legal landscape...",
+            "Checking precedents and risks...",
+            "Triage complete — here's what matters.",
+        ],
         modelTier: "claude",
     },
 ]

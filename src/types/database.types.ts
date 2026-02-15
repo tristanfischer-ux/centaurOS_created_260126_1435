@@ -4871,6 +4871,8 @@ export type Database = {
       }
       foundries: {
         Row: {
+          company_intel: Json | null
+          company_profile: Json | null
           created_at: string | null
           id: string
           industry: string | null
@@ -4883,6 +4885,8 @@ export type Database = {
           stage: string | null
         }
         Insert: {
+          company_intel?: Json | null
+          company_profile?: Json | null
           created_at?: string | null
           id: string
           industry?: string | null
@@ -4895,6 +4899,8 @@ export type Database = {
           stage?: string | null
         }
         Update: {
+          company_intel?: Json | null
+          company_profile?: Json | null
           created_at?: string | null
           id?: string
           industry?: string | null
@@ -8880,6 +8886,7 @@ export type Database = {
           phone_number: string | null
           preferred_currency: string | null
           primary_function_id: string | null
+          professional_background: Json | null
           role: Database["public"]["Enums"]["member_role"]
           skills: string[] | null
           stripe_account_id: string | null
@@ -8913,6 +8920,7 @@ export type Database = {
           phone_number?: string | null
           preferred_currency?: string | null
           primary_function_id?: string | null
+          professional_background?: Json | null
           role?: Database["public"]["Enums"]["member_role"]
           skills?: string[] | null
           stripe_account_id?: string | null
@@ -8946,6 +8954,7 @@ export type Database = {
           phone_number?: string | null
           preferred_currency?: string | null
           primary_function_id?: string | null
+          professional_background?: Json | null
           role?: Database["public"]["Enums"]["member_role"]
           skills?: string[] | null
           stripe_account_id?: string | null
@@ -13619,6 +13628,10 @@ export type Database = {
       update_cad_lab_module: {
         Args: { p_module_data: Json; p_module_id: string; p_project_id: string }
         Returns: undefined
+      }
+      update_company_profile: {
+        Args: { p_company_profile: Json; p_foundry_id: string }
+        Returns: Json
       }
       update_foundry_purpose:
         | {

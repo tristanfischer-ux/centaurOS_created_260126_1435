@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import type { Json } from '@/types/database.types'
 
 /**
  * Profile hub data shape returned by getProfileHubData.
@@ -20,6 +21,7 @@ export interface ProfileHubData {
     bio: string | null
     phone_number: string | null
     linkedin_url: string | null
+    professional_background: Record<string, unknown> | null | Json
   } | null
   providerProfile: {
     id: string
@@ -94,7 +96,7 @@ export async function getProfileHubData(): Promise<ProfileHubData | null> {
   const [profileResult, providerResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, email, full_name, role, avatar_url, account_type, foundry_id, created_at, bio, phone_number, linkedin_url')
+      .select('id, email, full_name, role, avatar_url, account_type, foundry_id, created_at, bio, phone_number, linkedin_url, professional_background')
       .eq('id', user.id)
       .single(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -421,6 +423,11 @@ export async function updateBasicProfile(data: {
   bio: string | null
   phoneNumber: string | null
   linkedinUrl: string | null
+  professionalBackground?: {
+    summary: string | null
+    previous_companies: string | null
+    education: string | null
+  } | null
 }): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
 
@@ -443,15 +450,23 @@ export async function updateBasicProfile(data: {
     return { success: false, error: 'LinkedIn URL must start with https://' }
   }
 
+  // Build update payload — include professional_background only if provided
+  const updatePayload: Record<string, unknown> = {
+    full_name: data.fullName.trim(),
+    bio: data.bio || null,
+    phone_number: data.phoneNumber || null,
+    linkedin_url: data.linkedinUrl || null,
+    updated_at: new Date().toISOString(),
+  }
+
+  // Only include professional_background if explicitly provided (not undefined)
+  if (data.professionalBackground !== undefined) {
+    updatePayload.professional_background = data.professionalBackground
+  }
+
   const { error } = await supabase
     .from('profiles')
-    .update({
-      full_name: data.fullName.trim(),
-      bio: data.bio || null,
-      phone_number: data.phoneNumber || null,
-      linkedin_url: data.linkedinUrl || null,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', user.id)
 
   if (error) {

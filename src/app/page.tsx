@@ -190,12 +190,6 @@ export default function MarketingPage() {
               Getting Started
             </Link>
             <Link
-              href="/techniques"
-              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
-            >
-              Techniques
-            </Link>
-            <Link
               href="/pricing"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
@@ -278,7 +272,6 @@ export default function MarketingPage() {
                     { href: "/#problem", label: "Why Us" },
                     { href: "/#guild", label: "Guild" },
                     { href: "/#how-it-works", label: "Getting Started" },
-                    { href: "/techniques", label: "Techniques" },
                     { href: "/#faq", label: "FAQ" },
                   ].map((item) => (
                     <Link

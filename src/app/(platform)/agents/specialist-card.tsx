@@ -23,7 +23,9 @@ import {
     Factory,
     Route,
 } from "lucide-react"
+import { Clock, MessageSquare } from "lucide-react"
 import type { Specialist } from "./specialists-data"
+import type { SpecialistActivity } from "@/actions/agent-memory"
 
 /**
  * Icon map from string names to Lucide components.
@@ -65,6 +67,28 @@ interface SpecialistCardProps {
     onBrief: (specialistId: string) => void
     /** Animation delay for staggered entrance */
     index?: number
+    /** Activity data: last conversation time and topic */
+    activity?: SpecialistActivity
+}
+
+/**
+ * Formats a timestamp into a human-readable relative time string.
+ */
+function formatRelativeTime(dateStr: string): string {
+    const now = Date.now()
+    const then = new Date(dateStr).getTime()
+    const diffMs = now - then
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return "just now"
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays === 1) return "yesterday"
+    if (diffDays < 7) return `${diffDays}d ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+    return `${Math.floor(diffDays / 30)}mo ago`
 }
 
 /**
@@ -74,7 +98,7 @@ interface SpecialistCardProps {
  * human name, functional title, tagline, working style, capability count,
  * highlights, and a "Brief" CTA. Recommended specialists get a "Start here" badge.
  */
-export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0 }: SpecialistCardProps) {
+export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0, activity }: SpecialistCardProps) {
     const Icon = ICON_MAP[specialist.icon] ?? Compass
 
     return (
@@ -146,6 +170,22 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
                     <p className="text-xs text-muted-foreground leading-relaxed mb-4 line-clamp-2">
                         {specialist.workingStyle}
                     </p>
+
+                    {/* Activity Indicator — shows relationship with this specialist */}
+                    {activity?.lastMessageAt && (
+                        <div className="flex items-center gap-3 mb-3 px-2 py-1.5 rounded-md bg-muted/40">
+                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <Clock className="h-3 w-3" />
+                                <span>Talked {formatRelativeTime(activity.lastMessageAt)}</span>
+                            </div>
+                            {activity.lastTopic && (
+                                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground truncate min-w-0">
+                                    <MessageSquare className="h-3 w-3 flex-shrink-0" />
+                                    <span className="truncate">{activity.lastTopic}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Highlights */}
                     <div className="flex flex-wrap gap-1.5 mb-4">

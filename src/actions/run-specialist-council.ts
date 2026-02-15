@@ -43,6 +43,12 @@ export interface CouncilDecisionOption {
     rationale: string
 }
 
+export interface CouncilActionItem {
+    action: string
+    owner: string
+    priority: 'high' | 'medium' | 'low'
+}
+
 export interface CouncilReport {
     executive_summary: string
     positions: CouncilPosition[]
@@ -50,6 +56,10 @@ export interface CouncilReport {
     consensus: string[]
     recommendations: string[]
     decision_options: CouncilDecisionOption[]
+    /** Concrete action items extracted from the debate with ownership and priority */
+    action_items: CouncilActionItem[]
+    /** Ordered next steps for the founder to take immediately */
+    next_steps: string[]
 }
 
 export interface CouncilResult {
