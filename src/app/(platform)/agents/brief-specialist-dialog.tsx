@@ -723,28 +723,45 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
     }, [])
 
     const handleSwitchSpecialist = useCallback((id: string) => {
-        // Build handoff context from recent conversation
+        // Build rich handoff context that feels like a real colleague briefing
+        const targetSpec = getSpecialistById(id)
         let handoff: string | undefined
         if (messages.length > 0) {
-            const firstUserMsg = messages.find((m) => m.role === "user")
-            const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
+            const userMessages = messages.filter((m) => m.role === "user" && !m.historical)
+            const assistantMessages = messages.filter((m) => m.role === "assistant" && !m.historical)
+            const lastAssistant = assistantMessages[assistantMessages.length - 1]
+            const firstUserMsg = userMessages[0]
+
+            // Build a natural handoff that feels like a colleague briefing you
             const parts: string[] = [
-                `Handoff from ${specialist.name}:`,
+                `## Handoff from ${specialist.name} (${specialist.title})`,
+                "",
+                `${specialist.name} just finished working with the founder on this topic and is bringing you in because your expertise is needed next.`,
             ]
+
             if (firstUserMsg) {
-                parts.push(`The user was discussing: "${firstUserMsg.content.slice(0, 300)}"`)
+                parts.push(`\n**What the founder originally asked about:**\n"${firstUserMsg.content.slice(0, 400)}"`)
             }
+
             if (lastAssistant) {
-                parts.push(`Key points covered:\n${lastAssistant.content.slice(0, 500)}`)
+                parts.push(`\n**Key points ${specialist.name} covered:**\n${lastAssistant.content.slice(0, 600)}`)
             }
-            parts.push("\nThe user has been referred to you to continue this work. Acknowledge the handoff briefly and build on what was discussed.")
-            handoff = parts.join("\n\n")
+
+            // Check if the referring specialist has a relationship defined with the target
+            const relationship = specialist.personality.relationships?.[id]
+            if (relationship && targetSpec) {
+                parts.push(`\n**Your working relationship with ${specialist.name}:** ${relationship.pattern}`)
+            }
+
+            parts.push(`\n**Your job:** Pick up where ${specialist.name} left off. Don't repeat what was already covered — BUILD on it. Start substantively as if ${specialist.name} just briefed you in the hallway. The founder doesn't want to re-explain.`)
+
+            handoff = parts.join("\n")
         }
 
         onOpenChange(false)
         // Small delay to let dialog close animation finish
         setTimeout(() => onSwitchSpecialist?.(id, handoff), 200)
-    }, [onOpenChange, onSwitchSpecialist, messages, specialist.name])
+    }, [onOpenChange, onSwitchSpecialist, messages, specialist])
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -1443,6 +1460,16 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 onClick={() => {
                                     const hasUserMessages = messages.some((m) => m.role === "user" && !m.historical)
                                     if (hasUserMessages && !isExecuting) {
+                                        // Generate a quick conversation summary before clearing
+                                        const userMsgs = messages.filter((m) => m.role === "user" && !m.historical)
+                                        const assistMsgs = messages.filter((m) => m.role === "assistant" && !m.historical)
+                                        if (userMsgs.length > 0 && assistMsgs.length > 0) {
+                                            const topicSummary = userMsgs[0].content.slice(0, 80)
+                                            const keyPoints = assistMsgs.length
+                                            toast.success(`${specialist.name}: Got it. We covered "${topicSummary}${topicSummary.length >= 80 ? "..." : ""}" — ${keyPoints} exchange${keyPoints > 1 ? "s" : ""}. It's saved to Deliverables. Ready for the next topic.`, {
+                                                duration: 4000,
+                                            })
+                                        }
                                         // Start a new topic (clear non-historical messages but keep thread)
                                         setMessages((prev) => prev.filter((m) => m.historical))
                                         setSelectedPrompt(null)
