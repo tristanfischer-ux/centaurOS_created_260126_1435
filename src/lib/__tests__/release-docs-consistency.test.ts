@@ -37,6 +37,8 @@ describe("release documentation consistency", () => {
     expect(qaReport).toContain("SUPABASE_SERVICE_ROLE_KEY")
     expect(qaReport).toContain("PGRST202")
     expect(qaReport).toContain("release-config-consistency.test.ts")
+    expect(qaReport).toContain("manual-product-pass-results-consistency.test.ts")
+    expect(qaReport).toContain("Five-scenario product pass outcome log")
     expect(releasePacket).toContain("`npm run test:forge-rfq:contracts` passes.")
   })
 
