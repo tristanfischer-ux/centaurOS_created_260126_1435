@@ -13,8 +13,33 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 
+let adminClient: ReturnType<typeof createAdminClient> | null = null
+
+/**
+ * Lazily initializes the admin Supabase client for governance checks.
+ *
+ * @description Prevents build-time initialization failures when service-role
+ * credentials are intentionally absent (for example Docker image builds).
+ *
+ * @returns {ReturnType<typeof createAdminClient>} Service-role Supabase client
+ *
+ * @security Uses SUPABASE_SERVICE_ROLE_KEY and must execute server-side only
+ */
+function getPermissionGuardAdminClient(): ReturnType<typeof createAdminClient> {
+  if (!adminClient) {
+    adminClient = createAdminClient()
+  }
+  return adminClient
+}
+
 // SECURITY: Governance checks run in unattended agent contexts; service role is required.
-const supabase = createAdminClient()
+const supabase = new Proxy({} as ReturnType<typeof createAdminClient>, {
+  get(_target, prop, receiver) {
+    const client = getPermissionGuardAdminClient() as unknown as Record<PropertyKey, unknown>
+    const value = Reflect.get(client, prop, receiver)
+    return typeof value === 'function' ? value.bind(client) : value
+  },
+})
 
 // ============================================================================
 // TYPES
