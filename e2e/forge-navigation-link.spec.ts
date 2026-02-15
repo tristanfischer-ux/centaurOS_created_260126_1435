@@ -70,4 +70,20 @@ test.describe('Forge navigation route', () => {
     await page.waitForURL('**/the-forge', { timeout: 15000 })
     await expect(page).toHaveURL(/\/the-forge$/)
   })
+
+  test('mobile More menu routes Settings to /settings', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await loginIfNeeded(page)
+
+    const moreButton = page.getByRole('button', { name: /^More$/i })
+    await expect(moreButton).toBeVisible()
+    await moreButton.click()
+
+    const settingsMenuItem = page.getByRole('menuitem', { name: /^Settings$/i })
+    await expect(settingsMenuItem).toBeVisible()
+    await settingsMenuItem.click()
+
+    await page.waitForURL('**/settings', { timeout: 15000 })
+    await expect(page).toHaveURL(/\/settings$/)
+  })
 })
