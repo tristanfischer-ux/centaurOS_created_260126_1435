@@ -129,7 +129,7 @@ export function GuildSection() {
           <AnimatedSection delay={0.15}>
             <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden border shadow-lg">
               <Image
-                src="/images/guild-workshop-new.png"
+                src="/images/marketing/guild-workshop-hero.png"
                 alt="The Guild — a community of founders, executives, and apprentices collaborating in a modern workshop"
                 fill
                 className="object-cover"

@@ -23,7 +23,7 @@ const PILLARS = [
     title: "The Firm.",
     description:
       "Fractional Forge Ltd is the real-world entity that holds contracts, manages liability, and provides the legal fortress for the work to happen. You build; we handle the rest.",
-    image: "/images/centaur-dynamics-hq.png",
+    image: "/images/marketing/ecosystem-firm.png",
   },
   {
     icon: Monitor,
@@ -31,7 +31,7 @@ const PILLARS = [
     title: "The Operating System.",
     description:
       "ForgeOS coordinates founders, executives, and apprentices. It manages strategy, objectives, tasks, suppliers, and deliverables — the glue that makes fractional work.",
-    image: "/images/ecosystem-os.png",
+    image: "/images/marketing/ecosystem-os.png",
   },
   {
     icon: Users,
@@ -39,7 +39,7 @@ const PILLARS = [
     title: "The Guild.",
     description:
       "Virtual connectivity, physical reality. The Guild is a network of collaborative workshops and digital spaces where knowledge scales as fast as the work.",
-    image: "/images/ecosystem-guild.png",
+    image: "/images/marketing/ecosystem-guild.png",
   },
 ] as const
 
