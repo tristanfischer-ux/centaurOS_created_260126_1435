@@ -2,7 +2,6 @@
 
 
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { Database } from '@/types/database.types'
@@ -463,133 +462,45 @@ export async function getMarketplaceOnboardingStatus() {
  * @audit Logs repair events with userId and resolved foundryId.
  */
 export async function repairProfile(): Promise<{ success: true; foundryId: string } | { error: string }> {
-  // AUTH: Verify the user is authenticated via the regular client
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return { error: 'Unauthorized' }
 
-  // SECURITY: Use the admin client for all DB operations in this action.
-  // RLS policies on `profiles` can cause 500 recursion errors when the
-  // user's profile is in a broken state (missing foundry_id). The admin
-  // client bypasses RLS. This is safe because we verified auth above and
-  // only modify the authenticated user's own profile.
-  let admin: ReturnType<typeof createAdminClient>
-  try {
-    admin = createAdminClient()
-  } catch (envError) {
-    console.error('[RepairProfile] Admin client creation failed:', envError)
-    return { error: 'Server configuration error. Please contact support.' }
-  }
+  // Call the SECURITY DEFINER database function that bypasses all RLS.
+  // This avoids the two problems that block the admin client approach:
+  //   1) RLS recursion on profiles (stale policies can cause 500s)
+  //   2) Legacy service_role key is disabled in Supabase
+  // The RPC function verifies auth.uid() internally.
+  const { data, error: rpcError } = await supabase.rpc('repair_user_profile')
 
-  // Read current profile (admin client bypasses RLS)
-  const { data: profile, error: profileError } = await admin
-    .from('profiles')
-    .select('id, foundry_id, role, full_name, email, account_type')
-    .eq('id', user.id)
-    .single()
-
-  console.info('[RepairProfile] Profile query result:', {
-    userId: user.id,
-    hasData: !!profile,
-    errorCode: profileError?.code ?? null,
-    errorMessage: profileError?.message ?? null,
-  })
-
-  // If no profile at all, create one from scratch
-  if (profileError && profileError.code === 'PGRST116') {
-    console.warn('[RepairProfile] No profile found for user, creating from metadata:', user.id)
-    const userRole = (user.user_metadata?.role as 'Founder' | 'Executive' | 'Apprentice') ?? 'Apprentice'
-    const resolvedFoundry = await resolveOrCreateFoundry(admin, user.id, userRole, user.user_metadata?.full_name || user.email?.split('@')[0] || 'My Company')
-
-    if ('error' in resolvedFoundry) return resolvedFoundry
-
-    const { error: insertError } = await admin.from('profiles').insert({
-      id: user.id,
-      email: user.email ?? '',
-      full_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
-      role: userRole,
-      foundry_id: resolvedFoundry.foundryId,
-      active_foundry_id: resolvedFoundry.foundryId,
-      account_type: 'team_builder' as const,
-    })
-
-    if (insertError) {
-      console.error('[RepairProfile] Failed to create profile:', { userId: user.id, error: insertError.message })
-      return { error: `Failed to create profile: ${insertError.message}` }
-    }
-
-    // AUDIT: Log profile creation
-    console.info('[RepairProfile] Created profile with foundry:', { userId: user.id, foundryId: resolvedFoundry.foundryId })
-
-    revalidatePath('/', 'layout')
-    return { success: true, foundryId: resolvedFoundry.foundryId }
-  }
-
-  if (profileError) {
-    console.error('[RepairProfile] Failed to fetch profile:', {
+  if (rpcError) {
+    console.error('[RepairProfile] RPC failed:', {
       userId: user.id,
-      code: profileError.code,
-      message: profileError.message,
-      details: profileError.details,
-      hint: profileError.hint,
+      code: rpcError.code,
+      message: rpcError.message,
+      details: rpcError.details,
+      hint: rpcError.hint,
     })
-    return { error: `Profile error (${profileError.code}): ${profileError.message}` }
+    return { error: `Repair failed (${rpcError.code}): ${rpcError.message}` }
   }
 
-  // Profile exists — check if foundry_id points to a real foundry
-  if (profile.foundry_id) {
-    const { data: foundryExists } = await admin
-      .from('foundries')
-      .select('id')
-      .eq('id', profile.foundry_id)
-      .maybeSingle()
+  const result = data as { success?: boolean; foundry_id?: string; action?: string; error?: string }
 
-    if (foundryExists) {
-      // Foundry is valid — ensure membership exists too
-      await ensureMembership(admin, user.id, profile.foundry_id, profile.role || 'Apprentice')
-      revalidatePath('/', 'layout')
-      return { success: true, foundryId: profile.foundry_id }
-    }
-
-    // foundry_id is set but points to a non-existent foundry — need to fix it
-    console.warn('[RepairProfile] foundry_id points to non-existent foundry:', {
-      userId: user.id,
-      invalidFoundryId: profile.foundry_id,
-    })
-  }
-
-  // Resolve the correct foundry based on role
-  const role = (profile.role as 'Founder' | 'Executive' | 'Apprentice') || 'Apprentice'
-  const resolvedFoundry = await resolveOrCreateFoundry(admin, user.id, role, profile.full_name || 'My Company')
-
-  if ('error' in resolvedFoundry) return resolvedFoundry
-
-  // Update the profile with the valid foundry
-  const { error: updateError } = await admin
-    .from('profiles')
-    .update({
-      foundry_id: resolvedFoundry.foundryId,
-      active_foundry_id: resolvedFoundry.foundryId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', user.id)
-
-  if (updateError) {
-    console.error('[RepairProfile] Failed to update profile:', { userId: user.id, error: updateError.message })
-    return { error: `Failed to update profile: ${updateError.message}` }
+  if (result.error) {
+    console.error('[RepairProfile] RPC returned error:', { userId: user.id, error: result.error })
+    return { error: result.error }
   }
 
   // AUDIT: Log repair event
-  console.info('[RepairProfile] Profile repaired:', {
+  console.info('[RepairProfile] Profile repaired via RPC:', {
     userId: user.id,
-    role,
-    foundryId: resolvedFoundry.foundryId,
-    wasCreated: resolvedFoundry.wasCreated,
+    foundryId: result.foundry_id,
+    action: result.action,
   })
 
   revalidatePath('/', 'layout')
-  return { success: true, foundryId: resolvedFoundry.foundryId }
+  return { success: true, foundryId: result.foundry_id ?? '' }
 }
 
 /**

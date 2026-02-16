@@ -1,3 +1,4 @@
+Initialising login role...
 export type Json =
   | string
   | number
@@ -14374,6 +14375,7 @@ export type Database = {
       refresh_platform_stats: { Args: never; Returns: undefined }
       refresh_provider_stats: { Args: never; Returns: undefined }
       refresh_search_ranking: { Args: never; Returns: undefined }
+      repair_user_profile: { Args: never; Returns: Json }
       schedule_payment_retry: {
         Args: { p_failed_payment_id: string }
         Returns: string
@@ -15484,3 +15486,5 @@ export const Constants = {
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.7)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
