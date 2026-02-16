@@ -73,7 +73,7 @@ export function PricingContent() {
               Sign In
             </Link>
             <Button asChild size="sm" className="bg-international-orange hover:bg-international-orange-hover">
-              <Link href="/join/founder">Get Started</Link>
+              <Link href="/join">Get Started</Link>
             </Button>
           </div>
         </div>

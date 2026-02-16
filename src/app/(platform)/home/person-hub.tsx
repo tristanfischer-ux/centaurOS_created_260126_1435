@@ -137,7 +137,7 @@ export function PersonHub({
                 you, or start your own company to get going.
               </p>
               <Button asChild className="bg-international-orange hover:bg-international-orange/90">
-                <Link href="/join/founder">
+                <Link href="/join?role=founder">
                   <Plus className="h-4 w-4 mr-2" />
                   Create a Company
                 </Link>

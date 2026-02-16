@@ -197,7 +197,7 @@ export default function MarketingPage() {
             </a>
             <motion.div whileHover={buttonHover} whileTap={buttonTap}>
               <Link
-                href="/join/founder"
+                href="/join"
                 className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-5 py-2.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md"
               >
                 Get Started
@@ -249,7 +249,7 @@ export default function MarketingPage() {
                 <div className="px-4 sm:px-6 py-4 flex flex-col gap-1">
                   {/* CTA first — always visible without scrolling */}
                   <Link
-                    href="/join/founder"
+                    href="/join"
                     className="mb-3 bg-international-orange hover:bg-international-orange-hover text-white py-3.5 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] flex items-center justify-center"
                     onClick={() => setMobileMenuOpen(false)}
                   >
@@ -316,10 +316,10 @@ export default function MarketingPage() {
             className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-t border-muted px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
           >
             <Link
-              href="/#roles"
+              href="/join"
               className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full"
             >
-              Choose Your Path
+              Get Started
               <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
@@ -364,7 +364,7 @@ export default function MarketingPage() {
                   Login
                 </a>
                 <Link
-                  href="/join/founder"
+                  href="/join"
                   className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Get Started Free
@@ -378,19 +378,19 @@ export default function MarketingPage() {
               </p>
               <div className="flex flex-col gap-1 sm:gap-2">
                 <Link
-                  href="/join/founder"
+                  href="/join"
                   className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Founders
                 </Link>
                 <Link
-                  href="/join/executive"
+                  href="/join?role=executive"
                   className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Executives
                 </Link>
                 <Link
-                  href="/join/apprentice"
+                  href="/join?role=apprentice"
                   className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
                 >
                   Apprentices
@@ -639,10 +639,10 @@ function HeroSection() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
             <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
               <Link
-                href="/join/founder"
+                href="/join"
                 className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto"
               >
-                Start as Founder
+                Get Started
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </motion.div>
@@ -650,7 +650,7 @@ function HeroSection() {
               href="#roles"
               className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
             >
-              Choose Your Path
+              Learn More
               <ChevronDown className="h-4 w-4" />
             </a>
           </div>
@@ -822,7 +822,7 @@ function PricingPreviewSection() {
       description: "Get started and explore the platform",
       features: ["5 orders/month", "20 smart assists/month", "Basic marketplace"],
       cta: "Start Free",
-      href: "/join/founder",
+      href: "/join",
       highlight: false,
     },
     {
@@ -837,7 +837,7 @@ function PricingPreviewSection() {
         "1 active retainer",
       ],
       cta: "Get Started",
-      href: "/join/founder",
+      href: "/join",
       highlight: false,
     },
     {
@@ -853,7 +853,7 @@ function PricingPreviewSection() {
         "API access",
       ],
       cta: "Get Started",
-      href: "/join/founder",
+      href: "/join",
       highlight: true,
     },
   ] as const;

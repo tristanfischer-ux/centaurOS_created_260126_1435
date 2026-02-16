@@ -75,7 +75,7 @@ export async function signup(formData: FormData) {
   // Security: Rate limit signup attempts
   const rateLimitResult = await rateLimit("signup", clientIP);
   if (!rateLimitResult.success) {
-    return redirect(`/join/${role}?error=${encodeURIComponent("Too many signup attempts. Please try again later.")}`);
+    return redirect(`/join?role=${role}&error=${encodeURIComponent("Too many signup attempts. Please try again later.")}`);
   }
 
   const supabase = await createClient();
@@ -98,7 +98,7 @@ export async function signup(formData: FormData) {
   // Security: Validate and sanitize inputs
   const email = sanitizeEmail(rawEmail);
   if (!email) {
-    return redirect(`/join/${role || "general"}?error=Invalid email address`);
+    return redirect(`/join?role=${role || "general"}&error=${encodeURIComponent("Invalid email address")}`);
   }
 
   // Security: Sanitize name to prevent XSS
@@ -107,23 +107,23 @@ export async function signup(formData: FormData) {
   const businessName = rawBusinessName ? escapeHtml(rawBusinessName.trim().slice(0, 100)) : null;
 
   if (!fullName || !role) {
-    return redirect(`/join/${role || "general"}?error=All fields are required`);
+    return redirect(`/join?role=${role || "general"}&error=${encodeURIComponent("All fields are required")}`);
   }
 
   // Security: Validate password strength
   const passwordValidation = validatePassword(password);
   if (!passwordValidation.valid) {
-    return redirect(`/join/${role || "general"}?error=${encodeURIComponent(passwordValidation.error || "Invalid password")}`);
+    return redirect(`/join?role=${role || "general"}&error=${encodeURIComponent(passwordValidation.error || "Invalid password")}`);
   }
 
   // Founders must provide a company name
   if (role === "founder" && !companyName) {
-    return redirect(`/join/founder?error=Company name is required`);
+    return redirect(`/join?role=founder&error=${encodeURIComponent("Company name is required")}`);
   }
 
   // Suppliers must provide a business name
   if (role === "supplier" && !businessName) {
-    return redirect(`/join/supplier?error=Business name is required`);
+    return redirect(`/join?role=supplier&error=${encodeURIComponent("Business name is required")}`);
   }
 
   // 1. Create auth user
@@ -148,7 +148,7 @@ export async function signup(formData: FormData) {
   }
 
   if (!authData.user) {
-    return redirect(`/join/${role}?error=Failed to create account`);
+    return redirect(`/join?role=${role}&error=${encodeURIComponent("Failed to create account")}`);
   }
 
   let foundryId: string;
@@ -253,7 +253,7 @@ export async function signup(formData: FormData) {
     // CRITICAL: Profile is required for the app to function.
     // Redirect to an error state rather than silently continuing.
     return redirect(
-      `/join/${role}?error=${encodeURIComponent("Account created but profile setup failed. Please try logging in — your profile will be created automatically.")}`
+      `/join?role=${role}&error=${encodeURIComponent("Account created but profile setup failed. Please try logging in — your profile will be created automatically.")}`
     );
   }
 

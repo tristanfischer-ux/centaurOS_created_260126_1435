@@ -104,7 +104,7 @@ export default function TechniquesPage() {
           </div>
           <motion.div whileHover={buttonHover} whileTap={buttonTap}>
             <Link
-              href="/join/founder"
+              href="/join"
               className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-4 py-2 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px]"
             >
               Apply Now
@@ -280,7 +280,7 @@ export default function TechniquesPage() {
               className="inline-block"
             >
               <Link
-                href="/join/founder"
+                href="/join"
                 className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[44px]"
               >
                 Apply for Early Access
