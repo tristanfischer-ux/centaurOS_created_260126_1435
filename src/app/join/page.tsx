@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useActionState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useFormStatus } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,38 +19,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { signup } from "@/actions/signup";
+import type { SignupState } from "@/actions/signup";
 import { getDemoAccountData, type DemoAccountData } from "@/actions/demo-accounts";
-
-/**
- * SubmitButton — Shows loading state while the server action is running.
- * Must be a child of the <form> to use useFormStatus.
- */
-function SubmitButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <motion.div
-      whileHover={pending ? {} : { scale: 1.01 }}
-      whileTap={pending ? {} : { scale: 0.98 }}
-      className="pt-2"
-    >
-      <Button
-        type="submit"
-        disabled={pending}
-        className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
-      >
-        {pending ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            Creating Account...
-          </>
-        ) : (
-          "Create Account"
-        )}
-      </Button>
-    </motion.div>
-  );
-}
 
 /** Total founding member spots available */
 const TOTAL_FOUNDING_SPOTS = 100;
@@ -60,32 +29,6 @@ const SPOTS_CLAIMED = 53;
 
 type UserPath = "founder" | "joining";
 type JoiningRole = "executive" | "apprentice";
-
-/**
- * ErrorMessage — Displays form errors from URL search params.
- */
-function ErrorMessage() {
-  const searchParams = useSearchParams();
-  const error = searchParams.get("error");
-
-  if (!error) return null;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      role="alert"
-      aria-live="polite"
-      className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-lg flex items-center gap-3"
-    >
-      <span
-        className="h-2 w-2 rounded-full bg-destructive animate-pulse"
-        aria-hidden="true"
-      />
-      {decodeURIComponent(error)}
-    </motion.div>
-  );
-}
 
 /**
  * FoundingMemberCounter -- Animated progress bar showing remaining spots.
@@ -127,7 +70,6 @@ function JoinPageInner() {
 
   // Pre-select path from URL (e.g. /join?role=founder or /join?role=executive)
   const roleParam = searchParams.get("role");
-  const hasError = searchParams.get("error") !== null;
   const isDemoMode = searchParams.get("demo") === "true";
 
   const initialPath: UserPath | null = roleParam === "founder"
@@ -142,6 +84,10 @@ function JoinPageInner() {
   const [selectedPath, setSelectedPath] = useState<UserPath | null>(initialPath);
   const [joiningRole, setJoiningRole] = useState<JoiningRole>(initialJoiningRole);
   const [demoData, setDemoData] = useState<DemoAccountData | null>(null);
+
+  // useActionState: errors returned inline, form data preserved on failure.
+  // On success the server action calls redirect() so this state is never updated.
+  const [state, formAction, isPending] = useActionState<SignupState, FormData>(signup, {});
 
   // Fetch demo data if in demo mode
   useEffect(() => {
@@ -194,11 +140,21 @@ function JoinPageInner() {
             </p>
           </div>
 
-          {/* Error Message */}
-          {hasError && (
-            <Suspense fallback={null}>
-              <ErrorMessage />
-            </Suspense>
+          {/* Error Message — displayed inline from action state */}
+          {state.error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              role="alert"
+              aria-live="polite"
+              className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-lg flex items-center gap-3"
+            >
+              <span
+                className="h-2 w-2 rounded-full bg-destructive animate-pulse"
+                aria-hidden="true"
+              />
+              {state.error}
+            </motion.div>
           )}
 
           {/* Demo Mode Banner */}
@@ -306,7 +262,7 @@ function JoinPageInner() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.3 }}
               >
-                <form action={signup} className="space-y-5">
+                <form action={formAction} className="space-y-5">
                   <input type="hidden" name="role" value={effectiveRole} />
 
                   {/* Role sub-selection for Joining path */}
@@ -520,7 +476,26 @@ function JoinPageInner() {
                   )}
 
                   {/* Submit */}
-                  <SubmitButton />
+                  <motion.div
+                    whileHover={isPending ? {} : { scale: 1.01 }}
+                    whileTap={isPending ? {} : { scale: 0.98 }}
+                    className="pt-2"
+                  >
+                    <Button
+                      type="submit"
+                      disabled={isPending}
+                      className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
+                    >
+                      {isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Creating Account...
+                        </>
+                      ) : (
+                        "Create Account"
+                      )}
+                    </Button>
+                  </motion.div>
                 </form>
 
                 {/* Founding member counter */}

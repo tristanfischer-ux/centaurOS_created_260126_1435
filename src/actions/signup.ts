@@ -15,6 +15,15 @@ type SignupRole = "founder" | "executive" | "apprentice" | "supplier";
 type ApplicationRole = "vc" | "factory" | "university" | "network";
 
 /**
+ * State returned by the signup action for useActionState.
+ * On error, `error` contains the message to display inline.
+ * On success, the action calls redirect() so no state is returned.
+ */
+export type SignupState = {
+  error?: string;
+};
+
+/**
  * Security: Validate password strength
  * Requires: min 8 chars, at least one uppercase, one lowercase, one number
  */
@@ -60,12 +69,20 @@ function generateSlug(name: string): string {
 }
 
 /**
- * Direct signup for Founders, Executives, and Apprentices
- * Creates auth user and profile immediately
- * For Founders: also creates a foundry record with company details
+ * Direct signup for Founders, Executives, and Apprentices.
+ * Creates auth user and profile immediately.
+ * For Founders: also creates a foundry record with company details.
+ *
+ * @description Uses the useActionState-compatible signature so errors
+ * are returned inline (preserving form data) instead of redirecting.
+ * Only success paths call redirect().
+ *
+ * @param _prevState - Previous action state (required by useActionState)
+ * @param formData - The submitted form data
+ * @returns SignupState with an error message, or never returns on success (redirect)
  */
-export async function signup(formData: FormData) {
-  // Extract role early so error redirects go to the correct page
+export async function signup(_prevState: SignupState, formData: FormData): Promise<SignupState> {
+  // Extract role early for logging context
   const role = (formData.get("role") as SignupRole) || "general";
 
   // Security: Get client IP for rate limiting
@@ -75,7 +92,7 @@ export async function signup(formData: FormData) {
   // Security: Rate limit signup attempts
   const rateLimitResult = await rateLimit("signup", clientIP);
   if (!rateLimitResult.success) {
-    return redirect(`/join?role=${role}&error=${encodeURIComponent("Too many signup attempts. Please try again later.")}`);
+    return { error: "Too many signup attempts. Please try again later." };
   }
 
   const supabase = await createClient();
@@ -98,7 +115,7 @@ export async function signup(formData: FormData) {
   // Security: Validate and sanitize inputs
   const email = sanitizeEmail(rawEmail);
   if (!email) {
-    return redirect(`/join?role=${role || "general"}&error=${encodeURIComponent("Invalid email address")}`);
+    return { error: "Invalid email address" };
   }
 
   // Security: Sanitize name to prevent XSS
@@ -107,23 +124,23 @@ export async function signup(formData: FormData) {
   const businessName = rawBusinessName ? escapeHtml(rawBusinessName.trim().slice(0, 100)) : null;
 
   if (!fullName || !role) {
-    return redirect(`/join?role=${role || "general"}&error=${encodeURIComponent("All fields are required")}`);
+    return { error: "All fields are required" };
   }
 
   // Security: Validate password strength
   const passwordValidation = validatePassword(password);
   if (!passwordValidation.valid) {
-    return redirect(`/join?role=${role || "general"}&error=${encodeURIComponent(passwordValidation.error || "Invalid password")}`);
+    return { error: passwordValidation.error || "Invalid password" };
   }
 
   // Founders must provide a company name
   if (role === "founder" && !companyName) {
-    return redirect(`/join?role=founder&error=${encodeURIComponent("Company name is required")}`);
+    return { error: "Company name is required" };
   }
 
   // Suppliers must provide a business name
   if (role === "supplier" && !businessName) {
-    return redirect(`/join?role=supplier&error=${encodeURIComponent("Business name is required")}`);
+    return { error: "Business name is required" };
   }
 
   // 1. Create auth user
@@ -142,13 +159,11 @@ export async function signup(formData: FormData) {
 
   if (authError) {
     console.error("Signup error:", authError);
-    return redirect(
-      `/join/${role}?error=${encodeURIComponent(authError.message)}`
-    );
+    return { error: authError.message };
   }
 
   if (!authData.user) {
-    return redirect(`/join?role=${role}&error=${encodeURIComponent("Failed to create account")}`);
+    return { error: "Failed to create account" };
   }
 
   let foundryId: string;
@@ -251,10 +266,8 @@ export async function signup(formData: FormData) {
       details: profileError.details,
     });
     // CRITICAL: Profile is required for the app to function.
-    // Redirect to an error state rather than silently continuing.
-    return redirect(
-      `/join?role=${role}&error=${encodeURIComponent("Account created but profile setup failed. Please try logging in — your profile will be created automatically.")}`
-    );
+    // Return error inline so the user can try again or contact support.
+    return { error: "Account created but profile setup failed. Please try logging in — your profile will be created automatically." };
   }
 
   // 3b. Create foundry_memberships record for multi-foundry support
