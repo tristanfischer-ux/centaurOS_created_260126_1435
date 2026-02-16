@@ -21,24 +21,18 @@ import {
   AnimatedSection,
 } from "@/components/marketing/animations";
 import {
-  Clock,
   DollarSign,
-  TrendingDown,
   Users,
-  Wrench,
   Shield,
-  Rocket,
   UserCheck,
   Hammer,
   ChevronDown,
   ArrowRight,
   CheckCircle2,
-  Factory,
   Share2,
   Check,
   Timer,
   TrendingUp,
-  ExternalLink,
 } from "lucide-react";
 import {
   Accordion,
@@ -48,11 +42,7 @@ import {
 } from "@/components/ui/accordion";
 import { RolesSection } from "@/components/marketing/RolesSection";
 import { GuildSection } from "@/components/marketing/GuildSection";
-import { PlatformShowcaseSection } from "@/components/marketing/PlatformShowcaseSection";
-import { EcosystemSection } from "@/components/marketing/EcosystemSection";
-import { TrustSection } from "@/components/marketing/TrustSection";
 import { SoftwareVsHardwareSection } from "@/components/marketing/SoftwareVsHardwareSection";
-import { HumanAIPromiseSection } from "@/components/marketing/HumanAIPromiseSection";
 import { FactoryPartnerSection } from "@/components/marketing/FactoryPartnerSection";
 import { BuiltInBritainSection } from "@/components/marketing/BuiltInBritainSection";
 
@@ -169,28 +159,22 @@ export default function MarketingPage() {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
             <Link
+              href="/#the-gap"
+              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
+            >
+              Why Us
+            </Link>
+            <Link
               href="/#roles"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               Roles
             </Link>
             <Link
-              href="/#problem"
-              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
-            >
-              Why Us
-            </Link>
-            <Link
               href="/#guild"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
               Guild
-            </Link>
-            <Link
-              href="/#factories"
-              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
-            >
-              Factories
             </Link>
             <Link
               href="/#how-it-works"
@@ -277,10 +261,9 @@ export default function MarketingPage() {
                     Get Started Free
                   </Link>
                   {[
+                    { href: "/#the-gap", label: "Why Us" },
                     { href: "/#roles", label: "Roles" },
-                    { href: "/#problem", label: "Why Us" },
                     { href: "/#guild", label: "Guild" },
-                    { href: "/#factories", label: "Factories" },
                     { href: "/#how-it-works", label: "Getting Started" },
                     { href: "/#faq", label: "FAQ" },
                   ].map((item) => (
@@ -317,9 +300,7 @@ export default function MarketingPage() {
       {/* ── Main Content ── */}
       <main id="main-content">
         <HeroSection />
-        <RolesSection />
         <SoftwareVsHardwareSection />
-        <ProblemSection />
         <Suspense fallback={
           <div className="py-16 px-4">
             <div className="max-w-4xl mx-auto">
@@ -332,18 +313,12 @@ export default function MarketingPage() {
         }>
           <SavingsCalculatorSection />
         </Suspense>
-        <SolutionSection />
-        <PlatformShowcaseSection />
-        <HowItWorksSection />
-        <PricingPreviewSection />
+        <RolesSection />
         <GuildSection />
-        <HumanAIPromiseSection />
-        <EcosystemSection />
+        <HowItWorksSection />
         <FactoryPartnerSection />
-        <HowAProjectWorksSection />
         <BuiltInBritainSection />
-        <TrustSection />
-        <PlatformCapabilitiesSection />
+        <PricingPreviewSection />
         <FAQSection />
       </main>
 
@@ -698,12 +673,36 @@ function HeroSection() {
           </div>
         </motion.div>
 
+        {/* Metrics strip — verifiable platform stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1, duration: 0.6 }}
+          className="mt-8 sm:mt-10 md:mt-14 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 max-w-3xl mx-auto"
+        >
+          {[
+            { value: "78+", label: "Manufacturing Techniques" },
+            { value: "100", label: "Founding Member Spots" },
+            { value: "12", label: "Week Sprints" },
+            { value: "£0", label: "Equity Given Up" },
+          ].map((metric) => (
+            <div key={metric.label} className="text-center">
+              <p className="text-lg sm:text-2xl font-black text-international-orange">
+                {metric.value}
+              </p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground font-mono uppercase tracking-wider">
+                {metric.label}
+              </p>
+            </div>
+          ))}
+        </motion.div>
+
         {/* Version line */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2, duration: 0.6 }}
-          className="mt-6 sm:mt-8 md:mt-12 text-xs text-muted-foreground font-mono tracking-wider"
+          className="mt-4 sm:mt-6 text-xs text-muted-foreground font-mono tracking-wider"
         >
           Forged in Britain. Shipping weekly. Shaped by founding members.
         </motion.p>
@@ -731,102 +730,7 @@ function HeroSection() {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
- * SECTION 2 — PROBLEM
- * Makes the hardware development pain painfully clear.
- * ════════════════════════════════════════════════════════════════════════ */
-
-function ProblemSection() {
-  const PAIN_POINTS = [
-    {
-      icon: Clock,
-      title: "18-Month Timelines",
-      stat: "12–18 months",
-      description:
-        "Traditional hardware development takes 12–18 months from concept to first prototype. By the time you ship, the market has moved on.",
-    },
-    {
-      icon: DollarSign,
-      title: "Astronomical Burn Rate",
-      stat: "£50–100k/month",
-      description:
-        "A full-time engineering team costs £50k–£100k per month in salaries alone. That's before you factor in tooling, materials, and manufacturing.",
-    },
-    {
-      icon: TrendingDown,
-      title: "Unnecessary Equity Dilution",
-      stat: "30–40% given away",
-      description:
-        "Raising a £2M seed round to build a team you only need for 6 months means giving away equity you'll never get back — for capability you don't permanently need.",
-    },
-  ] as const;
-
-  return (
-    <section id="problem" className="py-12 sm:py-16 md:py-28 bg-background scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        {/* Section header */}
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-20">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            The Hardware Trap
-          </span>
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Building Hardware Shouldn&apos;t
-            <br className="hidden sm:block" /> Mean Burning Everything.
-          </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Most hardware startups fail not because of bad ideas — but because
-            the traditional development model is broken. Here&apos;s what
-            founders are up against:
-          </p>
-        </AnimatedSection>
-
-        {/* Pain point cards */}
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
-          {PAIN_POINTS.map((point) => {
-            const Icon = point.icon;
-            return (
-              <AnimatedCard
-                key={point.title}
-                className="border bg-card rounded-xl p-5 sm:p-6 md:p-8 flex flex-col text-center"
-              >
-                <div className="mx-auto mb-3 sm:mb-4 h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-status-error-light flex items-center justify-center">
-                  <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-destructive" />
-                </div>
-                <p className="text-2xl sm:text-2xl md:text-3xl font-black text-foreground mb-1 sm:mb-2">
-                  {point.stat}
-                </p>
-                <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">{point.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {point.description}
-                </p>
-              </AnimatedCard>
-            );
-          })}
-        </StaggerContainer>
-
-        {/* Comparison image — labels are HTML, not baked into the image */}
-        <AnimatedSection className="mt-10 sm:mt-12 md:mt-20" delay={0.2}>
-          <div className="relative w-full aspect-[3/2] sm:aspect-[2.2/1] rounded-lg sm:rounded-xl overflow-hidden border">
-            <Image
-              src="/images/problem-comparison.png"
-              alt="Comparison: traditional hardware development versus the fractional model with Fractional Forge"
-              fill
-              className="object-cover object-[55%_center]"
-              sizes="(max-width: 640px) 100vw, (max-width: 768px) 100vw, 1200px"
-              loading="lazy"
-            />
-          </div>
-          <div className="flex justify-between text-xs text-muted-foreground mt-3 sm:mt-4 font-mono tracking-wider px-1">
-            <span>Traditional Development</span>
-            <span>The Fractional Model</span>
-          </div>
-        </AnimatedSection>
-      </div>
-    </section>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════════════════
- * SECTION 2b — SAVINGS CALCULATOR
+ * SECTION 2 — SAVINGS CALCULATOR
  * Interactive tool that makes the savings tangible and shareable.
  * ════════════════════════════════════════════════════════════════════════ */
 
@@ -1129,342 +1033,6 @@ function SavingsCalculatorSection() {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
- * SECTION 3 — SOLUTION
- * Presents Fractional Forge as the answer to the pain.
- * ════════════════════════════════════════════════════════════════════════ */
-
-function SolutionSection() {
-  const BENEFITS = [
-    {
-      icon: Users,
-      title: "Fractional Teams",
-      description:
-        "On-demand executives and engineers who have built and shipped hardware before. No long-term commitments — scale up or down as your project needs change.",
-    },
-    {
-      icon: DollarSign,
-      title: "Fractional Cost",
-      description:
-        "Pay only for the expertise you need, when you need it. A fractional CTO costs a fraction of a full-time one — and often delivers more, faster.",
-    },
-    {
-      icon: Shield,
-      title: "Full Ownership",
-      description:
-        "Your IP. Your equity. Your company. We provide the team and the infrastructure — you keep everything you build.",
-    },
-    {
-      icon: Rocket,
-      title: "12-Week Sprints",
-      description:
-        "Go from concept to validated prototype in a single sprint. Our structured process eliminates the guesswork and compresses timelines dramatically.",
-    },
-    {
-      icon: Factory,
-      title: "Manufacturing Network",
-      description:
-        "Access 78+ manufacturing techniques through our vetted supplier network. From 3D printing to injection moulding — one platform, every process.",
-    },
-    {
-      icon: Wrench,
-      title: "Operating System",
-      description:
-        "ForgeOS coordinates your fractional team, tracks objectives, manages suppliers, and keeps everyone aligned — the system that makes fractional collaboration work.",
-    },
-  ] as const;
-
-  return (
-    <section
-      id="solution"
-      className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20"
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-20">
-          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            The Fractional Model
-          </span>
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            What If You Could Build Hardware
-            <br className="hidden sm:block" />{" "}
-            <span className="text-electric-blue">Like Software?</span>
-          </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Fractional Forge gives you on-demand access to the people,
-            processes, and manufacturing network you need — without the
-            overhead of building it all yourself.
-          </p>
-        </AnimatedSection>
-
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {BENEFITS.map((benefit) => {
-            const Icon = benefit.icon;
-            return (
-              <AnimatedCard
-                key={benefit.title}
-                className="border bg-card rounded-xl p-5 sm:p-6 md:p-8 flex flex-col"
-              >
-                <div className="mb-3 sm:mb-4 h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-electric-blue-light flex items-center justify-center">
-                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-electric-blue" />
-                </div>
-                <h3 className="text-base sm:text-lg font-bold mb-2">{benefit.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                  {benefit.description}
-                </p>
-              </AnimatedCard>
-            );
-          })}
-        </StaggerContainer>
-      </div>
-    </section>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════════════════
- * SECTION 3b — CASE STUDY
- * A specific, detailed story with real numbers that builds credibility.
- * ════════════════════════════════════════════════════════════════════════ */
-
-function HowAProjectWorksSection() {
-  const PHASES = [
-    { week: "Week 1–2", label: "Scope definition & expert matching", done: true },
-    { week: "Week 3–5", label: "Concept design & engineering simulation", done: true },
-    { week: "Week 6–8", label: "Rapid prototyping (3D print, CNC, etc.)", done: true },
-    { week: "Week 9–10", label: "Functional testing & iteration", done: true },
-    { week: "Week 11–12", label: "Production-ready deliverable", done: true },
-  ];
-
-  return (
-    <section className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            A Typical Sprint
-          </span>
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            From Concept to Prototype.
-            <br className="hidden sm:block" />{" "}
-            <span className="text-international-orange">Weeks, Not Months.</span>
-          </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Here is a typical project timeline when you work with fractional
-            experts instead of building a full-time team.
-          </p>
-        </AnimatedSection>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center">
-          {/* Left: Image */}
-          <AnimatedSection>
-            <div className="relative w-full aspect-[4/3] rounded-lg sm:rounded-xl overflow-hidden border shadow-lg">
-              <Image
-                src="/images/case-study-drone.png"
-                alt="Example: an inspection drone prototype — the kind of project fractional teams can tackle"
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 600px"
-                loading="lazy"
-              />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-foreground/80 to-transparent p-4 sm:p-6">
-                <p className="text-background/80 text-sm">
-                  Inspection Drone Prototype
-                </p>
-              </div>
-            </div>
-          </AnimatedSection>
-
-          {/* Right: Explanation + Timeline */}
-          <AnimatedSection delay={0.15} className="space-y-6 sm:space-y-8">
-            {/* The traditional problem */}
-            <div>
-              <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">The Traditional Way</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                A hardware startup building something like an inspection drone
-                would typically need to hire 4–6 full-time engineers, spend
-                months recruiting, and commit to 12–18 months of runway burn
-                before seeing a working prototype.
-              </p>
-            </div>
-
-            {/* The fractional approach */}
-            <div>
-              <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">The Fractional Approach</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                With Fractional Forge, you assemble a team of senior specialists
-                in days, not months. You pay only for the expertise you need,
-                keep your equity, and move at sprint pace. Here is what a
-                typical timeline looks like:
-              </p>
-            </div>
-
-            {/* Timeline */}
-            <div>
-              <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4">Typical Sprint Timeline</h3>
-              <div className="space-y-2.5 sm:space-y-3">
-                {PHASES.map((phase, i) => (
-                  <motion.div
-                    key={phase.week}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.08, duration: 0.4 }}
-                    className="flex items-start sm:items-center gap-3"
-                  >
-                    <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-international-orange flex items-center justify-center mt-0.5 sm:mt-0">
-                      <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
-                    </div>
-                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-muted pb-2.5 sm:pb-3 gap-0.5 sm:gap-2">
-                      <span className="text-sm font-medium text-foreground">
-                        {phase.label}
-                      </span>
-                      <span className="text-xs font-mono text-muted-foreground flex-shrink-0">
-                        {phase.week}
-                      </span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            {/* Honest framing */}
-            <div className="border-l-4 border-international-orange pl-4">
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Timelines vary by project complexity. The fractional model works
-                because you get senior specialists from day one — no recruiting,
-                no ramp-up, no long-term commitments.
-              </p>
-            </div>
-          </AnimatedSection>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════════════════
- * SECTION 4 — PLATFORM CAPABILITIES
- * Shows real, verifiable platform metrics. No fabricated testimonials.
- * ════════════════════════════════════════════════════════════════════════ */
-
-function PlatformCapabilitiesSection() {
-  const METRICS = [
-    { value: "78+", label: "Manufacturing Techniques" },
-    { value: "100", label: "Founding Member Spots" },
-    { value: "12", label: "Week Sprints" },
-    { value: "£0", label: "Equity Given Up" },
-  ] as const;
-
-  const VALUE_PROPS = [
-    {
-      icon: UserCheck,
-      title: "Senior Specialists Only",
-      description:
-        "Every expert on the platform is vetted. No juniors, no generalists — only people who have shipped real hardware products.",
-    },
-    {
-      icon: Shield,
-      title: "No Equity, No Lock-In",
-      description:
-        "Pay for expertise by the day or project. No equity stakes, no long-term contracts, no golden handcuffs.",
-    },
-    {
-      icon: Factory,
-      title: "Full Manufacturing Stack",
-      description:
-        "From 3D printing to CNC to injection moulding — access 78+ manufacturing techniques through one platform.",
-    },
-  ] as const;
-
-  return (
-    <section className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        {/* Metrics bar — all verifiable */}
-        <StaggerContainer className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 md:gap-8 mb-12 sm:mb-16 md:mb-24">
-          {METRICS.map((metric) => (
-            <AnimatedCard
-              key={metric.label}
-              className="text-center p-4 sm:p-6 rounded-xl border bg-card"
-            >
-              <p className="text-2xl sm:text-3xl md:text-4xl font-black text-international-orange mb-1">
-                {metric.value}
-              </p>
-              <p className="text-xs md:text-sm text-muted-foreground font-mono uppercase tracking-wider">
-                {metric.label}
-              </p>
-            </AnimatedCard>
-          ))}
-        </StaggerContainer>
-
-        {/* Value propositions — not testimonials */}
-        <AnimatedSection className="text-center mb-8 sm:mb-10">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            The Founding Member Advantage
-          </span>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black">
-            What You Get on Day One.
-          </h2>
-        </AnimatedSection>
-
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
-          {VALUE_PROPS.map((prop) => {
-            const Icon = prop.icon;
-            return (
-              <AnimatedCard
-                key={prop.title}
-                className="border bg-card rounded-xl p-5 sm:p-6 md:p-8 flex flex-col"
-              >
-                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-international-orange/10 flex items-center justify-center mb-3 sm:mb-4">
-                  <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-international-orange" />
-                </div>
-                <h3 className="text-foreground text-base font-bold mb-2">
-                  {prop.title}
-                </h3>
-                <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                  {prop.description}
-                </p>
-              </AnimatedCard>
-            );
-          })}
-        </StaggerContainer>
-
-        {/* Manufacturing capabilities — merged from former CapabilitiesHighlight */}
-        <AnimatedSection className="text-center mt-12 sm:mt-16 md:mt-24">
-          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-5 sm:mb-6">
-            {[
-              "Additive Manufacturing",
-              "CNC Machining",
-              "Sheet Metal",
-              "Injection Moulding",
-              "Casting",
-              "Composites",
-              "PCB Assembly",
-              "Surface Treatment",
-            ].map((cap) => (
-              <span
-                key={cap}
-                className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border bg-card text-xs sm:text-sm font-medium text-foreground"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-status-success flex-shrink-0" />
-                {cap}
-              </span>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground font-mono tracking-wider mb-5 sm:mb-6">
-            + Welding, Brazing, Carbon Fibre, Nano-Imprint, Bio-Printing, and
-            dozens more.
-          </p>
-          <Link
-            href="/techniques"
-            className="inline-flex items-center justify-center gap-2 text-electric-blue hover:text-electric-blue-hover text-xs sm:text-sm font-mono uppercase tracking-wider transition-colors min-h-[44px] sm:min-h-0"
-          >
-            Explore All 78+ Techniques
-            <ExternalLink className="h-4 w-4" />
-          </Link>
-        </AnimatedSection>
-      </div>
-    </section>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════════════════
  * SECTION 5 — HOW IT WORKS
  * Simple 3-step process for primary audience (Founders).
  * ════════════════════════════════════════════════════════════════════════ */
@@ -1682,6 +1250,24 @@ function PricingPreviewSection() {
           ))}
         </StaggerContainer>
 
+        {/* Trust strip — compact confidence signals */}
+        <div className="flex flex-wrap justify-center gap-x-6 sm:gap-x-8 gap-y-3 mb-8 sm:mb-10 text-sm text-muted-foreground">
+          {[
+            { icon: Shield, text: "Your IP, 100%" },
+            { icon: UserCheck, text: "Verified Experts" },
+            { icon: DollarSign, text: "No Equity Required" },
+            { icon: CheckCircle2, text: "Cancel Anytime" },
+          ].map((signal) => {
+            const Icon = signal.icon;
+            return (
+              <div key={signal.text} className="flex items-center gap-2">
+                <Icon className="h-4 w-4 text-international-orange flex-shrink-0" />
+                <span className="font-medium text-foreground">{signal.text}</span>
+              </div>
+            );
+          })}
+        </div>
+
         <div className="text-center">
           <Link
             href="/pricing"
@@ -1719,11 +1305,6 @@ function FAQSection() {
         "Anything physical. Our founding members are building consumer electronics, robotics, medical devices, aerospace components, IoT hardware, and industrial equipment. If it can be designed, prototyped, and manufactured, we can help.",
     },
     {
-      question: "What does \"Early Access\" mean? Is the platform ready?",
-      answer:
-        "Early Access means the platform is live and functional, but we're actively iterating based on founding member feedback. You get direct input into the product roadmap, priority support, and early-access pricing that won't increase for founding members.",
-    },
-    {
       question: "How much does it actually cost?",
       answer:
         "The platform starts free. Paid plans start at £49/month for growing ventures. On top of the subscription, there's a 10% platform fee on marketplace transactions (manufacturing orders, retainer payments). No hidden fees. Cancel anytime.",
@@ -1734,24 +1315,9 @@ function FAQSection() {
         "Founders bring vision and capital — they need hardware built. Executives are senior professionals who deploy their expertise fractionally across multiple ventures. Apprentices are ambitious early-career people who get paired with executives for structured mentorship while shipping real projects. Each role has its own signup path and experience inside the platform.",
     },
     {
-      question: "How does the Guild work?",
-      answer:
-        "The Guild is our community hub. It hosts events, workshops, and networking sessions. Executives mentor apprentices through structured programmes. Apprentices build portfolios of real work. Founders connect with people who can help. It's the human side of making hardware fast — because tools alone don't ship products, people do.",
-    },
-    {
-      question: "How do Executives get paid?",
-      answer:
-        "Executives set their own rates and work through retainer agreements managed on the platform. Payment is handled through Stripe Connect — secure, transparent, and automatic. You can work with multiple startups simultaneously, choosing your own level of engagement.",
-    },
-    {
       question: "How quickly can I go from idea to prototype?",
       answer:
         "Our structured sprints target 12 weeks from kick-off to validated prototype. Some simpler projects ship faster. The key is eliminating the months of hiring, onboarding, and team-building that typically precede any actual engineering work.",
-    },
-    {
-      question: "Is there a refund policy?",
-      answer:
-        "Yes. If you're not satisfied within the first 30 days of a paid plan, we'll refund you in full — no questions asked. We want founding members who genuinely benefit from the platform.",
     },
   ] as const;
 

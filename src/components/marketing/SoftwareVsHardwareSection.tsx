@@ -57,6 +57,18 @@ const COMPARISON_ITEMS = [
  * @description Maps each hardware pain point to its Fractional Forge equivalent,
  * showing how hardware development can feel as lightweight as software.
  */
+/**
+ * Hard stats from the traditional hardware development model.
+ *
+ * @description Pulled from industry benchmarks — these numbers make the
+ * pain viscerally concrete before the comparison table drives it home.
+ */
+const PAIN_STATS = [
+  { stat: "12–18 months", label: "To first prototype" },
+  { stat: "£50–100k", label: "Monthly burn rate" },
+  { stat: "30–40%", label: "Equity given away" },
+] as const
+
 const BRIDGE_ITEMS = [
   {
     pain: "Full-time engineering team",
@@ -73,6 +85,10 @@ const BRIDGE_ITEMS = [
   {
     pain: "Equity dilution to fund hiring",
     solution: "Keep 100% of your company",
+  },
+  {
+    pain: "Finding manufacturers yourself",
+    solution: "78+ manufacturing techniques, one platform",
   },
   {
     pain: "Building everything from scratch",
@@ -115,6 +131,23 @@ export function SoftwareVsHardwareSection() {
             Until now.
           </p>
         </AnimatedSection>
+
+        {/* Pain Stats — the hard numbers */}
+        <StaggerContainer className="grid grid-cols-3 gap-3 sm:gap-6 mb-10 sm:mb-12 md:mb-16">
+          {PAIN_STATS.map((item) => (
+            <AnimatedCard
+              key={item.label}
+              className="text-center p-4 sm:p-6 rounded-xl border bg-card"
+            >
+              <p className="text-lg sm:text-2xl md:text-3xl font-black text-destructive mb-1">
+                {item.stat}
+              </p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground font-mono uppercase tracking-wider">
+                {item.label}
+              </p>
+            </AnimatedCard>
+          ))}
+        </StaggerContainer>
 
         {/* Side-by-Side Comparison */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-10 sm:mb-12 md:mb-20">
