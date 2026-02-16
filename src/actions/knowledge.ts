@@ -20,7 +20,6 @@ import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import {
   queryKnowledgeNotes,
-  getKnowledgeNote,
   getKnowledgeNoteWithLinks,
   createKnowledgeNote,
   updateKnowledgeNote,
@@ -32,7 +31,6 @@ import {
   removeKnowledgeLink,
   getVaultStats,
   ensureDefaultDomains,
-  getKnowledgeDomains,
   extractKnowledge,
   discoverConnections,
 } from '@/lib/knowledge-vault'
