@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from "react"
 import Image from "next/image"
-import { Play, Pause } from "lucide-react"
+import { Play } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -165,6 +165,7 @@ export function VideoWalkthrough({
   const embedUrl = videoUrl && !isDirect ? getEmbedUrl(videoUrl) : null
   const hasVideo = !!((isDirect || embedUrl) && !comingSoon)
   const isDisabled = !hasVideo
+  const showComingSoon = comingSoon || (!videoUrl && !!thumbnailUrl)
 
   const handlePlayClick = useCallback(() => {
     if (isDisabled) return
@@ -257,33 +258,38 @@ export function VideoWalkthrough({
                 />
               ) : null}
 
-              {/* Coming Soon overlay */}
-              {comingSoon && (
-                <div className="absolute inset-0 flex items-center justify-center bg-foreground/20">
-                  <span className="rounded-full bg-foreground/80 px-3 py-1 text-xs font-medium text-background">
-                    Coming Soon
+              {/* Coming Soon overlay — shows when video isn't uploaded yet */}
+              {showComingSoon && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-foreground/10">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-foreground/20 backdrop-blur-sm">
+                    <Play className="h-6 w-6 text-white/80" aria-hidden />
+                  </div>
+                  <span className="rounded-full bg-foreground/60 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                    Video coming soon
                   </span>
                 </div>
               )}
 
-              {/* Play button overlay */}
-              <button
-                type="button"
-                onClick={handlePlayClick}
-                disabled={isDisabled}
-                aria-label={hasVideo ? `Play ${title}` : "Video coming soon"}
-                className={cn(
-                  "absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full transition-all",
-                  hasVideo
-                    ? "bg-international-orange/90 hover:bg-international-orange hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-2"
-                    : "cursor-not-allowed bg-international-orange/40"
-                )}
-              >
-                <Play
-                  className="h-6 w-6 fill-white text-white"
-                  aria-hidden
-                />
-              </button>
+              {/* Play button overlay — only when video is available */}
+              {!showComingSoon && (
+                <button
+                  type="button"
+                  onClick={handlePlayClick}
+                  disabled={isDisabled}
+                  aria-label={hasVideo ? `Play ${title}` : "Video coming soon"}
+                  className={cn(
+                    "absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full transition-all",
+                    hasVideo
+                      ? "bg-international-orange/90 hover:bg-international-orange hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-2"
+                      : "cursor-not-allowed bg-international-orange/40"
+                  )}
+                >
+                  <Play
+                    className="h-6 w-6 fill-white text-white"
+                    aria-hidden
+                  />
+                </button>
+              )}
 
               {/* Duration badge */}
               {duration && hasVideo && (

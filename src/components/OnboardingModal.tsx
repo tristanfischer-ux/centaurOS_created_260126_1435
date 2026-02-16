@@ -558,22 +558,24 @@ export function OnboardingModal({ userRole, accountType: initialAccountType }: O
                     </motion.p>
                   </div>
 
-                  {/* Platform Overview Video */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.7 }}
-                    className="max-w-sm mx-auto"
-                  >
-                    <VideoWalkthrough
-                      videoUrl={VIDEOS.platformOverview.videoUrl}
-                      thumbnailUrl={VIDEOS.platformOverview.thumbnailUrl}
-                      title="Quick Platform Tour"
-                      description="60 seconds to see everything ForgeOS can do"
-                      duration={VIDEOS.platformOverview.duration}
-                      mode="modal"
-                    />
-                  </motion.div>
+                  {/* Platform Overview Video — only shown when video is uploaded */}
+                  {VIDEOS.platformOverview.videoUrl && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.7 }}
+                      className="max-w-sm mx-auto"
+                    >
+                      <VideoWalkthrough
+                        videoUrl={VIDEOS.platformOverview.videoUrl}
+                        thumbnailUrl={VIDEOS.platformOverview.thumbnailUrl}
+                        title="Quick Platform Tour"
+                        description="60 seconds to see everything ForgeOS can do"
+                        duration={VIDEOS.platformOverview.duration}
+                        mode="modal"
+                      />
+                    </motion.div>
+                  )}
 
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}

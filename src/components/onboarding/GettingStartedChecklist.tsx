@@ -221,7 +221,7 @@ export function GettingStartedChecklist({
                       </button>
                       {!isComplete && (
                         <>
-                          {item.isVideo ? (
+                          {item.isVideo && onPlayVideo ? (
                             <button
                               type="button"
                               onClick={handlePlayVideo}

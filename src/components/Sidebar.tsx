@@ -368,7 +368,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                             onDismiss={async () => {
                                 await updateOnboardingData({ checklist_dismissed: true })
                             }}
-                            onPlayVideo={() => setIsVideoModalOpen(true)}
+                            onPlayVideo={VIDEOS.platformOverview.videoUrl ? () => setIsVideoModalOpen(true) : undefined}
                         />
                     </div>
                 )}

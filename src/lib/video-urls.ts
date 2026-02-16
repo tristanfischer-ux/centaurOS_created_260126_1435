@@ -43,7 +43,7 @@ export const VIDEOS = {
     title: 'Platform Overview',
     description: 'A tour of ForgeOS and how everything connects',
     duration: '60s',
-    videoUrl: `${SUPABASE_STORAGE_BASE}/walkthroughs/platform-overview.mp4`,
+    videoUrl: undefined as string | undefined, // `${SUPABASE_STORAGE_BASE}/walkthroughs/platform-overview.mp4`
     thumbnailUrl: '/videos/thumbnails/thumb-platform-overview.jpg',
   },
   creatingObjectives: {
@@ -51,7 +51,7 @@ export const VIDEOS = {
     title: 'Creating Objectives',
     description: 'Turn ideas into actionable objectives with key results',
     duration: '45s',
-    videoUrl: `${SUPABASE_STORAGE_BASE}/walkthroughs/creating-objectives.mp4`,
+    videoUrl: undefined as string | undefined, // `${SUPABASE_STORAGE_BASE}/walkthroughs/creating-objectives.mp4`
     thumbnailUrl: '/videos/thumbnails/thumb-creating-objectives.jpg',
   },
   managingTasks: {
@@ -59,7 +59,7 @@ export const VIDEOS = {
     title: 'Managing Tasks',
     description: 'Organize and complete work efficiently',
     duration: '45s',
-    videoUrl: `${SUPABASE_STORAGE_BASE}/walkthroughs/managing-tasks.mp4`,
+    videoUrl: undefined as string | undefined, // `${SUPABASE_STORAGE_BASE}/walkthroughs/managing-tasks.mp4`
     thumbnailUrl: '/videos/thumbnails/thumb-managing-tasks.jpg',
   },
   buildingYourTeam: {
@@ -67,7 +67,7 @@ export const VIDEOS = {
     title: 'Building Your Team',
     description: 'Invite members and assign roles',
     duration: '45s',
-    videoUrl: `${SUPABASE_STORAGE_BASE}/walkthroughs/building-your-team.mp4`,
+    videoUrl: undefined as string | undefined, // `${SUPABASE_STORAGE_BASE}/walkthroughs/building-your-team.mp4`
     thumbnailUrl: '/videos/thumbnails/thumb-building-your-team.jpg',
   },
   marketplace: {
@@ -75,7 +75,7 @@ export const VIDEOS = {
     title: 'The Marketplace',
     description: 'Find and hire specialists for your projects',
     duration: '90s',
-    videoUrl: `${SUPABASE_STORAGE_BASE}/walkthroughs/marketplace.mp4`,
+    videoUrl: undefined as string | undefined, // `${SUPABASE_STORAGE_BASE}/walkthroughs/marketplace.mp4`
     thumbnailUrl: '/videos/thumbnails/thumb-marketplace.jpg',
   },
   theForgeCadLab: {
@@ -83,7 +83,7 @@ export const VIDEOS = {
     title: 'The Forge & CAD Lab',
     description: 'Product development from concept to manufacturing',
     duration: '90s',
-    videoUrl: `${SUPABASE_STORAGE_BASE}/walkthroughs/the-forge-cad-lab.mp4`,
+    videoUrl: undefined as string | undefined, // `${SUPABASE_STORAGE_BASE}/walkthroughs/the-forge-cad-lab.mp4`
     thumbnailUrl: '/videos/thumbnails/thumb-the-forge-cad-lab.jpg',
   },
   strategyDashboard: {
@@ -91,7 +91,7 @@ export const VIDEOS = {
     title: 'Strategy Dashboard',
     description: 'Define pillars, track health, and align objectives',
     duration: '45s',
-    videoUrl: `${SUPABASE_STORAGE_BASE}/walkthroughs/strategy-dashboard.mp4`,
+    videoUrl: undefined as string | undefined, // `${SUPABASE_STORAGE_BASE}/walkthroughs/strategy-dashboard.mp4`
     thumbnailUrl: '/videos/thumbnails/thumb-strategy-dashboard.jpg',
   },
   todayDailyBriefing: {
@@ -99,7 +99,7 @@ export const VIDEOS = {
     title: 'Today — Daily Briefing',
     description: 'Your personalized morning command center',
     duration: '45s',
-    videoUrl: `${SUPABASE_STORAGE_BASE}/walkthroughs/today-daily-briefing.mp4`,
+    videoUrl: undefined as string | undefined, // `${SUPABASE_STORAGE_BASE}/walkthroughs/today-daily-briefing.mp4`
     thumbnailUrl: '/videos/thumbnails/thumb-today-daily-briefing.jpg',
   },
 } as const satisfies Record<string, VideoEntry>
