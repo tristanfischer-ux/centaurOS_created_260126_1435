@@ -47,10 +47,48 @@ export default async function PlatformLayout({
         getUserFoundries(),
     ]);
 
-    const { data: profile, error: profileError } = profileResult;
+    let { data: profile, error: profileError } = profileResult;
 
+    // If the regular profile query fails (e.g. RLS 500), attempt auto-repair
+    // via the SECURITY DEFINER RPC. This transparently fixes broken profiles
+    // without showing the user a manual "Complete Setup" screen.
     if (profileError) {
-        console.error("Failed to fetch user profile:", profileError.message);
+        console.warn("[PlatformLayout] Profile query failed, attempting auto-repair:", profileError.message);
+
+        const { data: rpcResult, error: rpcError } = await supabase.rpc("repair_user_profile");
+
+        if (!rpcError && rpcResult?.success && rpcResult?.foundry_id) {
+            console.info("[PlatformLayout] Auto-repair succeeded:", rpcResult);
+
+            // Re-fetch the profile now that it's been repaired
+            const { data: repairedProfile, error: refetchError } = await supabase
+                .from("profiles")
+                .select("foundry_id, active_foundry_id, full_name, role, account_type, onboarding_data")
+                .eq("id", user.id)
+                .single();
+
+            if (!refetchError && repairedProfile) {
+                profile = repairedProfile;
+                profileError = null;
+            } else {
+                // The re-fetch also failed (persistent RLS issue). Construct a
+                // minimal profile from auth metadata + RPC result so the layout
+                // can render. This prevents the repair screen from looping.
+                console.warn("[PlatformLayout] Re-fetch failed, using fallback profile:", refetchError?.message);
+                const meta = user.user_metadata ?? {};
+                profile = {
+                    foundry_id: rpcResult.foundry_id as string,
+                    active_foundry_id: rpcResult.foundry_id as string,
+                    full_name: (meta.full_name as string) ?? user.email?.split("@")[0] ?? "User",
+                    role: (meta.role as string) ?? "Apprentice",
+                    account_type: "team_builder" as const,
+                    onboarding_data: null,
+                };
+                profileError = null;
+            }
+        } else {
+            console.error("[PlatformLayout] Auto-repair failed:", rpcError?.message ?? rpcResult?.error);
+        }
     }
 
     let foundryName = "Forge Foundry";
