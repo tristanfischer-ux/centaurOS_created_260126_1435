@@ -17,6 +17,7 @@ import { PresenceProvider } from "@/components/PresenceProvider";
 import { ZoomProvider, MobileZoomControl, ZoomableContent } from "@/components/ZoomProvider";
 import { ScreenContextProvider } from "@/contexts/screen-context";
 import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
+import { ProfileSetupRequired } from "@/components/ProfileSetupRequired";
 import { createClient } from "@/lib/supabase/server";
 import { getUserFoundries } from "@/lib/supabase/foundry-context";
 import { redirect } from "next/navigation";
@@ -97,6 +98,10 @@ export default async function PlatformLayout({
     const activeFoundry = userFoundries.find(f => f.isActive)
     const activeFoundryDisplayName = activeFoundry?.foundryName || foundryName
 
+    // GUARD: If user has no valid foundry, show recovery screen instead of page content.
+    // The sidebar still renders so the user isn't completely disoriented.
+    const needsProfileRepair = !profile?.foundry_id
+
     return (
         <TooltipProvider>
             <PresenceProvider>
@@ -109,10 +114,16 @@ export default async function PlatformLayout({
                         <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} />
                         <ZoomableContent className="flex-1 overflow-y-auto bg-background">
                             <main className="p-4 pt-14 sm:p-6 lg:p-8 pb-32 sm:pb-8">
-                                <WelcomeBackBanner userName={profile?.full_name || user.email || "builder"} />
-                                <ErrorBoundary>
-                                    {children}
-                                </ErrorBoundary>
+                                {needsProfileRepair ? (
+                                    <ProfileSetupRequired userRole={profile?.role} />
+                                ) : (
+                                    <>
+                                        <WelcomeBackBanner userName={profile?.full_name || user.email || "builder"} />
+                                        <ErrorBoundary>
+                                            {children}
+                                        </ErrorBoundary>
+                                    </>
+                                )}
                             </main>
                         </ZoomableContent>
                         <MobileNav />
@@ -123,8 +134,12 @@ export default async function PlatformLayout({
                         <DragDropPolyfill />
                         <OfflineIndicator />
                         <ActivityTracker />
-                        <OnboardingModal userRole={profile?.role} accountType={profile?.account_type} />
-                        <ExecutiveProfilePrompt userRole={profile?.role} />
+                        {!needsProfileRepair && (
+                            <>
+                                <OnboardingModal userRole={profile?.role} accountType={profile?.account_type} />
+                                <ExecutiveProfilePrompt userRole={profile?.role} />
+                            </>
+                        )}
                         <Suspense fallback={null}>
                             <VerificationSuccessToast />
                         </Suspense>

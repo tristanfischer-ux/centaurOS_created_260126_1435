@@ -1,12 +1,11 @@
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { TeamPageView } from './team-page-view'
 import { isPast } from 'date-fns'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { RefreshButton } from '@/components/RefreshButton'
-import { AlertCircle, AlertTriangle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { AlertCircle } from 'lucide-react'
+import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
 import type { BusinessFunction, FunctionId } from './types'
 
 /**
@@ -29,7 +28,7 @@ export default async function TeamPage() {
     // AUTH: Verify user has a foundry
     const { data: currentUserProfile, error: profileError } = await supabase
         .from('profiles')
-        .select('foundry_id')
+        .select('foundry_id, role')
         .eq('id', user.id)
         .single()
 
@@ -40,28 +39,7 @@ export default async function TeamPage() {
     const foundry_id = currentUserProfile?.foundry_id || user.app_metadata?.foundry_id
 
     if (!foundry_id) {
-        return (
-            <div className="max-w-2xl mx-auto py-12 px-4 text-center space-y-6">
-                <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-status-warning-light mx-auto">
-                    <AlertTriangle className="h-7 w-7 text-status-warning" />
-                </div>
-                <div className="space-y-2">
-                    <h1 className="text-xl font-bold text-foreground">Profile Setup Incomplete</h1>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                        Your account profile hasn&apos;t been fully set up yet.
-                        Please complete the onboarding process or contact support if this persists.
-                    </p>
-                </div>
-                <div className="flex gap-3 justify-center">
-                    <Button asChild>
-                        <Link href="/today">Go to Dashboard</Link>
-                    </Button>
-                    <Button variant="outline" asChild>
-                        <Link href="/settings">Settings</Link>
-                    </Button>
-                </div>
-            </div>
-        )
+        return <ProfileSetupRequired userRole={currentUserProfile?.role} />
     }
 
     // Fetch all tasks with extended fields

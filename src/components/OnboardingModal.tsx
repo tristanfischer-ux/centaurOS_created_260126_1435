@@ -122,7 +122,7 @@ export function OnboardingModal({ userRole, accountType: initialAccountType }: O
 
     try {
       const result = await setAccountType(intent)
-      if (result.success) {
+      if ('success' in result) {
         localStorage.setItem(INTENT_SELECTED_KEY, intent)
 
         if (intent === 'supplier') {

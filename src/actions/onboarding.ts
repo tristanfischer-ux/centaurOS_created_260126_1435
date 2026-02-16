@@ -446,6 +446,222 @@ export async function getMarketplaceOnboardingStatus() {
 }
 
 /**
+ * Repair a user's profile when foundry_id is missing or invalid.
+ *
+ * @description Detects when a user ended up without a valid foundry and
+ * creates / assigns one based on their role:
+ *   - Founders  → new personal foundry
+ *   - Executives / Apprentices → shared "forge-guild" foundry
+ *   - Suppliers  → shared "forge-suppliers" foundry
+ *
+ * Also creates the foundry_memberships row so multi-foundry switching works.
+ *
+ * @returns Object with `success: true` or an `error` string
+ *
+ * @security Requires authenticated user. Only modifies own profile.
+ * @audit Logs repair events with userId and resolved foundryId.
+ */
+export async function repairProfile(): Promise<{ success: true; foundryId: string } | { error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Unauthorized' }
+
+  // Read current profile
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, foundry_id, role, full_name, email, account_type')
+    .eq('id', user.id)
+    .single()
+
+  // If no profile at all, create one from scratch
+  if (profileError && profileError.code === 'PGRST116') {
+    console.warn('[RepairProfile] No profile found for user, creating from metadata:', user.id)
+    const userRole = (user.user_metadata?.role as 'Founder' | 'Executive' | 'Apprentice') ?? 'Apprentice'
+    const resolvedFoundry = await resolveOrCreateFoundry(supabase, user.id, userRole, user.user_metadata?.full_name || user.email?.split('@')[0] || 'My Company')
+
+    if ('error' in resolvedFoundry) return resolvedFoundry
+
+    const { error: insertError } = await supabase.from('profiles').insert({
+      id: user.id,
+      email: user.email ?? '',
+      full_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
+      role: userRole,
+      foundry_id: resolvedFoundry.foundryId,
+      active_foundry_id: resolvedFoundry.foundryId,
+      account_type: userRole === 'Founder' ? 'team_builder' : 'team_builder',
+    })
+
+    if (insertError) {
+      console.error('[RepairProfile] Failed to create profile:', { userId: user.id, error: insertError.message })
+      return { error: `Failed to create profile: ${insertError.message}` }
+    }
+
+    // AUDIT: Log profile creation
+    console.info('[RepairProfile] Created profile with foundry:', { userId: user.id, foundryId: resolvedFoundry.foundryId })
+
+    revalidatePath('/', 'layout')
+    return { success: true, foundryId: resolvedFoundry.foundryId }
+  }
+
+  if (profileError) {
+    console.error('[RepairProfile] Failed to fetch profile:', { userId: user.id, error: profileError.message })
+    return { error: 'Failed to read your profile. Please try again.' }
+  }
+
+  // Profile exists — check if foundry_id points to a real foundry
+  if (profile.foundry_id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: foundryExists } = await (supabase as any)
+      .from('foundries')
+      .select('id')
+      .eq('id', profile.foundry_id)
+      .maybeSingle()
+
+    if (foundryExists) {
+      // Foundry is valid — ensure membership exists too
+      await ensureMembership(supabase, user.id, profile.foundry_id, profile.role || 'Apprentice')
+      revalidatePath('/', 'layout')
+      return { success: true, foundryId: profile.foundry_id }
+    }
+
+    // foundry_id is set but points to a non-existent foundry — need to fix it
+    console.warn('[RepairProfile] foundry_id points to non-existent foundry:', {
+      userId: user.id,
+      invalidFoundryId: profile.foundry_id,
+    })
+  }
+
+  // Resolve the correct foundry based on role
+  const role = (profile.role as 'Founder' | 'Executive' | 'Apprentice') || 'Apprentice'
+  const resolvedFoundry = await resolveOrCreateFoundry(supabase, user.id, role, profile.full_name || 'My Company')
+
+  if ('error' in resolvedFoundry) return resolvedFoundry
+
+  // Update the profile with the valid foundry
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({
+      foundry_id: resolvedFoundry.foundryId,
+      active_foundry_id: resolvedFoundry.foundryId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', user.id)
+
+  if (updateError) {
+    console.error('[RepairProfile] Failed to update profile:', { userId: user.id, error: updateError.message })
+    return { error: `Failed to update profile: ${updateError.message}` }
+  }
+
+  // AUDIT: Log repair event
+  console.info('[RepairProfile] Profile repaired:', {
+    userId: user.id,
+    role,
+    foundryId: resolvedFoundry.foundryId,
+    wasCreated: resolvedFoundry.wasCreated,
+  })
+
+  revalidatePath('/', 'layout')
+  return { success: true, foundryId: resolvedFoundry.foundryId }
+}
+
+/**
+ * Resolve the correct foundry for a user based on role, creating it if needed.
+ *
+ * @param supabase - Supabase client
+ * @param userId - The user's auth ID
+ * @param role - The user's role
+ * @param displayName - Name to use for new foundry (Founders only)
+ * @returns The foundry ID and whether it was newly created, or an error
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveOrCreateFoundry(
+  supabase: any,
+  userId: string,
+  role: 'Founder' | 'Executive' | 'Apprentice',
+  displayName: string,
+): Promise<{ foundryId: string; wasCreated: boolean } | { error: string }> {
+  if (role === 'Founder') {
+    // Founders get their own foundry
+    const slug = `foundry-${userId.slice(0, 8)}-${Date.now().toString(36)}`
+    const { data: newFoundry, error: createError } = await supabase
+      .from('foundries')
+      .insert({
+        name: `${displayName}'s Foundry`,
+        slug,
+        owner_id: userId,
+      })
+      .select('id')
+      .single()
+
+    if (createError) {
+      console.error('[RepairProfile] Failed to create foundry for Founder:', { userId, error: createError.message })
+      return { error: 'Failed to create your workspace. Please contact support.' }
+    }
+
+    await ensureMembership(supabase, userId, newFoundry.id, 'Founder')
+    return { foundryId: newFoundry.id, wasCreated: true }
+  }
+
+  // Executives / Apprentices → forge-guild, Suppliers would use forge-suppliers
+  const sharedFoundryId = 'forge-guild'
+  const sharedFoundryName = 'ForgeOS Guild'
+
+  // Check if the shared foundry exists
+  const { data: foundryExists } = await supabase
+    .from('foundries')
+    .select('id')
+    .eq('id', sharedFoundryId)
+    .maybeSingle()
+
+  if (!foundryExists) {
+    // Create the shared foundry
+    const { error: createError } = await supabase
+      .from('foundries')
+      .insert({
+        id: sharedFoundryId,
+        name: sharedFoundryName,
+        slug: sharedFoundryId,
+        owner_id: userId,
+      })
+
+    if (createError) {
+      console.error('[RepairProfile] Failed to create shared foundry:', { error: createError.message })
+      return { error: 'Failed to set up your workspace. Please contact support.' }
+    }
+  }
+
+  await ensureMembership(supabase, userId, sharedFoundryId, role)
+  return { foundryId: sharedFoundryId, wasCreated: !foundryExists }
+}
+
+/**
+ * Ensure a foundry_memberships row exists for the user.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function ensureMembership(supabase: any, userId: string, foundryId: string, role: string): Promise<void> {
+  const { data: existing } = await supabase
+    .from('foundry_memberships')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('foundry_id', foundryId)
+    .maybeSingle()
+
+  if (!existing) {
+    const { error } = await supabase.from('foundry_memberships').insert({
+      user_id: userId,
+      foundry_id: foundryId,
+      role,
+      is_primary: true,
+      joined_at: new Date().toISOString(),
+    })
+    if (error) {
+      console.warn('[RepairProfile] Failed to create membership:', { userId, foundryId, error: error.message })
+    }
+  }
+}
+
+/**
  * Record the user's first marketplace action
  */
 export async function recordMarketplaceAction(

@@ -1,5 +1,6 @@
 {
   "errors": [
+    "e2e/apprentice-onboarding-e2e.spec.ts|TS2769|No overload matches this call.",
     "e2e/content-verification.spec.ts|TS18047|'sectionText' is possibly 'null'.",
     "e2e/content-verification.spec.ts|TS2345|Argument of type is not assignable to parameter of type.",
     "src/actions/activity.ts|TS2345|Argument of type is not assignable to parameter of type.",
@@ -24,7 +25,6 @@
     "src/actions/disputes.ts|TS2345|Argument of type is not assignable to parameter of type.",
     "src/actions/feedback.ts|TS2339|Property 'errors' does not exist on type.",
     "src/actions/foundry-context.ts|TS2322|Type is not assignable to type.",
-    "src/actions/foundry.ts|TS2345|Argument of type is not assignable to parameter of type.",
     "src/actions/fraud.ts|TS7006|Parameter 's' implicitly has an 'any' type.",
     "src/actions/integrations.ts|TS2339|Property 'business_function_id' does not exist on type.",
     "src/actions/integrations.ts|TS2339|Property 'business_function' does not exist on type.",
@@ -48,7 +48,6 @@
     "src/actions/retainers.ts|TS2322|Type is not assignable to type.",
     "src/actions/search.ts|TS2322|Type is not assignable to type.",
     "src/actions/search.ts|TS2769|No overload matches this call.",
-    "src/actions/tasks.ts|TS2322|Type is not assignable to type.",
     "src/actions/trials.ts|TS18047|'provider.trial_rate_discount' is possibly 'null'.",
     "src/actions/trials.ts|TS2345|Argument of type is not assignable to parameter of type.",
     "src/actions/universal-subsystems.ts|TS2322|Type is not assignable to type.",
@@ -76,7 +75,6 @@
     "src/app/(platform)/me/components/focus-cards.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/me/components/quick-actions.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/my-profile/components/links-tab.tsx|TS2322|Type is not assignable to type.",
-    "src/app/(platform)/new-tasks/page.tsx|TS2345|Argument of type is not assignable to parameter of type.",
     "src/app/(platform)/objectives/create-objective-dialog.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/provider-signup/page.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/the-forge/components/edit-module-dialog.tsx|TS2322|Type is not assignable to type.",
@@ -175,11 +173,7 @@
     "src/lib/analytics/service.ts|TS2322|Type is not assignable to type.",
     "src/lib/analytics/service.ts|TS2345|Argument of type is not assignable to parameter of type.",
     "src/lib/analytics/service.ts|TS2769|No overload matches this call.",
-    "src/lib/billing/bank-transfers.ts|TS2322|Type is not assignable to type.",
-    "src/lib/billing/bank-transfers.ts|TS2345|Argument of type is not assignable to parameter of type.",
-    "src/lib/billing/bank-transfers.ts|TS7006|Parameter 'addr' implicitly has an 'any' type.",
-    "src/lib/disputes/service.ts|TS18047|'dispute.evidence_urls' is possibly 'null'.",
-    "src/lib/disputes/service.ts|TS2345|Argument of type is not assignable to parameter of type.",
-    "src/lib/disputes/service.ts|TS2769|No overload matches this call."
+    "test-browser-signup-flow.ts|TS2367|This comparison appears to be unintentional because compared types have no overlap.",
+    "test-error-stage-fix.ts|TS2322|Type is not assignable to type."
   ]
 }
