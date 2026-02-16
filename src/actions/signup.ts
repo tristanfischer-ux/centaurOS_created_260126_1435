@@ -170,27 +170,65 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   }
 
   // 1. Create auth user
-  // Note: email confirmation is handled server-side after signup (auto-confirmed
-  // via admin client) so emailRedirectTo is not needed.
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
+  // Strategy: try admin client first (creates user without sending a
+  // confirmation email → avoids Supabase's email rate limit entirely).
+  // Fall back to the regular signUp() if admin client is unavailable.
+  let userId: string;
+  let createdViaAdmin = false;
+
+  try {
+    const adminSupabase = createAdminClient();
+    const { data: adminUser, error: adminCreateError } = await adminSupabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // auto-confirmed — no email sent
+      user_metadata: {
         full_name: fullName,
         role: capitalizeRole(role),
       },
-    },
-  });
+    });
 
-  if (authError) {
-    console.error("Signup error:", authError);
-    return errorWithValues(authError.message);
+    if (adminCreateError) {
+      // "User already registered" is not a rate-limit issue — surface it
+      console.error("[Signup] Admin createUser failed:", adminCreateError.message);
+      throw adminCreateError; // fall through to regular signUp
+    }
+
+    userId = adminUser.user.id;
+    createdViaAdmin = true;
+    console.info("[Signup] User created via admin client (no email sent):", userId);
+  } catch (adminError) {
+    // Admin client unavailable or createUser failed — use regular signUp.
+    // This WILL send a confirmation email and is subject to Supabase rate limits.
+    console.warn("[Signup] Admin creation unavailable, falling back to signUp():", {
+      error: adminError instanceof Error ? adminError.message : "Unknown error",
+    });
+
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          role: capitalizeRole(role),
+        },
+      },
+    });
+
+    if (authError) {
+      console.error("[Signup] signUp error:", authError);
+      return errorWithValues(authError.message);
+    }
+
+    if (!authData.user) {
+      return errorWithValues("Failed to create account");
+    }
+
+    userId = authData.user.id;
   }
 
-  if (!authData.user) {
-    return errorWithValues("Failed to create account");
-  }
+  // Alias for the rest of the function — keeps diff small
+  const authData = { user: { id: userId } };
 
   let foundryId: string;
   let accountType: 'team_builder' | 'supplier' | null = null;
@@ -391,36 +429,31 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     }
   }
 
-  // 5. Auto-confirm email and sign the user in immediately.
-  // The user just gave us their email and password — no reason to make them
-  // verify via email before they can use the app. Confirm server-side with
-  // the admin client, then sign in with the credentials they just provided.
-  //
-  // CRITICAL: This entire block is wrapped in try/catch because createAdminClient()
-  // throws if SUPABASE_SERVICE_ROLE_KEY is missing. An unhandled throw here would
-  // crash the server action and flash the user back to a blank form.
-  try {
-    const adminSupabase = createAdminClient();
+  // 5. Auto-confirm email (only needed if user was created via regular signUp,
+  // which sends a confirmation email. Admin-created users are already confirmed.)
+  if (!createdViaAdmin) {
+    try {
+      const adminSupabase = createAdminClient();
 
-    const { error: confirmError } = await adminSupabase.auth.admin.updateUserById(
-      authData.user.id,
-      { email_confirm: true }
-    );
+      const { error: confirmError } = await adminSupabase.auth.admin.updateUserById(
+        authData.user.id,
+        { email_confirm: true }
+      );
 
-    if (confirmError) {
-      console.error("[Signup] Failed to auto-confirm email:", {
+      if (confirmError) {
+        console.error("[Signup] Failed to auto-confirm email:", {
+          userId: authData.user.id,
+          error: confirmError.message,
+        });
+      }
+    } catch (adminError) {
+      // Admin client unavailable — signInWithPassword will still work if Supabase
+      // has email confirmation disabled, or the user can verify via email.
+      console.error("[Signup] Admin auto-confirm unavailable:", {
         userId: authData.user.id,
-        error: confirmError.message,
+        error: adminError instanceof Error ? adminError.message : "Unknown error",
       });
     }
-  } catch (adminError) {
-    // Admin client unavailable (missing service role key) or confirm failed.
-    // Log but don't block — signInWithPassword will still work if Supabase
-    // has email confirmation disabled, or the user can verify via email.
-    console.error("[Signup] Admin auto-confirm unavailable:", {
-      userId: authData.user.id,
-      error: adminError instanceof Error ? adminError.message : "Unknown error",
-    });
   }
 
   // Sign the user in with the password they just created.
