@@ -462,13 +462,22 @@ export async function getMarketplaceOnboardingStatus() {
  * @audit Logs repair events with userId and resolved foundryId.
  */
 export async function repairProfile(): Promise<{ success: true; foundryId: string } | { error: string }> {
+  // AUTH: Verify the user is authenticated via the regular client
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return { error: 'Unauthorized' }
 
-  // Read current profile
-  const { data: profile, error: profileError } = await supabase
+  // SECURITY: Use the admin client for all DB operations in this action.
+  // RLS policies on `profiles` can cause 500 recursion errors when the
+  // user's profile is in a broken state (missing foundry_id). The admin
+  // client bypasses RLS. This is safe because we verified auth above and
+  // only modify the authenticated user's own profile.
+  const { createAdminClient } = await import('@/lib/supabase/admin')
+  const admin = createAdminClient()
+
+  // Read current profile (admin client bypasses RLS)
+  const { data: profile, error: profileError } = await admin
     .from('profiles')
     .select('id, foundry_id, role, full_name, email, account_type')
     .eq('id', user.id)
@@ -478,18 +487,18 @@ export async function repairProfile(): Promise<{ success: true; foundryId: strin
   if (profileError && profileError.code === 'PGRST116') {
     console.warn('[RepairProfile] No profile found for user, creating from metadata:', user.id)
     const userRole = (user.user_metadata?.role as 'Founder' | 'Executive' | 'Apprentice') ?? 'Apprentice'
-    const resolvedFoundry = await resolveOrCreateFoundry(supabase, user.id, userRole, user.user_metadata?.full_name || user.email?.split('@')[0] || 'My Company')
+    const resolvedFoundry = await resolveOrCreateFoundry(admin, user.id, userRole, user.user_metadata?.full_name || user.email?.split('@')[0] || 'My Company')
 
     if ('error' in resolvedFoundry) return resolvedFoundry
 
-    const { error: insertError } = await supabase.from('profiles').insert({
+    const { error: insertError } = await admin.from('profiles').insert({
       id: user.id,
       email: user.email ?? '',
       full_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
       role: userRole,
       foundry_id: resolvedFoundry.foundryId,
       active_foundry_id: resolvedFoundry.foundryId,
-      account_type: userRole === 'Founder' ? 'team_builder' : 'team_builder',
+      account_type: 'team_builder' as const,
     })
 
     if (insertError) {
@@ -511,8 +520,7 @@ export async function repairProfile(): Promise<{ success: true; foundryId: strin
 
   // Profile exists — check if foundry_id points to a real foundry
   if (profile.foundry_id) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: foundryExists } = await (supabase as any)
+    const { data: foundryExists } = await admin
       .from('foundries')
       .select('id')
       .eq('id', profile.foundry_id)
@@ -520,7 +528,7 @@ export async function repairProfile(): Promise<{ success: true; foundryId: strin
 
     if (foundryExists) {
       // Foundry is valid — ensure membership exists too
-      await ensureMembership(supabase, user.id, profile.foundry_id, profile.role || 'Apprentice')
+      await ensureMembership(admin, user.id, profile.foundry_id, profile.role || 'Apprentice')
       revalidatePath('/', 'layout')
       return { success: true, foundryId: profile.foundry_id }
     }
@@ -534,12 +542,12 @@ export async function repairProfile(): Promise<{ success: true; foundryId: strin
 
   // Resolve the correct foundry based on role
   const role = (profile.role as 'Founder' | 'Executive' | 'Apprentice') || 'Apprentice'
-  const resolvedFoundry = await resolveOrCreateFoundry(supabase, user.id, role, profile.full_name || 'My Company')
+  const resolvedFoundry = await resolveOrCreateFoundry(admin, user.id, role, profile.full_name || 'My Company')
 
   if ('error' in resolvedFoundry) return resolvedFoundry
 
   // Update the profile with the valid foundry
-  const { error: updateError } = await supabase
+  const { error: updateError } = await admin
     .from('profiles')
     .update({
       foundry_id: resolvedFoundry.foundryId,
