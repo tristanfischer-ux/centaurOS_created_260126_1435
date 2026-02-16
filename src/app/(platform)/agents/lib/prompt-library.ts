@@ -4597,13 +4597,12 @@ Categorize your traffic sources by temperature:
 Design the complete funnel for each traffic temperature:
 
 #### Cold Traffic Funnel
-```
+
 Ad/Content Hook (Hormozi-style: dream outcome + specificity)
     → Landing Page (Lead Magnet — solve a micro-problem for free)
         → Email Sequence (5-7 emails: educate → agitate → solution → proof → offer)
             → Tripwire Offer (low-price, breaks buying barrier)
                 → Core Offer (main product/service)
-```
 
 **Provide:**
 - Ad/content hook variations (3 options)
@@ -4613,12 +4612,11 @@ Ad/Content Hook (Hormozi-style: dream outcome + specificity)
 - Transition mechanism to core offer
 
 #### Warm Traffic Funnel
-```
+
 Content/Email (value-first, deepens relationship)
     → Case Study / Webinar (demonstrates mechanism)
         → Direct Offer Page (core product with value stack)
             → Urgency Mechanism (Kennedy-style deadline + reason-why)
-```
 
 **Provide:**
 - Content strategy for warming
@@ -4627,12 +4625,11 @@ Content/Email (value-first, deepens relationship)
 - Urgency mechanism with genuine reason-why
 
 #### Hot Traffic Funnel
-```
+
 Retargeting Ad / Email (specific, personalized)
     → Offer Page (direct, assumes awareness)
         → Checkout with Order Bump
             → Upsell Page (profit maximizer)
-```
 
 **Provide:**
 - Retargeting ad concepts
