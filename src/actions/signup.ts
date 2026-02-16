@@ -356,22 +356,37 @@ export async function signup(formData: FormData) {
   // The user just gave us their email and password — no reason to make them
   // verify via email before they can use the app. Confirm server-side with
   // the admin client, then sign in with the credentials they just provided.
-  const adminSupabase = createAdminClient();
+  //
+  // CRITICAL: This entire block is wrapped in try/catch because createAdminClient()
+  // throws if SUPABASE_SERVICE_ROLE_KEY is missing. An unhandled throw here would
+  // crash the server action and flash the user back to a blank form.
+  try {
+    const adminSupabase = createAdminClient();
 
-  const { error: confirmError } = await adminSupabase.auth.admin.updateUserById(
-    authData.user.id,
-    { email_confirm: true }
-  );
+    const { error: confirmError } = await adminSupabase.auth.admin.updateUserById(
+      authData.user.id,
+      { email_confirm: true }
+    );
 
-  if (confirmError) {
-    console.error("[Signup] Failed to auto-confirm email:", {
+    if (confirmError) {
+      console.error("[Signup] Failed to auto-confirm email:", {
+        userId: authData.user.id,
+        error: confirmError.message,
+      });
+    }
+  } catch (adminError) {
+    // Admin client unavailable (missing service role key) or confirm failed.
+    // Log but don't block — signInWithPassword will still work if Supabase
+    // has email confirmation disabled, or the user can verify via email.
+    console.error("[Signup] Admin auto-confirm unavailable:", {
       userId: authData.user.id,
-      error: confirmError.message,
+      error: adminError instanceof Error ? adminError.message : "Unknown error",
     });
-    // Non-blocking — if confirm fails, they can still verify via email later
   }
 
-  // Sign the user in with the password they just created
+  // Sign the user in with the password they just created.
+  // This works when: (a) email was auto-confirmed above, or
+  // (b) Supabase has email confirmation disabled in project settings.
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -382,9 +397,10 @@ export async function signup(formData: FormData) {
       userId: authData.user.id,
       error: signInError.message,
     });
-    // Fall back: send them to login page where they can sign in manually
+    // Account was created but we can't sign them in automatically.
+    // Send to login — NEVER back to /join (their account already exists).
     revalidatePath("/", "layout");
-    redirect(`/login?message=${encodeURIComponent("Account created! Sign in to get started.")}`);
+    redirect(`/login?message=${encodeURIComponent("Account created! Sign in with your email and password.")}`);
   }
 
   // User is now authenticated — go straight into the app

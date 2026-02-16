@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useFormStatus } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +17,41 @@ import {
   Briefcase,
   GraduationCap,
   TestTube2,
+  Loader2,
 } from "lucide-react";
 import { signup } from "@/actions/signup";
 import { getDemoAccountData, type DemoAccountData } from "@/actions/demo-accounts";
+
+/**
+ * SubmitButton — Shows loading state while the server action is running.
+ * Must be a child of the <form> to use useFormStatus.
+ */
+function SubmitButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <motion.div
+      whileHover={pending ? {} : { scale: 1.01 }}
+      whileTap={pending ? {} : { scale: 0.98 }}
+      className="pt-2"
+    >
+      <Button
+        type="submit"
+        disabled={pending}
+        className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
+      >
+        {pending ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            Creating Account...
+          </>
+        ) : (
+          "Create Account"
+        )}
+      </Button>
+    </motion.div>
+  );
+}
 
 /** Total founding member spots available */
 const TOTAL_FOUNDING_SPOTS = 100;
@@ -487,18 +520,7 @@ function JoinPageInner() {
                   )}
 
                   {/* Submit */}
-                  <motion.div
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="pt-2"
-                  >
-                    <Button
-                      type="submit"
-                      className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors shadow-lg hover:shadow-xl"
-                    >
-                      Create Account
-                    </Button>
-                  </motion.div>
+                  <SubmitButton />
                 </form>
 
                 {/* Founding member counter */}
