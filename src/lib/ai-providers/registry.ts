@@ -387,6 +387,50 @@ async function streamQwen(opts: StreamingTextOptions): Promise<void> {
     opts.onDone()
 }
 
+// ─── Qwen Local (Ollama) Text Streaming ──────────────────────────────
+
+/**
+ * Streams text from a locally-hosted Qwen3 model via Ollama's OpenAI-compatible endpoint.
+ *
+ * @description Ollama exposes an OpenAI-compatible API at localhost:11434/v1.
+ * This enables zero-cost, zero-latency-to-API inference for specialist agents
+ * when running on hardware with sufficient memory (Mac Studio recommended).
+ *
+ * The base URL is configurable via OLLAMA_BASE_URL env var, defaulting to
+ * localhost. This supports both direct localhost and ngrok tunnel scenarios.
+ *
+ * @security Runs entirely on-premises — no data leaves the local network.
+ * Ideal for sensitive business strategy and financial discussions.
+ *
+ * @see https://ollama.com/library/qwen3
+ */
+async function streamQwenLocal(opts: StreamingTextOptions): Promise<void> {
+    const OpenAI = (await import("openai")).default
+    const baseURL = process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1"
+    const client = new OpenAI({
+        apiKey: opts.apiKey || "ollama",
+        baseURL,
+    })
+
+    const stream = await client.chat.completions.create({
+        model: opts.modelId,
+        messages: [
+            { role: "system", content: opts.systemPrompt },
+            { role: "user", content: opts.userPrompt },
+        ],
+        stream: true,
+        // Ollama handles max_tokens differently; cap at a reasonable default
+        ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
+    })
+
+    for await (const chunk of stream) {
+        if (opts.signal?.aborted) break
+        const text = chunk.choices[0]?.delta?.content ?? ""
+        if (text) opts.onChunk(text)
+    }
+    opts.onDone()
+}
+
 // ─── MiniMax Image Generation ────────────────────────────────────────
 
 /**
@@ -682,6 +726,7 @@ const TEXT_PROVIDERS: Partial<Record<AIProviderId, TextStreamFn>> = {
     anthropic: streamAnthropic,
     google: streamGoogle,
     qwen: streamQwen,
+    "qwen-local": streamQwenLocal,
     minimax: streamMiniMax,
 }
 

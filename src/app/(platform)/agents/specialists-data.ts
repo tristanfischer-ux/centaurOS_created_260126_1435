@@ -97,8 +97,8 @@ export interface Specialist {
     thinkingIndicator: string
     /** Progressive thinking phases shown at 0s, 3s, and 8s while waiting for a response */
     thinkingPhases: [string, string, string]
-    /** AI model tier: "claude" for high-stakes reasoning, "qwen" for frontier open-source MoE, "minimax" for high-volume work */
-    modelTier: "claude" | "qwen" | "minimax"
+    /** AI model tier: "claude" for high-stakes reasoning, "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume work */
+    modelTier: "claude" | "qwen" | "qwen-local" | "minimax"
 }
 
 export const SPECIALISTS: Specialist[] = [

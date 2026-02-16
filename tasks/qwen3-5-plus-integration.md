@@ -129,3 +129,93 @@ Estimated savings from moving 3 specialists (CTO, VP Eng, Product) from Claude t
 - **~90% cost reduction** for these specialists with comparable quality
 
 At scale (1000 active foundries), this could save $5,000-15,000/month.
+
+---
+
+## Local Self-Hosted Deployment (Mac Studio)
+
+### Upgrading from Qwen 2.5 to Qwen 3
+
+The Mac Studio is currently running **Qwen 2.5** (7B coder + 14B instruct) via Ollama.
+These are two generations behind. Here's the upgrade path:
+
+#### Quick Upgrade Commands
+
+```bash
+# Pull the new Qwen3 models (run on Mac Studio)
+ollama pull qwen3:30b-a3b    # MoE, 3B active — fastest, best value
+ollama pull qwen3:32b         # Dense — strongest reasoning
+ollama pull qwen3:8b          # Lightweight — quick tasks
+
+# Optional: remove old models to free space
+ollama rm qwen2.5-coder:7b
+ollama rm qwen2.5:14b-instruct-q4_K_M
+ollama rm deepseek-coder:6.7b
+
+# Or use the automated script
+./start-ollama.sh
+```
+
+#### Why Qwen3.5-plus Can't Run Locally
+
+Qwen3.5-plus has 397B total parameters. Even at Q4 quantization, this needs
+~200GB of memory. Only the **Mac Studio Ultra with 192GB unified memory** could
+attempt it, and performance would be marginal.
+
+Instead, we use the **tiered approach**:
+- **Qwen3.5-plus via DashScope API** — for production ForgeOS (cloud tier)
+- **Qwen3 30B-A3B via Ollama** — for local dev and zero-cost inference
+
+#### Mac Studio Model Selection Guide
+
+| Mac Studio Config | RAM | Best Model | Notes |
+|---|---|---|---|
+| M2 Max (64GB) | 64GB | `qwen3:30b-a3b` | MoE, only 3B active. Runs fast. |
+| M2 Max (96GB) | 96GB | `qwen3:32b` | Dense, best quality at this tier |
+| M2 Ultra (192GB) | 192GB | `qwen3:235b-a22b` | Full open-weight MoE, frontier quality |
+
+The `qwen3:30b-a3b` model is the sweet spot — it's a Mixture of Experts model
+with 30B total params but only 3B active at inference. This means:
+- Fits easily in 64GB (model is ~18GB at Q4)
+- Inference is nearly as fast as the old 7B model
+- Quality is dramatically better than Qwen 2.5 14B
+
+#### Qwen3 vs Qwen 2.5 Comparison
+
+| Metric | Qwen 2.5 14B | Qwen3 30B-A3B | Qwen3 32B |
+|---|---|---|---|
+| Architecture | Dense | MoE (3B active) | Dense |
+| MMLU | 79.9 | 84.2 | 83.9 |
+| HumanEval | 72.0 | 81.7 | 80.5 |
+| Speed (tps) | ~30 | ~80 | ~25 |
+| Memory (Q4) | ~9GB | ~18GB | ~20GB |
+| Thinking mode | No | Yes | Yes |
+
+### ForgeOS `qwen-local` Provider
+
+The new `qwen-local` provider routes ForgeOS specialist traffic through
+your local Ollama instance. This means:
+
+- **Zero API cost** — no per-token charges
+- **Full privacy** — no data leaves your network
+- **Low latency** — no round-trip to cloud APIs
+- **Works offline** — specialists work without internet
+
+#### Configuration
+
+1. Start Ollama: `./start-ollama.sh`
+2. Set in `.env.local`:
+   ```
+   OLLAMA_BASE_URL=http://localhost:11434/v1
+   ```
+3. Any specialist set to `modelTier: "qwen-local"` will use your Mac Studio
+
+#### When to Use Local vs Cloud
+
+| Scenario | Use | Why |
+|---|---|---|
+| Development/testing | `qwen-local` | Free, fast iteration |
+| Sensitive discussions (finance, legal) | `qwen-local` | Data stays on-premises |
+| Production at scale | `qwen` (DashScope) | Reliable, no hardware dependency |
+| Frontier reasoning | `claude` | Still best for highest-stakes decisions |
+| High-volume chat | `minimax` | Cheapest cloud option |
