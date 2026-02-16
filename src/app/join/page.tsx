@@ -341,7 +341,8 @@ function JoinPageInner() {
                       id="name"
                       name="name"
                       placeholder="Jane Smith"
-                      defaultValue={demoData?.fullName || ""}
+                      key={`name-${state.values?.name ?? ""}`}
+                      defaultValue={state.values?.name || demoData?.fullName || ""}
                       className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                       required
                       aria-required="true"
@@ -364,7 +365,8 @@ function JoinPageInner() {
                       name="email"
                       type="email"
                       placeholder="you@example.com"
-                      defaultValue={demoData?.email || ""}
+                      key={`email-${state.values?.email ?? ""}`}
+                      defaultValue={state.values?.email || demoData?.email || ""}
                       className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                       required
                       aria-required="true"
@@ -433,7 +435,8 @@ function JoinPageInner() {
                           id="company_name"
                           name="company_name"
                           placeholder="Your startup name"
-                          defaultValue={demoData?.companyName || ""}
+                          key={`company-${state.values?.company_name ?? ""}`}
+                          defaultValue={state.values?.company_name || demoData?.companyName || ""}
                           className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                           required
                           aria-required="true"
@@ -452,7 +455,8 @@ function JoinPageInner() {
                             id="industry"
                             name="industry"
                             placeholder="Hardware, DeepTech..."
-                            defaultValue={demoData?.industry || ""}
+                            key={`industry-${state.values?.industry ?? ""}`}
+                            defaultValue={state.values?.industry || demoData?.industry || ""}
                             className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                           />
                         </div>
@@ -467,7 +471,8 @@ function JoinPageInner() {
                             id="stage"
                             name="stage"
                             placeholder="Pre-seed, Seed..."
-                            defaultValue={demoData?.stage || ""}
+                            key={`stage-${state.values?.stage ?? ""}`}
+                            defaultValue={state.values?.stage || demoData?.stage || ""}
                             className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                           />
                         </div>

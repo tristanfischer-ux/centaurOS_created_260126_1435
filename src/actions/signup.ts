@@ -16,11 +16,19 @@ type ApplicationRole = "vc" | "factory" | "university" | "network";
 
 /**
  * State returned by the signup action for useActionState.
- * On error, `error` contains the message to display inline.
+ * On error, `error` contains the message to display inline and `values`
+ * echoes back the submitted form data so inputs can repopulate.
  * On success, the action calls redirect() so no state is returned.
  */
 export type SignupState = {
   error?: string;
+  values?: {
+    name?: string;
+    email?: string;
+    company_name?: string;
+    industry?: string;
+    stage?: string;
+  };
 };
 
 /**
@@ -85,6 +93,27 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   // Extract role early for logging context
   const role = (formData.get("role") as SignupRole) || "general";
 
+  // Capture raw form values up front so every error return can echo them back.
+  // This allows useActionState to repopulate inputs on the client after an error.
+  const rawEmail = formData.get("email") as string;
+  const rawFullName = formData.get("name") as string;
+  const rawCompanyName = formData.get("company_name") as string | null;
+  const rawIndustry = formData.get("industry") as string | null;
+  const rawStage = formData.get("stage") as string | null;
+
+  const formValues: SignupState["values"] = {
+    name: rawFullName || "",
+    email: rawEmail || "",
+    company_name: rawCompanyName || "",
+    industry: rawIndustry || "",
+    stage: rawStage || "",
+  };
+
+  /** Return an error with the submitted form values so the client can repopulate fields. */
+  function errorWithValues(error: string): SignupState {
+    return { error, values: formValues };
+  }
+
   // Security: Get client IP for rate limiting
   const headersList = await headers();
   const clientIP = getClientIP(headersList);
@@ -92,21 +121,14 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   // Security: Rate limit signup attempts
   const rateLimitResult = await rateLimit("signup", clientIP);
   if (!rateLimitResult.success) {
-    return { error: "Too many signup attempts. Please try again later." };
+    return errorWithValues("Too many signup attempts. Please try again later.");
   }
 
   const supabase = await createClient();
 
-  const rawEmail = formData.get("email") as string;
   const password = formData.get("password") as string;
-  const rawFullName = formData.get("name") as string;
   const intent = formData.get("intent") as string | null;
   const listingId = formData.get("listing_id") as string | null;
-
-  // Founder-specific fields
-  const rawCompanyName = formData.get("company_name") as string | null;
-  const industry = formData.get("industry") as string | null;
-  const stage = formData.get("stage") as string | null;
 
   // Supplier-specific fields
   const rawBusinessName = formData.get("business_name") as string | null;
@@ -115,7 +137,7 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   // Security: Validate and sanitize inputs
   const email = sanitizeEmail(rawEmail);
   if (!email) {
-    return { error: "Invalid email address" };
+    return errorWithValues("Invalid email address");
   }
 
   // Security: Sanitize name to prevent XSS
@@ -123,24 +145,28 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   const companyName = rawCompanyName ? escapeHtml(rawCompanyName.trim().slice(0, 100)) : null;
   const businessName = rawBusinessName ? escapeHtml(rawBusinessName.trim().slice(0, 100)) : null;
 
+  // Founder-specific fields (used later for foundry creation)
+  const industry = rawIndustry || null;
+  const stage = rawStage || null;
+
   if (!fullName || !role) {
-    return { error: "All fields are required" };
+    return errorWithValues("All fields are required");
   }
 
   // Security: Validate password strength
   const passwordValidation = validatePassword(password);
   if (!passwordValidation.valid) {
-    return { error: passwordValidation.error || "Invalid password" };
+    return errorWithValues(passwordValidation.error || "Invalid password");
   }
 
   // Founders must provide a company name
   if (role === "founder" && !companyName) {
-    return { error: "Company name is required" };
+    return errorWithValues("Company name is required");
   }
 
   // Suppliers must provide a business name
   if (role === "supplier" && !businessName) {
-    return { error: "Business name is required" };
+    return errorWithValues("Business name is required");
   }
 
   // 1. Create auth user
@@ -159,11 +185,11 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
 
   if (authError) {
     console.error("Signup error:", authError);
-    return { error: authError.message };
+    return errorWithValues(authError.message);
   }
 
   if (!authData.user) {
-    return { error: "Failed to create account" };
+    return errorWithValues("Failed to create account");
   }
 
   let foundryId: string;
@@ -267,7 +293,7 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     });
     // CRITICAL: Profile is required for the app to function.
     // Return error inline so the user can try again or contact support.
-    return { error: "Account created but profile setup failed. Please try logging in — your profile will be created automatically." };
+    return errorWithValues("Account created but profile setup failed. Please try logging in — your profile will be created automatically.");
   }
 
   // 3b. Create foundry_memberships record for multi-foundry support
