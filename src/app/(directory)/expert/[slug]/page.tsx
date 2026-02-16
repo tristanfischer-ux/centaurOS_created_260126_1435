@@ -15,19 +15,16 @@ import {
     Clock,
     Shield,
     Briefcase,
-    ExternalLink,
     Linkedin,
     Globe,
     Calendar,
-    ArrowRight,
     ChevronLeft,
-    Award,
     Quote,
     TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { generateExpertJsonLd } from '@/lib/directory/structured-data'
-import type { DirectoryExpertFull, DirectoryCaseStudy } from '@/lib/directory/types'
+import type { DirectoryCaseStudy } from '@/lib/directory/types'
 import { sanitizeHref } from '@/lib/security/url-validation'
 
 /**

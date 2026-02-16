@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next'
-import { getDirectoryExpertSlugs, getDirectoryRoles, getDirectoryLocations } from '@/actions/directory'
+import { getDirectoryExpertSlugs, getDirectoryLocations } from '@/actions/directory'
 import { DIRECTORY_ROLE_CATEGORIES, locationToSlug } from '@/lib/directory/types'
 import type { DirectoryRoleSlug } from '@/lib/directory/types'
 

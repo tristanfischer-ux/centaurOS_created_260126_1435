@@ -78,11 +78,9 @@ function GridSkeleton() {
 }
 
 async function RolePageContent({
-    role,
     roleSlug,
     page,
 }: {
-    role: string
     roleSlug: string
     page: number
 }) {
@@ -234,7 +232,7 @@ export default async function RoleCategoryPage({ params, searchParams }: PagePro
             {/* Content */}
             <div className="space-y-6">
                 <Suspense fallback={<GridSkeleton />}>
-                    <RolePageContent role={role} roleSlug={role} page={page} />
+                    <RolePageContent roleSlug={role} page={page} />
                 </Suspense>
             </div>
 

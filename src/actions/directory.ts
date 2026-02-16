@@ -252,7 +252,7 @@ export async function getDirectoryExpertSlugs(): Promise<string[]> {
             .map((e: Record<string, unknown>) =>
                 (e.profile_slug as string) || (e.username as string) || null
             )
-            .filter((slug): slug is string => slug !== null)
+            .filter((s: string | null): s is string => s !== null)
     } catch (error) {
         console.error('[Directory] Unexpected error fetching slugs:', {
             error: error instanceof Error ? error.message : 'Unknown error',
