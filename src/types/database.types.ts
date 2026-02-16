@@ -1,4 +1,3 @@
-Initialising login role...
 export type Json =
   | string
   | number
@@ -13658,10 +13657,6 @@ export type Database = {
         Returns: number
       }
       calculate_workload_score: { Args: { p_user_id: string }; Returns: number }
-      can_access_profile: {
-        Args: { target_profile_id: string }
-        Returns: boolean
-      }
       can_user_approve: {
         Args: { p_task_id: string; p_user_id: string }
         Returns: boolean
@@ -13748,6 +13743,7 @@ export type Database = {
         Returns: Json
       }
       debug_check_foundry: { Args: { p_foundry_id: string }; Returns: Json }
+      debug_profiles_policies: { Args: never; Returns: Json }
       diagnose_foundry_rls: { Args: never; Returns: Json }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
@@ -14144,6 +14140,7 @@ export type Database = {
         }
         Returns: string
       }
+      get_own_profile: { Args: never; Returns: Json }
       get_pending_decisions_count: {
         Args: { p_profile_id: string }
         Returns: number
@@ -14162,6 +14159,11 @@ export type Database = {
       get_platform_fee_percent: {
         Args: { p_order_type?: string; p_role?: string }
         Returns: number
+      }
+      get_profile_by_id: { Args: { target_id: string }; Returns: Json }
+      get_profiles_by_foundry: {
+        Args: { target_foundry_id: string }
+        Returns: Json
       }
       get_provider_earnings: {
         Args: {
@@ -15075,6 +15077,7 @@ export type Database = {
         Args: { p_foundry_id: string; p_sector: string }
         Returns: undefined
       }
+      update_own_profile: { Args: { data: Json }; Returns: Json }
       update_trending_searches: { Args: never; Returns: undefined }
       updategeometrysrid: {
         Args: {
@@ -15486,5 +15489,3 @@ export const Constants = {
     },
   },
 } as const
-A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.7)
-We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
