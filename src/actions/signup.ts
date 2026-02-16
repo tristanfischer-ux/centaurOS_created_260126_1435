@@ -352,8 +352,21 @@ export async function signup(formData: FormData) {
     }
   }
 
-  // 5. Redirect to success/verification page
+  // 5. Redirect based on whether user already has a session
+  // When email confirmation is DISABLED, signUp() returns a session immediately.
+  // When email confirmation is ENABLED, session is null until the user clicks the email link.
   revalidatePath("/", "layout");
+
+  if (authData.session) {
+    // User is already authenticated — skip the "check your email" page
+    // and go straight to the post-signup onboarding flow
+    if (role === "supplier") {
+      redirect("/supplier-portal");
+    }
+    redirect("/marketplace-setup?verified=true");
+  }
+
+  // No session = email confirmation required — show verification page
   redirect(`/join/success?type=signup&role=${role}`);
 }
 
