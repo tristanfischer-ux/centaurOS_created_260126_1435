@@ -2,6 +2,7 @@
 
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { Database } from '@/types/database.types'
@@ -473,8 +474,13 @@ export async function repairProfile(): Promise<{ success: true; foundryId: strin
   // user's profile is in a broken state (missing foundry_id). The admin
   // client bypasses RLS. This is safe because we verified auth above and
   // only modify the authenticated user's own profile.
-  const { createAdminClient } = await import('@/lib/supabase/admin')
-  const admin = createAdminClient()
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch (envError) {
+    console.error('[RepairProfile] Admin client creation failed:', envError)
+    return { error: 'Server configuration error. Please contact support.' }
+  }
 
   // Read current profile (admin client bypasses RLS)
   const { data: profile, error: profileError } = await admin
@@ -482,6 +488,13 @@ export async function repairProfile(): Promise<{ success: true; foundryId: strin
     .select('id, foundry_id, role, full_name, email, account_type')
     .eq('id', user.id)
     .single()
+
+  console.info('[RepairProfile] Profile query result:', {
+    userId: user.id,
+    hasData: !!profile,
+    errorCode: profileError?.code ?? null,
+    errorMessage: profileError?.message ?? null,
+  })
 
   // If no profile at all, create one from scratch
   if (profileError && profileError.code === 'PGRST116') {
@@ -514,8 +527,14 @@ export async function repairProfile(): Promise<{ success: true; foundryId: strin
   }
 
   if (profileError) {
-    console.error('[RepairProfile] Failed to fetch profile:', { userId: user.id, error: profileError.message })
-    return { error: 'Failed to read your profile. Please try again.' }
+    console.error('[RepairProfile] Failed to fetch profile:', {
+      userId: user.id,
+      code: profileError.code,
+      message: profileError.message,
+      details: profileError.details,
+      hint: profileError.hint,
+    })
+    return { error: `Profile error (${profileError.code}): ${profileError.message}` }
   }
 
   // Profile exists — check if foundry_id points to a real foundry
