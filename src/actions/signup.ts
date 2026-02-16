@@ -197,6 +197,23 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     userId = adminUser.user.id;
     createdViaAdmin = true;
     console.info("[Signup] User created via admin client (no email sent):", userId);
+
+    // CRITICAL: admin.createUser() does NOT establish a session on the regular
+    // supabase client. We must sign in immediately so that all subsequent
+    // database operations (foundry, profile, memberships) pass RLS checks.
+    const { error: earlySignInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (earlySignInError) {
+      console.error("[Signup] Early sign-in after admin creation failed:", {
+        userId,
+        error: earlySignInError.message,
+      });
+      // Don't bail — the user was created. Fall through and try sign-in
+      // again at the end of the flow (step 5). Profile creation via the
+      // unauthenticated client may still work if RLS permits inserts.
+    }
   } catch (adminError) {
     // Admin client unavailable or createUser failed — use regular signUp.
     // This WILL send a confirmation email and is subject to Supabase rate limits.
