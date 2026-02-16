@@ -1,0 +1,177 @@
+{
+  "$schema": "./harness-contract.schema.json",
+  "version": "1",
+  "description": "ForgeOS Harness Engineering contract. Single source of truth for risk tiers, merge policy, required checks, and evidence requirements. Read by CI workflows, the verify script, and coding agents.",
+
+  "riskTierRules": {
+    "critical": {
+      "description": "Authentication, authorization, RLS, billing, and database schema. Changes here can cause data leaks, financial loss, or complete outages.",
+      "paths": [
+        "src/actions/auth.ts",
+        "src/actions/admin-permissions.ts",
+        "src/actions/billing.ts",
+        "src/actions/payments.ts",
+        "src/actions/stripe-connect.ts",
+        "src/actions/gdpr.ts",
+        "src/actions/admin-gdpr.ts",
+        "src/actions/fraud.ts",
+        "src/lib/supabase/server.ts",
+        "src/lib/supabase/admin.ts",
+        "src/lib/supabase/middleware.ts",
+        "src/lib/supabase/foundry-context.ts",
+        "src/app/api/webhooks/stripe/**",
+        "src/app/api/billing/**",
+        "src/app/api/dev-login/**",
+        "src/app/api/bot/telegram/**",
+        "supabase/migrations/**",
+        "scripts/deploy-security-migrations.sh"
+      ]
+    },
+    "high": {
+      "description": "Server actions, API routes, agent execution, and core business logic. Changes affect data integrity and user-facing behavior.",
+      "paths": [
+        "src/actions/**",
+        "src/app/api/**",
+        "src/lib/supabase/**",
+        "src/lib/billing/**",
+        "src/lib/cad-lab-types.ts",
+        "src/app/(platform)/**/page.tsx"
+      ]
+    },
+    "medium": {
+      "description": "Shared components, hooks, and utilities used across multiple pages. Changes can break multiple views.",
+      "paths": [
+        "src/components/**",
+        "src/hooks/**",
+        "src/lib/**",
+        "src/types/**"
+      ]
+    },
+    "low": {
+      "description": "Marketing pages, static content, config files, documentation, and tooling. Low blast radius.",
+      "paths": [
+        "src/app/(marketing)/**",
+        "public/**",
+        "scripts/**",
+        "e2e/**",
+        ".cursor/**",
+        "*.md",
+        "*.json",
+        "*.yml",
+        "**"
+      ]
+    }
+  },
+
+  "mergePolicy": {
+    "critical": {
+      "requiredChecks": [
+        "risk-policy-gate",
+        "security-typecheck",
+        "baseline-typecheck",
+        "lint",
+        "unit-tests",
+        "e2e-critical-paths",
+        "browser-evidence"
+      ],
+      "requiresHumanReview": true,
+      "minimumReviewers": 1,
+      "evidenceRequirements": [
+        "rls-verification",
+        "security-audit-comment"
+      ]
+    },
+    "high": {
+      "requiredChecks": [
+        "risk-policy-gate",
+        "security-typecheck",
+        "baseline-typecheck",
+        "lint",
+        "unit-tests",
+        "smoke-tests"
+      ],
+      "requiresHumanReview": false,
+      "minimumReviewers": 0,
+      "evidenceRequirements": [
+        "smoke-test-pass"
+      ]
+    },
+    "medium": {
+      "requiredChecks": [
+        "risk-policy-gate",
+        "baseline-typecheck",
+        "lint",
+        "smoke-tests"
+      ],
+      "requiresHumanReview": false,
+      "minimumReviewers": 0,
+      "evidenceRequirements": []
+    },
+    "low": {
+      "requiredChecks": [
+        "risk-policy-gate",
+        "baseline-typecheck",
+        "lint"
+      ],
+      "requiresHumanReview": false,
+      "minimumReviewers": 0,
+      "evidenceRequirements": []
+    }
+  },
+
+  "docsDriftRules": {
+    "description": "When control-plane files change, related docs must be updated in the same PR.",
+    "rules": [
+      {
+        "trigger": "harness-contract.json",
+        "requires": ["CLAUDE.md"],
+        "message": "Harness contract changed — verify CLAUDE.md agent directives still match."
+      },
+      {
+        "trigger": ".github/workflows/risk-policy-gate.yml",
+        "requires": ["harness-contract.json"],
+        "message": "Risk policy gate workflow changed — verify harness-contract.json is in sync."
+      },
+      {
+        "trigger": "scripts/verify.sh",
+        "requires": ["harness-contract.json"],
+        "message": "Verify script changed — ensure it still reads from harness-contract.json."
+      }
+    ]
+  },
+
+  "harnessGapPolicy": {
+    "description": "Production regressions must be converted into harness cases within SLA.",
+    "slaDays": 3,
+    "issueLabel": "harness-gap",
+    "caseDirectory": "src/lib/__tests__",
+    "namingConvention": "{feature}-{description}.test.ts"
+  },
+
+  "browserEvidence": {
+    "description": "UI/flow changes in critical paths require browser evidence artifacts.",
+    "requiredFlows": [
+      {
+        "name": "founder-login-to-dashboard",
+        "entrypoint": "/home",
+        "persona": "Founder"
+      },
+      {
+        "name": "executive-task-management",
+        "entrypoint": "/new-tasks",
+        "persona": "Executive"
+      },
+      {
+        "name": "apprentice-learning-path",
+        "entrypoint": "/apprenticeship",
+        "persona": "Apprentice"
+      },
+      {
+        "name": "supplier-portal-access",
+        "entrypoint": "/provider-portal",
+        "persona": "Supplier"
+      }
+    ],
+    "artifactMaxAgeMinutes": 60
+  }
+}

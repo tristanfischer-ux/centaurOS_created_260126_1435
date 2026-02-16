@@ -1,0 +1,348 @@
+# Risk Policy Gate — Harness Engineering Preflight
+#
+# Runs BEFORE expensive CI (build, e2e, Docker).
+# Reads harness-contract.json, classifies changed files by risk tier,
+# and determines which downstream checks are required.
+#
+# This workflow is the canonical enforcement point for the harness contract.
+# It must pass before any merge is allowed.
+#
+# @security This workflow determines what safety checks are enforced.
+#           Changes to this file or harness-contract.json are classified
+#           as critical tier and require human review.
+
+name: Risk Policy Gate
+
+on:
+  pull_request:
+    branches: [main, develop]
+  # Allow manual trigger for debugging
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  classify-risk:
+    name: Classify Risk Tier
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tier: ${{ steps.classify.outputs.tier }}
+      required_checks: ${{ steps.classify.outputs.required_checks }}
+      requires_human_review: ${{ steps.classify.outputs.requires_human_review }}
+      evidence_requirements: ${{ steps.classify.outputs.evidence_requirements }}
+      head_sha: ${{ steps.classify.outputs.head_sha }}
+      file_count: ${{ steps.classify.outputs.file_count }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history needed for diff
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Classify changed files
+        id: classify
+        run: |
+          # Run classifier against the PR base
+          RESULT=$(npx tsx scripts/harness-risk-tier.ts --ref origin/${{ github.base_ref }} 2>/dev/null)
+
+          # Extract fields from JSON output
+          TIER=$(echo "$RESULT" | jq -r '.tier')
+          CHECKS=$(echo "$RESULT" | jq -r '.requiredChecks | join(",")')
+          HUMAN=$(echo "$RESULT" | jq -r '.requiresHumanReview')
+          EVIDENCE=$(echo "$RESULT" | jq -r '.evidenceRequirements | join(",")')
+          SHA=$(echo "$RESULT" | jq -r '.headSha')
+          COUNT=$(echo "$RESULT" | jq -r '.fileCount')
+
+          echo "tier=$TIER" >> $GITHUB_OUTPUT
+          echo "required_checks=$CHECKS" >> $GITHUB_OUTPUT
+          echo "requires_human_review=$HUMAN" >> $GITHUB_OUTPUT
+          echo "evidence_requirements=$EVIDENCE" >> $GITHUB_OUTPUT
+          echo "head_sha=$SHA" >> $GITHUB_OUTPUT
+          echo "file_count=$COUNT" >> $GITHUB_OUTPUT
+
+          # Log summary
+          echo "## Risk Classification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Risk Tier** | \`$TIER\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Head SHA** | \`$SHA\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Files Changed** | $COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Human Review Required** | $HUMAN |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Required Checks" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for check in $(echo "$CHECKS" | tr ',' '\n'); do
+            echo "- \`$check\`" >> $GITHUB_STEP_SUMMARY
+          done
+          if [ -n "$EVIDENCE" ] && [ "$EVIDENCE" != "" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Evidence Requirements" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            for ev in $(echo "$EVIDENCE" | tr ',' '\n'); do
+              echo "- \`$ev\`" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+
+  # ── Docs Drift Check ──────────────────────────────────────────────────
+  docs-drift:
+    name: Docs Drift Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for docs drift
+        run: npx tsx scripts/harness-docs-drift.ts --ref origin/${{ github.base_ref }}
+
+  # ── Security Typecheck (Critical + High) ───────────────────────────────
+  security-typecheck:
+    name: Security Typecheck
+    needs: classify-risk
+    if: contains(needs.classify-risk.outputs.required_checks, 'security-typecheck')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Security typecheck
+        run: npm run typecheck:security
+
+  # ── Baseline Typecheck (All tiers) ─────────────────────────────────────
+  baseline-typecheck:
+    name: Baseline Typecheck
+    needs: classify-risk
+    if: contains(needs.classify-risk.outputs.required_checks, 'baseline-typecheck')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Baseline typecheck
+        run: npm run typecheck:baseline
+
+  # ── Lint (All tiers) ───────────────────────────────────────────────────
+  lint:
+    name: Lint
+    needs: classify-risk
+    if: contains(needs.classify-risk.outputs.required_checks, 'lint')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: ESLint
+        run: npm run lint -- --quiet
+
+  # ── Unit Tests (High + Critical) ───────────────────────────────────────
+  unit-tests:
+    name: Unit Tests
+    needs: classify-risk
+    if: contains(needs.classify-risk.outputs.required_checks, 'unit-tests')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Run tests
+        run: npm test
+        env:
+          CI: true
+
+  # ── Smoke Tests (Medium + High) ────────────────────────────────────────
+  smoke-tests:
+    name: Smoke Tests
+    needs: classify-risk
+    if: contains(needs.classify-risk.outputs.required_checks, 'smoke-tests')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Build application
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      - name: Run smoke tests
+        run: |
+          npx tsx scripts/route-mapper.ts --ref origin/${{ github.base_ref }} > /tmp/routes.txt 2>/dev/null || true
+          ROUTES=$(cat /tmp/routes.txt)
+          if [ -n "$ROUTES" ]; then
+            SMOKE_ROUTES="$ROUTES" npx playwright test e2e/smoke.spec.ts --project=smoke --reporter=list
+          else
+            echo "No routes mapped — skipping smoke tests"
+          fi
+        env:
+          CI: true
+
+  # ── E2E Critical Paths (Critical tier only) ────────────────────────────
+  e2e-critical-paths:
+    name: E2E Critical Paths
+    needs: classify-risk
+    if: contains(needs.classify-risk.outputs.required_checks, 'e2e-critical-paths')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Run critical E2E tests
+        run: |
+          npm run test:e2e -- --project=auth-setup
+          npm run test:e2e -- --project=chromium --grep="@critical"
+        env:
+          CI: true
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          TEST_FOUNDER_EMAIL: ${{ secrets.TEST_FOUNDER_EMAIL }}
+          TEST_FOUNDER_PASSWORD: ${{ secrets.TEST_FOUNDER_PASSWORD }}
+
+  # ── Final Gate ─────────────────────────────────────────────────────────
+  # This job aggregates all required checks and produces a single pass/fail.
+  # Branch protection should require this job to pass.
+  risk-policy-gate:
+    name: Risk Policy Gate
+    needs:
+      - classify-risk
+      - docs-drift
+      - security-typecheck
+      - baseline-typecheck
+      - lint
+      - unit-tests
+      - smoke-tests
+      - e2e-critical-paths
+    # Always run so we can report even when upstream jobs are skipped
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate gate
+        env:
+          TIER: ${{ needs.classify-risk.outputs.tier }}
+          HEAD_SHA: ${{ needs.classify-risk.outputs.head_sha }}
+          REQUIRED_CHECKS: ${{ needs.classify-risk.outputs.required_checks }}
+          REQUIRES_HUMAN: ${{ needs.classify-risk.outputs.requires_human_review }}
+          # Job results
+          CLASSIFY_RESULT: ${{ needs.classify-risk.result }}
+          DOCS_DRIFT_RESULT: ${{ needs.docs-drift.result }}
+          SECURITY_TC_RESULT: ${{ needs.security-typecheck.result }}
+          BASELINE_TC_RESULT: ${{ needs.baseline-typecheck.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          UNIT_RESULT: ${{ needs.unit-tests.result }}
+          SMOKE_RESULT: ${{ needs.smoke-tests.result }}
+          E2E_RESULT: ${{ needs.e2e-critical-paths.result }}
+        run: |
+          echo "## Risk Policy Gate — Final Verdict" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Risk Tier:** \`$TIER\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Head SHA:** \`$HEAD_SHA\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          FAILED=false
+
+          # Classification must succeed
+          if [ "$CLASSIFY_RESULT" != "success" ]; then
+            echo "::error::Risk classification failed"
+            FAILED=true
+          fi
+
+          # Docs drift must succeed
+          if [ "$DOCS_DRIFT_RESULT" != "success" ]; then
+            echo "::error::Docs drift check failed"
+            FAILED=true
+          fi
+
+          # Check each required job based on tier
+          check_job() {
+            local name=$1
+            local result=$2
+            local required=$3
+
+            if echo "$REQUIRED_CHECKS" | grep -q "$required"; then
+              if [ "$result" = "success" ] || [ "$result" = "skipped" ]; then
+                echo "| \`$required\` | ✅ $result |" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "| \`$required\` | ❌ $result |" >> $GITHUB_STEP_SUMMARY
+                echo "::error::Required check '$required' failed with result: $result"
+                FAILED=true
+              fi
+            else
+              echo "| \`$required\` | ⏭️ not required |" >> $GITHUB_STEP_SUMMARY
+            fi
+          }
+
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+
+          check_job "Security Typecheck" "$SECURITY_TC_RESULT" "security-typecheck"
+          check_job "Baseline Typecheck" "$BASELINE_TC_RESULT" "baseline-typecheck"
+          check_job "Lint" "$LINT_RESULT" "lint"
+          check_job "Unit Tests" "$UNIT_RESULT" "unit-tests"
+          check_job "Smoke Tests" "$SMOKE_RESULT" "smoke-tests"
+          check_job "E2E Critical" "$E2E_RESULT" "e2e-critical-paths"
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$REQUIRES_HUMAN" = "true" ]; then
+            echo "⚠️ **Human review is required for this risk tier.**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "$FAILED" = "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **GATE FAILED** — Fix failing checks before merge." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "✅ **GATE PASSED** — All required checks for \`$TIER\` tier passed." >> $GITHUB_STEP_SUMMARY
+          fi
