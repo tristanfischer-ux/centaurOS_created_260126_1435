@@ -1,12 +1,12 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 import { sanitizeEmail, escapeHtml } from "@/lib/security/sanitize";
-import { getBaseUrl } from "@/lib/domains";
 
 // Direct signup roles (Founder, Executive, Apprentice, Supplier)
 type SignupRole = "founder" | "executive" | "apprentice" | "supplier";
@@ -65,6 +65,9 @@ function generateSlug(name: string): string {
  * For Founders: also creates a foundry record with company details
  */
 export async function signup(formData: FormData) {
+  // Extract role early so error redirects go to the correct page
+  const role = (formData.get("role") as SignupRole) || "general";
+
   // Security: Get client IP for rate limiting
   const headersList = await headers();
   const clientIP = getClientIP(headersList);
@@ -72,7 +75,7 @@ export async function signup(formData: FormData) {
   // Security: Rate limit signup attempts
   const rateLimitResult = await rateLimit("signup", clientIP);
   if (!rateLimitResult.success) {
-    return redirect(`/join/general?error=${encodeURIComponent("Too many signup attempts. Please try again later.")}`);
+    return redirect(`/join/${role}?error=${encodeURIComponent("Too many signup attempts. Please try again later.")}`);
   }
 
   const supabase = await createClient();
@@ -80,7 +83,6 @@ export async function signup(formData: FormData) {
   const rawEmail = formData.get("email") as string;
   const password = formData.get("password") as string;
   const rawFullName = formData.get("name") as string;
-  const role = formData.get("role") as SignupRole;
   const intent = formData.get("intent") as string | null;
   const listingId = formData.get("listing_id") as string | null;
 
@@ -124,10 +126,9 @@ export async function signup(formData: FormData) {
     return redirect(`/join/supplier?error=Business name is required`);
   }
 
-  // Get the base URL for email redirect
-  const siteUrl = getBaseUrl()
-
   // 1. Create auth user
+  // Note: email confirmation is handled server-side after signup (auto-confirmed
+  // via admin client) so emailRedirectTo is not needed.
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
@@ -136,7 +137,6 @@ export async function signup(formData: FormData) {
         full_name: fullName,
         role: capitalizeRole(role),
       },
-      emailRedirectTo: `${siteUrl}/auth/callback`,
     },
   });
 
@@ -352,22 +352,49 @@ export async function signup(formData: FormData) {
     }
   }
 
-  // 5. Redirect based on whether user already has a session
-  // When email confirmation is DISABLED, signUp() returns a session immediately.
-  // When email confirmation is ENABLED, session is null until the user clicks the email link.
-  revalidatePath("/", "layout");
+  // 5. Auto-confirm email and sign the user in immediately.
+  // The user just gave us their email and password — no reason to make them
+  // verify via email before they can use the app. Confirm server-side with
+  // the admin client, then sign in with the credentials they just provided.
+  const adminSupabase = createAdminClient();
 
-  if (authData.session) {
-    // User is already authenticated — skip the "check your email" page
-    // and go straight to the post-signup onboarding flow
-    if (role === "supplier") {
-      redirect("/supplier-portal");
-    }
-    redirect("/marketplace-setup?verified=true");
+  const { error: confirmError } = await adminSupabase.auth.admin.updateUserById(
+    authData.user.id,
+    { email_confirm: true }
+  );
+
+  if (confirmError) {
+    console.error("[Signup] Failed to auto-confirm email:", {
+      userId: authData.user.id,
+      error: confirmError.message,
+    });
+    // Non-blocking — if confirm fails, they can still verify via email later
   }
 
-  // No session = email confirmation required — show verification page
-  redirect(`/join/success?type=signup&role=${role}`);
+  // Sign the user in with the password they just created
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (signInError) {
+    console.error("[Signup] Auto sign-in failed:", {
+      userId: authData.user.id,
+      error: signInError.message,
+    });
+    // Fall back: send them to login page where they can sign in manually
+    revalidatePath("/", "layout");
+    redirect(`/login?message=${encodeURIComponent("Account created! Sign in to get started.")}`);
+  }
+
+  // User is now authenticated — go straight into the app
+  revalidatePath("/", "layout");
+
+  if (role === "supplier") {
+    redirect("/supplier-portal");
+  }
+
+  redirect("/today");
 }
 
 /**
