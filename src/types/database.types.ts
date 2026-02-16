@@ -2392,6 +2392,54 @@ export type Database = {
           },
         ]
       }
+      assembly_templates: {
+        Row: {
+          category: string
+          created_at: string
+          default_stats: Json
+          description: string
+          difficulty: string
+          id: string
+          name: string
+          schematic_svg: string | null
+          sector: string | null
+          slots: Json
+          slug: string
+          thumbnail_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          default_stats?: Json
+          description?: string
+          difficulty?: string
+          id?: string
+          name: string
+          schematic_svg?: string | null
+          sector?: string | null
+          slots?: Json
+          slug: string
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          default_stats?: Json
+          description?: string
+          difficulty?: string
+          id?: string
+          name?: string
+          schematic_svg?: string | null
+          sector?: string | null
+          slots?: Json
+          slug?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       availability_slots: {
         Row: {
           booking_id: string | null
@@ -14357,6 +14405,10 @@ export type Database = {
         Returns: string
       }
       seed_founder_demo_data: {
+        Args: { p_foundry_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      seed_founder_demo_data_expanded: {
         Args: { p_foundry_id: string; p_user_id: string }
         Returns: undefined
       }

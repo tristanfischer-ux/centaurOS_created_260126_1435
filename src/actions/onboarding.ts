@@ -9,15 +9,70 @@ import { Database } from '@/types/database.types'
 type AccountType = Database['public']['Enums']['account_type']
 
 /**
- * Set the user's account type (supplier or team_builder)
- * This determines which portal they land on after login
+ * Set the user's account type (supplier or team_builder).
+ * This determines which portal they land on after login.
+ *
+ * @description Updates the account_type field on the user's profile.
+ * If the profile doesn't exist yet (race condition during signup),
+ * attempts to create it before failing.
+ *
+ * @param accountType - The account type to set
+ * @returns Object with success boolean or error string
+ *
+ * @security Requires authenticated user. Only updates own profile via RLS.
  */
-export async function setAccountType(accountType: AccountType) {
+export async function setAccountType(accountType: AccountType): Promise<{ success: true } | { error: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
   if (!user) return { error: 'Unauthorized' }
-  
+
+  // First check if profile exists (it might not if signup had a race condition)
+  const { data: existingProfile, error: fetchError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single()
+
+  if (fetchError && fetchError.code === 'PGRST116') {
+    // Profile doesn't exist yet — create it with the account type
+    console.warn('[Onboarding] Profile missing during setAccountType, creating profile for user:', user.id)
+    const userRole = (user.user_metadata?.role as 'Founder' | 'Executive' | 'Apprentice') ?? 'Apprentice'
+    const fallbackFoundryId = userRole === 'Founder' ? `foundry_${user.id.slice(0, 8)}` : 'forge-guild'
+    const { error: insertError } = await supabase
+      .from('profiles')
+      .insert({
+        id: user.id,
+        email: user.email ?? '',
+        full_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
+        role: userRole,
+        foundry_id: fallbackFoundryId,
+        account_type: accountType,
+      })
+
+    if (insertError) {
+      console.error('[Onboarding] Failed to create profile during setAccountType:', {
+        userId: user.id,
+        error: insertError.message,
+        code: insertError.code,
+        details: insertError.details,
+      })
+      return { error: `Failed to create profile: ${insertError.message}` }
+    }
+
+    revalidatePath('/')
+    return { success: true }
+  }
+
+  if (fetchError) {
+    console.error('[Onboarding] Failed to check profile existence:', {
+      userId: user.id,
+      error: fetchError.message,
+      code: fetchError.code,
+    })
+  }
+
+  // Profile exists — update it
   const { error } = await supabase
     .from('profiles')
     .update({ 
@@ -27,8 +82,14 @@ export async function setAccountType(accountType: AccountType) {
     .eq('id', user.id)
   
   if (error) {
-    console.error('Error setting account type:', error)
-    return { error: 'Failed to set account type' }
+    console.error('[Onboarding] Failed to set account type:', {
+      userId: user.id,
+      accountType,
+      error: error.message,
+      code: error.code,
+      details: error.details,
+    })
+    return { error: `Failed to save selection: ${error.message}` }
   }
   
   revalidatePath('/')

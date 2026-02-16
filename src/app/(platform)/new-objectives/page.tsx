@@ -1,5 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { AlertTriangle, ArrowRight } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { ObjectivesBoard } from './objectives-board'
 
 export const dynamic = 'force-dynamic'
@@ -20,11 +24,25 @@ export default async function NewObjectivesPage() {
 
   if (!profile) {
     return (
-      <div className="p-8">
-        <h1 className="font-bold mb-2 text-destructive">Profile Not Found</h1>
-        <p className="text-muted-foreground">
-          Unable to load your profile. Please try refreshing or contact support.
-        </p>
+      <div className="max-w-2xl mx-auto py-12 px-4 text-center space-y-6">
+        <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-status-warning-light mx-auto">
+          <AlertTriangle className="h-7 w-7 text-status-warning" />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-xl font-bold text-foreground">Profile Setup Incomplete</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Your account profile hasn&apos;t been fully set up yet.
+            Please complete the onboarding process to access objectives.
+          </p>
+        </div>
+        <div className="flex gap-3 justify-center">
+          <Button asChild>
+            <Link href="/today">Go to Dashboard</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/settings">Settings</Link>
+          </Button>
+        </div>
       </div>
     )
   }

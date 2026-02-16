@@ -201,7 +201,7 @@ const roleConfigs: Record<string, RoleConfig> = {
         isApplication: true
     },
     general: {
-        title: "FORGE OS",
+        title: "ForgeOS",
         headline: "BUILD ATOMS AT THE SPEED OF BITS.",
         subheadline: "The operating system for physical creation.",
         description: "Hardware at software speed. A fraction of the cost. A fraction of the time. A fraction of the headcount.",
@@ -294,7 +294,7 @@ function ComingSoonPage({ roleTitle }: { roleTitle: string }) {
                         {roleTitle} Access Is Coming
                     </h1>
                     <p className="text-lg text-muted-foreground leading-relaxed max-w-lg mx-auto">
-                        We&apos;re building something special for {roleTitle.toLowerCase()}s. 
+                        We&apos;re building something special for {roleTitle}. 
                         In the meantime, you can join ForgeOS as one of our core roles:
                     </p>
 
@@ -350,21 +350,38 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
     // Check if this role has a video (currently only founder)
     const hasVideo = roleKey === "founder";
 
-    // Handle the cinematic transition
+    // Handle the cinematic transition with safety fallback
     const handleBeginInduction = () => {
         if (hasVideo) {
             setStage("transitioning");
             
             // After video expands (1s), fade to white
-            setTimeout(() => {
+            const fadeTimer = setTimeout(() => {
                 setFadeToBlack(true);
             }, 1000);
             
             // After fade completes (1s more), show form
-            setTimeout(() => {
+            const formTimer = setTimeout(() => {
                 setStage("form");
                 setFadeToBlack(false);
             }, 2000);
+
+            // Safety fallback: if video fails or transition gets stuck,
+            // force-show the form after 3.5s
+            const safetyTimer = setTimeout(() => {
+                setStage((current) => {
+                    if (current !== "form") {
+                        clearTimeout(fadeTimer);
+                        clearTimeout(formTimer);
+                        setFadeToBlack(false);
+                        return "form";
+                    }
+                    return current;
+                });
+            }, 3500);
+
+            // Clean up safety timer if transition completes normally
+            setTimeout(() => clearTimeout(safetyTimer), 2100);
         } else {
             setStage("form");
         }

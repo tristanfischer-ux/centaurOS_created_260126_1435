@@ -201,6 +201,35 @@ export async function signup(formData: FormData) {
   // 3. Create profile
   // Suppliers get 'Apprentice' role (minimal permissions) but 'supplier' account_type
   const memberRole = role === 'supplier' ? 'Apprentice' : capitalizeRole(role);
+
+  // VALIDATION: For shared foundries, verify the foundry exists before inserting profile
+  if (foundryId === "forge-guild" || foundryId === "forge-suppliers") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: foundryExists } = await (supabase as any)
+      .from("foundries")
+      .select("id")
+      .eq("id", foundryId)
+      .single();
+
+    if (!foundryExists) {
+      console.error(`[Signup] Shared foundry "${foundryId}" does not exist. Creating it now.`);
+      // Auto-create the shared foundry if it's missing
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: createFoundryError } = await (supabase as any)
+        .from("foundries")
+        .insert({
+          id: foundryId,
+          name: foundryId === "forge-guild" ? "ForgeOS Guild" : "ForgeOS Suppliers",
+          slug: foundryId,
+          owner_id: authData.user.id,
+        });
+      if (createFoundryError) {
+        console.error(`[Signup] Failed to create shared foundry "${foundryId}":`, createFoundryError);
+        // Fall back: set foundryId to null so the user can still sign up
+        // Their profile will lack a foundry, but they won't be completely blocked
+      }
+    }
+  }
   
   const { error: profileError } = await supabase.from("profiles").insert({
     id: authData.user.id,
@@ -213,8 +242,19 @@ export async function signup(formData: FormData) {
   });
 
   if (profileError) {
-    console.error("Profile creation error:", profileError);
-    // Don't fail completely - auth user exists, profile can be created later
+    console.error("[Signup] Profile creation failed:", {
+      userId: authData.user.id,
+      foundryId,
+      role: memberRole,
+      error: profileError.message,
+      code: profileError.code,
+      details: profileError.details,
+    });
+    // CRITICAL: Profile is required for the app to function.
+    // Redirect to an error state rather than silently continuing.
+    return redirect(
+      `/join/${role}?error=${encodeURIComponent("Account created but profile setup failed. Please try logging in — your profile will be created automatically.")}`
+    );
   }
 
   // 3b. Create foundry_memberships record for multi-foundry support
@@ -249,6 +289,17 @@ export async function signup(formData: FormData) {
     } catch (demoError) {
       // Non-critical — don't fail signup if demo seeding fails
       console.warn("[Signup] Failed to seed demo objectives/tasks:", demoError)
+    }
+
+    // Seed expanded demo data: marketplace listings + activity events
+    try {
+      await supabase.rpc("seed_founder_demo_data_expanded", {
+        p_foundry_id: foundryId,
+        p_user_id: authData.user.id,
+      })
+    } catch (demoError) {
+      // Non-critical — don't fail signup if expanded demo seeding fails
+      console.warn("[Signup] Failed to seed expanded demo data:", demoError)
     }
   }
 

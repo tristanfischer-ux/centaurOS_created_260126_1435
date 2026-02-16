@@ -14,7 +14,7 @@
 import React from "react"
 import Link from "next/link"
 
-import { ArrowRight, Sparkles, Plus } from "lucide-react"
+import { ArrowRight, Sparkles, Plus, Gamepad2 } from "lucide-react"
 
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
@@ -41,6 +41,7 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
       <div className="space-y-8">
         <PageHeader />
         <CadLabEntrypoint />
+        <AssemblyBuilderEntrypoint />
         <p className="text-sm text-destructive">{result.error}</p>
       </div>
     )
@@ -52,6 +53,7 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
     <div className="space-y-8">
       <PageHeader projectCount={scans.length} />
       <CadLabEntrypoint />
+      <AssemblyBuilderEntrypoint />
 
       {scans.length === 0 ? (
         <EmptyState
@@ -103,6 +105,32 @@ function CadLabEntrypoint(): React.ReactNode {
             <Link href="/the-forge/new">Open Legacy Concept Flow</Link>
           </Button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function AssemblyBuilderEntrypoint(): React.ReactNode {
+  return (
+    <div className="rounded-xl border border-electric-blue/30 bg-gradient-to-r from-electric-blue-light/30 via-background to-background p-5">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1.5">
+          <p className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-semibold text-electric-blue">
+            <Gamepad2 className="h-3.5 w-3.5" />
+            Visual builder
+          </p>
+          <h2 className="text-lg font-semibold text-foreground">Assembly Builder</h2>
+          <p className="text-sm text-muted-foreground max-w-2xl">
+            Pick a design skeleton and fill its component slots from our library of 256+ parametric parts —
+            like equipping a character in an RPG.
+          </p>
+        </div>
+        <Button asChild variant="outline" className="whitespace-nowrap border-electric-blue text-electric-blue hover:bg-electric-blue hover:text-white">
+          <Link href="/the-forge/assembly-builder">
+            Open Assembly Builder
+            <ArrowRight className="h-4 w-4 ml-1.5" />
+          </Link>
+        </Button>
       </div>
     </div>
   )

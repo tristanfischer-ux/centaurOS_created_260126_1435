@@ -199,28 +199,43 @@ export function TodayView(): React.ReactElement {
         return <TodayViewSkeleton />
     }
 
-    // ─── Full error state ─────────────────────────────────────────
+    // ─── Welcome state for new users / full error state ──────────
 
     if (bothFailed) {
         return (
             <div className="max-w-5xl space-y-8">
                 <PageHeader />
-                <Card className="rounded-xl border shadow-sm">
-                    <CardContent className="pt-6 pb-6 flex flex-col items-center gap-4 text-center">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-destructive/10">
-                            <AlertTriangle className="h-6 w-6 text-destructive" />
+                <Card className="rounded-xl border shadow-sm bg-gradient-to-br from-background to-international-orange/[0.03]">
+                    <CardContent className="pt-8 pb-8 flex flex-col items-center gap-5 text-center">
+                        <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-international-orange/10">
+                            <Sun className="h-7 w-7 text-international-orange" />
                         </div>
-                        <div className="space-y-1">
-                            <p className="text-base font-semibold text-foreground">
-                                Unable to load your daily briefing
+                        <div className="space-y-2 max-w-md">
+                            <p className="text-xl font-bold text-foreground">
+                                Welcome to ForgeOS
                             </p>
-                            <p className="text-sm text-muted-foreground">
-                                We couldn&apos;t fetch your data right now. Please try again.
+                            <p className="text-sm text-muted-foreground leading-relaxed">
+                                Your daily briefing will appear here once you start creating objectives and tasks.
+                                Get started by setting up your first goal.
                             </p>
                         </div>
-                        <Button onClick={loadData} variant="outline" size="sm" className="gap-1.5">
-                            <RefreshCw className="h-3.5 w-3.5" />
-                            Retry
+                        <div className="flex flex-wrap gap-3 justify-center">
+                            <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
+                                <Link href="/new-objectives">
+                                    <Target className="h-3.5 w-3.5" />
+                                    Create your first objective
+                                </Link>
+                            </Button>
+                            <Button variant="outline" size="sm" asChild className="gap-1.5">
+                                <Link href="/strategy">
+                                    <Waypoints className="h-3.5 w-3.5" />
+                                    Explore strategy
+                                </Link>
+                            </Button>
+                        </div>
+                        <Button onClick={loadData} variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
+                            <RefreshCw className="h-3 w-3" />
+                            Retry loading
                         </Button>
                     </CardContent>
                 </Card>
