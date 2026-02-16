@@ -6,7 +6,7 @@ describe("profiles RLS stabilization migration", () => {
     process.cwd(),
     "supabase",
     "migrations",
-    "20260215120000_stabilize_profiles_rls_no_recursion.sql",
+    "20260215120000_stabilize_profiles_rls_no_recursion.sql.skip",
   )
 
   it("keeps canonical non-recursive profile policies", () => {

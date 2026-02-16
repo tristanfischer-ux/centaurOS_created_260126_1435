@@ -1,6 +1,6 @@
 "use client"
 
-import { Shield, Lock, BadgeCheck, Scale } from "lucide-react"
+import { Shield, Lock, BadgeCheck, Scale, Crown } from "lucide-react"
 import {
   AnimatedSection,
   AnimatedCard,
@@ -39,6 +39,12 @@ const TRUST_SIGNALS = [
     description:
       "Fractional Forge Ltd is the operating company that holds contracts, manages liability, and provides the legal infrastructure. You focus on building.",
   },
+  {
+    icon: Crown,
+    title: "British Manufacturing Heritage",
+    description:
+      "Built on centuries of British engineering excellence. Our network of UK factories, executives, and apprentices keeps the tradition of quality manufacturing alive and thriving.",
+  },
 ] as const
 
 /**
@@ -66,7 +72,7 @@ export function TrustSection() {
           </p>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
           {TRUST_SIGNALS.map((signal) => {
             const Icon = signal.icon
             return (

@@ -23,25 +23,25 @@ const GUILD_FEATURES = [
     icon: Handshake,
     title: "Mentorship Pairing",
     description:
-      "Every apprentice is paired with an experienced executive. Real relationships, real guidance, real career acceleration.",
+      "Every apprentice is paired with an experienced British executive. Real relationships, real guidance, real career acceleration — across generations.",
   },
   {
     icon: Calendar,
     title: "Events & Workshops",
     description:
-      "Regular meetups, technical workshops, and networking events. Virtual connectivity backed by physical reality.",
+      "Regular meetups, technical workshops, and networking events across the UK. Virtual connectivity backed by physical reality in British workshops.",
   },
   {
     icon: BookOpen,
     title: "Structured Learning",
     description:
-      "On-the-job training tracked and measured. Apprentices build portfolios of real projects — not classroom exercises.",
+      "On-the-job training tracked and measured. AI-augmented apprentices build portfolios of real projects — mentored by veterans who've done it before.",
   },
   {
     icon: Users,
     title: "The Network",
     description:
-      "A curated community of founders, executives, and apprentices. Knowledge scales as fast as the work.",
+      "A curated community of British founders, executives, and apprentices. Experienced judgement meets youthful energy, amplified by AI tools.",
   },
 ] as const
 
@@ -74,9 +74,11 @@ export function GuildSection() {
             </h2>
             <p className="text-muted-foreground text-sm sm:text-base md:text-lg leading-relaxed mb-6 sm:mb-8">
               Manufacturing at software speed doesn&apos;t happen through tools alone.
-              It happens when experienced executives mentor ambitious apprentices,
-              when founders share hard-won lessons, and when the community
-              lifts everyone up. That&apos;s the Guild.
+              It happens when experienced British executives mentor ambitious
+              AI-augmented apprentices, when founders share hard-won lessons, and
+              when the community lifts everyone up. The best work happens when
+              decades of experience meets youthful energy and modern AI tools.
+              That&apos;s the Guild.
             </p>
 
             {/* Feature list */}

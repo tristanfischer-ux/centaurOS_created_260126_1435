@@ -51,6 +51,10 @@ import { GuildSection } from "@/components/marketing/GuildSection";
 import { PlatformShowcaseSection } from "@/components/marketing/PlatformShowcaseSection";
 import { EcosystemSection } from "@/components/marketing/EcosystemSection";
 import { TrustSection } from "@/components/marketing/TrustSection";
+import { SoftwareVsHardwareSection } from "@/components/marketing/SoftwareVsHardwareSection";
+import { HumanAIPromiseSection } from "@/components/marketing/HumanAIPromiseSection";
+import { FactoryPartnerSection } from "@/components/marketing/FactoryPartnerSection";
+import { BuiltInBritainSection } from "@/components/marketing/BuiltInBritainSection";
 
 // Domain configuration
 const APP_DOMAIN =
@@ -183,6 +187,12 @@ export default function MarketingPage() {
               Guild
             </Link>
             <Link
+              href="/#factories"
+              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
+            >
+              Factories
+            </Link>
+            <Link
               href="/#how-it-works"
               className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
             >
@@ -270,6 +280,7 @@ export default function MarketingPage() {
                     { href: "/#roles", label: "Roles" },
                     { href: "/#problem", label: "Why Us" },
                     { href: "/#guild", label: "Guild" },
+                    { href: "/#factories", label: "Factories" },
                     { href: "/#how-it-works", label: "Getting Started" },
                     { href: "/#faq", label: "FAQ" },
                   ].map((item) => (
@@ -307,6 +318,7 @@ export default function MarketingPage() {
       <main id="main-content">
         <HeroSection />
         <RolesSection />
+        <SoftwareVsHardwareSection />
         <ProblemSection />
         <Suspense fallback={
           <div className="py-16 px-4">
@@ -325,8 +337,11 @@ export default function MarketingPage() {
         <HowItWorksSection />
         <PricingPreviewSection />
         <GuildSection />
+        <HumanAIPromiseSection />
         <EcosystemSection />
+        <FactoryPartnerSection />
         <HowAProjectWorksSection />
+        <BuiltInBritainSection />
         <TrustSection />
         <PlatformCapabilitiesSection />
         <FAQSection />
@@ -363,9 +378,12 @@ export default function MarketingPage() {
               <p className="text-base sm:text-lg font-bold tracking-tight mb-2 sm:mb-3">
                 FRACTIONAL FORGE
               </p>
-              <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
+              <p className="text-sm text-muted-foreground max-w-sm leading-relaxed mb-2">
                 Build hardware at software speed. A fraction of the cost. A
                 fraction of the time. A fraction of the headcount.
+              </p>
+              <p className="text-xs font-mono uppercase tracking-widest text-international-orange">
+                Proudly British. Globally Ambitious.
               </p>
             </div>
 
@@ -442,7 +460,7 @@ export default function MarketingPage() {
                 Privacy
               </Link>
               <span className="font-mono tracking-wider">
-                Build Faster. Burn Less.
+                Forged in Britain. Built for the World.
               </span>
             </div>
           </div>
@@ -687,7 +705,7 @@ function HeroSection() {
           transition={{ delay: 1.2, duration: 0.6 }}
           className="mt-6 sm:mt-8 md:mt-12 text-xs text-muted-foreground font-mono tracking-wider"
         >
-          Shipping weekly. Shaped by founding members.
+          Forged in Britain. Shipping weekly. Shaped by founding members.
         </motion.p>
       </div>
 
