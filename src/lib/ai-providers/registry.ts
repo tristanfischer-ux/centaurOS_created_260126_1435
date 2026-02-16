@@ -336,6 +336,57 @@ async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
     opts.onDone()
 }
 
+// ─── Qwen Text Streaming (DashScope / OpenAI-compatible) ─────────────
+
+/**
+ * Streams text from Alibaba's Qwen models via the DashScope OpenAI-compatible endpoint.
+ *
+ * @description DashScope exposes an OpenAI-compatible chat completions API at
+ * `https://dashscope.aliyuncs.com/compatible-mode/v1`. We reuse the OpenAI SDK
+ * with a custom baseURL — identical to the MiniMax pattern.
+ *
+ * Qwen3.5-plus is a Hybrid Sparse MoE model (397B total, 17B active) that
+ * delivers frontier-class performance at dramatically lower inference cost.
+ * Supports 201 languages and Multi-Token Prediction for up to 8× speed gains.
+ *
+ * @see https://www.alibabacloud.com/help/en/model-studio/getting-started/models
+ * @see https://help.aliyun.com/zh/model-studio/developer-reference/use-qwen-by-calling-api
+ */
+async function streamQwen(opts: StreamingTextOptions): Promise<void> {
+    const OpenAI = (await import("openai")).default
+    const client = new OpenAI({
+        apiKey: opts.apiKey,
+        baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    })
+
+    // Qwen3.5-plus supports enable_thinking for extended reasoning (similar to Anthropic)
+    // When enableThinking is true, include extra_body to activate thinking mode
+    const extraParams: Record<string, unknown> = {}
+    if (opts.enableThinking) {
+        extraParams.extra_body = {
+            enable_thinking: true,
+        }
+    }
+
+    const stream = await client.chat.completions.create({
+        model: opts.modelId,
+        messages: [
+            { role: "system", content: opts.systemPrompt },
+            { role: "user", content: opts.userPrompt },
+        ],
+        stream: true,
+        max_tokens: opts.maxTokens ?? 8192,
+        ...extraParams,
+    })
+
+    for await (const chunk of stream) {
+        if (opts.signal?.aborted) break
+        const text = chunk.choices[0]?.delta?.content ?? ""
+        if (text) opts.onChunk(text)
+    }
+    opts.onDone()
+}
+
 // ─── MiniMax Image Generation ────────────────────────────────────────
 
 /**
@@ -630,6 +681,7 @@ const TEXT_PROVIDERS: Partial<Record<AIProviderId, TextStreamFn>> = {
     openai: streamOpenAI,
     anthropic: streamAnthropic,
     google: streamGoogle,
+    qwen: streamQwen,
     minimax: streamMiniMax,
 }
 

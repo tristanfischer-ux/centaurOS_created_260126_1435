@@ -5,14 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Sparkles, Brain, Globe, Image, Mic, Cpu, Zap, Eye, EyeOff, Trash2, Check, Loader2, ExternalLink, KeyRound } from 'lucide-react'
+import { Sparkles, Brain, Globe, Image, Mic, Cpu, Zap, Flame, Eye, EyeOff, Trash2, Check, Loader2, ExternalLink, KeyRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PROVIDER_REGISTRY, type AIProviderId } from '@/lib/ai-providers/types'
 import { saveProviderKey, deleteProviderKey, getProviderKeys } from '@/actions/ai-providers'
 import { toast } from 'sonner'
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
-    Sparkles, Brain, Globe, Image, Mic, Cpu, Zap,
+    Sparkles, Brain, Globe, Image, Mic, Cpu, Zap, Flame,
 }
 
 interface StoredKey {

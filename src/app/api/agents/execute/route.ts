@@ -153,6 +153,7 @@ export async function POST(request: Request) {
         openai: process.env.OPENAI_API_KEY ?? "",
         anthropic: process.env.ANTHROPIC_API_KEY ?? "",
         google: process.env.GOOGLE_AI_API_KEY ?? "",
+        qwen: process.env.DASHSCOPE_API_KEY ?? "",
         stability: process.env.STABILITY_API_KEY ?? "",
         elevenlabs: process.env.ELEVENLABS_API_KEY ?? "",
         replicate: process.env.REPLICATE_API_TOKEN ?? "",
