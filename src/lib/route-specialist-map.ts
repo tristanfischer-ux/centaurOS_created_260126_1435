@@ -57,6 +57,7 @@ const ROUTE_SPECIALIST_MAP: Array<{
   { pattern: "/buyer", specialistId: "vp-supply-chain" },
   { pattern: "/orders", specialistId: "vp-supply-chain" },
   { pattern: "/settings", specialistId: "chief-of-staff" },
+  { pattern: "/browse", specialistId: "strategist" },
 ]
 
 export interface RouteSpecialistResult {

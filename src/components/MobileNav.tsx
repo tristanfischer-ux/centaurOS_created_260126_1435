@@ -37,6 +37,7 @@ import {
     CalendarDays,
     Brain,
     AppWindow,
+    Globe,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -84,6 +85,7 @@ const workshopMoreNavigation = [
     { name: "Team", href: "/team", icon: Users },
     { name: "Specialists", href: "/agents", icon: UsersRound },
     { name: "Knowledge", href: "/knowledge", icon: Brain },
+    { name: "Browse", href: "/browse", icon: Globe },
 ]
 
 // "More" dropdown — Marketplace section

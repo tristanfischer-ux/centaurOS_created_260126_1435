@@ -118,7 +118,10 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.stripe.com https://api.openai.com https://*.sentry.io https://*.ingest.sentry.io",
-              "frame-src 'self' https://*.stripe.com",
+              // SECURITY: Allow iframes from any origin for the in-app browser (/browse).
+              // The iframe uses sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              // to restrict embedded page capabilities (no top-navigation, no pointer-lock).
+              "frame-src 'self' https://*.stripe.com https: http:",
               // SECURITY: worker-src allows Three.js Web Workers for 3D rendering (blob: URLs)
               "worker-src 'self' blob:",
               "frame-ancestors 'self'",
