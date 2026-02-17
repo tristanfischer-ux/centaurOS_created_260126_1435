@@ -579,6 +579,64 @@ export async function deleteArtifact(artifactId: string): Promise<{
   return { error: null }
 }
 
+/**
+ * Delete multiple artifacts in a single operation.
+ *
+ * @description Bulk-deletes artifacts by their IDs. Only artifacts the user
+ * owns (enforced by RLS) will actually be removed.
+ *
+ * @param artifactIds - Array of artifact UUIDs to delete
+ * @returns Count of deleted artifacts and any error
+ * @security RLS enforces ownership (only creator can delete)
+ * @audit Logs bulk deletion with count and IDs
+ */
+export async function deleteArtifacts(artifactIds: string[]): Promise<{
+  deletedCount: number
+  error: string | null
+}> {
+  const supabase = await createClient()
+
+  // AUTH: Verify user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { deletedCount: 0, error: 'Not authenticated' }
+  }
+
+  // VALIDATION: At least one ID required
+  if (!artifactIds.length) {
+    return { deletedCount: 0, error: 'No artifact IDs provided' }
+  }
+
+  // VALIDATION: Cap batch size to prevent abuse
+  const MAX_BATCH_SIZE = 100
+  if (artifactIds.length > MAX_BATCH_SIZE) {
+    return { deletedCount: 0, error: `Cannot delete more than ${MAX_BATCH_SIZE} artifacts at once` }
+  }
+
+  const { error, count } = await supabase
+    .from('agent_artifacts')
+    .delete({ count: 'exact' })
+    .in('id', artifactIds)
+
+  if (error) {
+    console.error('[AgentArtifacts] Failed to bulk delete artifacts:', {
+      userId: user.id,
+      requestedCount: artifactIds.length,
+      error: error.message,
+    })
+    return { deletedCount: 0, error: sanitizeErrorMessage(error) }
+  }
+
+  // AUDIT: Log bulk deletion
+  console.info('[AgentArtifacts] Bulk deleted artifacts:', {
+    userId: user.id,
+    deletedCount: count ?? 0,
+    requestedCount: artifactIds.length,
+  })
+
+  return { deletedCount: count ?? 0, error: null }
+}
+
 // ============================================================================
 // PHASE 2: EXTERNAL INTEGRATIONS
 // ============================================================================

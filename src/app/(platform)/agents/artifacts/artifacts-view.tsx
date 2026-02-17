@@ -12,14 +12,34 @@ import {
   CheckSquare,
   Sparkles,
   X,
+  Trash2,
+  CheckCheck,
+  MoreVertical,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
-import { toggleArtifactStar } from '@/actions/agent-artifacts'
+import { toggleArtifactStar, deleteArtifact, deleteArtifacts } from '@/actions/agent-artifacts'
 import { ArtifactDetailDialog } from './artifact-detail-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 
@@ -99,11 +119,11 @@ interface ArtifactsViewProps {
 }
 
 /**
- * ArtifactsView - Interactive listing of agent artifacts.
+ * ArtifactsView - Interactive listing of agent artifacts with selection and deletion.
  *
  * @description Client component that provides search, filtering, starring,
- * and card-based browsing of artifacts. Filters are applied locally on the
- * pre-fetched data to avoid server roundtrips.
+ * individual and bulk deletion, and card-based browsing of artifacts.
+ * Filters are applied locally on the pre-fetched data to avoid server roundtrips.
  *
  * @component
  *
@@ -120,6 +140,15 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
   const [activeTypeFilter, setActiveTypeFilter] = useState<ArtifactContentType | 'all'>('all')
   const [starredOnly, setStarredOnly] = useState(false)
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null)
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+
+  // Delete confirmation state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([])
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -147,6 +176,15 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
   useEffect(() => {
     setArtifacts(initialArtifacts)
   }, [initialArtifacts])
+
+  // ---------------------------------------------------------------------------
+  // Exit selection mode when no items are selected
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (isSelectionMode && selectedIds.size === 0) {
+      // Keep selection mode active — user toggled it on intentionally
+    }
+  }, [isSelectionMode, selectedIds.size])
 
   // ---------------------------------------------------------------------------
   // Filtered artifacts
@@ -178,11 +216,20 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
   }, [artifacts, activeTypeFilter, starredOnly, debouncedSearch])
 
   // ---------------------------------------------------------------------------
+  // Derived: how many of the currently visible items are selected
+  // ---------------------------------------------------------------------------
+  const filteredIds = useMemo(() => new Set(filteredArtifacts.map((a) => a.id)), [filteredArtifacts])
+  const visibleSelectedCount = useMemo(
+    () => [...selectedIds].filter((id) => filteredIds.has(id)).length,
+    [selectedIds, filteredIds]
+  )
+  const isAllVisibleSelected = filteredArtifacts.length > 0 && visibleSelectedCount === filteredArtifacts.length
+
+  // ---------------------------------------------------------------------------
   // Star toggle with optimistic update
   // ---------------------------------------------------------------------------
   const handleToggleStar = useCallback(
     async (e: React.MouseEvent, artifactId: string): Promise<void> => {
-      // Prevent card click from firing
       e.stopPropagation()
 
       // Optimistic update
@@ -216,6 +263,117 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
   }, [])
 
   // ---------------------------------------------------------------------------
+  // Selection handlers
+  // ---------------------------------------------------------------------------
+  const handleToggleSelection = useCallback((artifactId: string): void => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(artifactId)) {
+        next.delete(artifactId)
+      } else {
+        next.add(artifactId)
+      }
+      return next
+    })
+  }, [])
+
+  const handleSelectAll = useCallback((): void => {
+    if (isAllVisibleSelected) {
+      // Deselect all visible
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        for (const a of filteredArtifacts) {
+          next.delete(a.id)
+        }
+        return next
+      })
+    } else {
+      // Select all visible
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        for (const a of filteredArtifacts) {
+          next.add(a.id)
+        }
+        return next
+      })
+    }
+  }, [isAllVisibleSelected, filteredArtifacts])
+
+  const handleExitSelectionMode = useCallback((): void => {
+    setIsSelectionMode(false)
+    setSelectedIds(new Set())
+  }, [])
+
+  const handleEnterSelectionMode = useCallback((): void => {
+    setIsSelectionMode(true)
+  }, [])
+
+  // ---------------------------------------------------------------------------
+  // Delete handlers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Prompt confirmation before deleting one or more artifacts.
+   */
+  const handleRequestDelete = useCallback((ids: string[]): void => {
+    setPendingDeleteIds(ids)
+    setDeleteConfirmOpen(true)
+  }, [])
+
+  /**
+   * Execute the confirmed deletion.
+   */
+  const handleConfirmDelete = useCallback(async (): Promise<void> => {
+    if (pendingDeleteIds.length === 0) return
+
+    setIsDeleting(true)
+
+    try {
+      if (pendingDeleteIds.length === 1) {
+        // Single delete
+        const { error } = await deleteArtifact(pendingDeleteIds[0])
+        if (error) {
+          toast.error('Failed to delete deliverable')
+          return
+        }
+        toast.success('Deliverable deleted')
+      } else {
+        // Bulk delete
+        const { deletedCount, error } = await deleteArtifacts(pendingDeleteIds)
+        if (error) {
+          toast.error('Failed to delete deliverables')
+          return
+        }
+        toast.success(`${deletedCount} deliverable${deletedCount === 1 ? '' : 's'} deleted`)
+      }
+
+      // Remove from local state
+      setArtifacts((prev) => prev.filter((a) => !pendingDeleteIds.includes(a.id)))
+
+      // Clean up selection
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        for (const id of pendingDeleteIds) {
+          next.delete(id)
+        }
+        return next
+      })
+
+      // If we deleted everything that was selected, exit selection mode
+      if (pendingDeleteIds.length === selectedIds.size) {
+        setIsSelectionMode(false)
+      }
+    } catch (err) {
+      console.error('[ArtifactsView] Delete failed:', err instanceof Error ? err.message : 'Unknown error')
+      toast.error('Something went wrong while deleting')
+    } finally {
+      setIsDeleting(false)
+      setDeleteConfirmOpen(false)
+      setPendingDeleteIds([])
+    }
+  }, [pendingDeleteIds, selectedIds.size])
+
+  // ---------------------------------------------------------------------------
   // Selected artifact for detail dialog
   // ---------------------------------------------------------------------------
   const selectedArtifact = useMemo(
@@ -225,11 +383,31 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
   )
 
   // ---------------------------------------------------------------------------
+  // Delete confirmation text
+  // ---------------------------------------------------------------------------
+  const deleteConfirmText = useMemo((): { title: string; description: string } => {
+    const count = pendingDeleteIds.length
+    if (count === 1) {
+      const artifact = artifacts.find((a) => a.id === pendingDeleteIds[0])
+      return {
+        title: 'Delete deliverable?',
+        description: artifact
+          ? `"${artifact.title}" will be permanently deleted. This action cannot be undone.`
+          : 'This deliverable will be permanently deleted. This action cannot be undone.',
+      }
+    }
+    return {
+      title: `Delete ${count} deliverables?`,
+      description: `${count} deliverables will be permanently deleted. This action cannot be undone.`,
+    }
+  }, [pendingDeleteIds, artifacts])
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
   return (
     <div className="space-y-6 pt-6">
-      {/* ── Toolbar: Search + Starred toggle ── */}
+      {/* ── Toolbar: Search + Actions ── */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -252,17 +430,72 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
           )}
         </div>
 
-        <Button
-          variant={starredOnly ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setStarredOnly((prev) => !prev)}
-          className="shrink-0"
-          aria-pressed={starredOnly}
-        >
-          <Star className={cn('h-4 w-4 mr-2', starredOnly && 'fill-current')} />
-          Starred
-        </Button>
+        <div className="flex items-center gap-2">
+          {!isSelectionMode ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEnterSelectionMode}
+              className="shrink-0"
+              aria-label="Select deliverables"
+            >
+              <CheckCheck className="h-4 w-4 mr-2" />
+              Select
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleExitSelectionMode}
+              className="shrink-0"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+          )}
+
+          <Button
+            variant={starredOnly ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStarredOnly((prev) => !prev)}
+            className="shrink-0"
+            aria-pressed={starredOnly}
+          >
+            <Star className={cn('h-4 w-4 mr-2', starredOnly && 'fill-current')} />
+            Starred
+          </Button>
+        </div>
       </div>
+
+      {/* ── Selection toolbar (visible when items are selected) ── */}
+      {isSelectionMode && (
+        <div className="flex items-center gap-4 rounded-lg bg-muted px-4 py-3">
+          <Checkbox
+            checked={isAllVisibleSelected}
+            onCheckedChange={handleSelectAll}
+            aria-label={isAllVisibleSelected ? 'Deselect all' : 'Select all'}
+          />
+          <span className="text-sm font-medium text-foreground">
+            {visibleSelectedCount > 0
+              ? `${visibleSelectedCount} selected`
+              : 'Select items'}
+          </span>
+
+          {visibleSelectedCount > 0 && (
+            <>
+              <div className="h-4 w-px bg-border" />
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => handleRequestDelete([...selectedIds].filter((id) => filteredIds.has(id)))}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete {visibleSelectedCount > 1 ? `(${visibleSelectedCount})` : ''}
+              </Button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Content type filter pills ── */}
       <div className="flex flex-wrap items-center gap-2">
@@ -290,25 +523,54 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
           {filteredArtifacts.map((artifact) => {
             const Icon = CONTENT_TYPE_ICONS[artifact.content_type] ?? FileText
             const workflowName = getWorkflowName(artifact.metadata)
+            const isSelected = selectedIds.has(artifact.id)
 
             return (
               <Card
                 key={artifact.id}
                 role="button"
                 tabIndex={0}
-                className="cursor-pointer hover:shadow-md transition-shadow border"
-                onClick={() => setSelectedArtifactId(artifact.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
+                className={cn(
+                  'cursor-pointer transition-all border relative group',
+                  isSelected
+                    ? 'ring-2 ring-international-orange shadow-md'
+                    : 'hover:shadow-md'
+                )}
+                onClick={() => {
+                  if (isSelectionMode) {
+                    handleToggleSelection(artifact.id)
+                  } else {
                     setSelectedArtifactId(artifact.id)
                   }
                 }}
-                aria-label={`View ${artifact.title}`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    if (isSelectionMode) {
+                      handleToggleSelection(artifact.id)
+                    } else {
+                      setSelectedArtifactId(artifact.id)
+                    }
+                  }
+                }}
+                aria-label={isSelectionMode ? `Select ${artifact.title}` : `View ${artifact.title}`}
+                aria-selected={isSelected}
               >
-                <CardContent className="pt-6">
+                {/* Selection checkbox overlay */}
+                {isSelectionMode && (
+                  <div className="absolute top-3 left-3 z-10">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => handleToggleSelection(artifact.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Select ${artifact.title}`}
+                    />
+                  </div>
+                )}
+
+                <CardContent className={cn('pt-6', isSelectionMode && 'pl-10')}>
                   <div className="space-y-3">
-                    {/* Top row: badge + star */}
+                    {/* Top row: badge + actions */}
                     <div className="flex items-start justify-between gap-2">
                       <Badge
                         variant="outline"
@@ -321,21 +583,52 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
                         {artifact.content_type}
                       </Badge>
 
-                      <button
-                        type="button"
-                        onClick={(e) => handleToggleStar(e, artifact.id)}
-                        className="shrink-0 p-1 rounded-md hover:bg-muted transition-colors"
-                        aria-label={artifact.is_starred ? 'Remove from starred' : 'Add to starred'}
-                      >
-                        <Star
-                          className={cn(
-                            'h-4 w-4',
-                            artifact.is_starred
-                              ? 'fill-amber-400 text-amber-400'
-                              : 'text-muted-foreground'
-                          )}
-                        />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {/* Star button */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleStar(e, artifact.id)}
+                          className="shrink-0 p-1 rounded-md hover:bg-muted transition-colors"
+                          aria-label={artifact.is_starred ? 'Remove from starred' : 'Add to starred'}
+                        >
+                          <Star
+                            className={cn(
+                              'h-4 w-4',
+                              artifact.is_starred
+                                ? 'fill-amber-400 text-amber-400'
+                                : 'text-muted-foreground'
+                            )}
+                          />
+                        </button>
+
+                        {/* More actions menu (individual delete) */}
+                        {!isSelectionMode && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={(e) => e.stopPropagation()}
+                                className="shrink-0 p-1 rounded-md hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                aria-label="More actions"
+                              >
+                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleRequestDelete([artifact.id])
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
                     </div>
 
                     {/* Title */}
@@ -397,6 +690,28 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
           setSelectedArtifactId(null)
         }}
       />
+
+      {/* ── Delete confirmation dialog ── */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{deleteConfirmText.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirmText.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

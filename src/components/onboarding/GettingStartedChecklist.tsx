@@ -189,20 +189,20 @@ export function GettingStartedChecklist({
                       initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.2, delay: 0.05 + index * 0.04 }}
-                      className="flex items-center justify-between gap-2 px-4 py-2.5"
+                      className="flex items-start justify-between gap-2 px-4 py-2.5"
                     >
                       <button
                         type="button"
                         onClick={() => handleCheckboxClick(item.key)}
                         className={cn(
-                          'flex items-center gap-3 min-w-0 flex-1 text-left rounded-md p-1 -m-1 transition-colors',
+                          'flex items-start gap-3 min-w-0 flex-1 text-left rounded-md p-1 -m-1 transition-colors',
                           'hover:bg-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-1'
                         )}
                         aria-pressed={isComplete}
                       >
                         <div
                           className={cn(
-                            'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all',
+                            'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all mt-0.5',
                             isComplete
                               ? 'border-international-orange bg-international-orange'
                               : 'border-muted-foreground/50 bg-transparent'
@@ -212,7 +212,7 @@ export function GettingStartedChecklist({
                         </div>
                         <span
                           className={cn(
-                            'text-sm font-medium truncate',
+                            'text-sm font-medium',
                             isComplete ? 'text-muted-foreground line-through' : 'text-foreground'
                           )}
                         >
@@ -225,14 +225,14 @@ export function GettingStartedChecklist({
                             <button
                               type="button"
                               onClick={handlePlayVideo}
-                              className="shrink-0 text-xs font-medium text-international-orange hover:text-international-orange-hover hover:underline transition-colors px-2 py-1 rounded"
+                              className="shrink-0 text-xs font-medium text-international-orange hover:text-international-orange-hover hover:underline transition-colors px-2 py-1 rounded mt-0.5"
                             >
                               Watch
                             </button>
                           ) : item.href ? (
                             <Link
                               href={item.href}
-                              className="shrink-0 text-xs font-medium text-international-orange hover:text-international-orange-hover hover:underline transition-colors px-2 py-1 rounded"
+                              className="shrink-0 text-xs font-medium text-international-orange hover:text-international-orange-hover hover:underline transition-colors px-2 py-1 rounded mt-0.5"
                             >
                               Go
                             </Link>
