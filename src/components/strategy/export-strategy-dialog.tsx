@@ -19,7 +19,7 @@
 'use client'
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
-import { Copy, FileText, Target, CheckSquare, Minus } from 'lucide-react'
+import { Copy, FileText, Target, CheckSquare, Minus, ListTree, ListChecks } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { cn } from '@/lib/utils'
@@ -32,6 +32,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/ui/status-badge'
 import type { GoalBundle, CanvasObjective, CanvasTask } from '@/types/canvas'
 import type { StrategyPillar } from '@/app/(platform)/strategy/strategy-dashboard'
@@ -381,12 +383,94 @@ export function ExportStrategyDialog({
   // Selected item IDs — start with everything selected
   const [selected, setSelected] = useState<Set<string>>(() => new Set(allIds))
 
+  // Whether objectives and tasks are included in the export
+  const [includeObjectives, setIncludeObjectives] = useState(true)
+  const [includeTasks, setIncludeTasks] = useState(true)
+
   // Reset selection when dialog opens
   useEffect(() => {
     if (open) {
       setSelected(new Set(allIds))
+      setIncludeObjectives(true)
+      setIncludeTasks(true)
     }
   }, [open, allIds])
+
+  // ── Include toggles ──
+
+  const handleToggleObjectives = useCallback(
+    (checked: boolean): void => {
+      setIncludeObjectives(checked)
+      if (!checked) {
+        // Also turn off tasks since they depend on objectives
+        setIncludeTasks(false)
+        // Remove all objective and task IDs from selection
+        setSelected((prev) => {
+          const next = new Set(prev)
+          for (const bundle of bundles) {
+            for (const { objective, tasks } of getObjectivesWithTasks(bundle)) {
+              next.delete(objective.id)
+              for (const task of tasks) {
+                next.delete(task.id)
+              }
+            }
+          }
+          return next
+        })
+      } else {
+        // Re-add all objective and task IDs for selected goals
+        setSelected((prev) => {
+          const next = new Set(prev)
+          for (const bundle of bundles) {
+            if (!next.has(bundle.goal.id)) continue
+            for (const { objective, tasks } of getObjectivesWithTasks(bundle)) {
+              next.add(objective.id)
+              for (const task of tasks) {
+                next.add(task.id)
+              }
+            }
+          }
+          return next
+        })
+      }
+    },
+    [bundles]
+  )
+
+  const handleToggleTasks = useCallback(
+    (checked: boolean): void => {
+      setIncludeTasks(checked)
+      if (!checked) {
+        // Remove all task IDs from selection
+        setSelected((prev) => {
+          const next = new Set(prev)
+          for (const bundle of bundles) {
+            for (const { objective, tasks } of getObjectivesWithTasks(bundle)) {
+              for (const task of tasks) {
+                next.delete(task.id)
+              }
+            }
+          }
+          return next
+        })
+      } else {
+        // Re-add task IDs for selected objectives
+        setSelected((prev) => {
+          const next = new Set(prev)
+          for (const bundle of bundles) {
+            for (const { objective, tasks } of getObjectivesWithTasks(bundle)) {
+              if (!next.has(objective.id)) continue
+              for (const task of tasks) {
+                next.add(task.id)
+              }
+            }
+          }
+          return next
+        })
+      }
+    },
+    [bundles]
+  )
 
   // ── Selection helpers ──
 
@@ -561,6 +645,44 @@ export function ExportStrategyDialog({
             </span>
           </div>
 
+          {/* Include toggles */}
+          <div className="flex items-center gap-5 px-1 py-1.5 border rounded-lg bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="include-objectives"
+                checked={includeObjectives}
+                onCheckedChange={handleToggleObjectives}
+                aria-label="Include objectives in export"
+              />
+              <Label
+                htmlFor="include-objectives"
+                className="text-xs font-medium text-foreground cursor-pointer flex items-center gap-1.5"
+              >
+                <ListTree className="h-3.5 w-3.5 text-muted-foreground" />
+                Objectives
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="include-tasks"
+                checked={includeTasks}
+                onCheckedChange={handleToggleTasks}
+                disabled={!includeObjectives}
+                aria-label="Include tasks in export"
+              />
+              <Label
+                htmlFor="include-tasks"
+                className={cn(
+                  'text-xs font-medium cursor-pointer flex items-center gap-1.5',
+                  includeObjectives ? 'text-foreground' : 'text-muted-foreground'
+                )}
+              >
+                <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />
+                Tasks
+              </Label>
+            </div>
+          </div>
+
           {/* Checkbox tree */}
           <ScrollArea className="max-h-[55vh]">
             <div className="space-y-1 pr-4">
@@ -605,7 +727,7 @@ export function ExportStrategyDialog({
                     </button>
 
                     {/* Objectives under this goal */}
-                    {objsWithTasks.map(({ objective, tasks }) => {
+                    {includeObjectives && objsWithTasks.map(({ objective, tasks }) => {
                       const objState = getObjectiveState(objective.id, tasks)
 
                       return (
@@ -635,7 +757,7 @@ export function ExportStrategyDialog({
                           </button>
 
                           {/* Tasks under this objective */}
-                          {tasks.map((task) => {
+                          {includeTasks && tasks.map((task) => {
                             const isComplete =
                               task.status === 'Completed' ||
                               task.status === 'Accepted'
@@ -711,20 +833,20 @@ export function ExportStrategyDialog({
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                onClick={handleCopyDetailed}
-                disabled={!hasSelection}
-                className="gap-1.5"
-              >
-                <FileText className="h-4 w-4" />
-                Copy Detailed
-              </Button>
-              <Button
                 onClick={handleCopySummary}
                 disabled={!hasSelection}
                 className="gap-1.5"
               >
                 <Copy className="h-4 w-4" />
                 Copy Summary
+              </Button>
+              <Button
+                onClick={handleCopyDetailed}
+                disabled={!hasSelection}
+                className="gap-1.5"
+              >
+                <FileText className="h-4 w-4" />
+                Copy Detailed
               </Button>
             </div>
           </div>
