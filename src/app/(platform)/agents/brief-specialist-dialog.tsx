@@ -47,6 +47,8 @@ const ENABLE_ADVANCED_MODES = typeof window !== "undefined"
 
 const MODEL_TIERS = {
     claude: { providerId: "anthropic", modelId: "claude-opus-4-6" },
+    qwen: { providerId: "qwen", modelId: "qwen3.5-plus" },
+    "qwen-local": { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },
     minimax: { providerId: "minimax", modelId: "MiniMax-M2.5" },
 } as const
 

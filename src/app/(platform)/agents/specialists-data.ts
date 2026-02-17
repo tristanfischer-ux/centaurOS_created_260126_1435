@@ -97,8 +97,8 @@ export interface Specialist {
     thinkingIndicator: string
     /** Progressive thinking phases shown at 0s, 3s, and 8s while waiting for a response */
     thinkingPhases: [string, string, string]
-    /** AI model tier: "claude" for high-stakes reasoning, "minimax" for high-volume work */
-    modelTier: "claude" | "minimax"
+    /** AI model tier: "claude" for high-stakes reasoning, "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume work */
+    modelTier: "claude" | "qwen" | "qwen-local" | "minimax"
 }
 
 export const SPECIALISTS: Specialist[] = [
@@ -294,7 +294,7 @@ export const SPECIALISTS: Specialist[] = [
             "Stripping away the unnecessary...",
             "Found the simplest path — writing it up.",
         ],
-        modelTier: "claude",
+        modelTier: "qwen",
     },
     {
         id: "vp-engineering",
@@ -385,7 +385,7 @@ export const SPECIALISTS: Specialist[] = [
             "Estimating velocity and timeline...",
             "Sprint plan taking shape — almost ready.",
         ],
-        modelTier: "minimax",
+        modelTier: "qwen",
     },
     {
         id: "vp-manufacturing",
@@ -662,7 +662,7 @@ export const SPECIALISTS: Specialist[] = [
             "Defining acceptance criteria...",
             "Scope is tight — writing the recommendation.",
         ],
-        modelTier: "minimax",
+        modelTier: "qwen",
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // GROWTH — How we get customers
