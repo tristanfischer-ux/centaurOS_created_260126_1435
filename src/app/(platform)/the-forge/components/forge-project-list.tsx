@@ -15,6 +15,7 @@
 
 import React from "react"
 import Link from "next/link"
+import { formatDistanceToNow } from "date-fns"
 
 import {
   ArrowRight,
@@ -26,6 +27,7 @@ import {
   ShoppingCart,
   ClipboardCheck,
   Blocks,
+  PlayCircle,
 } from "lucide-react"
 
 import { typography } from "@/lib/design-system"
@@ -34,6 +36,7 @@ import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 
 import { listScansAction } from "@/actions/xray"
+import { listCadLabProjects } from "@/actions/cad-lab-projects"
 import { ForgeProjectCard } from "./forge-project-card"
 
 // ─── Pipeline Stage Definitions (for preview) ──────────────────────────
@@ -55,22 +58,39 @@ const PIPELINE_STAGES = [
  * hero CTA, pipeline preview, Assembly Builder link, and project grid.
  */
 export async function ForgeProjectList(): Promise<React.ReactNode> {
-  const result = await listScansAction()
+  // Fetch pipeline scans and CAD Lab projects in parallel
+  const [scansResult, cadLabResult] = await Promise.all([
+    listScansAction(),
+    listCadLabProjects(),
+  ])
 
-  if ("error" in result) {
+  if ("error" in scansResult) {
     return (
       <div className="space-y-8">
         <PageHeader />
-        <p className="text-sm text-destructive">{result.error}</p>
+        <p className="text-sm text-destructive">{scansResult.error}</p>
       </div>
     )
   }
 
-  const { scans } = result
+  const { scans } = scansResult
+
+  // Find the most recently updated in-progress item to show in "Continue" card
+  const cadLabProjects = "projects" in cadLabResult ? cadLabResult.projects : []
+  const inProgressCadLab = cadLabProjects.find(
+    (p) => p.status !== "complete" && p.status !== "rfq_created",
+  )
+  const inProgressScan = scans.find(
+    (s) => s.status !== "complete" && s.status !== "archived",
+  )
+
+  // Pick whichever was updated most recently
+  const continueItem = pickMostRecent(inProgressCadLab, inProgressScan)
 
   return (
     <div className="space-y-10">
       <PageHeader />
+      {continueItem && <ContinueCard item={continueItem} />}
       <HeroSection />
       <PipelinePreview />
       <AssemblyBuilderLink />
@@ -106,6 +126,114 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
         </div>
       )}
     </div>
+  )
+}
+
+// ─── Continue Where You Left Off ─────────────────────────────────────
+
+/**
+ * Normalized shape for an in-progress project from either data source.
+ */
+interface ContinueItemData {
+  name: string
+  stage: string
+  updatedAt: string
+  href: string
+  source: "pipeline" | "cad-lab"
+}
+
+/** Stage label mapping for pipeline scans */
+const SCAN_STAGE_LABELS: Record<string, string> = {
+  concept: "Concept",
+  dossier: "Dossier",
+  people: "People Matching",
+  supply_chain: "Supply Chain",
+  contracting: "Contracting",
+}
+
+/** Stage label mapping for CAD Lab projects */
+const CAD_LAB_STAGE_LABELS: Record<string, string> = {
+  design: "Design",
+  research: "Research",
+  interface: "Interface Definition",
+  generation: "Generation",
+  rfq_created: "RFQ Created",
+}
+
+/**
+ * Pick the most recently updated item between a CAD Lab project and a scan.
+ * Returns null if neither exists.
+ */
+function pickMostRecent(
+  cadLab: { name: string; stage: string; updatedAt: string; id: string } | undefined,
+  scan: { name: string | null; idea: string; stage: string; updatedAt: string; id: string } | undefined,
+): ContinueItemData | null {
+  if (!cadLab && !scan) return null
+
+  const cadLabTime = cadLab ? new Date(cadLab.updatedAt).getTime() : 0
+  const scanTime = scan ? new Date(scan.updatedAt).getTime() : 0
+
+  if (cadLab && cadLabTime >= scanTime) {
+    return {
+      name: cadLab.name || "Untitled Project",
+      stage: CAD_LAB_STAGE_LABELS[cadLab.stage] ?? cadLab.stage,
+      updatedAt: cadLab.updatedAt,
+      href: `/the-forge/cad-lab?project=${cadLab.id}`,
+      source: "cad-lab",
+    }
+  }
+
+  if (scan) {
+    return {
+      name: scan.name || scan.idea.slice(0, 60) || "Untitled Design",
+      stage: SCAN_STAGE_LABELS[scan.stage] ?? scan.stage,
+      updatedAt: scan.updatedAt,
+      href: `/the-forge/project/${scan.id}`,
+      source: "pipeline",
+    }
+  }
+
+  return null
+}
+
+/**
+ * ContinueCard — Prominent card that lets users resume their most recent in-progress project.
+ * Only rendered when there is an active project to continue.
+ */
+function ContinueCard({ item }: { item: ContinueItemData }): React.ReactNode {
+  let timeAgo = ""
+  try {
+    timeAgo = formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })
+  } catch {
+    // Graceful fallback — show card without time
+  }
+
+  return (
+    <Link
+      href={item.href}
+      className="group flex items-center gap-4 rounded-xl border-2 border-international-orange/20 bg-international-orange-light/30 p-5 transition-all hover:border-international-orange/40 hover:shadow-md"
+    >
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-international-orange text-white">
+        <PlayCircle className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-foreground">
+          Continue where you left off
+        </p>
+        <p className="truncate text-sm text-muted-foreground">
+          {item.name}
+          <span className="mx-1.5 text-muted-foreground/40">·</span>
+          {item.stage}
+          {timeAgo && (
+            <>
+              <span className="mx-1.5 text-muted-foreground/40">·</span>
+              {timeAgo}
+            </>
+          )}
+        </p>
+      </div>
+      <ArrowRight className="h-5 w-5 shrink-0 text-international-orange transition-transform group-hover:translate-x-0.5" />
+    </Link>
   )
 }
 
