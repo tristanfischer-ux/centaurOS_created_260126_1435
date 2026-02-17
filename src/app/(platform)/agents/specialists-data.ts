@@ -298,7 +298,7 @@ export const SPECIALISTS: Specialist[] = [
             "Stripping away the unnecessary...",
             "Found the simplest path — writing it up.",
         ],
-        modelTier: "qwen",
+        modelTier: "minimax",
     },
     {
         id: "vp-engineering",
@@ -389,7 +389,7 @@ export const SPECIALISTS: Specialist[] = [
             "Estimating velocity and timeline...",
             "Sprint plan taking shape — almost ready.",
         ],
-        modelTier: "qwen",
+        modelTier: "minimax",
     },
     {
         id: "vp-manufacturing",
@@ -666,7 +666,7 @@ export const SPECIALISTS: Specialist[] = [
             "Defining acceptance criteria...",
             "Scope is tight — writing the recommendation.",
         ],
-        modelTier: "qwen",
+        modelTier: "minimax",
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // GROWTH — How we get customers

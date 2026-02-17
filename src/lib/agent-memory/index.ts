@@ -21,8 +21,13 @@ export {
   addMemoryMessage,
   getMemoryContext,
   formatMemoryForPrompt,
+  formatObservationsForPrompt,
+  getConversationHistory,
   processMemory,
 } from './manager'
+
+// Conversation message type (for multi-turn LLM calls)
+export type { ConversationMessage } from './manager'
 
 // Token counting
 export { countTokens, countMessagesTokens } from './token-counter'

@@ -276,23 +276,60 @@ export async function buildAIContext(
       }
     }
 
-    // ── 9. Active objectives (optional) ──────────────────────────────
+    // ── 9. Active objectives with hierarchy (optional) ────────────────
+    // Fetches all active objectives with parent-child relationships so
+    // specialists can recommend archiving specific items by exact title.
     if (options.includeObjectives) {
       const { data: objectives } = await supabase
         .from('objectives')
-        .select('title, progress, status')
+        .select('id, title, progress, status, parent_objective_id')
         .eq('foundry_id', foundryId)
         .eq('is_ghost', false)
         .is('deleted_at', null)
         .in('status', ['In Progress', 'Not Started'])
         .order('created_at', { ascending: false })
-        .limit(10)
+        .limit(50)
 
       if (objectives && objectives.length > 0) {
-        const objectiveLines = objectives.map(
-          (o) => `- ${o.title} (${o.progress ?? 0}% complete, ${o.status})`
+        // Build parent-child tree for readable output
+        const topLevel = objectives.filter((o) => !o.parent_objective_id)
+        const children = objectives.filter((o) => o.parent_objective_id)
+        const childMap = new Map<string, typeof objectives>()
+        for (const child of children) {
+          const parentId = child.parent_objective_id as string
+          if (!childMap.has(parentId)) childMap.set(parentId, [])
+          childMap.get(parentId)!.push(child)
+        }
+
+        const lines: string[] = []
+        for (const parent of topLevel) {
+          lines.push(`- ${parent.title} (${parent.progress ?? 0}% complete, ${parent.status})`)
+          const kids = childMap.get(parent.id)
+          if (kids) {
+            for (const kid of kids) {
+              lines.push(`  - ${kid.title} (${kid.progress ?? 0}% complete)`)
+              // Check for grandchildren
+              const grandkids = childMap.get(kid.id)
+              if (grandkids) {
+                for (const gk of grandkids) {
+                  lines.push(`    - ${gk.title} (${gk.progress ?? 0}% complete)`)
+                }
+              }
+            }
+          }
+        }
+
+        // Also list orphaned children (parent not in result set)
+        const topIds = new Set(topLevel.map((o) => o.id))
+        const childIds = new Set(children.map((o) => o.id))
+        const orphans = children.filter(
+          (c) => !topIds.has(c.parent_objective_id as string) && !childIds.has(c.parent_objective_id as string)
         )
-        sections.push(`Active objectives:\n${objectiveLines.join('\n')}`)
+        for (const orphan of orphans) {
+          lines.push(`- ${orphan.title} (${orphan.progress ?? 0}% complete, child of unknown parent)`)
+        }
+
+        sections.push(`Active objectives (use exact titles for archive actions):\n${lines.join('\n')}`)
       }
     }
 

@@ -41,10 +41,23 @@ const ObjectivesGanttView = dynamic(
   () => import('./gantt-view').then((m) => ({ default: m.ObjectivesGanttView })),
   { ssr: false, loading: () => <Skeleton className="w-full h-[500px] rounded-lg" /> },
 )
-import { deleteObjective } from '@/actions/objectives'
+import { deleteObjective, linkObjectiveToStrategic } from '@/actions/objectives'
 import { toast } from 'sonner'
 import { WeeklyDigestPanel } from './weekly-digest'
 import { TeamPulseDashboard } from './team-pulse'
+import {
+  DndContext,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  KeyboardSensor,
+  closestCenter,
+  type DragStartEvent,
+  type DragEndEvent,
+} from '@dnd-kit/core'
 import type { ObjectiveWithTasks, ObjectiveTask, Member, Team, StrategicObjective } from './types'
 import type { TaskWithData } from '../new-tasks/types'
 
@@ -569,7 +582,164 @@ export function ObjectivesBoard({
   )
 }
 
-// Board view: 3-tier hierarchy — Strategy > Objectives > Tasks (via cards)
+// ─── Drag-and-Drop Helpers ────────────────────────────────────────
+
+/**
+ * Wrapper that makes an ObjectiveCard draggable via @dnd-kit.
+ *
+ * @description Applies useDraggable to the card so it can be picked up
+ * and dropped onto strategy sections or the unlinked zone.
+ */
+function DraggableObjectiveCard(props: {
+  objective: ObjectiveWithTasks
+  strategicObjectives: StrategicObjective[]
+  isSelected: boolean
+  onSelect: (id: string) => void
+  onEdit?: (objective: ObjectiveWithTasks) => void
+  onDelete?: (objectiveId: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: props.objective.id,
+    data: { objective: props.objective },
+  })
+
+  return (
+    <div ref={setNodeRef} {...listeners} {...attributes} className="outline-none">
+      <ObjectiveCard {...props} isDragging={isDragging} />
+    </div>
+  )
+}
+
+/**
+ * Droppable zone representing a strategy section.
+ *
+ * @description Uses useDroppable so objective cards can be dropped here
+ * to link them to this strategic objective. Shows a visual highlight
+ * when a card is being dragged over this section.
+ */
+function DroppableStrategySection({
+  strategy,
+  index,
+  isCollapsed,
+  onToggleCollapse,
+  objectiveCount,
+  isDragActive,
+  children,
+}: {
+  strategy: StrategicObjective
+  index: number
+  isCollapsed: boolean
+  onToggleCollapse: () => void
+  objectiveCount: number
+  isDragActive: boolean
+  children: React.ReactNode
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `strategy-${strategy.id}`,
+    data: { strategyId: strategy.id },
+  })
+
+  const color = getStrategyColor(index)
+  const showDropHighlight = isOver && isDragActive
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'rounded-xl border-l-4 p-4 space-y-3 transition-all duration-200',
+        color.border,
+        color.bg,
+        showDropHighlight && 'ring-2 ring-international-orange/30 shadow-lg scale-[1.005]',
+      )}
+    >
+      {/* Strategy header */}
+      <button
+        onClick={onToggleCollapse}
+        className="flex items-center gap-2 w-full text-left group"
+      >
+        {isCollapsed ? (
+          <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+        )}
+        <Flag className={cn('h-3.5 w-3.5', color.icon)} />
+        <span className="text-sm font-semibold text-foreground">
+          {strategy.title}
+        </span>
+        <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
+          {objectiveCount}
+        </span>
+      </button>
+
+      {/* Content (grid or empty message) */}
+      {!isCollapsed && children}
+
+      {/* Drop hint when collapsed and dragging over */}
+      {isCollapsed && showDropHighlight && (
+        <p className="text-xs text-international-orange font-medium py-1 animate-pulse">
+          Drop here to link
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Droppable zone for the "Unlinked Objectives" section.
+ *
+ * @description Dropping a card here unlinks it from any strategy.
+ * Always visible during an active drag so users can unlink objectives.
+ */
+function DroppableUnlinkedSection({
+  objectiveCount,
+  isDragActive,
+  children,
+}: {
+  objectiveCount: number
+  isDragActive: boolean
+  children: React.ReactNode
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: 'unlinked',
+    data: { strategyId: null },
+  })
+
+  const showDropHighlight = isOver && isDragActive
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'space-y-3 rounded-xl p-4 transition-all duration-200',
+        showDropHighlight && 'ring-2 ring-muted-foreground/30 bg-muted/40 scale-[1.005]',
+        isDragActive && !showDropHighlight && 'bg-muted/20',
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <div className="h-4 w-4" />
+        <span className="text-sm font-semibold text-muted-foreground">
+          Unlinked Objectives
+        </span>
+        {objectiveCount > 0 && (
+          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
+            {objectiveCount}
+          </span>
+        )}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+// ─── Board View ───────────────────────────────────────────────────
+
+/**
+ * Board view: 3-tier hierarchy — Strategy > Objectives > Tasks (via cards).
+ *
+ * @description Groups objectives under their linked strategic objectives
+ * with drag-and-drop support. Users can drag objective cards between
+ * strategy sections (or to "Unlinked") to change their strategic linkage.
+ */
 function BoardView({
   objectives,
   strategicObjectives,
@@ -588,6 +758,13 @@ function BoardView({
   onCreateNew?: () => void
 }) {
   const [collapsedStrategies, setCollapsedStrategies] = useState<Set<string>>(new Set())
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [pendingLinks, setPendingLinks] = useState<Map<string, string | null>>(new Map())
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor),
+  )
 
   const toggleCollapse = useCallback((strategyId: string) => {
     setCollapsedStrategies(prev => {
@@ -598,32 +775,110 @@ function BoardView({
     })
   }, [])
 
-  // Group objectives by strategy
-  const { grouped, unlinked } = useMemo(() => {
-    const grouped: { strategy: StrategicObjective; objectives: ObjectiveWithTasks[] }[] = []
-    const unlinked: ObjectiveWithTasks[] = []
+  // Apply optimistic overrides for pending link operations
+  const effectiveObjectives = useMemo(() => {
+    if (pendingLinks.size === 0) return objectives
+    return objectives.map(obj => {
+      const override = pendingLinks.get(obj.id)
+      if (override !== undefined) {
+        return { ...obj, parent_objective_id: override }
+      }
+      return obj
+    })
+  }, [objectives, pendingLinks])
 
-    // Build a map of strategy ID → objectives
+  // Group objectives by strategy (using effective/optimistic data)
+  const { grouped, unlinked } = useMemo(() => {
+    const result: { strategy: StrategicObjective; objectives: ObjectiveWithTasks[] }[] = []
+    const orphaned: ObjectiveWithTasks[] = []
+
     const stratMap = new Map<string, ObjectiveWithTasks[]>()
-    for (const obj of objectives) {
+    for (const obj of effectiveObjectives) {
       if (obj.parent_objective_id && strategicObjectives.some(s => s.id === obj.parent_objective_id)) {
         const existing = stratMap.get(obj.parent_objective_id) || []
         existing.push(obj)
         stratMap.set(obj.parent_objective_id, existing)
       } else {
-        unlinked.push(obj)
+        orphaned.push(obj)
       }
     }
 
     for (const strat of strategicObjectives) {
-      grouped.push({
+      result.push({
         strategy: strat,
         objectives: stratMap.get(strat.id) || [],
       })
     }
 
-    return { grouped, unlinked }
+    return { grouped: result, unlinked: orphaned }
+  }, [effectiveObjectives, strategicObjectives])
+
+  // Find the active objective for DragOverlay
+  const activeObjective = activeId ? objectives.find(o => o.id === activeId) ?? null : null
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }, [])
+
+  const handleDragCancel = useCallback(() => {
+    setActiveId(null)
+  }, [])
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveId(null)
+
+    if (!over) return
+
+    const objectiveId = active.id as string
+    const objective = objectives.find(o => o.id === objectiveId)
+    if (!objective) return
+
+    // Determine target strategy ID from droppable ID
+    const droppableId = over.id as string
+    let targetStrategyId: string | null = null
+
+    if (droppableId === 'unlinked') {
+      targetStrategyId = null
+    } else if (droppableId.startsWith('strategy-')) {
+      targetStrategyId = droppableId.replace('strategy-', '')
+    } else {
+      return
+    }
+
+    // Determine current strategy (null if unlinked)
+    const currentStrategyId =
+      objective.parent_objective_id &&
+      strategicObjectives.some(s => s.id === objective.parent_objective_id)
+        ? objective.parent_objective_id
+        : null
+
+    // No change — skip server call
+    if (targetStrategyId === currentStrategyId) return
+
+    // Optimistic update — move card immediately
+    setPendingLinks(prev => new Map(prev).set(objectiveId, targetStrategyId))
+
+    const result = await linkObjectiveToStrategic(objectiveId, targetStrategyId)
+
+    // Clear optimistic override (revalidated server data takes over)
+    setPendingLinks(prev => {
+      const next = new Map(prev)
+      next.delete(objectiveId)
+      return next
+    })
+
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      const targetName = targetStrategyId
+        ? strategicObjectives.find(s => s.id === targetStrategyId)?.title
+        : null
+      toast.success(targetName ? `Linked to "${targetName}"` : 'Unlinked from strategy')
+    }
   }, [objectives, strategicObjectives])
+
+  // ─── Empty state ─────────────────────────────────────
 
   if (objectives.length === 0) {
     return (
@@ -645,7 +900,8 @@ function BoardView({
     )
   }
 
-  // If no strategies exist, render flat grid
+  // ─── Flat grid when no strategies exist (no DnD needed) ──────────
+
   if (strategicObjectives.length === 0) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -664,111 +920,112 @@ function BoardView({
     )
   }
 
+  // ─── Strategy-grouped board with drag-and-drop ───────────────────
+
+  const isDragActive = activeId !== null
+
   return (
-    <div className="space-y-6">
-      {/* Strategy color legend */}
-      {grouped.length > 1 && (
-        <div className="flex flex-wrap items-center gap-4 text-sm">
-          <span className="text-muted-foreground font-medium text-xs">Strategies:</span>
-          {grouped.map(({ strategy }, index) => {
-            const color = getStrategyColor(index)
-            return (
-              <div key={strategy.id} className="flex items-center gap-2">
-                <div className={cn('h-2 w-8 rounded-full', color.swatch)} />
-                <span className="text-muted-foreground text-xs">{strategy.title}</span>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Strategy sections */}
-      {grouped.map(({ strategy, objectives: stratObjectives }, index) => {
-        const isCollapsed = collapsedStrategies.has(strategy.id)
-        const color = getStrategyColor(index)
-
-        return (
-          <div
-            key={strategy.id}
-            className={cn(
-              'rounded-xl border-l-4 p-4 space-y-3 transition-colors',
-              color.border,
-              color.bg,
-            )}
-          >
-            {/* Strategy header */}
-            <button
-              onClick={() => toggleCollapse(strategy.id)}
-              className="flex items-center gap-2 w-full text-left group"
-            >
-              {isCollapsed ? (
-                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
-              )}
-              <Flag className={cn('h-3.5 w-3.5', color.icon)} />
-              <span className="text-sm font-semibold text-foreground">
-                {strategy.title}
-              </span>
-              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
-                {stratObjectives.length}
-              </span>
-            </button>
-
-            {/* Objectives grid */}
-            {!isCollapsed && (
-              stratObjectives.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {stratObjectives.map(obj => (
-                    <ObjectiveCard
-                      key={obj.id}
-                      objective={obj}
-                      strategicObjectives={strategicObjectives}
-                      isSelected={selectedId === obj.id}
-                      onSelect={onSelect}
-                      onEdit={onEdit}
-                      onDelete={onDelete}
-                    />
-                  ))}
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className="space-y-6">
+        {/* Strategy color legend */}
+        {grouped.length > 1 && (
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <span className="text-muted-foreground font-medium text-xs">Strategies:</span>
+            {grouped.map(({ strategy }, index) => {
+              const color = getStrategyColor(index)
+              return (
+                <div key={strategy.id} className="flex items-center gap-2">
+                  <div className={cn('h-2 w-8 rounded-full', color.swatch)} />
+                  <span className="text-muted-foreground text-xs">{strategy.title}</span>
                 </div>
-              ) : (
-                <p className="text-xs text-muted-foreground py-2">
-                  No objectives linked to this strategy yet.
-                </p>
               )
-            )}
+            })}
           </div>
-        )
-      })}
+        )}
 
-      {/* Unlinked objectives */}
-      {unlinked.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="h-4 w-4" /> {/* Spacer for alignment */}
-            <span className="text-sm font-semibold text-muted-foreground">
-              Unlinked Objectives
-            </span>
-            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
-              {unlinked.length}
-            </span>
+        {/* Strategy sections — each is a droppable zone */}
+        {grouped.map(({ strategy, objectives: stratObjectives }, index) => (
+          <DroppableStrategySection
+            key={strategy.id}
+            strategy={strategy}
+            index={index}
+            isCollapsed={collapsedStrategies.has(strategy.id)}
+            onToggleCollapse={() => toggleCollapse(strategy.id)}
+            objectiveCount={stratObjectives.length}
+            isDragActive={isDragActive}
+          >
+            {stratObjectives.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {stratObjectives.map(obj => (
+                  <DraggableObjectiveCard
+                    key={obj.id}
+                    objective={obj}
+                    strategicObjectives={strategicObjectives}
+                    isSelected={selectedId === obj.id}
+                    onSelect={onSelect}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground py-2">
+                {isDragActive ? 'Drop here to link' : 'No objectives linked to this strategy yet.'}
+              </p>
+            )}
+          </DroppableStrategySection>
+        ))}
+
+        {/* Unlinked objectives — always visible during drag for unlinking */}
+        {(unlinked.length > 0 || isDragActive) && (
+          <DroppableUnlinkedSection
+            objectiveCount={unlinked.length}
+            isDragActive={isDragActive}
+          >
+            {unlinked.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {unlinked.map(obj => (
+                  <DraggableObjectiveCard
+                    key={obj.id}
+                    objective={obj}
+                    strategicObjectives={strategicObjectives}
+                    isSelected={selectedId === obj.id}
+                    onSelect={onSelect}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground py-2">
+                Drop here to unlink from strategy
+              </p>
+            )}
+          </DroppableUnlinkedSection>
+        )}
+      </div>
+
+      {/* Drag overlay — follows cursor during drag */}
+      <DragOverlay dropAnimation={null}>
+        {activeObjective ? (
+          <div className="w-80">
+            <ObjectiveCard
+              objective={activeObjective}
+              strategicObjectives={strategicObjectives}
+              isSelected={false}
+              onSelect={() => {}}
+              isDragOverlay
+            />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pl-6">
-            {unlinked.map(obj => (
-              <ObjectiveCard
-                key={obj.id}
-                objective={obj}
-                strategicObjectives={strategicObjectives}
-                isSelected={selectedId === obj.id}
-                onSelect={onSelect}
-                onEdit={onEdit}
-                onDelete={onDelete}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   )
 }
 

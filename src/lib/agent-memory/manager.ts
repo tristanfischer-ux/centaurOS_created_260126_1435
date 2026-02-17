@@ -254,6 +254,11 @@ export async function getMemoryContext(
 /**
  * Formats the memory context into a string block for system prompt injection.
  *
+ * @deprecated Use formatObservationsForPrompt + getConversationHistory instead.
+ * This function puts conversation history in the system prompt as flat text,
+ * which causes the model to ignore recent user messages. Kept for backward
+ * compatibility with non-specialist callers.
+ *
  * @param context - The memory context from getMemoryContext
  * @returns A formatted string ready to append to a system prompt, or empty string
  */
@@ -279,6 +284,75 @@ export function formatMemoryForPrompt(context: MemoryContext): string {
   }
 
   return '\n' + parts.join('\n') + '\n'
+}
+
+/**
+ * Formats ONLY the observations (compressed summaries) for system prompt injection.
+ *
+ * @description Recent messages should be passed as proper multi-turn messages
+ * in the API call, not embedded in the system prompt. This function extracts
+ * only the observations block for the system prompt.
+ *
+ * @param context - The memory context from getMemoryContext
+ * @returns A formatted observations string for the system prompt, or empty string
+ */
+export function formatObservationsForPrompt(context: MemoryContext): string {
+  if (!context.observations) {
+    return ''
+  }
+
+  const parts: string[] = [
+    '--- Agent Memory (Observations) ---',
+    context.observations,
+    '--- End Observations ---',
+  ]
+
+  return '\n' + parts.join('\n') + '\n'
+}
+
+/** Message format compatible with LLM API multi-turn conversations */
+export interface ConversationMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/**
+ * Extracts recent unobserved messages as a properly typed array for
+ * multi-turn LLM API calls.
+ *
+ * @description Instead of embedding conversation history as text in the
+ * system prompt, this returns messages in the format expected by LLM APIs
+ * (user/assistant turns). System and tool messages are excluded since they
+ * don't map to standard conversation roles.
+ *
+ * @param context - The memory context from getMemoryContext
+ * @param maxMessages - Maximum number of messages to return (default: 40)
+ * @returns Array of user/assistant messages for the LLM messages parameter
+ */
+export function getConversationHistory(
+  context: MemoryContext,
+  maxMessages: number = 40
+): ConversationMessage[] {
+  if (context.recentMessages.length === 0) {
+    return []
+  }
+
+  // Filter to only user and assistant messages (system/tool don't map to conversation turns)
+  const conversationMessages = context.recentMessages
+    .filter((msg): msg is typeof msg & { role: 'user' | 'assistant' } =>
+      msg.role === 'user' || msg.role === 'assistant'
+    )
+    .map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }))
+
+  // Cap at maxMessages to avoid exceeding context windows
+  if (conversationMessages.length > maxMessages) {
+    return conversationMessages.slice(-maxMessages)
+  }
+
+  return conversationMessages
 }
 
 // ─── Process Memory (Observe + Reflect) ─────────────────────────────

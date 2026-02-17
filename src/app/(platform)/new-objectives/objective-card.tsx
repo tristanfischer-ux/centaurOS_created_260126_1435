@@ -24,6 +24,10 @@ interface ObjectiveCardProps {
   onSelect: (id: string) => void
   onEdit?: (objective: ObjectiveWithTasks) => void
   onDelete?: (objectiveId: string) => void
+  /** Rendered inside DragOverlay — elevated visual, no interactivity */
+  isDragOverlay?: boolean
+  /** Original card is being dragged — show faded placeholder */
+  isDragging?: boolean
 }
 
 const HEALTH_BORDER: Record<string, string> = {
@@ -42,7 +46,7 @@ const HEALTH_LABEL: Record<string, { text: string; className: string }> = {
   'not-started': { text: 'Not Started', className: 'bg-muted text-muted-foreground border-muted-foreground/20' },
 }
 
-export function ObjectiveCard({ objective, strategicObjectives = [], isSelected, onSelect, onEdit, onDelete }: ObjectiveCardProps) {
+export function ObjectiveCard({ objective, strategicObjectives = [], isSelected, onSelect, onEdit, onDelete, isDragOverlay, isDragging }: ObjectiveCardProps) {
   const { title, description, progress, health, totalTasks, completedTasks, overdueTasks, tasks, parent_objective_id } = objective
   const variant = getHealthVariant(progress)
   const [isLinking, startLinking] = useTransition()
@@ -75,15 +79,17 @@ export function ObjectiveCard({ objective, strategicObjectives = [], isSelected,
     <div
       className={cn(
         'w-full text-left rounded-xl border-l-4 border bg-card group relative',
-        'transition-all duration-200 hover:shadow-md hover:-translate-y-0.5',
+        'transition-all duration-200',
         HEALTH_BORDER[health] || 'border-l-muted',
-        isSelected
-          ? 'ring-2 ring-international-orange/30 shadow-md'
-          : 'hover:border-foreground/10'
+        isDragging && 'opacity-30 shadow-none',
+        isDragOverlay && 'shadow-xl rotate-[1.5deg] ring-2 ring-international-orange/40 cursor-grabbing',
+        !isDragOverlay && !isDragging && 'hover:shadow-md hover:-translate-y-0.5',
+        !isDragOverlay && !isDragging && isSelected && 'ring-2 ring-international-orange/30 shadow-md',
+        !isDragOverlay && !isDragging && !isSelected && 'hover:border-foreground/10',
       )}
     >
-      {/* Action buttons - visible on hover */}
-      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+      {/* Action buttons - visible on hover (hidden during drag) */}
+      {!isDragOverlay && <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         {onEdit && (
           <Button
             variant="ghost"
@@ -112,7 +118,7 @@ export function ObjectiveCard({ objective, strategicObjectives = [], isSelected,
             <Trash className="h-3.5 w-3.5" />
           </Button>
         )}
-      </div>
+      </div>}
 
       {/* Using div+role instead of <button> to avoid invalid nested <button> 
            from the Popover trigger inside this clickable area */}

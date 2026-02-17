@@ -8,11 +8,24 @@ import type { AIProviderId, OutputModality } from "./types"
 
 // ─── Common types for provider implementations ──────────────────────
 
+/** A single message in a multi-turn conversation */
+export interface ChatMessage {
+    role: "system" | "user" | "assistant"
+    content: string
+}
+
 export interface StreamingTextOptions {
     apiKey: string
     modelId: string
     systemPrompt: string
     userPrompt: string
+    /**
+     * Optional conversation history to send as proper multi-turn messages.
+     * When provided, these are inserted between the system prompt and the
+     * final user prompt, giving the model real conversational context
+     * instead of a flat text blob in the system prompt.
+     */
+    conversationHistory?: ChatMessage[]
     maxTokens?: number
     /** Enable Anthropic extended thinking for deeper reasoning. Only applies to Anthropic models. */
     enableThinking?: boolean
@@ -48,18 +61,45 @@ export interface AudioGenerationResult {
     audioUrl: string // base64 data URI
 }
 
+// ─── Multi-Turn Message Builder ──────────────────────────────────────
+
+/**
+ * Builds the full messages array for an LLM call, inserting conversation
+ * history between the system prompt and the current user prompt.
+ *
+ * @description When conversationHistory is provided, the model sees a real
+ * multi-turn exchange instead of a flat text blob. This dramatically improves
+ * the model's ability to track what the user said and respond accordingly.
+ *
+ * @param opts - The streaming options containing system prompt, history, and user prompt
+ * @returns An array of messages ready for the LLM API
+ */
+function buildMessages(opts: StreamingTextOptions): ChatMessage[] {
+    const messages: ChatMessage[] = [
+        { role: "system", content: opts.systemPrompt },
+    ]
+
+    if (opts.conversationHistory && opts.conversationHistory.length > 0) {
+        for (const msg of opts.conversationHistory) {
+            messages.push({ role: msg.role, content: msg.content })
+        }
+    }
+
+    messages.push({ role: "user", content: opts.userPrompt })
+    return messages
+}
+
 // ─── Text Streaming Providers ────────────────────────────────────────
 
 async function streamOpenAI(opts: StreamingTextOptions): Promise<void> {
     const OpenAI = (await import("openai")).default
     const client = new OpenAI({ apiKey: opts.apiKey })
 
+    const messages = buildMessages(opts)
+
     const stream = await client.chat.completions.create({
         model: opts.modelId,
-        messages: [
-            { role: "system", content: opts.systemPrompt },
-            { role: "user", content: opts.userPrompt },
-        ],
+        messages,
         stream: true,
         max_tokens: opts.maxTokens ?? 4096,
     })
@@ -76,6 +116,19 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
     const Anthropic = (await import("@anthropic-ai/sdk")).default
     const client = new Anthropic({ apiKey: opts.apiKey })
 
+    // Anthropic uses a separate `system` param, so we build messages without it
+    const conversationMessages: Array<{ role: "user" | "assistant"; content: string }> = []
+
+    if (opts.conversationHistory && opts.conversationHistory.length > 0) {
+        for (const msg of opts.conversationHistory) {
+            if (msg.role === "user" || msg.role === "assistant") {
+                conversationMessages.push({ role: msg.role, content: msg.content })
+            }
+        }
+    }
+
+    conversationMessages.push({ role: "user", content: opts.userPrompt })
+
     // Build stream parameters, conditionally enabling extended thinking
     // Extended thinking adds an internal chain-of-thought step before the
     // final response, improving reasoning quality for complex analysis.
@@ -84,7 +137,7 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
         model: opts.modelId,
         max_tokens: opts.maxTokens ?? 4096,
         system: opts.systemPrompt,
-        messages: [{ role: "user", content: opts.userPrompt }],
+        messages: conversationMessages,
         ...(opts.enableThinking && {
             thinking: {
                 type: "enabled" as const,
@@ -109,10 +162,26 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
 async function streamGoogle(opts: StreamingTextOptions): Promise<void> {
     const { GoogleGenerativeAI } = await import("@google/generative-ai")
     const genAI = new GoogleGenerativeAI(opts.apiKey)
-    const model = genAI.getGenerativeModel({ model: opts.modelId })
+    const model = genAI.getGenerativeModel({
+        model: opts.modelId,
+        systemInstruction: opts.systemPrompt,
+    })
+
+    // Build multi-turn contents for Google's format
+    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = []
+
+    if (opts.conversationHistory && opts.conversationHistory.length > 0) {
+        for (const msg of opts.conversationHistory) {
+            // Google uses "user" and "model" (not "assistant")
+            const role = msg.role === "assistant" ? "model" : "user"
+            contents.push({ role, parts: [{ text: msg.content }] })
+        }
+    }
+
+    contents.push({ role: "user", parts: [{ text: opts.userPrompt }] })
 
     const result = await model.generateContentStream({
-        contents: [{ role: "user", parts: [{ text: `${opts.systemPrompt}\n\n${opts.userPrompt}` }] }],
+        contents,
         generationConfig: {
             maxOutputTokens: opts.maxTokens ?? 4096,
         },
@@ -318,12 +387,11 @@ async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
         baseURL: "https://api.minimax.io/v1",
     })
 
+    const messages = buildMessages(opts)
+
     const stream = await client.chat.completions.create({
         model: opts.modelId,
-        messages: [
-            { role: "system", content: opts.systemPrompt },
-            { role: "user", content: opts.userPrompt },
-        ],
+        messages,
         stream: true,
         max_tokens: opts.maxTokens ?? 4096,
     })
@@ -368,12 +436,11 @@ async function streamQwen(opts: StreamingTextOptions): Promise<void> {
         }
     }
 
+    const messages = buildMessages(opts)
+
     const stream = await client.chat.completions.create({
         model: opts.modelId,
-        messages: [
-            { role: "system", content: opts.systemPrompt },
-            { role: "user", content: opts.userPrompt },
-        ],
+        messages,
         stream: true,
         max_tokens: opts.maxTokens ?? 8192,
         ...extraParams,
@@ -412,12 +479,11 @@ async function streamQwenLocal(opts: StreamingTextOptions): Promise<void> {
         baseURL,
     })
 
+    const messages = buildMessages(opts)
+
     const stream = await client.chat.completions.create({
         model: opts.modelId,
-        messages: [
-            { role: "system", content: opts.systemPrompt },
-            { role: "user", content: opts.userPrompt },
-        ],
+        messages,
         stream: true,
         // Ollama handles max_tokens differently; cap at a reasonable default
         ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),

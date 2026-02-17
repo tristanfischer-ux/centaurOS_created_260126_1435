@@ -7,10 +7,12 @@ import type { AIProviderId, OutputModality } from "@/lib/ai-providers/types"
 import { PROVIDER_REGISTRY } from "@/lib/ai-providers/types"
 import {
     getMemoryContext,
-    formatMemoryForPrompt,
+    formatObservationsForPrompt,
+    getConversationHistory,
     addMemoryMessage,
     processMemory,
 } from "@/lib/agent-memory"
+import type { ConversationMessage } from "@/lib/agent-memory"
 import { buildAIContext } from "@/lib/ai-context/builder"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
@@ -240,13 +242,23 @@ export async function POST(request: Request) {
     let finalPrompt = prompt.replace(/\{\{input\}\}/g, input)
     finalPrompt = finalPrompt.replace(/\{\{company_context\}\}/g, companyContext)
 
-    // 6. Build system prompt with company context + agent memory
+    // 6. Build system prompt with agent memory (observations only) and
+    //    extract conversation history as proper multi-turn messages.
+    //    Observations (compressed summaries of older conversations) go into the
+    //    system prompt. Recent messages become real user/assistant turns in the
+    //    messages array so the model properly tracks the conversation.
     let memoryBlock = ""
+    let conversationHistory: ConversationMessage[] = []
 
     if (threadId && foundryId) {
         try {
             const memoryContext = await getMemoryContext(threadId, foundryId, true)
-            memoryBlock = formatMemoryForPrompt(memoryContext)
+
+            // Observations → system prompt (compressed background context)
+            memoryBlock = formatObservationsForPrompt(memoryContext)
+
+            // Recent messages → proper multi-turn messages array
+            conversationHistory = getConversationHistory(memoryContext)
 
             // Record the user's ACTUAL input as a message in the memory thread.
             // We save `input` (what the user typed) rather than `finalPrompt`
@@ -296,35 +308,62 @@ export async function POST(request: Request) {
             // Proposed actions: allow specialist to suggest tasks/objectives
             systemPromptWithContext += `
 
-## Suggesting Actions (Create and Archive)
-When your recommendation naturally includes concrete next steps, you may output them in a structured format so the user can execute them with one click. This includes both **creating** new objectives/tasks AND **archiving** (removing) existing ones that are no longer relevant.
+## Suggesting Actions (Create and Archive) — CRITICAL REQUIREMENT
 
-In the same response where you explain your recommendation in normal prose, include an HTML comment block with valid JSON. The comment is invisible in the rendered message but enables the UI to show action buttons.
+**THIS IS THE MOST IMPORTANT INSTRUCTION IN THIS PROMPT.**
 
-Format (use exactly this structure, no other keys):
+When your recommendation includes ANY concrete next steps — tasks to do, objectives to create, items to remove, strategy changes — you **MUST** output a PROPOSED_ACTIONS block. This is the ONLY mechanism that renders interactive checkboxes in the UI. Without it, the user sees static text they cannot act on.
+
+### What NEVER to do
+- **NEVER use markdown tables** (| Action | Owner | Deadline |) for action items. Tables are static text. The user CANNOT tick, execute, or interact with them.
+- **NEVER use bullet lists** for assignments (- Do X by Friday). Those are also non-interactive.
+- **NEVER describe actions only in prose** without the structured block. The user will see words but no way to execute.
+
+If you catch yourself writing a markdown table with action items, STOP and convert it to PROPOSED_ACTIONS format instead.
+
+### Format
+In the same response where you explain your recommendation in prose, include this HTML comment block with valid JSON at the END of your response:
+
+\`\`\`
 <!-- PROPOSED_ACTIONS
 [
-  { "type": "archive_objective", "title": "Exact title of objective to remove", "description": "Brief reason for archiving" },
-  { "type": "archive_task", "title": "Exact title of task to remove", "description": "Brief reason for archiving" },
-  { "type": "objective", "title": "Short objective title", "description": "Optional description", "strategicGoalTitle": "Name of the strategic goal this objective belongs under" },
-  { "type": "task", "title": "Task title", "description": "Optional", "objectiveTitle": "Exact title of objective above if this task belongs under it" }
+  { "type": "archive_objective", "title": "Exact title from objectives list", "description": "Why" },
+  { "type": "archive_task", "title": "Exact task title", "description": "Why" },
+  { "type": "objective", "title": "New objective title", "description": "Details", "strategicGoalTitle": "Parent goal title" },
+  { "type": "task", "title": "New task title", "description": "Details", "objectiveTitle": "Parent objective title" }
 ]
 -->
+\`\`\`
 
-Action types:
-- "objective" — Create a new objective (use "strategicGoalTitle" to place it under the right strategic goal)
-- "task" — Create a new task (optionally linked to an objective via "objectiveTitle")
-- "archive_objective" — Archive (soft-delete) an existing objective that is redundant, outdated, or being replaced
-- "archive_task" — Archive (soft-delete) an existing task that is redundant, outdated, or being replaced
+### Action types
+- \`"archive_objective"\` — Remove an existing objective (soft-delete). Use the EXACT title from the objectives list above.
+- \`"archive_task"\` — Remove an existing task (soft-delete). Use the EXACT title.
+- \`"objective"\` — Create a new objective. Set \`"strategicGoalTitle"\` to nest it under the right parent.
+- \`"task"\` — Create a new task. Set \`"objectiveTitle"\` to link it to an objective.
 
-Rules:
-- Only include this block when you are actually recommending specific actions. Do not add it to every message.
-- **When recommending a strategy change, include BOTH the items to archive AND the items to create.** This lets the user clean up old strategy and adopt new strategy in one click. Put archive actions before create actions.
-- For archive actions, use the exact title of the existing objective or task so the system can find and archive it. The title is matched case-insensitively.
-- **For new objectives, always set "strategicGoalTitle" to the exact title of the strategic goal it should be nested under.** This prevents orphaned objectives that don't appear under any strategic pillar. Look at the user's existing strategic goals (provided in context above) and choose the most relevant one.
-- For tasks that belong under an objective in the same proposal, set "objectiveTitle" to the exact "title" of that objective so they can be linked.
-- Keep titles concise (under 200 chars for objectives, under 500 for tasks). Descriptions are optional but helpful for archive actions (explain why).
-- The visible text of your response should still read naturally; the block is supplementary.`
+### Example: Recommending to kill a feature and consolidate strategy
+If the user has duplicate objectives like "raise 50m funding" and "raise 60m funding", and you recommend consolidating:
+
+\`\`\`
+<!-- PROPOSED_ACTIONS
+[
+  { "type": "archive_objective", "title": "raise 50m funding", "description": "Duplicate — consolidating into single fundraising strategy" },
+  { "type": "archive_objective", "title": "raise 60m funding", "description": "Duplicate — consolidating into single fundraising strategy" },
+  { "type": "objective", "title": "Raise $50M Series A", "description": "Consolidated fundraising objective with clear milestones", "strategicGoalTitle": "Consolidate Fundraising Strategy" }
+]
+-->
+\`\`\`
+
+This renders as interactive cards with checkboxes. The user ticks which ones to archive, which to create, and clicks one button.
+
+### Rules
+1. **ALWAYS include PROPOSED_ACTIONS when you recommend actions.** This is mandatory, not optional. The user explicitly expects interactive checkboxes.
+2. **When recommending cleanup or strategy changes, include BOTH archive AND create actions.** Archive the old, create the new — in one block.
+3. **Use EXACT titles from the objectives/tasks list** for archive actions. Title matching is case-insensitive but must be exact otherwise.
+4. **Put archive actions BEFORE create actions** in the array.
+5. **For new objectives, always set "strategicGoalTitle"** to an existing strategic goal title so they nest correctly.
+6. Only skip the block for purely informational responses with zero actionable recommendations.
+7. The visible prose should read naturally. The PROPOSED_ACTIONS block is supplementary — describe actions in words, then include the structured block at the end.`
 
             // Workflow capabilities: let the specialist know what they can produce
             const { getSpecialistWorkflows } = await import("@/lib/agents/specialist-workflows")
@@ -584,10 +623,10 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
 
     try {
         if (modality === "text") {
-            return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking)
+            return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory)
         }
         if (modality === "slides") {
-            // Slides use text generation with a structured output prompt
+            // Slides use text generation with a structured output prompt (no conversation history needed)
             return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback)
         }
         if (modality === "image") {
@@ -629,6 +668,7 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
  * @param customSystemPrompt - System prompt override
  * @param onComplete - Callback fired after streaming completes (for memory + usage logging)
  * @param enableThinking - When true, enables Anthropic extended thinking for deeper reasoning
+ * @param history - Optional conversation history for multi-turn context
  */
 async function handleTextStreaming(
     apiKey: string,
@@ -637,7 +677,8 @@ async function handleTextStreaming(
     finalPrompt: string,
     customSystemPrompt?: string,
     onComplete?: (fullOutput: string) => Promise<void>,
-    enableThinking?: boolean
+    enableThinking?: boolean,
+    history?: ConversationMessage[]
 ): Promise<Response> {
     const streamFn = getTextProvider(providerId)
     if (!streamFn) {
@@ -653,6 +694,12 @@ async function handleTextStreaming(
     const encoder = new TextEncoder()
     let fullOutput = ""
 
+    // Convert ConversationMessage[] to ChatMessage[] for the provider
+    const conversationHistory = history?.map((msg) => ({
+        role: msg.role as "system" | "user" | "assistant",
+        content: msg.content,
+    }))
+
     const readable = new ReadableStream({
         async start(controller) {
             try {
@@ -661,6 +708,7 @@ async function handleTextStreaming(
                     modelId,
                     systemPrompt: customSystemPrompt ?? SYSTEM_PROMPT,
                     userPrompt: finalPrompt,
+                    conversationHistory,
                     maxTokens,
                     enableThinking: enableThinking && providerId === "anthropic",
                     onChunk(text) {
