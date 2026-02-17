@@ -325,6 +325,8 @@ export function BriefSpecialistDialog({
     /** Snapshot of messages for the greeting effect — avoids re-running (and aborting) the greeting when messages change */
     const messagesSnapshotRef = useRef(messages)
     messagesSnapshotRef.current = messages
+    /** Smart scroll: true when the user is near the bottom of the chat — auto-scroll only fires when true */
+    const isNearBottomRef = useRef(true)
 
     // Derived: true when the AI response is actively streaming visible text
     const isStreaming = isExecuting && streamingResponse.length > 0
@@ -497,9 +499,18 @@ export function BriefSpecialistDialog({
         }
     }, [open, isLoadingThread, isExecuting])
 
-    // Auto-scroll chat as messages come in
+    // Smart auto-scroll: only scroll to bottom when user is near the bottom.
+    // This lets users scroll up to read earlier messages without being yanked back down
+    // on every streaming chunk. Standard chat UX (Slack, Discord, etc.).
+    const handleChatScroll = useCallback(() => {
+        const el = scrollRef.current
+        if (!el) return
+        const threshold = 120
+        isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+    }, [])
+
     useEffect(() => {
-        if (scrollRef.current) {
+        if (scrollRef.current && isNearBottomRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight
         }
     }, [messages, streamingResponse])
@@ -806,6 +817,9 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
         setStreamingResponse("")
         setError(null)
         setDynamicSuggestion(null)
+
+        // Always scroll to bottom when the user sends a message — they should see their own message
+        isNearBottomRef.current = true
 
         // Detect urgency in user message for visual feedback
         const urgencySignals = /!{2,}|HELP|URGENT|ASAP|EMERGENCY|CRISIS|CRITICAL/i
@@ -1456,6 +1470,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         {(hasConversation || hasHistoricalMessages) && (
                             <div
                                 ref={scrollRef}
+                                onScroll={handleChatScroll}
                                 role="log"
                                 aria-live="polite"
                                 aria-label="Conversation with specialist"
@@ -2150,6 +2165,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         {(hasConversation || hasHistoricalMessages) && (
                             <div
                                 ref={scrollRef}
+                                onScroll={handleChatScroll}
                                 role="log"
                                 aria-live="polite"
                                 aria-label="Conversation with specialist"
