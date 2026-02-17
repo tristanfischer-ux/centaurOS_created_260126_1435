@@ -1,8 +1,8 @@
 {
   "errors": [
-    "e2e/apprentice-onboarding-e2e.spec.ts|TS2769|No overload matches this call.",
     "e2e/content-verification.spec.ts|TS18047|'sectionText' is possibly 'null'.",
     "e2e/content-verification.spec.ts|TS2345|Argument of type is not assignable to parameter of type.",
+    "e2e/signup.spec.ts|TS2339|Property 'id' does not exist on type.",
     "src/actions/activity.ts|TS2345|Argument of type is not assignable to parameter of type.",
     "src/actions/activity.ts|TS7006|Parameter 'r' implicitly has an 'any' type.",
     "src/actions/apprenticeship-enrollment.ts|TS2339|Property '0' does not exist on type.",
@@ -64,6 +64,10 @@
     "src/app/(platform)/inspiration/components/category-tabs.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/inspiration/components/industry-selector.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/inspiration/components/pack-card.tsx|TS2322|Type is not assignable to type.",
+    "src/app/(platform)/layout.tsx|TS2322|Type is not assignable to type.",
+    "src/app/(platform)/layout.tsx|TS2339|Property 'error' does not exist on type.",
+    "src/app/(platform)/layout.tsx|TS2339|Property 'foundry_id' does not exist on type.",
+    "src/app/(platform)/layout.tsx|TS2339|Property 'success' does not exist on type.",
     "src/app/(platform)/marketplace-v2/components/MarketCardV2.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/marketplace-v2/components/MarketplaceBrowse.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/marketplace-v2/components/MarketplaceCompareView.tsx|TS2322|Type is not assignable to type.",
@@ -172,8 +176,6 @@
     "src/lib/analytics/service.ts|TS18047|'o.platform_fee' is possibly 'null'.",
     "src/lib/analytics/service.ts|TS2322|Type is not assignable to type.",
     "src/lib/analytics/service.ts|TS2345|Argument of type is not assignable to parameter of type.",
-    "src/lib/analytics/service.ts|TS2769|No overload matches this call.",
-    "test-browser-signup-flow.ts|TS2367|This comparison appears to be unintentional because compared types have no overlap.",
-    "test-error-stage-fix.ts|TS2322|Type is not assignable to type."
+    "src/lib/analytics/service.ts|TS2769|No overload matches this call."
   ]
 }
