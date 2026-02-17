@@ -31,13 +31,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (errorParam) {
         console.warn('[GoogleCallback] User denied consent:', errorParam)
         return NextResponse.redirect(
-            new URL('/settings/integrations?error=consent_denied', req.nextUrl.origin)
+            new URL('/google-apps?error=consent_denied', req.nextUrl.origin)
         )
     }
 
     if (!code || !stateParam) {
         return NextResponse.redirect(
-            new URL('/settings/integrations?error=missing_params', req.nextUrl.origin)
+            new URL('/google-apps?error=missing_params', req.nextUrl.origin)
         )
     }
 
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     if (!user) {
         return NextResponse.redirect(
-            new URL('/login?redirect=/settings/integrations', req.nextUrl.origin)
+            new URL('/login?redirect=/google-apps', req.nextUrl.origin)
         )
     }
 
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     })
     if (!rateLimitResult.success) {
         return NextResponse.redirect(
-            new URL('/settings/integrations?error=rate_limited', req.nextUrl.origin)
+            new URL('/google-apps?error=rate_limited', req.nextUrl.origin)
         )
     }
 
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (!oauthStateSecret) {
         console.error('[GoogleCallback] Missing OAuth state signing secret')
         return NextResponse.redirect(
-            new URL('/settings/integrations?error=oauth_not_configured', req.nextUrl.origin)
+            new URL('/google-apps?error=not_configured', req.nextUrl.origin)
         )
     }
 
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (!stateData) {
         console.error('[GoogleCallback] Invalid or expired state parameter')
         return NextResponse.redirect(
-            new URL('/settings/integrations?error=invalid_state', req.nextUrl.origin)
+            new URL('/google-apps?error=oauth_error', req.nextUrl.origin)
         )
     }
 
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             authUserId: user.id,
         })
         return NextResponse.redirect(
-            new URL('/settings/integrations?error=user_mismatch', req.nextUrl.origin)
+            new URL('/google-apps?error=oauth_error', req.nextUrl.origin)
         )
     }
 
@@ -104,7 +104,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             foundryId: stateData.foundryId,
         })
         return NextResponse.redirect(
-            new URL('/settings/integrations?error=foundry_mismatch', req.nextUrl.origin)
+            new URL('/google-apps?error=oauth_error', req.nextUrl.origin)
         )
     }
 
@@ -119,7 +119,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         if (!tokens.access_token) {
             console.error('[GoogleCallback] No access token received')
             return NextResponse.redirect(
-                new URL('/settings/integrations?error=no_token', req.nextUrl.origin)
+                new URL('/google-apps?error=oauth_error', req.nextUrl.origin)
             )
         }
 
@@ -146,7 +146,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         if (!saveResult.success) {
             console.error('[GoogleCallback] Failed to save token:', saveResult.error)
             return NextResponse.redirect(
-                new URL('/settings/integrations?error=save_failed', req.nextUrl.origin)
+                new URL('/google-apps?error=oauth_error', req.nextUrl.origin)
             )
         }
 
@@ -161,7 +161,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         const postRedirect = req.cookies.get('google_oauth_redirect')?.value
         const redirectPath = postRedirect && postRedirect.startsWith('/')
             ? `${postRedirect}?success=connected`
-            : '/settings/integrations?success=connected'
+            : '/google-apps?success=connected'
 
         const response = NextResponse.redirect(
             new URL(redirectPath, req.nextUrl.origin)
@@ -176,7 +176,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             error: err instanceof Error ? err.message : 'Unknown error',
         })
         return NextResponse.redirect(
-            new URL('/settings/integrations?error=exchange_failed', req.nextUrl.origin)
+            new URL('/google-apps?error=oauth_error', req.nextUrl.origin)
         )
     }
 }

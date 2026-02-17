@@ -28,7 +28,9 @@ const ERROR_MESSAGES: Record<string, string> = {
     not_configured: 'Google integration is not configured yet. Please contact support.',
     no_foundry: 'Please complete your profile setup before connecting Google.',
     rate_limited: 'Too many connection attempts. Please try again in a few minutes.',
-    oauth_error: 'Something went wrong starting the Google connection. Please try again.',
+    consent_denied: 'You declined the Google permissions request. Click Connect to try again.',
+    missing_params: 'The Google sign-in response was incomplete. Please try again.',
+    oauth_error: 'Something went wrong connecting your Google account. Please try again.',
 } satisfies Record<string, string>
 
 interface GoogleAppsNotConnectedProps {
