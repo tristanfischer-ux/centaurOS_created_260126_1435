@@ -239,11 +239,13 @@ describe('agent error-response sanitization regressions', () => {
 
     expect(source).toContain('{ error: "Failed to execute prompt" }')
     // Stream errors are classified through classifyStreamError() which returns
-    // safe, user-friendly messages — never raw error details or stack traces.
-    // The classified result is an object { message, category, rawHint } and
-    // the SSE payload uses classified.message (not the raw error string).
+    // a ClassifiedError { message, category, rawHint }. The SSE payload uses
+    // classified.message for the user-facing error, plus category and rawHint
+    // for client-side diagnostic logging. Raw error details are never exposed
+    // directly in the user-facing message.
     expect(source).toContain('classifyStreamError')
     expect(source).toContain('error: classified.message')
+    expect(source).toContain('errorCategory: classified.category')
     expect(source).not.toContain('return NextResponse.json({ error: message }, { status: 500 })')
     expect(source).not.toContain('JSON.stringify({ error })')
   })
