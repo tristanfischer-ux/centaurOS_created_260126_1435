@@ -88,7 +88,14 @@ export async function saveGoogleToken(
     // via the signed state parameter, so RLS is not needed here.
     // The cookie-based client's auth.uid() may not be available during
     // the OAuth redirect round-trip, causing silent RLS INSERT failures.
-    const supabase = createAdminClient()
+    let supabase
+    try {
+        supabase = createAdminClient()
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error creating admin client'
+        console.error('[GoogleTokens] Admin client creation failed:', msg)
+        return { success: false, error: msg }
+    }
 
     const { error } = await supabase
         .from('google_oauth_tokens')

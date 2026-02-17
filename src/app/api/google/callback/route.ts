@@ -145,9 +145,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
         if (!saveResult.success) {
             console.error('[GoogleCallback] Failed to save token:', saveResult.error)
-            return NextResponse.redirect(
-                new URL('/google-apps?error=save_failed', req.nextUrl.origin)
-            )
+            const saveErrorUrl = new URL('/google-apps', req.nextUrl.origin)
+            saveErrorUrl.searchParams.set('error', 'save_failed')
+            saveErrorUrl.searchParams.set('detail', (saveResult.error || 'Unknown save error').slice(0, 200))
+            return NextResponse.redirect(saveErrorUrl)
         }
 
         // AUDIT: Log successful connection
