@@ -10,6 +10,8 @@ const PUBLIC_ROUTES = [
     '/auth/callback',  // Email verification callback
     '/join',
     '/invite',
+    '/experts',  // Public expert directory (SEO)
+    '/expert',   // Individual expert profiles (SEO)
     '/api/health',
     '/api/webhooks',
     '/api/dev-login',  // Dev-only auto-login for AI agents/tests (returns 404 in production)
