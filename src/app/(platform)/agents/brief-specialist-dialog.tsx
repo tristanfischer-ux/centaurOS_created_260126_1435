@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
     Loader2, Send, AlertCircle, Copy, Check, Eye, AlertTriangle,
     MessageSquareQuote, ArrowRight, Clock, ChevronDown, ChevronUp,
-    History, Mic, MicOff, Volume2, VolumeX, Sparkles, Brain,
+    History, Mic, MicOff, Volume2, VolumeX, Sparkles, Brain, X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { stripThinkTags, stripPartialThinkTags } from "@/lib/utils/strip-think-tags"
@@ -118,6 +118,8 @@ export interface ProposedAction {
     description?: string
     /** For tasks: exact title of an objective in the same batch to link under. */
     objectiveTitle?: string
+    /** For objectives: title of the strategic goal this objective should be nested under. */
+    strategicGoalTitle?: string
 }
 
 /** Whether a proposed action is destructive (archive/remove). */
@@ -168,6 +170,9 @@ function stripProposedActionsBlock(content: string): string {
     return content.replace(PROPOSED_ACTIONS_REGEX, "").trim()
 }
 
+/** Render mode: "dialog" for centered modal, "panel" for persistent sidebar */
+export type SpecialistRenderMode = "dialog" | "panel"
+
 interface BriefSpecialistDialogProps {
     /** The specialist being briefed */
     specialist: Specialist
@@ -183,6 +188,8 @@ interface BriefSpecialistDialogProps {
     referredBy?: string | null
     /** Optional label shown as a badge in the header indicating what entity is being discussed */
     contextLabel?: string | null
+    /** Render mode: "dialog" for centered modal (default), "panel" for sidebar layout */
+    renderMode?: SpecialistRenderMode
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -205,7 +212,9 @@ export function BriefSpecialistDialog({
     handoffContext,
     referredBy,
     contextLabel,
+    renderMode = "dialog",
 }: BriefSpecialistDialogProps) {
+    const isPanel = renderMode === "panel"
     // ─── State ────────────────────────────────────────────────────────────
     const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(null)
     const [briefText, setBriefText] = useState("")
@@ -741,12 +750,15 @@ ${otherSpecialists}
 
 Only recommend ONE specialist. Choose based on what gaps or next steps emerged from this conversation. If no follow-up is needed, write: NEXT_SPECIALIST: none | No immediate follow-up needed.`)
 
-        // Conversation-aware prompt: follow-up messages use a lightweight
+        // Conversation-aware prompt: once the specialist has greeted the user,
+        // all subsequent messages are conversational follow-ups. Use a lightweight
         // template so the AI treats them as natural conversation turns.
         // The specialist personality, memory, and response standards are
         // already in the system prompt — no need to repeat "demonstrate
         // deep expertise" on every message (which overrides conversational intent).
-        const isFollowUp = messages.filter(m => !m.historical && m.role === "user").length > 0
+        // We check for an assistant message (the greeting) rather than user messages
+        // because setMessages for the current user message hasn't flushed yet.
+        const isFollowUp = messages.some(m => !m.historical && m.role === "assistant")
 
         const promptTemplate = selectedPrompt?.defaultPrompt
             ?? (isFollowUp
@@ -1018,6 +1030,648 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
     const hasHistoricalMessages = messages.some((m) => m.historical)
     // isStreaming is declared earlier (before the useEffect that depends on it)
     const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant" && !m.historical)
+
+    // ─── Panel Header (for panel mode) ──────────────────────────────────
+    const panelHeader = (
+        <div className="flex items-start gap-3 px-4 py-3 border-b bg-background">
+            <div className="flex-shrink-0 relative h-10 w-10 rounded-full overflow-hidden bg-muted">
+                {specialist.avatarImage ? (
+                    <Image
+                        src={specialist.avatarImage}
+                        alt={specialist.name}
+                        fill
+                        className="object-cover"
+                        sizes="40px"
+                    />
+                ) : (
+                    <div className="flex items-center justify-center h-full w-full">
+                        <span className="text-base font-display font-semibold text-foreground">
+                            {specialist.name.charAt(0)}
+                        </span>
+                    </div>
+                )}
+            </div>
+            <div className="flex-1 min-w-0">
+                <h2 className="text-sm font-display font-semibold text-foreground">
+                    {specialist.name}
+                    <span className="text-xs font-normal text-muted-foreground ml-1.5">
+                        {specialist.title}
+                    </span>
+                </h2>
+                <p className="text-xs text-muted-foreground italic mt-0.5 truncate">
+                    &ldquo;{specialist.tagline}&rdquo;
+                </p>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+                {contextLabel ? (
+                    <Badge variant="secondary" className="text-[10px] gap-1 max-w-[120px] truncate">
+                        <MessageSquareQuote className="h-2.5 w-2.5 flex-shrink-0" />
+                        {contextLabel}
+                    </Badge>
+                ) : screenContext.pageTitle !== "ForgeOS Platform" ? (
+                    <Badge variant="secondary" className="text-[10px] gap-1 max-w-[120px] truncate opacity-70">
+                        <Eye className="h-2.5 w-2.5 flex-shrink-0" />
+                        {screenContext.pageTitle}
+                    </Badge>
+                ) : null}
+                {/* Voice output toggle */}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                        const enabling = !tts.voiceEnabled
+                        tts.setVoiceEnabled(enabling)
+                        if (enabling) tts.warmUp()
+                    }}
+                    className={cn(
+                        "h-7 w-7 p-0",
+                        tts.voiceEnabled && "text-international-orange",
+                        tts.isPlaying && "animate-pulse"
+                    )}
+                    aria-label={tts.voiceEnabled ? "Mute voice output" : "Enable voice output"}
+                >
+                    {tts.voiceEnabled ? (
+                        <Volume2 className="h-3.5 w-3.5" />
+                    ) : (
+                        <VolumeX className="h-3.5 w-3.5" />
+                    )}
+                </Button>
+                {threadId && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleToggleHistory}
+                        className={cn(
+                            "h-7 w-7 p-0",
+                            showHistory && "text-international-orange"
+                        )}
+                        aria-label="Show conversation history"
+                    >
+                        <History className="h-3.5 w-3.5" />
+                    </Button>
+                )}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onOpenChange(false)}
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                    aria-label="Close advisor panel"
+                >
+                    <X className="h-3.5 w-3.5" />
+                </Button>
+            </div>
+        </div>
+    )
+
+    // ─── Render ──────────────────────────────────────────────────────────
+
+    // Panel mode: render as a sidebar div (no Dialog wrapper)
+    if (isPanel) {
+        if (!open) return null
+
+        return (
+            <div className="flex flex-col h-full bg-background">
+                {panelHeader}
+
+                {/* Loading State */}
+                {isLoadingThread && (
+                    <div className="flex items-center justify-center py-8 flex-1">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mr-2" />
+                        <span className="text-sm text-muted-foreground">Connecting to {specialist.name}...</span>
+                    </div>
+                )}
+
+                {/* History Panel */}
+                {showHistory && !isLoadingThread && (
+                    <div className="border-b bg-muted/20 max-h-[30vh] overflow-y-auto">
+                        <div className="px-3 py-2 border-b bg-muted/50 sticky top-0">
+                            <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                                Past conversations
+                            </p>
+                        </div>
+                        {isLoadingHistory ? (
+                            <div className="flex items-center justify-center py-6">
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mr-2" />
+                                <span className="text-sm text-muted-foreground">Loading history...</span>
+                            </div>
+                        ) : historyMessages.length === 0 ? (
+                            <div className="py-6 text-center text-sm text-muted-foreground">
+                                No previous conversations with {specialist.name}.
+                            </div>
+                        ) : (
+                            <div className="p-3 space-y-3">
+                                {historyMessages.map((msg, i) => (
+                                    <div key={i} className={cn(
+                                        "text-xs",
+                                        msg.role === "user" ? "text-foreground" : "text-muted-foreground"
+                                    )}>
+                                        <span className="font-semibold">
+                                            {msg.role === "user" ? "You" : specialist.name}:
+                                        </span>{" "}
+                                        <span className="line-clamp-3">
+                                            {msg.content.slice(0, 200)}
+                                            {msg.content.length > 200 ? "..." : ""}
+                                        </span>
+                                        <span className="block text-[10px] text-muted-foreground mt-0.5">
+                                            {new Date(msg.createdAt).toLocaleDateString(undefined, {
+                                                month: "short",
+                                                day: "numeric",
+                                                hour: "2-digit",
+                                                minute: "2-digit",
+                                            })}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Content — fills remaining space */}
+                {!isLoadingThread && (
+                    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                        {/* Chat Messages Area */}
+                        {(hasConversation || hasHistoricalMessages) && (
+                            <div
+                                ref={scrollRef}
+                                role="log"
+                                aria-live="polite"
+                                aria-label="Conversation with specialist"
+                                className="flex-1 min-h-0 overflow-y-auto space-y-4 p-4"
+                            >
+                                {/* Handoff Briefing Card */}
+                                {referredBy && handoffContext && (
+                                    <div className="rounded-lg border border-international-orange/20 bg-international-orange/5 overflow-hidden mb-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsHandoffBriefingExpanded((prev) => !prev)}
+                                            className="flex items-center justify-between w-full px-3 py-2 text-xs font-medium text-international-orange hover:bg-international-orange/10 transition-colors"
+                                        >
+                                            <span className="flex items-center gap-1.5">
+                                                <ArrowRight className="h-3 w-3" />
+                                                Briefed by {referredBy}
+                                            </span>
+                                            {isHandoffBriefingExpanded ? (
+                                                <ChevronUp className="h-3 w-3" />
+                                            ) : (
+                                                <ChevronDown className="h-3 w-3" />
+                                            )}
+                                        </button>
+                                        {isHandoffBriefingExpanded && (
+                                            <div className="px-3 pb-2.5 text-xs text-muted-foreground leading-relaxed border-t border-international-orange/10 pt-2">
+                                                {handoffContext.length > 400
+                                                    ? handoffContext.slice(0, 400) + "..."
+                                                    : handoffContext
+                                                }
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                {messages.map((msg, i) => {
+                                    const isLastAssistant = msg.role === "assistant" && !msg.historical && i === messages.length - 1
+                                    const isFirstHistorical = msg.historical && i === 0
+                                    const isTransitionToNew = !msg.historical && i > 0 && messages[i - 1]?.historical
+                                    return (
+                                    <div key={i}>
+                                        {isFirstHistorical && (
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <div className="flex-1 border-t border-muted" />
+                                                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                                                    Previous conversation
+                                                </span>
+                                                <div className="flex-1 border-t border-muted" />
+                                            </div>
+                                        )}
+                                        {isTransitionToNew && (
+                                            <div className="flex items-center gap-2 my-4">
+                                                <div className="flex-1 border-t border-international-orange/30" />
+                                                <span className="text-[10px] font-mono uppercase tracking-widest text-international-orange/70">
+                                                    Now
+                                                </span>
+                                                <div className="flex-1 border-t border-international-orange/30" />
+                                            </div>
+                                        )}
+                                        <div className={cn(
+                                            "flex gap-2.5",
+                                            msg.role === "user" ? "justify-end" : "justify-start",
+                                            msg.historical && "opacity-60"
+                                        )}>
+                                            {msg.role === "assistant" && (
+                                                <div className="flex flex-col items-center gap-1 flex-shrink-0 mt-1">
+                                                    <SpecialistChatAvatar
+                                                        specialist={specialist}
+                                                        state={isLastAssistant && (tts.isPlaying || tts.isLoading) ? "speaking" : "idle"}
+                                                    />
+                                                </div>
+                                            )}
+                                            <div className={cn(
+                                                "max-w-[90%] rounded-lg px-3 py-2.5",
+                                                msg.role === "user"
+                                                    ? "bg-international-orange/10 text-foreground"
+                                                    : "bg-muted/50 border border-muted"
+                                            )}>
+                                                {msg.role === "user" ? (
+                                                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                                ) : (
+                                                    <Markdown content={msg.content} className="text-sm" />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    )
+                                })}
+
+                                {/* Streaming indicator */}
+                                {isStreaming && (
+                                    <div className="flex gap-2.5 justify-start">
+                                        <div className="flex-shrink-0 mt-1">
+                                            <SpecialistChatAvatar specialist={specialist} state="speaking" />
+                                        </div>
+                                        <div className="max-w-[90%] rounded-lg px-3 py-2.5 bg-muted/50 border border-muted">
+                                            <Markdown content={streamingResponse} className="text-sm" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Typing indicator */}
+                                {(isExecuting && !isStreaming) && (
+                                    <div className="flex gap-2.5 justify-start">
+                                        <div className={cn("flex-shrink-0 mt-1", isUrgentMessage && "ring-2 ring-international-orange ring-offset-1 rounded-full")}>
+                                            <SpecialistChatAvatar specialist={specialist} state="thinking" />
+                                        </div>
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-3 transition-opacity duration-300">
+                                            {deepThinkEnabled ? (
+                                                <Brain className="h-4 w-4 animate-pulse text-international-orange" />
+                                            ) : isUrgentMessage ? (
+                                                <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
+                                            ) : (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            )}
+                                            <span key={`${thinkingPhaseIndex}-${isUrgentMessage}`} className="animate-in fade-in duration-300 text-xs">
+                                                {deepThinkEnabled
+                                                    ? `${specialist.name} is analyzing deeply...`
+                                                    : isUrgentMessage
+                                                        ? thinkingPhaseIndex === 0
+                                                            ? `On it. Prioritizing this now.`
+                                                            : thinkingPhaseIndex === 1
+                                                                ? `Working through the critical path...`
+                                                                : `Almost there — focused recommendation incoming.`
+                                                        : specialist.thinkingPhases
+                                                            ? `${specialist.thinkingPhases[thinkingPhaseIndex] ?? specialist.thinkingPhases[0]}`
+                                                            : specialist.thinkingIndicator ?? `${specialist.name} is thinking...`
+                                                }
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Greeting generation indicator */}
+                                {isGeneratingGreeting && !isExecuting && (
+                                    <div className="flex gap-2.5 justify-start">
+                                        <div className="flex-shrink-0 mt-1">
+                                            <SpecialistChatAvatar specialist={specialist} state="thinking" />
+                                        </div>
+                                        <div className="flex flex-col gap-1 py-3">
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                {specialist.name} is catching up...
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Proposed actions */}
+                        {lastAssistantMessage && !isExecuting && lastAssistantMessage.proposals && lastAssistantMessage.proposals.length > 0 && (
+                            <div className="px-4">
+                                <ProposedActionsCard
+                                    proposals={lastAssistantMessage.proposals}
+                                    specialist={specialist}
+                                    onDismiss={() => {
+                                        setMessages((prev) => {
+                                            const idx = prev.map((m, i) => ({ m, i }))
+                                                .reverse()
+                                                .find(({ m }) => m.role === "assistant" && !m.historical)?.i
+                                            if (idx === undefined || !prev[idx].proposals?.length) return prev
+                                            return prev.map((msg, i) =>
+                                                i === idx ? { ...msg, proposals: undefined } : msg
+                                            )
+                                        })
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        {/* Dynamic specialist recommendation */}
+                        {lastAssistantMessage && !isExecuting && dynamicSuggestion && (() => {
+                            const suggested = getSpecialistById(dynamicSuggestion.specialistId)
+                            if (!suggested) return null
+                            return (
+                                <div className="mx-4 mb-3 p-2.5 rounded-lg bg-international-orange/5 border border-international-orange/20">
+                                    <p className="text-[10px] font-medium text-international-orange mb-1.5 flex items-center gap-1">
+                                        <Sparkles className="h-2.5 w-2.5" />
+                                        Recommended Next
+                                    </p>
+                                    <button
+                                        onClick={() => handleSwitchSpecialist(suggested.id)}
+                                        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md bg-background border border-international-orange/30 hover:border-international-orange/60 transition-colors text-xs group"
+                                    >
+                                        {suggested.avatarImage && (
+                                            <div className="relative h-5 w-5 rounded-full overflow-hidden flex-shrink-0">
+                                                <Image src={suggested.avatarImage} alt={suggested.name} fill className="object-cover" sizes="20px" />
+                                            </div>
+                                        )}
+                                        <div className="flex-1 text-left min-w-0">
+                                            <span className="font-medium text-foreground">{suggested.name}</span>
+                                            <p className="text-[10px] text-muted-foreground truncate">{dynamicSuggestion.reason}</p>
+                                        </div>
+                                        <ArrowRight className="h-3 w-3 text-international-orange group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+                                    </button>
+                                </div>
+                            )
+                        })()}
+
+                        {/* Tension card */}
+                        {lastAssistantMessage && !isExecuting && tensionCard && (() => {
+                            const tensionSpecialist = getSpecialistById(tensionCard.specialistId)
+                            if (!tensionSpecialist) return null
+                            return (
+                                <div className="mx-4 mb-3 p-2.5 rounded-lg bg-status-warning-light border border-status-warning/30">
+                                    <div className="flex items-start gap-2">
+                                        <AlertTriangle className="h-3.5 w-3.5 text-status-warning flex-shrink-0 mt-0.5" />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-xs font-medium text-foreground mb-0.5">
+                                                Different perspective from {tensionSpecialist.name}
+                                            </p>
+                                            <p className="text-[10px] text-muted-foreground leading-relaxed">
+                                                {tensionCard.description}
+                                            </p>
+                                            <button
+                                                onClick={() => handleSwitchSpecialist(tensionSpecialist.id)}
+                                                className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-status-warning hover:text-foreground transition-colors"
+                                            >
+                                                Hear {tensionSpecialist.name}&apos;s side
+                                                <ArrowRight className="h-2.5 w-2.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })()}
+
+                        {/* Static fallback suggestions */}
+                        {lastAssistantMessage && !isExecuting && !dynamicSuggestion && suggestedSpecialists.length > 0 && (
+                            <div className="mx-4 mb-3 p-2.5 rounded-lg bg-muted/30 border border-muted/50">
+                                <p className="text-[10px] font-medium text-muted-foreground mb-1.5">Continue with...</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {suggestedSpecialists.map((s) => (
+                                        <button
+                                            key={s.id}
+                                            onClick={() => handleSwitchSpecialist(s.id)}
+                                            className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-background border border-muted hover:border-international-orange/50 transition-colors text-xs group"
+                                        >
+                                            {s.avatarImage && (
+                                                <div className="relative h-4 w-4 rounded-full overflow-hidden flex-shrink-0">
+                                                    <Image src={s.avatarImage} alt={s.name} fill className="object-cover" sizes="16px" />
+                                                </div>
+                                            )}
+                                            <span className="font-medium text-foreground">{s.name}</span>
+                                            <ArrowRight className="h-2.5 w-2.5 text-muted-foreground group-hover:text-international-orange transition-colors" />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Intro card for first-time users */}
+                        {!hasConversation && !hasHistoricalMessages && (
+                            <div className="mx-4 mb-3 p-3 rounded-lg bg-muted/30 border border-muted space-y-3">
+                                <div className="flex items-start gap-2.5">
+                                    <div className="flex-shrink-0">
+                                        <SpecialistChatAvatar specialist={specialist} state={isGeneratingGreeting ? "thinking" : "idle"} />
+                                    </div>
+                                    <div className="min-w-0 flex-1 pt-0.5">
+                                        <p className="text-sm font-medium text-foreground italic">
+                                            &ldquo;{specialist.tagline}&rdquo;
+                                        </p>
+                                        {isGeneratingGreeting && (
+                                            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                {specialist.name} is getting up to speed...
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                                {(dynamicStarters || specialist.highlights.length > 0) && (
+                                    <>
+                                        <p className="text-[10px] font-medium text-muted-foreground">
+                                            {dynamicStarters ? "Ask me about..." : "Start with a topic"}
+                                        </p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {(dynamicStarters ?? specialist.highlights).map((starter) => (
+                                                <button
+                                                    key={starter}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (dynamicStarters) {
+                                                            setBriefText(starter)
+                                                        } else {
+                                                            handleStarterClick(starter)
+                                                        }
+                                                        setError(null)
+                                                        textareaRef.current?.focus()
+                                                    }}
+                                                    disabled={isExecuting}
+                                                    className={cn(
+                                                        "inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium text-foreground text-left",
+                                                        dynamicStarters
+                                                            ? "border-international-orange/20 bg-international-orange/5 hover:border-international-orange/40"
+                                                            : "border-muted bg-background hover:border-international-orange/50 hover:bg-muted/50",
+                                                        "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-2"
+                                                    )}
+                                                >
+                                                    {dynamicStarters ? <Sparkles className="h-2.5 w-2.5 mr-1 text-international-orange flex-shrink-0" /> : null}
+                                                    {starter}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Returning user card */}
+                        {!hasConversation && hasHistoricalMessages && !isGeneratingGreeting && (
+                            <div className="mx-4 mb-3 p-3 rounded-lg bg-muted/30 border border-muted space-y-3">
+                                <div className="flex items-start gap-2.5">
+                                    <div className="flex-shrink-0">
+                                        <SpecialistChatAvatar specialist={specialist} state="idle" />
+                                    </div>
+                                    <div className="min-w-0 flex-1 pt-0.5">
+                                        <p className="text-xs text-muted-foreground">
+                                            Pick up where you left off, or start something new.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {(() => {
+                                        const pastUserMsgs = historyMessages
+                                            .filter(m => m.role === "user")
+                                            .slice(-3)
+                                            .map(m => m.content.slice(0, 50) + (m.content.length > 50 ? "..." : ""))
+                                        const starters = pastUserMsgs.length > 0
+                                            ? [`Follow up on: "${pastUserMsgs[pastUserMsgs.length - 1]}"`, ...specialist.highlights.slice(0, 2)]
+                                            : specialist.highlights.slice(0, 3)
+                                        return starters.map((starter) => (
+                                            <button
+                                                key={starter}
+                                                type="button"
+                                                onClick={() => {
+                                                    setBriefText(starter.startsWith("Follow up") ? "" : `Help me with ${starter}`)
+                                                    setError(null)
+                                                    textareaRef.current?.focus()
+                                                }}
+                                                disabled={isExecuting}
+                                                className={cn(
+                                                    "inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium text-foreground",
+                                                    starter.startsWith("Follow up")
+                                                        ? "border-international-orange/30 bg-international-orange/5 hover:border-international-orange/50"
+                                                        : "border-muted bg-background hover:border-international-orange/50 hover:bg-muted/50",
+                                                    "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-2"
+                                                )}
+                                            >
+                                                {starter}
+                                            </button>
+                                        ))
+                                    })()}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Text Input (pinned to bottom) */}
+                        <div className="p-4 pt-2 border-t bg-background space-y-2 mt-auto">
+                            <div className="relative">
+                                <Textarea
+                                    ref={textareaRef}
+                                    id="panel-brief-text"
+                                    value={briefText}
+                                    onChange={(e) => {
+                                        setBriefText(e.target.value)
+                                        if (error) setError(null)
+                                    }}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder={
+                                        speechRecognition.isProcessing
+                                            ? "Transcribing..."
+                                            : speechRecognition.isListening
+                                                ? "Listening... speak now"
+                                                : hasNonHistoricalMessages
+                                                ? `Follow up with ${specialist.name}...`
+                                                : `What do you need from ${specialist.name}?`
+                                    }
+                                    className={cn(
+                                        "resize-none pr-20 min-h-[60px]",
+                                        (speechRecognition.isListening || speechRecognition.isProcessing) && "border-destructive/50"
+                                    )}
+                                    aria-required
+                                    disabled={isExecuting}
+                                />
+                                <div className="absolute bottom-2 right-2 flex items-center gap-1">
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => {
+                                            const next = !deepThinkEnabled
+                                            setDeepThinkEnabled(next)
+                                            try { localStorage.setItem(DEEP_THINK_STORAGE_KEY, String(next)) } catch { /* noop */ }
+                                            toast.success(next ? "Deep Think enabled" : "Deep Think disabled", { duration: 2000 })
+                                        }}
+                                        disabled={isExecuting}
+                                        className={cn("h-7 w-7", deepThinkEnabled ? "text-international-orange" : "text-muted-foreground hover:text-foreground")}
+                                        aria-label={deepThinkEnabled ? "Disable deep thinking" : "Enable deep thinking"}
+                                    >
+                                        <Brain className="h-3.5 w-3.5" />
+                                    </Button>
+                                    {speechRecognition.isSupported && (
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() => speechRecognition.isListening ? speechRecognition.stop() : speechRecognition.start()}
+                                            disabled={isExecuting || speechRecognition.isProcessing}
+                                            className={cn("h-7 w-7", speechRecognition.isListening ? "text-destructive animate-pulse" : "text-muted-foreground hover:text-foreground")}
+                                            aria-label={speechRecognition.isListening ? "Stop listening" : "Start voice input"}
+                                        >
+                                            {speechRecognition.isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : speechRecognition.isListening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                                        </Button>
+                                    )}
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={handleExecute}
+                                        disabled={isExecuting || !briefText.trim()}
+                                        className="h-7 w-7 text-muted-foreground hover:text-international-orange"
+                                        aria-label="Send message"
+                                    >
+                                        {isExecuting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <p className="text-[10px] text-muted-foreground">
+                                    {hasNonHistoricalMessages ? "⌘+Enter to send" : `${briefText.length} chars`}
+                                    {deepThinkEnabled && (
+                                        <span className="ml-2 text-international-orange">
+                                            <Brain className="h-2.5 w-2.5 inline mr-0.5" />Deep Think
+                                        </span>
+                                    )}
+                                </p>
+                                {hasNonHistoricalMessages && !isExecuting && lastAssistantMessage && (
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="ghost" size="sm" onClick={handleCopyLast} className="text-[10px] h-5 px-1.5">
+                                            {copied ? <Check className="h-2.5 w-2.5 mr-0.5" /> : <Copy className="h-2.5 w-2.5 mr-0.5" />}
+                                            {copied ? "Copied" : "Copy"}
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                const hasUserMessages = messages.some((m) => m.role === "user" && !m.historical)
+                                                if (hasUserMessages) {
+                                                    const userMsgs = messages.filter((m) => m.role === "user" && !m.historical)
+                                                    const topicSummary = userMsgs[0].content.slice(0, 80)
+                                                    toast.success(`Topic saved. Ready for the next one.`, { duration: 3000 })
+                                                    setNewTopicPreviousSummary(topicSummary)
+                                                    setMessages((prev) => prev.filter((m) => m.historical))
+                                                    setSelectedPrompt(null)
+                                                    setBriefText("")
+                                                    setError(null)
+                                                    setDynamicSuggestion(null)
+                                                    greetingGeneratedRef.current = false
+                                                }
+                                            }}
+                                            disabled={isExecuting || isGeneratingGreeting}
+                                            className="text-[10px] h-5 px-1.5"
+                                        >
+                                            New Topic
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                            {error && (
+                                <Alert variant="destructive" className="mt-1">
+                                    <AlertCircle className="h-3.5 w-3.5" />
+                                    <AlertDescription className="text-xs">{error}</AlertDescription>
+                                </Alert>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    // ─── Dialog Mode (original) ──────────────────────────────────────────
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

@@ -306,13 +306,13 @@ Format (use exactly this structure, no other keys):
 [
   { "type": "archive_objective", "title": "Exact title of objective to remove", "description": "Brief reason for archiving" },
   { "type": "archive_task", "title": "Exact title of task to remove", "description": "Brief reason for archiving" },
-  { "type": "objective", "title": "Short objective title", "description": "Optional description" },
+  { "type": "objective", "title": "Short objective title", "description": "Optional description", "strategicGoalTitle": "Name of the strategic goal this objective belongs under" },
   { "type": "task", "title": "Task title", "description": "Optional", "objectiveTitle": "Exact title of objective above if this task belongs under it" }
 ]
 -->
 
 Action types:
-- "objective" — Create a new objective
+- "objective" — Create a new objective (use "strategicGoalTitle" to place it under the right strategic goal)
 - "task" — Create a new task (optionally linked to an objective via "objectiveTitle")
 - "archive_objective" — Archive (soft-delete) an existing objective that is redundant, outdated, or being replaced
 - "archive_task" — Archive (soft-delete) an existing task that is redundant, outdated, or being replaced
@@ -321,6 +321,7 @@ Rules:
 - Only include this block when you are actually recommending specific actions. Do not add it to every message.
 - **When recommending a strategy change, include BOTH the items to archive AND the items to create.** This lets the user clean up old strategy and adopt new strategy in one click. Put archive actions before create actions.
 - For archive actions, use the exact title of the existing objective or task so the system can find and archive it. The title is matched case-insensitively.
+- **For new objectives, always set "strategicGoalTitle" to the exact title of the strategic goal it should be nested under.** This prevents orphaned objectives that don't appear under any strategic pillar. Look at the user's existing strategic goals (provided in context above) and choose the most relevant one.
 - For tasks that belong under an objective in the same proposal, set "objectiveTitle" to the exact "title" of that objective so they can be linked.
 - Keep titles concise (under 200 chars for objectives, under 500 for tasks). Descriptions are optional but helpful for archive actions (explain why).
 - The visible text of your response should still read naturally; the block is supplementary.`
