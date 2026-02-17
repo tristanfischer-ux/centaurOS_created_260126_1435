@@ -13,6 +13,7 @@ import {
     Loader2, Send, AlertCircle, Copy, Check, Eye, AlertTriangle,
     MessageSquareQuote, ArrowRight, Clock, ChevronDown, ChevronUp,
     History, Mic, MicOff, Volume2, VolumeX, Sparkles, Brain, X,
+    HelpCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { stripThinkTags, stripPartialThinkTags } from "@/lib/utils/strip-think-tags"
@@ -545,9 +546,32 @@ export function BriefSpecialistDialog({
                 ? `\n\nIMPORTANT TIME CONTEXT: It has been ${daysSinceLastChat} day${daysSinceLastChat === 1 ? "" : "s"} since your last conversation with this founder. Acknowledge the gap naturally — ask if they've made progress on what you discussed, or note that you've been thinking about their situation since then. Don't be dramatic about it, just show you're aware time has passed. Example: "It's been a couple of weeks since we talked about [topic] — have you had a chance to move on that?"`
                 : ""
 
+            // Detect guidance mode from handoff context
+            const isGuidanceMode = handoffContext?.startsWith("__GUIDE_MODE__") ?? false
+            const isFirstVisitToPage = screenContext.isFirstVisit ?? false
+
             // Build specific greeting instructions based on what context is available
             let greetingInstructions: string
-            if (newTopicPreviousSummary) {
+            if (isGuidanceMode) {
+                // "Guide me" mode — walk the user through the current page step-by-step
+                greetingInstructions = `The founder clicked "Guide me through this page." They want you to walk them through the ${screenContext.pageTitle} page.
+
+Write a friendly, structured page orientation (4-6 sentences) that:
+1. Briefly names the page and its purpose (one sentence)
+2. Walks through the 2-3 most important actions they can take, in order of priority
+3. For each action, explain WHERE to find it (be specific about buttons, sections) and WHEN to use it
+4. End by asking which action they'd like to try first, or if they have a specific question
+
+Use the page knowledge provided in the system context. Be specific about UI locations — "Click the '+ Add Pillar' button in the top right" not "you can add pillars."
+
+Stay in character as ${specialist.name}. Be warm, encouraging, and practical — like a knowledgeable colleague showing someone around.
+
+IMPORTANT: After your walkthrough, output 3 follow-up starters in this format:
+STARTERS:
+- [action-oriented question about the most important feature, e.g. "Help me create my first strategic pillar"]
+- [question about a specific workflow on this page]
+- [question about how this page connects to other parts of ForgeOS]`
+            } else if (newTopicPreviousSummary) {
                 // "New Topic" variant — the user just cleared a conversation, re-engage naturally
                 greetingInstructions = `The founder just finished discussing "${newTopicPreviousSummary}" with you and wants to move to a new topic.
 
@@ -587,6 +611,10 @@ Write a proactive opening (2-3 sentences) that:
 
 Stay in character as ${specialist.name}. Be warm but direct. No generic pleasantries.`
             } else {
+                const firstVisitHint = isFirstVisitToPage && screenContext.pageTitle !== "ForgeOS Platform"
+                    ? `\n\nIMPORTANT: This is the founder's FIRST TIME on the ${screenContext.pageTitle} page. After your opening, briefly mention that you can walk them through this page if they'd like — something natural like "By the way, I can walk you through everything on this page if you'd like a quick tour." Don't make it the focus, just a helpful offer.`
+                    : ""
+
                 greetingInstructions = `A founder is meeting you for the first time. Write a brief, engaging opening (2-3 sentences) that:
 - Introduces your perspective and what you bring to the table
 - Asks ONE specific, thought-provoking question that shows your expertise
@@ -594,7 +622,7 @@ Stay in character as ${specialist.name}. Be warm but direct. No generic pleasant
 
 If company context is provided below, reference specific details and suggest 1-2 things you could help with right now. If no company context is provided, ask something that will help you quickly understand their situation.
 
-Stay in character as ${specialist.name}. Be warm but direct. No generic pleasantries.
+Stay in character as ${specialist.name}. Be warm but direct. No generic pleasantries.${firstVisitHint}
 
 IMPORTANT: After your opening message, on a new line, output exactly 3 conversation starter questions the founder could ask you, in this exact format:
 STARTERS:
@@ -1072,6 +1100,13 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
         setError(null)
         textareaRef.current?.focus()
     }, [])
+
+    /** "Walk me through this page" starter — shown when page knowledge is available */
+    const pageGuidanceStarter = useMemo(() => {
+        if (!screenContext.availableActions || screenContext.availableActions.length === 0) return null
+        if (screenContext.pageTitle === "ForgeOS Platform") return null
+        return `Walk me through the ${screenContext.pageTitle} page`
+    }, [screenContext.availableActions, screenContext.pageTitle])
 
     const handleSwitchSpecialist = useCallback((id: string) => {
         // Build rich handoff context that feels like a real colleague briefing
@@ -1656,12 +1691,33 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         )}
                                     </div>
                                 </div>
-                                {(dynamicStarters || specialist.highlights.length > 0) && (
+                                {(dynamicStarters || specialist.highlights.length > 0 || pageGuidanceStarter) && (
                                     <>
                                         <p className="text-[10px] font-medium text-muted-foreground">
                                             {dynamicStarters ? "Ask me about..." : "Start with a topic"}
                                         </p>
                                         <div className="flex flex-wrap gap-1.5">
+                                            {/* Page guidance starter — always first when available */}
+                                            {pageGuidanceStarter && !dynamicStarters && (
+                                                <button
+                                                    key="__page_guide__"
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setBriefText(pageGuidanceStarter)
+                                                        setError(null)
+                                                        textareaRef.current?.focus()
+                                                    }}
+                                                    disabled={isExecuting}
+                                                    className={cn(
+                                                        "inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium text-foreground text-left",
+                                                        "border-international-orange/30 bg-international-orange/10 hover:border-international-orange/50",
+                                                        "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-2"
+                                                    )}
+                                                >
+                                                    <HelpCircle className="h-2.5 w-2.5 mr-1 text-international-orange flex-shrink-0" />
+                                                    {pageGuidanceStarter}
+                                                </button>
+                                            )}
                                             {(dynamicStarters ?? specialist.highlights).map((starter) => (
                                                 <button
                                                     key={starter}
@@ -2369,12 +2425,33 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         )}
                                     </div>
                                 </div>
-                                {(dynamicStarters || specialist.highlights.length > 0) && (
+                                {(dynamicStarters || specialist.highlights.length > 0 || pageGuidanceStarter) && (
                                     <>
                                         <p className="text-xs font-medium text-muted-foreground">
                                             {dynamicStarters ? "Ask me about..." : "Start with a topic"}
                                         </p>
                                         <div className="flex flex-wrap gap-2">
+                                            {/* Page guidance starter — always first when available */}
+                                            {pageGuidanceStarter && !dynamicStarters && (
+                                                <button
+                                                    key="__page_guide__"
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setBriefText(pageGuidanceStarter)
+                                                        setError(null)
+                                                        textareaRef.current?.focus()
+                                                    }}
+                                                    disabled={isExecuting}
+                                                    className={cn(
+                                                        "inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium text-foreground text-left",
+                                                        "border-international-orange/30 bg-international-orange/10 hover:border-international-orange/50",
+                                                        "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-2"
+                                                    )}
+                                                >
+                                                    <HelpCircle className="h-3 w-3 mr-1.5 text-international-orange flex-shrink-0" />
+                                                    {pageGuidanceStarter}
+                                                </button>
+                                            )}
                                             {(dynamicStarters ?? specialist.highlights).map((starter) => (
                                                 <button
                                                     key={starter}

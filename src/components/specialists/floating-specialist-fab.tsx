@@ -18,7 +18,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { MessageSquare, Sparkles } from "lucide-react"
+import { MessageSquare, Sparkles, HelpCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-dialog"
@@ -113,6 +113,7 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
   )
   const entityContext = serializeContext(pageContext)
 
+  /** Standard click: open specialist for general conversation */
   const handleClick = useCallback(() => {
     setHasUnreadInsights(false)
 
@@ -126,6 +127,25 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
       setMobileDialogOpen(true)
     }
   }, [isDesktop, advisorPanel, specialistId, specialist])
+
+  /** "Guide me" click: open specialist in page guidance mode */
+  const handleGuideMeClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setHasUnreadInsights(false)
+
+    const guidanceContext = `__GUIDE_MODE__\nThe user clicked "Guide me through this page". Walk them through what they can do on the ${screenContext.pageTitle} page. Use the page knowledge to give a friendly, step-by-step orientation. Start with the most important action, cover 2-3 more, then ask what they'd like to try first.`
+
+    if (isDesktop) {
+      advisorPanel.openPanel(specialistId, {
+        handoffContext: guidanceContext,
+        contextLabel: `Guide: ${screenContext.pageTitle}`,
+      })
+    } else {
+      setMobileHandoff({ context: guidanceContext, referredBy: null })
+      setMobileActiveSpecialist(specialist ?? null)
+      setMobileDialogOpen(true)
+    }
+  }, [isDesktop, advisorPanel, specialistId, specialist, screenContext.pageTitle])
 
   const handleMobileSwitchSpecialist = useCallback(
     (newId: string, handoffCtx?: string) => {
@@ -207,6 +227,30 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
             }
           </TooltipContent>
         </Tooltip>
+
+        {/* "Guide me" secondary action — small help badge */}
+        {screenContext.availableActions && screenContext.availableActions.length > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleGuideMeClick}
+                aria-label={`Guide me through ${screenContext.pageTitle}`}
+                className={cn(
+                  "absolute -bottom-1 -left-1 flex h-6 w-6 items-center justify-center rounded-full",
+                  "bg-international-orange text-white shadow-md",
+                  "hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "transition-transform duration-200",
+                )}
+              >
+                <HelpCircle className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              Guide me through this page
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
 
       {/* Mobile-only: Dialog fallback for small screens */}

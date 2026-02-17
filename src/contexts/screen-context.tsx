@@ -8,13 +8,17 @@
  * BriefSpecialistDialog reads this context to give specialists
  * "eyes" on the screen — even when opened from the sidebar.
  *
- * Two layers of context:
+ * Three layers of context:
  * 1. Route-based fallback: automatically derived from `usePathname()`
  * 2. Rich page context: explicitly registered by pages via `useRegisterScreenContext`
+ * 3. Page knowledge: automatically injected from the page-knowledge registry
+ *    (available actions, getting started steps, workflows)
  *
  * @related
  * - BriefSpecialistDialog: src/app/(platform)/agents/brief-specialist-dialog.tsx
  * - AskSpecialistButton: src/components/specialists/ask-specialist-button.tsx
+ * - Page knowledge registry: src/lib/page-knowledge.ts
+ * - Visit tracker: src/lib/page-visit-tracker.ts
  */
 
 import {
@@ -27,6 +31,9 @@ import {
   type ReactNode,
 } from "react"
 import { usePathname } from "next/navigation"
+import { getPageKnowledge, serializePageKnowledge } from "@/lib/page-knowledge"
+import type { PageFeature } from "@/lib/page-knowledge"
+import { isFirstPageVisit, markPageVisited } from "@/lib/page-visit-tracker"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -39,6 +46,12 @@ export interface ScreenContextData {
   summary: string
   /** Structured details about entities visible on screen */
   entities?: ScreenEntity[]
+  /** Available features/actions on this page (auto-injected from page-knowledge registry) */
+  availableActions?: PageFeature[]
+  /** Recommended first steps for new users (auto-injected from page-knowledge registry) */
+  gettingStarted?: string[]
+  /** Whether this is the user's first visit to this page */
+  isFirstVisit?: boolean
   /** Timestamp of last registration (to detect stale context) */
   registeredAt: number
 }
@@ -149,10 +162,21 @@ const STALE_THRESHOLD_MS = 60_000
 export function ScreenContextProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const [richContext, setRichContext] = useState<ScreenContextData | null>(null)
+  const [firstVisitFlag, setFirstVisitFlag] = useState(false)
 
   // Clear rich context when the route changes (user navigated away)
+  // Also check first-visit status and mark the page as visited
   useEffect(() => {
     setRichContext(null)
+
+    // Check first-visit status before marking (client-side only)
+    if (typeof window !== "undefined") {
+      const isFirst = isFirstPageVisit(pathname)
+      setFirstVisitFlag(isFirst)
+      // Mark visited after a short delay so the flag is captured first
+      const timer = setTimeout(() => markPageVisited(pathname), 500)
+      return () => clearTimeout(timer)
+    }
   }, [pathname])
 
   const registerScreenContext = useCallback(
@@ -166,22 +190,36 @@ export function ScreenContextProvider({ children }: { children: ReactNode }) {
     [pathname],
   )
 
+  // Auto-inject page knowledge from the registry
+  const pageKnowledge = useMemo(() => getPageKnowledge(pathname), [pathname])
+
   // Resolve: use rich context if fresh and on the same route, otherwise route fallback
+  // Then enrich with page knowledge and first-visit status
   const screenContext: ScreenContextData = (() => {
+    let base: ScreenContextData
+
     if (
       richContext &&
       richContext.route === pathname &&
       Date.now() - richContext.registeredAt < STALE_THRESHOLD_MS
     ) {
-      return richContext
+      base = richContext
+    } else {
+      const fallback = getRouteDescription(pathname)
+      base = {
+        pageTitle: fallback.title,
+        route: pathname,
+        summary: fallback.summary,
+        registeredAt: Date.now(),
+      }
     }
 
-    const fallback = getRouteDescription(pathname)
+    // Enrich with page knowledge (auto-injected, pages don't need to register this)
     return {
-      pageTitle: fallback.title,
-      route: pathname,
-      summary: fallback.summary,
-      registeredAt: Date.now(),
+      ...base,
+      availableActions: base.availableActions ?? pageKnowledge?.features,
+      gettingStarted: base.gettingStarted ?? pageKnowledge?.gettingStarted,
+      isFirstVisit: firstVisitFlag,
     }
   })()
 
@@ -190,6 +228,9 @@ export function ScreenContextProvider({ children }: { children: ReactNode }) {
     lines.push(`## What the User Is Looking At`)
     lines.push(`**Page:** ${screenContext.pageTitle}`)
     lines.push(`**Route:** ${screenContext.route}`)
+    if (screenContext.isFirstVisit) {
+      lines.push(`**First Visit:** Yes — the user has never been to this page before.`)
+    }
     lines.push("")
     lines.push(screenContext.summary)
 
@@ -208,13 +249,19 @@ export function ScreenContextProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // Inject page knowledge (available actions, getting started, workflows)
+    if (pageKnowledge) {
+      lines.push("")
+      lines.push(serializePageKnowledge(pageKnowledge))
+    }
+
     lines.push("")
     lines.push(
       "Reference what the user is looking at when relevant — it shows you understand their current focus.",
     )
 
     return lines.join("\n")
-  }, [screenContext])
+  }, [screenContext, pageKnowledge])
 
   // Memoize the provider value to prevent unnecessary consumer re-renders.
   // Without this, every setRichContext call creates a new value object,
