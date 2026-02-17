@@ -157,9 +157,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             googleEmail,
         })
 
-        return NextResponse.redirect(
-            new URL('/settings/integrations?success=connected', req.nextUrl.origin)
+        // Read optional post-connect redirect from cookie
+        const postRedirect = req.cookies.get('google_oauth_redirect')?.value
+        const redirectPath = postRedirect && postRedirect.startsWith('/')
+            ? `${postRedirect}?success=connected`
+            : '/settings/integrations?success=connected'
+
+        const response = NextResponse.redirect(
+            new URL(redirectPath, req.nextUrl.origin)
         )
+
+        // Clear the redirect cookie
+        response.cookies.delete('google_oauth_redirect')
+
+        return response
     } catch (err) {
         console.error('[GoogleCallback] Token exchange failed:', {
             error: err instanceof Error ? err.message : 'Unknown error',

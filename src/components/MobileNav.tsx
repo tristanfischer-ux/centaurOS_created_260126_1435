@@ -36,6 +36,7 @@ import {
     Flame,
     CalendarDays,
     Brain,
+    AppWindow,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -64,6 +65,11 @@ const mainNavigation = [
     { name: "Today", shortName: "Today", href: "/today", icon: CalendarDays },
     { name: "Updates", shortName: "Updates", href: "/updates", icon: Bell },
     { name: "Tasks", shortName: "Tasks", href: "/new-tasks", icon: CheckSquare },
+]
+
+// "More" dropdown — Me section (items not in main bar)
+const meMoreNavigation = [
+    { name: "Google Apps", href: "/google-apps", icon: AppWindow },
 ]
 
 // "More" dropdown — Plan section
@@ -105,7 +111,7 @@ export function MobileNav() {
         router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
 
-    const allMoreItems = [...planMoreNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
+    const allMoreItems = [...meMoreNavigation, ...planMoreNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
 
     /**
      * Renders a dropdown menu item with active state highlighting.
@@ -179,6 +185,14 @@ export function MobileNav() {
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe w-56">
+                        {/* Me section */}
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                            Me
+                        </DropdownMenuLabel>
+                        {meMoreNavigation.map(renderDropdownItem)}
+
+                        <DropdownMenuSeparator />
+
                         {/* Plan section */}
                         <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
                             Plan

@@ -81,6 +81,52 @@ export async function getGoogleConnectionStatus(): Promise<{
 }
 
 /**
+ * Check if the user has Google connected in any other foundry.
+ * Used for multi-foundry awareness on the Google Apps page.
+ *
+ * @returns The foundry name where Google is connected, or null
+ */
+export async function getGoogleConnectionInOtherFoundries(): Promise<{
+    connectedFoundryName: string | null
+    error?: string
+}> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+        return { connectedFoundryName: null, error: 'Unauthorized' }
+    }
+
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) {
+        return { connectedFoundryName: null, error: 'No active foundry' }
+    }
+
+    // Find tokens for this user in OTHER foundries
+    const { data: otherTokens } = await supabase
+        .from('google_oauth_tokens')
+        .select('foundry_id')
+        .eq('user_id', user.id)
+        .neq('foundry_id', foundryId)
+        .limit(1)
+
+    if (!otherTokens || otherTokens.length === 0) {
+        return { connectedFoundryName: null }
+    }
+
+    // Get the foundry name
+    const { data: foundry } = await supabase
+        .from('foundries')
+        .select('name')
+        .eq('id', otherTokens[0].foundry_id)
+        .single()
+
+    return {
+        connectedFoundryName: foundry?.name || 'another workspace',
+    }
+}
+
+/**
  * Disconnect the user's Google account from their current foundry.
  * Revokes stored tokens and removes all calendar sync mappings.
  *

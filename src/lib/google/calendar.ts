@@ -280,6 +280,81 @@ export async function checkAvailability(
     }
 }
 
+export interface CalendarEvent {
+    id: string
+    summary: string
+    description: string | null
+    startTime: string
+    endTime: string
+    allDay: boolean
+    location: string | null
+    meetLink: string | null
+    htmlLink: string | null
+    attendees: Array<{ email: string; displayName: string | null; responseStatus: string | null }>
+    colorId: string | null
+}
+
+/**
+ * List calendar events within a time range.
+ *
+ * @param client - Authenticated OAuth2 client
+ * @param timeMin - Start of range (ISO string)
+ * @param timeMax - End of range (ISO string)
+ * @param calendarId - Google Calendar ID (defaults to 'primary')
+ * @param maxResults - Maximum events to return (default 50)
+ * @returns Array of calendar events sorted by start time
+ */
+export async function listCalendarEvents(
+    client: OAuth2Client,
+    timeMin: string,
+    timeMax: string,
+    calendarId: string = 'primary',
+    maxResults: number = 50
+): Promise<{ events: CalendarEvent[]; error?: string }> {
+    const calendar = google.calendar({ version: 'v3', auth: client })
+
+    try {
+        const { data } = await calendar.events.list({
+            calendarId,
+            timeMin,
+            timeMax,
+            maxResults,
+            singleEvents: true,
+            orderBy: 'startTime',
+        })
+
+        const events: CalendarEvent[] = (data.items || []).map(event => ({
+            id: event.id || '',
+            summary: event.summary || '(No title)',
+            description: event.description || null,
+            startTime: event.start?.dateTime || event.start?.date || '',
+            endTime: event.end?.dateTime || event.end?.date || '',
+            allDay: Boolean(event.start?.date && !event.start?.dateTime),
+            location: event.location || null,
+            meetLink: event.conferenceData?.entryPoints?.find(
+                ep => ep.entryPointType === 'video'
+            )?.uri || event.hangoutLink || null,
+            htmlLink: event.htmlLink || null,
+            attendees: (event.attendees || []).map(a => ({
+                email: a.email || '',
+                displayName: a.displayName || null,
+                responseStatus: a.responseStatus || null,
+            })),
+            colorId: event.colorId || null,
+        }))
+
+        return { events }
+    } catch (err) {
+        console.error('[GoogleCalendar] Failed to list events:', {
+            error: err instanceof Error ? err.message : 'Unknown error',
+        })
+        return {
+            events: [],
+            error: err instanceof Error ? err.message : 'Failed to list calendar events',
+        }
+    }
+}
+
 /**
  * Default end time: 1 hour after start.
  */

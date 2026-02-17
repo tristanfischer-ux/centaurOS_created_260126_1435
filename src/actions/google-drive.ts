@@ -130,3 +130,119 @@ export async function attachDriveFileToTask(
 
     return { success: true, fileId: fileRecord.id }
 }
+
+/** MIME types for Google Workspace document types */
+const GOOGLE_DOC_MIME_TYPES = [
+    'application/vnd.google-apps.document',
+    'application/vnd.google-apps.spreadsheet',
+    'application/vnd.google-apps.presentation',
+] as const
+
+/**
+ * Browse the user's Google Drive filtered to Google Docs, Sheets, and Slides.
+ *
+ * @description Uses raw Google Drive query syntax to filter by MIME type,
+ * since listDriveFiles wraps the query param in `name contains`. This
+ * function builds the full query and calls listDriveFilesRaw instead.
+ *
+ * @param query - Optional search query (file name)
+ * @param mimeFilter - Optional filter: 'docs' | 'sheets' | 'slides' | 'all'
+ * @param pageToken - Pagination token
+ * @returns List of Google Workspace documents
+ */
+export async function browseDriveDocuments(
+    query?: string,
+    mimeFilter?: 'docs' | 'sheets' | 'slides' | 'all',
+    pageToken?: string
+): Promise<{ files: DriveFile[]; nextPageToken: string | null; error?: string }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { files: [], nextPageToken: null, error: 'Unauthorized' }
+
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { files: [], nextPageToken: null, error: 'No active foundry' }
+
+    const client = await getGoogleClient(user.id, foundryId)
+    if (!client) {
+        return { files: [], nextPageToken: null, error: 'Google account not connected' }
+    }
+
+    // Build MIME type filter query
+    let mimeQuery: string
+    if (mimeFilter === 'docs') {
+        mimeQuery = "mimeType = 'application/vnd.google-apps.document'"
+    } else if (mimeFilter === 'sheets') {
+        mimeQuery = "mimeType = 'application/vnd.google-apps.spreadsheet'"
+    } else if (mimeFilter === 'slides') {
+        mimeQuery = "mimeType = 'application/vnd.google-apps.presentation'"
+    } else {
+        mimeQuery = GOOGLE_DOC_MIME_TYPES.map(m => `mimeType = '${m}'`).join(' or ')
+        mimeQuery = `(${mimeQuery})`
+    }
+
+    // Build full query: MIME filter + optional name search + not trashed
+    const queryParts = ['trashed = false', mimeQuery]
+    if (query) {
+        queryParts.push(`name contains '${query.replace(/'/g, "\\'")}'`)
+    }
+
+    return listDriveFilesRaw(client, queryParts.join(' and '), pageToken)
+}
+
+/**
+ * List Drive files using a raw Google Drive query string.
+ * Unlike listDriveFiles, this does NOT wrap the query in `name contains`.
+ *
+ * @param client - Authenticated OAuth2 client
+ * @param rawQuery - Full Google Drive query string
+ * @param pageToken - Pagination token
+ * @returns List of files matching the query
+ */
+async function listDriveFilesRaw(
+    client: NonNullable<Awaited<ReturnType<typeof getGoogleClient>>>,
+    rawQuery: string,
+    pageToken?: string
+): Promise<{ files: DriveFile[]; nextPageToken: string | null; error?: string }> {
+    const { google } = await import('googleapis')
+    const drive = google.drive({ version: 'v3', auth: client })
+
+    try {
+        const { data } = await drive.files.list({
+            q: rawQuery,
+            fields: 'nextPageToken, files(id, name, mimeType, iconLink, thumbnailLink, webViewLink, size, modifiedTime, owners)',
+            orderBy: 'modifiedTime desc',
+            pageSize: 20,
+            pageToken: pageToken || undefined,
+            spaces: 'drive',
+        })
+
+        const files: DriveFile[] = (data.files || []).map(f => ({
+            id: f.id || '',
+            name: f.name || 'Untitled',
+            mimeType: f.mimeType || 'application/octet-stream',
+            iconLink: f.iconLink || null,
+            thumbnailLink: f.thumbnailLink || null,
+            webViewLink: f.webViewLink || null,
+            size: f.size || null,
+            modifiedTime: f.modifiedTime || null,
+            owners: f.owners?.map(o => ({
+                displayName: o.displayName || '',
+                emailAddress: o.emailAddress || '',
+            })) || null,
+        }))
+
+        return {
+            files,
+            nextPageToken: data.nextPageToken || null,
+        }
+    } catch (err) {
+        console.error('[GoogleDrive] Failed to list documents:', {
+            error: err instanceof Error ? err.message : 'Unknown error',
+        })
+        return {
+            files: [],
+            nextPageToken: null,
+            error: err instanceof Error ? err.message : 'Failed to list documents',
+        }
+    }
+}

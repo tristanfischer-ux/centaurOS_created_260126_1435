@@ -79,5 +79,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         include_granted_scopes: true,
     })
 
-    return NextResponse.redirect(authUrl)
+    const response = NextResponse.redirect(authUrl)
+
+    // Store optional post-connect redirect path in a short-lived cookie
+    // so the callback route can redirect back to the originating page
+    const postConnectRedirect = req.nextUrl.searchParams.get('redirect')
+    if (postConnectRedirect && postConnectRedirect.startsWith('/')) {
+        response.cookies.set('google_oauth_redirect', postConnectRedirect, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 600, // 10 minutes — matches state TTL
+            path: '/',
+        })
+    }
+
+    return response
 }

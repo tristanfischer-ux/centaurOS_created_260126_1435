@@ -24,8 +24,94 @@ import {
     updateCalendarEvent,
     deleteCalendarEvent,
     checkAvailability,
+    listCalendarEvents,
 } from '@/lib/google/calendar'
-import type { CalendarEventParams } from '@/lib/google/calendar'
+import type { CalendarEventParams, CalendarEvent } from '@/lib/google/calendar'
+
+/**
+ * List upcoming calendar events for the current user.
+ *
+ * @param range - Time range: 'today', 'week', or 'month'
+ * @returns Array of upcoming calendar events
+ */
+export async function listUpcomingEvents(
+    range: 'today' | 'week' | 'month' = 'week'
+): Promise<{ events: CalendarEvent[]; error?: string }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { events: [], error: 'Unauthorized' }
+
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { events: [], error: 'No active foundry' }
+
+    const client = await getGoogleClient(user.id, foundryId)
+    if (!client) {
+        return { events: [], error: 'Google account not connected' }
+    }
+
+    const now = new Date()
+    const timeMin = now.toISOString()
+
+    let timeMax: Date
+    switch (range) {
+        case 'today': {
+            timeMax = new Date(now)
+            timeMax.setHours(23, 59, 59, 999)
+            break
+        }
+        case 'week': {
+            timeMax = new Date(now)
+            timeMax.setDate(timeMax.getDate() + 7)
+            break
+        }
+        case 'month': {
+            timeMax = new Date(now)
+            timeMax.setMonth(timeMax.getMonth() + 1)
+            break
+        }
+    }
+
+    return listCalendarEvents(client, timeMin, timeMax.toISOString())
+}
+
+/**
+ * Create a new calendar event for the current user.
+ *
+ * @param params - Event creation parameters
+ * @returns Created event details
+ */
+export async function createNewCalendarEvent(
+    params: CalendarEventParams
+): Promise<{ eventId: string | null; meetLink: string | null; htmlLink: string | null; error?: string }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { eventId: null, meetLink: null, htmlLink: null, error: 'Unauthorized' }
+
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { eventId: null, meetLink: null, htmlLink: null, error: 'No active foundry' }
+
+    const client = await getGoogleClient(user.id, foundryId)
+    if (!client) {
+        return { eventId: null, meetLink: null, htmlLink: null, error: 'Google account not connected' }
+    }
+
+    const result = await createCalendarEvent(client, params)
+
+    if (result.success) {
+        console.info('[GoogleCalendar] Event created from Google Apps page:', {
+            eventId: result.eventId,
+            summary: params.summary,
+            userId: user.id,
+        })
+    }
+
+    return {
+        eventId: result.eventId || null,
+        meetLink: result.meetLink || null,
+        htmlLink: result.htmlLink || null,
+        error: result.error,
+    }
+}
 
 /**
  * Sync a task's due dates to Google Calendar.

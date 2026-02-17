@@ -48,6 +48,8 @@ import {
     CalendarDays,
     Brain,
     Package,
+    AppWindow,
+    Globe,
 } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
@@ -89,6 +91,7 @@ const todayNavItem = { name: "Today", href: "/today", icon: CalendarDays, toolti
 const meNavigation = [
     { name: "My Profile", href: "/my-profile", icon: UserCircle, tooltip: "Your profile, companies, and marketplace presence" },
     { name: "Updates", href: "/updates", icon: Bell, tooltip: "Notes, comments, and changes across tasks and objectives" },
+    { name: "Google Apps", href: "/google-apps", icon: AppWindow, tooltip: "Your Google Drive, Docs, Calendar, and Email" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,6 +113,7 @@ const workshopNavigation = [
     { name: "Specialists", href: "/agents", icon: UsersRound, tooltip: "Your on-demand team of experts — brief them on anything" },
     { name: "Knowledge", href: "/knowledge", icon: Brain, tooltip: "Your organizational second brain — everything your AI team has learned" },
     { name: "Deliverables", href: "/agents/artifacts", icon: FileOutput, tooltip: "Documents, reports, and deliverables from your specialists" },
+    { name: "Browse", href: "/browse", icon: Globe, tooltip: "Browse the web with your specialist — get real-time guidance and analysis" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
