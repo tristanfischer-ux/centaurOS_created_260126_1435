@@ -232,7 +232,8 @@ export async function getGoalBundle(
       return { error: milestoneError.message }
     }
 
-    const milestoneIds = (milestones ?? []).map((m) => m.id)
+    let effectiveMilestones = (milestones ?? []) as Milestone[]
+    const milestoneIds = effectiveMilestones.map((m) => m.id)
 
     // 3. Fetch objectives under those milestones (non-milestone children)
     let objectives: CanvasObjective[] = []
@@ -257,16 +258,72 @@ export async function getGoalBundle(
       objectives = (objData ?? []) as CanvasObjective[]
     }
 
-    const objectiveIds = objectives.map((o) => o.id)
+    // 3b. Fallback: if no milestones exist, fetch direct child objectives
+    // and promote them to synthetic milestones so they appear in the River.
+    // This handles goals created via the regular objectives flow (not Canvas wizard).
+    if (effectiveMilestones.length === 0) {
+      const { data: directChildren, error: directError } = await supabase
+        .from('objectives')
+        .select('*')
+        .eq('foundry_id', foundryId)
+        .eq('parent_objective_id', goalId)
+        .eq('is_strategic_goal', false)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true })
 
-    // 4. Fetch tasks under those objectives
+      if (directError) {
+        console.error('[CanvasService] Failed to fetch direct child objectives:', {
+          goalId,
+          error: directError.message,
+        })
+      } else if (directChildren && directChildren.length > 0) {
+        // Promote direct children to synthetic milestones for the River
+        effectiveMilestones = directChildren.map((child, index) => ({
+          ...child,
+          is_milestone: true as const,
+          parent_objective_id: goalId,
+          milestone_order_index: index,
+          milestone_date: child.milestone_date ?? goal.milestone_date,
+        })) as Milestone[]
+
+        // Fetch tasks directly under these objectives (they ARE the milestones now)
+        // The objectives array stays empty since the children are milestones
+      }
+    }
+
+    // Recalculate milestone IDs after potential promotion
+    const effectiveMilestoneIds = effectiveMilestones.map((m) => m.id)
+
+    // If we promoted direct children, fetch their sub-objectives too
+    if (milestoneIds.length === 0 && effectiveMilestoneIds.length > 0) {
+      const { data: subObjData, error: subObjError } = await supabase
+        .from('objectives')
+        .select('*')
+        .eq('foundry_id', foundryId)
+        .in('parent_objective_id', effectiveMilestoneIds)
+        .eq('is_milestone', false)
+        .eq('is_strategic_goal', false)
+        .is('deleted_at', null)
+
+      if (!subObjError && subObjData) {
+        objectives = subObjData as CanvasObjective[]
+      }
+    }
+
+    // Collect all objective IDs for task fetching — includes both sub-objectives
+    // and promoted milestones (which may have tasks directly linked)
+    const objectiveIds = objectives.map((o) => o.id)
+    const allObjectiveIdsForTasks = [...objectiveIds, ...effectiveMilestoneIds]
+
+    // 4. Fetch tasks under objectives and promoted milestones
     let tasks: CanvasTask[] = []
-    if (objectiveIds.length > 0) {
+    if (allObjectiveIdsForTasks.length > 0) {
       const { data: taskData, error: taskError } = await supabase
         .from('tasks')
         .select('*')
         .eq('foundry_id', foundryId)
-        .in('objective_id', objectiveIds)
+        .in('objective_id', allObjectiveIdsForTasks)
         .is('deleted_at', null)
 
       if (taskError) {
@@ -310,7 +367,7 @@ export async function getGoalBundle(
     // 5. Fetch work edges connecting any items in this bundle
     const allItemIds = [
       goalId,
-      ...milestoneIds,
+      ...effectiveMilestoneIds,
       ...objectiveIds,
       ...tasks.map((t) => t.id),
     ]
@@ -340,7 +397,7 @@ export async function getGoalBundle(
 
     const bundle: GoalBundle = {
       goal: goal as StrategicGoal,
-      milestones: (milestones ?? []) as Milestone[],
+      milestones: effectiveMilestones,
       objectives,
       tasks,
       edges,

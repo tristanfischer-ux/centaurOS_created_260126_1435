@@ -84,13 +84,30 @@ function bundleToRiverSO(
         riverTasks.push({
           id: task.id,
           title: task.title,
-          // Field fixes: end_date (not due_date), created_at (not goal.start_date)
           start: task.start_date?.slice(0, 10) ?? task.created_at?.slice(0, 10) ?? todayISO,
           end: task.end_date?.slice(0, 10) ?? milestone.milestone_date?.slice(0, 10) ?? goal.milestone_date?.slice(0, 10) ?? todayISO,
           status: mapStatus(task.status),
           assignee: getInitials(task),
           assigneeRole: firstAssignee?.role ?? null,
         })
+      })
+    })
+
+    // Also collect tasks directly linked to the milestone itself
+    // (happens when direct child objectives are promoted to synthetic milestones)
+    const directTasks = bundle.tasks.filter((t) => t.objective_id === milestone.id)
+    directTasks.forEach((task) => {
+      // Avoid duplicates if task was already added via sub-objectives
+      if (riverTasks.some((rt) => rt.id === task.id)) return
+      const firstAssignee = task.assignees?.[0] ?? null
+      riverTasks.push({
+        id: task.id,
+        title: task.title,
+        start: task.start_date?.slice(0, 10) ?? task.created_at?.slice(0, 10) ?? todayISO,
+        end: task.end_date?.slice(0, 10) ?? milestone.milestone_date?.slice(0, 10) ?? goal.milestone_date?.slice(0, 10) ?? todayISO,
+        status: mapStatus(task.status),
+        assignee: getInitials(task),
+        assigneeRole: firstAssignee?.role ?? null,
       })
     })
 
