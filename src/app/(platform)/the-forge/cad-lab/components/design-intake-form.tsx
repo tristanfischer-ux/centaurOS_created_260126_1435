@@ -1,13 +1,15 @@
 "use client"
 
 /**
- * @file design-intake-form.tsx — Structured design intake form for The Forge.
+ * @file design-intake-form.tsx — Collapsible manufacturing details for The Forge.
  *
  * @description Collects use-case, compliance, process, material, tolerance,
- * quantity, and assumption inputs that drive research quality and RFQ readiness.
- * Also includes the product subject input and Claude model selector.
+ * quantity, and assumption inputs that improve research quality and build
+ * toward a supplier-ready RFQ. Collapsed by default with clear explanation
+ * of purpose. Also includes the Claude model selector under "Advanced."
  */
 
+import { useState } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import {
   Box,
@@ -15,11 +17,13 @@ import {
   Ruler,
   Scale,
   ShieldCheck,
-  ClipboardList,
+  ChevronDown,
+  ChevronRight,
+  Settings2,
+  FileText,
 } from "lucide-react"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -75,8 +79,6 @@ const QUANTITY_OPTIONS = [
 // ─── Component ───────────────────────────────────────────────────────
 
 interface DesignIntakeFormProps {
-  subject: string
-  setSubject: (value: string) => void
   modelId: ClaudeModelId
   setModelId: (value: ClaudeModelId) => void
   designBrief: CadLabDesignBrief
@@ -88,12 +90,12 @@ interface DesignIntakeFormProps {
 }
 
 /**
- * DesignIntakeForm — Structured intake for use-case, constraints,
- * manufacturing parameters, subject description, and model selection.
+ * DesignIntakeForm — Collapsible manufacturing details section.
+ *
+ * @description Collapsed by default. Explains its purpose clearly:
+ * these details improve research quality and build toward a supplier-ready RFQ.
  */
 export function DesignIntakeForm({
-  subject,
-  setSubject,
   modelId,
   setModelId,
   designBrief,
@@ -103,26 +105,75 @@ export function DesignIntakeForm({
   designReadinessPct,
   isAnyLoading,
 }: DesignIntakeFormProps): React.ReactNode {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
   return (
-    <>
-      {/* ── Design Intake ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <ClipboardList className="h-4 w-4" />
-            Design Intake
-            <span className="text-xs font-normal text-muted-foreground">
-              RFQ readiness: {designReadinessPct}%
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-international-orange rounded-full transition-all duration-500"
-              style={{ width: `${designReadinessPct}%` }}
-            />
+    <Card>
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full text-left p-4 sm:p-6 flex items-center justify-between gap-4 hover:bg-muted/30 transition-colors rounded-xl"
+        aria-expanded={isExpanded}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">
+              Add manufacturing details
+              <span className="ml-2 text-xs font-normal text-muted-foreground">(optional)</span>
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Improve research accuracy and build toward a supplier-ready RFQ
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {/* RFQ readiness indicator */}
+          <div className="hidden sm:flex items-center gap-2">
+            <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-international-orange rounded-full transition-all duration-500"
+                style={{ width: `${designReadinessPct}%` }}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground font-mono">
+              {designReadinessPct}%
+            </span>
+          </div>
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+      </button>
+
+      {isExpanded && (
+        <CardContent className="pt-0 pb-6 px-4 sm:px-6 space-y-5">
+          {/* Explanation */}
+          <div className="rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground leading-relaxed">
+            Specifying materials, tolerances, and manufacturing process helps the research
+            phase find more relevant reference designs. These details also build toward a
+            complete Request for Quote (RFQ) that you can send directly to suppliers.
+          </div>
+
+          {/* RFQ readiness bar (visible on mobile) */}
+          <div className="sm:hidden space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">RFQ readiness</span>
+              <span className="font-mono text-muted-foreground">{designReadinessPct}%</span>
+            </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-international-orange rounded-full transition-all duration-500"
+                style={{ width: `${designReadinessPct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Use case + Compliance */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="use-case" className="flex items-center gap-1.5">
@@ -151,6 +202,8 @@ export function DesignIntakeForm({
               />
             </div>
           </div>
+
+          {/* Process, Material, Tolerance, Quantity */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="target-process" className="flex items-center gap-1.5">
@@ -227,8 +280,10 @@ export function DesignIntakeForm({
               </Select>
             </div>
           </div>
+
+          {/* Assumptions */}
           <div className="space-y-2">
-            <Label htmlFor="assumptions">Known assumptions or non-negotiables (optional)</Label>
+            <Label htmlFor="assumptions">Known assumptions or non-negotiables</Label>
             <Textarea
               id="assumptions"
               value={assumptionNotes}
@@ -238,43 +293,43 @@ export function DesignIntakeForm({
               disabled={isAnyLoading}
             />
           </div>
-        </CardContent>
-      </Card>
 
-      {/* ── Product subject + Model selector ── */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="subject">Product or sub-assembly to engineer</Label>
-              <Input
-                id="subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="e.g., 1U CubeSat bus structure, EV battery module enclosure, 6-DOF robotic arm joint"
-                disabled={isAnyLoading}
-              />
-            </div>
-            <div className="w-64 space-y-2">
-              <Label htmlFor="model">Claude Model</Label>
-              <Select
-                value={modelId}
-                onValueChange={(v) => setModelId(v as ClaudeModelId)}
-                disabled={isAnyLoading}
-              >
-                <SelectTrigger id="model">
-                  <SelectValue placeholder="Select model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CLAUDE_MODELS.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Advanced: Model selector */}
+          <div className="border-t pt-4">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+              <span className="font-medium">Advanced settings</span>
+              {showAdvanced ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </button>
+            {showAdvanced && (
+              <div className="mt-3 max-w-xs space-y-2">
+                <Label htmlFor="model">Claude Model</Label>
+                <Select
+                  value={modelId}
+                  onValueChange={(v) => setModelId(v as ClaudeModelId)}
+                  disabled={isAnyLoading}
+                >
+                  <SelectTrigger id="model">
+                    <SelectValue placeholder="Select model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CLAUDE_MODELS.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </CardContent>
-      </Card>
-    </>
+      )}
+    </Card>
   )
 }

@@ -1,22 +1,20 @@
 "use client"
 
 /**
- * @file research-section.tsx — Research trigger, report viewer, and sources.
+ * @file research-section.tsx — Research report viewer and sources.
  *
- * @description Contains the research action button, the editable research
- * report with raw-markdown toggle, and the collapsible source citations.
+ * @description Displays the editable research report with raw-markdown toggle
+ * and collapsible source citations. The research trigger button has been moved
+ * to the hero section for a cleaner flow — this component only handles results.
  */
 
 import {
-  Loader2,
-  Search,
   FileText,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Globe,
   ExternalLink,
-  RotateCcw,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -28,94 +26,67 @@ import type { CadLabResearchResult } from "@/lib/cad-lab-types"
 // ─── Component ───────────────────────────────────────────────────────
 
 interface ResearchSectionProps {
-  isResearching: boolean
   hasResearch: boolean
   isAnyLoading: boolean
-  subjectTrimmed: boolean
   researchResult: CadLabResearchResult | null
   editableReport: string
   setEditableReport: (value: string) => void
   showSources: boolean
   setShowSources: (value: boolean) => void
-  handleResearch: () => void
   handleReset: () => void
 }
 
 /**
- * ResearchSection — Research button, editable report viewer, and source citations.
+ * ResearchSection — Editable report viewer and source citations.
+ * Only renders when research has completed.
  */
 export function ResearchSection({
-  isResearching,
   hasResearch,
   isAnyLoading,
-  subjectTrimmed,
   researchResult,
   editableReport,
   setEditableReport,
   showSources,
   setShowSources,
-  handleResearch,
   handleReset,
 }: ResearchSectionProps): React.ReactNode {
+  if (!hasResearch && !researchResult?.error) return null
+
   return (
     <>
-      {/* ── Research button ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Search className="h-4 w-4" />
-            Research Real Dimensions
-            {researchResult?.success && (
-              <span className="text-xs font-normal text-status-success flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                Complete ({(researchResult.researchTime / 1000).toFixed(1)}s)
-              </span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Before anything else, search for real-world reference dimensions. Never invent dimensions.
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              id="research-btn"
-              onClick={handleResearch}
-              disabled={isAnyLoading || !subjectTrimmed}
-              variant={hasResearch ? "secondary" : "default"}
-            >
-              {isResearching ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Researching...</>
-              ) : hasResearch ? (
-                <><RotateCcw className="h-4 w-4 mr-2" />Re-Research</>
-              ) : (
-                <><Search className="h-4 w-4 mr-2" />Research Product</>
-              )}
-            </Button>
-            {hasResearch && (
-              <Button variant="ghost" size="sm" onClick={handleReset}>Start Over</Button>
-            )}
-          </div>
-
-          {researchResult && !researchResult.success && researchResult.error && (
+      {/* ── Error display ── */}
+      {researchResult && !researchResult.success && researchResult.error && (
+        <Card>
+          <CardContent className="pt-6">
             <div className="p-3 bg-status-error-light rounded text-sm text-destructive font-mono">
               {researchResult.error}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Research Report (editable) ── */}
       {hasResearch && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Research Report
-              <span className="text-xs font-normal text-muted-foreground">
-                (review and edit dimensions before proceeding)
-              </span>
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Research Report
+                {researchResult?.success && (
+                  <span className="text-xs font-normal text-status-success flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Complete ({(researchResult.researchTime / 1000).toFixed(1)}s)
+                  </span>
+                )}
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={handleReset}>
+                Start Over
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Review and edit dimensions before proceeding to Build.
+            </p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="border rounded-md p-4 bg-muted/30">

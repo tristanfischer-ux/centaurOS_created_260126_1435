@@ -4,9 +4,9 @@
  * @file page.tsx — The Forge: Research stage (Stage 1).
  *
  * @description Orchestrator page for The Forge research pipeline stage.
- * Renders the hero section (pre-research), design intake form, research
- * trigger, and report viewer. Auto-triggers module decomposition after
- * research completes and navigates to /build once modules are mapped.
+ * Renders a focused input area (hero), collapsible manufacturing details,
+ * research report viewer, and auto-triggers module decomposition after
+ * research completes. Navigates to /build once modules are mapped.
  */
 
 import { useEffect, useRef } from "react"
@@ -94,10 +94,16 @@ export default function CadLabResearchPage(): React.ReactNode {
 
   return (
     <div className="space-y-6">
-      {/* ── Hero landing (before research) ── */}
-      {!hasResearch && !isResearching && (
-        <HeroSection onSelectTemplate={handleSelectTemplate} />
-      )}
+      {/* ── Primary input + templates ── */}
+      <HeroSection
+        subject={subject}
+        setSubject={setSubject}
+        isAnyLoading={isAnyLoading}
+        isResearching={isResearching}
+        hasResearch={hasResearch}
+        onResearch={handleResearch}
+        onSelectTemplate={handleSelectTemplate}
+      />
 
       {/* ── Pipeline preview during research wait ── */}
       {isResearching && (
@@ -130,32 +136,29 @@ export default function CadLabResearchPage(): React.ReactNode {
         </Card>
       )}
 
-      {/* ── Design intake form ── */}
-      <DesignIntakeForm
-        subject={subject}
-        setSubject={setSubject}
-        modelId={modelId}
-        setModelId={setModelId}
-        designBrief={designBrief}
-        setDesignBrief={setDesignBrief}
-        assumptionNotes={assumptionNotes}
-        setAssumptionNotes={setAssumptionNotes}
-        designReadinessPct={designReadinessPct}
-        isAnyLoading={isAnyLoading}
-      />
+      {/* ── Collapsible manufacturing details ── */}
+      {!hasResearch && !isResearching && (
+        <DesignIntakeForm
+          modelId={modelId}
+          setModelId={setModelId}
+          designBrief={designBrief}
+          setDesignBrief={setDesignBrief}
+          assumptionNotes={assumptionNotes}
+          setAssumptionNotes={setAssumptionNotes}
+          designReadinessPct={designReadinessPct}
+          isAnyLoading={isAnyLoading}
+        />
+      )}
 
-      {/* ── Research trigger + report ── */}
+      {/* ── Research results (report + sources) ── */}
       <ResearchSection
-        isResearching={isResearching}
         hasResearch={hasResearch}
         isAnyLoading={isAnyLoading}
-        subjectTrimmed={!!subject.trim()}
         researchResult={researchResult}
         editableReport={editableReport}
         setEditableReport={setEditableReport}
         showSources={showSources}
         setShowSources={setShowSources}
-        handleResearch={handleResearch}
         handleReset={handleReset}
       />
 

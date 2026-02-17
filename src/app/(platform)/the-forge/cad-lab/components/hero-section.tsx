@@ -1,20 +1,18 @@
 "use client"
 
 /**
- * @file hero-section.tsx — Pre-research hero content for The Forge pipeline.
+ * @file hero-section.tsx — Primary input area for The Forge pipeline.
  *
- * @description Displays hero banner image, credibility stats, capability cards,
- * and quick-start templates. Only shown before research has been initiated.
+ * @description Focused entry point: a single prominent input for describing
+ * what to build, an inline Research button, and quick-start templates.
+ * Replaces the previous marketing-heavy hero with a clean action-first layout.
  */
 
 import Image from "next/image"
-import {
-  Search,
-  Box,
-  Download,
-  Printer,
-  Ruler,
-} from "lucide-react"
+import { Search, ArrowRight, Loader2, RotateCcw } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 // ─── Quick-start templates ───────────────────────────────────────────
 
@@ -27,101 +25,128 @@ const QUICK_START_TEMPLATES = [
   { id: "heavy-drone", label: "Heavy-Lift Drone", subject: "Octocopter heavy-lift drone frame with coaxial motor mounts, central payload bay with 3-axis gimbal interface, retractable landing gear, and folding arm hinges in carbon fiber", image: "/cad-lab/templates/heavy-drone.png", complexity: "UAV" },
 ] as const
 
-const CAPABILITY_CARDS = [
-  { icon: Search, title: "Spec Research", desc: "Real-world specs from datasheets, reference designs, and engineering databases" },
-  { icon: Box, title: "256 Components", desc: "Parametric library spanning CubeSats, EVs, drones, robotics, and more" },
-  { icon: Printer, title: "DFM Analysis", desc: "Printability, support volume, material usage, and compatible printers" },
-  { icon: Ruler, title: "Mass Properties", desc: "Bounding box, mass, volume, surface area, and center-of-gravity coordinates" },
-  { icon: Download, title: "STEP + STL", desc: "Industry-standard exports compatible with SolidWorks, Fusion 360, and any slicer" },
-] as const
-
 // ─── Component ───────────────────────────────────────────────────────
 
 interface HeroSectionProps {
-  /** Callback to set the subject input when a template is selected */
+  /** Current product subject text */
+  subject: string
+  /** Callback to update the subject input */
+  setSubject: (value: string) => void
+  /** Whether any operation is currently loading */
+  isAnyLoading: boolean
+  /** Whether research is currently in progress */
+  isResearching: boolean
+  /** Whether research has already completed */
+  hasResearch: boolean
+  /** Trigger the research action */
+  onResearch: () => void
+  /** Callback when a quick-start template is selected */
   onSelectTemplate: (subject: string) => void
 }
 
 /**
- * HeroSection — Pre-research landing content with hero image,
- * credibility stats, capability showcase, and quick-start templates.
+ * HeroSection — Focused entry point with product input, research button,
+ * and quick-start templates. No marketing fluff — just the action.
  */
-export function HeroSection({ onSelectTemplate }: HeroSectionProps): React.ReactNode {
+export function HeroSection({
+  subject,
+  setSubject,
+  isAnyLoading,
+  isResearching,
+  hasResearch,
+  onResearch,
+  onSelectTemplate,
+}: HeroSectionProps): React.ReactNode {
+  const subjectTrimmed = subject.trim().length > 0
+
   return (
-    <div className="space-y-8">
-      {/* Hero banner */}
-      <div className="relative rounded-xl overflow-hidden border border-muted">
-        <Image
-          src="/cad-lab/hero.png"
-          alt="From idea to manufacturing-ready CAD"
-          width={1200}
-          height={400}
-          className="w-full h-auto object-cover"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/60 to-transparent flex items-center">
-          <div className="p-8 max-w-lg">
-            <h2 className="text-2xl font-bold text-foreground leading-tight">
-              Parametric CAD from a single sentence
-            </h2>
-            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-              Describe any physical product. The system researches real-world specifications, generates
-              parametric CadQuery models with 7 orthographic projections, runs DFM analysis, and
-              delivers STEP + STL exports with center-of-gravity data.
-            </p>
-          </div>
+    <div className="space-y-6">
+      {/* Primary input card */}
+      <div className="rounded-xl border bg-card p-6 sm:p-8 space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">
+            What do you want to build?
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Describe any physical product or sub-assembly. The system will research real-world
+            specs, generate parametric CAD, and produce manufacturing-ready files.
+          </p>
         </div>
-      </div>
 
-      {/* Credibility stats bar */}
-      <div className="flex items-center justify-center gap-6 py-3 px-4 rounded-lg bg-muted/50 border border-muted text-xs text-muted-foreground">
-        <span className="font-mono font-semibold text-foreground">256</span> Parametric Components
-        <span className="text-muted">|</span>
-        <span className="font-mono font-semibold text-foreground">15</span> Industry Sectors
-        <span className="text-muted">|</span>
-        <span className="font-mono font-semibold text-foreground">7</span> Projection Views
-        <span className="text-muted">|</span>
-        <span className="font-mono font-semibold text-foreground">STEP + STL</span> Export
-      </div>
-
-      {/* Capability cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {CAPABILITY_CARDS.map(({ icon: Icon, title, desc }) => (
-          <div key={title} className="flex flex-col items-center gap-2 p-4 rounded-lg border border-muted bg-card text-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-international-orange-light">
-              <Icon className="h-5 w-5 text-international-orange" />
-            </div>
-            <h3 className="text-xs font-semibold text-foreground">{title}</h3>
-            <p className="text-[10px] text-muted-foreground leading-relaxed">{desc}</p>
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              id="subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="e.g., 1U CubeSat bus structure, EV battery module enclosure, 6-DOF robotic arm joint"
+              className="pl-10 h-12 text-base"
+              disabled={isAnyLoading}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && subjectTrimmed && !isAnyLoading) {
+                  onResearch()
+                }
+              }}
+            />
           </div>
-        ))}
+          <Button
+            id="research-btn"
+            onClick={onResearch}
+            disabled={isAnyLoading || !subjectTrimmed}
+            size="lg"
+            variant={hasResearch ? "secondary" : "default"}
+            className="gap-2 h-12 px-6 shrink-0"
+          >
+            {isResearching ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Researching...
+              </>
+            ) : hasResearch ? (
+              <>
+                <RotateCcw className="h-4 w-4" />
+                Re-Research
+              </>
+            ) : (
+              <>
+                Research
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Quick-start templates */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-foreground">Quick Start — select an engineering template or describe your own product</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {QUICK_START_TEMPLATES.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => onSelectTemplate(t.subject)}
-              className="group flex flex-col items-center gap-2 p-3 rounded-lg border border-muted bg-card hover:border-international-orange/50 hover:bg-international-orange-light/10 transition-all text-center cursor-pointer"
-            >
-              <Image
-                src={t.image}
-                alt={t.label}
-                width={80}
-                height={80}
-                className="rounded-md group-hover:scale-105 transition-transform"
-              />
-              <span className="text-xs font-medium text-foreground">{t.label}</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
-                {t.complexity}
-              </span>
-            </button>
-          ))}
+      {!hasResearch && !isResearching && (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Or start from a template:
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {QUICK_START_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => onSelectTemplate(t.subject)}
+                className="group flex flex-col items-center gap-2 p-3 rounded-lg border border-muted bg-card hover:border-international-orange/50 hover:bg-international-orange-light/10 transition-all text-center cursor-pointer"
+              >
+                <Image
+                  src={t.image}
+                  alt={t.label}
+                  width={80}
+                  height={80}
+                  className="rounded-md group-hover:scale-105 transition-transform"
+                />
+                <span className="text-xs font-medium text-foreground">{t.label}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
+                  {t.complexity}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
