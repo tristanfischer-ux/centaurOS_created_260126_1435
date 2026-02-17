@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
     Loader2, Send, AlertCircle, Copy, Check, Eye, AlertTriangle,
     MessageSquareQuote, ArrowRight, Clock, ChevronDown, ChevronUp,
@@ -1144,37 +1145,116 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
     // isStreaming is declared earlier (before the useEffect that depends on it)
     const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant" && !m.historical)
 
+    // ─── Specialist Switcher State ───────────────────────────────────────
+    const [isSwitcherOpen, setIsSwitcherOpen] = useState(false)
+
     // ─── Panel Header (for panel mode) ──────────────────────────────────
     const panelHeader = (
         <div className="flex items-start gap-3 px-4 py-3 border-b bg-background">
-            <div className="flex-shrink-0 relative h-10 w-10 rounded-full overflow-hidden bg-muted">
-                {specialist.avatarImage ? (
-                    <Image
-                        src={specialist.avatarImage}
-                        alt={specialist.name}
-                        fill
-                        className="object-cover"
-                        sizes="40px"
-                    />
-                ) : (
-                    <div className="flex items-center justify-center h-full w-full">
-                        <span className="text-base font-display font-semibold text-foreground">
-                            {specialist.name.charAt(0)}
-                        </span>
+            <Popover open={isSwitcherOpen} onOpenChange={setIsSwitcherOpen}>
+                <PopoverTrigger asChild>
+                    <button
+                        className="flex items-center gap-3 flex-1 min-w-0 rounded-lg px-1.5 py-1 -mx-1.5 -my-1 hover:bg-muted/60 transition-colors text-left group"
+                        aria-label={`Switch specialist. Current: ${specialist.name}, ${specialist.title}`}
+                    >
+                        <div className="flex-shrink-0 relative h-10 w-10 rounded-full overflow-hidden bg-muted">
+                            {specialist.avatarImage ? (
+                                <Image
+                                    src={specialist.avatarImage}
+                                    alt={specialist.name}
+                                    fill
+                                    className="object-cover"
+                                    sizes="40px"
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center h-full w-full">
+                                    <span className="text-base font-display font-semibold text-foreground">
+                                        {specialist.name.charAt(0)}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h2 className="text-sm font-display font-semibold text-foreground flex items-center gap-1">
+                                {specialist.name}
+                                <span className="text-xs font-normal text-muted-foreground">
+                                    {specialist.title}
+                                </span>
+                                <ChevronDown className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-auto flex-shrink-0" />
+                            </h2>
+                            <p className="text-xs text-muted-foreground italic mt-0.5 truncate">
+                                &ldquo;{specialist.tagline}&rdquo;
+                            </p>
+                        </div>
+                    </button>
+                </PopoverTrigger>
+                <PopoverContent
+                    align="start"
+                    sideOffset={8}
+                    className="w-[340px] p-0 max-h-[420px] overflow-y-auto"
+                >
+                    <div className="px-3 py-2.5 border-b">
+                        <p className="text-xs font-medium text-muted-foreground">Switch Specialist</p>
                     </div>
-                )}
-            </div>
-            <div className="flex-1 min-w-0">
-                <h2 className="text-sm font-display font-semibold text-foreground">
-                    {specialist.name}
-                    <span className="text-xs font-normal text-muted-foreground ml-1.5">
-                        {specialist.title}
-                    </span>
-                </h2>
-                <p className="text-xs text-muted-foreground italic mt-0.5 truncate">
-                    &ldquo;{specialist.tagline}&rdquo;
-                </p>
-            </div>
+                    <div className="py-1">
+                        {SPECIALISTS.map((s) => {
+                            const isActive = s.id === specialist.id
+                            return (
+                                <button
+                                    key={s.id}
+                                    onClick={() => {
+                                        if (!isActive) {
+                                            onSwitchSpecialist?.(s.id)
+                                        }
+                                        setIsSwitcherOpen(false)
+                                    }}
+                                    className={cn(
+                                        "flex items-center gap-3 w-full px-3 py-2.5 text-left transition-colors",
+                                        isActive
+                                            ? "bg-muted/60"
+                                            : "hover:bg-muted/40"
+                                    )}
+                                >
+                                    <div className="flex-shrink-0 relative h-8 w-8 rounded-full overflow-hidden bg-muted">
+                                        {s.avatarImage ? (
+                                            <Image
+                                                src={s.avatarImage}
+                                                alt={s.name}
+                                                fill
+                                                className="object-cover"
+                                                sizes="32px"
+                                            />
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full w-full">
+                                                <span className="text-xs font-display font-semibold text-foreground">
+                                                    {s.name.charAt(0)}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className={cn(
+                                            "text-sm font-medium",
+                                            isActive ? "text-international-orange" : "text-foreground"
+                                        )}>
+                                            {s.name}
+                                            <span className="text-xs font-normal text-muted-foreground ml-1.5">
+                                                {s.title}
+                                            </span>
+                                        </p>
+                                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                            {s.description.slice(0, 60)}{s.description.length > 60 ? "..." : ""}
+                                        </p>
+                                    </div>
+                                    {isActive && (
+                                        <Check className="h-3.5 w-3.5 text-international-orange flex-shrink-0" />
+                                    )}
+                                </button>
+                            )
+                        })}
+                    </div>
+                </PopoverContent>
+            </Popover>
             <div className="flex items-center gap-1 flex-shrink-0">
                 {contextLabel ? (
                     <Badge variant="secondary" className="text-[10px] gap-1 max-w-[120px] truncate">
