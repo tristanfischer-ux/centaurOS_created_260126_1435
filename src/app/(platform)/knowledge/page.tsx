@@ -6,7 +6,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Knowledge | ForgeOS',
-  description: 'Your organizational knowledge vault — everything your AI team has learned',
+  description: 'Your organizational knowledge vault — everything your team has learned',
 }
 
 export const dynamic = 'force-dynamic'

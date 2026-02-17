@@ -262,7 +262,7 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1 ml-[1.625rem]">
-            Everything your AI team has learned about your business
+            Everything your team has learned about your business
           </p>
         </div>
 
@@ -282,17 +282,12 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
         <div className="py-12">
           <EmptyState
             title="Your knowledge vault is empty"
-            description="Knowledge accumulates automatically as you talk to your specialists. Brief a specialist to get started, or add knowledge manually."
+            description="Knowledge accumulates automatically as you consult your specialists. You can also add notes manually to capture decisions, insights, and lessons."
             action={
-              <div className="flex items-center gap-3">
-                <Button variant="default" onClick={() => setIsCreateDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Knowledge
-                </Button>
-                <Button variant="secondary" asChild>
-                  <a href="/agents">Brief a Specialist</a>
-                </Button>
-              </div>
+              <Button variant="default" onClick={() => setIsCreateDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Knowledge
+              </Button>
             }
           />
         </div>
