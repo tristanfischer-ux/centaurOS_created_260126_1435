@@ -11,7 +11,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import {
   Loader2,
   FolderOpen,
@@ -66,6 +66,7 @@ function getCurrentStageLabel(pathname: string): string {
 
 function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.ReactNode {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const {
     // Header
     sector, subject,
@@ -79,6 +80,14 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     // Milestone
     milestone, setMilestone,
   } = useCadLab()
+
+  // Auto-load project from URL ?project=<id> parameter
+  const projectParam = searchParams.get("project")
+  useEffect(() => {
+    if (projectParam && !activeProjectId) {
+      handleLoadProject(projectParam)
+    }
+  }, [projectParam, activeProjectId, handleLoadProject])
 
   const isAnyActive = isResearching || isDecomposing || isBatchRunning || activeModuleId !== null
   const currentStageLabel = getCurrentStageLabel(pathname)

@@ -258,7 +258,7 @@ export async function generateRfqPackAction(
     result = data
   }
 
-  revalidatePath(`/the-forge/${input.scanId}/contracting`)
+  revalidatePath("/the-forge/cad-lab")
   return { contract: result as unknown as ForgeContract }
 }
 
@@ -384,7 +384,7 @@ export async function generateForgeContractAction(
     return { error: error.message }
   }
 
-  revalidatePath(`/the-forge/${input.scanId}/contracting`)
+  revalidatePath("/the-forge/cad-lab")
   return { contract: data as unknown as ForgeContract }
 }
 

@@ -4,13 +4,12 @@
  * @description Server component that renders the main launchpad for The Forge.
  * Presents a single focused hero CTA to start the design pipeline,
  * a pipeline preview showing the 5 stages, a secondary Assembly Builder
- * link, and a grid of recent projects. If the user has an in-progress
- * pipeline project, a "Continue where you left off" card appears.
+ * link, and a grid of recent CAD Lab projects. If the user has an
+ * in-progress project, a "Continue where you left off" card appears.
  *
  * @related
  * - Page: src/app/(platform)/the-forge/page.tsx
- * - Actions: src/actions/xray.ts (listScansAction, deleteScanAction, copyScanAction)
- * - Card client: ./forge-project-card.tsx
+ * - Actions: src/actions/cad-lab-projects.ts (listCadLabProjects)
  */
 
 import React from "react"
@@ -28,16 +27,20 @@ import {
   ClipboardCheck,
   Blocks,
   PlayCircle,
+  Flame,
+  Clock,
 } from "lucide-react"
 
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { EmptyState } from "@/components/ui/empty-state"
 
-import { listScansAction } from "@/actions/xray"
 import { listCadLabProjects } from "@/actions/cad-lab-projects"
-import { ForgeProjectCard } from "./forge-project-card"
+
+import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 
 // ─── Pipeline Stage Definitions (for preview) ──────────────────────────
 
@@ -49,53 +52,43 @@ const PIPELINE_STAGES = [
   { label: "Review", icon: ClipboardCheck, description: "Supplier-ready package" },
 ] as const
 
+// ─── Stage Display Config ───────────────────────────────────────────
+
+const STAGE_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" | "info" }> = {
+  draft: { label: "Draft", variant: "secondary" },
+  researched: { label: "Researched", variant: "info" },
+  interface_ready: { label: "Building", variant: "warning" },
+  generated: { label: "Generated", variant: "success" },
+  complete: { label: "Complete", variant: "success" },
+}
+
 // ─── Component ───────────────────────────────────────────────────────
 
 /**
  * ForgeProjectList — Server component: The Forge landing page.
  *
- * @description Fetches projects from DB and renders the launchpad with
- * hero CTA, pipeline preview, Assembly Builder link, and project grid.
+ * @description Fetches CAD Lab projects from DB and renders the launchpad
+ * with hero CTA, pipeline preview, Assembly Builder link, and project grid.
  */
 export async function ForgeProjectList(): Promise<React.ReactNode> {
-  // Fetch pipeline scans and CAD Lab projects in parallel
-  const [scansResult, cadLabResult] = await Promise.all([
-    listScansAction(),
-    listCadLabProjects(),
-  ])
+  const cadLabResult = await listCadLabProjects()
 
-  if ("error" in scansResult) {
-    return (
-      <div className="space-y-8">
-        <PageHeader />
-        <p className="text-sm text-destructive">{scansResult.error}</p>
-      </div>
-    )
-  }
+  const projects: CadLabProjectSummary[] = "projects" in cadLabResult ? cadLabResult.projects : []
 
-  const { scans } = scansResult
-
-  // Find the most recently updated in-progress item to show in "Continue" card
-  const cadLabProjects = "projects" in cadLabResult ? cadLabResult.projects : []
-  const inProgressCadLab = cadLabProjects.find(
+  // Find the most recently updated in-progress project for "Continue" card
+  const inProgressProject = projects.find(
     (p) => p.status !== "complete" && p.status !== "rfq_created",
   )
-  const inProgressScan = scans.find(
-    (s) => s.status !== "complete" && s.status !== "archived",
-  )
-
-  // Pick whichever was updated most recently
-  const continueItem = pickMostRecent(inProgressCadLab, inProgressScan)
 
   return (
     <div className="space-y-10">
       <PageHeader />
-      {continueItem && <ContinueCard item={continueItem} />}
+      {inProgressProject && <ContinueCard project={inProgressProject} />}
       <HeroSection />
       <PipelinePreview />
       <AssemblyBuilderLink />
 
-      {scans.length === 0 ? (
+      {projects.length === 0 ? (
         <EmptyState
           title="No designs yet"
           description="Start your first design to generate a full engineering package — 3D models, specs, analysis, and procurement-ready files."
@@ -114,13 +107,13 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
             <h2 className="text-lg font-semibold text-foreground">
               Recent Projects
               <span className="ml-2 text-sm font-normal text-muted-foreground">
-                {scans.length} project{scans.length !== 1 ? "s" : ""}
+                {projects.length} project{projects.length !== 1 ? "s" : ""}
               </span>
             </h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {scans.map((scan) => (
-              <ForgeProjectCard key={scan.id} scan={scan} />
+            {projects.map((project) => (
+              <CadLabProjectCard key={project.id} project={project} />
             ))}
           </div>
         </div>
@@ -129,88 +122,23 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
   )
 }
 
-// ─── Continue Where You Left Off ─────────────────────────────────────
-
-/**
- * Normalized shape for an in-progress project from either data source.
- */
-interface ContinueItemData {
-  name: string
-  stage: string
-  updatedAt: string
-  href: string
-  source: "pipeline" | "cad-lab"
-}
-
-/** Stage label mapping for pipeline scans */
-const SCAN_STAGE_LABELS: Record<string, string> = {
-  concept: "Concept",
-  dossier: "Dossier",
-  people: "People Matching",
-  supply_chain: "Supply Chain",
-  contracting: "Contracting",
-}
-
-/** Stage label mapping for CAD Lab projects */
-const CAD_LAB_STAGE_LABELS: Record<string, string> = {
-  design: "Design",
-  research: "Research",
-  interface: "Interface Definition",
-  generation: "Generation",
-  rfq_created: "RFQ Created",
-}
-
-/**
- * Pick the most recently updated item between a CAD Lab project and a scan.
- * Returns null if neither exists.
- */
-function pickMostRecent(
-  cadLab: { name: string; stage: string; updatedAt: string; id: string } | undefined,
-  scan: { name: string | null; idea: string; stage: string; updatedAt: string; id: string } | undefined,
-): ContinueItemData | null {
-  if (!cadLab && !scan) return null
-
-  const cadLabTime = cadLab ? new Date(cadLab.updatedAt).getTime() : 0
-  const scanTime = scan ? new Date(scan.updatedAt).getTime() : 0
-
-  if (cadLab && cadLabTime >= scanTime) {
-    return {
-      name: cadLab.name || "Untitled Project",
-      stage: CAD_LAB_STAGE_LABELS[cadLab.stage] ?? cadLab.stage,
-      updatedAt: cadLab.updatedAt,
-      href: `/the-forge/cad-lab?project=${cadLab.id}`,
-      source: "cad-lab",
-    }
-  }
-
-  if (scan) {
-    return {
-      name: scan.name || scan.idea.slice(0, 60) || "Untitled Design",
-      stage: SCAN_STAGE_LABELS[scan.stage] ?? scan.stage,
-      updatedAt: scan.updatedAt,
-      href: `/the-forge/project/${scan.id}`,
-      source: "pipeline",
-    }
-  }
-
-  return null
-}
-
 /**
  * ContinueCard — Prominent card that lets users resume their most recent in-progress project.
  * Only rendered when there is an active project to continue.
  */
-function ContinueCard({ item }: { item: ContinueItemData }): React.ReactNode {
+function ContinueCard({ project }: { project: CadLabProjectSummary }): React.ReactNode {
+  const stageLabel = STAGE_CONFIG[project.status]?.label ?? project.status
+
   let timeAgo = ""
   try {
-    timeAgo = formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })
+    timeAgo = formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })
   } catch {
     // Graceful fallback — show card without time
   }
 
   return (
     <Link
-      href={item.href}
+      href={`/the-forge/cad-lab?project=${project.id}`}
       className="group flex items-center gap-4 rounded-xl border-2 border-international-orange/20 bg-international-orange-light/30 p-5 transition-all hover:border-international-orange/40 hover:shadow-md"
     >
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-international-orange text-white">
@@ -221,9 +149,9 @@ function ContinueCard({ item }: { item: ContinueItemData }): React.ReactNode {
           Continue where you left off
         </p>
         <p className="truncate text-sm text-muted-foreground">
-          {item.name}
+          {project.subject || project.name || "Untitled Project"}
           <span className="mx-1.5 text-muted-foreground/40">·</span>
-          {item.stage}
+          {stageLabel}
           {timeAgo && (
             <>
               <span className="mx-1.5 text-muted-foreground/40">·</span>
@@ -233,6 +161,56 @@ function ContinueCard({ item }: { item: ContinueItemData }): React.ReactNode {
         </p>
       </div>
       <ArrowRight className="h-5 w-5 shrink-0 text-international-orange transition-transform group-hover:translate-x-0.5" />
+    </Link>
+  )
+}
+
+// ─── CAD Lab Project Card ─────────────────────────────────────────────
+
+/**
+ * CadLabProjectCard — Card for a CAD Lab project linking to the pipeline.
+ */
+function CadLabProjectCard({ project }: { project: CadLabProjectSummary }): React.ReactNode {
+  const stageConfig = STAGE_CONFIG[project.status] ?? STAGE_CONFIG.draft
+  const displayName = project.subject || project.name || "Untitled Project"
+
+  return (
+    <Link href={`/the-forge/cad-lab?project=${project.id}`}>
+      <Card className="group cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5">
+        {/* Thumbnail or gradient placeholder */}
+        <div className="h-32 rounded-t-xl overflow-hidden bg-gradient-to-br from-international-orange/5 to-muted relative">
+          {project.thumbnailSvg ? (
+            <img
+              src={project.thumbnailSvg}
+              alt={`${displayName} thumbnail`}
+              className="w-full h-full object-contain p-4"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <Flame className="h-10 w-10 text-international-orange/30" />
+            </div>
+          )}
+
+          {/* Status badge overlay */}
+          <div className="absolute top-3 right-3">
+            <Badge variant={stageConfig.variant} className="gap-1">
+              {stageConfig.label}
+            </Badge>
+          </div>
+        </div>
+
+        <CardContent className="pt-4">
+          <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-international-orange transition-colors">
+            {displayName}
+          </h3>
+          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
     </Link>
   )
 }

@@ -1,93 +1,17 @@
 /**
- * @file layout.tsx — Shared layout for Forge project sub-pages
+ * @file layout.tsx — Passthrough layout for legacy forge project routes
  *
- * @description Loads the forge project from DB, wraps children in
- * ForgeProjectProvider, and renders the stage sub-navigation bar.
- * All stage pages (/concept, /dossier, /people, etc.) share this layout.
- *
- * @security Project loading uses withAuth via loadScanAction (RLS)
- *
- * @related
- * - Provider: src/app/(platform)/the-forge/components/forge-project-context.tsx
- * - Sub-nav: src/app/(platform)/the-forge/components/forge-sub-nav.tsx
+ * @description All legacy /the-forge/[id]/* routes now redirect to
+ * /the-forge/cad-lab. This layout is a minimal passthrough that lets
+ * the redirect pages render without loading the old ForgeProjectProvider.
  */
 
-import React, { Suspense } from "react"
-import { notFound } from "next/navigation"
+import React from "react"
 
-import { loadScanAction } from "@/actions/xray"
-import { typography } from "@/lib/design-system"
-import { cn } from "@/lib/utils"
-
-import { ForgeProjectProvider } from "../components/forge-project-context"
-import { ForgeSubNav } from "../components/forge-sub-nav"
-import { ForgeProjectHeader } from "../components/forge-project-header"
-
-import type { ForgeProject, ForgeStage } from "../components/forge-project-context"
-
-// ─── Layout ──────────────────────────────────────────────────────────
-
-interface ForgeProjectLayoutProps {
-  children: React.ReactNode
-  params: Promise<unknown>
-}
-
-/**
- * ForgeProjectLayout — Shared layout for all forge project stage pages.
- *
- * @description Server component that loads the project from DB, then
- * wraps children in ForgeProjectProvider with the loaded data.
- */
-export default async function ForgeProjectLayout({
+export default function ForgeProjectLayout({
   children,
-  params,
-}: ForgeProjectLayoutProps): Promise<React.ReactNode> {
-  const { id } = (await params) as { id: string }
-
-  // Load project from DB
-  const result = await loadScanAction(id)
-
-  if ("error" in result) {
-    notFound()
-  }
-
-  const project: ForgeProject = {
-    scanId: result.scanId,
-    foundryId: result.foundryId,
-    spec: result.spec,
-    name: result.name,
-    stage: result.stage as ForgeStage,
-    idea: result.idea,
-    status: result.status,
-    scanStatus: (result.scanStatus as "idle" | "scanning" | "complete") || "idle",
-    thumbnailUrl: result.thumbnailUrl,
-    researchReport: result.researchReport ?? null,
-    createdAt: result.createdAt,
-    updatedAt: result.updatedAt,
-  }
-
-  return (
-    <ForgeProjectProvider initialProject={project}>
-      <div>
-        {/* Project header with name and idea */}
-        <div className="mb-6">
-          <ForgeProjectHeader />
-        </div>
-
-        {/* Stage sub-navigation — tight gap to children so tabs feel connected */}
-        <ForgeSubNav projectId={id} spec={result.spec} />
-
-        {/* Active stage page */}
-        <Suspense
-          fallback={
-            <div className="h-96 flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">Loading...</p>
-            </div>
-          }
-        >
-          {children}
-        </Suspense>
-      </div>
-    </ForgeProjectProvider>
-  )
+}: {
+  children: React.ReactNode
+}): React.ReactNode {
+  return <>{children}</>
 }
