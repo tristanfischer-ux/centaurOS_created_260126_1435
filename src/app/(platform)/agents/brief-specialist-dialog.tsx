@@ -108,13 +108,21 @@ function normalizeSpecialistError(error: string, specialistName: string): string
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-/** Structured proposal from the Specialist for one-click creation (parsed from PROPOSED_ACTIONS block). */
+/** Valid action types for specialist proposals. */
+export type ProposedActionType = "objective" | "task" | "archive_objective" | "archive_task"
+
+/** Structured proposal from the Specialist for one-click creation or archival (parsed from PROPOSED_ACTIONS block). */
 export interface ProposedAction {
-    type: "objective" | "task"
+    type: ProposedActionType
     title: string
     description?: string
     /** For tasks: exact title of an objective in the same batch to link under. */
     objectiveTitle?: string
+}
+
+/** Whether a proposed action is destructive (archive/remove). */
+export function isDestructiveAction(action: ProposedAction): boolean {
+    return action.type === "archive_objective" || action.type === "archive_task"
 }
 
 interface ChatMessage {
@@ -139,13 +147,14 @@ function parseProposedActions(content: string): ProposedAction[] {
         const raw = match[1].trim()
         const parsed = JSON.parse(raw) as unknown
         if (!Array.isArray(parsed)) return []
+        const VALID_TYPES: ProposedActionType[] = ["objective", "task", "archive_objective", "archive_task"]
         return parsed.filter(
             (item): item is ProposedAction =>
                 typeof item === "object" &&
                 item !== null &&
                 typeof (item as ProposedAction).type === "string" &&
                 typeof (item as ProposedAction).title === "string" &&
-                ((item as ProposedAction).type === "objective" || (item as ProposedAction).type === "task")
+                VALID_TYPES.includes((item as ProposedAction).type as ProposedActionType)
         )
     } catch {
         return []
@@ -738,6 +747,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
         const controller = new AbortController()
         executeAbortRef.current = controller
 
+        // Determine if we should stream TTS (declared before try so catch can stop it)
+        const isTtsStreaming = tts.voiceEnabled && !!specialist.voice
+
         try {
             const res = await fetch("/api/agents/execute", {
                 method: "POST",
@@ -766,6 +778,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             const reader = res.body?.getReader()
             if (!reader) throw new Error("No response body")
 
+            // Start streaming TTS so speech begins as sentences arrive
+            if (isTtsStreaming) {
+                tts.startStreaming(specialist.voice)
+            }
+
             const decoder = new TextDecoder()
             let fullResponse = ""
             let streamError: string | null = null
@@ -788,11 +805,20 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             }
                             if (parsed.text) {
                                 fullResponse += parsed.text
-                                setStreamingResponse(stripPartialThinkTags(fullResponse))
+                                const strippedText = stripPartialThinkTags(fullResponse)
+                                setStreamingResponse(strippedText)
+                                // Feed accumulated text to TTS — plays sentences as they complete
+                                if (isTtsStreaming) {
+                                    tts.feedStreamingText(strippedText)
+                                }
                             }
                         } catch {
                             fullResponse += data
-                            setStreamingResponse(stripPartialThinkTags(fullResponse))
+                            const strippedText = stripPartialThinkTags(fullResponse)
+                            setStreamingResponse(strippedText)
+                            if (isTtsStreaming) {
+                                tts.feedStreamingText(strippedText)
+                            }
                         }
                     }
                 }
@@ -800,6 +826,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             }
 
             if (streamError) {
+                if (isTtsStreaming) tts.stop()
                 setError(normalizeSpecialistError(streamError, specialist.name))
                 return
             }
@@ -849,11 +876,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             setMessages((prev) => [...prev, assistantMessage])
             setStreamingResponse("")
 
-            // Auto-play TTS if voice output is enabled (chunked for faster time-to-first-audio)
-            if (tts.voiceEnabled && specialist.voice) {
-                tts.playChunked(displayResponse, specialist.voice).catch((err) => {
-                    console.warn("[BriefDialog] TTS playback failed:", err)
-                })
+            // Finish streaming TTS with the cleaned display text (plays any remaining sentence)
+            if (isTtsStreaming) {
+                tts.finishStreaming(displayResponse)
             }
 
             // Auto-save to deliverables (fire and forget)
@@ -879,6 +904,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             })
 
         } catch (err) {
+            if (isTtsStreaming) tts.stop()
             if (err instanceof Error && err.name === "AbortError") return
             const message = err instanceof Error ? err.message : "Unknown error"
             console.error("[BriefDialog] Execution failed:", { specialist: specialist.id, error: message })
@@ -889,7 +915,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             setIsExecuting(false)
             setIsUrgentMessage(false)
         }
-    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, tts.voiceEnabled, tts.warmUp, tts.playChunked, deepThinkEnabled, serializeScreenContext])
+    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")

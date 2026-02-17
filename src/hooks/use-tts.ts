@@ -64,6 +64,22 @@ export interface UseTtsReturn {
      * First sentence plays immediately after synthesis; subsequent chunks play in sequence.
      */
     playChunked: (text: string, voice: string) => Promise<void>
+    /**
+     * Start a streaming TTS session. Sentences are played as they arrive
+     * during text streaming, so speech is simultaneous with the text appearing.
+     * Call feedStreamingText() as accumulated text grows, finish() when done.
+     */
+    startStreaming: (voice: string) => void
+    /**
+     * Feed the full accumulated text so far to the streaming TTS session.
+     * Internally extracts new complete sentences and queues them for playback.
+     */
+    feedStreamingText: (fullText: string) => void
+    /**
+     * Signal that streaming is complete. Pass the final cleaned display text
+     * to ensure any remaining partial sentence is spoken.
+     */
+    finishStreaming: (displayText: string) => void
     /** Stop any currently playing audio */
     stop: () => void
     /**
@@ -335,6 +351,173 @@ export function useTts(): UseTtsReturn {
         [stopPlayback],
     )
 
+    // ────────────────────────────────────────────────────────
+    // Streaming TTS — plays sentences as they arrive during text streaming
+    // ────────────────────────────────────────────────────────
+    const streamVoiceRef = useRef<string | null>(null)
+    const streamSentencesSentRef = useRef<number>(0)
+    const streamQueueRef = useRef<string[]>([])
+    const streamPlayingRef = useRef(false)
+    const streamControllerRef = useRef<AbortController | null>(null)
+    const streamFinishedRef = useRef(false)
+
+    /**
+     * Internal: drain the sentence queue, playing one sentence at a time.
+     * Runs in a loop until the queue is empty, then exits. Re-entered whenever
+     * new sentences are added to the queue.
+     */
+    const drainStreamQueue = useCallback(async () => {
+        if (streamPlayingRef.current) return
+        streamPlayingRef.current = true
+
+        const voice = streamVoiceRef.current
+        const controller = streamControllerRef.current
+        if (!voice || !controller || controller.signal.aborted) {
+            streamPlayingRef.current = false
+            return
+        }
+
+        if (!audioContextRef.current) {
+            audioContextRef.current = new AudioContext()
+        }
+        const ctx = audioContextRef.current
+        if (ctx.state === "suspended") {
+            try {
+                await ctx.resume()
+            } catch {
+                console.warn("[TTS-Stream] AudioContext resume failed")
+                streamPlayingRef.current = false
+                return
+            }
+        }
+
+        while (streamQueueRef.current.length > 0) {
+            if (controller.signal.aborted) break
+
+            const sentence = streamQueueRef.current.shift()!
+            if (!sentence.trim()) continue
+
+            try {
+                setIsLoading(true)
+                const res = await fetch("/api/agents/tts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text: sentence, voice }),
+                    signal: controller.signal,
+                })
+
+                if (!res.ok || controller.signal.aborted) {
+                    setIsLoading(false)
+                    continue
+                }
+
+                const arrayBuffer = await res.arrayBuffer()
+                if (controller.signal.aborted) break
+
+                const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
+                if (controller.signal.aborted) break
+
+                const source = ctx.createBufferSource()
+                source.buffer = audioBuffer
+                source.connect(ctx.destination)
+                sourceNodeRef.current = source
+
+                setIsLoading(false)
+                setIsPlaying(true)
+
+                await new Promise<void>((resolve) => {
+                    source.onended = () => {
+                        sourceNodeRef.current = null
+                        resolve()
+                    }
+                    source.start()
+                })
+
+                setIsPlaying(false)
+            } catch (err) {
+                if (err instanceof Error && err.name === "AbortError") break
+                console.warn("[TTS-Stream] Sentence playback failed:", err instanceof Error ? err.message : err)
+                setIsLoading(false)
+                setIsPlaying(false)
+            }
+        }
+
+        streamPlayingRef.current = false
+        // If queue is truly empty and stream is done, clean up state
+        if (streamQueueRef.current.length === 0) {
+            setIsLoading(false)
+            setIsPlaying(false)
+        }
+    }, [])
+
+    /** Start a streaming TTS session. Resets internal state and prepares for sentence playback. */
+    const startStreaming = useCallback(
+        (voice: string) => {
+            stopPlayback()
+            streamVoiceRef.current = voice
+            streamSentencesSentRef.current = 0
+            streamQueueRef.current = []
+            streamPlayingRef.current = false
+            streamFinishedRef.current = false
+            const controller = new AbortController()
+            streamControllerRef.current = controller
+            abortRef.current = controller
+        },
+        [stopPlayback],
+    )
+
+    /**
+     * Feed accumulated text to the streaming session. Extracts new complete
+     * sentences and queues them for immediate playback.
+     */
+    const feedStreamingText = useCallback(
+        (fullText: string) => {
+            if (!streamControllerRef.current || streamControllerRef.current.signal.aborted) return
+
+            const clean = stripMarkdownForTTS(fullText)
+            const sentences = splitIntoSentences(clean)
+
+            // Only queue sentences we haven't sent yet (excluding the last one
+            // which may be incomplete while streaming continues)
+            const completeSentences = sentences.slice(0, -1)
+            const alreadySent = streamSentencesSentRef.current
+
+            if (completeSentences.length > alreadySent) {
+                const newSentences = completeSentences.slice(alreadySent)
+                streamQueueRef.current.push(...newSentences)
+                streamSentencesSentRef.current = completeSentences.length
+                // Kick the drain loop if it's not already running
+                drainStreamQueue()
+            }
+        },
+        [drainStreamQueue],
+    )
+
+    /**
+     * Feed the final cleaned display response and close the streaming session.
+     * This ensures any trailing sentence is spoken.
+     */
+    const finishStreamingWithText = useCallback(
+        (displayText: string) => {
+            if (!streamControllerRef.current || streamControllerRef.current.signal.aborted) return
+
+            const clean = stripMarkdownForTTS(displayText)
+            const sentences = splitIntoSentences(clean)
+            const alreadySent = streamSentencesSentRef.current
+
+            // Queue any remaining sentences (including the final partial one)
+            if (sentences.length > alreadySent) {
+                const remaining = sentences.slice(alreadySent)
+                streamQueueRef.current.push(...remaining)
+                streamSentencesSentRef.current = sentences.length
+                drainStreamQueue()
+            }
+
+            streamFinishedRef.current = true
+        },
+        [drainStreamQueue],
+    )
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
@@ -361,6 +544,9 @@ export function useTts(): UseTtsReturn {
         isPlaying,
         play,
         playChunked,
+        startStreaming,
+        feedStreamingText,
+        finishStreaming: finishStreamingWithText,
         stop: stopPlayback,
         warmUp,
     }
