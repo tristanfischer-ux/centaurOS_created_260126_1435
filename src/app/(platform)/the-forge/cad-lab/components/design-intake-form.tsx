@@ -1,0 +1,280 @@
+"use client"
+
+/**
+ * @file design-intake-form.tsx — Structured design intake form for The Forge.
+ *
+ * @description Collects use-case, compliance, process, material, tolerance,
+ * quantity, and assumption inputs that drive research quality and RFQ readiness.
+ * Also includes the product subject input and Claude model selector.
+ */
+
+import type { Dispatch, SetStateAction } from "react"
+import {
+  Box,
+  Factory,
+  Ruler,
+  Scale,
+  ShieldCheck,
+  ClipboardList,
+} from "lucide-react"
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { CLAUDE_MODELS } from "@/lib/cad-lab-types"
+import type { ClaudeModelId, CadLabDesignBrief } from "@/lib/cad-lab-types"
+
+// ─── Option constants ────────────────────────────────────────────────
+
+const TARGET_PROCESS_OPTIONS = [
+  "CNC Machining",
+  "Sheet Metal",
+  "Injection Molding",
+  "Casting",
+  "FDM 3D Print",
+  "SLS/Powder Print",
+  "Manual Assembly",
+  "Undecided",
+] as const
+
+const TARGET_MATERIAL_OPTIONS = [
+  "Aluminium",
+  "Steel/Stainless",
+  "ABS/Nylon",
+  "PLA/PETG",
+  "Carbon Fiber Composite",
+  "Copper/Brass",
+  "Titanium",
+  "Undecided",
+] as const
+
+const TOLERANCE_OPTIONS = [
+  "±1mm (concept)",
+  "±0.5mm (standard)",
+  "±0.1mm (precision)",
+  "±0.05mm (tight fit)",
+  "Undecided",
+] as const
+
+const QUANTITY_OPTIONS = [
+  "Prototype (1-5)",
+  "Pilot (10-100)",
+  "Low-volume (100-1000)",
+  "Production (1000+)",
+  "Undecided",
+] as const
+
+// ─── Component ───────────────────────────────────────────────────────
+
+interface DesignIntakeFormProps {
+  subject: string
+  setSubject: (value: string) => void
+  modelId: ClaudeModelId
+  setModelId: (value: ClaudeModelId) => void
+  designBrief: CadLabDesignBrief
+  setDesignBrief: Dispatch<SetStateAction<CadLabDesignBrief>>
+  assumptionNotes: string
+  setAssumptionNotes: (value: string) => void
+  designReadinessPct: number
+  isAnyLoading: boolean
+}
+
+/**
+ * DesignIntakeForm — Structured intake for use-case, constraints,
+ * manufacturing parameters, subject description, and model selection.
+ */
+export function DesignIntakeForm({
+  subject,
+  setSubject,
+  modelId,
+  setModelId,
+  designBrief,
+  setDesignBrief,
+  assumptionNotes,
+  setAssumptionNotes,
+  designReadinessPct,
+  isAnyLoading,
+}: DesignIntakeFormProps): React.ReactNode {
+  return (
+    <>
+      {/* ── Design Intake ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />
+            Design Intake
+            <span className="text-xs font-normal text-muted-foreground">
+              RFQ readiness: {designReadinessPct}%
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-international-orange rounded-full transition-all duration-500"
+              style={{ width: `${designReadinessPct}%` }}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="use-case" className="flex items-center gap-1.5">
+                <Ruler className="h-3.5 w-3.5" /> Use case & critical dimensions
+              </Label>
+              <Textarea
+                id="use-case"
+                value={designBrief.useCase}
+                onChange={(e) => setDesignBrief((prev) => ({ ...prev, useCase: e.target.value }))}
+                placeholder="e.g. Outdoor heavy-lift UAV payload mount, 300×220×120mm envelope, must survive 20g shock"
+                className="min-h-[84px]"
+                disabled={isAnyLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="compliance" className="flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5" /> Compliance and constraints
+              </Label>
+              <Textarea
+                id="compliance"
+                value={designBrief.complianceNotes}
+                onChange={(e) => setDesignBrief((prev) => ({ ...prev, complianceNotes: e.target.value }))}
+                placeholder="e.g. IP54 ingress protection, ASTM F963 edges, RoHS, food-safe surfaces"
+                className="min-h-[84px]"
+                disabled={isAnyLoading}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="target-process" className="flex items-center gap-1.5">
+                <Factory className="h-3.5 w-3.5" /> Process
+              </Label>
+              <Select
+                value={designBrief.targetProcess}
+                onValueChange={(v) => setDesignBrief((prev) => ({ ...prev, targetProcess: v }))}
+                disabled={isAnyLoading}
+              >
+                <SelectTrigger id="target-process">
+                  <SelectValue placeholder="Select process" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TARGET_PROCESS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="target-material" className="flex items-center gap-1.5">
+                <Box className="h-3.5 w-3.5" /> Material
+              </Label>
+              <Select
+                value={designBrief.targetMaterial}
+                onValueChange={(v) => setDesignBrief((prev) => ({ ...prev, targetMaterial: v }))}
+                disabled={isAnyLoading}
+              >
+                <SelectTrigger id="target-material">
+                  <SelectValue placeholder="Select material" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TARGET_MATERIAL_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="target-tolerance" className="flex items-center gap-1.5">
+                <Scale className="h-3.5 w-3.5" /> Tolerance
+              </Label>
+              <Select
+                value={designBrief.toleranceTarget}
+                onValueChange={(v) => setDesignBrief((prev) => ({ ...prev, toleranceTarget: v }))}
+                disabled={isAnyLoading}
+              >
+                <SelectTrigger id="target-tolerance">
+                  <SelectValue placeholder="Select tolerance" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TOLERANCE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="target-quantity">Quantity target</Label>
+              <Select
+                value={designBrief.quantityTarget}
+                onValueChange={(v) => setDesignBrief((prev) => ({ ...prev, quantityTarget: v }))}
+                disabled={isAnyLoading}
+              >
+                <SelectTrigger id="target-quantity">
+                  <SelectValue placeholder="Select quantity" />
+                </SelectTrigger>
+                <SelectContent>
+                  {QUANTITY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="assumptions">Known assumptions or non-negotiables (optional)</Label>
+            <Textarea
+              id="assumptions"
+              value={assumptionNotes}
+              onChange={(e) => setAssumptionNotes(e.target.value)}
+              placeholder="e.g. Must fit existing M3 bolt pattern at 60mm PCD; supplier must support PPAP level 3"
+              className="min-h-[72px]"
+              disabled={isAnyLoading}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Product subject + Model selector ── */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-4">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="subject">Product or sub-assembly to engineer</Label>
+              <Input
+                id="subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="e.g., 1U CubeSat bus structure, EV battery module enclosure, 6-DOF robotic arm joint"
+                disabled={isAnyLoading}
+              />
+            </div>
+            <div className="w-64 space-y-2">
+              <Label htmlFor="model">Claude Model</Label>
+              <Select
+                value={modelId}
+                onValueChange={(v) => setModelId(v as ClaudeModelId)}
+                disabled={isAnyLoading}
+              >
+                <SelectTrigger id="model">
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CLAUDE_MODELS.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  )
+}
