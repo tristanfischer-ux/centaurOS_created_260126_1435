@@ -3,10 +3,13 @@
 /**
  * @file team-meeting-dialog.tsx
  *
- * @description Multi-specialist roundtable meeting dialog. Users pick 2-9
- * specialists, pose a topic, and each specialist responds sequentially --
- * each seeing what prior specialists said. After Round 1 the user can
- * trigger discussion rounds where specialists respond to each other.
+ * @description Conversation-led multi-specialist meeting dialog. Users pick 2+
+ * specialists, pose a topic, and the FIRST specialist responds automatically.
+ * After that, the user drives the conversation: tapping specialist chips to
+ * hear from specific people, weighing in with their own thoughts, or letting
+ * specialists debate autonomously. Specialists whose expertise is relevant to
+ * what was just said are highlighted as "wants to speak".
+ *
  * On wrap-up, generates structured meeting outputs (notes, objectives,
  * marketplace suggestions) via a single AI call.
  *
@@ -44,6 +47,9 @@ import {
     Volume2,
     VolumeX,
     Sparkles,
+    ChevronDown,
+    ChevronUp,
+    Hand,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
@@ -53,20 +59,25 @@ import { compileInterSpecialistDynamics } from "@/lib/agents/relationship-matrix
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import { MeetingOutputs } from "./meeting-outputs"
+import { parseProposedActions, stripProposedActionsBlock } from "./brief-specialist-dialog"
+import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { Specialist } from "./specialists-data"
+import type { ProposedAction } from "./brief-specialist-dialog"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-/** A single specialist response within a meeting round */
+/** A single specialist response within a meeting */
 interface MeetingEntry {
     specialistId: string
     specialistName: string
     round: number
     content: string
+    /** Parsed PROPOSED_ACTIONS from specialist response; rendered as interactive approval cards. */
+    proposals?: ProposedAction[]
 }
 
-/** The four phases of a team meeting */
-type MeetingPhase = "setup" | "in-progress" | "round-complete" | "outputs"
+/** The phases of a conversation-led meeting */
+type MeetingPhase = "setup" | "in-progress" | "awaiting-input" | "outputs"
 
 /** Structured outputs from the post-meeting AI call */
 export interface MeetingOutputData {
@@ -201,12 +212,10 @@ function computeSuggestions(selectedIds: Set<string>): string[] {
 
     const suggestions: string[] = []
 
-    // Check for 3+ selected: show a broad suggestion
     if (selectedIds.size >= 3) {
         suggestions.push("What's our 90-day company plan? Where do we focus?")
     }
 
-    // Check combination matches (all pairs of selected specialists)
     const ids = Array.from(selectedIds).sort()
     for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
@@ -218,7 +227,6 @@ function computeSuggestions(selectedIds: Set<string>): string[] {
         }
     }
 
-    // If we still need more, add per-specialist suggestions
     if (suggestions.length < 4) {
         for (const id of selectedIds) {
             const perSpecialist = SPECIALIST_SUGGESTIONS[id]
@@ -229,7 +237,6 @@ function computeSuggestions(selectedIds: Set<string>): string[] {
         }
     }
 
-    // Deduplicate and cap at 4
     return [...new Set(suggestions)].slice(0, 4)
 }
 
@@ -252,20 +259,72 @@ function getDynamicPlaceholder(selectedIds: Set<string>): string {
     return `What should ${names} discuss together?`
 }
 
+// ─── "Wants to Speak" Detection ───────────────────────────────────────────────
+
+/**
+ * Keywords that map each specialist's domain. Used for client-side relevance
+ * detection to highlight specialists who "want to speak" after a response.
+ */
+const SPECIALIST_KEYWORDS: Record<string, string[]> = {
+    strategist: ["strategy", "market", "competitive", "positioning", "go-to-market", "gtm", "moat", "differentiation", "pivot", "vision", "mission", "okr", "roadmap"],
+    cto: ["technology", "tech", "architecture", "infrastructure", "engineering", "code", "platform", "build", "ship", "technical debt", "stack", "api", "system"],
+    "vp-engineering": ["engineering", "velocity", "sprint", "agile", "ci/cd", "deploy", "quality", "testing", "team velocity", "developer", "code review"],
+    "vp-manufacturing": ["manufacturing", "production", "factory", "supply", "quality control", "lean", "tooling", "assembly", "prototype", "fabrication", "bom"],
+    "vp-supply-chain": ["supply chain", "logistics", "procurement", "vendor", "supplier", "inventory", "shipping", "sourcing", "lead time", "warehouse"],
+    "product-lead": ["product", "feature", "user experience", "ux", "prd", "roadmap", "prioritize", "mvp", "user research", "design", "iteration"],
+    "growth-marketer": ["marketing", "growth", "brand", "content", "seo", "ads", "funnel", "conversion", "awareness", "campaign", "social media", "acquisition"],
+    "sales-lead": ["sales", "revenue", "pipeline", "deal", "pricing", "customer", "close", "outreach", "crm", "quota", "prospect", "cold email"],
+    "chief-of-staff": ["operations", "process", "alignment", "priorities", "board", "meeting", "coordination", "execution", "cross-functional", "ops"],
+    "finance-lead": ["finance", "budget", "runway", "burn rate", "unit economics", "revenue", "cost", "cash flow", "financial model", "kpi", "metrics", "profit"],
+    "fundraising-advisor": ["fundraising", "investor", "raise", "series", "pitch", "valuation", "term sheet", "vc", "angel", "capital", "deck"],
+    "hiring-team": ["hiring", "recruit", "talent", "team", "compensation", "equity", "culture", "onboarding", "headcount", "job", "candidate", "hr"],
+    "legal-counsel": ["legal", "contract", "compliance", "ip", "intellectual property", "liability", "regulation", "terms", "privacy", "gdpr", "incorporation"],
+}
+
+/**
+ * Determine which specialists "want to speak" based on the latest response content.
+ *
+ * @description Scans the response text for keywords matching each remaining
+ * specialist's domain. Returns the IDs of specialists whose expertise was
+ * referenced or is relevant to what was just discussed.
+ *
+ * @param lastResponse - The text of the most recent specialist response
+ * @param remainingSpecialistIds - IDs of specialists who haven't spoken yet (or could speak again)
+ * @param lastSpeakerId - ID of the specialist who just spoke (excluded from results)
+ * @returns Set of specialist IDs that are relevant
+ */
+function getWantsToSpeak(
+    lastResponse: string,
+    remainingSpecialistIds: string[],
+    lastSpeakerId: string,
+): Set<string> {
+    const wants = new Set<string>()
+    const lower = lastResponse.toLowerCase()
+
+    for (const id of remainingSpecialistIds) {
+        if (id === lastSpeakerId) continue
+        const keywords = SPECIALIST_KEYWORDS[id]
+        if (!keywords) continue
+
+        const matchCount = keywords.filter((kw) => lower.includes(kw)).length
+        // Require at least 2 keyword matches to reduce noise
+        if (matchCount >= 2) {
+            wants.add(id)
+        }
+    }
+
+    return wants
+}
+
 // ─── Prompt Templates ─────────────────────────────────────────────────────────
 
 /**
  * Maximum character budget for the prior discussion block in prompts.
- * The /api/agents/execute endpoint has a 50k char limit on the prompt field.
- * We reserve ~15k for the prompt template, company context placeholder, and
- * specialist metadata, leaving ~30k for prior discussion content.
  */
 const MAX_PRIOR_DISCUSSION_CHARS = 30_000
 
 /**
  * Truncates the prior discussion block to fit within the character budget.
- * Keeps the most recent entries in full (they're most relevant for continuity)
- * and summarizes older entries with just the specialist name and round.
  *
  * @param responses - All prior meeting entries
  * @param maxChars - Maximum character budget for the block
@@ -277,17 +336,13 @@ function buildPriorDiscussionBlock(
 ): string {
     if (responses.length === 0) return ""
 
-    // Format all entries
     const formatted = responses.map(
         (r) => `**${r.specialistName}** (Round ${r.round}):\n${r.content}`
     )
 
-    // Check if everything fits
     const fullBlock = formatted.join("\n\n---\n\n")
     if (fullBlock.length <= maxChars) return fullBlock
 
-    // Doesn't fit — keep recent entries in full, truncate older ones.
-    // Work backwards from the most recent entry.
     const separator = "\n\n---\n\n"
     let recentBlock = ""
     let recentCount = 0
@@ -296,7 +351,6 @@ function buildPriorDiscussionBlock(
         const candidate = recentCount === 0
             ? formatted[i]
             : formatted[i] + separator + recentBlock
-        // Reserve ~2k chars for the summary header of truncated entries
         if (candidate.length > maxChars - 2000 && recentCount > 0) break
         recentBlock = candidate
         recentCount++
@@ -304,11 +358,9 @@ function buildPriorDiscussionBlock(
 
     const truncatedCount = responses.length - recentCount
     if (truncatedCount === 0) {
-        // Even with all entries, we're over budget — just hard-truncate
         return fullBlock.slice(0, maxChars) + "\n\n*[Discussion truncated for length]*"
     }
 
-    // Build a brief summary of the truncated (older) entries
     const truncatedSummary = responses
         .slice(0, truncatedCount)
         .map((r) => `- ${r.specialistName} (Round ${r.round})`)
@@ -317,6 +369,17 @@ function buildPriorDiscussionBlock(
     return `*[Earlier discussion summarized — ${truncatedCount} responses from:]*\n${truncatedSummary}\n\n---\n\n${recentBlock}`
 }
 
+/**
+ * Build a meeting prompt for a single specialist. Prompts are designed for
+ * short, meeting-appropriate responses (100-200 words).
+ *
+ * @param specialist - The specialist who will respond
+ * @param topic - The meeting topic
+ * @param priorResponses - All prior responses in the meeting
+ * @param round - Current round number
+ * @param userThoughts - Optional founder input to respond to
+ * @returns The formatted prompt string
+ */
 function buildMeetingPrompt(
     specialist: Specialist,
     topic: string,
@@ -325,9 +388,36 @@ function buildMeetingPrompt(
     userThoughts?: string
 ): string {
     const priorBlock = buildPriorDiscussionBlock(priorResponses)
-
     const displayName = getSpecialistDisplayName(specialist)
 
+    // First speaker in the meeting -- no prior context
+    if (priorResponses.length === 0) {
+        return `You are ${specialist.name}, the ${specialist.title} specialist in a team meeting.
+
+## Your Role
+${specialist.description}
+
+## Working Style
+${specialist.workingStyle}
+
+## Meeting Topic
+"${topic}"
+
+## Your Task
+You are opening this meeting. Give your single strongest take on this topic. Be direct — this is a live meeting, not a memo.
+
+Rules:
+- State your position clearly in 2-3 sentences
+- Flag your biggest concern or opportunity
+- Pose one sharp question for the group to react to
+- **Keep it under 150 words.** Short and punchy. You'll get to elaborate if asked.
+
+Use markdown formatting. Sign off as "${displayName}".
+
+{{company_context}}`
+    }
+
+    // Subsequent speaker reacting to what's been said
     if (round === 1) {
         return `You are ${specialist.name}, the ${specialist.title} specialist in a team meeting.
 
@@ -340,17 +430,26 @@ ${specialist.workingStyle}
 ## Meeting Topic
 "${topic}"
 
-${priorBlock ? `## What Your Colleagues Have Said\n\n${priorBlock}\n\n` : ""}## Your Task
-Provide your expert perspective on this topic. Be specific, actionable, and direct.
-${priorBlock ? "Build on or respectfully challenge what your colleagues have said. Reference them by name. If you spot a synergy or conflict between your view and theirs, call it out explicitly." : "You are speaking first. Set the stage with your analysis and flag areas where you'll need input from other specialists."}
+${userThoughts ? `## The Founder Just Said\n"${userThoughts}"\n\n` : ""}## What Has Been Said So Far
 
-Keep your response focused and under 600 words. Use markdown formatting. Sign off as "${displayName}".
+${priorBlock}
+
+## Your Task
+React to what you've heard. This is a meeting — be conversational, not formal.
+
+Rules:
+- Lead with where you agree or disagree (name the person)
+- Add ONE new insight from your area of expertise
+- If something concerns you, say so directly
+- **Keep it under 200 words.** Be concise — you can elaborate if the founder asks.
+
+Use markdown formatting. Sign off as "${displayName}".
 
 {{company_context}}`
     }
 
-    // Discussion rounds
-    return `You are ${specialist.name}, the ${specialist.title} specialist in a team meeting discussion round.
+    // Discussion rounds (round 2+)
+    return `You are ${specialist.name}, the ${specialist.title} specialist in a team meeting discussion.
 
 ## Your Role
 ${specialist.description}
@@ -363,21 +462,21 @@ ${userThoughts ? `## The Founder's Additional Thoughts\n"${userThoughts}"\n\n` :
 ${priorBlock}
 
 ## Your Task
-This is the discussion round. You have heard everyone's perspective${userThoughts ? " and the founder's additional thoughts" : ""}. Now:
-- Build on ideas that resonated with you (name the colleague)
-- Respectfully challenge points you disagree with (explain why)
-- Refine or update your own position based on what you have learned
-- Propose concrete next steps from your area of expertise
+The founder has asked for your perspective. Respond directly to the discussion so far.
 
-Be direct and specific. Reference colleagues by name. Under 400 words. Use markdown formatting.
+Rules:
+- Reference specific points others made (by name)
+- Build on what resonated, challenge what you disagree with
+- Propose something concrete — a decision, a next step, a framework
+- **Keep it under 250 words.** Be direct and specific.
+
+Use markdown formatting. Sign off as "${displayName}".
 
 {{company_context}}`
 }
 
 /**
  * Build a prompt for autonomous specialist-to-specialist debate.
- * In this mode, specialists respond to EACH OTHER, not the founder.
- * They build on, challenge, and refine each other's ideas.
  */
 function buildDebatePrompt(
     specialist: Specialist,
@@ -409,12 +508,11 @@ You MUST:
 - **Directly address at least one other specialist by name** ("I agree with the Sales Lead's point about...")
 - **Challenge or build on a specific point** — don't just repeat what others said
 - **Propose something concrete** — a decision, a next step, a framework
-- **Ask a direct question to another specialist** if you need their expertise
 - **Be opinionated** — the founder wants to hear real debate, not consensus for consensus's sake
 
 If you disagree with someone, say so clearly and explain why. The founder needs to hear the tensions, not just the agreements.
 
-Keep it punchy. Under 300 words. Use markdown. Be direct.
+Keep it punchy. Under 250 words. Use markdown.
 
 {{company_context}}`
 }
@@ -456,17 +554,167 @@ Return ONLY valid JSON (no markdown code fences, no extra text). Use this exact 
 }
 
 Rules:
-- Extract 1-4 objectives with 2-5 tasks each. Only include objectives that were clearly discussed.
+- Extract 2-5 objectives with 2-5 tasks each. Be thorough — capture every actionable thread from the discussion.
 - Extract 0-3 marketplace suggestions. Only suggest if a clear gap or need was identified.
 - Key decisions should be things the group aligned on.
 - Action items should be specific and assignable.
+- Objectives should cover the major themes discussed. Don't miss anything the team committed to.
 - Be concise. Quality over quantity.`
+
+// ─── Meeting Outputs Loading ──────────────────────────────────────────────────
+
+/**
+ * Animated loading state shown while AI processes the meeting transcript.
+ * Shows a step-by-step progress animation with specialist avatars and
+ * contextual descriptions of what's being extracted.
+ */
+
+const OUTPUT_STEPS = [
+    { id: "analyze", label: "Analyzing transcript", description: "Reading through the full discussion..." },
+    { id: "decisions", label: "Extracting key decisions", description: "Identifying what the team aligned on..." },
+    { id: "objectives", label: "Building objectives & tasks", description: "Turning action items into structured goals..." },
+    { id: "resources", label: "Identifying resource needs", description: "Matching gaps to marketplace solutions..." },
+    { id: "compile", label: "Compiling meeting notes", description: "Writing the executive summary..." },
+] as const
+
+function MeetingOutputsLoading({
+    attendees,
+    topic,
+}: {
+    attendees: Specialist[]
+    topic: string
+}) {
+    const [activeStep, setActiveStep] = useState(0)
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setActiveStep((prev) => {
+                if (prev < OUTPUT_STEPS.length - 1) return prev + 1
+                return prev
+            })
+        }, 3000)
+        return () => clearInterval(interval)
+    }, [])
+
+    return (
+        <div className="py-8 px-2 space-y-8">
+            {/* Header with specialist avatars */}
+            <div className="text-center space-y-4">
+                <div className="flex justify-center -space-x-3">
+                    {attendees.slice(0, 6).map((s, i) => (
+                        <div
+                            key={s.id}
+                            className="relative h-10 w-10 rounded-full overflow-hidden bg-muted border-2 border-background"
+                            style={{
+                                animation: `pulse 2s ease-in-out ${i * 0.3}s infinite`,
+                            }}
+                        >
+                            {s.avatarImage ? (
+                                <Image
+                                    src={s.avatarImage}
+                                    alt={s.name}
+                                    fill
+                                    className="object-cover"
+                                    sizes="40px"
+                                />
+                            ) : (
+                                <span className="flex items-center justify-center h-full w-full text-sm font-semibold">
+                                    {s.name.charAt(0)}
+                                </span>
+                            )}
+                        </div>
+                    ))}
+                    {attendees.length > 6 && (
+                        <div className="h-10 w-10 rounded-full bg-muted border-2 border-background flex items-center justify-center">
+                            <span className="text-xs font-medium text-muted-foreground">
+                                +{attendees.length - 6}
+                            </span>
+                        </div>
+                    )}
+                </div>
+                <div>
+                    <p className="text-sm font-semibold text-foreground">
+                        Processing your meeting
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 max-w-sm mx-auto truncate">
+                        {topic}
+                    </p>
+                </div>
+            </div>
+
+            {/* Step-by-step progress */}
+            <div className="max-w-sm mx-auto space-y-1">
+                {OUTPUT_STEPS.map((step, i) => {
+                    const isActive = i === activeStep
+                    const isComplete = i < activeStep
+                    const isPending = i > activeStep
+
+                    return (
+                        <div
+                            key={step.id}
+                            className={cn(
+                                "flex items-start gap-3 px-4 py-3 rounded-lg transition-all duration-500",
+                                isActive && "bg-international-orange/5",
+                                isComplete && "opacity-60",
+                                isPending && "opacity-30",
+                            )}
+                        >
+                            {/* Step indicator */}
+                            <div className="flex-shrink-0 mt-0.5">
+                                {isComplete ? (
+                                    <CheckCircle2 className="h-4 w-4 text-status-success" />
+                                ) : isActive ? (
+                                    <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
+                                ) : (
+                                    <div className="h-4 w-4 rounded-full border-2 border-muted" />
+                                )}
+                            </div>
+
+                            {/* Step content */}
+                            <div className="min-w-0 flex-1">
+                                <p
+                                    className={cn(
+                                        "text-sm font-medium transition-colors duration-300",
+                                        isActive ? "text-foreground" : "text-muted-foreground",
+                                    )}
+                                >
+                                    {step.label}
+                                </p>
+                                {isActive && (
+                                    <p className="text-xs text-muted-foreground mt-0.5 animate-in fade-in slide-in-from-top-1 duration-300">
+                                        {step.description}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+
+            {/* Subtle progress bar */}
+            <div className="max-w-sm mx-auto px-4">
+                <div className="h-1 rounded-full bg-muted overflow-hidden">
+                    <div
+                        className="h-full rounded-full bg-international-orange transition-all duration-1000 ease-out"
+                        style={{
+                            width: `${Math.min(((activeStep + 1) / OUTPUT_STEPS.length) * 100, 100)}%`,
+                        }}
+                    />
+                </div>
+            </div>
+        </div>
+    )
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 /**
- * TeamMeetingDialog -- Multi-specialist roundtable with discussion rounds
- * and structured post-meeting outputs.
+ * TeamMeetingDialog -- Conversation-led multi-specialist meeting.
+ *
+ * @description The first specialist speaks automatically. After that, the user
+ * drives the conversation by tapping specialist chips, weighing in, or
+ * triggering autonomous debate. Specialists whose expertise is relevant to
+ * the latest response are highlighted as "wants to speak".
  */
 export function TeamMeetingDialog({
     open,
@@ -481,6 +729,7 @@ export function TeamMeetingDialog({
     const [currentSpecialistIdx, setCurrentSpecialistIdx] = useState(0)
     const [streamingContent, setStreamingContent] = useState("")
     const [isStreaming, setIsStreaming] = useState(false)
+    const [isStarting, setIsStarting] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [threadIds, setThreadIds] = useState<Record<string, string>>({})
     const [userThoughts, setUserThoughts] = useState("")
@@ -488,6 +737,8 @@ export function TeamMeetingDialog({
     const [meetingOutputs, setMeetingOutputs] = useState<MeetingOutputData | null>(null)
     const [isGeneratingOutputs, setIsGeneratingOutputs] = useState(false)
     const [speakingEntryIdx, setSpeakingEntryIdx] = useState<number | null>(null)
+    const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set())
+    const [wantsToSpeak, setWantsToSpeak] = useState<Set<string>>(new Set())
 
     const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -517,13 +768,11 @@ export function TeamMeetingDialog({
     // ─── Reset on close ───────────────────────────────────────────────────
     useEffect(() => {
         if (!open) {
-            // Stop voice when dialog closes
             tts.stop()
             if (topicSpeechRecognition.isListening) topicSpeechRecognition.stop()
             if (thoughtsSpeechRecognition.isListening) thoughtsSpeechRecognition.stop()
             setSpeakingEntryIdx(null)
 
-            // Small delay to let close animation finish
             const timer = setTimeout(() => {
                 setPhase("setup")
                 setSelectedIds(new Set())
@@ -533,12 +782,15 @@ export function TeamMeetingDialog({
                 setCurrentSpecialistIdx(0)
                 setStreamingContent("")
                 setIsStreaming(false)
+                setIsStarting(false)
                 setError(null)
                 setThreadIds({})
                 setUserThoughts("")
                 setShowThoughtsInput(false)
                 setMeetingOutputs(null)
                 setIsGeneratingOutputs(false)
+                setExpandedEntries(new Set())
+                setWantsToSpeak(new Set())
             }, 300)
             return () => clearTimeout(timer)
         }
@@ -578,7 +830,7 @@ export function TeamMeetingDialog({
         return ids
     }, [selectedSpecialists])
 
-    // ─── Execute Single Specialist ────────────────────────────────────────
+    // ─── Execute Single Specialist (Streaming) ───────────────────────────
     const executeSpecialist = useCallback(
         async (
             specialist: Specialist,
@@ -642,129 +894,116 @@ export function TeamMeetingDialog({
         []
     )
 
-    // ─── Run a Full Round ─────────────────────────────────────────────────
-    const runRound = useCallback(
-        async (round: number, threads: Record<string, string>, thoughts?: string) => {
-            setPhase("in-progress")
-            setError(null)
-            setIsStreaming(true)
-
-            // Local accumulator so each specialist sees what earlier
-            // specialists said in THIS round (not just prior rounds)
-            const roundAccumulator: MeetingEntry[] = [...entries]
-
-            for (let i = 0; i < selectedSpecialists.length; i++) {
-                const specialist = selectedSpecialists[i]
-                setCurrentSpecialistIdx(i)
-                setStreamingContent("")
-
-                try {
-                    // Pass the accumulator (includes earlier responses from this round)
-                    const prompt = buildMeetingPrompt(
-                        specialist,
-                        topic,
-                        roundAccumulator,
-                        round,
-                        thoughts
-                    )
-
-                    // Build inter-specialist dynamics context (relationships + strong opinions)
-                    const dynamicsBlock = compileInterSpecialistDynamics(
-                        specialist.id,
-                        selectedSpecialists.map((s) => s.id),
-                        topic,
-                    )
-
-                    const response = await executeSpecialist(
-                        specialist,
-                        threads[specialist.id],
-                        prompt,
-                        topic,
-                        `\n\n## Meeting Context\nThis is a team meeting with ${selectedSpecialists.length} specialists. Topic: "${topic}"${dynamicsBlock ? `\n\n${dynamicsBlock}` : ""}`
-                    )
-
-                    const entry: MeetingEntry = {
-                        specialistId: specialist.id,
-                        specialistName: getSpecialistDisplayName(specialist),
-                        round,
-                        content: response,
-                    }
-
-                    // Add to both local accumulator and React state
-                    roundAccumulator.push(entry)
-                    setEntries((prev) => [...prev, entry])
-                } catch (err) {
-                    const message = err instanceof Error ? err.message : "Unknown error"
-                    console.error(`[TeamMeeting] ${specialist.name} failed:`, message)
-                    setError(`${specialist.name} encountered an error: ${message}`)
-
-                    const errorEntry: MeetingEntry = {
-                        specialistId: specialist.id,
-                        specialistName: getSpecialistDisplayName(specialist),
-                        round,
-                        content: `*[Error: Could not generate response]*`,
-                    }
-
-                    // Add to both accumulator and state so next specialist sees the gap
-                    roundAccumulator.push(errorEntry)
-                    setEntries((prev) => [...prev, errorEntry])
-                }
-            }
-
-            setIsStreaming(false)
-            setStreamingContent("")
-            // Brief delay so streaming UI can fade out before switching to round-complete
-            await new Promise((r) => setTimeout(r, 200))
-            setCurrentRound(round)
-            setPhase("round-complete")
-
-            // TTS sequential playback is handled by the useEffect below
-            // that watches for phase === "round-complete"
-        },
-        [selectedSpecialists, topic, entries, executeSpecialist]
-    )
-
-    // Use a ref to track entries for sequential playback
+    // Use a ref to track entries for TTS playback
     const entriesRef = useRef<MeetingEntry[]>([])
     useEffect(() => {
         entriesRef.current = entries
     }, [entries])
 
-    // Effect: When phase changes to round-complete, play entries sequentially
-    useEffect(() => {
-        if (phase !== "round-complete" || !tts.voiceEnabled) return
+    // ─── Run a Single Specialist ──────────────────────────────────────────
 
-        let cancelled = false
+    /**
+     * Execute a single specialist and transition to awaiting-input phase.
+     *
+     * @param specialistIdx - Index into selectedSpecialists
+     * @param round - Current round number
+     * @param threads - Thread ID map
+     * @param thoughts - Optional user thoughts to include in prompt
+     */
+    const runSingleSpecialist = useCallback(
+        async (
+            specialistIdx: number,
+            round: number,
+            threads: Record<string, string>,
+            thoughts?: string
+        ) => {
+            setPhase("in-progress")
+            setError(null)
+            setIsStreaming(true)
+            setCurrentSpecialistIdx(specialistIdx)
+            setStreamingContent("")
 
-        async function playSequentially(): Promise<void> {
-            const roundEntries = entriesRef.current.filter((e) => e.round === currentRound)
-            for (let i = 0; i < roundEntries.length; i++) {
-                if (cancelled) break
-                const entry = roundEntries[i]
-                const specialist = getSpecialistById(entry.specialistId)
-                if (!specialist?.voice) continue
-
-                // Find the global index for this entry
-                const globalIdx = entriesRef.current.indexOf(entry)
-                setSpeakingEntryIdx(globalIdx)
-
-                // Play and wait for it to finish
-                await tts.play(entry.content, specialist.voice)
-
-                // Small pause between specialists
-                if (i < roundEntries.length - 1 && !cancelled) {
-                    await new Promise((r) => setTimeout(r, 1500))
-                }
+            const specialist = selectedSpecialists[specialistIdx]
+            if (!specialist) {
+                setError("Invalid specialist index")
+                setIsStreaming(false)
+                setPhase("awaiting-input")
+                return
             }
-            if (!cancelled) setSpeakingEntryIdx(null)
-        }
 
-        playSequentially()
-        return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [phase, currentRound])
+            try {
+                const prompt = buildMeetingPrompt(
+                    specialist,
+                    topic,
+                    entriesRef.current,
+                    round,
+                    thoughts
+                )
+
+                const dynamicsBlock = compileInterSpecialistDynamics(
+                    specialist.id,
+                    selectedSpecialists.map((s) => s.id),
+                    topic,
+                )
+
+                const response = await executeSpecialist(
+                    specialist,
+                    threads[specialist.id],
+                    prompt,
+                    topic,
+                    `\n\n## Meeting Context\nThis is a team meeting with ${selectedSpecialists.length} specialists. Topic: "${topic}"${dynamicsBlock ? `\n\n${dynamicsBlock}` : ""}`
+                )
+
+                const proposals = parseProposedActions(response)
+                const entry: MeetingEntry = {
+                    specialistId: specialist.id,
+                    specialistName: getSpecialistDisplayName(specialist),
+                    round,
+                    content: stripProposedActionsBlock(response),
+                    proposals: proposals.length > 0 ? proposals : undefined,
+                }
+
+                setEntries((prev) => [...prev, entry])
+
+                // Compute "wants to speak" for remaining specialists
+                const remainingIds = selectedSpecialists.map((s) => s.id)
+                const wants = getWantsToSpeak(response, remainingIds, specialist.id)
+                setWantsToSpeak(wants)
+
+                // TTS: play the response if voice is enabled
+                if (tts.voiceEnabled && specialist.voice) {
+                    const globalIdx = entriesRef.current.length // will be the new entry's index
+                    setSpeakingEntryIdx(globalIdx)
+                    await tts.play(response, specialist.voice)
+                    setSpeakingEntryIdx(null)
+                }
+            } catch (err) {
+                const message = err instanceof Error ? err.message : "Unknown error"
+                console.error(`[TeamMeeting] ${specialist.name} failed:`, message)
+                setError(`${specialist.name} encountered an error: ${message}`)
+
+                const errorEntry: MeetingEntry = {
+                    specialistId: specialist.id,
+                    specialistName: getSpecialistDisplayName(specialist),
+                    round,
+                    content: `*[Error: Could not generate response]*`,
+                }
+                setEntries((prev) => [...prev, errorEntry])
+            }
+
+            setIsStreaming(false)
+            setStreamingContent("")
+            setCurrentRound(round)
+            setPhase("awaiting-input")
+        },
+        [selectedSpecialists, topic, executeSpecialist, tts]
+    )
 
     // ─── Start Meeting ────────────────────────────────────────────────────
+
+    /**
+     * Initialize threads and run only the FIRST specialist.
+     */
     const handleStartMeeting = useCallback(async () => {
         if (selectedIds.size < 2) {
             setError("Select at least 2 specialists for a meeting.")
@@ -775,25 +1014,42 @@ export function TeamMeetingDialog({
             return
         }
         setError(null)
-        const threads = await initializeThreads()
-        await runRound(1, threads)
-    }, [selectedIds, topic, initializeThreads, runRound])
+        setIsStarting(true)
 
-    // ─── Discussion Round ─────────────────────────────────────────────────
-    const handleDiscussionRound = useCallback(async () => {
-        setShowThoughtsInput(false)
-        const nextRound = currentRound + 1
-        await runRound(nextRound, threadIds, userThoughts.trim() || undefined)
-        setUserThoughts("")
-    }, [currentRound, threadIds, userThoughts, runRound])
+        try {
+            const threads = await initializeThreads()
+            await runSingleSpecialist(0, 1, threads)
+        } finally {
+            setIsStarting(false)
+        }
+    }, [selectedIds, topic, initializeThreads, runSingleSpecialist])
 
-    // ─── Autonomous Debate: Specialists discuss among themselves ──────
+    // ─── Ask a Specific Specialist ────────────────────────────────────────
+
+    /**
+     * User tapped a specialist chip — run that specialist next.
+     */
+    const handleAskSpecialist = useCallback(
+        async (specialist: Specialist) => {
+            setShowThoughtsInput(false)
+            const thoughts = userThoughts.trim() || undefined
+            setUserThoughts("")
+
+            const idx = selectedSpecialists.findIndex((s) => s.id === specialist.id)
+            if (idx === -1) return
+
+            const nextRound = currentRound + 1
+            await runSingleSpecialist(idx, nextRound, threadIds, thoughts)
+        },
+        [selectedSpecialists, currentRound, threadIds, userThoughts, runSingleSpecialist]
+    )
+
+    // ─── Autonomous Debate: Specialists discuss among themselves ──────────
     const handleAutonomousDebate = useCallback(async () => {
         setShowThoughtsInput(false)
         setPhase("in-progress")
         setError(null)
 
-        // Run 2 autonomous debate rounds where specialists talk to each other
         const debateAccumulator: MeetingEntry[] = [...entriesRef.current]
         let roundCounter = currentRound
 
@@ -815,7 +1071,6 @@ export function TeamMeetingDialog({
                         debateRound
                     )
 
-                    // Build inter-specialist dynamics for debate
                     const debateDynamicsBlock = compileInterSpecialistDynamics(
                         specialist.id,
                         selectedSpecialists.map((s) => s.id),
@@ -830,11 +1085,13 @@ export function TeamMeetingDialog({
                         `\n\n## Autonomous Debate\nThe specialists are debating among themselves. The founder is listening. Round: ${roundLabel}${debateDynamicsBlock ? `\n\n${debateDynamicsBlock}` : ""}`
                     )
 
+                    const proposals = parseProposedActions(response)
                     const entry: MeetingEntry = {
                         specialistId: specialist.id,
                         specialistName: getSpecialistDisplayName(specialist),
                         round: roundCounter,
-                        content: response,
+                        content: stripProposedActionsBlock(response),
+                        proposals: proposals.length > 0 ? proposals : undefined,
                     }
 
                     debateAccumulator.push(entry)
@@ -859,7 +1116,7 @@ export function TeamMeetingDialog({
         }
 
         setCurrentRound(roundCounter)
-        setPhase("round-complete")
+        setPhase("awaiting-input")
     }, [currentRound, selectedSpecialists, topic, threadIds, executeSpecialist])
 
     // ─── Wrap Up (Generate Outputs) ───────────────────────────────────────
@@ -868,7 +1125,6 @@ export function TeamMeetingDialog({
         setIsGeneratingOutputs(true)
         setError(null)
 
-        // Build full transcript
         const attendees = selectedSpecialists.map((s) => s.name).join(", ")
         const transcript = entries
             .map((e) => `**${e.specialistName}** (Round ${e.round}):\n${e.content}`)
@@ -893,7 +1149,6 @@ export function TeamMeetingDialog({
                 throw new Error(`HTTP ${res.status}`)
             }
 
-            // Collect full streaming response
             const reader = res.body?.getReader()
             if (!reader) throw new Error("No response body")
 
@@ -919,7 +1174,6 @@ export function TeamMeetingDialog({
                 }
             }
 
-            // Parse JSON from the response (strip any markdown fences)
             const jsonStr = fullResponse
                 .replace(/^```json\s*/i, "")
                 .replace(/^```\s*/i, "")
@@ -936,6 +1190,32 @@ export function TeamMeetingDialog({
             setIsGeneratingOutputs(false)
         }
     }, [selectedSpecialists, entries, topic, currentRound])
+
+    // ─── Toggle Entry Expansion ───────────────────────────────────────────
+    const toggleEntry = useCallback((idx: number) => {
+        setExpandedEntries((prev) => {
+            const next = new Set(prev)
+            if (next.has(idx)) {
+                next.delete(idx)
+            } else {
+                next.add(idx)
+            }
+            return next
+        })
+    }, [])
+
+    /**
+     * Extract a short preview from a response (first 1-2 sentences).
+     */
+    function getPreview(content: string): string {
+        // Split on sentence boundaries, take first 2
+        const sentences = content.split(/(?<=[.!?])\s+/)
+        const preview = sentences.slice(0, 2).join(" ")
+        if (preview.length < content.length) {
+            return preview.length > 200 ? preview.slice(0, 200) + "..." : preview + "..."
+        }
+        return preview
+    }
 
     // ─── Render ───────────────────────────────────────────────────────────
 
@@ -1165,56 +1445,83 @@ export function TeamMeetingDialog({
                     </div>
                 )}
 
-                {/* ── Phase 2: In Progress ─────────────────────────────────── */}
+                {/* ── Phase 2: In Progress (Single Specialist Streaming) ──── */}
                 {phase === "in-progress" && (
                     <div
                         ref={scrollRef}
-                        className="flex-1 min-h-0 overflow-y-auto space-y-6 pr-1"
+                        className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1"
                         style={{ maxHeight: "60vh" }}
                     >
-                        {/* Completed entries */}
+                        {/* Collapsed previous entries */}
                         {entries.map((entry, i) => {
                             const specialist = getSpecialistById(entry.specialistId)
+                            const isExpanded = expandedEntries.has(i)
                             return (
-                                <div key={i} className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                                <div key={i}>
+                                    <button
+                                        onClick={() => toggleEntry(i)}
+                                        className="flex items-start gap-2 w-full text-left py-2 px-3 rounded-lg hover:bg-muted/30 transition-colors"
+                                    >
+                                        <div className="relative h-6 w-6 rounded-full overflow-hidden bg-muted flex-shrink-0 mt-0.5">
                                             {specialist?.avatarImage ? (
                                                 <Image
                                                     src={specialist.avatarImage}
                                                     alt={entry.specialistName}
                                                     fill
                                                     className="object-cover"
-                                                    sizes="28px"
+                                                    sizes="24px"
                                                 />
                                             ) : (
-                                                <span className="flex items-center justify-center h-full w-full text-xs font-semibold">
+                                                <span className="flex items-center justify-center h-full w-full text-[10px] font-semibold">
                                                     {entry.specialistName.charAt(0)}
                                                 </span>
                                             )}
                                         </div>
-                                        <span className="text-sm font-semibold text-foreground">
-                                            {entry.specialistName}
-                                        </span>
-                                        <Badge variant="secondary" className="text-[10px]">
-                                            Round {entry.round}
-                                        </Badge>
-                                    </div>
-                                    <div className="ml-9 rounded-lg border border-muted bg-muted/30 p-4">
-                                        <Markdown content={entry.content} className="text-sm" />
-                                    </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-semibold text-foreground">
+                                                    {entry.specialistName}
+                                                </span>
+                                                <Badge variant="secondary" className="text-[10px]">
+                                                    Round {entry.round}
+                                                </Badge>
+                                                {isExpanded ? (
+                                                    <ChevronUp className="h-3 w-3 text-muted-foreground ml-auto" />
+                                                ) : (
+                                                    <ChevronDown className="h-3 w-3 text-muted-foreground ml-auto" />
+                                                )}
+                                            </div>
+                                            {isExpanded ? (
+                                                <div className="mt-2 rounded-lg border border-muted bg-muted/30 p-3">
+                                                    <Markdown content={entry.content} className="text-sm" />
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                                    {getPreview(entry.content)}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </button>
+                                    {isExpanded && entry.proposals && entry.proposals.length > 0 && specialist && (
+                                        <div className="ml-9 mt-2">
+                                            <ProposedActionsCard
+                                                proposals={entry.proposals}
+                                                specialist={specialist}
+                                                onDismiss={() => {
+                                                    setEntries((prev) => prev.map((e, idx) =>
+                                                        idx === i ? { ...e, proposals: undefined } : e
+                                                    ))
+                                                }}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             )
                         })}
 
-                        {/* Currently streaming specialist — always mounted during round, opacity transition when done */}
+                        {/* Currently streaming specialist */}
                         {currentSpecialist && (
-                            <div
-                                className={cn(
-                                    "space-y-2 transition-opacity duration-200",
-                                    !isStreaming && "opacity-0 pointer-events-none"
-                                )}
-                            >
+                            <div className="space-y-2">
                                 <div className="flex items-center gap-2">
                                     <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted flex-shrink-0">
                                         {currentSpecialist.avatarImage ? (
@@ -1234,11 +1541,13 @@ export function TeamMeetingDialog({
                                     <span className="text-sm font-semibold text-foreground">
                                         {currentSpecialist.name}
                                     </span>
-                                    <Loader2 className="h-3 w-3 animate-spin text-international-orange" />
+                                    {isStreaming && (
+                                        <Loader2 className="h-3 w-3 animate-spin text-international-orange" />
+                                    )}
                                 </div>
-                                <div className="ml-9 rounded-lg border border-muted bg-muted/30 p-4">
+                                <div className="ml-9 rounded-lg border border-international-orange/20 bg-international-orange/5 p-4">
                                     {streamingContent ? (
-                                        <Markdown content={streamingContent} className="text-sm" />
+                                        <Markdown content={stripProposedActionsBlock(streamingContent)} className="text-sm" />
                                     ) : (
                                         <p className="text-sm text-muted-foreground italic">
                                             {currentSpecialist.thinkingIndicator
@@ -1250,70 +1559,118 @@ export function TeamMeetingDialog({
                                 </div>
                             </div>
                         )}
-
-                        {/* Progress indicator — always mounted during round, opacity transition when done */}
-                        <div
-                            className={cn(
-                                "flex items-center justify-center gap-2 py-2 transition-opacity duration-200",
-                                !isStreaming && "opacity-0 pointer-events-none"
-                            )}
-                        >
-                            <div className="flex gap-1">
-                                {selectedSpecialists.map((s, i) => (
-                                    <div
-                                        key={s.id}
-                                        className={cn(
-                                            "h-1.5 w-6 rounded-full transition-colors",
-                                            i < currentSpecialistIdx
-                                                ? "bg-international-orange"
-                                                : i === currentSpecialistIdx
-                                                ? "bg-international-orange/50"
-                                                : "bg-muted"
-                                        )}
-                                    />
-                                ))}
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                                {currentSpecialistIdx + 1} of {selectedSpecialists.length}
-                            </span>
-                        </div>
                     </div>
                 )}
 
-                {/* ── Phase 3: Round Complete ───────────────────────────────── */}
-                {phase === "round-complete" && (
+                {/* ── Phase 3: Awaiting Input (User Decides Who Speaks Next) ── */}
+                {phase === "awaiting-input" && (
                     <div className="flex-1 min-h-0 flex flex-col">
                         <div
                             ref={scrollRef}
-                            className="flex-1 min-h-0 overflow-y-auto space-y-6 pr-1"
-                            style={{ maxHeight: "55vh" }}
+                            className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1"
+                            style={{ maxHeight: "50vh" }}
                         >
-                            {entries.map((entry, i) => {
+                            {/* Previous entries (collapsed) */}
+                            {entries.slice(0, -1).map((entry, i) => {
                                 const specialist = getSpecialistById(entry.specialistId)
+                                const isExpanded = expandedEntries.has(i)
                                 const isSpeaking = speakingEntryIdx === i
                                 return (
-                                    <div key={i} className="space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                                    <div key={i}>
+                                        <button
+                                            onClick={() => toggleEntry(i)}
+                                            className={cn(
+                                                "flex items-start gap-2 w-full text-left py-2 px-3 rounded-lg transition-colors",
+                                                isSpeaking
+                                                    ? "bg-international-orange/5"
+                                                    : "hover:bg-muted/30"
+                                            )}
+                                        >
+                                            <div className="relative h-6 w-6 rounded-full overflow-hidden bg-muted flex-shrink-0 mt-0.5">
                                                 {specialist?.avatarImage ? (
                                                     <Image
                                                         src={specialist.avatarImage}
                                                         alt={entry.specialistName}
                                                         fill
                                                         className="object-cover"
-                                                        sizes="28px"
+                                                        sizes="24px"
                                                     />
                                                 ) : (
-                                                    <span className="flex items-center justify-center h-full w-full text-xs font-semibold">
+                                                    <span className="flex items-center justify-center h-full w-full text-[10px] font-semibold">
                                                         {entry.specialistName.charAt(0)}
                                                     </span>
                                                 )}
                                             </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-semibold text-foreground">
+                                                        {entry.specialistName}
+                                                    </span>
+                                                    {isSpeaking && (
+                                                        <Volume2 className="h-3 w-3 text-international-orange animate-pulse" />
+                                                    )}
+                                                    {isExpanded ? (
+                                                        <ChevronUp className="h-3 w-3 text-muted-foreground ml-auto" />
+                                                    ) : (
+                                                        <ChevronDown className="h-3 w-3 text-muted-foreground ml-auto" />
+                                                    )}
+                                                </div>
+                                                {isExpanded ? (
+                                                    <div className="mt-2 rounded-lg border border-muted bg-muted/30 p-3">
+                                                        <Markdown content={entry.content} className="text-sm" />
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                                        {getPreview(entry.content)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </button>
+                                        {isExpanded && entry.proposals && entry.proposals.length > 0 && specialist && (
+                                            <div className="ml-9 mt-2">
+                                                <ProposedActionsCard
+                                                    proposals={entry.proposals}
+                                                    specialist={specialist}
+                                                    onDismiss={() => {
+                                                        setEntries((prev) => prev.map((e, idx) =>
+                                                            idx === i ? { ...e, proposals: undefined } : e
+                                                        ))
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })}
+
+                            {/* Latest entry (always expanded, highlighted) */}
+                            {entries.length > 0 && (() => {
+                                const lastEntry = entries[entries.length - 1]
+                                const specialist = getSpecialistById(lastEntry.specialistId)
+                                const isSpeaking = speakingEntryIdx === entries.length - 1
+                                return (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                                                {specialist?.avatarImage ? (
+                                                    <Image
+                                                        src={specialist.avatarImage}
+                                                        alt={lastEntry.specialistName}
+                                                        fill
+                                                        className="object-cover"
+                                                        sizes="28px"
+                                                    />
+                                                ) : (
+                                                    <span className="flex items-center justify-center h-full w-full text-xs font-semibold">
+                                                        {lastEntry.specialistName.charAt(0)}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <span className="text-sm font-semibold text-foreground">
-                                                {entry.specialistName}
+                                                {lastEntry.specialistName}
                                             </span>
                                             <Badge variant="secondary" className="text-[10px]">
-                                                Round {entry.round}
+                                                Round {lastEntry.round}
                                             </Badge>
                                             {isSpeaking && (
                                                 <Volume2 className="h-3.5 w-3.5 text-international-orange animate-pulse" />
@@ -1325,16 +1682,92 @@ export function TeamMeetingDialog({
                                                 ? "border-international-orange/30 bg-international-orange/5"
                                                 : "border-muted bg-muted/30"
                                         )}>
-                                            <Markdown content={entry.content} className="text-sm" />
+                                            <Markdown content={lastEntry.content} className="text-sm" />
                                         </div>
+                                        {lastEntry.proposals && lastEntry.proposals.length > 0 && specialist && (
+                                            <div className="ml-9 mt-2">
+                                                <ProposedActionsCard
+                                                    proposals={lastEntry.proposals}
+                                                    specialist={specialist}
+                                                    onDismiss={() => {
+                                                        setEntries((prev) => prev.map((e, idx) =>
+                                                            idx === entries.length - 1 ? { ...e, proposals: undefined } : e
+                                                        ))
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 )
-                            })}
+                            })()}
                         </div>
+
+                        {/* ── Specialist Chips: Who should speak next? ──────── */}
+                        {!showThoughtsInput && (
+                            <div className="mt-4 border-t pt-4 space-y-3">
+                                <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                                    Who should speak next?
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    {selectedSpecialists.map((s) => {
+                                        // Check if this specialist just spoke (last entry)
+                                        const lastEntry = entries[entries.length - 1]
+                                        const justSpoke = lastEntry?.specialistId === s.id
+                                        const wants = wantsToSpeak.has(s.id)
+
+                                        return (
+                                            <button
+                                                key={s.id}
+                                                onClick={() => handleAskSpecialist(s)}
+                                                disabled={justSpoke}
+                                                className={cn(
+                                                    "flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-all",
+                                                    justSpoke
+                                                        ? "border-muted bg-muted/30 opacity-50 cursor-not-allowed"
+                                                        : wants
+                                                        ? "border-international-orange bg-international-orange/5 hover:bg-international-orange/10 ring-1 ring-international-orange/20"
+                                                        : "border-muted hover:border-muted-foreground/30 bg-background"
+                                                )}
+                                            >
+                                                <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                                                    {s.avatarImage ? (
+                                                        <Image
+                                                            src={s.avatarImage}
+                                                            alt={s.name}
+                                                            fill
+                                                            className="object-cover"
+                                                            sizes="28px"
+                                                        />
+                                                    ) : (
+                                                        <span className="flex items-center justify-center h-full w-full text-xs font-semibold">
+                                                            {s.name.charAt(0)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium text-foreground">
+                                                        {s.name}
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        {s.title}
+                                                    </p>
+                                                </div>
+                                                {wants && !justSpoke && (
+                                                    <Hand className="h-3.5 w-3.5 text-international-orange flex-shrink-0" />
+                                                )}
+                                                {justSpoke && (
+                                                    <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                                )}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         {/* User Thoughts Input */}
                         {showThoughtsInput && (
-                            <div className="mt-4 space-y-2 border-t pt-4">
+                            <div className="mt-4 space-y-3 border-t pt-4">
                                 <Label className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                                     Your thoughts for the team
                                 </Label>
@@ -1381,11 +1814,55 @@ export function TeamMeetingDialog({
                                         </Button>
                                     )}
                                 </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Type your thoughts, then pick a specialist to respond.
+                                </p>
                                 {thoughtsSpeechRecognition.isListening && (
                                     <p className="text-xs text-destructive animate-pulse">
                                         Listening... speak now
                                     </p>
                                 )}
+
+                                {/* Specialist chips for responding to user thoughts */}
+                                <div className="flex flex-wrap gap-2 pt-2">
+                                    {selectedSpecialists.map((s) => {
+                                        const wants = wantsToSpeak.has(s.id)
+                                        return (
+                                            <button
+                                                key={s.id}
+                                                onClick={() => handleAskSpecialist(s)}
+                                                className={cn(
+                                                    "flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-all",
+                                                    wants
+                                                        ? "border-international-orange bg-international-orange/5 hover:bg-international-orange/10"
+                                                        : "border-muted hover:border-muted-foreground/30 bg-background"
+                                                )}
+                                            >
+                                                <div className="relative h-6 w-6 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                                                    {s.avatarImage ? (
+                                                        <Image
+                                                            src={s.avatarImage}
+                                                            alt={s.name}
+                                                            fill
+                                                            className="object-cover"
+                                                            sizes="24px"
+                                                        />
+                                                    ) : (
+                                                        <span className="flex items-center justify-center h-full w-full text-[10px] font-semibold">
+                                                            {s.name.charAt(0)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className="text-sm font-medium text-foreground">
+                                                    {s.name}
+                                                </span>
+                                                {wants && (
+                                                    <Hand className="h-3 w-3 text-international-orange" />
+                                                )}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
                             </div>
                         )}
 
@@ -1402,17 +1879,7 @@ export function TeamMeetingDialog({
                 {phase === "outputs" && (
                     <div className="flex-1 min-h-0 overflow-y-auto" style={{ maxHeight: "65vh" }}>
                         {isGeneratingOutputs ? (
-                            <div className="flex flex-col items-center justify-center py-16 gap-4">
-                                <Loader2 className="h-8 w-8 animate-spin text-international-orange" />
-                                <div className="text-center">
-                                    <p className="text-sm font-medium text-foreground">
-                                        Generating meeting outputs...
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Extracting notes, objectives, and recommendations
-                                    </p>
-                                </div>
-                            </div>
+                            <MeetingOutputsLoading attendees={selectedSpecialists} topic={topic} />
                         ) : meetingOutputs ? (
                             <MeetingOutputs
                                 outputs={meetingOutputs}
@@ -1446,7 +1913,7 @@ export function TeamMeetingDialog({
                         <Button
                             variant="secondary"
                             onClick={() => onOpenChange(false)}
-                            disabled={isStreaming || isGeneratingOutputs}
+                            disabled={isStreaming || isGeneratingOutputs || isStarting}
                         >
                             {phase === "outputs" && meetingOutputs ? "Done" : "Cancel"}
                         </Button>
@@ -1456,15 +1923,24 @@ export function TeamMeetingDialog({
                             {phase === "setup" && (
                                 <Button
                                     onClick={handleStartMeeting}
-                                    disabled={selectedIds.size < 2 || !topic.trim()}
+                                    disabled={selectedIds.size < 2 || !topic.trim() || isStarting}
                                     className="bg-international-orange hover:bg-international-orange-hover text-white"
                                 >
-                                    <Play className="h-4 w-4 mr-2" />
-                                    Start Meeting
+                                    {isStarting ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            Starting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Play className="h-4 w-4 mr-2" />
+                                            Start Meeting
+                                        </>
+                                    )}
                                 </Button>
                             )}
 
-                            {phase === "round-complete" && !showThoughtsInput && (
+                            {phase === "awaiting-input" && !showThoughtsInput && (
                                 <>
                                     <Button
                                         variant="secondary"
@@ -1481,13 +1957,6 @@ export function TeamMeetingDialog({
                                         Let Them Discuss
                                     </Button>
                                     <Button
-                                        variant="secondary"
-                                        onClick={handleDiscussionRound}
-                                    >
-                                        <Users className="h-4 w-4 mr-2" />
-                                        Guided Discussion
-                                    </Button>
-                                    <Button
                                         onClick={handleWrapUp}
                                         className="bg-international-orange hover:bg-international-orange-hover text-white"
                                     >
@@ -1497,26 +1966,17 @@ export function TeamMeetingDialog({
                                 </>
                             )}
 
-                            {phase === "round-complete" && showThoughtsInput && (
-                                <>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => {
-                                            setShowThoughtsInput(false)
-                                            setUserThoughts("")
-                                        }}
-                                    >
-                                        <X className="h-4 w-4 mr-2" />
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        onClick={handleDiscussionRound}
-                                        className="bg-international-orange hover:bg-international-orange-hover text-white"
-                                    >
-                                        <Users className="h-4 w-4 mr-2" />
-                                        Continue Discussion
-                                    </Button>
-                                </>
+                            {phase === "awaiting-input" && showThoughtsInput && (
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => {
+                                        setShowThoughtsInput(false)
+                                        setUserThoughts("")
+                                    }}
+                                >
+                                    <X className="h-4 w-4 mr-2" />
+                                    Cancel
+                                </Button>
                             )}
                         </div>
                     </div>

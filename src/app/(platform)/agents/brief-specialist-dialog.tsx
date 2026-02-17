@@ -25,6 +25,7 @@ import { getSpecialistById, SPECIALISTS } from "./specialists-data"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import { useScreenContext } from "@/contexts/screen-context"
+import { useBrowseContext } from "@/contexts/browse-context"
 import { SpecialistChatAvatar } from "@/components/specialists/specialist-presentation"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { PromptTemplate } from "./lib/agent-types"
@@ -154,7 +155,7 @@ const PROPOSED_ACTIONS_REGEX = /<!--\s*PROPOSED_ACTIONS\s*([\s\S]*?)\s*-->/i
 /**
  * Parse PROPOSED_ACTIONS JSON block from Specialist response. Returns empty array if none or invalid.
  */
-function parseProposedActions(content: string): ProposedAction[] {
+export function parseProposedActions(content: string): ProposedAction[] {
     const match = content.match(PROPOSED_ACTIONS_REGEX)
     if (!match || !match[1]) return []
     try {
@@ -178,7 +179,7 @@ function parseProposedActions(content: string): ProposedAction[] {
 /**
  * Remove PROPOSED_ACTIONS HTML comment from content so it does not render in Markdown.
  */
-function stripProposedActionsBlock(content: string): string {
+export function stripProposedActionsBlock(content: string): string {
     return content.replace(PROPOSED_ACTIONS_REGEX, "").trim()
 }
 
@@ -298,6 +299,9 @@ export function BriefSpecialistDialog({
 
     // ─── Screen Awareness ─────────────────────────────────────────────────
     const { serializeScreenContext, screenContext } = useScreenContext()
+
+    // ─── Browse Context (In-App Browser) ─────────────────────────────────
+    const { formatForPrompt: formatBrowseContext } = useBrowseContext()
 
     // ─── Voice Hooks ──────────────────────────────────────────────────────
     const tts = useTts()
@@ -731,6 +735,12 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
             systemExtras.push(`\n\n${screenContextStr}`)
         }
 
+        // Browse context: inject web page content from the in-app browser
+        const browseContextStr = formatBrowseContext()
+        if (browseContextStr) {
+            systemExtras.push(browseContextStr)
+        }
+
         if (handoffContext && messages.length <= 1) {
             // Only inject handoff on the first exchange
             systemExtras.push(`\n\n## Handoff Context\n${handoffContext}`)
@@ -949,7 +959,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             setIsExecuting(false)
             setIsUrgentMessage(false)
         }
-    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext])
+    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext, formatBrowseContext])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
