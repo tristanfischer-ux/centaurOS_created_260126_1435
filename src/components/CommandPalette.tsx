@@ -26,9 +26,11 @@ import {
   Lightbulb,
   Sparkles,
   Home,
+  FileUp,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { QuickCaptureDialog } from '@/components/smart/quick-capture-dialog'
+import { TranscriptImportDialog } from '@/components/strategy/transcript-import-dialog'
 
 import type { SmartGoalSuggestion } from '@/actions/smart-goals'
 
@@ -53,6 +55,7 @@ interface TeamMember {
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
   const [captureOpen, setCaptureOpen] = useState(false)
+  const [transcriptImportOpen, setTranscriptImportOpen] = useState(false)
   const [tasks, setTasks] = useState<Task[]>([])
   const [objectives, setObjectives] = useState<Objective[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -227,6 +230,11 @@ export function CommandPalette() {
             <Target className="mr-2 h-4 w-4" />
             New Objective
           </CommandItem>
+          <CommandItem onSelect={() => { setOpen(false); setTranscriptImportOpen(true) }}>
+            <FileUp className="mr-2 h-4 w-4" />
+            Import Transcript
+            <span className="ml-auto text-xs text-muted-foreground">AI-powered</span>
+          </CommandItem>
           <CommandItem onSelect={() => { toggleFocusMode(); setOpen(false) }}>
             <Focus className="mr-2 h-4 w-4" />
             {isFocusMode ? 'Exit Focus Mode' : 'Enter Focus Mode'}
@@ -371,6 +379,13 @@ export function CommandPalette() {
       onOpenChange={setCaptureOpen}
       onCreateObjective={handleCaptureObjective}
       onCreateTask={handleCaptureTask}
+    />
+
+    {/* Transcript Import Dialog - Opened from command palette */}
+    <TranscriptImportDialog
+      open={transcriptImportOpen}
+      onOpenChange={setTranscriptImportOpen}
+      onComplete={() => router.refresh()}
     />
     </>
   )

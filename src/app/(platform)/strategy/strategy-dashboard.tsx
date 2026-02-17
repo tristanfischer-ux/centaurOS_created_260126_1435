@@ -27,9 +27,12 @@ import { AddToRiverDialog } from '@/components/canvas/add-to-river-dialog'
 import {
   LayoutDashboard, Waypoints, Link2, Flag, Target, CheckCircle2,
   AlertTriangle, TrendingUp, ArrowRight, Plus, XCircle, ChevronRight,
-  MessageSquare,
+  MessageSquare, FileText, Copy, Sparkles,
 } from 'lucide-react'
 import { CreateStrategicGoalDialog } from '@/components/strategy/create-strategic-goal-dialog'
+import { TranscriptImportDialog } from '@/components/strategy/transcript-import-dialog'
+import { ExportStrategyDialog } from '@/components/strategy/export-strategy-dialog'
+import { AutoGenerateMilestonesDialog } from '@/components/strategy/auto-generate-milestones-dialog'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import { StrategyHealthReview } from '@/components/specialists/strategy-health-review'
 import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
@@ -117,6 +120,16 @@ export function StrategyDashboard({
 
   // ── Create Strategic Goal dialog ──
   const [isCreateGoalOpen, setIsCreateGoalOpen] = useState(false)
+  // ── Transcript Import dialog ──
+  const [isTranscriptImportOpen, setIsTranscriptImportOpen] = useState(false)
+  const [isExportOpen, setIsExportOpen] = useState(false)
+  // ── Auto-generate milestones dialog (for existing goals) ──
+  const [autoGenGoal, setAutoGenGoal] = useState<{
+    id: string
+    title: string
+    deadline: string
+    description: string | null
+  } | null>(null)
   const [expandedObjectiveIds, setExpandedObjectiveIds] = useState<Set<string>>(() => {
     if (riverData.length > 0) {
       return new Set(riverData[0].objectives.map((o) => o.id))
@@ -263,6 +276,20 @@ export function StrategyDashboard({
             </TabsList>
           </Tabs>
           <Button
+            variant="outline"
+            onClick={() => setIsExportOpen(true)}
+          >
+            <Copy className="h-4 w-4 mr-1.5" />
+            Copy for Email
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsTranscriptImportOpen(true)}
+          >
+            <FileText className="h-4 w-4 mr-1.5" />
+            Import Transcript
+          </Button>
+          <Button
             onClick={() => setIsCreateGoalOpen(true)}
             className="bg-international-orange hover:bg-international-orange-hover"
           >
@@ -361,6 +388,12 @@ export function StrategyDashboard({
                   key={pillar.id}
                   pillar={pillar}
                   colorIndex={index}
+                  onGeneratePlan={(id, title, description) => {
+                    // Find the goal bundle to get the deadline
+                    const bundle = initialBundles.find((b) => b.goal.id === id)
+                    const deadline = bundle?.goal.milestone_date || ''
+                    setAutoGenGoal({ id, title, deadline, description })
+                  }}
                 />
               ))}
             </div>
@@ -473,6 +506,36 @@ export function StrategyDashboard({
         open={isCreateGoalOpen}
         onOpenChange={setIsCreateGoalOpen}
       />
+
+      {/* Transcript Import dialog */}
+      <TranscriptImportDialog
+        open={isTranscriptImportOpen}
+        onOpenChange={setIsTranscriptImportOpen}
+        onComplete={handleDialogUpdate}
+      />
+
+      {/* Export Strategy for Email dialog */}
+      <ExportStrategyDialog
+        open={isExportOpen}
+        onOpenChange={setIsExportOpen}
+        bundles={initialBundles}
+        pillars={pillars}
+      />
+
+      {/* Auto-generate milestones dialog (for existing goals) */}
+      {autoGenGoal && (
+        <AutoGenerateMilestonesDialog
+          open={!!autoGenGoal}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setAutoGenGoal(null)
+          }}
+          goalId={autoGenGoal.id}
+          goalTitle={autoGenGoal.title}
+          goalDeadline={autoGenGoal.deadline}
+          goalDescription={autoGenGoal.description}
+          onComplete={handleDialogUpdate}
+        />
+      )}
     </div>
   )
 }
@@ -507,7 +570,15 @@ function SummaryPill({
   )
 }
 
-function PillarCard({ pillar, colorIndex }: { pillar: StrategyPillar; colorIndex: number }) {
+function PillarCard({
+  pillar,
+  colorIndex,
+  onGeneratePlan,
+}: {
+  pillar: StrategyPillar
+  colorIndex: number
+  onGeneratePlan: (id: string, title: string, description: string | null) => void
+}) {
   const color = getStrategyColor(colorIndex)
   const healthConfig = HEALTH_CONFIG[pillar.health]
   const { specialistId, specialistName } = useRelevantSpecialist(
@@ -608,8 +679,29 @@ function PillarCard({ pillar, colorIndex }: { pillar: StrategyPillar; colorIndex
         </CardContent>
       </Link>
 
-      {/* Specialist chip -- outside the Link to prevent navigation on click */}
-      <div className="px-6 pb-4 pt-0">
+      {/* Actions area -- outside the Link to prevent navigation on click */}
+      <div className="px-6 pb-4 pt-0 space-y-2">
+        {/* Generate Plan button for empty pillars */}
+        {pillar.objectiveCount === 0 && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation() }}
+            role="presentation"
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-1.5 text-international-orange border-international-orange/30 hover:bg-international-orange/5"
+              onClick={(e) => {
+                e.preventDefault()
+                onGeneratePlan(pillar.id, pillar.title, pillar.description)
+              }}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Generate Plan
+            </Button>
+          </div>
+        )}
         <div
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation() }}

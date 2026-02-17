@@ -13,7 +13,7 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, Plus, Target, Calendar, FileText, Flag } from 'lucide-react'
+import { Loader2, Plus, Target, Calendar, FileText, Flag, Sparkles } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -36,6 +37,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle } from 'lucide-react'
 import { createStrategicGoal } from '@/actions/canvas'
+import { AutoGenerateMilestonesDialog } from './auto-generate-milestones-dialog'
 import { GOAL_TYPES } from '@/types/canvas'
 
 import type { GoalType } from '@/types/canvas'
@@ -94,6 +96,13 @@ export function CreateStrategicGoalDialog({
   const [targetDate, setTargetDate] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [autoGenerate, setAutoGenerate] = useState(true)
+
+  // State for chaining to the auto-generate dialog after goal creation
+  const [autoGenGoalId, setAutoGenGoalId] = useState<string | null>(null)
+  const [autoGenGoalTitle, setAutoGenGoalTitle] = useState('')
+  const [autoGenGoalDeadline, setAutoGenGoalDeadline] = useState('')
+  const [autoGenGoalDescription, setAutoGenGoalDescription] = useState<string | null>(null)
 
   const resetForm = useCallback((): void => {
     setTitle('')
@@ -101,6 +110,7 @@ export function CreateStrategicGoalDialog({
     setGoalType('Other')
     setTargetDate('')
     setError(null)
+    setAutoGenerate(true)
   }, [])
 
   const handleOpenChange = useCallback((nextOpen: boolean): void => {
@@ -145,6 +155,14 @@ export function CreateStrategicGoalDialog({
 
       handleOpenChange(false)
       router.refresh()
+
+      // Chain to auto-generate dialog if enabled
+      if (autoGenerate && 'data' in result && result.data) {
+        setAutoGenGoalId(result.data.id)
+        setAutoGenGoalTitle(title.trim())
+        setAutoGenGoalDeadline(targetDate)
+        setAutoGenGoalDescription(description.trim() || null)
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create strategic goal'
       console.error('[CreateStrategicGoalDialog] Unexpected error:', { error: message })
@@ -152,12 +170,13 @@ export function CreateStrategicGoalDialog({
     } finally {
       setIsSubmitting(false)
     }
-  }, [title, description, goalType, targetDate, handleOpenChange, router])
+  }, [title, description, goalType, targetDate, autoGenerate, handleOpenChange, router])
 
   // Compute minimum date (today)
   const today = new Date().toISOString().split('T')[0]
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent size="md">
         <DialogHeader>
@@ -282,6 +301,28 @@ export function CreateStrategicGoalDialog({
               </div>
             </div>
           </div>
+
+          {/* Auto-generate toggle */}
+          <label className="flex items-start gap-3 rounded-xl border bg-muted/30 p-4 cursor-pointer">
+            <Checkbox
+              checked={autoGenerate}
+              onCheckedChange={(checked) => setAutoGenerate(checked === true)}
+              className="mt-0.5"
+              aria-label="Auto-generate milestones and tasks"
+            />
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-international-orange" />
+                <span className="text-sm font-medium text-foreground">
+                  Auto-generate milestones and tasks
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                AI will create a full plan with milestones, tasks, dependencies, and risk analysis.
+                You&apos;ll review everything before it&apos;s created.
+              </p>
+            </div>
+          </label>
         </div>
 
         <DialogFooter>
@@ -314,5 +355,24 @@ export function CreateStrategicGoalDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Chained auto-generate dialog */}
+    {autoGenGoalId && (
+      <AutoGenerateMilestonesDialog
+        open={!!autoGenGoalId}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setAutoGenGoalId(null)
+        }}
+        goalId={autoGenGoalId}
+        goalTitle={autoGenGoalTitle}
+        goalDeadline={autoGenGoalDeadline}
+        goalDescription={autoGenGoalDescription}
+        onComplete={() => {
+          setAutoGenGoalId(null)
+          router.refresh()
+        }}
+      />
+    )}
+    </>
   )
 }

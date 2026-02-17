@@ -18,7 +18,12 @@
  */
 
 import { revalidatePath } from 'next/cache'
+import OpenAI from 'openai'
 import { withAuth, type ActionError } from '@/lib/server-action-utils'
+import { checkRateLimit } from '@/lib/security/rate-limit'
+import { buildAIContext } from '@/lib/ai-context/builder'
+import type { Json } from '@/types/database.types'
+import type { StrategicPlan } from '@/types/strategic-planner'
 
 import type {
   StrategicGoal,
@@ -51,6 +56,18 @@ function revalidateCanvas(): void {
   revalidatePath('/new-objectives')
   revalidatePath('/strategy')
   revalidatePath('/tasks')
+}
+
+// Singleton OpenAI client for AI plan generation
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI | null {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) return null
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey })
+  }
+  return openaiClient
 }
 
 // ============================================================================
@@ -1581,4 +1598,467 @@ export async function linkTaskToObjective(
     revalidateCanvas()
     return { success: true }
   })
+}
+
+// ============================================================================
+// AI MILESTONE PLAN GENERATION
+// ============================================================================
+
+/**
+ * Generates a full milestone plan for an existing strategic goal using GPT-4o.
+ *
+ * @description Fetches the goal's context (title, description, target date),
+ * builds company/team context, and asks GPT-4o to backward-plan from the
+ * deadline to today. Returns phases (milestones), tasks, dependencies, risks,
+ * resource gaps, and AI suggestions.
+ *
+ * @param goalId - UUID of the strategic goal to generate milestones for
+ * @param userPrompt - Optional guidance from the user (e.g. "Focus on legal prep")
+ * @returns AI-generated StrategicPlan or error
+ *
+ * @security Requires authenticated user; verifies goal belongs to user's foundry
+ * @audit Logs plan generation events
+ */
+export async function generateMilestonePlan(
+  goalId: string,
+  userPrompt?: string
+): Promise<{ plan?: StrategicPlan; error?: string }> {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit AI calls to prevent cost abuse
+    const rateLimitError = await checkRateLimit('aiStrategicPlan', `ai:${user.id}`)
+    if (rateLimitError) return { error: rateLimitError }
+
+    // SECURITY: Verify goal exists and belongs to this foundry
+    const { data: goal, error: goalError } = await supabase
+      .from('objectives')
+      .select('id, title, description, milestone_date, goal_type')
+      .eq('id', goalId)
+      .eq('foundry_id', foundryId)
+      .eq('is_strategic_goal', true)
+      .is('deleted_at', null)
+      .single()
+
+    if (goalError || !goal) {
+      return { error: 'Strategic goal not found' }
+    }
+
+    // VALIDATION: Goal needs a target date for backward planning
+    if (!goal.milestone_date) {
+      return { error: 'Goal has no target date. Please set a deadline first.' }
+    }
+
+    console.info('[CanvasService] Generating milestone plan:', {
+      userId: user.id,
+      foundryId,
+      goalId,
+      goalTitle: goal.title,
+      deadline: goal.milestone_date,
+    })
+
+    // Build company context for the AI prompt
+    const companyContext = await buildAIContext(foundryId, user.id, {
+      includeActivity: false,
+      includeObjectives: true,
+    })
+
+    // Fetch team members for role matching
+    const { data: members } = await supabase
+      .from('foundry_memberships')
+      .select(`
+        user_id,
+        role,
+        profiles!inner(id, full_name, role, email, skills, expertise_areas)
+      `)
+      .eq('foundry_id', foundryId)
+
+    const teamContext = members && members.length > 0
+      ? `\nTeam members:\n${members.map((m) => {
+          const p = m.profiles as unknown as {
+            id: string
+            full_name: string | null
+            role: string | null
+            skills: string[] | null
+            expertise_areas: string[] | null
+          }
+          const skills = [...(p.skills || []), ...(p.expertise_areas || [])].join(', ')
+          return `- ${p.full_name || 'Unknown'} (${m.role}${skills ? `, skills: ${skills}` : ''})`
+        }).join('\n')}`
+      : '\nNo team members found.'
+
+    // Fetch org blueprint gaps for resource recommendations
+    const { data: gaps } = await supabase
+      .from('foundry_function_coverage')
+      .select(`
+        coverage_status,
+        business_functions!inner(name, category, description)
+      `)
+      .eq('foundry_id', foundryId)
+      .in('coverage_status', ['gap', 'partial'])
+      .limit(20)
+
+    const gapContext = gaps && gaps.length > 0
+      ? `\nOrganizational capability gaps:\n${gaps.map((g) => {
+          const fn = g.business_functions as unknown as {
+            name: string
+            category: string
+          }
+          return `- ${fn.name} (${fn.category}) - ${g.coverage_status}`
+        }).join('\n')}`
+      : ''
+
+    const today = new Date().toISOString().split('T')[0]
+    const deadline = goal.milestone_date
+
+    const systemPrompt = `You are a senior strategic planning advisor. You help founders and executives create detailed, actionable plans to achieve business goals.
+
+Given a strategic goal and deadline, you must:
+1. Backward-plan from the deadline to today
+2. Break the goal into 2-5 sequential phases (milestones)
+3. Each phase has 2-6 specific, actionable tasks
+4. Tasks have realistic start/end dates that work backward from the deadline
+5. Identify dependencies between tasks (which must finish before others can start)
+6. Suggest who on the team should own each task based on their role/skills
+7. Identify resource gaps where no team member fits the needed role
+8. Identify risks and suggest mitigations
+9. Highlight the critical path (the chain of dependent tasks that determines minimum duration)
+10. Suggest additional tasks or considerations the user might be missing
+
+Today's date is ${today}. The deadline is ${deadline}.
+${companyContext}
+${teamContext}
+${gapContext}
+
+IMPORTANT:
+- Be specific with dates. Use YYYY-MM-DD format.
+- Task dates must not overlap illogically with their dependencies.
+- Phase start/end dates should encompass all their tasks.
+- suggestedRole should be a job title like "Founder", "CFO", "Legal Advisor", "Marketing Lead".
+- dependsOn references other task titles within the plan (exact match).
+- For resourceGaps, suggest marketplace hires for roles not covered by the current team.
+- criticalPath is the ordered list of task titles forming the longest dependency chain.
+- Generate 3-5 actionable AI suggestions for things the user might be overlooking.
+
+Respond with ONLY valid JSON matching this schema (no markdown, no code fences):
+{
+  "phases": [
+    {
+      "title": "string",
+      "description": "string",
+      "startDate": "YYYY-MM-DD",
+      "endDate": "YYYY-MM-DD",
+      "tasks": [
+        {
+          "title": "string",
+          "description": "string",
+          "startDate": "YYYY-MM-DD",
+          "endDate": "YYYY-MM-DD",
+          "suggestedRole": "string",
+          "suggestedAssigneeId": "string or null",
+          "dependsOn": ["task title strings"],
+          "riskLevel": "Low" | "Medium" | "High"
+        }
+      ]
+    }
+  ],
+  "resourceGaps": [
+    {
+      "role": "string",
+      "reason": "string",
+      "phase": "string",
+      "marketplaceMatches": [],
+      "priority": "critical" | "recommended" | "nice_to_have"
+    }
+  ],
+  "risks": [
+    {
+      "description": "string",
+      "mitigation": "string",
+      "severity": "high" | "medium" | "low",
+      "relatedTaskTitle": "string or null"
+    }
+  ],
+  "criticalPath": ["ordered task title strings"],
+  "suggestions": [
+    {
+      "id": "string (unique)",
+      "type": "add_task" | "assign_person" | "hire_resource" | "timeline_warning" | "dependency",
+      "message": "string",
+      "relatedPhase": "string or null",
+      "relatedTaskTitle": "string or null"
+    }
+  ]
+}`
+
+    const openai = getOpenAIClient()
+    if (!openai) {
+      return { error: 'AI planning service is not configured' }
+    }
+
+    const userMessage = userPrompt?.trim()
+      ? `My strategic goal: ${goal.title}\n\nDescription: ${goal.description || 'Not provided'}\n\nGoal type: ${goal.goal_type || 'Other'}\n\nTarget deadline: ${deadline}\n\nAdditional guidance: ${userPrompt.trim()}`
+      : `My strategic goal: ${goal.title}\n\nDescription: ${goal.description || 'Not provided'}\n\nGoal type: ${goal.goal_type || 'Other'}\n\nTarget deadline: ${deadline}`
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.7,
+        max_tokens: 4000,
+      })
+
+      const content = response.choices[0]?.message?.content
+      if (!content) {
+        return { error: 'AI returned empty response. Please try again.' }
+      }
+
+      const plan = JSON.parse(content) as StrategicPlan
+
+      // VALIDATION: Ensure plan structure is reasonable
+      if (!plan.phases || plan.phases.length === 0) {
+        return { error: 'AI generated an empty plan. Please try with more detail.' }
+      }
+
+      // Match team members to suggested roles
+      if (members && members.length > 0) {
+        for (const phase of plan.phases) {
+          for (const task of phase.tasks) {
+            if (!task.suggestedAssigneeId) {
+              const match = members.find((m) => {
+                const roleLower = task.suggestedRole.toLowerCase()
+                const memberRole = (m.role || '').toLowerCase()
+                return memberRole.includes(roleLower) || roleLower.includes(memberRole)
+              })
+              if (match) {
+                task.suggestedAssigneeId = match.user_id
+              }
+            }
+          }
+        }
+      }
+
+      console.info('[CanvasService] Milestone plan generated:', {
+        userId: user.id,
+        goalId,
+        phases: plan.phases.length,
+        totalTasks: plan.phases.reduce((sum, p) => sum + p.tasks.length, 0),
+        resourceGaps: plan.resourceGaps?.length || 0,
+        risks: plan.risks?.length || 0,
+      })
+
+      return { plan }
+    } catch (err) {
+      console.error('[CanvasService] AI milestone plan generation failed:', {
+        goalId,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      })
+      return { error: 'Failed to generate plan. Please try again.' }
+    }
+  }) as Promise<{ plan?: StrategicPlan; error?: string }>
+}
+
+/**
+ * Persists an AI-generated milestone plan under an existing strategic goal.
+ *
+ * @description Creates milestones (is_milestone objectives), objectives under
+ * milestones, tasks under objectives, task assignees, and task dependencies.
+ * Works on an existing goal — does NOT create the goal itself.
+ *
+ * @param goalId - UUID of the existing strategic goal
+ * @param plan - The AI-generated plan (reviewed/approved by the user)
+ * @returns Count of created entities or error
+ *
+ * @security Requires authenticated user; verifies goal belongs to user's foundry
+ * @audit Logs all created entities
+ */
+export async function applyMilestonePlan(
+  goalId: string,
+  plan: StrategicPlan
+): Promise<{ milestonesCreated: number; tasksCreated: number; error?: never } | { error: string; milestonesCreated?: never; tasksCreated?: never }> {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // VALIDATION
+    if (!plan?.phases?.length) {
+      return { error: 'Plan must have at least one phase' }
+    }
+
+    // SECURITY: Verify goal exists and belongs to this foundry
+    const { data: goal, error: goalError } = await supabase
+      .from('objectives')
+      .select('id, milestone_date')
+      .eq('id', goalId)
+      .eq('foundry_id', foundryId)
+      .eq('is_strategic_goal', true)
+      .is('deleted_at', null)
+      .single()
+
+    if (goalError || !goal) {
+      return { error: 'Strategic goal not found' }
+    }
+
+    console.info('[CanvasService] Applying milestone plan:', {
+      userId: user.id,
+      foundryId,
+      goalId,
+      phases: plan.phases.length,
+    })
+
+    // Store risks and suggestions on the goal for later display
+    if (plan.risks?.length || plan.suggestions?.length || plan.resourceGaps?.length) {
+      await supabase
+        .from('objectives')
+        .update({
+          strategic_risks: (plan.risks || []) as unknown as Json,
+          ai_suggestions: (plan.suggestions || []) as unknown as Json,
+          resource_suggestions: (plan.resourceGaps || []) as unknown as Json,
+        })
+        .eq('id', goalId)
+        .eq('foundry_id', foundryId)
+    }
+
+    // Track task title -> task ID for dependency creation
+    const taskTitleToId = new Map<string, string>()
+    let milestonesCreated = 0
+    let tasksCreated = 0
+
+    // Create phases as milestones with objectives and tasks underneath
+    for (let phaseIdx = 0; phaseIdx < plan.phases.length; phaseIdx++) {
+      const phase = plan.phases[phaseIdx]
+
+      // Create the milestone (is_milestone = true objective)
+      const { data: milestoneObj, error: milestoneError } = await supabase
+        .from('objectives')
+        .insert({
+          title: phase.title,
+          description: phase.description,
+          parent_objective_id: goalId,
+          is_milestone: true,
+          milestone_order_index: phaseIdx,
+          milestone_date: phase.endDate,
+          creator_id: user.id,
+          foundry_id: foundryId,
+          status: 'In Progress',
+          progress: 0,
+        })
+        .select('id')
+        .single()
+
+      if (milestoneError || !milestoneObj) {
+        console.error('[CanvasService] Failed to create milestone:', {
+          phase: phase.title,
+          error: milestoneError?.message,
+        })
+        continue
+      }
+
+      milestonesCreated++
+
+      // Create an objective under the milestone for the tasks to live under
+      const { data: phaseObjective, error: phaseObjError } = await supabase
+        .from('objectives')
+        .insert({
+          title: phase.title,
+          description: phase.description,
+          parent_objective_id: milestoneObj.id,
+          creator_id: user.id,
+          foundry_id: foundryId,
+          status: 'In Progress',
+          progress: 0,
+        })
+        .select('id')
+        .single()
+
+      if (phaseObjError || !phaseObjective) {
+        console.error('[CanvasService] Failed to create phase objective:', {
+          milestone: phase.title,
+          error: phaseObjError?.message,
+        })
+        continue
+      }
+
+      // Create tasks for this phase
+      for (const task of phase.tasks) {
+        const assigneeId = task.suggestedAssigneeId || user.id
+
+        const { data: taskData, error: taskError } = await supabase
+          .from('tasks')
+          .insert({
+            title: task.title,
+            description: task.description,
+            objective_id: phaseObjective.id,
+            start_date: task.startDate,
+            end_date: task.endDate,
+            risk_level: task.riskLevel,
+            assignee_id: assigneeId,
+            creator_id: user.id,
+            foundry_id: foundryId,
+            status: 'Pending',
+          })
+          .select('id')
+          .single()
+
+        if (taskError || !taskData) {
+          console.error('[CanvasService] Failed to create task:', {
+            task: task.title,
+            error: taskError?.message,
+          })
+          continue
+        }
+
+        tasksCreated++
+        taskTitleToId.set(task.title, taskData.id)
+
+        // Add assignee to task_assignees table
+        if (assigneeId) {
+          await supabase
+            .from('task_assignees')
+            .insert({ task_id: taskData.id, profile_id: assigneeId })
+            .select()
+          // Non-fatal if this fails
+        }
+      }
+    }
+
+    // Create dependencies between tasks
+    for (const phase of plan.phases) {
+      for (const task of phase.tasks) {
+        const taskId = taskTitleToId.get(task.title)
+        if (!taskId || !task.dependsOn?.length) continue
+
+        for (const depTitle of task.dependsOn) {
+          const depTaskId = taskTitleToId.get(depTitle)
+          if (!depTaskId) {
+            console.warn('[CanvasService] Dependency target not found:', {
+              task: task.title,
+              dependsOn: depTitle,
+            })
+            continue
+          }
+
+          await supabase
+            .from('task_dependencies')
+            .insert({
+              task_id: taskId,
+              depends_on_task_id: depTaskId,
+              dependency_type: 'finish_to_start',
+              foundry_id: foundryId,
+            })
+            .select()
+          // Ignore duplicate errors
+        }
+      }
+    }
+
+    console.info('[CanvasService] Milestone plan applied:', {
+      goalId,
+      milestonesCreated,
+      tasksCreated,
+      dependenciesCreated: taskTitleToId.size,
+    })
+
+    revalidateCanvas()
+    return { milestonesCreated, tasksCreated }
+  }) as Promise<{ milestonesCreated: number; tasksCreated: number; error?: never } | { error: string; milestonesCreated?: never; tasksCreated?: never }>
 }
