@@ -83,8 +83,10 @@ export interface Specialist {
     avatarImage?: string
     /** IDs of specialists to suggest after this one completes a brief */
     suggestedNext?: SpecialistId[]
-    /** OpenAI TTS voice ID for spoken output */
+    /** OpenAI TTS voice ID for spoken output (fallback when Voicebox unavailable) */
     voice: string
+    /** Voicebox voice profile UUID for cloned voice output (preferred over stock voices) */
+    voiceboxProfileId?: string
     /** Department grouping for org chart (e.g., "Strategy", "Technology", "Finance") */
     department: string
     /** Specialist ID this person reports to (null = direct CEO report) */
