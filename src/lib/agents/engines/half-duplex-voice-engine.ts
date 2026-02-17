@@ -448,6 +448,7 @@ export class HalfDuplexVoiceEngine implements ConversationEngine {
                     foundryId: this.config.foundryId,
                     providerId: this.config.providerId,
                     modelId: this.config.modelId,
+                    modelTier: this.config.modelTier,
                     systemPromptSuffix: this.config.systemPromptSuffix,
                     deepThinkEnabled: this.config.deepThinkEnabled,
                     voice: this.config.voice,

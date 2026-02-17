@@ -257,6 +257,7 @@ export function VoiceSessionDialog({
                     threadId: threadId ?? null,
                     foundryId,
                     ...providerConfig,
+                    modelTier: specialist.modelTier,
                     systemPromptSuffix: "",
                     voice: specialist.voice,
                     deepThinkEnabled: false,

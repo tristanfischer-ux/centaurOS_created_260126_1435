@@ -121,7 +121,7 @@ class TextChatEngine implements ConversationEngine {
         this.abortController?.abort()
         this.abortController = new AbortController()
 
-        const { specialistId, threadId, providerId, modelId, systemPromptSuffix, deepThinkEnabled } = this.config
+        const { specialistId, threadId, providerId, modelId, systemPromptSuffix, deepThinkEnabled, modelTier } = this.config
 
         try {
             const res = await fetch("/api/agents/execute", {
@@ -132,6 +132,7 @@ class TextChatEngine implements ConversationEngine {
                     input: message,
                     providerId,
                     modelId,
+                    modelTier,
                     modality: "text",
                     threadId: threadId ?? undefined,
                     specialistId,

@@ -114,6 +114,10 @@ export interface ConversationEngineConfig {
     /** Whether to use deep thinking mode (extended reasoning) */
     deepThinkEnabled: boolean
 
+    /** Model tier for provider failover (e.g., "claude", "qwen", "minimax"). When set, the API
+     *  route uses the corresponding fallback chain if the primary provider is unavailable. */
+    modelTier?: string
+
     /** AbortSignal for cancellation */
     signal?: AbortSignal
 }

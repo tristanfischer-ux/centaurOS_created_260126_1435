@@ -502,7 +502,7 @@ describe('google oauth state hardening regressions', () => {
     expect(source).toContain('createSignedOAuthState')
     expect(source).toContain('buildOAuthStatePayload')
     expect(source).toContain("process.env.GOOGLE_OAUTH_STATE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET")
-    expect(source).toContain("return NextResponse.json({ error: 'OAuth state signing not configured' }, { status: 503 })")
+    expect(source).toContain("redirectWithError('not_configured')")
     expect(source).toContain("await rateLimit('api', `google-connect:${user.id}`")
   })
 

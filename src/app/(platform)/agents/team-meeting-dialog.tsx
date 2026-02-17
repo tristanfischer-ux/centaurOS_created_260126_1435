@@ -847,6 +847,7 @@ export function TeamMeetingDialog({
                     input,
                     providerId: "anthropic",
                     modelId: "claude-sonnet-4-20250514",
+                    modelTier: "claude",
                     modality: "text",
                     threadId: threadId ?? undefined,
                     specialistId: specialist.id,
@@ -1141,6 +1142,7 @@ export function TeamMeetingDialog({
                     input: fullTranscript,
                     providerId: "anthropic",
                     modelId: "claude-sonnet-4-20250514",
+                    modelTier: "claude",
                     modality: "text",
                 }),
             })

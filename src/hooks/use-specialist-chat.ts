@@ -75,6 +75,8 @@ export interface UseSpecialistChatOptions {
     systemPromptSuffix: string
     /** Whether deep thinking is enabled */
     deepThinkEnabled: boolean
+    /** Model tier for provider failover (e.g., "claude", "qwen", "minimax") */
+    modelTier?: string
     /** Whether the dialog is open (triggers connect/disconnect) */
     isOpen: boolean
 }
@@ -116,6 +118,7 @@ export function useSpecialistChat({
     modelId,
     systemPromptSuffix,
     deepThinkEnabled,
+    modelTier,
     isOpen,
 }: UseSpecialistChatOptions): UseSpecialistChatReturn {
     // ─── State ───────────────────────────────────────────────────────────
@@ -277,6 +280,7 @@ export function useSpecialistChat({
             foundryId: null, // Resolved server-side from auth
             providerId,
             modelId,
+            modelTier,
             systemPromptSuffix: fullSystemPrompt,
             voice: specialist.voice,
             deepThinkEnabled,

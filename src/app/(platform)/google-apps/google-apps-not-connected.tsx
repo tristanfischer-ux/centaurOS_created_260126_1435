@@ -10,7 +10,9 @@
 
 'use client'
 
+import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { typography } from '@/lib/design-system'
 import {
     HardDrive,
@@ -18,11 +20,22 @@ import {
     Calendar,
     Mail,
     Link2,
+    AlertCircle,
 } from 'lucide-react'
+
+/** Map of error codes returned by the connect route to user-friendly messages. */
+const ERROR_MESSAGES: Record<string, string> = {
+    not_configured: 'Google integration is not configured yet. Please contact support.',
+    no_foundry: 'Please complete your profile setup before connecting Google.',
+    rate_limited: 'Too many connection attempts. Please try again in a few minutes.',
+    oauth_error: 'Something went wrong starting the Google connection. Please try again.',
+} satisfies Record<string, string>
 
 interface GoogleAppsNotConnectedProps {
     /** Name of another foundry where Google IS connected, or null */
     connectedInOtherFoundry: string | null
+    /** Error code from a failed OAuth connect attempt */
+    error?: string
 }
 
 const FEATURES = [
@@ -48,7 +61,18 @@ const FEATURES = [
     },
 ]
 
-export function GoogleAppsNotConnected({ connectedInOtherFoundry }: GoogleAppsNotConnectedProps) {
+export function GoogleAppsNotConnected({ connectedInOtherFoundry, error }: GoogleAppsNotConnectedProps) {
+    const errorMessage = error ? (ERROR_MESSAGES[error] ?? ERROR_MESSAGES.oauth_error) : null
+
+    // Clean the error param from the URL so refreshing doesn't re-show it
+    useEffect(() => {
+        if (error) {
+            const url = new URL(window.location.href)
+            url.searchParams.delete('error')
+            window.history.replaceState({}, '', url.toString())
+        }
+    }, [error])
+
     return (
         <div className="space-y-8">
             {/* Page Header */}
@@ -61,6 +85,14 @@ export function GoogleAppsNotConnected({ connectedInOtherFoundry }: GoogleAppsNo
                     Access your Google Workspace from within ForgeOS
                 </p>
             </div>
+
+            {/* Error Alert */}
+            {errorMessage && (
+                <Alert variant="destructive" className="max-w-lg mx-auto">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{errorMessage}</AlertDescription>
+                </Alert>
+            )}
 
             {/* Empty State */}
             <div className="flex flex-col items-center justify-center py-16 px-4">

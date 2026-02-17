@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import {
   X, ListChecks, AlertTriangle, Clock, CheckCircle2,
-  FileText, Circle, Waypoints, ChevronRight, MessageSquare,
+  FileText, Circle, Waypoints, ChevronRight, MessageSquare, Pencil,
 } from 'lucide-react'
 import Link from 'next/link'
 import { getStatusBadgeClass } from '@/lib/status-colors'
@@ -22,6 +22,8 @@ interface ObjectiveDetailPanelProps {
   onClose: () => void
   /** Called when a task row is clicked. Navigates to task detail. */
   onTaskSelect?: (taskId: string) => void
+  /** Called when the user clicks the edit button. Opens the edit dialog. */
+  onEdit?: (objective: ObjectiveWithTasks) => void
 }
 
 function TaskRow({ task, onClick }: { task: ObjectiveTask; onClick?: () => void }) {
@@ -74,7 +76,7 @@ function TaskRow({ task, onClick }: { task: ObjectiveTask; onClick?: () => void 
   )
 }
 
-export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect }: ObjectiveDetailPanelProps) {
+export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect, onEdit }: ObjectiveDetailPanelProps) {
   const variant = getHealthVariant(objective.progress)
 
   // Group tasks by status
@@ -127,9 +129,16 @@ export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect }: Objec
             {objective.title}
           </h2>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} className="flex-shrink-0 h-8 w-8 mt-1" aria-label="Close panel">
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1 flex-shrink-0 mt-1">
+          {onEdit && (
+            <Button variant="ghost" size="icon" onClick={() => onEdit(objective)} className="h-8 w-8" aria-label="Edit objective">
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8" aria-label="Close panel">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <ScrollArea className="flex-1 w-full max-w-full">

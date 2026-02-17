@@ -1,3 +1,4 @@
+Initialising login role...
 export type Json =
   | string
   | number
@@ -7623,6 +7624,7 @@ export type Database = {
           creator_id: string
           deleted_at: string | null
           description: string | null
+          end_date: string | null
           extended_description: string | null
           foundry_id: string
           ghost_rationale: string | null
@@ -7640,6 +7642,7 @@ export type Database = {
           parent_objective_id: string | null
           progress: number | null
           resource_suggestions: Json | null
+          start_date: string | null
           status: string | null
           strategic_risks: Json | null
           title: string
@@ -7655,6 +7658,7 @@ export type Database = {
           creator_id: string
           deleted_at?: string | null
           description?: string | null
+          end_date?: string | null
           extended_description?: string | null
           foundry_id: string
           ghost_rationale?: string | null
@@ -7672,6 +7676,7 @@ export type Database = {
           parent_objective_id?: string | null
           progress?: number | null
           resource_suggestions?: Json | null
+          start_date?: string | null
           status?: string | null
           strategic_risks?: Json | null
           title: string
@@ -7687,6 +7692,7 @@ export type Database = {
           creator_id?: string
           deleted_at?: string | null
           description?: string | null
+          end_date?: string | null
           extended_description?: string | null
           foundry_id?: string
           ghost_rationale?: string | null
@@ -7704,6 +7710,7 @@ export type Database = {
           parent_objective_id?: string | null
           progress?: number | null
           resource_suggestions?: Json | null
+          start_date?: string | null
           status?: string | null
           strategic_risks?: Json | null
           title?: string
@@ -15904,3 +15911,5 @@ export const Constants = {
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.7)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

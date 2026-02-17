@@ -14,16 +14,25 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
+interface GoogleAppsPageProps {
+    searchParams: Promise<{ error?: string }>
+}
+
 /**
  * Google Apps page -- unified Google Workspace hub.
  *
  * @description Provides access to Google Drive files, Docs/Sheets/Slides,
  * Calendar events, and (future) Gmail from within ForgeOS. Handles three
  * connection states: connected, not connected, and connected-in-other-foundry.
+ * Also handles error redirects from the OAuth connect route.
+ *
+ * @param props.searchParams - URL search params, may contain `error` from failed OAuth initiation
  *
  * @security Authenticates user and scopes all data to their active foundry.
  */
-export default async function GoogleAppsPage(): Promise<React.ReactNode> {
+export default async function GoogleAppsPage({ searchParams }: GoogleAppsPageProps): Promise<React.ReactNode> {
+    const { error } = await searchParams
+
     // AUTH: Verify user session
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -48,6 +57,7 @@ export default async function GoogleAppsPage(): Promise<React.ReactNode> {
         return (
             <GoogleAppsNotConnected
                 connectedInOtherFoundry={connectedFoundryName}
+                error={error}
             />
         )
     }

@@ -22,12 +22,25 @@ import { buildOAuthStatePayload, createSignedOAuthState } from '@/lib/security/o
 import { rateLimit } from '@/lib/security/rate-limit'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
+    const origin = req.nextUrl.origin
+
+    /**
+     * Redirect back to the Google Apps page with an error code.
+     * Since this route is navigated to via <a href>, returning JSON
+     * would cause the browser to download a file instead of displaying it.
+     */
+    function redirectWithError(errorCode: string): NextResponse {
+        const redirectUrl = new URL('/google-apps', origin)
+        redirectUrl.searchParams.set('error', errorCode)
+        return NextResponse.redirect(redirectUrl)
+    }
+
     // AUTH: Verify the user is authenticated
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        return NextResponse.redirect(new URL('/login', origin))
     }
 
     // SECURITY: Limit OAuth connect initiations per user to reduce abuse.
@@ -36,15 +49,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         window: 10 * 60 * 1000,
     })
     if (!rateLimitResult.success) {
-        return NextResponse.json(
-            { error: 'Rate limit exceeded. Please try again shortly.' },
-            { status: 429 }
-        )
+        return redirectWithError('rate_limited')
     }
 
     const foundryId = await getFoundryIdCached()
     if (!foundryId) {
-        return NextResponse.json({ error: 'No active foundry' }, { status: 400 })
+        return redirectWithError('no_foundry')
     }
 
     // Determine which features to request scopes for
@@ -56,16 +66,24 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const scopes = getScopesForFeatures(features.length > 0 ? features : ['calendar'])
 
     // Build the redirect URI based on the current host
-    const origin = req.nextUrl.origin
     const redirectUri = `${origin}/api/google/callback`
 
-    const oauth2Client = createOAuth2Client(redirectUri)
+    // SECURITY: Catch missing env vars gracefully instead of throwing
+    let oauth2Client: ReturnType<typeof createOAuth2Client>
+    try {
+        oauth2Client = createOAuth2Client(redirectUri)
+    } catch (err) {
+        console.error('[GoogleConnect] Failed to create OAuth client:', {
+            error: err instanceof Error ? err.message : 'Unknown error',
+        })
+        return redirectWithError('not_configured')
+    }
 
     // SECURITY: Sign OAuth state to prevent tampering between connect and callback.
     const oauthStateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET
     if (!oauthStateSecret) {
         console.error('[GoogleConnect] Missing OAuth state signing secret')
-        return NextResponse.json({ error: 'OAuth state signing not configured' }, { status: 503 })
+        return redirectWithError('not_configured')
     }
 
     const statePayload = buildOAuthStatePayload({ userId: user.id, foundryId })

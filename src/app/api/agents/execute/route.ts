@@ -75,6 +75,104 @@ Return ONLY valid JSON wrapped in a markdown code block. Use this exact structur
 Layout options: "title" (first slide), "content" (standard), "two-column" (split bullets), "closing" (last slide).
 Create 6-12 slides with clear, concise bullet points. Make the content professional and actionable.`
 
+// ─── Provider Failover Configuration ─────────────────────────────────
+
+/**
+ * Model tier type matching specialists-data.ts modelTier field.
+ * Used to look up the fallback chain when a primary provider fails.
+ */
+type ModelTier = "claude" | "qwen" | "qwen-local" | "minimax"
+
+interface ProviderTarget {
+    providerId: AIProviderId
+    modelId: string
+}
+
+/**
+ * Ordered fallback chains per model tier. When the primary provider returns
+ * a retryable error (503, rate limit, network), the system tries the next
+ * provider in the chain. The first entry is the primary (same as MODEL_TIERS
+ * on the client). "qwen-local" has no fallbacks — local-only by design.
+ *
+ * @security Failover never crosses the qwen-local boundary. If you chose
+ * local inference for privacy, a cloud fallback would violate that contract.
+ */
+const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
+    claude: [
+        { providerId: "anthropic", modelId: "claude-opus-4-6" },
+        { providerId: "openai", modelId: "gpt-4o" },
+        { providerId: "google", modelId: "gemini-2.0-flash" },
+    ],
+    qwen: [
+        { providerId: "qwen", modelId: "qwen3.5-plus" },
+        { providerId: "minimax", modelId: "MiniMax-M2.5" },
+        { providerId: "openai", modelId: "gpt-4o" },
+    ],
+    minimax: [
+        { providerId: "minimax", modelId: "MiniMax-M2.5" },
+        { providerId: "qwen", modelId: "qwen3.5-plus" },
+        { providerId: "openai", modelId: "gpt-4o" },
+    ],
+    "qwen-local": [
+        { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },
+        // No fallbacks — local-only for privacy
+    ],
+}
+
+/**
+ * Determines whether a raw provider error is retryable via failover.
+ *
+ * @description Retryable errors indicate the provider is the problem (overloaded,
+ * rate-limited, unreachable). Non-retryable errors indicate the request itself is
+ * invalid (too long, content filtered, bad auth) — retrying on another provider
+ * would produce the same failure or violate the user's intent.
+ *
+ * @param rawError - The raw error string from the provider
+ * @returns true if the error is retryable on a different provider
+ */
+function isRetryableError(rawError: string): boolean {
+    const lower = rawError.toLowerCase()
+
+    // Non-retryable: request-side problems
+    if (lower.includes("too many tokens") || lower.includes("context_length") || lower.includes("maximum context") || lower.includes("too long")) return false
+    if (lower.includes("content_filter") || lower.includes("safety") || lower.includes("blocked") || lower.includes("content_policy")) return false
+    if (lower.includes("authentication") || lower.includes("invalid api key") || lower.includes("unauthorized") || lower.includes("401")) return false
+
+    // Retryable: provider-side problems
+    if (lower.includes("overloaded") || lower.includes("503") || lower.includes("capacity") || lower.includes("server_error")) return true
+    if (lower.includes("rate_limit") || lower.includes("rate limit") || lower.includes("429") || lower.includes("too many requests")) return true
+    if (lower.includes("econnrefused") || lower.includes("enotfound") || lower.includes("timeout") || lower.includes("network") || lower.includes("fetch failed")) return true
+    if (lower.includes("500") || lower.includes("internal server error")) return true
+
+    // Unknown errors default to non-retryable to avoid wasting fallback attempts
+    return false
+}
+
+/**
+ * Resolves the platform API key for a given provider from environment variables.
+ *
+ * @description Centralises the env var → API key mapping so both the primary
+ * request path and failover attempts use the same resolution logic.
+ *
+ * @param pid - The provider ID to resolve an API key for
+ * @returns The API key string, or null if not configured
+ */
+function resolveApiKeyForProvider(pid: AIProviderId): string | null {
+    const envMap: Partial<Record<AIProviderId, string>> = {
+        openai: process.env.OPENAI_API_KEY ?? "",
+        anthropic: process.env.ANTHROPIC_API_KEY ?? "",
+        google: process.env.GOOGLE_AI_API_KEY ?? "",
+        qwen: process.env.DASHSCOPE_API_KEY ?? "",
+        "qwen-local": "ollama",
+        stability: process.env.STABILITY_API_KEY ?? "",
+        elevenlabs: process.env.ELEVENLABS_API_KEY ?? "",
+        replicate: process.env.REPLICATE_API_TOKEN ?? "",
+        minimax: process.env.MINIMAX_API_KEY ?? "",
+    }
+    const key = envMap[pid]
+    return key || null
+}
+
 export async function POST(request: Request) {
     // 1. Authenticate
     const supabase = await createClient()
@@ -107,6 +205,7 @@ export async function POST(request: Request) {
     let enableThinking: boolean
     let videoConfig: { duration?: number; resolution?: string; promptOptimizer?: boolean } | undefined
     let firstFrameImage: string | undefined
+    let modelTier: ModelTier | undefined
 
     try {
         const body = await request.json()
@@ -124,6 +223,9 @@ export async function POST(request: Request) {
         enableThinking = body.enableThinking === true
         videoConfig = body.videoConfig ?? undefined
         firstFrameImage = typeof body.firstFrameImage === "string" ? body.firstFrameImage : undefined
+        modelTier = (typeof body.modelTier === "string" && body.modelTier in FALLBACK_CHAINS)
+            ? body.modelTier as ModelTier
+            : undefined
 
         if (!prompt || typeof prompt !== "string") {
             return NextResponse.json({ error: "prompt is required" }, { status: 400 })
@@ -147,22 +249,8 @@ export async function POST(request: Request) {
     // 3. Resolve API key
     // Platform provides AI — use env vars by default.
     // Users can optionally bring their own key (BYOK) to override.
-    let apiKey: string | null = null
+    let apiKey: string | null = resolveApiKeyForProvider(providerId)
     let keySource: "platform" | "user" = "platform"
-
-    // Check for platform keys first (this is the standard path)
-    const envMap: Partial<Record<AIProviderId, string>> = {
-        openai: process.env.OPENAI_API_KEY ?? "",
-        anthropic: process.env.ANTHROPIC_API_KEY ?? "",
-        google: process.env.GOOGLE_AI_API_KEY ?? "",
-        qwen: process.env.DASHSCOPE_API_KEY ?? "",
-        "qwen-local": "ollama", // Ollama doesn't need a real key
-        stability: process.env.STABILITY_API_KEY ?? "",
-        elevenlabs: process.env.ELEVENLABS_API_KEY ?? "",
-        replicate: process.env.REPLICATE_API_TOKEN ?? "",
-        minimax: process.env.MINIMAX_API_KEY ?? "",
-    }
-    apiKey = envMap[providerId] || null
 
     // Allow user's own key to override (BYOK), if configured
     const { data: keyRow } = await supabase
@@ -621,13 +709,19 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
             await logUsageAfterCompletion(fullOutput.length)
         }
 
+    // Build the fallback chain for text modalities.
+    // If the client sent modelTier, use that chain. Otherwise fall back to single-provider (no failover).
+    const fallbackChain: ProviderTarget[] = modelTier
+        ? FALLBACK_CHAINS[modelTier]
+        : [{ providerId, modelId }]
+
     try {
         if (modality === "text") {
-            return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory)
+            return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory)
         }
         if (modality === "slides") {
             // Slides use text generation with a structured output prompt (no conversation history needed)
-            return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback)
+            return await handleTextStreaming(fallbackChain, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback)
         }
         if (modality === "image") {
             const result = await handleImageGeneration(apiKey, providerId, modelId, finalPrompt)
@@ -705,91 +799,184 @@ function classifyStreamError(rawError: string): string {
     return "Stream interrupted. Please try sending your message again."
 }
 
-// ─── Text Streaming Handler ──────────────────────────────────────────
+// ─── Text Streaming Handler (with Provider Failover) ─────────────────
 
 /**
- * Streams a text generation response back to the client via SSE.
+ * Streams a text generation response back to the client via SSE,
+ * with automatic failover across providers in the fallback chain.
  *
- * @param apiKey - Resolved API key for the provider
- * @param providerId - Which AI provider to use
- * @param modelId - Specific model ID
+ * @description Tries each provider in the chain sequentially. If the primary
+ * provider throws a retryable error (503, rate limit, network) during stream
+ * setup, the next provider in the chain is attempted. Mid-stream errors
+ * (after chunks have already been sent) are NOT retried — the partial
+ * response is abandoned and the error is surfaced to the client.
+ *
+ * @param chain - Ordered list of {providerId, modelId} to try
  * @param finalPrompt - The user prompt with placeholders resolved
  * @param customSystemPrompt - System prompt override
  * @param onComplete - Callback fired after streaming completes (for memory + usage logging)
  * @param enableThinking - When true, enables Anthropic extended thinking for deeper reasoning
  * @param history - Optional conversation history for multi-turn context
+ *
+ * @security Failover never leaves the declared chain. qwen-local chains
+ * have no cloud fallbacks, preserving the privacy contract.
  */
 async function handleTextStreaming(
-    apiKey: string,
-    providerId: AIProviderId,
-    modelId: string,
+    chain: ProviderTarget[],
     finalPrompt: string,
     customSystemPrompt?: string,
     onComplete?: (fullOutput: string) => Promise<void>,
     enableThinking?: boolean,
     history?: ConversationMessage[]
 ): Promise<Response> {
-    const streamFn = getTextProvider(providerId)
-    if (!streamFn) {
-        return NextResponse.json(
-            { error: `${PROVIDER_REGISTRY[providerId].name} does not support text generation` },
-            { status: 400 }
-        )
-    }
-
-    // Extended thinking requires more output headroom for the thinking budget + response
-    const maxTokens = enableThinking ? 32768 : 16384
-
-    const encoder = new TextEncoder()
-    let fullOutput = ""
-
-    // Convert ConversationMessage[] to ChatMessage[] for the provider
+    // Convert ConversationMessage[] to ChatMessage[] for the provider (shared across attempts)
     const conversationHistory = history?.map((msg) => ({
         role: msg.role as "system" | "user" | "assistant",
         content: msg.content,
     }))
 
+    const encoder = new TextEncoder()
+    let fullOutput = ""
+
     const readable = new ReadableStream({
         async start(controller) {
-            try {
-                await streamFn({
-                    apiKey,
-                    modelId,
-                    systemPrompt: customSystemPrompt ?? SYSTEM_PROMPT,
-                    userPrompt: finalPrompt,
-                    conversationHistory,
-                    maxTokens,
-                    enableThinking: enableThinking && providerId === "anthropic",
-                    onChunk(text) {
-                        fullOutput += text
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
-                    },
-                    onDone() {
-                        controller.enqueue(encoder.encode("data: [DONE]\n\n"))
-                        controller.close()
-                        // Record the full output to agent memory (fire-and-forget)
-                        if (onComplete && fullOutput) {
-                            onComplete(fullOutput).catch(() => {})
-                        }
-                    },
-                    onError(error) {
-                        console.error("[agents/execute] stream error:", error)
-                        const errorDetail = classifyStreamError(error)
-                        controller.enqueue(
-                            encoder.encode(`data: ${JSON.stringify({ error: errorDetail })}\n\n`)
-                        )
-                        controller.close()
-                    },
-                })
-            } catch (err) {
-                console.error("[agents/execute] stream setup failed:", err)
-                const errorStr = err instanceof Error ? err.message : String(err)
-                const errorDetail = classifyStreamError(errorStr)
-                controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ error: errorDetail })}\n\n`)
-                )
-                controller.close()
+            let lastError = "No providers available"
+
+            for (let i = 0; i < chain.length; i++) {
+                const target = chain[i]
+                const streamFn = getTextProvider(target.providerId)
+                if (!streamFn) {
+                    console.warn("[agents/execute] Provider does not support text:", target.providerId)
+                    continue
+                }
+
+                const targetApiKey = resolveApiKeyForProvider(target.providerId)
+                if (!targetApiKey) {
+                    console.warn("[agents/execute] No API key for fallback provider:", target.providerId)
+                    continue
+                }
+
+                // Extended thinking requires more output headroom
+                const maxTokens = enableThinking ? 32768 : 16384
+                // Extended thinking only works with Anthropic models
+                const useThinking = enableThinking && target.providerId === "anthropic"
+
+                if (i > 0) {
+                    console.info("[agents/execute] Failover attempt:", {
+                        attempt: i + 1,
+                        from: `${chain[i - 1].providerId}/${chain[i - 1].modelId}`,
+                        to: `${target.providerId}/${target.modelId}`,
+                        reason: lastError,
+                    })
+                }
+
+                try {
+                    // Wrap streamFn in a promise so we can catch setup-phase errors
+                    // and distinguish them from mid-stream errors.
+                    await new Promise<void>((resolve, reject) => {
+                        let hasStartedStreaming = false
+
+                        streamFn({
+                            apiKey: targetApiKey,
+                            modelId: target.modelId,
+                            systemPrompt: customSystemPrompt ?? SYSTEM_PROMPT,
+                            userPrompt: finalPrompt,
+                            conversationHistory,
+                            maxTokens,
+                            enableThinking: useThinking,
+                            onChunk(text) {
+                                hasStartedStreaming = true
+                                fullOutput += text
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
+                            },
+                            onDone() {
+                                controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+                                controller.close()
+                                if (onComplete && fullOutput) {
+                                    onComplete(fullOutput).catch(() => {})
+                                }
+                                resolve()
+                            },
+                            onError(error) {
+                                if (hasStartedStreaming) {
+                                    // Mid-stream error — can't failover, surface to client
+                                    console.error("[agents/execute] Mid-stream error (no failover):", {
+                                        provider: target.providerId,
+                                        model: target.modelId,
+                                        error,
+                                    })
+                                    const errorDetail = classifyStreamError(error)
+                                    controller.enqueue(
+                                        encoder.encode(`data: ${JSON.stringify({ error: errorDetail })}\n\n`)
+                                    )
+                                    controller.close()
+                                    resolve() // Resolve — we've handled it, no retry
+                                } else {
+                                    // Pre-stream error — candidate for failover
+                                    reject(new Error(error))
+                                }
+                            },
+                        }).catch(reject) // Catch promise-level rejections from the stream fn
+                    })
+
+                    // If we reach here, streaming completed successfully
+                    if (i > 0) {
+                        console.info("[agents/execute] Failover succeeded:", {
+                            provider: target.providerId,
+                            model: target.modelId,
+                            attempt: i + 1,
+                        })
+                    }
+                    return // Exit the ReadableStream start — response is streaming
+                } catch (err) {
+                    const errorStr = err instanceof Error ? err.message : String(err)
+                    lastError = errorStr
+
+                    if (isRetryableError(errorStr) && i < chain.length - 1) {
+                        // Retryable error with more providers available — continue to next
+                        console.warn("[agents/execute] Retryable error, trying next provider:", {
+                            failedProvider: target.providerId,
+                            failedModel: target.modelId,
+                            error: errorStr,
+                            remainingProviders: chain.length - i - 1,
+                        })
+                        continue
+                    }
+
+                    // Non-retryable error OR last provider in chain — surface to client
+                    if (!isRetryableError(errorStr)) {
+                        console.error("[agents/execute] Non-retryable error:", {
+                            provider: target.providerId,
+                            model: target.modelId,
+                            error: errorStr,
+                        })
+                    } else {
+                        console.error("[agents/execute] All providers exhausted:", {
+                            chainLength: chain.length,
+                            lastProvider: target.providerId,
+                            lastError: errorStr,
+                        })
+                    }
+
+                    const errorDetail = classifyStreamError(errorStr)
+                    controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify({ error: errorDetail })}\n\n`)
+                    )
+                    controller.close()
+                    return
+                }
             }
+
+            // All providers skipped (no streamFn or no API key) — should be very rare
+            console.error("[agents/execute] No viable provider in fallback chain:", {
+                chain: chain.map(t => t.providerId),
+                lastError,
+            })
+            const errorDetail = classifyStreamError(lastError)
+            controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ error: errorDetail })}\n\n`)
+            )
+            controller.close()
         },
     })
 

@@ -16,7 +16,306 @@
 import { createClient } from "@/lib/supabase/server"
 import type { Sector } from "@/types/foundry"
 
-// ─── Types ───────────────────────────────────────────────────────────
+// ─── Catalogue Browsing Types ────────────────────────────────────────
+
+/** Filters for the component catalogue list view */
+export interface ComponentFilters {
+  search?: string
+  category?: string
+  sortBy?: "name" | "price_asc" | "price_desc" | "rating" | "compat"
+  page?: number
+  pageSize?: number
+}
+
+/** Summary item for the component grid card */
+export interface ComponentListItem {
+  id: string
+  name: string
+  manufacturer: string | null
+  geometry_type_slug: string
+  material: string | null
+  verified: boolean | null
+  price_min: number | null
+  price_max: number | null
+  currency: string | null
+  avg_rating: number | null
+  review_count: number
+  cert_count: number
+  compat_count: number
+}
+
+/** Full detail for the component detail dialog */
+export interface ComponentDetail {
+  component: Record<string, unknown>
+  pricing: Record<string, unknown> | null
+  certifications: Record<string, unknown> | null
+  compatibility: Record<string, unknown>[]
+  reviews: Record<string, unknown>[]
+}
+
+// ─── Catalogue Browsing Actions ──────────────────────────────────────
+
+/**
+ * Fetches a paginated list of components from the catalogue with
+ * enrichment data (pricing, ratings, certifications, compatibility).
+ *
+ * @description Joins component_catalogue with component_pricing,
+ * entity_reviews, component_certifications, and component_compatibility
+ * to produce a rich card view. Supports search, category filter, and sorting.
+ *
+ * @param filters - Search, category, sort, and pagination options
+ * @returns Paginated list of components with enrichment counts
+ */
+export async function getComponents(
+  filters: ComponentFilters = {}
+): Promise<{ data: ComponentListItem[]; total: number } | { error: string }> {
+  const supabase = await createClient()
+  const { search, category, sortBy = "name", page = 1, pageSize = 24 } = filters
+  const offset = (page - 1) * pageSize
+
+  // Base query on component_catalogue
+  let query = supabase
+    .from("component_catalogue")
+    .select("id, name, manufacturer, geometry_type_slug, material, verified, tags", { count: "exact" })
+
+  // Apply search filter
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,manufacturer.ilike.%${search}%,geometry_type_slug.ilike.%${search}%`)
+  }
+
+  // Apply category filter (matches geometry_type_slug category prefix)
+  if (category) {
+    query = query.ilike("geometry_type_slug", `%${category}%`)
+  }
+
+  // Sort
+  switch (sortBy) {
+    case "name":
+      query = query.order("name", { ascending: true })
+      break
+    case "price_asc":
+    case "price_desc":
+    case "rating":
+    case "compat":
+      // These sorts require enrichment data — fall back to name sort
+      // and we'll re-sort client-side after enrichment
+      query = query.order("name", { ascending: true })
+      break
+  }
+
+  // Paginate
+  query = query.range(offset, offset + pageSize - 1)
+
+  const { data: components, error, count } = await query
+
+  if (error) {
+    console.error("[ComponentLibrary] Failed to fetch components:", {
+      error: error.message,
+      code: error.code,
+    })
+    return { error: "Failed to load components. Please try again." }
+  }
+
+  if (!components || components.length === 0) {
+    return { data: [], total: count ?? 0 }
+  }
+
+  // Enrich with pricing, reviews, certifications, compatibility
+  const componentNames = components.map((c) => c.name)
+
+  const [pricingResult, reviewsResult, certsResult, compatResult] = await Promise.all([
+    supabase
+      .from("component_pricing")
+      .select("component_name, pricing_tiers, currency")
+      .in("component_name", componentNames),
+    supabase
+      .from("entity_reviews")
+      .select("entity_name, rating")
+      .eq("entity_type", "component")
+      .in("entity_name", componentNames),
+    supabase
+      .from("component_certifications")
+      .select("component_name, certifications")
+      .in("component_name", componentNames),
+    supabase
+      .from("component_compatibility")
+      .select("component_a, component_b")
+      .or(
+        componentNames.map((n) => `component_a.eq.${n}`).join(",") +
+        "," +
+        componentNames.map((n) => `component_b.eq.${n}`).join(",")
+      ),
+  ])
+
+  // Build lookup maps
+  const pricingMap = new Map<string, { min: number | null; max: number | null; currency: string | null }>()
+  for (const p of pricingResult.data ?? []) {
+    const tiers = p.pricing_tiers as Array<{ unit_price_usd: number }> | null
+    if (tiers && tiers.length > 0) {
+      const prices = tiers.map((t) => t.unit_price_usd)
+      pricingMap.set(p.component_name, {
+        min: Math.min(...prices),
+        max: Math.max(...prices),
+        currency: p.currency,
+      })
+    }
+  }
+
+  const reviewMap = new Map<string, { total: number; sum: number }>()
+  for (const r of reviewsResult.data ?? []) {
+    const existing = reviewMap.get(r.entity_name) ?? { total: 0, sum: 0 }
+    existing.total += 1
+    existing.sum += r.rating
+    reviewMap.set(r.entity_name, existing)
+  }
+
+  const certMap = new Map<string, number>()
+  for (const c of certsResult.data ?? []) {
+    const certs = c.certifications as unknown[] | null
+    certMap.set(c.component_name, Array.isArray(certs) ? certs.length : 0)
+  }
+
+  const compatMap = new Map<string, number>()
+  for (const c of compatResult.data ?? []) {
+    compatMap.set(c.component_a, (compatMap.get(c.component_a) ?? 0) + 1)
+    compatMap.set(c.component_b, (compatMap.get(c.component_b) ?? 0) + 1)
+  }
+
+  // Assemble enriched list items
+  const enriched: ComponentListItem[] = components.map((comp) => {
+    const pricing = pricingMap.get(comp.name)
+    const reviews = reviewMap.get(comp.name)
+    return {
+      id: comp.id,
+      name: comp.name,
+      manufacturer: comp.manufacturer,
+      geometry_type_slug: comp.geometry_type_slug,
+      material: comp.material,
+      verified: comp.verified,
+      price_min: pricing?.min ?? null,
+      price_max: pricing?.max ?? null,
+      currency: pricing?.currency ?? null,
+      avg_rating: reviews ? reviews.sum / reviews.total : null,
+      review_count: reviews?.total ?? 0,
+      cert_count: certMap.get(comp.name) ?? 0,
+      compat_count: compatMap.get(comp.name) ?? 0,
+    }
+  })
+
+  // Client-side sort for enrichment-based sorts
+  if (sortBy === "price_asc") {
+    enriched.sort((a, b) => (a.price_min ?? Infinity) - (b.price_min ?? Infinity))
+  } else if (sortBy === "price_desc") {
+    enriched.sort((a, b) => (b.price_max ?? 0) - (a.price_max ?? 0))
+  } else if (sortBy === "rating") {
+    enriched.sort((a, b) => (b.avg_rating ?? 0) - (a.avg_rating ?? 0))
+  } else if (sortBy === "compat") {
+    enriched.sort((a, b) => b.compat_count - a.compat_count)
+  }
+
+  return { data: enriched, total: count ?? 0 }
+}
+
+/**
+ * Fetches distinct geometry type categories from the component catalogue.
+ *
+ * @description Used for the category filter tabs on the component library page.
+ * Extracts unique geometry_type_slug values grouped by their category prefix.
+ *
+ * @returns Array of category strings
+ */
+export async function getComponentCategories(): Promise<{ data: string[] } | { error: string }> {
+  const supabase = await createClient()
+
+  // Get distinct categories from component_geometry_types
+  const { data, error } = await supabase
+    .from("component_geometry_types")
+    .select("category")
+    .eq("verified", true)
+    .order("category")
+
+  if (error) {
+    console.error("[ComponentLibrary] Failed to fetch categories:", {
+      error: error.message,
+      code: error.code,
+    })
+    return { error: "Failed to load categories." }
+  }
+
+  // Deduplicate
+  const categories = [...new Set((data ?? []).map((d) => d.category))]
+  return { data: categories }
+}
+
+/**
+ * Fetches full detail for a single component including all enrichment data.
+ *
+ * @description Loads the component record from component_catalogue, then
+ * fetches pricing, certifications, compatibility, and reviews in parallel.
+ *
+ * @param componentId - UUID of the component in component_catalogue
+ * @returns Full component detail with all enrichment data
+ */
+export async function getComponentDetail(
+  componentId: string
+): Promise<ComponentDetail | { error: string }> {
+  const supabase = await createClient()
+
+  // Fetch the base component
+  const { data: component, error } = await supabase
+    .from("component_catalogue")
+    .select("*")
+    .eq("id", componentId)
+    .single()
+
+  if (error || !component) {
+    console.error("[ComponentLibrary] Failed to fetch component detail:", {
+      componentId,
+      error: error?.message,
+    })
+    return { error: "Component not found." }
+  }
+
+  const name = component.name
+
+  // Fetch enrichment data in parallel
+  const [pricingResult, certsResult, compatResult, reviewsResult] = await Promise.all([
+    supabase
+      .from("component_pricing")
+      .select("*")
+      .eq("component_name", name)
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("component_certifications")
+      .select("*")
+      .eq("component_name", name)
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("component_compatibility")
+      .select("*")
+      .or(`component_a.eq.${name},component_b.eq.${name}`)
+      .limit(20),
+    supabase
+      .from("entity_reviews")
+      .select("*")
+      .eq("entity_type", "component")
+      .eq("entity_name", name)
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ])
+
+  return {
+    component: component as unknown as Record<string, unknown>,
+    pricing: (pricingResult.data as unknown as Record<string, unknown>) ?? null,
+    certifications: (certsResult.data as unknown as Record<string, unknown>) ?? null,
+    compatibility: (compatResult.data as unknown as Record<string, unknown>[]) ?? [],
+    reviews: (reviewsResult.data as unknown as Record<string, unknown>[]) ?? [],
+  }
+}
+
+// ─── CAD Geometry Library Types ──────────────────────────────────────
 
 /** Compact summary of a library component for prompt injection */
 export interface LibraryComponentSummary {

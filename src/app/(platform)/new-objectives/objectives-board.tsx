@@ -34,6 +34,7 @@ import { getStrategyColor } from './strategy-colors'
 import { CreateObjectiveDialog } from '../objectives/create-objective-dialog'
 import dynamic from 'next/dynamic'
 import { EditObjectiveDialog } from '@/components/objectives/edit-objective-dialog'
+import { EditTaskDialog } from '@/components/tasks/edit-task-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TaskDetailPanel } from '../new-tasks/task-detail-panel'
 
@@ -58,6 +59,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core'
+import type { Database } from '@/types/database.types'
 import type { ObjectiveWithTasks, ObjectiveTask, Member, Team, StrategicObjective } from './types'
 import type { TaskWithData } from '../new-tasks/types'
 
@@ -131,6 +133,7 @@ export function ObjectivesBoard({
   const [objectiveToDelete, setObjectiveToDelete] = useState<string | null>(null)
   const [deleteChildAction, setDeleteChildAction] = useState<'keep' | 'cascade'>('keep')
   const [objectiveToEdit, setObjectiveToEdit] = useState<ObjectiveWithTasks | null>(null)
+  const [taskToEdit, setTaskToEdit] = useState<TaskWithData | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
@@ -227,6 +230,10 @@ export function ObjectivesBoard({
   const handleTaskSelect = useCallback((taskId: string) => {
     setSelectedId(null) // clear objective selection when selecting a task
     setSelectedTaskId(prev => prev === taskId ? null : taskId)
+  }, [])
+
+  const handleTaskEdit = useCallback((task: TaskWithData) => {
+    setTaskToEdit(task)
   }, [])
 
   // Count children of the objective being deleted (for the confirmation dialog)
@@ -365,6 +372,16 @@ export function ObjectivesBoard({
           members={members}
           teams={teams}
           currentUserId={currentUserId}
+        />
+      )}
+
+      {/* Edit Task Dialog */}
+      {taskToEdit && (
+        <EditTaskDialog
+          open={!!taskToEdit}
+          onOpenChange={(open) => !open && setTaskToEdit(null)}
+          task={taskToEdit as unknown as Database['public']['Tables']['tasks']['Row']}
+          members={members.map(m => ({ id: m.id, full_name: m.full_name, role: m.role ?? '' }))}
         />
       )}
 
@@ -548,12 +565,14 @@ export function ObjectivesBoard({
               <TaskDetailPanel
                 task={selectedTaskData}
                 onClose={() => setSelectedTaskId(null)}
+                onEdit={handleTaskEdit}
               />
             ) : selectedObjective ? (
               <ObjectiveDetailPanel
                 objective={selectedObjective}
                 onClose={() => setSelectedId(null)}
                 onTaskSelect={handleTaskSelect}
+                onEdit={setObjectiveToEdit}
               />
             ) : null}
           </div>
@@ -566,6 +585,7 @@ export function ObjectivesBoard({
           <TaskDetailPanel
             task={selectedTaskData}
             onClose={() => setSelectedTaskId(null)}
+            onEdit={handleTaskEdit}
           />
         </div>
       )}
@@ -575,6 +595,7 @@ export function ObjectivesBoard({
             objective={selectedObjective}
             onClose={() => setSelectedId(null)}
             onTaskSelect={handleTaskSelect}
+            onEdit={setObjectiveToEdit}
           />
         </div>
       )}
