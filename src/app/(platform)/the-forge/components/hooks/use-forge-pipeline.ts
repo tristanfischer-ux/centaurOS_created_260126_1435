@@ -1,0 +1,334 @@
+"use client"
+
+/**
+ * @file use-forge-pipeline.ts — Full engineering analysis pipeline orchestration.
+ *
+ * @description Manages individual analysis operations (mass/DFM, structural,
+ * thermal, topology, convergence, premium) and the full sequential pipeline.
+ * Also handles engineering review creation and design change application.
+ */
+
+import { useState, useCallback } from "react"
+import { toast } from "sonner"
+
+import {
+  analyzeModulesAction,
+  runStructuralAnalysisAction,
+  runThermalAnalysisAction,
+  runTopologyOptimizationAction,
+  runConvergenceStepAction,
+  runPremiumAnalysisAction,
+  createEngineeringReviewAction,
+  applyDesignChangesAction,
+} from "@/actions/xray"
+
+import type { XRaySpec } from "../../services/xray-schema"
+import type {
+  PipelineProgress,
+  PipelineStageStatus,
+  PipelineStageId,
+} from "../forge-project-context"
+import type { ConvergenceEvaluation } from "../../services/convergence-controller"
+
+interface UseForgePipelineOptions {
+  scanId: string
+  specRef: React.MutableRefObject<XRaySpec>
+  setSpecDirect: (next: XRaySpec) => void
+}
+
+export interface UseForgePipelineReturn {
+  handleRunAnalysis: () => Promise<void>
+  handleRunStructural: () => Promise<void>
+  handleRunConvergence: () => Promise<void>
+  handleRunPremium: () => Promise<void>
+  handleRunFullPipeline: () => Promise<void>
+  handleCreateReviewObjective: () => Promise<string | null>
+  handleApplyDesignChanges: (changes: Array<{ moduleId: string; parameter: string; newValue: string }>) => Promise<boolean>
+  dismissPipelineChanges: () => void
+  isAnalyzing: boolean
+  isRunningStructural: boolean
+  isRunningConvergence: boolean
+  isRunningPremium: boolean
+  pipelineProgress: PipelineProgress
+}
+
+const INITIAL_PIPELINE_STAGES: PipelineStageStatus[] = [
+  { id: "mass_dfm", label: "Mass & DFM", status: "pending" },
+  { id: "structural", label: "Structural FEA", status: "pending" },
+  { id: "thermal", label: "Thermal Analysis", status: "pending" },
+  { id: "topology", label: "Topology Optimization", status: "pending" },
+  { id: "convergence", label: "Convergence Check", status: "pending" },
+]
+
+/**
+ * useForgePipeline — Engineering analysis pipeline with sequential stage execution.
+ */
+export function useForgePipeline({
+  scanId,
+  specRef,
+  setSpecDirect,
+}: UseForgePipelineOptions): UseForgePipelineReturn {
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isRunningStructural, setIsRunningStructural] = useState(false)
+  const [isRunningConvergence, setIsRunningConvergence] = useState(false)
+  const [isRunningPremium, setIsRunningPremium] = useState(false)
+
+  const [pipelineProgress, setPipelineProgress] = useState<PipelineProgress>({
+    isRunning: false,
+    stages: INITIAL_PIPELINE_STAGES,
+  })
+
+  const handleRunAnalysis = useCallback(async (): Promise<void> => {
+    setIsAnalyzing(true)
+    toast.info("Running engineering analysis...")
+    try {
+      const result = await analyzeModulesAction(scanId)
+      if ("error" in result) { toast.error(result.error); return }
+      setSpecDirect(result.spec)
+      toast.success("Engineering analysis complete")
+    } catch (error) {
+      toast.error("Engineering analysis failed")
+      console.error("[Forge] Analysis error:", error instanceof Error ? error.message : "Unknown")
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }, [scanId, setSpecDirect])
+
+  const handleRunStructural = useCallback(async (): Promise<void> => {
+    setIsRunningStructural(true)
+    toast.info("Running structural FEA...")
+    try {
+      const result = await runStructuralAnalysisAction(scanId)
+      if ("error" in result) { toast.error(result.error); return }
+      setSpecDirect(result.spec)
+      if ("persistError" in result) {
+        toast.warning("Results computed but failed to save. Please refresh and retry.")
+      } else {
+        toast.success("Structural FEA complete")
+      }
+    } catch {
+      toast.error("Structural FEA failed")
+    } finally {
+      setIsRunningStructural(false)
+    }
+  }, [scanId, setSpecDirect])
+
+  const handleRunConvergence = useCallback(async (): Promise<void> => {
+    setIsRunningConvergence(true)
+    toast.info("Evaluating convergence criteria...")
+    try {
+      const result = await runConvergenceStepAction(scanId)
+      if ("error" in result) { toast.error(result.error); return }
+      setSpecDirect(result.spec)
+      if ("persistError" in result) {
+        toast.warning("Results computed but failed to save. Please refresh and retry.")
+      } else if (result.evaluation.isConverged) {
+        toast.success("All convergence criteria met!")
+      } else {
+        toast.info(`${result.evaluation.proposedChanges.length} changes proposed`)
+      }
+    } catch {
+      toast.error("Convergence evaluation failed")
+    } finally {
+      setIsRunningConvergence(false)
+    }
+  }, [scanId, setSpecDirect])
+
+  const handleRunPremium = useCallback(async (): Promise<void> => {
+    setIsRunningPremium(true)
+    toast.info("Running premium analyses...")
+    try {
+      const result = await runPremiumAnalysisAction(scanId, ["emi", "fatigue", "impact"])
+      if ("error" in result) { toast.error(result.error); return }
+      setSpecDirect(result.spec)
+      if ("persistError" in result) {
+        toast.warning("Results computed but failed to save. Please refresh and retry.")
+      } else {
+        toast.success("Premium analyses complete!")
+      }
+    } catch {
+      toast.error("Premium analysis failed")
+    } finally {
+      setIsRunningPremium(false)
+    }
+  }, [scanId, setSpecDirect])
+
+  const handleRunFullPipeline = useCallback(async (): Promise<void> => {
+    const stages = INITIAL_PIPELINE_STAGES.map((s) => ({ ...s }))
+    setPipelineProgress({ isRunning: true, stages })
+
+    const updateStage = (id: PipelineStageId, update: Partial<PipelineStageStatus>): void => {
+      const idx = stages.findIndex((s) => s.id === id)
+      if (idx >= 0) stages[idx] = { ...stages[idx], ...update }
+      setPipelineProgress({ isRunning: true, stages: [...stages] })
+    }
+
+    try {
+      // Stage 1: Mass properties + DFM
+      updateStage("mass_dfm", { status: "running" })
+      toast.info("Pipeline: Running mass properties & DFM...")
+      try {
+        const r = await analyzeModulesAction(scanId)
+        if ("error" in r) {
+          updateStage("mass_dfm", { status: "error", error: r.error })
+        } else {
+          setSpecDirect(r.spec)
+          updateStage("mass_dfm", { status: "complete" })
+          if ("persistError" in r) toast.warning("Mass/DFM: Results computed but failed to save.")
+        }
+      } catch (err) {
+        updateStage("mass_dfm", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
+      }
+
+      // Stage 2: Structural FEA
+      updateStage("structural", { status: "running" })
+      toast.info("Pipeline: Running structural FEA...")
+      try {
+        const r = await runStructuralAnalysisAction(scanId)
+        if ("error" in r) {
+          updateStage("structural", { status: "error", error: r.error })
+        } else {
+          setSpecDirect(r.spec)
+          updateStage("structural", { status: "complete" })
+          if ("persistError" in r) toast.warning("Structural FEA: Results computed but failed to save.")
+        }
+      } catch (err) {
+        updateStage("structural", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
+      }
+
+      // Stage 3: Thermal analysis
+      updateStage("thermal", { status: "running" })
+      toast.info("Pipeline: Running thermal analysis...")
+      try {
+        const r = await runThermalAnalysisAction(scanId)
+        if ("error" in r) {
+          updateStage("thermal", { status: "error", error: r.error })
+        } else {
+          setSpecDirect(r.spec)
+          updateStage("thermal", { status: "complete" })
+          if ("persistError" in r) toast.warning("Thermal: Results computed but failed to save.")
+        }
+      } catch (err) {
+        updateStage("thermal", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
+      }
+
+      // Stage 4: Topology optimization
+      updateStage("topology", { status: "running" })
+      toast.info("Pipeline: Running topology optimization...")
+      try {
+        const r = await runTopologyOptimizationAction(scanId)
+        if ("error" in r) {
+          updateStage("topology", { status: "error", error: r.error })
+        } else {
+          setSpecDirect(r.spec)
+          updateStage("topology", { status: "complete" })
+          if ("persistError" in r) toast.warning("Topology: Results computed but failed to save.")
+        }
+      } catch (err) {
+        updateStage("topology", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
+      }
+
+      // Stage 5: Convergence evaluation
+      updateStage("convergence", { status: "running" })
+      toast.info("Pipeline: Evaluating convergence criteria...")
+      try {
+        const r = await runConvergenceStepAction(scanId)
+        if ("error" in r) {
+          updateStage("convergence", { status: "error", error: r.error })
+        } else {
+          setSpecDirect(r.spec)
+          updateStage("convergence", { status: "complete" })
+          if ("persistError" in r) toast.warning("Convergence: Results computed but failed to save.")
+
+          setPipelineProgress((prev) => ({
+            ...prev,
+            convergenceResult: r.evaluation,
+            proposedChanges: r.evaluation.proposedChanges,
+          }))
+
+          if (r.evaluation.isConverged) {
+            toast.success("Full analysis pipeline complete — all criteria met!")
+          } else {
+            toast.info(`Pipeline complete — ${r.evaluation.proposedChanges.length} design changes proposed`)
+          }
+        }
+      } catch (err) {
+        updateStage("convergence", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
+      }
+    } finally {
+      setPipelineProgress((prev) => ({
+        ...prev,
+        isRunning: false,
+        stages: [...stages],
+      }))
+    }
+  }, [scanId, setSpecDirect])
+
+  const dismissPipelineChanges = useCallback((): void => {
+    setPipelineProgress((prev) => ({
+      ...prev,
+      convergenceResult: undefined,
+      proposedChanges: undefined,
+    }))
+  }, [])
+
+  const handleCreateReviewObjective = useCallback(async (): Promise<string | null> => {
+    try {
+      const result = await createEngineeringReviewAction(
+        scanId,
+        pipelineProgress.convergenceResult as ConvergenceEvaluation | undefined,
+      )
+      if ("error" in result) {
+        toast.error(result.error)
+        return null
+      }
+      toast.success(
+        `Review objective created with ${result.analysisTaskCount} analysis task${result.analysisTaskCount !== 1 ? "s" : ""}` +
+        (result.changeTaskCount > 0 ? ` and ${result.changeTaskCount} change task${result.changeTaskCount !== 1 ? "s" : ""}` : ""),
+      )
+      return result.objectiveId
+    } catch (error) {
+      toast.error("Failed to create review objective")
+      console.error("[Forge] Review objective error:", error instanceof Error ? error.message : "Unknown")
+      return null
+    }
+  }, [scanId, pipelineProgress.convergenceResult])
+
+  const handleApplyDesignChanges = useCallback(async (
+    changes: Array<{ moduleId: string; parameter: string; newValue: string }>,
+  ): Promise<boolean> => {
+    try {
+      const result = await applyDesignChangesAction(scanId, changes)
+      if ("error" in result) {
+        toast.error(result.error)
+        return false
+      }
+      setSpecDirect(result.spec)
+      toast.success(
+        `${result.appliedCount} parameter${result.appliedCount !== 1 ? "s" : ""} updated. ` +
+        `Run the full pipeline again to re-analyze with the new values.`,
+      )
+      return true
+    } catch (error) {
+      toast.error("Failed to apply design changes")
+      console.error("[Forge] Design change error:", error instanceof Error ? error.message : "Unknown")
+      return false
+    }
+  }, [scanId, setSpecDirect])
+
+  return {
+    handleRunAnalysis,
+    handleRunStructural,
+    handleRunConvergence,
+    handleRunPremium,
+    handleRunFullPipeline,
+    handleCreateReviewObjective,
+    handleApplyDesignChanges,
+    dismissPipelineChanges,
+    isAnalyzing,
+    isRunningStructural,
+    isRunningConvergence,
+    isRunningPremium,
+    pipelineProgress,
+  }
+}
