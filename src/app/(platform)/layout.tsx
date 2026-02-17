@@ -57,8 +57,11 @@ export default async function PlatformLayout({
 
         const { data: rpcResult, error: rpcError } = await supabase.rpc("repair_user_profile");
 
-        if (!rpcError && rpcResult?.success && rpcResult?.foundry_id) {
-            console.info("[PlatformLayout] Auto-repair succeeded:", rpcResult);
+        // AUTH: Type-narrow the RPC result — the repair_user_profile function
+        // returns { success: boolean, foundry_id: string } or { error: string }
+        const repairResult = rpcResult as Record<string, unknown> | null;
+        if (!rpcError && repairResult?.success && repairResult?.foundry_id) {
+            console.info("[PlatformLayout] Auto-repair succeeded:", repairResult);
 
             // Re-fetch the profile now that it's been repaired
             const { data: repairedProfile, error: refetchError } = await supabase
@@ -77,17 +80,17 @@ export default async function PlatformLayout({
                 console.warn("[PlatformLayout] Re-fetch failed, using fallback profile:", refetchError?.message);
                 const meta = user.user_metadata ?? {};
                 profile = {
-                    foundry_id: rpcResult.foundry_id as string,
-                    active_foundry_id: rpcResult.foundry_id as string,
+                    foundry_id: repairResult.foundry_id as string,
+                    active_foundry_id: repairResult.foundry_id as string,
                     full_name: (meta.full_name as string) ?? user.email?.split("@")[0] ?? "User",
-                    role: (meta.role as string) ?? "Apprentice",
+                    role: (meta.role as string) as "Executive" | "Apprentice" | "AI_Agent" | "Founder" ?? "Apprentice",
                     account_type: "team_builder" as const,
                     onboarding_data: null,
                 };
                 profileError = null;
             }
         } else {
-            console.error("[PlatformLayout] Auto-repair failed:", rpcError?.message ?? rpcResult?.error);
+            console.error("[PlatformLayout] Auto-repair failed:", rpcError?.message ?? repairResult?.error);
         }
     }
 

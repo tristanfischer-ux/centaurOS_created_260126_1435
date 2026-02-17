@@ -437,7 +437,7 @@ test.describe('Unified Signup Flow (/join)', () => {
           .eq('owner_id', user.id)
 
         if (foundries) {
-          for (const f of foundries) {
+          for (const f of foundries as { id: string }[]) {
             await adminClient.from('foundries').delete().eq('id', f.id)
           }
         }
