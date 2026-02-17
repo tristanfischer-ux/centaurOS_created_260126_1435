@@ -83,7 +83,7 @@ This applies in ALL contexts — during feature work, during deploys, during bug
 At the start of each session on this project:
 1. **Read `~/.memory/master-preferences.md`** for working style, preferences, and things to avoid
 2. Check `~/.memory/carry-forward.md` for pending items across all projects
-3. Check `tasks/lessons.md` for project-specific patterns to avoid
+3. **Check `~/.memory/lessons.md`** for coding lessons and pre-flight checklists (scan P0/P1 patterns relevant to ForgeOS -- especially Supabase, UI, Auth, Build categories)
 4. Check `tasks/todo.md` for any in-progress work
 5. Check `AGENT_HANDOVER.md` if continuing from another session
 

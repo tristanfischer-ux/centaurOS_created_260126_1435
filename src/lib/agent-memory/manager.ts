@@ -320,9 +320,9 @@ export interface ConversationMessage {
  * Maximum token budget for conversation history passed to the LLM.
  * This prevents long conversations from blowing up the context window.
  * The system prompt (personality, context layers, observations) typically
- * uses 5,000-15,000 tokens, so we reserve ~12,000 for conversation history.
+ * uses 5,000-15,000 tokens, so we reserve ~16,000 for conversation history.
  */
-const CONVERSATION_TOKEN_BUDGET = 12_000
+const CONVERSATION_TOKEN_BUDGET = 16_000
 
 /**
  * Messages within this count from the end are kept at full length.
@@ -332,9 +332,9 @@ const FULL_LENGTH_RECENT_COUNT = 6
 
 /**
  * Maximum characters to keep from a truncated older message.
- * Roughly ~250 tokens — enough to preserve the gist without the full detail.
+ * Roughly ~300 tokens — enough to preserve the gist without the full detail.
  */
-const TRUNCATED_MESSAGE_MAX_CHARS = 1000
+const TRUNCATED_MESSAGE_MAX_CHARS = 1200
 
 /**
  * Extracts recent unobserved messages as a properly typed array for
