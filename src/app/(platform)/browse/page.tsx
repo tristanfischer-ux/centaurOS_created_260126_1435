@@ -7,9 +7,10 @@
  * navigate to any URL. The specialist advisor panel stays open alongside,
  * receiving page content as context for real-time guidance.
  *
- * Strategy: Try iframe first. If the site blocks embedding, automatically
- * fall back to a server-side "reader view" extraction. Either way, the
- * specialist always gets the page content.
+ * Strategy: Fetch page server-side first (fast, reliable). Check response
+ * headers to determine if the site allows iframe embedding. Show reader
+ * view immediately for non-embeddable sites; show iframe for embeddable
+ * ones. Users can toggle between views when both are available.
  *
  * @related
  * - Browser frame: src/app/(platform)/browse/browser-frame.tsx
@@ -49,7 +50,7 @@ type ViewMode = "empty" | "iframe" | "reader" | "loading" | "error"
 interface HistoryEntry {
   url: string
   title: string
-  mode: "iframe" | "reader"
+  embeddable: boolean
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -76,14 +77,26 @@ function normalizeUrl(input: string): string {
   return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`
 }
 
+/**
+ * Extracts the hostname from a URL for display purposes.
+ */
+function getDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "")
+  } catch {
+    return url
+  }
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 /**
  * BrowsePage — In-app browser with specialist co-browsing.
  *
  * @description Full-page browser experience that fills the main content area.
- * Features a URL bar with navigation controls, iframe embedding with automatic
- * reader view fallback, and specialist context injection.
+ * Features a URL bar with navigation controls. Fetches pages server-side first
+ * to determine embeddability, then shows reader view or iframe accordingly.
+ * Users can toggle between views when a site supports embedding.
  */
 export default function BrowsePage(): React.ReactElement {
   const [urlInput, setUrlInput] = useState("")
@@ -91,6 +104,7 @@ export default function BrowsePage(): React.ReactElement {
   const [viewMode, setViewMode] = useState<ViewMode>("empty")
   const [pageData, setPageData] = useState<WebPageResult | null>(null)
   const [errorMessage, setErrorMessage] = useState("")
+  const [isEmbeddable, setIsEmbeddable] = useState(false)
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -127,7 +141,11 @@ export default function BrowsePage(): React.ReactElement {
   }, [pageData, setPageContext])
 
   /**
-   * Navigates to a URL: tries iframe first, falls back to reader view.
+   * Navigates to a URL: fetches server-side first, then decides view mode.
+   *
+   * @description Reader-first approach: always fetch the page content first
+   * (2-3s), check headers for embeddability, then show the appropriate view.
+   * This eliminates the 8s iframe timeout problem entirely.
    */
   const navigateTo = useCallback(async (rawUrl: string) => {
     const url = normalizeUrl(rawUrl)
@@ -138,72 +156,38 @@ export default function BrowsePage(): React.ReactElement {
     setViewMode("loading")
     setErrorMessage("")
     setPageData(null)
+    setIsEmbeddable(false)
 
-    // Start fetching page content server-side (for reader fallback + specialist context)
-    // This runs in parallel with the iframe attempt
-    const fetchPromise = fetchWebPage(url)
+    const result = await fetchWebPage(url)
 
-    // Set view to iframe — the BrowserFrame component will handle failure detection
-    setViewMode("iframe")
+    if (!result.success || !result.data) {
+      setViewMode("error")
+      setErrorMessage(result.error || "Failed to load page")
+      return
+    }
 
-    // Store the fetch promise for later use
-    fetchPromise.then((result) => {
-      if (result.success && result.data) {
-        setPageData(result.data)
-      }
-    }).catch(() => {
-      // Non-critical — iframe may still work
-    })
-  }, [])
+    setPageData(result.data)
+    setIsEmbeddable(result.data.embeddable)
 
-  /**
-   * Called when iframe successfully loads the page.
-   */
-  const handleEmbedSuccess = useCallback(() => {
-    setViewMode("iframe")
+    // Show iframe for embeddable sites, reader view for everything else
+    if (result.data.embeddable) {
+      setViewMode("iframe")
+    } else {
+      setViewMode("reader")
+    }
+
     // Add to history
     setHistory((prev) => {
-      const newEntry: HistoryEntry = { url: currentUrl, title: currentUrl, mode: "iframe" }
+      const newEntry: HistoryEntry = {
+        url,
+        title: result.data!.title,
+        embeddable: result.data!.embeddable,
+      }
       const newHistory = [...prev.slice(0, historyIndex + 1), newEntry]
       setHistoryIndex(newHistory.length - 1)
       return newHistory
     })
-  }, [currentUrl, historyIndex])
-
-  /**
-   * Called when iframe fails to load — switch to reader view.
-   */
-  const handleEmbedFailed = useCallback(async () => {
-    setViewMode("loading")
-
-    // If we already have page data from the parallel fetch, use it
-    if (pageData) {
-      setViewMode("reader")
-      setHistory((prev) => {
-        const newEntry: HistoryEntry = { url: currentUrl, title: pageData.title, mode: "reader" }
-        const newHistory = [...prev.slice(0, historyIndex + 1), newEntry]
-        setHistoryIndex(newHistory.length - 1)
-        return newHistory
-      })
-      return
-    }
-
-    // Otherwise, fetch now
-    const result = await fetchWebPage(currentUrl)
-    if (result.success && result.data) {
-      setPageData(result.data)
-      setViewMode("reader")
-      setHistory((prev) => {
-        const newEntry: HistoryEntry = { url: currentUrl, title: result.data!.title, mode: "reader" }
-        const newHistory = [...prev.slice(0, historyIndex + 1), newEntry]
-        setHistoryIndex(newHistory.length - 1)
-        return newHistory
-      })
-    } else {
-      setViewMode("error")
-      setErrorMessage(result.error || "Failed to load page")
-    }
-  }, [currentUrl, pageData, historyIndex])
+  }, [historyIndex])
 
   /**
    * Handle URL bar form submission.
@@ -214,6 +198,21 @@ export default function BrowsePage(): React.ReactElement {
   }, [urlInput, navigateTo])
 
   /**
+   * Toggle between reader and iframe view (only for embeddable sites).
+   */
+  const toggleView = useCallback(() => {
+    if (!isEmbeddable) return
+    setViewMode((prev) => (prev === "iframe" ? "reader" : "iframe"))
+  }, [isEmbeddable])
+
+  /**
+   * Switch to reader view (used when iframe fails despite being marked embeddable).
+   */
+  const switchToReader = useCallback(() => {
+    setViewMode("reader")
+  }, [])
+
+  /**
    * Navigate back in history.
    */
   const goBack = useCallback(() => {
@@ -222,9 +221,10 @@ export default function BrowsePage(): React.ReactElement {
       setHistoryIndex(historyIndex - 1)
       setCurrentUrl(prevEntry.url)
       setUrlInput(prevEntry.url)
-      setViewMode(prevEntry.mode)
+      // Re-navigate to reload content
+      navigateTo(prevEntry.url)
     }
-  }, [history, historyIndex])
+  }, [history, historyIndex, navigateTo])
 
   /**
    * Navigate forward in history.
@@ -235,9 +235,9 @@ export default function BrowsePage(): React.ReactElement {
       setHistoryIndex(historyIndex + 1)
       setCurrentUrl(nextEntry.url)
       setUrlInput(nextEntry.url)
-      setViewMode(nextEntry.mode)
+      navigateTo(nextEntry.url)
     }
-  }, [history, historyIndex])
+  }, [history, historyIndex, navigateTo])
 
   /**
    * Reload the current page.
@@ -325,7 +325,7 @@ export default function BrowsePage(): React.ReactElement {
           </Button>
         </form>
 
-        {/* View mode indicator */}
+        {/* View mode indicator + toggle */}
         <div className="flex items-center gap-2">
           {viewMode === "iframe" && (
             <StatusBadge status="success" size="sm" dot>
@@ -344,6 +344,30 @@ export default function BrowsePage(): React.ReactElement {
               <Loader2 className="h-3 w-3 mr-1 animate-spin" />
               Loading
             </StatusBadge>
+          )}
+
+          {/* View toggle — only shown when site is embeddable and content is loaded */}
+          {pageData && isEmbeddable && (viewMode === "iframe" || viewMode === "reader") && (
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleView}
+                  aria-label={viewMode === "iframe" ? "Switch to Reader View" : "Switch to Live View"}
+                  className="h-8 w-8"
+                >
+                  {viewMode === "iframe" ? (
+                    <BookOpen className="h-4 w-4" />
+                  ) : (
+                    <Monitor className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {viewMode === "iframe" ? "Switch to Reader View" : "Switch to Live View"}
+              </TooltipContent>
+            </Tooltip>
           )}
 
           {currentUrl && (
@@ -374,15 +398,21 @@ export default function BrowsePage(): React.ReactElement {
         {viewMode === "loading" && (
           <div className="flex flex-col items-center justify-center h-full gap-4">
             <Loader2 className="h-8 w-8 text-international-orange animate-spin" />
-            <p className="text-sm text-muted-foreground">Loading page...</p>
+            <div className="text-center space-y-1">
+              <p className="text-sm font-medium text-foreground">
+                Fetching {getDomain(currentUrl)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Extracting content for your specialist...
+              </p>
+            </div>
           </div>
         )}
 
         {viewMode === "iframe" && currentUrl && (
           <BrowserFrame
             url={currentUrl}
-            onEmbedFailed={handleEmbedFailed}
-            onEmbedSuccess={handleEmbedSuccess}
+            onEmbedFailed={switchToReader}
             className="h-full"
           />
         )}

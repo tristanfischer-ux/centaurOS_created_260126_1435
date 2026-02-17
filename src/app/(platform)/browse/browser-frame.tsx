@@ -3,150 +3,125 @@
 /**
  * @file browser-frame.tsx
  *
- * @description Iframe component that attempts to embed a URL directly.
- * Detects when a site blocks iframe embedding (via X-Frame-Options or CSP)
- * and signals the parent to fall back to reader view.
- *
- * Detection strategy:
- * 1. Set iframe src and start a timeout
- * 2. Listen for onLoad — if it fires, the site loaded (may still be blocked)
- * 3. If timeout expires without onLoad, or onError fires, trigger fallback
- * 4. Some sites load a blank page when blocked — detect via timeout heuristic
+ * @description Iframe component that embeds a URL directly. Only rendered
+ * when the server-side header check confirms the site allows embedding.
+ * Includes a safety timeout in case the server check was wrong (some sites
+ * block via JavaScript rather than headers).
  *
  * @related
  * - Browse page: src/app/(platform)/browse/page.tsx
  * - Reader view: src/app/(platform)/browse/reader-view.tsx
+ * - Web fetch action: src/actions/web-fetch.ts
  */
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
-import { AlertCircle, ExternalLink } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { BookOpen } from "lucide-react"
 
 interface BrowserFrameProps {
   /** URL to embed */
   url: string
-  /** Called when the iframe fails to load (site blocks embedding) */
+  /** Called when the iframe fails to load — parent switches to reader view */
   onEmbedFailed: () => void
-  /** Called when the iframe loads successfully */
-  onEmbedSuccess: () => void
   /** Additional CSS classes */
   className?: string
 }
 
-/** How long to wait for iframe to load before assuming it's blocked */
-const EMBED_TIMEOUT_MS = 8000
+/**
+ * Safety timeout: if the iframe hasn't fired onLoad after this many ms,
+ * show a fallback button. Reduced from 8s since we already know the site
+ * should be embeddable (server checked headers).
+ */
+const SAFETY_TIMEOUT_MS = 5000
 
 /**
- * BrowserFrame — Sandboxed iframe with embed failure detection.
+ * BrowserFrame — Sandboxed iframe for embeddable sites.
  *
  * @description Renders an iframe with security sandbox attributes.
- * Monitors the load event and uses a timeout fallback to detect
- * when sites silently block iframe embedding.
+ * Since the server already confirmed the site allows embedding via
+ * response headers, this component is simpler — it just needs a safety
+ * timeout for the rare case where a site blocks via JavaScript.
  *
  * @component
  */
 export function BrowserFrame({
   url,
   onEmbedFailed,
-  onEmbedSuccess,
   className,
 }: BrowserFrameProps): React.ReactElement {
   const [isLoading, setIsLoading] = useState(true)
-  const [hasError, setHasError] = useState(false)
+  const [showFallback, setShowFallback] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const hasReportedRef = useRef(false)
 
   const handleLoad = useCallback(() => {
-    if (hasReportedRef.current) return
-    hasReportedRef.current = true
-
-    // Clear the timeout since we got a load event
+    setIsLoading(false)
+    // Clear safety timeout — iframe loaded successfully
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
       timeoutRef.current = null
     }
-
-    setIsLoading(false)
-    onEmbedSuccess()
-  }, [onEmbedSuccess])
+  }, [])
 
   const handleError = useCallback(() => {
-    if (hasReportedRef.current) return
-    hasReportedRef.current = true
-
+    setIsLoading(false)
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
       timeoutRef.current = null
     }
-
-    setIsLoading(false)
-    setHasError(true)
+    // Iframe errored — switch to reader view
     onEmbedFailed()
   }, [onEmbedFailed])
 
-  // Set up timeout for silent failures (sites that block without error event)
+  // Safety timeout: if iframe hasn't loaded, show a manual fallback button
   useEffect(() => {
-    hasReportedRef.current = false
     setIsLoading(true)
-    setHasError(false)
+    setShowFallback(false)
 
     timeoutRef.current = setTimeout(() => {
-      if (!hasReportedRef.current) {
-        hasReportedRef.current = true
-        setIsLoading(false)
-        setHasError(true)
-        onEmbedFailed()
-      }
-    }, EMBED_TIMEOUT_MS)
+      // Don't auto-switch — just show a button so the user can decide
+      setShowFallback(true)
+      setIsLoading(false)
+    }, SAFETY_TIMEOUT_MS)
 
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
       }
     }
-  }, [url, onEmbedFailed])
-
-  if (hasError) {
-    return (
-      <div className={cn("flex flex-col items-center justify-center gap-4 p-8 text-center", className)}>
-        <div className="flex items-center justify-center h-12 w-12 rounded-full bg-status-warning-light">
-          <AlertCircle className="h-6 w-6 text-status-warning" />
-        </div>
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-foreground">
-            This site doesn&apos;t support embedding
-          </p>
-          <p className="text-sm text-muted-foreground max-w-md">
-            Switching to Reader View so your specialist can still see the content.
-          </p>
-        </div>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-sm text-electric-blue hover:underline"
-        >
-          <ExternalLink className="h-4 w-4" />
-          Open in new tab
-        </a>
-      </div>
-    )
-  }
+  }, [url])
 
   return (
     <div className={cn("relative w-full h-full", className)}>
+      {/* Loading overlay */}
       {isLoading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background z-10">
           <Skeleton className="w-full h-8 max-w-lg" />
           <Skeleton className="w-full h-64 max-w-lg" />
           <Skeleton className="w-full h-8 max-w-md" />
           <p className="text-sm text-muted-foreground animate-pulse">
-            Loading page...
+            Loading live view...
           </p>
         </div>
       )}
+
+      {/* Fallback button — shown if iframe takes too long */}
+      {showFallback && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onEmbedFailed}
+            className="shadow-lg border"
+          >
+            <BookOpen className="h-4 w-4 mr-2" />
+            Page not loading? Switch to Reader View
+          </Button>
+        </div>
+      )}
+
       <iframe
         ref={iframeRef}
         src={url}

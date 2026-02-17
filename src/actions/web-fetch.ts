@@ -43,6 +43,8 @@ export interface WebPageResult {
   byline: string | null
   /** Estimated reading time in minutes */
   readingTimeMinutes: number
+  /** Whether the site likely allows iframe embedding (based on X-Frame-Options / CSP headers) */
+  embeddable: boolean
 }
 
 export interface WebFetchResponse {
@@ -55,7 +57,7 @@ export interface WebFetchResponse {
 
 const MAX_CONTENT_LENGTH = 8000
 const MAX_HTML_LENGTH = 50000
-const FETCH_TIMEOUT_MS = 15000
+const FETCH_TIMEOUT_MS = 10000
 
 /**
  * Blocked IP ranges: private networks, loopback, link-local, metadata endpoints.
@@ -79,6 +81,34 @@ const BLOCKED_HOSTNAMES = [
   "metadata.google.internal",
   "169.254.169.254",
 ]
+
+// ─── Embed Detection ────────────────────────────────────────────────────────
+
+/**
+ * Checks response headers to determine if a site allows iframe embedding.
+ *
+ * @description Reads X-Frame-Options and Content-Security-Policy frame-ancestors
+ * directives. These are the same headers browsers use to decide whether to render
+ * an iframe — checking them server-side lets us skip the iframe attempt entirely
+ * for sites that will block it.
+ *
+ * @param response - The fetch Response object
+ * @returns true if the site likely allows embedding, false if it blocks it
+ *
+ * @security This is a best-effort check. Some sites block iframes via JavaScript
+ * instead of headers, which this cannot detect.
+ */
+function checkEmbeddable(response: Response): boolean {
+  // SECURITY: Check X-Frame-Options header
+  const xfo = response.headers.get("x-frame-options")?.toLowerCase()
+  if (xfo === "deny" || xfo === "sameorigin") return false
+
+  // SECURITY: Check Content-Security-Policy frame-ancestors directive
+  const csp = response.headers.get("content-security-policy")?.toLowerCase() ?? ""
+  if (csp.includes("frame-ancestors 'none'") || csp.includes("frame-ancestors 'self'")) return false
+
+  return true
+}
 
 // ─── URL Validation ─────────────────────────────────────────────────────────
 
@@ -271,10 +301,19 @@ export async function fetchWebPage(url: string): Promise<WebFetchResponse> {
     const response = await fetch(validatedUrl.toString(), {
       signal: controller.signal,
       headers: {
+        // Use a realistic browser User-Agent to avoid bot detection on sites
+        // like ThomasNet (DataDome) and Alibaba (Cloudflare)
         "User-Agent":
-          "Mozilla/5.0 (compatible; ForgeOS/1.0; +https://forgeos.com)",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Cache-Control": "no-cache",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
       },
       redirect: "follow",
     })
@@ -282,10 +321,12 @@ export async function fetchWebPage(url: string): Promise<WebFetchResponse> {
     clearTimeout(timeout)
 
     if (!response.ok) {
-      return {
-        success: false,
-        error: `Failed to fetch page (HTTP ${response.status})`,
-      }
+      const errorMsg = response.status === 403
+        ? "This site blocks automated access. Try opening it in a new tab instead."
+        : response.status === 429
+          ? "Too many requests to this site. Wait a moment and try again."
+          : `Failed to fetch page (HTTP ${response.status})`
+      return { success: false, error: errorMsg }
     }
 
     const contentType = response.headers.get("content-type") ?? ""
@@ -295,6 +336,9 @@ export async function fetchWebPage(url: string): Promise<WebFetchResponse> {
         error: "URL does not point to an HTML page",
       }
     }
+
+    // Check if the site allows iframe embedding before reading body
+    const embeddable = checkEmbeddable(response)
 
     const html = await response.text()
 
@@ -326,6 +370,7 @@ export async function fetchWebPage(url: string): Promise<WebFetchResponse> {
           favicon,
           byline: null,
           readingTimeMinutes: 1,
+          embeddable,
         },
       }
     }
@@ -359,6 +404,7 @@ export async function fetchWebPage(url: string): Promise<WebFetchResponse> {
         favicon,
         byline: article.byline || null,
         readingTimeMinutes: estimateReadingTime(textContent),
+        embeddable,
       },
     }
   } catch (error) {
