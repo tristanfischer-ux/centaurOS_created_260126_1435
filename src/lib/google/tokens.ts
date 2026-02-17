@@ -12,6 +12,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export interface GoogleTokenRecord {
     id: string
@@ -82,7 +83,12 @@ export async function getGoogleToken(
 export async function saveGoogleToken(
     params: SaveTokenParams
 ): Promise<{ success: boolean; error?: string }> {
-    const supabase = await createClient()
+    // SECURITY: Use admin client to bypass RLS for server-side token storage.
+    // The caller (OAuth callback) has already verified the user's identity
+    // via the signed state parameter, so RLS is not needed here.
+    // The cookie-based client's auth.uid() may not be available during
+    // the OAuth redirect round-trip, causing silent RLS INSERT failures.
+    const supabase = createAdminClient()
 
     const { error } = await supabase
         .from('google_oauth_tokens')
