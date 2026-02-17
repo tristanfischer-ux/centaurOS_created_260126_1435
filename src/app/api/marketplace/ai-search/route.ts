@@ -170,8 +170,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
 
         // Call OpenAI to extract structured filters
-        // @ts-expect-error types for beta.chat.completions.parse are conflicting
-        const completion = await openai.beta.chat.completions.parse({
+        const completion = await openai.chat.completions.parse({
             model: "gpt-4o",
             messages: [
                 {

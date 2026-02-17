@@ -316,8 +316,7 @@ export async function parseTranscriptToStrategy(text: string): Promise<{ plan?: 
     // ── Step 1: AI Parsing ──
     let parsedPlan: z.infer<typeof StrategicPlanSchema>
     try {
-      // @ts-expect-error types for beta.chat.completions.parse are conflicting
-      const completion = await openai.beta.chat.completions.parse({
+      const completion = await openai.chat.completions.parse({
         model: 'gpt-4o-2024-08-06',
         messages: [
           {
@@ -373,7 +372,9 @@ Transform the text into a comprehensive strategic plan.`,
         response_format: zodResponseFormat(StrategicPlanSchema, 'strategic_plan'),
       })
 
-      parsedPlan = completion.choices[0].message.parsed
+      // Safe assertion: the parse() return matches our StrategicPlanSchema but
+      // TypeScript sees two distinct Zod-inferred types (SDK internal vs project Zod)
+      parsedPlan = completion.choices[0].message.parsed as typeof parsedPlan
 
       if (!parsedPlan) {
         return { error: 'AI could not extract a strategic plan from this text. Try providing more detail.' }

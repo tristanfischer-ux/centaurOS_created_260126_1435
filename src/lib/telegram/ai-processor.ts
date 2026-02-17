@@ -77,8 +77,7 @@ export async function parseTextToObjective(text: string): Promise<ParsedObjectiv
     
     const currentDate = new Date().toISOString().split('T')[0]
 
-    // @ts-expect-error types for beta.chat.completions.parse are conflicting
-    const completion = await openai.beta.chat.completions.parse({
+    const completion = await openai.chat.completions.parse({
         model: 'gpt-4o-2024-08-06',
         messages: [
             {
@@ -142,8 +141,7 @@ export async function refineObjective(
         throw new Error('AI service not configured')
     }
 
-    // @ts-expect-error types for beta.chat.completions.parse are conflicting
-    const completion = await openai.beta.chat.completions.parse({
+    const completion = await openai.chat.completions.parse({
         model: 'gpt-4o-2024-08-06',
         messages: [
             {
