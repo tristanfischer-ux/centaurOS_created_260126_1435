@@ -317,28 +317,54 @@ export interface ConversationMessage {
 }
 
 /**
+ * Maximum token budget for conversation history passed to the LLM.
+ * This prevents long conversations from blowing up the context window.
+ * The system prompt (personality, context layers, observations) typically
+ * uses 5,000-15,000 tokens, so we reserve ~12,000 for conversation history.
+ */
+const CONVERSATION_TOKEN_BUDGET = 12_000
+
+/**
+ * Messages within this count from the end are kept at full length.
+ * Older messages get truncated to save tokens while preserving recent context.
+ */
+const FULL_LENGTH_RECENT_COUNT = 6
+
+/**
+ * Maximum characters to keep from a truncated older message.
+ * Roughly ~250 tokens — enough to preserve the gist without the full detail.
+ */
+const TRUNCATED_MESSAGE_MAX_CHARS = 1000
+
+/**
  * Extracts recent unobserved messages as a properly typed array for
- * multi-turn LLM API calls.
+ * multi-turn LLM API calls, with token-budget-aware truncation.
  *
  * @description Instead of embedding conversation history as text in the
  * system prompt, this returns messages in the format expected by LLM APIs
  * (user/assistant turns). System and tool messages are excluded since they
  * don't map to standard conversation roles.
  *
+ * To prevent long conversations from exceeding context windows:
+ * 1. Caps at maxMessages (default 20)
+ * 2. Keeps the most recent messages at full length
+ * 3. Truncates older messages to ~250 tokens each
+ * 4. Drops oldest messages if total still exceeds token budget
+ *
  * @param context - The memory context from getMemoryContext
- * @param maxMessages - Maximum number of messages to return (default: 40)
+ * @param maxMessages - Maximum number of messages to return (default: 20)
  * @returns Array of user/assistant messages for the LLM messages parameter
  */
 export function getConversationHistory(
   context: MemoryContext,
-  maxMessages: number = 40
+  maxMessages: number = 20
 ): ConversationMessage[] {
   if (context.recentMessages.length === 0) {
     return []
   }
 
   // Filter to only user and assistant messages (system/tool don't map to conversation turns)
-  const conversationMessages = context.recentMessages
+  let conversationMessages = context.recentMessages
     .filter((msg): msg is typeof msg & { role: 'user' | 'assistant' } =>
       msg.role === 'user' || msg.role === 'assistant'
     )
@@ -347,9 +373,32 @@ export function getConversationHistory(
       content: msg.content,
     }))
 
-  // Cap at maxMessages to avoid exceeding context windows
+  // Cap at maxMessages — take the most recent
   if (conversationMessages.length > maxMessages) {
-    return conversationMessages.slice(-maxMessages)
+    conversationMessages = conversationMessages.slice(-maxMessages)
+  }
+
+  // Truncate older messages to save tokens while preserving recent context.
+  // The last FULL_LENGTH_RECENT_COUNT messages stay intact; older ones get
+  // trimmed so long assistant analyses don't dominate the context window.
+  if (conversationMessages.length > FULL_LENGTH_RECENT_COUNT) {
+    const cutoff = conversationMessages.length - FULL_LENGTH_RECENT_COUNT
+    for (let i = 0; i < cutoff; i++) {
+      const msg = conversationMessages[i]
+      if (msg.content.length > TRUNCATED_MESSAGE_MAX_CHARS) {
+        conversationMessages[i] = {
+          role: msg.role,
+          content: msg.content.slice(0, TRUNCATED_MESSAGE_MAX_CHARS) + '\n\n[...truncated for brevity]',
+        }
+      }
+    }
+  }
+
+  // Final token budget enforcement — drop oldest messages until we're under budget
+  let totalTokens = countMessagesTokens(conversationMessages)
+  while (totalTokens > CONVERSATION_TOKEN_BUDGET && conversationMessages.length > 2) {
+    conversationMessages.shift()
+    totalTokens = countMessagesTokens(conversationMessages)
   }
 
   return conversationMessages

@@ -71,15 +71,16 @@ export const OBSERVATION_PRIORITY = {
 export interface MemoryConfig {
   /**
    * Token threshold for raw messages before triggering the Observer.
-   * When unobserved messages exceed this, they get compressed.
-   * @default 30_000
+   * When unobserved messages exceed this, they get compressed into observations.
+   * Lower values mean more frequent compression but faster conversations.
+   * @default 8_000
    */
   observeThresholdTokens: number
 
   /**
    * Token threshold for observations before triggering the Reflector.
    * When observations exceed this, they get consolidated/garbage-collected.
-   * @default 40_000
+   * @default 20_000
    */
   reflectThresholdTokens: number
 
@@ -104,8 +105,8 @@ export interface MemoryConfig {
 
 /** Default memory configuration */
 export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
-  observeThresholdTokens: 30_000,
-  reflectThresholdTokens: 40_000,
+  observeThresholdTokens: 8_000,
+  reflectThresholdTokens: 20_000,
   memoryModel: 'gpt-4o-mini',
   observerTemperature: 0.3,
   reflectorTemperature: 0,
