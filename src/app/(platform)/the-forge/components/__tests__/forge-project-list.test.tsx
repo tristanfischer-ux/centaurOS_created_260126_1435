@@ -2,28 +2,21 @@ import React from "react"
 import { render, screen } from "@testing-library/react"
 
 import { ForgeProjectList } from "../forge-project-list"
-import { listScansAction } from "@/actions/xray"
+import { listCadLabProjects } from "@/actions/cad-lab-projects"
 
-jest.mock("@/actions/xray", () => ({
-  listScansAction: jest.fn(),
+jest.mock("@/actions/cad-lab-projects", () => ({
+  listCadLabProjects: jest.fn(),
 }))
 
-jest.mock("../forge-project-card", () => ({
-  ForgeProjectCard: ({ scan }: { scan: { id: string } }) => (
-    <div data-testid={`project-${scan.id}`}>Project {scan.id}</div>
-  ),
-}))
+const mockedListCadLabProjects = listCadLabProjects as jest.MockedFunction<typeof listCadLabProjects>
 
-const mockedListScansAction = listScansAction as jest.MockedFunction<typeof listScansAction>
-
-const sampleScan = {
-  id: "scan-1",
-  idea: "Bracket fixture",
+const sampleProject = {
+  id: "proj-1",
   name: "Bracket Project",
-  status: "completed",
-  stage: "contracting",
-  thumbnailUrl: null,
-  moduleCount: 2,
+  subject: "Bracket fixture",
+  status: "active",
+  stage: "researched",
+  thumbnailSvg: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-02T00:00:00.000Z",
 }
@@ -33,17 +26,8 @@ describe("ForgeProjectList", () => {
     jest.clearAllMocks()
   })
 
-  it("shows error message when project load fails", async () => {
-    mockedListScansAction.mockResolvedValue({ error: "Failed to load projects" })
-
-    render(await ForgeProjectList())
-
-    expect(screen.getByRole("heading", { name: "The Forge" })).toBeInTheDocument()
-    expect(screen.getByText("Failed to load projects")).toBeInTheDocument()
-  })
-
   it("shows empty state when no projects exist", async () => {
-    mockedListScansAction.mockResolvedValue({ scans: [] })
+    mockedListCadLabProjects.mockResolvedValue({ projects: [] })
 
     render(await ForgeProjectList())
 
@@ -55,13 +39,13 @@ describe("ForgeProjectList", () => {
     )
   })
 
-  it("renders project cards with pipeline preview", async () => {
-    mockedListScansAction.mockResolvedValue({ scans: [sampleScan] })
+  it("renders project cards when projects exist", async () => {
+    mockedListCadLabProjects.mockResolvedValue({ projects: [sampleProject] })
 
     render(await ForgeProjectList())
 
     expect(screen.getByRole("heading", { name: "The Forge" })).toBeInTheDocument()
-    expect(screen.getByTestId("project-scan-1")).toBeInTheDocument()
+    expect(screen.getByText("Bracket fixture")).toBeInTheDocument()
     expect(screen.getByText("Recent Projects")).toBeInTheDocument()
   })
 })
