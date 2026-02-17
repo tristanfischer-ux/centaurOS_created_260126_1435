@@ -27,7 +27,7 @@ export default async function NewObjectivesPage() {
   // Note: is_private may not be in generated types but exists in DB via migration
   const { data: rawObjectives, error } = await supabase
     .from('objectives')
-    .select('id, title, description, extended_description, status, progress, parent_objective_id, is_strategic_goal, is_demo, creator_id, foundry_id, created_at, updated_at')
+    .select('id, title, description, extended_description, status, progress, parent_objective_id, is_strategic_goal, is_demo, creator_id, foundry_id, created_at, updated_at, start_date, end_date')
     .eq('foundry_id', profile.foundry_id)
     .eq('is_ghost', false)
     .is('deleted_at', null)
@@ -37,7 +37,9 @@ export default async function NewObjectivesPage() {
     id: string; title: string; description: string | null; extended_description: string | null;
     status: string | null; progress: number | null; parent_objective_id: string | null;
     is_strategic_goal: boolean | null;
-    creator_id: string; foundry_id: string; created_at: string; updated_at: string; is_private?: boolean; is_demo?: boolean;
+    creator_id: string; foundry_id: string; created_at: string; updated_at: string;
+    start_date: string | null; end_date: string | null;
+    is_private?: boolean; is_demo?: boolean;
   }>
 
   // Separate strategic objectives (high-level pillars) from regular objectives

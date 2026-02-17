@@ -1245,3 +1245,205 @@ export async function linkObjectiveToStrategic(
         return {}
     })
 }
+
+/**
+ * Updates an objective's start and end dates for timeline scheduling.
+ *
+ * @description Allows users to drag objective bars on the Gantt chart to
+ * reschedule them. Sets explicit start_date and end_date on the objective.
+ *
+ * @param {string} objectiveId - The objective to update
+ * @param {string} startDate - ISO 8601 start date
+ * @param {string} endDate - ISO 8601 end date
+ * @returns {Promise<{ success: true } | { error: string }>}
+ *
+ * @security Requires authenticated user with foundry membership
+ * @audit Logs date change event
+ */
+export async function updateObjectiveDates(
+    objectiveId: string,
+    startDate: string,
+    endDate: string
+) {
+    return withAuth(async ({ supabase, user, foundryId }) => {
+        // SECURITY: Verify objective exists and belongs to user's foundry
+        const { data: objective, error: fetchError } = await supabase
+            .from('objectives')
+            .select('id, foundry_id, title')
+            .eq('id', objectiveId)
+            .single()
+
+        if (fetchError || !objective) {
+            return { error: 'Objective not found' }
+        }
+
+        // SECURITY: Check foundry isolation
+        if (objective.foundry_id !== foundryId) {
+            console.warn(`[SECURITY] User ${user.id} attempted to update objective dates ${objectiveId} from different foundry`)
+            return { error: 'Objective not found' }
+        }
+
+        // VALIDATION: Ensure dates are valid ISO strings
+        const parsedStart = new Date(startDate)
+        const parsedEnd = new Date(endDate)
+        if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
+            return { error: 'Invalid date format' }
+        }
+        if (parsedEnd <= parsedStart) {
+            return { error: 'End date must be after start date' }
+        }
+
+        const { error: updateError } = await supabase
+            .from('objectives')
+            .update({
+                start_date: startDate,
+                end_date: endDate,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', objectiveId)
+            .eq('foundry_id', foundryId)
+
+        if (updateError) {
+            console.error('[ObjectiveService] Failed to update objective dates:', {
+                objectiveId,
+                error: updateError.message,
+            })
+            return { error: updateError.message }
+        }
+
+        // AUDIT: Log the date change
+        console.info('[ObjectiveService] Objective dates updated:', {
+            objectiveId,
+            startDate: startDate.split('T')[0],
+            endDate: endDate.split('T')[0],
+            updatedBy: user.id,
+            foundryId,
+        })
+
+        revalidatePath('/new-objectives')
+        revalidatePath('/objectives')
+        return { success: true }
+    })
+}
+
+/**
+ * Moves a task from one objective to another.
+ *
+ * @description Allows users to drag tasks between objectives on the timeline
+ * view. Updates the task's objective_id and recalculates progress for both
+ * the source and target objectives.
+ *
+ * @param {string} taskId - The task to move
+ * @param {string} targetObjectiveId - The objective to move the task to
+ * @returns {Promise<{ success: true } | { error: string }>}
+ *
+ * @security Requires authenticated user; both task and target objective must
+ *   belong to the same foundry
+ * @audit Logs task move event
+ */
+export async function moveTaskToObjective(
+    taskId: string,
+    targetObjectiveId: string
+) {
+    return withAuth(async ({ supabase, user, foundryId }) => {
+        // SECURITY: Verify task exists and belongs to user's foundry
+        const { data: task, error: taskError } = await supabase
+            .from('tasks')
+            .select('id, foundry_id, objective_id, title')
+            .eq('id', taskId)
+            .single()
+
+        if (taskError || !task) {
+            return { error: 'Task not found' }
+        }
+        if (task.foundry_id !== foundryId) {
+            console.warn(`[SECURITY] User ${user.id} attempted to move task ${taskId} from different foundry`)
+            return { error: 'Task not found' }
+        }
+
+        // No-op if task is already in the target objective
+        if (task.objective_id === targetObjectiveId) {
+            return { success: true }
+        }
+
+        const sourceObjectiveId = task.objective_id
+
+        // SECURITY: Verify target objective exists and belongs to same foundry
+        const { data: targetObj, error: targetError } = await supabase
+            .from('objectives')
+            .select('id, foundry_id')
+            .eq('id', targetObjectiveId)
+            .single()
+
+        if (targetError || !targetObj) {
+            return { error: 'Target objective not found' }
+        }
+        if (targetObj.foundry_id !== foundryId) {
+            console.warn(`[SECURITY] User ${user.id} attempted to move task to objective in different foundry`)
+            return { error: 'Target objective not found' }
+        }
+
+        // Move the task
+        const { error: updateError } = await supabase
+            .from('tasks')
+            .update({ objective_id: targetObjectiveId })
+            .eq('id', taskId)
+            .eq('foundry_id', foundryId)
+
+        if (updateError) {
+            console.error('[ObjectiveService] Failed to move task:', {
+                taskId,
+                targetObjectiveId,
+                error: updateError.message,
+            })
+            return { error: updateError.message }
+        }
+
+        // Recalculate progress for both source and target objectives
+        const recalcProgress = async (objectiveId: string): Promise<void> => {
+            const { data: tasks } = await supabase
+                .from('tasks')
+                .select('id, status')
+                .eq('objective_id', objectiveId)
+                .eq('foundry_id', foundryId)
+                .eq('is_ghost', false)
+                .is('deleted_at', null)
+
+            if (!tasks || tasks.length === 0) {
+                await supabase
+                    .from('objectives')
+                    .update({ progress: 0 })
+                    .eq('id', objectiveId)
+                return
+            }
+
+            const completed = tasks.filter(t => t.status === 'Completed').length
+            const progress = Math.round((completed / tasks.length) * 100)
+            await supabase
+                .from('objectives')
+                .update({ progress })
+                .eq('id', objectiveId)
+        }
+
+        // Recalculate both objectives
+        if (sourceObjectiveId) {
+            await recalcProgress(sourceObjectiveId)
+        }
+        await recalcProgress(targetObjectiveId)
+
+        // AUDIT: Log the move
+        console.info('[ObjectiveService] Task moved between objectives:', {
+            taskId,
+            taskTitle: task.title,
+            from: sourceObjectiveId,
+            to: targetObjectiveId,
+            movedBy: user.id,
+            foundryId,
+        })
+
+        revalidatePath('/new-objectives')
+        revalidatePath('/objectives')
+        revalidatePath('/tasks')
+        return { success: true }
+    })
+}

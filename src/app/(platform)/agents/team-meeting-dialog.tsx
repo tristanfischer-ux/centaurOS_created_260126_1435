@@ -50,6 +50,7 @@ import {
     ChevronDown,
     ChevronUp,
     Hand,
+    Square,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
@@ -791,6 +792,8 @@ export function TeamMeetingDialog({
                 setIsGeneratingOutputs(false)
                 setExpandedEntries(new Set())
                 setWantsToSpeak(new Set())
+                setDebateCancelRequested(false)
+                debateCancelRef.current = false
             }, 300)
             return () => clearTimeout(timer)
         }
@@ -1017,13 +1020,16 @@ export function TeamMeetingDialog({
         setError(null)
         setIsStarting(true)
 
+        // Unlock AudioContext on this user gesture so TTS works after async work
+        tts.warmUp()
+
         try {
             const threads = await initializeThreads()
             await runSingleSpecialist(0, 1, threads)
         } finally {
             setIsStarting(false)
         }
-    }, [selectedIds, topic, initializeThreads, runSingleSpecialist])
+    }, [selectedIds, topic, initializeThreads, runSingleSpecialist, tts])
 
     // ─── Ask a Specific Specialist ────────────────────────────────────────
 
@@ -1036,20 +1042,37 @@ export function TeamMeetingDialog({
             const thoughts = userThoughts.trim() || undefined
             setUserThoughts("")
 
+            // Unlock AudioContext on this user gesture so TTS works after async work
+            tts.warmUp()
+
             const idx = selectedSpecialists.findIndex((s) => s.id === specialist.id)
             if (idx === -1) return
 
             const nextRound = currentRound + 1
             await runSingleSpecialist(idx, nextRound, threadIds, thoughts)
         },
-        [selectedSpecialists, currentRound, threadIds, userThoughts, runSingleSpecialist]
+        [selectedSpecialists, currentRound, threadIds, userThoughts, runSingleSpecialist, tts]
     )
 
     // ─── Autonomous Debate: Specialists discuss among themselves ──────────
+
+    /**
+     * Stop the autonomous debate after the current specialist finishes.
+     */
+    const handleStopDebate = useCallback(() => {
+        debateCancelRef.current = true
+        setDebateCancelRequested(true)
+    }, [])
+
     const handleAutonomousDebate = useCallback(async () => {
         setShowThoughtsInput(false)
         setPhase("in-progress")
         setError(null)
+        setDebateCancelRequested(false)
+        debateCancelRef.current = false
+
+        // Unlock AudioContext on this user gesture so TTS works after async work
+        tts.warmUp()
 
         const debateAccumulator: MeetingEntry[] = [...entriesRef.current]
         let roundCounter = currentRound
@@ -1059,6 +1082,11 @@ export function TeamMeetingDialog({
             const roundLabel = `Debate ${debateRound}`
 
             for (let i = 0; i < selectedSpecialists.length; i++) {
+                // Check if user requested cancellation before starting next specialist
+                if (debateCancelRef.current) {
+                    break
+                }
+
                 const specialist = selectedSpecialists[i]
                 setCurrentSpecialistIdx(i)
                 setStreamingContent("")
@@ -1114,11 +1142,27 @@ export function TeamMeetingDialog({
                     setStreamingContent("")
                 }
             }
+
+            // Check cancellation between debate rounds too
+            if (debateCancelRef.current) {
+                break
+            }
         }
 
         setCurrentRound(roundCounter)
+        setDebateCancelRequested(false)
+        debateCancelRef.current = false
+
+        // Compute "wants to speak" based on the last entry
+        const lastAccEntry = debateAccumulator[debateAccumulator.length - 1]
+        if (lastAccEntry) {
+            const remainingIds = selectedSpecialists.map((s) => s.id)
+            const wants = getWantsToSpeak(lastAccEntry.content, remainingIds, lastAccEntry.specialistId)
+            setWantsToSpeak(wants)
+        }
+
         setPhase("awaiting-input")
-    }, [currentRound, selectedSpecialists, topic, threadIds, executeSpecialist])
+    }, [currentRound, selectedSpecialists, topic, threadIds, executeSpecialist, tts])
 
     // ─── Wrap Up (Generate Outputs) ───────────────────────────────────────
     const handleWrapUp = useCallback(async () => {
@@ -1264,7 +1308,11 @@ export function TeamMeetingDialog({
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => tts.setVoiceEnabled(!tts.voiceEnabled)}
+                                onClick={() => {
+                                    const enabling = !tts.voiceEnabled
+                                    tts.setVoiceEnabled(enabling)
+                                    if (enabling) tts.warmUp()
+                                }}
                                 className={cn(
                                     "h-7 w-7 p-0 flex-shrink-0",
                                     tts.voiceEnabled && "text-international-orange",
@@ -1454,8 +1502,8 @@ export function TeamMeetingDialog({
                         className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1"
                         style={{ maxHeight: "60vh" }}
                     >
-                        {/* Collapsed previous entries */}
-                        {entries.map((entry, i) => {
+                        {/* Earlier entries (collapsed) — all except the last completed one */}
+                        {entries.slice(0, Math.max(0, entries.length - 1)).map((entry, i) => {
                             const specialist = getSpecialistById(entry.specialistId)
                             const isExpanded = expandedEntries.has(i)
                             return (
@@ -1520,6 +1568,55 @@ export function TeamMeetingDialog({
                                 </div>
                             )
                         })}
+
+                        {/* Last completed entry (always expanded so user can see what was just said) */}
+                        {entries.length > 0 && (() => {
+                            const lastEntry = entries[entries.length - 1]
+                            const specialist = getSpecialistById(lastEntry.specialistId)
+                            return (
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative h-7 w-7 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                                            {specialist?.avatarImage ? (
+                                                <Image
+                                                    src={specialist.avatarImage}
+                                                    alt={lastEntry.specialistName}
+                                                    fill
+                                                    className="object-cover"
+                                                    sizes="28px"
+                                                />
+                                            ) : (
+                                                <span className="flex items-center justify-center h-full w-full text-xs font-semibold">
+                                                    {lastEntry.specialistName.charAt(0)}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-sm font-semibold text-foreground">
+                                            {lastEntry.specialistName}
+                                        </span>
+                                        <Badge variant="secondary" className="text-[10px]">
+                                            Round {lastEntry.round}
+                                        </Badge>
+                                    </div>
+                                    <div className="ml-9 rounded-lg border border-muted bg-muted/30 p-4">
+                                        <Markdown content={lastEntry.content} className="text-sm" />
+                                    </div>
+                                    {lastEntry.proposals && lastEntry.proposals.length > 0 && specialist && (
+                                        <div className="ml-9 mt-2">
+                                            <ProposedActionsCard
+                                                proposals={lastEntry.proposals}
+                                                specialist={specialist}
+                                                onDismiss={() => {
+                                                    setEntries((prev) => prev.map((e, idx) =>
+                                                        idx === entries.length - 1 ? { ...e, proposals: undefined } : e
+                                                    ))
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })()}
 
                         {/* Currently streaming specialist */}
                         {currentSpecialist && (
@@ -1922,6 +2019,27 @@ export function TeamMeetingDialog({
 
                         {/* Right side */}
                         <div className="flex items-center gap-2">
+                            {/* Stop button during autonomous debate */}
+                            {phase === "in-progress" && isStreaming && (
+                                <Button
+                                    variant="destructive"
+                                    onClick={handleStopDebate}
+                                    disabled={debateCancelRequested}
+                                >
+                                    {debateCancelRequested ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            Stopping after this response...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Square className="h-4 w-4 mr-2" />
+                                            Stop Discussion
+                                        </>
+                                    )}
+                                </Button>
+                            )}
+
                             {phase === "setup" && (
                                 <Button
                                     onClick={handleStartMeeting}

@@ -5,7 +5,8 @@
  *
  * @description Post-meeting outputs display with three tabs: Meeting Notes,
  * Suggested Objectives & Tasks, and Marketplace Recommendations. Allows
- * one-click objective creation and saving the full meeting as a deliverable.
+ * one-click objective creation (optionally linked to a strategic objective)
+ * and saving the full meeting as a deliverable.
  *
  * @related
  * - team-meeting-dialog.tsx -- Parent component
@@ -13,12 +14,19 @@
  * - src/actions/agent-artifacts.ts -- createArtifact for saving deliverables
  */
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 import {
     FileText,
     Target,
@@ -29,13 +37,20 @@ import {
     Loader2,
     Save,
     ArrowRight,
+    Flag,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Markdown } from "@/components/ui/markdown"
-import { createObjective } from "@/actions/objectives"
+import { createObjective, getStrategicObjectives } from "@/actions/objectives"
 import { createArtifact } from "@/actions/agent-artifacts"
 import type { MeetingOutputData } from "./team-meeting-dialog"
+
+/** Minimal strategic objective shape for the selector */
+interface StrategicObjectiveOption {
+    id: string
+    title: string
+}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +80,38 @@ export function MeetingOutputs({
     const [isSaving, setIsSaving] = useState(false)
     const [isSaved, setIsSaved] = useState(false)
 
+    // Strategic objective selections: objIdx → strategicObjectiveId
+    const [strategicSelections, setStrategicSelections] = useState<Record<number, string>>({})
+    const [strategicObjectives, setStrategicObjectives] = useState<StrategicObjectiveOption[]>([])
+
+    // ─── Fetch Strategic Objectives ───────────────────────────────────────
+    useEffect(() => {
+        async function fetchStrategicObjectives(): Promise<void> {
+            try {
+                const result = await getStrategicObjectives()
+                if (result.data) {
+                    setStrategicObjectives(result.data)
+                }
+            } catch (err) {
+                console.error("[MeetingOutputs] Failed to fetch strategic objectives:", err)
+            }
+        }
+        fetchStrategicObjectives()
+    }, [])
+
+    /** Update the strategic objective selection for a given objective index */
+    const handleStrategicSelect = useCallback((objIdx: number, value: string) => {
+        setStrategicSelections((prev) => {
+            const next = { ...prev }
+            if (value === "none") {
+                delete next[objIdx]
+            } else {
+                next[objIdx] = value
+            }
+            return next
+        })
+    }, [])
+
     // ─── Create Objective ─────────────────────────────────────────────────
     const handleCreateObjective = useCallback(
         async (objIdx: number) => {
@@ -77,6 +124,12 @@ export function MeetingOutputs({
                 const formData = new FormData()
                 formData.set("title", obj.title)
                 formData.set("description", obj.description)
+
+                // Link to strategic objective if selected
+                const selectedStrategicId = strategicSelections[objIdx]
+                if (selectedStrategicId) {
+                    formData.set("parent_objective_id", selectedStrategicId)
+                }
 
                 // Add tasks as aiTasks JSON strings
                 for (const task of obj.tasks) {
@@ -93,9 +146,14 @@ export function MeetingOutputs({
                         description: result.error,
                     })
                 } else {
+                    const strategicTitle = selectedStrategicId
+                        ? strategicObjectives.find((s) => s.id === selectedStrategicId)?.title
+                        : null
                     setCreatedObjectives((prev) => new Set(prev).add(objIdx))
                     toast.success("Objective created", {
-                        description: `"${obj.title}" with ${obj.tasks.length} tasks`,
+                        description: strategicTitle
+                            ? `"${obj.title}" linked to "${strategicTitle}"`
+                            : `"${obj.title}" with ${obj.tasks.length} tasks`,
                     })
                 }
             } catch (err) {
@@ -105,7 +163,7 @@ export function MeetingOutputs({
                 setCreatingIdx(null)
             }
         },
-        [outputs.objectives]
+        [outputs.objectives, strategicSelections, strategicObjectives]
     )
 
     // ─── Save Meeting ─────────────────────────────────────────────────────
@@ -281,6 +339,10 @@ export function MeetingOutputs({
                         outputs.objectives.map((obj, objIdx) => {
                             const isCreated = createdObjectives.has(objIdx)
                             const isCreating = creatingIdx === objIdx
+                            const selectedStrategicId = strategicSelections[objIdx]
+                            const linkedStrategic = selectedStrategicId
+                                ? strategicObjectives.find((s) => s.id === selectedStrategicId)
+                                : null
                             return (
                                 <Card key={objIdx} className={cn("border", isCreated && "border-status-success/50 bg-status-success-light/20")}>
                                     <CardContent className="pt-5 space-y-3">
@@ -313,6 +375,41 @@ export function MeetingOutputs({
                                                 {isCreated ? "Created" : "Create"}
                                             </Button>
                                         </div>
+
+                                        {/* Strategic Objective Selector */}
+                                        {strategicObjectives.length > 0 && !isCreated && (
+                                            <div className="flex items-center gap-2">
+                                                <Flag className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                                <Select
+                                                    value={selectedStrategicId || "none"}
+                                                    onValueChange={(value) => handleStrategicSelect(objIdx, value)}
+                                                >
+                                                    <SelectTrigger className="h-8 text-xs flex-1">
+                                                        <SelectValue placeholder="Add to strategic objective..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">
+                                                            <span className="text-muted-foreground">No strategic objective</span>
+                                                        </SelectItem>
+                                                        {strategicObjectives.map((so) => (
+                                                            <SelectItem key={so.id} value={so.id}>
+                                                                {so.title}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
+
+                                        {/* Show linked strategic objective after creation */}
+                                        {isCreated && linkedStrategic && (
+                                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                <Flag className="h-3 w-3 text-international-orange" />
+                                                <span>
+                                                    Linked to <span className="font-medium text-foreground">{linkedStrategic.title}</span>
+                                                </span>
+                                            </div>
+                                        )}
 
                                         {/* Tasks */}
                                         <div className="space-y-1.5">

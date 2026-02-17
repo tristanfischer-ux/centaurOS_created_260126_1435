@@ -37,6 +37,10 @@ export interface ObjectiveWithTasks {
   foundry_id: string
   created_at: string
   updated_at: string
+  /** Explicit start date for timeline scheduling. If null, derived from earliest task. */
+  start_date: string | null
+  /** Explicit end/due date for timeline scheduling. If null, derived from latest task. */
+  end_date: string | null
   is_private?: boolean
   is_strategic_goal?: boolean | null
   is_demo?: boolean
