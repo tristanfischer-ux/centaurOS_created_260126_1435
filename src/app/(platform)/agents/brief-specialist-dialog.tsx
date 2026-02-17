@@ -873,9 +873,6 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 : `You are ${specialist.name}, the ${specialist.title} specialist for this company. ${specialist.workingStyle}\n\n{{input}}\n\n{{company_context}}\n\nProvide a thorough, actionable response that demonstrates deep expertise. Use markdown formatting with headers, tables, and bullet points for clarity.`
             )
 
-        const controller = new AbortController()
-        executeAbortRef.current = controller
-
         // Determine if we should stream TTS (declared before try so catch can stop it)
         const isTtsStreaming = tts.voiceEnabled && !!specialist.voice
 
@@ -887,6 +884,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             let fullResponse = ""
 
             for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+                // Fresh AbortController per attempt — a previous TTFB timeout
+                // aborts the controller, so reusing it would instantly abort the retry.
+                const controller = new AbortController()
+                executeAbortRef.current = controller
+
                 // TTFB timeout: abort if the server doesn't start responding
                 // within MESSAGE_TTFB_TIMEOUT_MS. Once streaming starts, the
                 // per-chunk timeout (readWithTimeout) takes over.
@@ -944,9 +946,21 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 const data = line.slice(6)
                                 if (data === "[DONE]") continue
                                 try {
-                                    const parsed = JSON.parse(data) as { text?: string; error?: string }
+                                    const parsed = JSON.parse(data) as { text?: string; error?: string; rawHint?: string; errorCategory?: string }
                                     if (parsed.error) {
                                         streamError = parsed.error
+                                        // Log raw provider error for debugging — the classified
+                                        // message hides the actual cause from the UI.
+                                        if (parsed.rawHint || parsed.errorCategory) {
+                                            console.error("[BriefDialog] Provider error detail:", {
+                                                classified: parsed.error,
+                                                rawHint: parsed.rawHint,
+                                                category: parsed.errorCategory,
+                                                specialist: specialist.id,
+                                                responseLength: fullResponse.length,
+                                                attempt,
+                                            })
+                                        }
                                         break
                                     }
                                     if (parsed.text) {
@@ -983,6 +997,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             attempt,
                             error: streamError,
                             specialist: specialist.id,
+                            responseLength: fullResponse.length,
                         })
                         // Reset streaming state for retry
                         setStreamingResponse("")

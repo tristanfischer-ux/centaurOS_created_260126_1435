@@ -807,41 +807,55 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
  * @param rawError - The raw error string from the provider or stream
  * @returns A user-friendly error message
  */
-function classifyStreamError(rawError: string): string {
+/**
+ * Error classification result with both user-facing message and diagnostic category.
+ */
+interface ClassifiedError {
+    /** User-facing error message (safe to display) */
+    message: string
+    /** Machine-readable category for client-side logging */
+    category: "context_length" | "rate_limit" | "auth" | "overloaded" | "network" | "content_filter" | "unknown"
+    /** First 120 chars of raw error for client-side debugging (no secrets — API keys are never in error messages) */
+    rawHint: string
+}
+
+function classifyStreamError(rawError: string): ClassifiedError {
     const lower = rawError.toLowerCase()
+    const rawHint = rawError.substring(0, 120)
 
     // Context window / prompt too long
     if (lower.includes("too many tokens") || lower.includes("context_length") || lower.includes("maximum context") || lower.includes("too long")) {
-        return "The conversation is too long for this model. Try starting a new conversation or using a shorter message."
+        return { message: "The conversation is too long for this model. Try starting a new conversation or using a shorter message.", category: "context_length", rawHint }
     }
 
     // Rate limiting from the AI provider
     if (lower.includes("rate_limit") || lower.includes("rate limit") || lower.includes("429") || lower.includes("too many requests")) {
-        return "The AI provider is rate-limiting requests. Please wait a moment and try again."
+        return { message: "The AI provider is rate-limiting requests. Please wait a moment and try again.", category: "rate_limit", rawHint }
     }
 
     // Authentication / API key issues
     if (lower.includes("authentication") || lower.includes("invalid api key") || lower.includes("unauthorized") || lower.includes("401")) {
-        return "AI provider authentication failed. The platform API key may need to be updated."
+        return { message: "AI provider authentication failed. The platform API key may need to be updated.", category: "auth", rawHint }
     }
 
     // Provider overloaded
     if (lower.includes("overloaded") || lower.includes("503") || lower.includes("capacity") || lower.includes("server_error")) {
-        return "The AI provider is temporarily overloaded. Please try again in a few seconds."
+        return { message: "The AI provider is temporarily overloaded. Please try again in a few seconds.", category: "overloaded", rawHint }
     }
 
     // Network / connection issues
     if (lower.includes("econnrefused") || lower.includes("enotfound") || lower.includes("timeout") || lower.includes("network") || lower.includes("fetch failed")) {
-        return "Could not reach the AI provider. This is usually temporary — please try again."
+        return { message: "Could not reach the AI provider. This is usually temporary — please try again.", category: "network", rawHint }
     }
 
     // Content filtering / safety
     if (lower.includes("content_filter") || lower.includes("safety") || lower.includes("blocked") || lower.includes("content_policy")) {
-        return "The response was blocked by the AI provider's content filter. Try rephrasing your message."
+        return { message: "The response was blocked by the AI provider's content filter. Try rephrasing your message.", category: "content_filter", rawHint }
     }
 
-    // Generic fallback — don't leak raw error details
-    return "Stream interrupted. Please try sending your message again."
+    // Generic fallback — don't leak raw error details in the user message,
+    // but include the rawHint for client-side console logging.
+    return { message: "Stream interrupted. Please try sending your message again.", category: "unknown", rawHint }
 }
 
 // ─── Text Streaming Handler (with Provider Failover) ─────────────────
@@ -963,9 +977,13 @@ async function handleTextStreaming(
                                         model: target.modelId,
                                         error,
                                     })
-                                    const errorDetail = classifyStreamError(error)
+                                    const classified = classifyStreamError(error)
                                     controller.enqueue(
-                                        encoder.encode(`data: ${JSON.stringify({ error: errorDetail })}\n\n`)
+                                        encoder.encode(`data: ${JSON.stringify({
+                                            error: classified.message,
+                                            errorCategory: classified.category,
+                                            rawHint: classified.rawHint,
+                                        })}\n\n`)
                                     )
                                     controller.close()
                                     resolve() // Resolve — we've handled it, no retry
@@ -1017,9 +1035,13 @@ async function handleTextStreaming(
                         })
                     }
 
-                    const errorDetail = classifyStreamError(errorStr)
+                    const classified = classifyStreamError(errorStr)
                     controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify({ error: errorDetail })}\n\n`)
+                        encoder.encode(`data: ${JSON.stringify({
+                            error: classified.message,
+                            errorCategory: classified.category,
+                            rawHint: classified.rawHint,
+                        })}\n\n`)
                     )
                     controller.close()
                     return
@@ -1032,9 +1054,13 @@ async function handleTextStreaming(
                 chain: chain.map(t => t.providerId),
                 lastError,
             })
-            const errorDetail = classifyStreamError(lastError)
+            const classified = classifyStreamError(lastError)
             controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ error: errorDetail })}\n\n`)
+                encoder.encode(`data: ${JSON.stringify({
+                    error: classified.message,
+                    errorCategory: classified.category,
+                    rawHint: classified.rawHint,
+                })}\n\n`)
             )
             controller.close()
         },

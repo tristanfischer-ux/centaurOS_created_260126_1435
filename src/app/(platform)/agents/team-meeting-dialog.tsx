@@ -915,9 +915,18 @@ export function TeamMeetingDialog({
                         const data = line.slice(6)
                         if (data === "[DONE]") continue
                         try {
-                            const parsed = JSON.parse(data) as { text?: string; error?: string }
+                            const parsed = JSON.parse(data) as { text?: string; error?: string; rawHint?: string; errorCategory?: string }
                             if (parsed.error) {
                                 streamError = parsed.error
+                                if (parsed.rawHint || parsed.errorCategory) {
+                                    console.error("[TeamMeeting] Provider error detail:", {
+                                        classified: parsed.error,
+                                        rawHint: parsed.rawHint,
+                                        category: parsed.errorCategory,
+                                        specialist: specialist.name,
+                                        responseLength: fullResponse.length,
+                                    })
+                                }
                                 break
                             }
                             if (parsed.text) {
