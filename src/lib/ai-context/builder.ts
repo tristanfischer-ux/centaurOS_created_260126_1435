@@ -38,9 +38,27 @@ import {
 } from '@/types/foundry'
 import type { Sector, CompanyIntelligence } from '@/types/foundry'
 
-// Per-request cache to avoid re-fetching within the same server request
-let cachedContext: { key: string; value: string; timestamp: number } | null = null
-const CACHE_TTL_MS = 10_000 // 10 seconds
+// ─── Context Cache ───────────────────────────────────────────────────
+// Company context changes slowly (profile, objectives, team). We cache
+// aggressively to avoid repeating 6+ DB queries on every specialist message.
+//
+// Strategy: stale-while-revalidate
+// - FRESH (< CACHE_FRESH_MS): return cached, no refresh
+// - STALE (< CACHE_STALE_MS): return cached immediately, refresh in background
+// - EXPIRED (>= CACHE_STALE_MS): block and rebuild
+//
+// On Vercel serverless, module-level state persists across warm invocations
+// within the same isolate, making this effective for back-to-back requests.
+const CACHE_FRESH_MS = 60_000   // 60 seconds — serve without refresh
+const CACHE_STALE_MS = 300_000  // 5 minutes — serve stale, refresh in background
+
+interface CacheEntry {
+    value: string
+    timestamp: number
+    refreshing?: boolean // Prevents concurrent background refreshes
+}
+
+const contextCache = new Map<string, CacheEntry>()
 
 export interface AIContextOptions {
   /** Include activity insights (slightly slower — queries activity_events) */
@@ -70,12 +88,48 @@ export async function buildAIContext(
   userId: string,
   options: AIContextOptions = { includeActivity: true, includeObjectives: true, includeUserProfile: true, includeInsightHistory: true }
 ): Promise<string> {
-  // Check per-request cache
   const cacheKey = `${foundryId}:${userId}:${JSON.stringify(options)}`
-  if (cachedContext && cachedContext.key === cacheKey && Date.now() - cachedContext.timestamp < CACHE_TTL_MS) {
-    return cachedContext.value
+  const cached = contextCache.get(cacheKey)
+  const now = Date.now()
+
+  if (cached) {
+    const age = now - cached.timestamp
+
+    if (age < CACHE_FRESH_MS) {
+      // Fresh: return immediately, no refresh needed
+      return cached.value
+    }
+
+    if (age < CACHE_STALE_MS) {
+      // Stale: return immediately, refresh in background (once)
+      if (!cached.refreshing) {
+        cached.refreshing = true
+        buildAIContextUncached(foundryId, userId, options).then((freshValue) => {
+          contextCache.set(cacheKey, { value: freshValue, timestamp: Date.now() })
+        }).catch((err) => {
+          console.warn('[AIContextBuilder] Background refresh failed:', err)
+          cached.refreshing = false
+        })
+      }
+      return cached.value
+    }
+    // Expired: fall through to rebuild
   }
 
+  const result = await buildAIContextUncached(foundryId, userId, options)
+  contextCache.set(cacheKey, { value: result, timestamp: Date.now() })
+  return result
+}
+
+/**
+ * Builds AI context without caching. Used by both the main function
+ * (on cache miss) and the background stale-while-revalidate refresh.
+ */
+async function buildAIContextUncached(
+  foundryId: string,
+  userId: string,
+  options: AIContextOptions,
+): Promise<string> {
   const supabase = await createClient()
   const sections: string[] = []
 
@@ -375,12 +429,7 @@ export async function buildAIContext(
     console.debug('[AIContextBuilder] Error building context:', err)
   }
 
-  const result = sections.length > 0
+  return sections.length > 0
     ? `\n--- Business Context ---\n${sections.join('\n\n')}\n--- End Business Context ---\n`
     : ''
-
-  // Cache the result
-  cachedContext = { key: cacheKey, value: result, timestamp: Date.now() }
-
-  return result
 }

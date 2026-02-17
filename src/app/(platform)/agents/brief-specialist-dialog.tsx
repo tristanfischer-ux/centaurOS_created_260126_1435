@@ -94,6 +94,48 @@ function getFallbackGreeting(specialist: Specialist): string {
 }
 
 /**
+ * Per-chunk timeout for SSE stream reads. If no data arrives within this
+ * window, the connection is considered stale (proxy dropped, provider hung).
+ */
+const STREAM_CHUNK_TIMEOUT_MS = 30_000
+
+/** Greeting fetch timeout — show static fallback if greeting takes too long. */
+const GREETING_TIMEOUT_MS = 15_000
+
+/** Message fetch TTFB timeout — how long to wait for the server to start responding. */
+const MESSAGE_TTFB_TIMEOUT_MS = 60_000
+
+/**
+ * Reads from a ReadableStream with a timeout. Rejects if no chunk arrives
+ * within `timeoutMs`. This prevents `reader.read()` from hanging indefinitely
+ * when a proxy or provider silently drops the connection.
+ */
+function readWithTimeout(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    timeoutMs: number,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+    return Promise.race([
+        reader.read(),
+        new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error("Stream chunk timeout")), timeoutMs)
+        }),
+    ])
+}
+
+/**
+ * Determines if a stream/fetch error is transient and worth retrying.
+ * Connection drops, timeouts, and provider overloads are retryable.
+ * Auth errors, rate limits, and content issues are not.
+ */
+function isRetryableStreamError(error: string): boolean {
+    const lower = error.toLowerCase()
+    if (lower.includes("stream interrupted") || lower.includes("stream chunk timeout")) return true
+    if (lower.includes("overloaded") || lower.includes("temporarily")) return true
+    if (lower.includes("network") || lower.includes("fetch failed")) return true
+    return false
+}
+
+/**
  * Show a friendly, actionable message when the specialist can't connect (e.g. provider unavailable).
  */
 function normalizeSpecialistError(error: string, specialistName: string): string {
@@ -571,6 +613,12 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
 {{company_context}}`
 
             try {
+                // Greeting timeout: abort after GREETING_TIMEOUT_MS and show
+                // static fallback immediately so the user isn't waiting.
+                const greetingTimeout = setTimeout(() => {
+                    if (!signal.aborted) controller.abort()
+                }, GREETING_TIMEOUT_MS)
+
                 const res = await fetch("/api/agents/execute", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -585,6 +633,7 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
                     }),
                     signal,
                 })
+                clearTimeout(greetingTimeout)
 
                 if (!res.ok || signal.aborted) {
                     const fallback: ChatMessage = {
@@ -603,7 +652,7 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
                 let fullResponse = ""
 
                 while (true) {
-                    const { done, value } = await reader.read()
+                    const { done, value } = await readWithTimeout(reader, STREAM_CHUNK_TIMEOUT_MS)
                     if (done || signal.aborted) break
                     const chunk = decoder.decode(value, { stream: true })
                     for (const line of chunk.split("\n")) {
@@ -796,85 +845,125 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
         const isTtsStreaming = tts.voiceEnabled && !!specialist.voice
 
         try {
-            const res = await fetch("/api/agents/execute", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    prompt: promptTemplate,
-                    input: userInput,
-                    providerId: getSpecialistModel(specialist).providerId,
-                    modelId: getSpecialistModel(specialist).modelId,
-                    modelTier: specialist.modelTier,
-                    modality: "text",
-                    threadId: threadId ?? undefined,
-                    specialistId: specialist.id,
-                    customSystemPromptSuffix: systemExtras.join(""),
-                    enableThinking: deepThinkEnabled,
-                }),
-                signal: controller.signal,
-            })
-
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({ error: "Execution failed" }))
-                const rawError = errData.error || `HTTP ${res.status}`
-                throw new Error(normalizeSpecialistError(rawError, specialist.name))
-            }
-
-            // Handle streaming response
-            const reader = res.body?.getReader()
-            if (!reader) throw new Error("No response body")
-
-            // Start streaming TTS so speech begins as sentences arrive
-            if (isTtsStreaming) {
-                tts.startStreaming(specialist.voice)
-            }
-
-            const decoder = new TextDecoder()
+            // Auto-retry: one transparent retry for transient stream failures
+            // (connection drops, provider timeouts). Non-retryable errors (auth,
+            // rate limit, content) surface immediately.
+            const MAX_ATTEMPTS = 2
             let fullResponse = ""
-            let streamError: string | null = null
 
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done || controller.signal.aborted) break
+            for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+                // TTFB timeout: abort if the server doesn't start responding
+                // within MESSAGE_TTFB_TIMEOUT_MS. Once streaming starts, the
+                // per-chunk timeout (readWithTimeout) takes over.
+                const ttfbTimeout = setTimeout(() => {
+                    if (!controller.signal.aborted) controller.abort()
+                }, MESSAGE_TTFB_TIMEOUT_MS)
 
-                const chunk = decoder.decode(value, { stream: true })
-                const lines = chunk.split("\n")
-                for (const line of lines) {
-                    if (line.startsWith("data: ")) {
-                        const data = line.slice(6)
-                        if (data === "[DONE]") continue
-                        try {
-                            const parsed = JSON.parse(data) as { text?: string; error?: string }
-                            if (parsed.error) {
-                                streamError = parsed.error
-                                break
-                            }
-                            if (parsed.text) {
-                                fullResponse += parsed.text
-                                const strippedText = stripPartialThinkTags(fullResponse)
-                                setStreamingResponse(strippedText)
-                                // Feed accumulated text to TTS — plays sentences as they complete
-                                if (isTtsStreaming) {
-                                    tts.feedStreamingText(strippedText)
+                const res = await fetch("/api/agents/execute", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        prompt: promptTemplate,
+                        input: userInput,
+                        providerId: getSpecialistModel(specialist).providerId,
+                        modelId: getSpecialistModel(specialist).modelId,
+                        modelTier: specialist.modelTier,
+                        modality: "text",
+                        threadId: threadId ?? undefined,
+                        specialistId: specialist.id,
+                        customSystemPromptSuffix: systemExtras.join(""),
+                        enableThinking: deepThinkEnabled,
+                    }),
+                    signal: controller.signal,
+                })
+                clearTimeout(ttfbTimeout)
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({ error: "Execution failed" }))
+                    const rawError = errData.error || `HTTP ${res.status}`
+                    throw new Error(normalizeSpecialistError(rawError, specialist.name))
+                }
+
+                // Handle streaming response
+                const reader = res.body?.getReader()
+                if (!reader) throw new Error("No response body")
+
+                // Start streaming TTS so speech begins as sentences arrive
+                if (isTtsStreaming && attempt === 1) {
+                    tts.startStreaming(specialist.voice)
+                }
+
+                const decoder = new TextDecoder()
+                fullResponse = ""
+                let streamError: string | null = null
+
+                try {
+                    while (true) {
+                        const { done, value } = await readWithTimeout(reader, STREAM_CHUNK_TIMEOUT_MS)
+                        if (done || controller.signal.aborted) break
+
+                        const chunk = decoder.decode(value, { stream: true })
+                        const lines = chunk.split("\n")
+                        for (const line of lines) {
+                            if (line.startsWith("data: ")) {
+                                const data = line.slice(6)
+                                if (data === "[DONE]") continue
+                                try {
+                                    const parsed = JSON.parse(data) as { text?: string; error?: string }
+                                    if (parsed.error) {
+                                        streamError = parsed.error
+                                        break
+                                    }
+                                    if (parsed.text) {
+                                        fullResponse += parsed.text
+                                        const strippedText = stripPartialThinkTags(fullResponse)
+                                        setStreamingResponse(strippedText)
+                                        if (isTtsStreaming) {
+                                            tts.feedStreamingText(strippedText)
+                                        }
+                                    }
+                                } catch {
+                                    fullResponse += data
+                                    const strippedText = stripPartialThinkTags(fullResponse)
+                                    setStreamingResponse(strippedText)
+                                    if (isTtsStreaming) {
+                                        tts.feedStreamingText(strippedText)
+                                    }
                                 }
                             }
-                        } catch {
-                            fullResponse += data
-                            const strippedText = stripPartialThinkTags(fullResponse)
-                            setStreamingResponse(strippedText)
-                            if (isTtsStreaming) {
-                                tts.feedStreamingText(strippedText)
-                            }
                         }
+                        if (streamError) break
                     }
+                } catch (readErr) {
+                    // Chunk timeout or network error during stream read
+                    const errMsg = readErr instanceof Error ? readErr.message : "Stream read failed"
+                    streamError = errMsg
+                    try { reader.cancel() } catch { /* already closed */ }
                 }
-                if (streamError) break
-            }
 
-            if (streamError) {
-                if (isTtsStreaming) tts.stop()
-                setError(normalizeSpecialistError(streamError, specialist.name))
-                return
+                if (streamError) {
+                    // Check if this is a retryable error and we have attempts left
+                    if (attempt < MAX_ATTEMPTS && isRetryableStreamError(streamError)) {
+                        console.warn("[BriefDialog] Stream error, retrying:", {
+                            attempt,
+                            error: streamError,
+                            specialist: specialist.id,
+                        })
+                        // Reset streaming state for retry
+                        setStreamingResponse("")
+                        fullResponse = ""
+                        if (isTtsStreaming) tts.stop()
+                        continue // Retry
+                    }
+
+                    // No more retries — surface the error
+                    if (isTtsStreaming) tts.stop()
+                    setError(normalizeSpecialistError(streamError, specialist.name))
+                    return
+                }
+
+                // Stream completed successfully — exit the retry loop
+                break
             }
 
             if (!fullResponse) {

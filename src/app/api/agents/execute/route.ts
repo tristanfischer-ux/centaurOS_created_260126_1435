@@ -289,14 +289,7 @@ export async function POST(request: Request) {
     // 4. Build rich company context using the AI Context Builder
     const foundryId = await resolveFoundryId(supabase, user.id)
 
-    // 4a. Fetch user profile for identity context (so the agent knows who they're speaking with)
-    const { data: userProfile } = await supabase
-        .from("profiles")
-        .select("full_name, role")
-        .eq("id", user.id)
-        .single()
-
-    // 4b. Validate threadId belongs to user's foundry (IDOR prevention)
+    // 4a. Validate threadId belongs to user's foundry (IDOR prevention)
     if (threadId && foundryId) {
         const { data: thread } = await supabase
             .from("agent_memory_threads")
@@ -311,19 +304,56 @@ export async function POST(request: Request) {
             )
         }
     }
+
+    // 4b. Fast-path detection for short conversational follow-ups.
+    // When a user sends a quick message like "hi", "thanks", or "what about X?"
+    // in an existing conversation, skip the ~15 DB queries for company context,
+    // preferences, intelligence, knowledge vault, etc. The conversation history
+    // and specialist personality are sufficient for a snappy reply.
+    const isConversationalFastPath = !!(
+        input.length > 0 &&
+        input.length < 100 &&
+        threadId &&
+        specialistId &&
+        modality === "text" &&
+        !customSystemPromptSuffix // No cross-specialist context injected
+    )
+
+    if (isConversationalFastPath) {
+        console.info("[agents/execute] Fast-path: short follow-up, skipping heavy context", {
+            inputLength: input.length,
+            specialistId,
+            threadId,
+        })
+    }
+
+    // 4c. Fetch user profile (skip on fast path — not needed for conversational turns)
+    let userProfile: { full_name: string | null; role: string | null } | null = null
+    if (!isConversationalFastPath) {
+        const { data } = await supabase
+            .from("profiles")
+            .select("full_name, role")
+            .eq("id", user.id)
+            .single()
+        userProfile = data
+    }
+
+    // 4d. Build company context (skip on fast path — biggest latency saver)
     let companyContext = ""
-    try {
-        if (foundryId) {
-            companyContext = await buildAIContext(foundryId, user.id, {
-                includeActivity: true,
-                includeObjectives: true,
-                includeUserProfile: false, // Skip heavy profile for streaming performance
-                includeInsightHistory: false,
-            })
+    if (!isConversationalFastPath) {
+        try {
+            if (foundryId) {
+                companyContext = await buildAIContext(foundryId, user.id, {
+                    includeActivity: true,
+                    includeObjectives: true,
+                    includeUserProfile: false, // Skip heavy profile for streaming performance
+                    includeInsightHistory: false,
+                })
+            }
+        } catch (err) {
+            // Non-critical — proceed without company context
+            console.warn("[agents/execute] Could not load company context:", err)
         }
-    } catch (err) {
-        // Non-critical — proceed without company context
-        console.warn("[agents/execute] Could not load company context:", err)
     }
 
     // 5. Build the final prompt
@@ -491,121 +521,136 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
         systemPromptWithContext += `\n\n## User Identity\nYou are speaking with ${userProfile.full_name}${roleSuffix}. Address them by name when natural.`
     }
 
-    // Founder preferences: learned communication style, trust level, pet peeves
-    if (foundryId && specialistId && threadId) {
-        try {
-            const [founderPrefs, specialistRel] = await Promise.all([
-                getFounderPreferences(foundryId),
-                getSpecialistRelationship(threadId, foundryId),
-            ])
-            const specialist = getSpecialistById(specialistId)
-            const prefsBlock = compileFounderPreferencesPrompt(
-                founderPrefs,
-                specialistRel,
-                specialist?.name ?? specialistId,
-            )
-            if (prefsBlock) {
-                systemPromptWithContext += `\n\n${prefsBlock}`
-            }
-        } catch (err) {
-            // Non-critical — proceed without preferences
-            console.warn("[agents/execute] Could not load founder preferences:", err)
-        }
-    }
+    // ─── Heavy context layers (skipped on fast path) ───────────────────
+    // These each make 1-3 DB queries and are supplementary for conversational
+    // follow-ups where conversation history already provides continuity.
 
-    // Specialist emotional state and relationship depth
-    if (foundryId && threadId && specialistId) {
-        try {
-            const { getSpecialistState, compileSpecialistStatePrompt } = await import("@/lib/agents/specialist-state")
-            const specialist = getSpecialistById(specialistId)
-            const { emotional, relationship } = await getSpecialistState(threadId, foundryId)
-            const stateBlock = compileSpecialistStatePrompt(emotional, relationship, specialist?.name ?? specialistId)
-            if (stateBlock) {
-                systemPromptWithContext += `\n\n${stateBlock}`
+    if (!isConversationalFastPath) {
+        // Founder preferences: learned communication style, trust level, pet peeves
+        if (foundryId && specialistId && threadId) {
+            try {
+                const [founderPrefs, specialistRel] = await Promise.all([
+                    getFounderPreferences(foundryId),
+                    getSpecialistRelationship(threadId, foundryId),
+                ])
+                const specialist = getSpecialistById(specialistId)
+                const prefsBlock = compileFounderPreferencesPrompt(
+                    founderPrefs,
+                    specialistRel,
+                    specialist?.name ?? specialistId,
+                )
+                if (prefsBlock) {
+                    systemPromptWithContext += `\n\n${prefsBlock}`
+                }
+            } catch (err) {
+                // Non-critical — proceed without preferences
+                console.warn("[agents/execute] Could not load founder preferences:", err)
             }
-        } catch (err) {
-            // Non-critical — proceed without state context
-            console.warn("[agents/execute] Could not load specialist state:", err)
         }
-    }
 
-    // Decision journal: past decisions for "remember when" references
-    if (foundryId && specialistId) {
-        try {
-            const { getRecentDecisions, compileDecisionJournalPrompt, detectDecisionPatterns } = await import("@/lib/agents/decision-journal")
-            const decisions = await getRecentDecisions(foundryId, specialistId, 10)
-            const journalBlock = compileDecisionJournalPrompt(decisions)
-            if (journalBlock) {
-                systemPromptWithContext += `\n\n${journalBlock}`
+        // Specialist emotional state and relationship depth
+        if (foundryId && threadId && specialistId) {
+            try {
+                const { getSpecialistState, compileSpecialistStatePrompt } = await import("@/lib/agents/specialist-state")
+                const specialist = getSpecialistById(specialistId)
+                const { emotional, relationship } = await getSpecialistState(threadId, foundryId)
+                const stateBlock = compileSpecialistStatePrompt(emotional, relationship, specialist?.name ?? specialistId)
+                if (stateBlock) {
+                    systemPromptWithContext += `\n\n${stateBlock}`
+                }
+            } catch (err) {
+                // Non-critical — proceed without state context
+                console.warn("[agents/execute] Could not load specialist state:", err)
             }
-            // Add pattern recognition for deep relationships
-            const allDecisions = await getRecentDecisions(foundryId, undefined, 50)
-            const patterns = detectDecisionPatterns(allDecisions)
-            if (patterns.length > 0) {
-                systemPromptWithContext += `\n\n## Founder Decision Patterns\n${patterns.join('\n')}`
+        }
+
+        // Decision journal: past decisions for "remember when" references
+        if (foundryId && specialistId) {
+            try {
+                const { getRecentDecisions, compileDecisionJournalPrompt, detectDecisionPatterns } = await import("@/lib/agents/decision-journal")
+                const decisions = await getRecentDecisions(foundryId, specialistId, 10)
+                const journalBlock = compileDecisionJournalPrompt(decisions)
+                if (journalBlock) {
+                    systemPromptWithContext += `\n\n${journalBlock}`
+                }
+                // Add pattern recognition for deep relationships
+                const allDecisions = await getRecentDecisions(foundryId, undefined, 50)
+                const patterns = detectDecisionPatterns(allDecisions)
+                if (patterns.length > 0) {
+                    systemPromptWithContext += `\n\n## Founder Decision Patterns\n${patterns.join('\n')}`
+                }
+            } catch (err) {
+                console.warn("[agents/execute] Could not load decision journal:", err)
             }
-        } catch (err) {
-            console.warn("[agents/execute] Could not load decision journal:", err)
         }
-    }
 
-    // External intelligence: recent reports from monitoring sweeps
-    if (foundryId && specialistId) {
-        try {
-            const { getRecentIntelligenceReports } = await import("@/lib/agents/intelligence-sweep-orchestrator")
-            const { compileIntelligencePrompt } = await import("@/lib/agents/external-intelligence")
-            const reports = await getRecentIntelligenceReports(foundryId, 3, specialistId)
-            const intelligenceBlock = compileIntelligencePrompt(reports, specialistId as SpecialistId)
-            if (intelligenceBlock) {
-                systemPromptWithContext += `\n\n${intelligenceBlock}`
+        // External intelligence: recent reports from monitoring sweeps
+        if (foundryId && specialistId) {
+            try {
+                const { getRecentIntelligenceReports } = await import("@/lib/agents/intelligence-sweep-orchestrator")
+                const { compileIntelligencePrompt } = await import("@/lib/agents/external-intelligence")
+                const reports = await getRecentIntelligenceReports(foundryId, 3, specialistId)
+                const intelligenceBlock = compileIntelligencePrompt(reports, specialistId as SpecialistId)
+                if (intelligenceBlock) {
+                    systemPromptWithContext += `\n\n${intelligenceBlock}`
+                }
+            } catch (err) {
+                // Non-critical: intelligence context is supplementary
+                console.warn("[agents/execute] Failed to load intelligence context:", err)
             }
-        } catch (err) {
-            // Non-critical: intelligence context is supplementary
-            console.warn("[agents/execute] Failed to load intelligence context:", err)
         }
-    }
 
-    // Knowledge Vault: inject relevant organizational knowledge
-    if (foundryId && specialistId) {
-        try {
-            const { searchKnowledgeForSpecialist } = await import("@/lib/knowledge-vault")
-            const vaultContext = await searchKnowledgeForSpecialist(
-                foundryId,
-                input || finalPrompt.slice(0, 500),
-                specialistId,
-                8
-            )
-            if (vaultContext) {
-                systemPromptWithContext += `\n\n${vaultContext}`
+        // Knowledge Vault: inject relevant organizational knowledge
+        if (foundryId && specialistId) {
+            try {
+                const { searchKnowledgeForSpecialist } = await import("@/lib/knowledge-vault")
+                const vaultContext = await searchKnowledgeForSpecialist(
+                    foundryId,
+                    input || finalPrompt.slice(0, 500),
+                    specialistId,
+                    8
+                )
+                if (vaultContext) {
+                    systemPromptWithContext += `\n\n${vaultContext}`
+                }
+            } catch (err) {
+                // Non-critical — Knowledge Vault is supplementary context
+                console.warn("[agents/execute] Could not load Knowledge Vault context:", err)
             }
-        } catch (err) {
-            // Non-critical — Knowledge Vault is supplementary context
-            console.warn("[agents/execute] Could not load Knowledge Vault context:", err)
         }
-    }
 
-    // Temporal awareness: what time/day it is, how to adjust behavior
-    // Also includes milestone awareness if we know when the foundry was created
-    let foundryCreatedAt: string | null = null
-    if (foundryId) {
-        try {
-            const { data: foundryData } = await supabase
-                .from("foundries")
-                .select("created_at")
-                .eq("id", foundryId)
-                .single()
-            foundryCreatedAt = foundryData?.created_at ?? null
-        } catch {
-            // Non-critical
+        // Temporal awareness: what time/day it is, how to adjust behavior
+        // Also includes milestone awareness if we know when the foundry was created
+        let foundryCreatedAt: string | null = null
+        if (foundryId) {
+            try {
+                const { data: foundryData } = await supabase
+                    .from("foundries")
+                    .select("created_at")
+                    .eq("id", foundryId)
+                    .single()
+                foundryCreatedAt = foundryData?.created_at ?? null
+            } catch {
+                // Non-critical
+            }
         }
-    }
-    const temporalBlock = compileTemporalPrompt(undefined, foundryCreatedAt)
-    systemPromptWithContext += `\n\n${temporalBlock}`
+        const temporalBlock = compileTemporalPrompt(undefined, foundryCreatedAt)
+        systemPromptWithContext += `\n\n${temporalBlock}`
 
-    // Emotional awareness: detect founder's emotional state from their message
-    const emotionalBlock = compileEmotionalPrompt(input)
-    if (emotionalBlock) {
-        systemPromptWithContext += `\n\n${emotionalBlock}`
+        // Emotional awareness: detect founder's emotional state from their message
+        const emotionalBlock = compileEmotionalPrompt(input)
+        if (emotionalBlock) {
+            systemPromptWithContext += `\n\n${emotionalBlock}`
+        }
+    } else {
+        // Fast path: lightweight temporal + emotional only (no DB queries)
+        const temporalBlock = compileTemporalPrompt()
+        systemPromptWithContext += `\n\n${temporalBlock}`
+
+        const emotionalBlock = compileEmotionalPrompt(input)
+        if (emotionalBlock) {
+            systemPromptWithContext += `\n\n${emotionalBlock}`
+        }
     }
 
     if (companyContext) {
@@ -840,6 +885,17 @@ async function handleTextStreaming(
 
     const readable = new ReadableStream({
         async start(controller) {
+            // SSE keepalive: send a comment every 15s to prevent proxies
+            // (Vercel, Cloudflare, browser) from closing idle connections.
+            // SSE spec: lines starting with ":" are comments — clients ignore them.
+            const heartbeatInterval = setInterval(() => {
+                try {
+                    controller.enqueue(encoder.encode(": keepalive\n\n"))
+                } catch {
+                    // Stream already closed — safe to ignore
+                }
+            }, 15_000)
+
             let lastError = "No providers available"
 
             for (let i = 0; i < chain.length; i++) {
@@ -890,6 +946,7 @@ async function handleTextStreaming(
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
                             },
                             onDone() {
+                                clearInterval(heartbeatInterval)
                                 controller.enqueue(encoder.encode("data: [DONE]\n\n"))
                                 controller.close()
                                 if (onComplete && fullOutput) {
@@ -900,6 +957,7 @@ async function handleTextStreaming(
                             onError(error) {
                                 if (hasStartedStreaming) {
                                     // Mid-stream error — can't failover, surface to client
+                                    clearInterval(heartbeatInterval)
                                     console.error("[agents/execute] Mid-stream error (no failover):", {
                                         provider: target.providerId,
                                         model: target.modelId,
@@ -944,6 +1002,7 @@ async function handleTextStreaming(
                     }
 
                     // Non-retryable error OR last provider in chain — surface to client
+                    clearInterval(heartbeatInterval)
                     if (!isRetryableError(errorStr)) {
                         console.error("[agents/execute] Non-retryable error:", {
                             provider: target.providerId,
@@ -968,6 +1027,7 @@ async function handleTextStreaming(
             }
 
             // All providers skipped (no streamFn or no API key) — should be very rare
+            clearInterval(heartbeatInterval)
             console.error("[agents/execute] No viable provider in fallback chain:", {
                 chain: chain.map(t => t.providerId),
                 lastError,
