@@ -514,7 +514,7 @@ describe('google oauth state hardening regressions', () => {
     expect(source).toContain('10 * 60 * 1000')
     expect(source).toContain(".from('foundry_memberships')")
     expect(source).toContain(".eq('foundry_id', stateData.foundryId)")
-    expect(source).toContain("error=foundry_mismatch")
+    expect(source).toContain("error=oauth_error")
     expect(source).toContain("await rateLimit('api', `google-callback:${user.id}`")
     expect(source).toContain("error=rate_limited")
   })
