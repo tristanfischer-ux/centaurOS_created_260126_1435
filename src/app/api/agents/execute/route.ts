@@ -483,6 +483,38 @@ This renders as interactive cards with checkboxes. The user ticks which ones to 
 6. Only skip the block for purely informational responses with zero actionable recommendations.
 7. The visible prose should read naturally. The PROPOSED_ACTIONS block is supplementary — describe actions in words, then include the structured block at the end.`
 
+            // Reinforce PROPOSED_ACTIONS format for non-Claude models that struggle
+            // with HTML comment syntax. MiniMax and Qwen need extra emphasis and
+            // a concrete, minimal example repeated at the end of the instructions.
+            if (modelTier && modelTier !== "claude") {
+                systemPromptWithContext += `
+
+### CRITICAL FORMAT REMINDER
+
+You MUST output the PROPOSED_ACTIONS block using EXACTLY this format. Copy the delimiters character-for-character:
+
+<!-- PROPOSED_ACTIONS
+[
+  { "type": "objective", "title": "Your objective title here", "description": "Description", "strategicGoalTitle": "Name of existing strategic goal" },
+  { "type": "task", "title": "Your task title here", "description": "Description", "objectiveTitle": "Name of parent objective" }
+]
+-->
+
+ABSOLUTE REQUIREMENTS for the block:
+- Start with exactly: <!-- PROPOSED_ACTIONS
+- End with exactly: -->
+- The JSON array MUST be valid JSON (use double quotes for keys and string values)
+- Every objective MUST include "strategicGoalTitle" matching an existing strategic goal name
+- Every task MUST include "objectiveTitle" matching the parent objective
+- Place the block at the END of your response, after all prose
+
+DO NOT:
+- Wrap the block in markdown code fences (\`\`\`)
+- Omit the <!-- or --> delimiters
+- Use single quotes in the JSON
+- Skip the block when you recommend concrete actions`
+            }
+
             // Workflow capabilities: let the specialist know what they can produce
             const { getSpecialistWorkflows } = await import("@/lib/agents/specialist-workflows")
             const workflows = getSpecialistWorkflows(specialistId as SpecialistId)

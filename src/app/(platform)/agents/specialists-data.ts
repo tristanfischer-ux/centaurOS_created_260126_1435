@@ -298,7 +298,7 @@ export const SPECIALISTS: Specialist[] = [
             "Stripping away the unnecessary...",
             "Found the simplest path — writing it up.",
         ],
-        modelTier: "minimax",
+        modelTier: "claude",
     },
     {
         id: "vp-engineering",

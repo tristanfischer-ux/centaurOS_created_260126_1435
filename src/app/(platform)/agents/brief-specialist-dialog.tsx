@@ -194,37 +194,112 @@ interface ChatMessage {
     proposals?: ProposedAction[]
 }
 
-const PROPOSED_ACTIONS_REGEX = /<!--\s*PROPOSED_ACTIONS\s*([\s\S]*?)\s*-->/i
+/**
+ * Ordered list of regex patterns to extract PROPOSED_ACTIONS from specialist output.
+ *
+ * @description Different LLMs produce the block in different formats:
+ * - Claude reliably outputs `<!-- PROPOSED_ACTIONS [...] -->`
+ * - MiniMax and other models sometimes use markdown fences, omit delimiters,
+ *   or wrap the block differently. These fallback patterns handle common variations.
+ *
+ * Patterns are tried in order; the first match wins.
+ */
+const PROPOSED_ACTIONS_PATTERNS: RegExp[] = [
+    // Pattern 1: Standard HTML comment (Claude-reliable)
+    /<!--\s*PROPOSED_ACTIONS\s*([\s\S]*?)\s*-->/i,
+    // Pattern 2: Markdown code fence with PROPOSED_ACTIONS label
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?PROPOSED_ACTIONS\s*\n?([\s\S]*?)\s*(?:-->)?\s*```/i,
+    // Pattern 3: PROPOSED_ACTIONS on its own line followed by JSON array (no delimiters)
+    /PROPOSED_ACTIONS\s*\n\s*(\[[\s\S]*?\])\s*(?:-->)?/i,
+    // Pattern 4: Just a bare JSON array after the PROPOSED_ACTIONS keyword on the same line
+    /PROPOSED_ACTIONS\s*(\[[\s\S]*?\])\s*(?:-->)?/i,
+]
 
 /**
- * Parse PROPOSED_ACTIONS JSON block from Specialist response. Returns empty array if none or invalid.
+ * Combined regex for stripping ALL variations of PROPOSED_ACTIONS blocks from display content.
  */
-export function parseProposedActions(content: string): ProposedAction[] {
-    const match = content.match(PROPOSED_ACTIONS_REGEX)
-    if (!match || !match[1]) return []
-    try {
-        const raw = match[1].trim()
-        const parsed = JSON.parse(raw) as unknown
-        if (!Array.isArray(parsed)) return []
-        const VALID_TYPES: ProposedActionType[] = ["objective", "task", "archive_objective", "archive_task"]
-        return parsed.filter(
-            (item): item is ProposedAction =>
-                typeof item === "object" &&
-                item !== null &&
-                typeof (item as ProposedAction).type === "string" &&
-                typeof (item as ProposedAction).title === "string" &&
-                VALID_TYPES.includes((item as ProposedAction).type as ProposedActionType)
-        )
-    } catch {
-        return []
-    }
+const STRIP_PROPOSED_ACTIONS_PATTERNS: RegExp[] = [
+    /<!--\s*PROPOSED_ACTIONS\s*[\s\S]*?\s*-->/gi,
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?PROPOSED_ACTIONS\s*\n?[\s\S]*?\s*(?:-->)?\s*```/gi,
+    /PROPOSED_ACTIONS\s*\n?\s*\[[\s\S]*?\]\s*(?:-->)?/gi,
+]
+
+/**
+ * Validates and filters a parsed array into valid ProposedAction items.
+ *
+ * @param parsed - Unknown parsed JSON value
+ * @returns Array of valid ProposedAction items
+ */
+function validateProposedActions(parsed: unknown): ProposedAction[] {
+    if (!Array.isArray(parsed)) return []
+    const VALID_TYPES: ProposedActionType[] = ["objective", "task", "archive_objective", "archive_task"]
+    return parsed.filter(
+        (item): item is ProposedAction =>
+            typeof item === "object" &&
+            item !== null &&
+            typeof (item as ProposedAction).type === "string" &&
+            typeof (item as ProposedAction).title === "string" &&
+            VALID_TYPES.includes((item as ProposedAction).type as ProposedActionType)
+    )
 }
 
 /**
- * Remove PROPOSED_ACTIONS HTML comment from content so it does not render in Markdown.
+ * Parse PROPOSED_ACTIONS JSON block from Specialist response.
+ *
+ * @description Tries multiple regex patterns to handle output format differences
+ * across LLM providers (Claude, MiniMax, Qwen, GPT). Logs diagnostic info
+ * when blocks are found but fail to parse, aiding debugging of LLM-specific issues.
+ *
+ * @param content - The raw specialist response text
+ * @returns Array of valid ProposedAction items, or empty array if none found
+ */
+export function parseProposedActions(content: string): ProposedAction[] {
+    // Try each pattern in order
+    for (let i = 0; i < PROPOSED_ACTIONS_PATTERNS.length; i++) {
+        const pattern = PROPOSED_ACTIONS_PATTERNS[i]
+        const match = content.match(pattern)
+        if (!match || !match[1]) continue
+
+        try {
+            const raw = match[1].trim()
+            const parsed = JSON.parse(raw) as unknown
+            const actions = validateProposedActions(parsed)
+            if (actions.length > 0) {
+                if (i > 0) {
+                    console.info("[ProposedActions] Parsed via fallback pattern", i, "—", actions.length, "actions found")
+                }
+                return actions
+            }
+        } catch (parseErr) {
+            // JSON parse failed for this pattern — log and try next
+            console.warn("[ProposedActions] Pattern", i, "matched but JSON parse failed:", {
+                snippet: match[1].slice(0, 200),
+                error: parseErr instanceof Error ? parseErr.message : "Unknown parse error",
+            })
+        }
+    }
+
+    // No pattern matched — check if the content contains the keyword at all
+    // (diagnostic: LLM tried but produced an unparseable format)
+    if (content.includes("PROPOSED_ACTIONS")) {
+        console.warn("[ProposedActions] Content contains PROPOSED_ACTIONS keyword but no pattern matched. Tail:", content.slice(-500))
+    }
+
+    return []
+}
+
+/**
+ * Remove PROPOSED_ACTIONS blocks (all format variations) from content so they don't render in Markdown.
+ *
+ * @param content - Raw specialist response with potential PROPOSED_ACTIONS blocks
+ * @returns Content with all PROPOSED_ACTIONS blocks stripped
  */
 export function stripProposedActionsBlock(content: string): string {
-    return content.replace(PROPOSED_ACTIONS_REGEX, "").trim()
+    let result = content
+    for (const pattern of STRIP_PROPOSED_ACTIONS_PATTERNS) {
+        result = result.replace(pattern, "")
+    }
+    return result.trim()
 }
 
 /** Render mode: "dialog" for centered modal, "panel" for persistent sidebar */
@@ -1063,6 +1138,23 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
 
             // Parse PROPOSED_ACTIONS from response and strip the block from displayed content
             const proposals = parseProposedActions(displayResponse)
+            if (proposals.length > 0) {
+                console.info("[SpecialistChat] PROPOSED_ACTIONS parsed:", {
+                    specialist: specialist.id,
+                    modelTier: specialist.modelTier,
+                    actionCount: proposals.length,
+                    types: proposals.map((p) => p.type),
+                })
+            } else if (displayResponse.length > 200) {
+                // Long response with no actions — log for diagnostic purposes
+                console.info("[SpecialistChat] No PROPOSED_ACTIONS in response:", {
+                    specialist: specialist.id,
+                    modelTier: specialist.modelTier,
+                    responseLength: displayResponse.length,
+                    containsKeyword: displayResponse.includes("PROPOSED_ACTIONS"),
+                    tail: displayResponse.slice(-300),
+                })
+            }
             displayResponse = stripProposedActionsBlock(displayResponse)
 
             // Add assistant message to chat (with think tags, recommendation, and proposal block stripped)

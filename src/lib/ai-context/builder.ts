@@ -333,10 +333,12 @@ async function buildAIContextUncached(
     // ── 9. Active objectives with hierarchy (optional) ────────────────
     // Fetches all active objectives with parent-child relationships so
     // specialists can recommend archiving specific items by exact title.
+    // Includes is_strategic_goal so we can explicitly label strategic goals
+    // and give the LLM an exact list of valid strategicGoalTitle values.
     if (options.includeObjectives) {
       const { data: objectives } = await supabase
         .from('objectives')
-        .select('id, title, progress, status, parent_objective_id')
+        .select('id, title, progress, status, parent_objective_id, is_strategic_goal')
         .eq('foundry_id', foundryId)
         .eq('is_ghost', false)
         .is('deleted_at', null)
@@ -345,10 +347,24 @@ async function buildAIContextUncached(
         .limit(50)
 
       if (objectives && objectives.length > 0) {
-        // Build parent-child tree for readable output
-        const topLevel = objectives.filter((o) => !o.parent_objective_id)
-        const children = objectives.filter((o) => o.parent_objective_id)
-        const childMap = new Map<string, typeof objectives>()
+        // Separate strategic goals from regular objectives for clear labeling
+        const strategicGoals = objectives.filter((o) => o.is_strategic_goal)
+        const regularObjectives = objectives.filter((o) => !o.is_strategic_goal)
+
+        // List strategic goals explicitly so the LLM knows the exact valid titles
+        if (strategicGoals.length > 0) {
+          const goalLines = strategicGoals.map(
+            (g) => `- "${g.title}" (${g.progress ?? 0}% complete, ${g.status})`
+          )
+          sections.push(
+            `Strategic goals (use these EXACT titles as "strategicGoalTitle" when creating objectives):\n${goalLines.join('\n')}`
+          )
+        }
+
+        // Build parent-child tree for regular objectives
+        const topLevel = regularObjectives.filter((o) => !o.parent_objective_id)
+        const children = regularObjectives.filter((o) => o.parent_objective_id)
+        const childMap = new Map<string, typeof regularObjectives>()
         for (const child of children) {
           const parentId = child.parent_objective_id as string
           if (!childMap.has(parentId)) childMap.set(parentId, [])
@@ -383,7 +399,9 @@ async function buildAIContextUncached(
           lines.push(`- ${orphan.title} (${orphan.progress ?? 0}% complete, child of unknown parent)`)
         }
 
-        sections.push(`Active objectives (use exact titles for archive actions):\n${lines.join('\n')}`)
+        if (lines.length > 0) {
+          sections.push(`Active objectives (use exact titles for archive actions):\n${lines.join('\n')}`)
+        }
       }
     }
 

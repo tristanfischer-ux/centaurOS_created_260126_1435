@@ -28,14 +28,39 @@ interface ProposedActionsCardProps {
 type ExecutedState = Record<number, { success: boolean; id?: string }>
 
 /**
- * Looks up active strategic goals in the user's foundry.
+ * Normalizes a title for fuzzy matching by stripping non-alphanumeric characters
+ * and collapsing whitespace.
+ *
+ * @param title - Raw title string
+ * @returns Normalized lowercase string for comparison
+ */
+function normalizeTitle(title: string): string {
+    return title
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+}
+
+/**
+ * Looks up active strategic goals in the user's foundry with fuzzy title matching.
  *
  * @description Fetches all objectives where is_strategic_goal = true
- * and deleted_at is null to enable linking new objectives to strategic goals.
+ * and deleted_at is null. Returns a resolver function that tries:
+ * 1. Exact case-insensitive match
+ * 2. Normalized match (strips punctuation, collapses whitespace)
+ * 3. Substring match (LLM title contains a strategic goal title or vice versa)
  *
- * @returns Map of lowercased strategic goal title to its objective ID.
+ * This handles common LLM mismatches like extra punctuation, slight rephrasing,
+ * or partial title references.
+ *
+ * @returns Object with the raw map and a resolve function for fuzzy matching
  */
-async function fetchStrategicGoalMap(): Promise<Map<string, string>> {
+async function fetchStrategicGoalMap(): Promise<{
+    resolve: (llmTitle: string) => string | undefined
+    goalTitles: string[]
+}> {
     const supabase = createClient()
     const { data } = await supabase
         .from("objectives")
@@ -43,13 +68,47 @@ async function fetchStrategicGoalMap(): Promise<Map<string, string>> {
         .eq("is_strategic_goal", true)
         .is("deleted_at", null)
 
-    const map = new Map<string, string>()
+    const exactMap = new Map<string, string>()
+    const normalizedMap = new Map<string, string>()
+    const goals: { id: string; title: string; normalized: string }[] = []
+
     if (data) {
         for (const row of data) {
-            map.set(row.title.trim().toLowerCase(), row.id)
+            const trimmed = row.title.trim()
+            exactMap.set(trimmed.toLowerCase(), row.id)
+            const norm = normalizeTitle(trimmed)
+            normalizedMap.set(norm, row.id)
+            goals.push({ id: row.id, title: trimmed, normalized: norm })
         }
     }
-    return map
+
+    return {
+        goalTitles: goals.map((g) => g.title),
+        resolve(llmTitle: string): string | undefined {
+            const lower = llmTitle.trim().toLowerCase()
+            // 1. Exact case-insensitive match
+            const exactId = exactMap.get(lower)
+            if (exactId) return exactId
+
+            // 2. Normalized match (strips punctuation, collapses whitespace)
+            const norm = normalizeTitle(llmTitle)
+            const normId = normalizedMap.get(norm)
+            if (normId) return normId
+
+            // 3. Substring / containment match (LLM might abbreviate or extend)
+            for (const goal of goals) {
+                if (norm.includes(goal.normalized) || goal.normalized.includes(norm)) {
+                    console.info("[ProposedActions] Fuzzy-matched strategic goal:", {
+                        llmTitle,
+                        matchedGoal: goal.title,
+                    })
+                    return goal.id
+                }
+            }
+
+            return undefined
+        },
+    }
 }
 
 export function ProposedActionsCard({
@@ -186,8 +245,8 @@ export function ProposedActionsCard({
         const results: ExecutedState = { ...executed }
 
         try {
-            // Fetch strategic goals so we can link objectives by title
-            const strategicGoalMap = await fetchStrategicGoalMap()
+            // Fetch strategic goals with fuzzy resolver for LLM title matching
+            const { resolve: resolveGoal } = await fetchStrategicGoalMap()
             const objectiveTitleToId = new Map<string, string>()
             const unlinkWarnings: string[] = []
 
@@ -204,9 +263,9 @@ export function ProposedActionsCard({
                     fd.set("description", p.description.trim().slice(0, 10000))
                 }
 
-                // Link to strategic goal if specified
+                // Link to strategic goal if specified (fuzzy matching handles LLM variations)
                 if (p.strategicGoalTitle?.trim()) {
-                    const goalId = strategicGoalMap.get(p.strategicGoalTitle.trim().toLowerCase())
+                    const goalId = resolveGoal(p.strategicGoalTitle)
                     if (goalId) {
                         fd.set("parent_objective_id", goalId)
                     } else {
@@ -330,8 +389,8 @@ export function ProposedActionsCard({
                 }
             }
 
-            // Phase 2: Create objectives (link to strategic goals)
-            const strategicGoalMap = await fetchStrategicGoalMap()
+            // Phase 2: Create objectives (link to strategic goals with fuzzy matching)
+            const { resolve: resolveGoal } = await fetchStrategicGoalMap()
             const objectiveTitleToId = new Map<string, string>()
             const unlinkWarnings: string[] = []
 
@@ -348,7 +407,7 @@ export function ProposedActionsCard({
                 }
 
                 if (p.strategicGoalTitle?.trim()) {
-                    const goalId = strategicGoalMap.get(p.strategicGoalTitle.trim().toLowerCase())
+                    const goalId = resolveGoal(p.strategicGoalTitle)
                     if (goalId) {
                         fd.set("parent_objective_id", goalId)
                     } else {
