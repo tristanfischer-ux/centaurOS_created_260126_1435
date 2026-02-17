@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'
 
 interface GoogleAppsPageProps {
-    searchParams: Promise<{ error?: string }>
+    searchParams: Promise<{ error?: string; detail?: string }>
 }
 
 /**
@@ -31,7 +31,7 @@ interface GoogleAppsPageProps {
  * @security Authenticates user and scopes all data to their active foundry.
  */
 export default async function GoogleAppsPage({ searchParams }: GoogleAppsPageProps): Promise<React.ReactNode> {
-    const { error } = await searchParams
+    const { error, detail } = await searchParams
 
     // AUTH: Verify user session
     const supabase = await createClient()
@@ -58,6 +58,7 @@ export default async function GoogleAppsPage({ searchParams }: GoogleAppsPagePro
             <GoogleAppsNotConnected
                 connectedInOtherFoundry={connectedFoundryName}
                 error={error}
+                errorDetail={detail}
             />
         )
     }

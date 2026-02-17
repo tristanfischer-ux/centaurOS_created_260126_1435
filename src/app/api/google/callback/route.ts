@@ -172,11 +172,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
         return response
     } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error'
         console.error('[GoogleCallback] Token exchange failed:', {
-            error: err instanceof Error ? err.message : 'Unknown error',
+            error: errorMessage,
+            origin,
+            redirectUri,
         })
-        return NextResponse.redirect(
-            new URL('/google-apps?error=exchange_failed', req.nextUrl.origin)
-        )
+        const errorUrl = new URL('/google-apps', req.nextUrl.origin)
+        errorUrl.searchParams.set('error', 'exchange_failed')
+        errorUrl.searchParams.set('detail', errorMessage.slice(0, 200))
+        return NextResponse.redirect(errorUrl)
     }
 }

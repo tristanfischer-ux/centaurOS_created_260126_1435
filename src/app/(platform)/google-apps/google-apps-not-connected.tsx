@@ -44,6 +44,8 @@ interface GoogleAppsNotConnectedProps {
     connectedInOtherFoundry: string | null
     /** Error code from a failed OAuth connect attempt */
     error?: string
+    /** Detailed error message from Google (for debugging exchange_failed) */
+    errorDetail?: string
 }
 
 const FEATURES = [
@@ -69,7 +71,7 @@ const FEATURES = [
     },
 ]
 
-export function GoogleAppsNotConnected({ connectedInOtherFoundry, error }: GoogleAppsNotConnectedProps) {
+export function GoogleAppsNotConnected({ connectedInOtherFoundry, error, errorDetail }: GoogleAppsNotConnectedProps) {
     const errorMessage = error ? (ERROR_MESSAGES[error] ?? ERROR_MESSAGES.oauth_error) : null
 
     // Clean the error param from the URL so refreshing doesn't re-show it
@@ -77,6 +79,7 @@ export function GoogleAppsNotConnected({ connectedInOtherFoundry, error }: Googl
         if (error) {
             const url = new URL(window.location.href)
             url.searchParams.delete('error')
+            url.searchParams.delete('detail')
             window.history.replaceState({}, '', url.toString())
         }
     }, [error])
@@ -98,7 +101,14 @@ export function GoogleAppsNotConnected({ connectedInOtherFoundry, error }: Googl
             {errorMessage && (
                 <Alert variant="destructive" className="max-w-lg mx-auto">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{errorMessage}</AlertDescription>
+                    <AlertDescription>
+                        {errorMessage}
+                        {errorDetail && (
+                            <span className="block mt-1 text-xs text-muted-foreground font-mono">
+                                {errorDetail}
+                            </span>
+                        )}
+                    </AlertDescription>
                 </Alert>
             )}
 

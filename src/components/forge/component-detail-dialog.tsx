@@ -12,6 +12,12 @@ import {
   AlertTriangle,
   Package,
   Loader2,
+  Search,
+  ShoppingCart,
+  Ruler,
+  MapPin,
+  FileText,
+  Plus,
 } from 'lucide-react'
 
 import {
@@ -29,6 +35,58 @@ import { cn } from '@/lib/utils'
 import { getComponentDetail } from '@/actions/component-library'
 import type { ComponentDetail } from '@/actions/component-library'
 
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+/**
+ * Human-readable labels for common geometry parameter keys.
+ * Falls back to title-casing the key if not found here.
+ */
+const PARAM_LABELS: Record<string, { label: string; unit?: string }> = {
+  thread_d: { label: 'Thread Diameter', unit: 'mm' },
+  thread_l: { label: 'Thread Length', unit: 'mm' },
+  width: { label: 'Width', unit: 'mm' },
+  height: { label: 'Height', unit: 'mm' },
+  depth: { label: 'Depth', unit: 'mm' },
+  thickness: { label: 'Thickness', unit: 'mm' },
+  corner_r: { label: 'Corner Radius', unit: 'mm' },
+  bore_d: { label: 'Bore Diameter', unit: 'mm' },
+  outer_d: { label: 'Outer Diameter', unit: 'mm' },
+  inner_d: { label: 'Inner Diameter', unit: 'mm' },
+  length: { label: 'Length', unit: 'mm' },
+  diameter: { label: 'Diameter', unit: 'mm' },
+  pitch: { label: 'Pitch', unit: 'mm' },
+  head_d: { label: 'Head Diameter', unit: 'mm' },
+  head_h: { label: 'Head Height', unit: 'mm' },
+  flange_d: { label: 'Flange Diameter', unit: 'mm' },
+  flange_h: { label: 'Flange Height', unit: 'mm' },
+  shaft_d: { label: 'Shaft Diameter', unit: 'mm' },
+  shaft_l: { label: 'Shaft Length', unit: 'mm' },
+  mounting_holes: { label: 'Mounting Holes' },
+  weight: { label: 'Weight', unit: 'g' },
+  wire_diameter: { label: 'Wire Diameter', unit: 'mm' },
+  outer_diameter: { label: 'Outer Diameter', unit: 'mm' },
+  free_length: { label: 'Free Length', unit: 'mm' },
+  coil_count: { label: 'Coil Count' },
+  teeth: { label: 'Teeth' },
+  module: { label: 'Module' },
+  pressure_angle: { label: 'Pressure Angle', unit: '°' },
+  num_teeth: { label: 'Number of Teeth' },
+} satisfies Record<string, { label: string; unit?: string }>
+
+/** Distributor search URLs keyed by name */
+const DISTRIBUTORS = [
+  { name: 'Mouser', url: (q: string) => `https://www.mouser.com/Search/Refine?Keyword=${encodeURIComponent(q)}` },
+  { name: 'DigiKey', url: (q: string) => `https://www.digikey.com/en/products/result?keywords=${encodeURIComponent(q)}` },
+  { name: 'McMaster-Carr', url: (q: string) => `https://www.mcmaster.com/${encodeURIComponent(q)}` },
+  { name: 'RS Components', url: (q: string) => `https://www.rs-online.com/web/c/?searchTerm=${encodeURIComponent(q)}` },
+] as const
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
 interface ComponentDetailDialogProps {
   componentId: string | null
   componentName: string | null
@@ -40,7 +98,8 @@ interface ComponentDetailDialogProps {
  * ComponentDetailDialog - Full detail view for a single component.
  *
  * @description Centered dialog with tabs for Overview, Pricing, Certifications,
- * Compatibility, and Reviews. Loads all enrichment data on open.
+ * Compatibility, and Reviews. Loads all enrichment data on open. Provides
+ * actionable purchase links and human-readable specifications.
  *
  * @component
  */
@@ -86,19 +145,23 @@ export function ComponentDetailDialog({
     ? reviews.reduce((sum, r) => sum + (r.rating as number), 0) / reviews.length
     : 0
 
+  const displayName = componentName ?? 'Component Detail'
+  const datasheetUrl = comp?.datasheet_url as string | null
+  const datasheetSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(`${displayName} datasheet filetype:pdf`)}`
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-international-orange" />
-            {componentName ?? 'Component Detail'}
+            {displayName}
           </DialogTitle>
-          {comp?.manufacturer && (
+          {comp?.manufacturer ? (
             <p className="text-sm text-muted-foreground">
-              by {comp.manufacturer as string}
+              by {String(comp.manufacturer)}
             </p>
-          )}
+          ) : null}
         </DialogHeader>
 
         {isLoading ? (
@@ -146,17 +209,17 @@ export function ComponentDetailDialog({
             <div className="flex-1 overflow-y-auto mt-4">
               {/* Overview Tab */}
               <TabsContent value="overview" className="space-y-4 m-0">
-                <OverviewTab component={comp} />
+                <OverviewTab component={comp} componentName={displayName} />
               </TabsContent>
 
               {/* Pricing Tab */}
               <TabsContent value="pricing" className="space-y-4 m-0">
-                <PricingTab pricing={pricing} />
+                <PricingTab pricing={pricing ?? null} componentName={displayName} />
               </TabsContent>
 
               {/* Certifications Tab */}
               <TabsContent value="certifications" className="space-y-4 m-0">
-                <CertificationsTab certifications={certs} />
+                <CertificationsTab certifications={certs ?? null} />
               </TabsContent>
 
               {/* Compatibility Tab */}
@@ -173,21 +236,55 @@ export function ComponentDetailDialog({
         )}
 
         <DialogFooter className="shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-          {comp?.datasheet_url && (
-            <Button variant="outline" asChild>
-              <a
-                href={comp.datasheet_url as string}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Datasheet
-              </a>
+          <div className="flex w-full items-center justify-between">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
             </Button>
-          )}
+            <div className="flex items-center gap-2">
+              {/* Datasheet: direct link if available, Google search fallback */}
+              {datasheetUrl ? (
+                <>
+                  <Button variant="outline" size="sm" asChild>
+                    <a
+                      href={datasheetUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Datasheet
+                    </a>
+                  </Button>
+                  <Button variant="ghost" size="sm" asChild>
+                    <a
+                      href={datasheetSearchUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Search for datasheet online"
+                    >
+                      <Search className="h-4 w-4" />
+                    </a>
+                  </Button>
+                </>
+              ) : (
+                <Button variant="outline" size="sm" asChild>
+                  <a
+                    href={datasheetSearchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Search className="h-4 w-4 mr-2" />
+                    Find Datasheet
+                  </a>
+                </Button>
+              )}
+
+              {/* Add to Assembly placeholder */}
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Add to Assembly
+              </Button>
+            </div>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -195,126 +292,320 @@ export function ComponentDetailDialog({
 }
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Converts a snake_case parameter key to a human-readable label with optional unit.
+ *
+ * @param key - The raw parameter key (e.g., "thread_d")
+ * @returns Formatted string like "Thread Diameter" or "Thread Diameter (mm)"
+ */
+function formatParamLabel(key: string): string {
+  const known = PARAM_LABELS[key]
+  if (known) return known.label
+  // Fallback: title-case the key
+  return key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+/**
+ * Formats a parameter value with its unit if known.
+ *
+ * @param key - The raw parameter key
+ * @param value - The parameter value
+ * @returns Formatted string like "2 mm" or "10"
+ */
+function formatParamValue(key: string, value: unknown): string {
+  const known = PARAM_LABELS[key]
+  const strValue = String(value)
+  if (known?.unit) return `${strValue} ${known.unit}`
+  return strValue
+}
+
+/**
+ * Generates a human-readable summary from component metadata.
+ *
+ * @param component - The raw component record
+ * @param componentName - The display name
+ * @returns A one-line description string
+ */
+function generateComponentSummary(
+  component: Record<string, unknown>,
+  componentName: string
+): string {
+  const parts: string[] = []
+
+  const geometrySlug = component.geometry_type_slug as string | null
+  if (geometrySlug) {
+    parts.push(humanizeSlug(geometrySlug))
+  }
+
+  const material = component.material as string | null
+  if (material) {
+    parts.push(`made from ${material}`)
+  }
+
+  const weight = component.weight_g as number | null
+  if (weight != null) {
+    parts.push(`weighing ${weight}g`)
+  }
+
+  if (parts.length === 0) return componentName
+
+  return `${parts[0].charAt(0).toUpperCase()}${parts[0].slice(1)}${parts.length > 1 ? ', ' + parts.slice(1).join(', ') : ''}`
+}
+
+/**
+ * Converts a slug like "socket_head_cap_screw" to "Socket Head Cap Screw".
+ */
+function humanizeSlug(slug: string): string {
+  return slug
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+// ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
 
-function OverviewTab({ component }: { component: Record<string, unknown> | undefined }) {
+function OverviewTab({
+  component,
+  componentName,
+}: {
+  component: Record<string, unknown> | undefined
+  componentName: string
+}) {
   if (!component) return <EmptyTabMessage message="No component data available." />
+
+  const summary = generateComponentSummary(component, componentName)
+  const geometryParams = component.geometry_params as Record<string, unknown> | null
+  const mountingPoints = component.mounting_points as unknown[] | null
+  const hasMountingPoints = Array.isArray(mountingPoints) && mountingPoints.length > 0
 
   const fields = [
     { label: 'Material', value: component.material },
     { label: 'Weight', value: component.weight_g ? `${component.weight_g}g` : null },
-    { label: 'Geometry Type', value: component.geometry_type_slug },
-    { label: 'Tags', value: Array.isArray(component.tags) ? (component.tags as string[]).join(', ') : null },
+    {
+      label: 'Category',
+      value: component.geometry_type_slug
+        ? humanizeSlug(component.geometry_type_slug as string)
+        : null,
+    },
+    {
+      label: 'Tags',
+      value: Array.isArray(component.tags)
+        ? (component.tags as string[]).join(', ')
+        : null,
+    },
   ]
 
   return (
-    <div className="space-y-3">
-      {fields.map(({ label, value }) =>
-        value ? (
-          <div key={label} className="flex items-start gap-3">
-            <span className="text-xs font-medium text-muted-foreground w-28 shrink-0 pt-0.5">
-              {label}
-            </span>
-            <span className="text-sm text-foreground">{value as string}</span>
-          </div>
-        ) : null
-      )}
+    <div className="space-y-6">
+      {/* Component summary */}
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        {summary}
+      </p>
 
-      {component.geometry_params && (
+      {/* Key specs */}
+      <div className="space-y-2">
+        {fields.map(({ label, value }) =>
+          value ? (
+            <div key={label} className="flex items-start gap-3">
+              <span className="text-xs font-medium text-muted-foreground w-24 shrink-0 pt-0.5">
+                {label}
+              </span>
+              <span className="text-sm text-foreground">{String(value)}</span>
+            </div>
+          ) : null
+        )}
+      </div>
+
+      {/* Geometry parameters as clean table */}
+      {geometryParams && Object.keys(geometryParams).length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Geometry Parameters</p>
-          <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto">
-            {JSON.stringify(component.geometry_params, null, 2)}
-          </pre>
+          <div className="flex items-center gap-2 mb-3">
+            <Ruler className="h-4 w-4 text-muted-foreground" />
+            <p className="text-xs font-semibold text-foreground uppercase tracking-wider">
+              Dimensions & Geometry
+            </p>
+          </div>
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <tbody>
+                {Object.entries(geometryParams).map(([key, value], i) => (
+                  <tr
+                    key={key}
+                    className={cn(i > 0 && 'border-t')}
+                  >
+                    <td className="px-3 py-2 text-muted-foreground font-medium w-1/2">
+                      {formatParamLabel(key)}
+                    </td>
+                    <td className="px-3 py-2 text-foreground font-semibold">
+                      {formatParamValue(key, value)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      {component.mounting_points && (
+      {/* Mounting points */}
+      {hasMountingPoints && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Mounting Points</p>
-          <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto">
-            {JSON.stringify(component.mounting_points, null, 2)}
-          </pre>
+          <div className="flex items-center gap-2 mb-3">
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+            <p className="text-xs font-semibold text-foreground uppercase tracking-wider">
+              Mounting Points
+            </p>
+          </div>
+          <div className="space-y-2">
+            {mountingPoints.map((point, i) => (
+              <div key={i} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                <span className="text-xs font-mono text-muted-foreground shrink-0 pt-0.5">
+                  #{i + 1}
+                </span>
+                <span className="text-sm text-foreground">
+                  {typeof point === 'object' && point !== null
+                    ? Object.entries(point as Record<string, unknown>)
+                        .map(([k, v]) => `${formatParamLabel(k)}: ${v}`)
+                        .join(', ')
+                    : String(point)}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-function PricingTab({ pricing }: { pricing: Record<string, unknown> | null }) {
-  if (!pricing) return <EmptyTabMessage message="Pricing data coming soon." />
-
-  const tiers = pricing.pricing_tiers as Array<{
+function PricingTab({
+  pricing,
+  componentName,
+}: {
+  pricing: Record<string, unknown> | null
+  componentName: string
+}) {
+  const tiers = pricing?.pricing_tiers as Array<{
     qty_min: number
     qty_max: number | null
     unit_price_usd: number
     source: string
   }> | null
 
-  const leadTimes = pricing.lead_time_days as Record<string, string> | null
+  const leadTimes = pricing?.lead_time_days as Record<string, string> | null
 
   return (
-    <div className="space-y-4">
-      {/* MOQ + Currency */}
-      <div className="flex items-center gap-4 text-sm">
-        <span className="text-muted-foreground">
-          MOQ: <strong className="text-foreground">{(pricing.moq as number) ?? 1}</strong>
-        </span>
-        <span className="text-muted-foreground">
-          Currency: <strong className="text-foreground">{(pricing.currency as string) ?? 'USD'}</strong>
-        </span>
-      </div>
-
-      {/* Pricing tiers table */}
-      {tiers && tiers.length > 0 && (
-        <div className="border rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted">
-                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Quantity</th>
-                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Unit Price</th>
-                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Source</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tiers.map((tier, i) => (
-                <tr key={i} className="border-t">
-                  <td className="px-3 py-2 text-foreground">
-                    {tier.qty_min}{tier.qty_max ? `–${tier.qty_max}` : '+'}
-                  </td>
-                  <td className="px-3 py-2 font-semibold text-foreground">
-                    ${tier.unit_price_usd.toFixed(2)}
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">{tier.source}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Lead times */}
-      {leadTimes && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Lead Times</p>
-          <div className="flex flex-wrap gap-3">
-            {Object.entries(leadTimes).map(([key, value]) => (
-              <div key={key} className="flex items-center gap-1.5 text-sm">
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
-                <span className="text-foreground font-medium">{value}</span>
-              </div>
-            ))}
+    <div className="space-y-6">
+      {/* Pricing tiers */}
+      {pricing && (
+        <>
+          {/* MOQ + Currency */}
+          <div className="flex items-center gap-4 text-sm">
+            <span className="text-muted-foreground">
+              MOQ: <strong className="text-foreground">{(pricing.moq as number) ?? 1}</strong>
+            </span>
+            <span className="text-muted-foreground">
+              Currency: <strong className="text-foreground">{(pricing.currency as string) ?? 'USD'}</strong>
+            </span>
           </div>
+
+          {/* Pricing tiers table */}
+          {tiers && tiers.length > 0 && (
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted">
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Quantity</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Unit Price</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tiers.map((tier, i) => (
+                    <tr key={i} className="border-t">
+                      <td className="px-3 py-2 text-foreground">
+                        {tier.qty_min}{tier.qty_max ? `–${tier.qty_max}` : '+'}
+                      </td>
+                      <td className="px-3 py-2 font-semibold text-foreground">
+                        ${tier.unit_price_usd.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">{tier.source}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Lead times */}
+          {leadTimes && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Lead Times</p>
+              <div className="flex flex-wrap gap-3">
+                {Object.entries(leadTimes).map(([key, value]) => (
+                  <div key={key} className="flex items-center gap-1.5 text-sm">
+                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
+                    <span className="text-foreground font-medium">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {pricing.shipping_notes && (
+            <p className="text-xs text-muted-foreground italic">
+              {String(pricing.shipping_notes)}
+            </p>
+          )}
+        </>
+      )}
+
+      {!pricing && (
+        <div className="py-6 text-center">
+          <p className="text-sm text-muted-foreground mb-1">Pricing data coming soon.</p>
+          <p className="text-xs text-muted-foreground">
+            Check distributors below for current pricing.
+          </p>
         </div>
       )}
 
-      {pricing.shipping_notes && (
-        <p className="text-xs text-muted-foreground italic">
-          {pricing.shipping_notes as string}
+      {/* Where to Buy section -- always shown */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          <p className="text-xs font-semibold text-foreground uppercase tracking-wider">
+            Where to Buy
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Search for this component on popular distributors:
         </p>
-      )}
+        <div className="grid grid-cols-2 gap-2">
+          {DISTRIBUTORS.map((dist) => (
+            <a
+              key={dist.name}
+              href={dist.url(componentName)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                'flex items-center gap-2 px-3 py-2.5 rounded-lg border',
+                'text-sm font-medium text-foreground',
+                'transition-colors hover:bg-muted hover:border-international-orange/30',
+              )}
+            >
+              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              {dist.name}
+            </a>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
@@ -386,10 +677,10 @@ function CertificationsTab({ certifications }: { certifications: Record<string, 
                 value={compliance.reach_compliant as boolean}
               />
             )}
-            {compliance.ip_rating && (
+            {compliance.ip_rating != null && (
               <div className="flex items-center gap-1.5">
                 <span className="text-muted-foreground">IP Rating:</span>
-                <span className="font-medium text-foreground">{compliance.ip_rating as string}</span>
+                <span className="font-medium text-foreground">{String(compliance.ip_rating)}</span>
               </div>
             )}
           </div>
@@ -435,9 +726,9 @@ function CompatibilityTab({ compatibility }: { compatibility: Record<string, unk
                   {Math.round((c.confidence as number) * 100)}% confidence
                 </span>
               )}
-              {c.domain && (
+              {c.domain != null && (
                 <span className="text-xs text-muted-foreground">
-                  · {c.domain as string}
+                  · {String(c.domain)}
                 </span>
               )}
             </div>
@@ -494,7 +785,7 @@ function ReviewsTab({ reviews, avgRating }: { reviews: Record<string, unknown>[]
                   />
                 ))}
               </div>
-              {r.verified_purchase && (
+              {r.verified_purchase === true && (
                 <Badge variant="success" className="text-[10px]">
                   <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
                   Verified
@@ -504,15 +795,15 @@ function ReviewsTab({ reviews, avgRating }: { reviews: Record<string, unknown>[]
             {(r.helpful_count as number) > 0 && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <ThumbsUp className="h-3 w-3" />
-                {r.helpful_count as number}
+                {Number(r.helpful_count)}
               </div>
             )}
           </div>
 
-          {r.title && (
-            <p className="text-sm font-semibold text-foreground">{r.title as string}</p>
+          {r.title != null && (
+            <p className="text-sm font-semibold text-foreground">{String(r.title)}</p>
           )}
-          <p className="text-sm text-muted-foreground mt-0.5">{r.body as string}</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{String(r.body)}</p>
 
           {/* Pros/Cons */}
           {((r.pros as string[])?.length > 0 || (r.cons as string[])?.length > 0) && (
@@ -538,9 +829,9 @@ function ReviewsTab({ reviews, avgRating }: { reviews: Record<string, unknown>[]
 
           {/* Reviewer info */}
           <p className="text-xs text-muted-foreground mt-2">
-            {r.reviewer_name as string}
-            {r.reviewer_role && ` · ${r.reviewer_role as string}`}
-            {r.reviewer_company && ` at ${r.reviewer_company as string}`}
+            {String(r.reviewer_name)}
+            {r.reviewer_role ? ` · ${String(r.reviewer_role)}` : ''}
+            {r.reviewer_company ? ` at ${String(r.reviewer_company)}` : ''}
           </p>
         </div>
       ))}
