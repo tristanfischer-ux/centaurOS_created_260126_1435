@@ -31,13 +31,33 @@ This file contains meta-agent behavior directives that influence HOW work is app
 
 **After completing any bug fix or UI change, run `npm run verify` before reporting the task as done.**
 
-This runs two tiers of checks:
-1. **Tier 1 (Static):** `tsc --noEmit` + ESLint — catches broken imports, type mismatches, syntax errors
-2. **Tier 2 (Smoke):** Playwright navigates to every affected page and checks it renders — catches runtime crashes
+The verify script is **contract-aware** — it reads `harness-contract.json` to determine what checks are required based on the risk tier of your changed files:
+
+- **Critical** (auth, billing, migrations): security typecheck + baseline + lint + unit tests + E2E + browser evidence
+- **High** (server actions, API routes): security typecheck + baseline + lint + unit tests + smoke tests
+- **Medium** (components, hooks, libs): baseline + lint + smoke tests
+- **Low** (docs, config, marketing): baseline + lint only
+
+The verify script runs the appropriate checks automatically. You don't need to think about which tier — it classifies your changes and tells you.
 
 If any tier fails, fix the issue and re-run. Never tell the user "done" until verify passes. If the dev server isn't running, Tier 2 is skipped gracefully and Tier 1 still provides protection.
 
 For static-only checks (no browser needed): `npm run verify -- --static`
+
+### Harness Engineering Commands
+
+```bash
+npm run harness:risk-tier              # Classify your changes by risk tier
+npm run harness:risk-tier -- --ref main # Classify against a specific ref
+npm run harness:docs-drift -- --ref main # Check control-plane docs are in sync
+npm run harness:gap-case -- --feature X --description "Y" --severity Z  # Generate regression test from incident
+```
+
+When a production regression is discovered, **always** generate a harness gap case before or alongside the fix:
+```bash
+npm run harness:gap-case -- --feature "billing" --description "Stripe webhook duplicate events" --severity critical --incident "INC-YYYY-MM-DD"
+```
+This creates a test skeleton with an SLA deadline. Implement it within the SLA window (default: 3 days).
 
 ### Commit-Per-Page Discipline
 
