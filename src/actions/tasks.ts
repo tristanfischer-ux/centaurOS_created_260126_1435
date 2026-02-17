@@ -2203,6 +2203,105 @@ export async function deleteTasks(taskIds: string[]) {
 }
 
 /**
+ * Soft-deletes (archives) a task by setting deleted_at.
+ *
+ * @description Used by the specialist proposed-actions system to archive
+ * tasks that are no longer relevant as part of a strategy refresh.
+ *
+ * @param taskId - The task ID to archive
+ * @returns Success or error result
+ *
+ * @security Requires authenticated user. Only creator, assignee, or Executive/Founder can archive.
+ * @audit Logs archive event
+ */
+export async function archiveTask(taskId: string): Promise<{ success: true } | { error: string }> {
+    return withAuth(async ({ supabase, user, foundryId }) => {
+        const now = new Date().toISOString()
+
+        // AUTH: Check permission to modify this task
+        const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
+        if (!authCheck.allowed) {
+            return { error: authCheck.error ?? 'Unauthorized' }
+        }
+
+        // Soft-delete the task
+        const { error: archiveError } = await supabase
+            .from('tasks')
+            .update({ deleted_at: now })
+            .eq('id', taskId)
+            .eq('foundry_id', foundryId)
+
+        if (archiveError) {
+            console.error('[TaskService] Archive error:', { taskId, error: archiveError.message })
+            return { error: archiveError.message }
+        }
+
+        // AUDIT: Log the archive
+        console.info('[TaskService] Task archived:', {
+            taskId,
+            archivedBy: user.id,
+            foundryId,
+        })
+
+        revalidatePath('/tasks')
+        revalidatePath('/new-tasks')
+        return { success: true }
+    })
+}
+
+/**
+ * Archives a task by matching its title (case-insensitive fuzzy match).
+ * Used by the specialist proposed-actions system where only the title is known.
+ *
+ * @description Finds the best-matching active task by title within the user's
+ * foundry and archives it. Uses case-insensitive ILIKE for matching.
+ *
+ * @param title - The task title to search for
+ * @returns The archived task ID and title, or an error
+ *
+ * @security Requires authenticated user with foundry membership
+ */
+export async function archiveTaskByTitle(
+    title: string
+): Promise<{ success: true; taskId: string; title: string } | { error: string }> {
+    return withAuth(async ({ supabase, foundryId }) => {
+        const searchTerm = title.trim()
+        if (!searchTerm) return { error: 'Title is required' }
+
+        const { data: matches, error: searchError } = await supabase
+            .from('tasks')
+            .select('id, title')
+            .eq('foundry_id', foundryId)
+            .is('deleted_at', null)
+            .ilike('title', `%${searchTerm}%`)
+            .limit(5)
+
+        if (searchError) {
+            console.error('[TaskService] Archive-by-title search error:', {
+                title: searchTerm,
+                error: searchError.message,
+            })
+            return { error: 'Failed to search for task' }
+        }
+
+        if (!matches || matches.length === 0) {
+            return { error: `No active task found matching "${searchTerm}"` }
+        }
+
+        // Prefer exact match, then first partial match
+        const exactMatch = matches.find(
+            (m) => m.title.toLowerCase() === searchTerm.toLowerCase()
+        )
+        const target = exactMatch ?? matches[0]
+
+        const result = await archiveTask(target.id)
+        if ('error' in result) return result
+
+        return { success: true, taskId: target.id, title: target.title }
+    })
+}
+
+/**
  * Fetch a single task by ID with all related data for the FullTaskView dialog
  * 
  * @param taskId - The task ID to fetch

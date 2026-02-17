@@ -741,8 +741,18 @@ ${otherSpecialists}
 
 Only recommend ONE specialist. Choose based on what gaps or next steps emerged from this conversation. If no follow-up is needed, write: NEXT_SPECIALIST: none | No immediate follow-up needed.`)
 
-        const promptTemplate = selectedPrompt?.defaultPrompt ??
-            `You are ${specialist.name}, the ${specialist.title} specialist for this company. ${specialist.workingStyle}\n\n{{input}}\n\n{{company_context}}\n\nProvide a thorough, actionable response that demonstrates deep expertise. Use markdown formatting with headers, tables, and bullet points for clarity.`
+        // Conversation-aware prompt: follow-up messages use a lightweight
+        // template so the AI treats them as natural conversation turns.
+        // The specialist personality, memory, and response standards are
+        // already in the system prompt — no need to repeat "demonstrate
+        // deep expertise" on every message (which overrides conversational intent).
+        const isFollowUp = messages.filter(m => !m.historical && m.role === "user").length > 0
+
+        const promptTemplate = selectedPrompt?.defaultPrompt
+            ?? (isFollowUp
+                ? `{{input}}\n\n{{company_context}}`
+                : `You are ${specialist.name}, the ${specialist.title} specialist for this company. ${specialist.workingStyle}\n\n{{input}}\n\n{{company_context}}\n\nProvide a thorough, actionable response that demonstrates deep expertise. Use markdown formatting with headers, tables, and bullet points for clarity.`
+            )
 
         const controller = new AbortController()
         executeAbortRef.current = controller

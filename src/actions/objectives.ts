@@ -542,6 +542,157 @@ export async function deleteObjectives(ids: string[], childAction: 'keep' | 'cas
 }
 
 /**
+ * Soft-deletes (archives) an objective by setting deleted_at.
+ * Also unlinks any child tasks so they become standalone.
+ *
+ * @description Used by the specialist proposed-actions system to archive
+ * objectives that are no longer relevant as part of a strategy refresh.
+ *
+ * @param objectiveId - The objective ID to archive
+ * @returns Success or error result
+ *
+ * @security Requires authenticated user with foundry membership. Only creator or Executive/Founder can archive.
+ * @audit Logs archive event with objective details
+ */
+export async function archiveObjective(objectiveId: string): Promise<{ success: true } | { error: string }> {
+    return withAuth(async ({ supabase, user, foundryId }) => {
+        const now = new Date().toISOString()
+
+        // 1. Verify objective exists, belongs to foundry, and isn't already archived
+        const { data: objective, error: fetchError } = await supabase
+            .from('objectives')
+            .select('id, title, creator_id, foundry_id')
+            .eq('id', objectiveId)
+            .eq('foundry_id', foundryId)
+            .is('deleted_at', null)
+            .single()
+
+        if (fetchError || !objective) return { error: 'Objective not found' }
+
+        // AUTH: Check permission — creator or elevated role
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        const canArchiveAny = profile?.role === 'Executive' || profile?.role === 'Founder'
+        if (objective.creator_id !== user.id && !canArchiveAny) {
+            return { error: 'Unauthorized: Only the creator or admins can archive this objective' }
+        }
+
+        // 2. Unlink tasks under this objective (set objective_id = null, don't delete them)
+        const { error: unlinkError } = await supabase
+            .from('tasks')
+            .update({ objective_id: null as unknown as string })
+            .eq('objective_id', objectiveId)
+            .eq('foundry_id', foundryId)
+            .is('deleted_at', null)
+
+        if (unlinkError) {
+            console.error('[ObjectiveService] Failed to unlink tasks before archive:', {
+                objectiveId,
+                error: unlinkError.message,
+            })
+            // Non-fatal: continue with archive
+        }
+
+        // 3. Unlink child objectives (set parent_objective_id = null)
+        const { error: unlinkChildrenError } = await supabase
+            .from('objectives')
+            .update({ parent_objective_id: null })
+            .eq('parent_objective_id', objectiveId)
+            .eq('foundry_id', foundryId)
+            .is('deleted_at', null)
+
+        if (unlinkChildrenError) {
+            console.error('[ObjectiveService] Failed to unlink children before archive:', {
+                objectiveId,
+                error: unlinkChildrenError.message,
+            })
+        }
+
+        // 4. Soft-delete the objective
+        const { error: archiveError } = await supabase
+            .from('objectives')
+            .update({ deleted_at: now })
+            .eq('id', objectiveId)
+            .eq('foundry_id', foundryId)
+
+        if (archiveError) {
+            console.error('[ObjectiveService] Archive error:', { objectiveId, error: archiveError.message })
+            return { error: archiveError.message }
+        }
+
+        // AUDIT: Log the archive
+        console.info('[ObjectiveService] Objective archived:', {
+            objectiveId,
+            title: objective.title,
+            archivedBy: user.id,
+            foundryId,
+        })
+
+        revalidatePath('/objectives')
+        revalidatePath('/new-objectives')
+        revalidatePath('/canvas')
+        return { success: true }
+    })
+}
+
+/**
+ * Archives an objective by matching its title (case-insensitive fuzzy match).
+ * Used by the specialist proposed-actions system where only the title is known.
+ *
+ * @description Finds the best-matching active objective by title within the user's
+ * foundry and archives it. Uses case-insensitive ILIKE for matching.
+ *
+ * @param title - The objective title to search for
+ * @returns The archived objective ID and title, or an error
+ *
+ * @security Requires authenticated user with foundry membership
+ */
+export async function archiveObjectiveByTitle(
+    title: string
+): Promise<{ success: true; objectiveId: string; title: string } | { error: string }> {
+    return withAuth(async ({ supabase, foundryId }) => {
+        // Search for active objectives matching the title (case-insensitive)
+        const searchTerm = title.trim()
+        if (!searchTerm) return { error: 'Title is required' }
+
+        const { data: matches, error: searchError } = await supabase
+            .from('objectives')
+            .select('id, title')
+            .eq('foundry_id', foundryId)
+            .is('deleted_at', null)
+            .ilike('title', `%${searchTerm}%`)
+            .limit(5)
+
+        if (searchError) {
+            console.error('[ObjectiveService] Archive-by-title search error:', {
+                title: searchTerm,
+                error: searchError.message,
+            })
+            return { error: 'Failed to search for objective' }
+        }
+
+        if (!matches || matches.length === 0) {
+            return { error: `No active objective found matching "${searchTerm}"` }
+        }
+
+        // Prefer exact match, then first partial match
+        const exactMatch = matches.find(
+            (m) => m.title.toLowerCase() === searchTerm.toLowerCase()
+        )
+        const target = exactMatch ?? matches[0]
+
+        const result = await archiveObjective(target.id)
+        if ('error' in result) return result
+
+        return { success: true, objectiveId: target.id, title: target.title }
+    })
+}
+
+/**
  * Creates an objective from a universal subsystem objective pack
  * 
  * @description Creates an objective with pre-built tasks from a subsystem pack.
