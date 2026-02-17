@@ -159,7 +159,7 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
         className={cn(
           "fixed z-[200] transition-all duration-200 ease-out",
           "bottom-24 right-4 sm:bottom-6 sm:right-6",
-          mounted ? "opacity-100 scale-100" : "opacity-0 scale-95",
+          mounted && !isPanelOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none",
         )}
       >
         <Tooltip>
