@@ -28,7 +28,7 @@ const QUICK_START_TEMPLATES = [
 ] as const
 
 const CAPABILITY_CARDS = [
-  { icon: Search, title: "AI Research", desc: "Real-world specs from datasheets, reference designs, and engineering databases" },
+  { icon: Search, title: "Spec Research", desc: "Real-world specs from datasheets, reference designs, and engineering databases" },
   { icon: Box, title: "256 Components", desc: "Parametric library spanning CubeSats, EVs, drones, robotics, and more" },
   { icon: Printer, title: "DFM Analysis", desc: "Printability, support volume, material usage, and compatible printers" },
   { icon: Ruler, title: "Mass Properties", desc: "Bounding box, mass, volume, surface area, and center-of-gravity coordinates" },
