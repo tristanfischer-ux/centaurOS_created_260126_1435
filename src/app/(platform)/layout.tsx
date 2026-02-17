@@ -16,6 +16,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
 import { ZoomProvider, MobileZoomControl, ZoomableContent } from "@/components/ZoomProvider";
 import { ScreenContextProvider } from "@/contexts/screen-context";
+import { AdvisorPanelProvider } from "@/contexts/advisor-panel-context";
+import { AdvisorPanel } from "@/components/specialists/advisor-panel";
 import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
 import { ProfileSetupRequired } from "@/components/ProfileSetupRequired";
 import { createClient } from "@/lib/supabase/server";
@@ -147,6 +149,7 @@ export default async function PlatformLayout({
         <TooltipProvider>
             <PresenceProvider>
                 <ZoomProvider>
+                  <AdvisorPanelProvider>
                   <ScreenContextProvider>
                     <div className="flex h-screen overflow-hidden">
                         <CommandPalette />
@@ -167,6 +170,9 @@ export default async function PlatformLayout({
                                 )}
                             </main>
                         </ZoomableContent>
+                        <Suspense fallback={null}>
+                            <AdvisorPanel />
+                        </Suspense>
                         <MobileNav />
                         <Suspense fallback={null}>
                             <FloatingSpecialistFAB />
@@ -186,6 +192,7 @@ export default async function PlatformLayout({
                         </Suspense>
                     </div>
                   </ScreenContextProvider>
+                  </AdvisorPanelProvider>
                 </ZoomProvider>
             </PresenceProvider>
         </TooltipProvider>

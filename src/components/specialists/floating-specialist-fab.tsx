@@ -4,12 +4,13 @@
  * @file floating-specialist-fab.tsx
  *
  * @description Global floating action button that shows the most relevant
- * AI specialist for the current page. Route-aware via getSpecialistForRoute.
- * Defaults to Chief of Staff (Cal) when no specific specialist matches.
- * Hidden on /agents (the specialists hub).
+ * AI specialist for the current page. On desktop (lg+), toggles the
+ * persistent advisor panel. On mobile, opens the dialog modal.
  *
  * @related
  * - Route mapping: src/lib/route-specialist-map.ts
+ * - AdvisorPanel: src/components/specialists/advisor-panel.tsx
+ * - AdvisorPanelProvider: src/contexts/advisor-panel-context.tsx
  * - BriefSpecialistDialog: src/app/(platform)/agents/brief-specialist-dialog.tsx
  * - Screen context: src/contexts/screen-context.tsx
  */
@@ -23,27 +24,41 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-dialog"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import { useScreenContext } from "@/contexts/screen-context"
+import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 import { getSpecialistForRoute } from "@/lib/route-specialist-map"
 import { serializeContext } from "./types"
 import type { Specialist } from "@/app/(platform)/agents/specialists-data"
 
-/** Handoff state when switching specialists from within the dialog */
+/** Handoff state when switching specialists from within the mobile dialog */
 interface HandoffState {
   context: string | null
   referredBy: string | null
 }
 
+/** Check if viewport is desktop (lg breakpoint = 1024px) */
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(false)
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)")
+    setIsDesktop(mql.matches)
+    const handler = (e: MediaQueryListEvent): void => setIsDesktop(e.matches)
+    mql.addEventListener("change", handler)
+    return () => mql.removeEventListener("change", handler)
+  }, [])
+  return isDesktop
+}
+
 export function FloatingSpecialistFAB(): React.ReactElement | null {
   const pathname = usePathname()
   const { screenContext } = useScreenContext()
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [activeSpecialist, setActiveSpecialist] = useState<Specialist | null>(
-    null,
-  )
-  const [handoff, setHandoff] = useState<HandoffState>({
-    context: null,
-    referredBy: null,
-  })
+  const advisorPanel = useAdvisorPanel()
+  const isDesktop = useIsDesktop()
+
+  // Mobile-only state: dialog for small screens
+  const [mobileDialogOpen, setMobileDialogOpen] = useState(false)
+  const [mobileActiveSpecialist, setMobileActiveSpecialist] = useState<Specialist | null>(null)
+  const [mobileHandoff, setMobileHandoff] = useState<HandoffState>({ context: null, referredBy: null })
+
   const [mounted, setMounted] = useState(false)
   const [hasUnreadInsights, setHasUnreadInsights] = useState(false)
 
@@ -53,24 +68,22 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
     return () => clearTimeout(t)
   }, [])
 
-  // Check for unread specialist insights periodically (lightweight poll)
+  // Check for unread specialist insights periodically
   useEffect(() => {
     let cancelled = false
 
     async function checkInsights(): Promise<void> {
       try {
-        // Dynamic import to avoid SSR issues and keep bundle light
         const { getUnreadInsightCount } = await import("@/actions/agent-insights")
         const count = await getUnreadInsightCount()
         if (!cancelled) {
           setHasUnreadInsights(count > 0)
         }
       } catch {
-        // Non-critical — silently ignore
+        // Non-critical
       }
     }
 
-    // Check once on mount after a delay, then every 5 minutes
     const initialTimer = setTimeout(checkInsights, 3000)
     const interval = setInterval(checkInsights, 5 * 60 * 1000)
 
@@ -79,7 +92,7 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
       clearTimeout(initialTimer)
       clearInterval(interval)
     }
-  }, [pathname]) // Re-check when navigating
+  }, [pathname])
 
   const { specialistId } = useMemo(
     () => getSpecialistForRoute(pathname ?? "/"),
@@ -100,26 +113,34 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
   )
   const entityContext = serializeContext(pageContext)
 
-  const openDialog = useCallback(() => {
-    setHandoff({ context: null, referredBy: null })
-    setActiveSpecialist(specialist)
-    setDialogOpen(true)
-  }, [specialist])
+  const handleClick = useCallback(() => {
+    setHasUnreadInsights(false)
 
-  const handleSwitchSpecialist = useCallback(
+    if (isDesktop) {
+      // Desktop: toggle the persistent panel
+      advisorPanel.togglePanel(specialistId)
+    } else {
+      // Mobile: open the dialog modal
+      setMobileHandoff({ context: null, referredBy: null })
+      setMobileActiveSpecialist(specialist ?? null)
+      setMobileDialogOpen(true)
+    }
+  }, [isDesktop, advisorPanel, specialistId, specialist])
+
+  const handleMobileSwitchSpecialist = useCallback(
     (newId: string, handoffCtx?: string) => {
       const spec = getSpecialistById(newId)
       if (spec) {
-        const fromName = activeSpecialist?.name ?? null
-        setHandoff({
+        const fromName = mobileActiveSpecialist?.name ?? null
+        setMobileHandoff({
           context: handoffCtx ?? null,
           referredBy: handoffCtx ? fromName : null,
         })
-        setActiveSpecialist(spec)
-        setDialogOpen(true)
+        setMobileActiveSpecialist(spec)
+        setMobileDialogOpen(true)
       }
     },
-    [activeSpecialist?.name],
+    [mobileActiveSpecialist?.name],
   )
 
   // Hide on /agents — the specialists hub doesn't need a redundant FAB
@@ -129,6 +150,8 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
   if (!specialist) {
     return null
   }
+
+  const isPanelOpen = isDesktop && advisorPanel.isOpen
 
   return (
     <>
@@ -143,19 +166,15 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
           <TooltipTrigger asChild>
             <button
               type="button"
-              onClick={() => {
-                openDialog()
-                // Clear the indicator when the user opens the dialog
-                setHasUnreadInsights(false)
-              }}
+              onClick={handleClick}
               aria-label={`Ask ${specialist.name} - ${specialist.title}${hasUnreadInsights ? " (has new insights)" : ""}`}
               className={cn(
                 "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
                 "bg-background border shadow-lg",
                 "hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 "transition-transform duration-200",
-                dialogOpen && "ring-2 ring-international-orange ring-offset-2",
-                hasUnreadInsights && !dialogOpen && "ring-2 ring-international-orange/50 ring-offset-1",
+                isPanelOpen && "ring-2 ring-international-orange ring-offset-2",
+                hasUnreadInsights && !isPanelOpen && "ring-2 ring-international-orange/50 ring-offset-1",
               )}
             >
               {specialist.avatarImage ? (
@@ -171,8 +190,8 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
               ) : (
                 <MessageSquare className="h-5 w-5 text-muted-foreground" />
               )}
-              {/* Proactive insight indicator — subtle sparkle when specialist has something to share */}
-              {hasUnreadInsights && !dialogOpen && (
+              {/* Proactive insight indicator */}
+              {hasUnreadInsights && !isPanelOpen && (
                 <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-international-orange shadow-sm">
                   <Sparkles className="h-2.5 w-2.5 text-white animate-pulse" />
                 </span>
@@ -182,20 +201,23 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
           <TooltipContent side="left">
             {hasUnreadInsights
               ? `${specialist.name} has something to share`
-              : `Ask ${specialist.name} — ${specialist.title}`
+              : isPanelOpen
+                ? `Close ${specialist.name}`
+                : `Ask ${specialist.name} — ${specialist.title}`
             }
           </TooltipContent>
         </Tooltip>
       </div>
 
-      {activeSpecialist ? (
+      {/* Mobile-only: Dialog fallback for small screens */}
+      {mobileActiveSpecialist && !isDesktop ? (
         <BriefSpecialistDialog
-          specialist={activeSpecialist}
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          onSwitchSpecialist={handleSwitchSpecialist}
-          handoffContext={handoff.context ?? entityContext}
-          referredBy={handoff.referredBy}
+          specialist={mobileActiveSpecialist}
+          open={mobileDialogOpen}
+          onOpenChange={setMobileDialogOpen}
+          onSwitchSpecialist={handleMobileSwitchSpecialist}
+          handoffContext={mobileHandoff.context ?? entityContext}
+          referredBy={mobileHandoff.referredBy}
           contextLabel={screenContext.pageTitle}
         />
       ) : null}

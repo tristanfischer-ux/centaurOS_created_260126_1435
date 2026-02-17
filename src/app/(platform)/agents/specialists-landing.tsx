@@ -20,6 +20,7 @@ import type { SpecialistActivity } from "@/actions/agent-memory"
 import { getInsightFeed } from "@/actions/agent-insights"
 import type { AgentInsight } from "@/actions/agent-insights"
 import { getSpecialistById } from "./specialists-data"
+import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 
 /**
  * Organises specialists into a hierarchical org chart structure.
@@ -65,6 +66,19 @@ export function SpecialistsLanding({
 }: SpecialistsLandingProps) {
     const searchParams = useSearchParams()
     const router = useRouter()
+    const advisorPanel = useAdvisorPanel()
+
+    // Desktop detection for panel vs dialog routing
+    const [isDesktop, setIsDesktop] = useState(false)
+    useEffect(() => {
+        const mql = window.matchMedia("(min-width: 1024px)")
+        setIsDesktop(mql.matches)
+        const handler = (e: MediaQueryListEvent): void => setIsDesktop(e.matches)
+        mql.addEventListener("change", handler)
+        return () => mql.removeEventListener("change", handler)
+    }, [])
+
+    // Mobile-only dialog state (desktop uses advisor panel)
     const [briefSpecialistId, setBriefSpecialistId] = useState<string | null>(null)
     const [isMeetingOpen, setIsMeetingOpen] = useState(false)
     const [isCouncilOpen, setIsCouncilOpen] = useState(false)
@@ -94,11 +108,15 @@ export function SpecialistsLanding({
     useEffect(() => {
         const specialistParam = searchParams.get('specialist')
         if (specialistParam && SPECIALISTS.some(s => s.id === specialistParam)) {
-            setBriefSpecialistId(specialistParam)
-            // Clean the URL so refreshing doesn't re-open the dialog
+            if (isDesktop) {
+                advisorPanel.openPanel(specialistParam)
+            } else {
+                setBriefSpecialistId(specialistParam)
+            }
+            // Clean the URL so refreshing doesn't re-open
             router.replace('/agents', { scroll: false })
         }
-    }, [searchParams, router])
+    }, [searchParams, router, isDesktop, advisorPanel])
 
     // Pre-compute hierarchy
     const orgHierarchy = useMemo(() => getOrgChartHierarchy(), [])
@@ -123,10 +141,14 @@ export function SpecialistsLanding({
     const selectedSpecialist = SPECIALISTS.find((s) => s.id === briefSpecialistId)
 
     const handleBrief = (specialistId: string) => {
-        // Clear handoff when opening directly (not via switch)
-        setHandoffContext(null)
-        setReferredByName(null)
-        setBriefSpecialistId(specialistId)
+        if (isDesktop) {
+            advisorPanel.openPanel(specialistId)
+        } else {
+            // Mobile: open dialog
+            setHandoffContext(null)
+            setReferredByName(null)
+            setBriefSpecialistId(specialistId)
+        }
     }
 
     return (
@@ -381,8 +403,8 @@ export function SpecialistsLanding({
                 </Card>
             </motion.div>
 
-            {/* ── Brief Dialog ──────────────────────────────────────────── */}
-            {selectedSpecialist && (
+            {/* ── Brief Dialog (mobile only — desktop uses advisor panel) ── */}
+            {selectedSpecialist && !isDesktop && (
                 <BriefSpecialistDialog
                     specialist={selectedSpecialist}
                     open={briefSpecialistId !== null}
@@ -394,7 +416,6 @@ export function SpecialistsLanding({
                         }
                     }}
                     onSwitchSpecialist={(id, context) => {
-                        // Capture the current specialist's name for the "Referred by" badge
                         const fromName = selectedSpecialist.name
                         setHandoffContext(context ?? null)
                         setReferredByName(context ? fromName : null)

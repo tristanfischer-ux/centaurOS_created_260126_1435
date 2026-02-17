@@ -4,21 +4,22 @@
  * @file ask-specialist-button.tsx
  *
  * @description The primary entry point for contextual specialist consultation.
- * Renders in three visual modes (button, chip, icon) and manages the full flow:
- *   1. User clicks -> optionally picks a specialist (or uses auto-suggested one)
- *   2. Opens BriefSpecialistDialog with serialized context as handoffContext
+ * Renders in three visual modes (button, chip, icon). On desktop (lg+),
+ * opens the persistent advisor panel via context. On mobile, falls back
+ * to the BriefSpecialistDialog modal.
  *
- * This is the single component used across Strategy, Objectives, Tasks, and
- * other surfaces to give users one-click access to specialist input.
+ * Used across Strategy, Objectives, Tasks, and other surfaces to give
+ * users one-click access to specialist input.
  */
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { MessageSquare, ChevronDown } from "lucide-react"
 import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-dialog"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 import { SpecialistPicker } from "./specialist-picker"
 import { serializeContext } from "./types"
 import type { SpecialistContext, SpecialistButtonVariant } from "./types"
@@ -43,10 +44,21 @@ interface AskSpecialistButtonProps {
 
 /** Handoff state passed between specialists during a conversation switch */
 interface HandoffState {
-  /** Context summary from the referring specialist's conversation */
   context: string | null
-  /** Name of the specialist that referred the user */
   referredBy: string | null
+}
+
+/** Check if viewport is desktop (lg breakpoint = 1024px) */
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(false)
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)")
+    setIsDesktop(mql.matches)
+    const handler = (e: MediaQueryListEvent): void => setIsDesktop(e.matches)
+    mql.addEventListener("change", handler)
+    return () => mql.removeEventListener("change", handler)
+  }, [])
+  return isDesktop
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -55,11 +67,9 @@ interface HandoffState {
  * AskSpecialistButton -- Contextual specialist consultation entry point.
  *
  * @description Renders as a button, chip, or icon. When clicked:
- * - If a specialist is pre-selected, opens BriefSpecialistDialog directly
+ * - Desktop (lg+): Opens the persistent advisor panel via context
+ * - Mobile: Opens BriefSpecialistDialog as a centered modal
  * - If no specialist is pre-selected, shows a SpecialistPicker first
- *
- * The entity context (objective, task, pillar, etc.) is serialized into
- * a handoff string so the specialist can reference specific details.
  */
 export function AskSpecialistButton({
   context,
@@ -69,54 +79,72 @@ export function AskSpecialistButton({
   className,
   label,
 }: AskSpecialistButtonProps) {
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [activeSpecialist, setActiveSpecialist] = useState<Specialist | null>(null)
-  const [handoff, setHandoff] = useState<HandoffState>({ context: null, referredBy: null })
+  const advisorPanel = useAdvisorPanel()
+  const isDesktop = useIsDesktop()
+
+  // Mobile-only state: dialog fallback for small screens
+  const [mobileDialogOpen, setMobileDialogOpen] = useState(false)
+  const [mobileActiveSpecialist, setMobileActiveSpecialist] = useState<Specialist | null>(null)
+  const [mobileHandoff, setMobileHandoff] = useState<HandoffState>({ context: null, referredBy: null })
 
   // Resolve pre-selected specialist
   const preselected = specialistId ? getSpecialistById(specialistId) : null
   const displayName = specialistName ?? preselected?.name
 
-  /** Open dialog with a specific specialist */
-  const openDialog = useCallback((id: string) => {
-    const spec = getSpecialistById(id)
-    if (spec) {
-      setHandoff({ context: null, referredBy: null })
-      setActiveSpecialist(spec)
-      setDialogOpen(true)
+  // Serialize entity context
+  const entityContext = serializeContext(context)
+  const contextLabel = context.title
+
+  /** Open with a specific specialist (from picker or direct click) */
+  const openSpecialist = useCallback((id: string) => {
+    if (isDesktop) {
+      advisorPanel.openPanel(id, {
+        handoffContext: entityContext,
+        contextLabel,
+      })
+    } else {
+      const spec = getSpecialistById(id)
+      if (spec) {
+        setMobileHandoff({ context: null, referredBy: null })
+        setMobileActiveSpecialist(spec)
+        setMobileDialogOpen(true)
+      }
     }
-  }, [])
+  }, [isDesktop, advisorPanel, entityContext, contextLabel])
 
   /** Handle direct click when specialist is pre-selected */
   const handleDirectClick = useCallback(() => {
     if (preselected) {
-      setHandoff({ context: null, referredBy: null })
-      setActiveSpecialist(preselected)
-      setDialogOpen(true)
+      openSpecialist(preselected.id)
     }
-  }, [preselected])
+  }, [preselected, openSpecialist])
 
-  /**
-   * Handle specialist switch from within the dialog.
-   * Captures the referring specialist's name and handoff context,
-   * then reopens the dialog with the new specialist.
-   */
-  const handleSwitchSpecialist = useCallback((newId: string, handoffCtx?: string) => {
+  /** Handle specialist switch from within the mobile dialog */
+  const handleMobileSwitchSpecialist = useCallback((newId: string, handoffCtx?: string) => {
     const spec = getSpecialistById(newId)
     if (spec) {
-      const fromName = activeSpecialist?.name ?? null
-      setHandoff({
+      const fromName = mobileActiveSpecialist?.name ?? null
+      setMobileHandoff({
         context: handoffCtx ?? null,
         referredBy: handoffCtx ? fromName : null,
       })
-      setActiveSpecialist(spec)
-      setDialogOpen(true)
+      setMobileActiveSpecialist(spec)
+      setMobileDialogOpen(true)
     }
-  }, [activeSpecialist?.name])
+  }, [mobileActiveSpecialist?.name])
 
-  // Serialize entity context for the dialog (page/entity being discussed)
-  const entityContext = serializeContext(context)
-  const contextLabel = context.title
+  // Mobile dialog element (only rendered on mobile)
+  const mobileDialog = mobileActiveSpecialist && !isDesktop ? (
+    <BriefSpecialistDialog
+      specialist={mobileActiveSpecialist}
+      open={mobileDialogOpen}
+      onOpenChange={setMobileDialogOpen}
+      onSwitchSpecialist={handleMobileSwitchSpecialist}
+      handoffContext={mobileHandoff.context ?? entityContext}
+      referredBy={mobileHandoff.referredBy}
+      contextLabel={contextLabel}
+    />
+  ) : null
 
   // ── Render: Chip variant ──
   if (variant === "chip") {
@@ -154,22 +182,11 @@ export function AskSpecialistButton({
         {preselected ? (
           chipContent
         ) : (
-          <SpecialistPicker onSelect={openDialog}>
+          <SpecialistPicker onSelect={openSpecialist}>
             {chipContent}
           </SpecialistPicker>
         )}
-
-        {activeSpecialist && (
-          <BriefSpecialistDialog
-            specialist={activeSpecialist}
-            open={dialogOpen}
-            onOpenChange={setDialogOpen}
-            onSwitchSpecialist={handleSwitchSpecialist}
-            handoffContext={handoff.context ?? entityContext}
-            referredBy={handoff.referredBy}
-            contextLabel={contextLabel}
-          />
-        )}
+        {mobileDialog}
       </>
     )
   }
@@ -205,22 +222,11 @@ export function AskSpecialistButton({
         {preselected ? (
           iconButton
         ) : (
-          <SpecialistPicker onSelect={openDialog}>
+          <SpecialistPicker onSelect={openSpecialist}>
             {iconButton}
           </SpecialistPicker>
         )}
-
-        {activeSpecialist && (
-          <BriefSpecialistDialog
-            specialist={activeSpecialist}
-            open={dialogOpen}
-            onOpenChange={setDialogOpen}
-            onSwitchSpecialist={handleSwitchSpecialist}
-            handoffContext={handoff.context ?? entityContext}
-            referredBy={handoff.referredBy}
-            contextLabel={contextLabel}
-          />
-        )}
+        {mobileDialog}
       </>
     )
   }
@@ -260,22 +266,11 @@ export function AskSpecialistButton({
       {hasPreselect ? (
         buttonContent
       ) : (
-        <SpecialistPicker onSelect={openDialog} recommendedId={specialistId}>
+        <SpecialistPicker onSelect={openSpecialist} recommendedId={specialistId}>
           {buttonContent}
         </SpecialistPicker>
       )}
-
-      {activeSpecialist && (
-        <BriefSpecialistDialog
-          specialist={activeSpecialist}
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          onSwitchSpecialist={handleSwitchSpecialist}
-          handoffContext={handoff.context ?? entityContext}
-          referredBy={handoff.referredBy}
-          contextLabel={contextLabel}
-        />
-      )}
+      {mobileDialog}
     </>
   )
 }
