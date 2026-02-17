@@ -138,6 +138,8 @@ export function MeetingOutputs({
                 "",
                 "## Full Transcript",
                 "",
+                "*The complete meeting discussion is included below for reference.*",
+                "",
                 transcript,
             ].join("\n")
 
@@ -175,7 +177,7 @@ export function MeetingOutputs({
     // ─── Render ───────────────────────────────────────────────────────────
     return (
         <div className="space-y-4">
-            <Tabs defaultValue="notes">
+            <Tabs defaultValue="objectives">
                 <TabsList className="w-full">
                     <TabsTrigger value="notes" className="flex-1 gap-1.5">
                         <FileText className="h-3.5 w-3.5" />
