@@ -21,6 +21,9 @@ interface SmartInsightsProps {
     insights: Insights
     onMemberClick?: (memberId: string) => void
     onQuickAssignClick?: () => void
+    /** Additional class names for the outer wrapper. Pass "contents" to render
+     *  pills as direct children of a parent flex container. */
+    className?: string
 }
 
 interface InsightCard {
@@ -47,7 +50,7 @@ const iconStyles = {
     success: "text-status-success",
 }
 
-export function SmartInsights({ insights, onMemberClick, onQuickAssignClick }: SmartInsightsProps) {
+export function SmartInsights({ insights, onMemberClick, onQuickAssignClick, className }: SmartInsightsProps) {
     const cards: InsightCard[] = [
         {
             id: 'overloaded',
@@ -107,7 +110,7 @@ export function SmartInsights({ insights, onMemberClick, onQuickAssignClick }: S
     if (visibleCards.length === 0) return null
 
     return (
-        <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
+        <div className={cn("flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin", className)}>
             {visibleCards.map(card => (
                 <button
                     key={card.id}

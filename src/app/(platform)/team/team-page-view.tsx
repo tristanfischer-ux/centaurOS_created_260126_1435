@@ -924,18 +924,16 @@ export function TeamPageView({
 
                 {/* Right: controls (same position in all modes) */}
                 <div className="flex items-center gap-2 shrink-0">
-                    {/* 3-way view toggle (members tab only) */}
-                    {activeTab === 'members' && (
-                        <ViewToggle
-                            options={[
-                                { value: 'orbit', label: 'Orbit', icon: Orbit, ariaLabel: 'Orbit view' },
-                                { value: 'cards', icon: LayoutGrid, ariaLabel: 'Cards view' },
-                                { value: 'list', icon: List, ariaLabel: 'List view' },
-                            ]}
-                            value={viewMode}
-                            onValueChange={(v) => setViewMode(v as 'orbit' | 'cards' | 'list')}
-                        />
-                    )}
+                    {/* 3-way view toggle — always visible so header doesn't shift */}
+                    <ViewToggle
+                        options={[
+                            { value: 'orbit', label: 'Orbit', icon: Orbit, ariaLabel: 'Orbit view' },
+                            { value: 'cards', icon: LayoutGrid, ariaLabel: 'Cards view' },
+                            { value: 'list', icon: List, ariaLabel: 'List view' },
+                        ]}
+                        value={viewMode}
+                        onValueChange={(v) => setViewMode(v as 'orbit' | 'cards' | 'list')}
+                    />
                     {foundryId && (
                         <Button
                             variant="secondary"
@@ -957,46 +955,35 @@ export function TeamPageView({
                 </div>
             </div>
 
-            {/* ── Stats Row (hidden in orbit mode — shown in bottom bar) ── */}
+            {/* ── Stats & Insights Pills (hidden in orbit mode — shown in bottom bar) ── */}
             {!isOrbitActive && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
-                        <div className="h-10 w-10 rounded-xl bg-international-orange/10 flex items-center justify-center shrink-0">
-                            <Users className="h-5 w-5 text-international-orange" />
-                        </div>
-                        <div>
-                            <p className="text-2xl font-display font-bold text-foreground">{totalPeople}</p>
-                            <p className="text-xs text-muted-foreground">People</p>
-                        </div>
+                <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
+                    {/* Stat pills — same size as insight pills */}
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-muted bg-card shrink-0 transition-all">
+                        <Users className="h-4 w-4 text-international-orange shrink-0" />
+                        <span className="text-sm font-semibold text-foreground">{totalPeople}</span>
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">People</span>
                     </div>
-                    <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
-                        <div className="h-10 w-10 rounded-xl bg-electric-blue/10 flex items-center justify-center shrink-0">
-                            <ShieldCheck className="h-5 w-5 text-electric-blue" />
-                        </div>
-                        <div>
-                            <p className="text-2xl font-display font-bold text-foreground">{totalTeams}</p>
-                            <p className="text-xs text-muted-foreground">Teams</p>
-                        </div>
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-muted bg-card shrink-0 transition-all">
+                        <ShieldCheck className="h-4 w-4 text-electric-blue shrink-0" />
+                        <span className="text-sm font-semibold text-foreground">{totalTeams}</span>
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">Teams</span>
                     </div>
-                    <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
-                        <div className="h-10 w-10 rounded-xl bg-status-success/10 flex items-center justify-center shrink-0">
-                            <BarChart3 className="h-5 w-5 text-status-success" />
-                        </div>
-                        <div>
-                            <p className="text-2xl font-display font-bold text-foreground">{avgCapacity}%</p>
-                            <p className="text-xs text-muted-foreground">Avg Capacity</p>
-                        </div>
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-muted bg-card shrink-0 transition-all">
+                        <BarChart3 className="h-4 w-4 text-status-success shrink-0" />
+                        <span className="text-sm font-semibold text-foreground">{avgCapacity}%</span>
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">Avg Capacity</span>
                     </div>
+                    {/* Insight pills — rendered inline via display:contents */}
+                    {insights && (
+                        <SmartInsights
+                            insights={insights}
+                            onMemberClick={(id) => setSelectedMemberId(id)}
+                            onQuickAssignClick={() => setShowQuickAssign(true)}
+                            className="contents"
+                        />
+                    )}
                 </div>
-            )}
-
-            {/* ── Smart Insights (hidden in orbit mode — key items in bottom bar) ── */}
-            {!isOrbitActive && insights && (
-                <SmartInsights
-                    insights={insights}
-                    onMemberClick={(id) => setSelectedMemberId(id)}
-                    onQuickAssignClick={() => setShowQuickAssign(true)}
-                />
             )}
 
             {/* ── Search + Quick Assign (non-orbit modes only) ──── */}
