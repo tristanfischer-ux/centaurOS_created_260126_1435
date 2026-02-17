@@ -104,18 +104,16 @@ export function StrategyDashboard({
   regularObjectives,
 }: StrategyDashboardProps) {
   const router = useRouter()
-  // Default to River view when river bundles exist, otherwise Dashboard shows pillar cards
-  const [viewMode, setViewMode] = useState<ViewMode>(() =>
-    initialBundles.length > 0 ? 'river' : 'dashboard'
-  )
 
   // ── Strategy River state ──
   const riverData = useMemo(() => goalBundlesToRiverData(initialBundles), [initialBundles])
 
-  // If pillars exist but no river data, ensure we're not stuck on river empty state
-  const effectiveViewMode = viewMode === 'river' && riverData.length === 0 && pillars.length > 0
-    ? 'dashboard'
-    : viewMode
+  // Default to River when river data exists, otherwise Dashboard shows pillar cards
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (riverData.length > 0) return 'river'
+    if (pillars.length > 0) return 'dashboard'
+    return 'dashboard'
+  })
 
   // ── Create Strategic Goal dialog ──
   const [isCreateGoalOpen, setIsCreateGoalOpen] = useState(false)
@@ -248,7 +246,7 @@ export function StrategyDashboard({
             specialistName="Sage"
             label="Discuss Strategy"
           />
-          <Tabs value={effectiveViewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
             <TabsList className="h-9">
               <TabsTrigger value="dashboard" className="text-xs gap-1.5 px-3">
                 <LayoutDashboard className="h-3.5 w-3.5" />
@@ -275,7 +273,7 @@ export function StrategyDashboard({
       </div>
 
       {/* ── Dashboard View ── */}
-      {effectiveViewMode === 'dashboard' && (
+      {viewMode === 'dashboard' && (
         <div className="space-y-8">
           {/* Company Purpose Hero */}
           <CompanyPurposeWrapper
@@ -400,7 +398,7 @@ export function StrategyDashboard({
       )}
 
       {/* ── Strategy River View ── */}
-      {effectiveViewMode === 'river' && (
+      {viewMode === 'river' && (
         <div className="-mx-4 sm:-mx-6 lg:-mx-8">
           {riverData.length === 0 ? (
             <div className="px-4 sm:px-6 lg:px-8">
@@ -436,7 +434,7 @@ export function StrategyDashboard({
       )}
 
       {/* ── Link Objectives View ── */}
-      {effectiveViewMode === 'link' && (
+      {viewMode === 'link' && (
         <div className="-mx-4 sm:-mx-6 lg:-mx-8">
           <StrategyLinkView
             strategicObjectives={strategicObjectives}
