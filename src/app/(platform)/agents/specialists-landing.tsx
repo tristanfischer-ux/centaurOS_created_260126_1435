@@ -13,7 +13,7 @@ import { SpecialistCard } from "./specialist-card"
 import { getPromptsByCategory } from "./lib/prompt-library"
 import { BriefSpecialistDialog } from "./brief-specialist-dialog"
 import { TeamMeetingDialog } from "./team-meeting-dialog"
-import { SpecialistCouncilDialog } from "@/components/agents/specialist-council-dialog"
+
 import { MeetingHistory } from "./meeting-history"
 import { getSpecialistActivities } from "@/actions/agent-memory"
 import type { SpecialistActivity } from "@/actions/agent-memory"
@@ -81,7 +81,7 @@ export function SpecialistsLanding({
     // Mobile-only dialog state (desktop uses advisor panel)
     const [briefSpecialistId, setBriefSpecialistId] = useState<string | null>(null)
     const [isMeetingOpen, setIsMeetingOpen] = useState(false)
-    const [isCouncilOpen, setIsCouncilOpen] = useState(false)
+
     const [handoffContext, setHandoffContext] = useState<string | null>(null)
     const [referredByName, setReferredByName] = useState<string | null>(null)
     const [showOrgChart, setShowOrgChart] = useState(false)
@@ -182,15 +182,6 @@ export function SpecialistsLanding({
                         >
                             <MessageSquare className="h-4 w-4 mr-2" />
                             Call a Team Meeting
-                        </Button>
-                        <Button
-                            onClick={() => setIsCouncilOpen(true)}
-                            variant="outline"
-                            className="rounded-full"
-                            size="sm"
-                        >
-                            <Users className="h-4 w-4 mr-2" />
-                            Specialist Council
                         </Button>
                     </div>
                 </div>
@@ -432,11 +423,6 @@ export function SpecialistsLanding({
                 onOpenChange={setIsMeetingOpen}
             />
 
-            {/* ── Specialist Council Dialog ──────────────────────────────── */}
-            <SpecialistCouncilDialog
-                open={isCouncilOpen}
-                onOpenChange={setIsCouncilOpen}
-            />
         </div>
     )
 }

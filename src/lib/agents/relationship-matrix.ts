@@ -2,7 +2,7 @@
  * @file relationship-matrix.ts
  *
  * @description Compiles inter-specialist relationship dynamics into prompt
- * context for team meetings and council debates. This makes specialists
+ * context for team meetings. This makes specialists
  * reference their working relationships naturally — creating genuine tension,
  * alignment, and collaboration patterns that feel like a real team.
  *
@@ -14,7 +14,6 @@
  * @related
  * - Specialist definitions: src/app/(platform)/agents/specialists-data.ts
  * - Team meeting: src/app/(platform)/agents/team-meeting-dialog.tsx
- * - Council: src/app/api/agents/council/route.ts
  */
 
 import { getSpecialistById, SPECIALISTS } from "@/app/(platform)/agents/specialists-data"
@@ -22,7 +21,7 @@ import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
 
 /**
  * Compiles the relationship context for a specialist in a multi-specialist
- * conversation (meeting or council debate).
+ * conversation (e.g. team meetings).
  *
  * @description Generates a prompt block that tells the specialist how they
  * relate to each other participant. This creates natural dynamics:
@@ -107,7 +106,7 @@ ${lines.join("\n")}`
 
 /**
  * Builds a complete inter-specialist dynamics block for team meetings
- * and council debates. Combines relationship context and strong opinions.
+ * and multi-specialist conversations. Combines relationship context and strong opinions.
  *
  * @param specialistId - The specialist being prompted
  * @param participantIds - All specialist IDs in the conversation

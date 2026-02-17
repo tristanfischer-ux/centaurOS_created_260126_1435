@@ -232,38 +232,7 @@ describe('message attachment authorization regressions', () => {
   })
 })
 
-describe('internal API egress hardening regressions', () => {
-  it('uses request origin for council specialist execution calls', async () => {
-    const councilRoutePath = path.join(process.cwd(), 'src/app/api/agents/council/route.ts')
-    const source = await readFile(councilRoutePath, 'utf-8')
-
-    expect(source).toContain('const internalApiOrigin = request.nextUrl.origin')
-    expect(source).toContain("new URL('/api/agents/execute', internalApiOrigin)")
-    expect(source).not.toContain('process.env.NEXT_PUBLIC_BASE_URL')
-    expect(source).not.toContain('process.env.VERCEL_URL')
-  })
-
-  it('derives council server-action API host from request headers, not environment', async () => {
-    const actionPath = path.join(process.cwd(), 'src/actions/run-specialist-council.ts')
-    const source = await readFile(actionPath, 'utf-8')
-
-    expect(source).toContain("const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host')")
-    expect(source).toContain("new URL('/api/agents/council', baseUrl)")
-    expect(source).toContain('isValidHostHeader')
-    expect(source).not.toContain('process.env.NEXT_PUBLIC_BASE_URL')
-    expect(source).not.toContain('process.env.VERCEL_URL')
-  })
-})
-
 describe('agent error-response sanitization regressions', () => {
-  it('does not expose raw server error messages from council route', async () => {
-    const councilRoutePath = path.join(process.cwd(), 'src/app/api/agents/council/route.ts')
-    const source = await readFile(councilRoutePath, 'utf-8')
-
-    expect(source).toContain("return NextResponse.json({ error: 'Council execution failed' }, { status: 500 })")
-    expect(source).not.toContain('return NextResponse.json({ error: message }, { status: 500 })')
-  })
-
   it('sanitizes execute route terminal and stream error payloads', async () => {
     const executeRoutePath = path.join(process.cwd(), 'src/app/api/agents/execute/route.ts')
     const source = await readFile(executeRoutePath, 'utf-8')

@@ -322,6 +322,9 @@ export function BriefSpecialistDialog({
     const introVideoPlayedRef = useRef(false)
     /** AbortController for in-flight execute request — aborted when dialog closes or specialist changes */
     const executeAbortRef = useRef<AbortController | null>(null)
+    /** Snapshot of messages for the greeting effect — avoids re-running (and aborting) the greeting when messages change */
+    const messagesSnapshotRef = useRef(messages)
+    messagesSnapshotRef.current = messages
 
     // Derived: true when the AI response is actively streaming visible text
     const isStreaming = isExecuting && streamingResponse.length > 0
@@ -515,8 +518,10 @@ export function BriefSpecialistDialog({
         async function generateGreeting(): Promise<void> {
             setIsGeneratingGreeting(true)
 
-            // Build context summary for the greeting prompt
-            const historyContext = messages
+            // Build context summary for the greeting prompt.
+            // Uses messagesSnapshotRef to avoid re-running this effect when messages change
+            // (which would abort the greeting mid-stream during specialist switches).
+            const historyContext = messagesSnapshotRef.current
                 .filter((m) => m.historical)
                 .slice(-4)
                 .map((m) => `${m.role === "user" ? "User" : specialist.name}: ${m.content.slice(0, 200)}`)
@@ -771,7 +776,8 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
         return () => {
             controller.abort()
         }
-    }, [isLoadingThread, open, specialist.id, specialist.name, specialist.title, specialist.workingStyle, specialist.voice, threadId, messages, crossSpecialistContext, tts.voiceEnabled, tts.playChunked])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- messages accessed via messagesSnapshotRef to prevent greeting abort on message changes
+    }, [isLoadingThread, open, specialist.id, specialist.name, specialist.title, specialist.workingStyle, specialist.voice, threadId, crossSpecialistContext, tts.voiceEnabled, tts.playChunked])
 
     // ─── Handlers ─────────────────────────────────────────────────────────
 
@@ -1144,10 +1150,23 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             handoff = parts.join("\n")
         }
 
-        onOpenChange(false)
-        // Small delay to let dialog close animation finish
-        setTimeout(() => onSwitchSpecialist?.(id, handoff), 200)
-    }, [onOpenChange, onSwitchSpecialist, messages, specialist])
+        // Abort any in-flight request from the current specialist before switching
+        executeAbortRef.current?.abort()
+        executeAbortRef.current = null
+
+        if (isPanel) {
+            // Panel mode: switch directly without close/reopen cycle.
+            // The close-then-reopen pattern causes a race condition where the
+            // open→false→true transition triggers cleanup effects that abort
+            // the new specialist's greeting stream mid-flight.
+            onSwitchSpecialist?.(id, handoff)
+        } else {
+            // Dialog mode: close first, then reopen with new specialist
+            // after the close animation finishes.
+            onOpenChange(false)
+            setTimeout(() => onSwitchSpecialist?.(id, handoff), 200)
+        }
+    }, [isPanel, onOpenChange, onSwitchSpecialist, messages, specialist])
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {

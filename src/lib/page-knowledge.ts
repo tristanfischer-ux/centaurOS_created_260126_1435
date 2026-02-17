@@ -364,12 +364,6 @@ const PAGE_KNOWLEDGE: PageKnowledge[] = [
         howToAccess: "Open a specialist's brief dialog -- history loads automatically.",
         whenToUse: "When you want to pick up where you left off or reference past advice.",
       },
-      {
-        name: "Specialist Council",
-        description: "Get a structured debate between specialists on a complex decision.",
-        howToAccess: "Click 'Specialist Council' in the page actions.",
-        whenToUse: "For high-stakes decisions where you want to hear multiple viewpoints.",
-      },
     ],
     gettingStarted: [
       "Start with Sage (Strategy) -- they'll help you define direction and recommend who to talk to next",
@@ -378,7 +372,7 @@ const PAGE_KNOWLEDGE: PageKnowledge[] = [
     ],
     workflows: [
       "Getting started: Brief Sage -> Follow specialist recommendations -> Build relationships over time",
-      "Decision making: Brief relevant specialist -> Get recommendation -> Use Council for debate -> Decide",
+      "Decision making: Brief relevant specialist -> Get recommendation -> Call a Team Meeting for multiple perspectives -> Decide",
     ],
   },
   {

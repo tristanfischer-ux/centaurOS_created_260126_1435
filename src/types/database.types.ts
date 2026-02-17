@@ -14495,6 +14495,19 @@ export type Database = {
           total_released: number
         }[]
       }
+      get_invitation_by_token: {
+        Args: { invitation_token: string }
+        Returns: {
+          email: string
+          expires_at: string
+          foundry_id: string
+          foundry_name: string
+          id: string
+          invited_by_name: string
+          is_valid: boolean
+          role: Database["public"]["Enums"]["member_role"]
+        }[]
+      }
       get_marketplace_recommendations: {
         Args: { p_foundry_id: string; p_limit?: number }
         Returns: {

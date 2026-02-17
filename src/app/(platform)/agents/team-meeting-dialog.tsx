@@ -827,6 +827,8 @@ export function TeamMeetingDialog({
             const result = await getOrCreateSpecialistThread(specialist.id)
             if (result.threadId) {
                 ids[specialist.id] = result.threadId
+            } else if (result.error) {
+                console.error(`[TeamMeeting] Thread init failed for ${specialist.name}:`, result.error)
             }
         }
         setThreadIds(ids)
@@ -834,6 +836,20 @@ export function TeamMeetingDialog({
     }, [selectedSpecialists])
 
     // ─── Execute Single Specialist (Streaming) ───────────────────────────
+
+    /** Read from a stream reader with a per-chunk timeout to prevent hanging. */
+    const readWithTimeout = useCallback(
+        async (reader: ReadableStreamDefaultReader<Uint8Array>, timeoutMs: number) => {
+            return Promise.race([
+                reader.read(),
+                new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error("Stream chunk timeout — the AI provider may be unresponsive.")), timeoutMs)
+                ),
+            ])
+        },
+        []
+    )
+
     const executeSpecialist = useCallback(
         async (
             specialist: Specialist,
@@ -842,21 +858,36 @@ export function TeamMeetingDialog({
             input: string,
             systemSuffix: string
         ): Promise<string> => {
-            const res = await fetch("/api/agents/execute", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    prompt,
-                    input,
-                    providerId: "anthropic",
-                    modelId: "claude-sonnet-4-20250514",
-                    modelTier: "claude",
-                    modality: "text",
-                    threadId: threadId ?? undefined,
-                    specialistId: specialist.id,
-                    customSystemPromptSuffix: systemSuffix,
-                }),
-            })
+            // 60s TTFB timeout — if the server doesn't respond at all, fail fast
+            const controller = new AbortController()
+            const fetchTimeout = setTimeout(() => controller.abort(), 60_000)
+
+            let res: Response
+            try {
+                res = await fetch("/api/agents/execute", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                        prompt,
+                        input,
+                        providerId: "anthropic",
+                        modelId: "claude-sonnet-4-20250514",
+                        modelTier: "claude",
+                        modality: "text",
+                        threadId: threadId ?? undefined,
+                        specialistId: specialist.id,
+                        customSystemPromptSuffix: systemSuffix,
+                    }),
+                })
+            } catch (err) {
+                clearTimeout(fetchTimeout)
+                if (err instanceof DOMException && err.name === "AbortError") {
+                    throw new Error(`${specialist.name} took too long to respond. Please try again.`)
+                }
+                throw err
+            }
+            clearTimeout(fetchTimeout)
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({ error: "Execution failed" }))
@@ -868,9 +899,13 @@ export function TeamMeetingDialog({
 
             const decoder = new TextDecoder()
             let fullResponse = ""
+            let streamError: string | null = null
+
+            // 30s per-chunk timeout — prevents hanging on stalled streams
+            const CHUNK_TIMEOUT_MS = 30_000
 
             while (true) {
-                const { done, value } = await reader.read()
+                const { done, value } = await readWithTimeout(reader, CHUNK_TIMEOUT_MS)
                 if (done) break
 
                 const chunk = decoder.decode(value, { stream: true })
@@ -880,7 +915,11 @@ export function TeamMeetingDialog({
                         const data = line.slice(6)
                         if (data === "[DONE]") continue
                         try {
-                            const parsed = JSON.parse(data)
+                            const parsed = JSON.parse(data) as { text?: string; error?: string }
+                            if (parsed.error) {
+                                streamError = parsed.error
+                                break
+                            }
                             if (parsed.text) {
                                 fullResponse += parsed.text
                                 setStreamingContent(fullResponse)
@@ -891,11 +930,16 @@ export function TeamMeetingDialog({
                         }
                     }
                 }
+                if (streamError) break
+            }
+
+            if (streamError) {
+                throw new Error(streamError)
             }
 
             return fullResponse || "No response received."
         },
-        []
+        [readWithTimeout]
     )
 
     // Use a ref to track entries for TTS playback
@@ -1025,11 +1069,25 @@ export function TeamMeetingDialog({
 
         try {
             const threads = await initializeThreads()
+
+            // Verify all specialist threads were created
+            if (Object.keys(threads).length !== selectedSpecialists.length) {
+                const missing = selectedSpecialists
+                    .filter((s) => !threads[s.id])
+                    .map((s) => s.name)
+                setError(`Failed to initialize threads for: ${missing.join(", ")}. Please try again.`)
+                return
+            }
+
             await runSingleSpecialist(0, 1, threads)
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Unknown error"
+            console.error("[TeamMeeting] Failed to start meeting:", message)
+            setError(`Failed to start meeting: ${message}`)
         } finally {
             setIsStarting(false)
         }
-    }, [selectedIds, topic, initializeThreads, runSingleSpecialist, tts])
+    }, [selectedIds, topic, initializeThreads, runSingleSpecialist, tts, selectedSpecialists])
 
     // ─── Ask a Specific Specialist ────────────────────────────────────────
 
@@ -1200,6 +1258,7 @@ export function TeamMeetingDialog({
 
             const decoder = new TextDecoder()
             let fullResponse = ""
+            let wrapUpStreamError: string | null = null
 
             while (true) {
                 const { done, value } = await reader.read()
@@ -1211,13 +1270,22 @@ export function TeamMeetingDialog({
                         const data = line.slice(6)
                         if (data === "[DONE]") continue
                         try {
-                            const parsed = JSON.parse(data)
+                            const parsed = JSON.parse(data) as { text?: string; error?: string }
+                            if (parsed.error) {
+                                wrapUpStreamError = parsed.error
+                                break
+                            }
                             if (parsed.text) fullResponse += parsed.text
                         } catch {
                             fullResponse += data
                         }
                     }
                 }
+                if (wrapUpStreamError) break
+            }
+
+            if (wrapUpStreamError) {
+                throw new Error(wrapUpStreamError)
             }
 
             const jsonStr = fullResponse

@@ -1,23 +1,23 @@
 'use server'
 
-
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sendInvitationEmail } from '@/lib/notifications/channels/email'
 import { checkRateLimit } from '@/lib/security/rate-limit'
+import { getBaseUrl } from '@/lib/domains'
 import type { Database } from '@/types/database.types'
 
 type MemberRole = Database['public']['Enums']['member_role']
 
-import { getBaseUrl } from '@/lib/domains'
-
-// Default invitation expiration: 7 days
+/** Default invitation expiration: 7 days */
 const INVITATION_EXPIRY_DAYS = 7
 
 /**
- * Generate a cryptographically secure random token
+ * Generate a cryptographically secure random token.
+ *
+ * @returns A 32-character hex string (128 bits of entropy)
  */
 function generateToken(): string {
   const array = new Uint8Array(16)
@@ -26,8 +26,16 @@ function generateToken(): string {
 }
 
 /**
- * Create a new invitation to join a foundry
- * Only Founders and Executives can invite new members
+ * Create a new invitation to join a foundry.
+ * Only Founders and Executives can invite new members.
+ *
+ * @param email - Email address to invite
+ * @param role - Role to assign the invitee
+ * @param customMessage - Optional personal message included in the email
+ * @returns Success status with invitation details or error
+ *
+ * @security Requires authenticated Founder or Executive
+ * @audit Sends invitation email and creates DB record
  */
 export async function createInvitation(
   email: string,
@@ -36,7 +44,7 @@ export async function createInvitation(
 ): Promise<{ success: boolean; invitation?: { id: string; token: string }; error?: string }> {
   const supabase = await createClient()
   
-  // Get current user
+  // AUTH: Get current user
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return { success: false, error: 'Unauthorized' }
@@ -46,7 +54,7 @@ export async function createInvitation(
   const rateLimitError = await checkRateLimit('emailInvite', `invite:${user.id}`)
   if (rateLimitError) return { success: false, error: rateLimitError }
   
-  // Get current user's foundry and role
+  // AUTH: Get current user's foundry and role
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('role, foundry_id')
@@ -57,13 +65,12 @@ export async function createInvitation(
     return { success: false, error: 'Failed to verify permissions' }
   }
   
-  // Only Founders and Executives can invite
+  // AUTH: Only Founders and Executives can invite
   if (profile.role !== 'Founder' && profile.role !== 'Executive') {
     return { success: false, error: 'Only Founders and Executives can invite team members' }
   }
   
-  // Get the foundry UUID from the foundry_id
-  // The foundry_id in profiles is a text field that may be a UUID or a string like "forge-guild"
+  // Get the foundry details
   const { data: foundry, error: foundryError } = await supabase
     .from('foundries')
     .select('id, name')
@@ -75,8 +82,7 @@ export async function createInvitation(
   }
   
   // Check if there's already a pending invitation for this email
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: existingInvitation } = await (supabase as any)
+  const { data: existingInvitation } = await supabase
     .from('company_invitations')
     .select('id, expires_at, accepted_at')
     .eq('foundry_id', foundry.id)
@@ -107,8 +113,7 @@ export async function createInvitation(
   expiresAt.setDate(expiresAt.getDate() + INVITATION_EXPIRY_DAYS)
   
   // Create the invitation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: invitation, error: inviteError } = await (supabase as any)
+  const { data: invitation, error: inviteError } = await supabase
     .from('company_invitations')
     .insert({
       foundry_id: foundry.id,
@@ -122,7 +127,11 @@ export async function createInvitation(
     .single()
   
   if (inviteError) {
-    console.error('Failed to create invitation:', inviteError)
+    console.error('[Invitations] Failed to create invitation:', {
+      foundryId: foundry.id,
+      email: email.toLowerCase(),
+      error: inviteError.message,
+    })
     return { success: false, error: 'Failed to create invitation' }
   }
   
@@ -154,7 +163,11 @@ export async function createInvitation(
 }
 
 /**
- * Get invitation details by token (public - for accepting invitations)
+ * Get invitation details by token (public - for accepting invitations).
+ * Uses a SECURITY DEFINER DB function to bypass RLS for public token lookups.
+ *
+ * @param token - The invitation token from the URL
+ * @returns Invitation details if valid, or error
  */
 export async function getInvitationByToken(token: string): Promise<{
   valid: boolean
@@ -171,9 +184,8 @@ export async function getInvitationByToken(token: string): Promise<{
 }> {
   const supabase = await createClient()
   
-  // Use the database function to get invitation details
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  // Use the SECURITY DEFINER database function to get invitation details
+  const { data, error } = await supabase
     .rpc('get_invitation_by_token', { invitation_token: token })
     .single()
   
@@ -200,10 +212,16 @@ export async function getInvitationByToken(token: string): Promise<{
 }
 
 /**
- * Accept an invitation and join the foundry
- * Can be called by:
- * 1. A logged-in user who wants to join a different foundry
- * 2. A new user during signup (with token in URL)
+ * Accept an invitation and join the foundry.
+ *
+ * @description Called by a logged-in user to accept a pending invitation.
+ * Creates a foundry membership, updates the user's active foundry, and
+ * marks the invitation as accepted.
+ *
+ * @param token - The invitation token
+ * @returns Success status with redirect URL, or error
+ *
+ * @security Verifies the authenticated user's email matches the invitation
  */
 export async function acceptInvitation(token: string): Promise<{
   success: boolean
@@ -212,10 +230,9 @@ export async function acceptInvitation(token: string): Promise<{
 }> {
   const supabase = await createClient()
   
-  // Get current user
+  // AUTH: Get current user
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    // User not logged in - redirect to signup with token
     return { 
       success: false, 
       error: 'Please sign up or log in first',
@@ -231,7 +248,7 @@ export async function acceptInvitation(token: string): Promise<{
   
   const invitation = inviteResult.invitation
   
-  // Verify the invitation email matches the user's email
+  // SECURITY: Verify the invitation email matches the user's email
   if (user.email?.toLowerCase() !== invitation.email.toLowerCase()) {
     return { 
       success: false, 
@@ -240,19 +257,22 @@ export async function acceptInvitation(token: string): Promise<{
   }
   
   // Add user to the foundry via foundry_memberships (supports multi-foundry)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: membershipError } = await (supabase as any)
+  const { error: membershipError } = await supabase
     .from('foundry_memberships')
     .upsert({
       user_id: user.id,
       foundry_id: invitation.foundryId,
       role: invitation.role,
-      is_primary: false, // Don't override their primary foundry
+      is_primary: false,
       joined_at: new Date().toISOString(),
     }, { onConflict: 'user_id,foundry_id' })
 
   if (membershipError) {
-    console.error('Failed to create membership:', membershipError)
+    console.error('[Invitations] Failed to create membership:', {
+      userId: user.id,
+      foundryId: invitation.foundryId,
+      error: membershipError.message,
+    })
     return { success: false, error: 'Failed to join company' }
   }
 
@@ -267,13 +287,15 @@ export async function acceptInvitation(token: string): Promise<{
     .eq('id', user.id)
   
   if (updateError) {
-    console.error('Failed to update profile:', updateError)
+    console.error('[Invitations] Failed to update profile:', {
+      userId: user.id,
+      error: updateError.message,
+    })
     // Non-fatal - membership was already created
   }
   
-  // Mark the invitation as accepted
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: acceptError } = await (supabase as any)
+  // Mark the invitation as accepted (RLS policy allows invited user to update own invitation)
+  const { error: acceptError } = await supabase
     .from('company_invitations')
     .update({
       accepted_at: new Date().toISOString(),
@@ -282,8 +304,11 @@ export async function acceptInvitation(token: string): Promise<{
     .eq('token', token)
   
   if (acceptError) {
-    console.error('Failed to mark invitation as accepted:', acceptError)
-    // Don't fail - the user has already been added to the foundry
+    console.error('[Invitations] Failed to mark invitation as accepted:', {
+      token,
+      error: acceptError.message,
+    })
+    // Non-fatal - the user has already been added to the foundry
   }
   
   revalidatePath('/', 'layout')
@@ -295,7 +320,15 @@ export async function acceptInvitation(token: string): Promise<{
 }
 
 /**
- * Accept an invitation during signup (creates new user and joins foundry)
+ * Accept an invitation during signup (creates new user and joins foundry).
+ *
+ * @description Handles the full signup-via-invitation flow: creates auth user,
+ * creates profile, creates foundry membership, and marks invitation accepted.
+ * Redirects to error page if profile creation fails (prevents orphaned auth accounts).
+ *
+ * @param formData - Form data with token, email, password, name
+ *
+ * @security Verifies email matches invitation before creating account
  */
 export async function signupWithInvitation(formData: FormData): Promise<void> {
   const supabase = await createClient()
@@ -305,6 +338,7 @@ export async function signupWithInvitation(formData: FormData): Promise<void> {
   const password = formData.get('password') as string
   const fullName = formData.get('name') as string
   
+  // VALIDATION: All fields required
   if (!token || !email || !password || !fullName) {
     redirect(`/invite/${token}?error=All fields are required`)
   }
@@ -317,7 +351,7 @@ export async function signupWithInvitation(formData: FormData): Promise<void> {
   
   const invitation = inviteResult.invitation
   
-  // Verify email matches
+  // SECURITY: Verify email matches
   if (email.toLowerCase() !== invitation.email.toLowerCase()) {
     redirect(`/invite/${token}?error=${encodeURIComponent(`This invitation was sent to ${invitation.email}`)}`)
   }
@@ -335,7 +369,10 @@ export async function signupWithInvitation(formData: FormData): Promise<void> {
   })
   
   if (authError) {
-    console.error('Signup error:', authError)
+    console.error('[Invitations] Signup error:', {
+      email,
+      error: authError.message,
+    })
     redirect(`/invite/${token}?error=${encodeURIComponent(authError.message)}`)
   }
   
@@ -343,9 +380,11 @@ export async function signupWithInvitation(formData: FormData): Promise<void> {
     redirect(`/invite/${token}?error=Failed to create account`)
   }
   
+  const newUserId = authData.user.id
+  
   // Create profile in the invited foundry
   const { error: profileError } = await supabase.from('profiles').insert({
-    id: authData.user.id,
+    id: newUserId,
     email,
     full_name: fullName,
     role: invitation.role,
@@ -354,37 +393,69 @@ export async function signupWithInvitation(formData: FormData): Promise<void> {
   })
   
   if (profileError) {
-    console.error('Profile creation error:', profileError)
+    console.error('[Invitations] Profile creation failed:', {
+      userId: newUserId,
+      email,
+      foundryId: invitation.foundryId,
+      error: profileError.message,
+    })
+    // SECURITY: Clean up the orphaned auth account to prevent a broken state
+    await supabase.auth.admin.deleteUser(newUserId).catch((deleteErr) => {
+      console.error('[Invitations] Failed to clean up orphaned auth user:', {
+        userId: newUserId,
+        error: deleteErr instanceof Error ? deleteErr.message : 'Unknown error',
+      })
+    })
+    redirect(`/invite/${token}?error=${encodeURIComponent('Failed to create your profile. Please try again.')}`)
   }
 
   // Create foundry membership record
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase as any)
+  const { error: membershipError } = await supabase
     .from('foundry_memberships')
     .insert({
-      user_id: authData.user.id,
+      user_id: newUserId,
       foundry_id: invitation.foundryId,
       role: invitation.role,
       is_primary: true,
       joined_at: new Date().toISOString(),
     })
+
+  if (membershipError) {
+    console.error('[Invitations] Failed to create membership during signup:', {
+      userId: newUserId,
+      foundryId: invitation.foundryId,
+      error: membershipError.message,
+    })
+    // Non-fatal: profile exists, user can still log in. Membership can be fixed manually.
+  }
   
   // Mark invitation as accepted
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase as any)
+  const { error: acceptError } = await supabase
     .from('company_invitations')
     .update({
       accepted_at: new Date().toISOString(),
-      accepted_by: authData.user.id,
+      accepted_by: newUserId,
     })
     .eq('token', token)
+
+  if (acceptError) {
+    console.error('[Invitations] Failed to mark invitation accepted during signup:', {
+      token,
+      error: acceptError.message,
+    })
+    // Non-fatal: user is already created and in the foundry
+  }
   
   revalidatePath('/', 'layout')
   redirect('/join/success?type=invitation')
 }
 
 /**
- * List all pending invitations for the current foundry
+ * List all pending invitations for the current foundry.
+ *
+ * @returns Array of invitations with status (pending/expired/accepted)
+ *
+ * @security Requires authenticated user in a foundry (RLS enforces Founder/Executive)
  */
 export async function listInvitations(): Promise<{
   invitations: Array<{
@@ -405,8 +476,7 @@ export async function listInvitations(): Promise<{
     return { invitations: [], error: 'Not in a foundry' }
   }
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('company_invitations')
     .select(`
       id,
@@ -422,7 +492,10 @@ export async function listInvitations(): Promise<{
     .order('created_at', { ascending: false })
   
   if (error) {
-    console.error('Failed to list invitations:', error)
+    console.error('[Invitations] Failed to list invitations:', {
+      foundryId,
+      error: error.message,
+    })
     return { invitations: [], error: 'Failed to load invitations' }
   }
   
@@ -434,13 +507,15 @@ export async function listInvitations(): Promise<{
       status = 'expired'
     }
     
+    // The join returns profiles as an object with full_name
+    const inviterProfile = inv.profiles as unknown as { full_name: string } | null
+    
     return {
       id: inv.id,
       email: inv.email,
-      role: inv.role as MemberRole,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      invitedByName: (inv.profiles as any)?.full_name || 'Unknown',
-      createdAt: inv.created_at,
+      role: inv.role,
+      invitedByName: inviterProfile?.full_name || 'Unknown',
+      createdAt: inv.created_at ?? '',
       expiresAt: inv.expires_at,
       status,
     }
@@ -450,7 +525,15 @@ export async function listInvitations(): Promise<{
 }
 
 /**
- * Resend an invitation (generates a new token and extends expiry)
+ * Resend an invitation with a new token and extended expiry.
+ *
+ * @description Generates a fresh token, extends the expiry by 7 days,
+ * and sends a new invitation email to the recipient.
+ *
+ * @param invitationId - The invitation UUID to resend
+ * @returns Success status or error
+ *
+ * @security Requires authenticated user in the same foundry (RLS enforced)
  */
 export async function resendInvitation(invitationId: string): Promise<{
   success: boolean
@@ -468,11 +551,10 @@ export async function resendInvitation(invitationId: string): Promise<{
     return { success: false, error: 'Not in a foundry' }
   }
   
-  // Get the existing invitation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: invitation, error: fetchError } = await (supabase as any)
+  // Get the existing invitation with all fields needed for the email
+  const { data: invitation, error: fetchError } = await supabase
     .from('company_invitations')
-    .select('id, accepted_at')
+    .select('id, email, role, accepted_at')
     .eq('id', invitationId)
     .eq('foundry_id', foundryId)
     .single()
@@ -490,8 +572,7 @@ export async function resendInvitation(invitationId: string): Promise<{
   const newExpiry = new Date()
   newExpiry.setDate(newExpiry.getDate() + INVITATION_EXPIRY_DAYS)
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: updateError } = await (supabase as any)
+  const { error: updateError } = await supabase
     .from('company_invitations')
     .update({
       token: newToken,
@@ -500,8 +581,36 @@ export async function resendInvitation(invitationId: string): Promise<{
     .eq('id', invitationId)
   
   if (updateError) {
+    console.error('[Invitations] Failed to update invitation for resend:', {
+      invitationId,
+      error: updateError.message,
+    })
     return { success: false, error: 'Failed to resend invitation' }
   }
+
+  // Get foundry name and inviter name for the email
+  const { data: foundry } = await supabase
+    .from('foundries')
+    .select('name')
+    .eq('id', foundryId)
+    .single()
+
+  const { data: inviterProfile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user.id)
+    .single()
+
+  // Send the invitation email with the new token
+  const inviteUrl = `${getBaseUrl()}/invite/${newToken}`
+  await sendInvitationEmail({
+    to: invitation.email,
+    foundryName: foundry?.name || 'Your company',
+    role: invitation.role,
+    invitedByName: inviterProfile?.full_name || 'A team member',
+    inviteUrl,
+    expiresAt: newExpiry.toISOString(),
+  })
   
   revalidatePath('/team')
   
@@ -509,7 +618,12 @@ export async function resendInvitation(invitationId: string): Promise<{
 }
 
 /**
- * Cancel/delete an invitation
+ * Cancel/delete an invitation.
+ *
+ * @param invitationId - The invitation UUID to cancel
+ * @returns Success status or error
+ *
+ * @security Requires authenticated user in the same foundry (RLS enforced)
  */
 export async function cancelInvitation(invitationId: string): Promise<{
   success: boolean
@@ -527,14 +641,18 @@ export async function cancelInvitation(invitationId: string): Promise<{
     return { success: false, error: 'Not in a foundry' }
   }
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('company_invitations')
     .delete()
     .eq('id', invitationId)
     .eq('foundry_id', foundryId)
   
   if (error) {
+    console.error('[Invitations] Failed to cancel invitation:', {
+      invitationId,
+      foundryId,
+      error: error.message,
+    })
     return { success: false, error: 'Failed to cancel invitation' }
   }
   

@@ -106,7 +106,7 @@ export interface AgentWritingStyle {
 
 /**
  * A strongly-held opinion that creates genuine debate in team meetings
- * and council sessions. When these topics arise, the specialist argues
+ * and team sessions. When these topics arise, the specialist argues
  * their position with conviction.
  */
 export interface StrongOpinion {
@@ -120,7 +120,7 @@ export interface StrongOpinion {
 
 /**
  * Defines how this specialist naturally interacts with another specific specialist.
- * Used in team meetings and council debates to create realistic working dynamics.
+ * Used in team meetings to create realistic working dynamics.
  */
 export interface SpecialistRelationship {
     /** The nature of the working relationship */

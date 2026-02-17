@@ -153,12 +153,12 @@ export default async function PlatformLayout({
                   <AdvisorPanelProvider>
                   <BrowseContextProvider>
                   <ScreenContextProvider>
-                    <div className="flex h-screen overflow-hidden">
+                    <div className="flex h-screen overflow-hidden gap-0">
                         <CommandPalette />
                         <KeyboardShortcutsDialog />
                         <MobileZoomControl />
                         <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} />
-                        <ZoomableContent className="flex-1 overflow-y-auto bg-background">
+                        <ZoomableContent className="flex-1 min-w-0 overflow-y-auto bg-background">
                             <main className="p-4 pt-14 sm:py-6 sm:pr-6 sm:pl-5 sm:pt-6 lg:py-8 lg:pr-8 lg:pl-6 lg:pt-8 pb-32 sm:pb-8">
                                 {needsProfileRepair ? (
                                     <ProfileSetupRequired userRole={profile?.role} />

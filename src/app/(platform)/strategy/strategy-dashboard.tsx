@@ -38,6 +38,9 @@ import { StrategyHealthReview } from '@/components/specialists/strategy-health-r
 import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
 import { useRegisterScreenContext } from '@/contexts/screen-context'
 import type { SpecialistContext } from '@/components/specialists/types'
+import { updateTaskDates } from '@/actions/tasks'
+import { updateCanvasItem } from '@/actions/canvas'
+import { toast } from 'sonner'
 import { getStrategyColor } from '../new-objectives/strategy-colors'
 import type { GoalBundle, MilestoneOption } from '@/types/canvas'
 import type { StrategicObjective } from '../new-objectives/types'
@@ -189,6 +192,40 @@ export function StrategyDashboard({
     setDialogNodeId(id)
     setDialogOpen(true)
   }, [])
+
+  /**
+   * Handles task drag-to-reschedule on the Strategy River.
+   * Persists new start/end dates via server action and refreshes.
+   */
+  const handleTaskDateChange = useCallback(async (taskId: string, newStart: string, newEnd: string): Promise<void> => {
+    const result = await updateTaskDates(taskId, newStart, newEnd)
+    if (result?.error) {
+      toast.error('Failed to reschedule task', { description: typeof result.error === 'string' ? result.error : 'Unknown error' })
+    } else {
+      toast.success('Task rescheduled', {
+        description: `${new Date(newStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} → ${new Date(newEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`,
+      })
+      router.refresh()
+    }
+  }, [router])
+
+  /**
+   * Handles milestone drag-to-reschedule on the Strategy River.
+   * Updates the milestone's due date (stored as milestone_date on the objective).
+   */
+  const handleMilestoneDateChange = useCallback(async (milestoneId: string, newDueDate: string): Promise<void> => {
+    // Milestones in the river are objectives with is_milestone=true.
+    // Their date is stored as `milestone_date` on the objectives table.
+    const result = await updateCanvasItem('objective', milestoneId, { milestone_date: newDueDate })
+    if ('error' in result) {
+      toast.error('Failed to reschedule milestone', { description: result.error })
+    } else {
+      toast.success('Milestone rescheduled', {
+        description: `New date: ${new Date(newDueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`,
+      })
+      router.refresh()
+    }
+  }, [router])
 
   const handleDialogUpdate = useCallback((): void => {
     router.refresh()
@@ -461,6 +498,8 @@ export function StrategyDashboard({
               onExpandToggle={handleExpandToggle}
               onExpandAll={handleExpandAll}
               onCollapseAll={handleCollapseAll}
+              onTaskDateChange={handleTaskDateChange}
+              onMilestoneDateChange={handleMilestoneDateChange}
             />
           )}
         </div>

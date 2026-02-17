@@ -51,7 +51,7 @@ export function AdvisorPanel(): React.ReactElement {
   return (
     <div
       className={cn(
-        "hidden lg:flex flex-col h-full border-l bg-background transition-all duration-200 ease-out overflow-hidden flex-shrink-0",
+        "hidden lg:flex flex-col h-full border-l bg-background transition-[width,border] duration-200 ease-out overflow-hidden flex-shrink-0",
         isOpen && activeSpecialist ? "w-[380px] xl:w-[420px]" : "w-0 border-l-0",
       )}
       role="complementary"

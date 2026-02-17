@@ -94,7 +94,10 @@ export function ZoomableContent({ children, className }: ZoomableContentProps) {
         setMounted(true)
     }, [])
 
-    const style: CSSProperties = mounted ? {
+    // Only apply zoom style when actually zoomed (not at 100%).
+    // Setting zoom: 1 explicitly can cause subpixel layout gaps in
+    // flex containers, especially in Safari/WebKit.
+    const style: CSSProperties = mounted && zoom !== DEFAULT_ZOOM ? {
         zoom: zoom / 100,
         WebkitTextSizeAdjust: "100%" as const,
     } : {}

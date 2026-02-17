@@ -16,7 +16,7 @@
  * - Types: src/types/canvas.ts
  */
 
-import { useState, useMemo, useRef, type FC } from 'react'
+import { useState, useMemo, useRef, useCallback, type FC } from 'react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -75,6 +75,10 @@ interface StrategyRiverProps {
   onExpandAll?: () => void
   /** Called to collapse every milestone across all strategic objectives */
   onCollapseAll?: () => void
+  /** Called when a task is dragged to new dates (start, end as ISO strings) */
+  onTaskDateChange?: (taskId: string, newStart: string, newEnd: string) => void
+  /** Called when a milestone is dragged to a new due date (ISO string) */
+  onMilestoneDateChange?: (milestoneId: string, newDueDate: string) => void
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -107,6 +111,28 @@ const PAD_L = 170
 const PAD_R = 80
 const SVG_W = 1200
 
+/** Minimum drag distance (in SVG units) before a drag is recognized */
+const DRAG_THRESHOLD = 4
+
+// ─── Drag state types ────────────────────────────────────────────────────────
+
+interface DragState {
+  type: 'task' | 'milestone'
+  id: string
+  /** SVG X at drag start */
+  startSvgX: number
+  /** Current SVG X during drag */
+  currentSvgX: number
+  /** Original start date (tasks only) */
+  originalStart?: string
+  /** Original end date (tasks/milestones) */
+  originalEnd: string
+  /** Duration in days (tasks only — preserved during drag) */
+  durationDays?: number
+  /** Whether drag threshold has been exceeded */
+  isDragging: boolean
+}
+
 // ─── Geometry ────────────────────────────────────────────────────────────────
 
 const daysBetween = (a: string, b: string): number => (new Date(b).getTime() - new Date(a).getTime()) / 864e5
@@ -117,6 +143,26 @@ const dateToX = (d: string, s: string, e: string, x0: number, x1: number): numbe
   return x0 + (daysBetween(s, d) / span) * (x1 - x0)
 }
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
+
+/**
+ * Inverse of dateToX — converts an SVG X coordinate back to an ISO date string.
+ *
+ * @param x - SVG X coordinate
+ * @param globalStart - Timeline start date (ISO)
+ * @param globalEnd - Timeline end date (ISO)
+ * @param x0 - Left pixel bound
+ * @param x1 - Right pixel bound
+ * @returns ISO date string (YYYY-MM-DD)
+ */
+function xToDate(x: number, globalStart: string, globalEnd: string, x0: number, x1: number): string {
+  const span = daysBetween(globalStart, globalEnd)
+  if (span === 0) return globalStart
+  const fraction = (x - x0) / (x1 - x0)
+  const days = Math.round(fraction * span)
+  const base = new Date(globalStart)
+  base.setDate(base.getDate() + days)
+  return base.toISOString().slice(0, 10)
+}
 
 function tributaryPath(endX: number, taskY: number, confX: number, slotY: number): string {
   const dx = confX - endX, dy = slotY - taskY
@@ -131,7 +177,7 @@ function riverSegPath(x1: number, y: number, w1: number, x2: number, w2: number)
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onTaskClick, onMilestoneClick, onGoalClick, onAddToRiver, expandedObjectiveIds, onExpandToggle, onExpandAll, onCollapseAll }) => {
+const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onTaskClick, onMilestoneClick, onGoalClick, onAddToRiver, expandedObjectiveIds, onExpandToggle, onExpandAll, onCollapseAll, onTaskDateChange, onMilestoneDateChange }) => {
   const NOW = today ?? new Date()
 
   // Per-milestone expansion — controlled externally or managed internally
@@ -152,6 +198,12 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState(0)
   const dragRef = useRef<{ x: number; startPan: number } | null>(null)
+
+  // ── Drag-to-reschedule state ──
+  // Use both state (for re-renders) and ref (for event handlers to avoid stale closures)
+  const [dragState, setDragState] = useState<DragState | null>(null)
+  const dragStateRef = useRef<DragState | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   const x0 = PAD_L, x1 = SVG_W - PAD_R
 
@@ -281,13 +333,109 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
 
   // ── Drag-to-pan ──
   const onMD = (e: React.MouseEvent): void => {
+    // Don't start pan if an item drag is active
+    if (dragStateRef.current) return
     if (zoom > 1) dragRef.current = { x: e.clientX, startPan: pan }
   }
   const onMM = (e: React.MouseEvent): void => {
-    if (!dragRef.current) return
+    if (!dragRef.current || dragStateRef.current) return
     setPan(clamp(dragRef.current.startPan + (dragRef.current.x - e.clientX) / zoom, -200, 800))
   }
   const onMU = (): void => { dragRef.current = null }
+
+  // ── Client → SVG coordinate conversion ──
+  const clientToSvgX = useCallback((clientX: number): number => {
+    const svg = svgRef.current
+    if (!svg) return 0
+    const rect = svg.getBoundingClientRect()
+    // Account for viewBox transform: viewBox starts at `pan`, width is `vbW`
+    const fraction = (clientX - rect.left) / rect.width
+    return pan + fraction * (SVG_W / zoom)
+  }, [pan, zoom])
+
+  // ── Drag start (called from task bar or milestone node mousedown) ──
+  const handleDragStart = useCallback((
+    e: React.MouseEvent,
+    type: 'task' | 'milestone',
+    id: string,
+    originalStart: string | undefined,
+    originalEnd: string,
+    durationDays?: number,
+  ): void => {
+    // Only left mouse button
+    if (e.button !== 0) return
+    e.stopPropagation()
+    e.preventDefault()
+    const svgX = clientToSvgX(e.clientX)
+    const newState: DragState = {
+      type,
+      id,
+      startSvgX: svgX,
+      currentSvgX: svgX,
+      originalStart,
+      originalEnd,
+      durationDays,
+      isDragging: false,
+    }
+    dragStateRef.current = newState
+    setDragState(newState)
+  }, [clientToSvgX])
+
+  // ── Drag move (runs on wrapper div mousemove when dragging) ──
+  // Uses ref to avoid stale closure issues with useCallback
+  const handleDragMove = useCallback((e: React.MouseEvent): void => {
+    const ds = dragStateRef.current
+    if (!ds) return
+    const svgX = clientToSvgX(e.clientX)
+    const delta = Math.abs(svgX - ds.startSvgX)
+    const updated: DragState = {
+      ...ds,
+      currentSvgX: svgX,
+      isDragging: ds.isDragging || delta > DRAG_THRESHOLD,
+    }
+    dragStateRef.current = updated
+    setDragState(updated)
+  }, [clientToSvgX])
+
+  // ── Drag end (commit the date change) ──
+  const handleDragEnd = useCallback((): void => {
+    const ds = dragStateRef.current
+    if (!ds || !ds.isDragging) {
+      dragStateRef.current = null
+      setDragState(null)
+      return
+    }
+
+    const deltaX = ds.currentSvgX - ds.startSvgX
+    if (Math.abs(deltaX) < DRAG_THRESHOLD) {
+      dragStateRef.current = null
+      setDragState(null)
+      return
+    }
+
+    if (ds.type === 'task' && onTaskDateChange && ds.originalStart) {
+      // Shift both start and end by the same delta
+      const origStartX = dateToX(ds.originalStart, globalStart, globalEnd, x0, x1)
+      const origEndX = dateToX(ds.originalEnd, globalStart, globalEnd, x0, x1)
+      const newStartX = clamp(origStartX + deltaX, x0, x1)
+      const newEndX = clamp(origEndX + deltaX, x0, x1)
+      const newStart = xToDate(newStartX, globalStart, globalEnd, x0, x1)
+      const newEnd = xToDate(newEndX, globalStart, globalEnd, x0, x1)
+      if (newStart !== ds.originalStart || newEnd !== ds.originalEnd) {
+        onTaskDateChange(ds.id, newStart, newEnd)
+      }
+    } else if (ds.type === 'milestone' && onMilestoneDateChange) {
+      const origX = dateToX(ds.originalEnd, globalStart, globalEnd, x0, x1)
+      const newX = clamp(origX + deltaX, x0, x1)
+      const newDate = xToDate(newX, globalStart, globalEnd, x0, x1)
+      if (newDate !== ds.originalEnd) {
+        onMilestoneDateChange(ds.id, newDate)
+      }
+    }
+
+    dragStateRef.current = null
+    setDragState(null)
+  }, [onTaskDateChange, onMilestoneDateChange, globalStart, globalEnd, x0, x1])
 
   // Toggle ALL milestones within an SO
   const toggleExpand = (soId: string): void => {
@@ -325,12 +473,28 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  // ── Unified mouse move: handles both pan and item drag ──
+  const handleMouseMove = (e: React.MouseEvent): void => {
+    if (dragStateRef.current) {
+      handleDragMove(e)
+    } else {
+      onMM(e)
+    }
+  }
+
+  const handleMouseUp = (): void => {
+    if (dragStateRef.current) {
+      handleDragEnd()
+    }
+    onMU()
+  }
+
   return (
     <div
       style={{ background: '#F8FAFC', fontFamily: FONT, position: 'relative' }}
-      onMouseMove={onMM}
-      onMouseUp={onMU}
-      onMouseLeave={onMU}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
     >
       {/* Floating controls (top-right corner of the river) */}
       <div style={{
@@ -377,8 +541,12 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
       </div>
 
       {/* SVG Canvas */}
-      <div style={{ padding: '0 20px 40px', cursor: zoom > 1 ? 'grab' : 'default' }} onMouseDown={onMD}>
-        <svg viewBox={`${pan} 0 ${vbW} ${totalH}`} style={{ width: '100%', height: totalH, display: 'block' }}>
+      <div style={{ padding: '0 20px 40px', cursor: dragState?.isDragging ? 'grabbing' : (zoom > 1 ? 'grab' : 'default') }} onMouseDown={onMD}>
+        <svg
+          ref={svgRef}
+          viewBox={`${pan} 0 ${vbW} ${totalH}`}
+          style={{ width: '100%', height: totalH, display: 'block' }}
+        >
           <defs>
             <filter id="strategy-ds">
               <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000" floodOpacity=".06" />
@@ -439,7 +607,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                           <rect x="0" y={ry + rH} width={SVG_W} height={totalH} />
                         </clipPath>
                       </defs>
-                      <g opacity="0.12" clipPath={`url(#clip-${obj.id})`}>
+                      <g opacity="0.12" clipPath={`url(#clip-${obj.id})`} pointerEvents="none">
                         {objTasks.map((t) => (
                           <g key={t.id}>
                             <path d={tributaryPath(t.ex, t.y, obj.cx, slotCY(t))} fill="none" stroke={so.color} strokeWidth={BAND_W} />
@@ -451,23 +619,68 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                       {/* Task bars + labels */}
                       {objTasks.map((t) => {
                         const st = STATUS_MAP[t.status]
-                        const isH = hovTask === t.id
+                        const isBeingDragged = dragState?.isDragging && dragState.type === 'task' && dragState.id === t.id
+                        const isH = hovTask === t.id || isBeingDragged
                         const above = t.side === 'above'
                         const avatarC = getAvatarColors(t.assigneeRole)
+                        const canDrag = !!onTaskDateChange
+
+                        // Compute visual offset if this task is being dragged
+                        const dragDeltaX = isBeingDragged ? (dragState.currentSvgX - dragState.startSvgX) : 0
+                        const visSx = t.sx + dragDeltaX
+                        const visEx = t.ex + dragDeltaX
+
+                        // Show projected dates during drag
+                        const projStart = isBeingDragged ? xToDate(clamp(visSx, x0, x1), globalStart, globalEnd, x0, x1) : t.start
+                        const projEnd = isBeingDragged ? xToDate(clamp(visEx, x0, x1), globalStart, globalEnd, x0, x1) : t.end
+
                         return (
-                          <g key={`${t.id}-ui`} tabIndex={0} role="button" aria-label={`Task: ${t.title} — ${st.label}`} onMouseEnter={() => setHovTask(t.id)} onMouseLeave={() => setHovTask(null)} onClick={() => onTaskClick?.(t.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTaskClick?.(t.id) } }} style={{ cursor: 'pointer' }}>
-                            <line x1={t.sx} y1={t.y} x2={t.ex} y2={t.y} stroke={st.solid} strokeWidth={BAND_W - 1} strokeLinecap="round" opacity={isH ? 0.65 : 0.4} />
-                            <line x1={t.sx} y1={t.y} x2={t.ex} y2={t.y} stroke="transparent" strokeWidth={BAND_W + 10} />
-                            <circle cx={t.sx - 13} cy={t.y} r={7} fill={avatarC.bg} />
-                            <text x={t.sx - 13} y={t.y + 0.5} textAnchor="middle" dominantBaseline="central" fill={avatarC.text} fontSize="5.5" fontFamily={FONT} fontWeight="800">{t.assignee}</text>
-                            <text x={t.sx + 6} y={t.y + (above ? -9 : 13)} fill={isH ? '#0F172A' : '#64748B'} fontSize="8.5" fontFamily={FONT} fontWeight={isH ? '700' : '600'}>{t.title}</text>
+                          <g
+                            key={`${t.id}-ui`}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`Task: ${t.title} — ${st.label}`}
+                            onMouseEnter={() => { if (!dragState) setHovTask(t.id) }}
+                            onMouseLeave={() => { if (!dragState) setHovTask(null) }}
+                            onClick={() => { if (!dragState?.isDragging) onTaskClick?.(t.id) }}
+                            onMouseDown={canDrag ? (e) => {
+                              const dur = daysBetween(t.start, t.end)
+                              handleDragStart(e, 'task', t.id, t.start, t.end, dur)
+                            } : undefined}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTaskClick?.(t.id) } }}
+                            style={{ cursor: canDrag ? (isBeingDragged ? 'grabbing' : 'grab') : 'pointer' }}
+                          >
+                            {/* Invisible hit area rect covering the full task region */}
+                            <rect
+                              x={visSx - 15}
+                              y={t.y - (BAND_W / 2 + 8)}
+                              width={visEx - visSx + 30}
+                              height={BAND_W + 16}
+                              fill="transparent"
+                              pointerEvents="all"
+                            />
+                            {/* Task bar */}
+                            <line x1={visSx} y1={t.y} x2={visEx} y2={t.y} stroke={st.solid} strokeWidth={BAND_W - 1} strokeLinecap="round" opacity={isBeingDragged ? 0.85 : (isH ? 0.65 : 0.4)} />
+                            {/* Assignee avatar */}
+                            <circle cx={visSx - 13} cy={t.y} r={7} fill={avatarC.bg} />
+                            <text x={visSx - 13} y={t.y + 0.5} textAnchor="middle" dominantBaseline="central" fill={avatarC.text} fontSize="5.5" fontFamily={FONT} fontWeight="800">{t.assignee}</text>
+                            {/* Task title */}
+                            <text x={visSx + 6} y={t.y + (above ? -9 : 13)} fill={isH ? '#0F172A' : '#64748B'} fontSize="8.5" fontFamily={FONT} fontWeight={isH ? '700' : '600'}>{t.title}</text>
+                            {/* Tooltip — shows projected dates during drag */}
                             {isH && (
                               <g>
-                                <rect x={t.sx - 10} y={t.y + (above ? -36 : 20)} width={170} height={22} rx={6} fill="#1E293B" filter="url(#strategy-ds)" />
-                                <text x={t.sx} y={t.y + (above ? -23 : 33)} fill="#E2E8F0" fontSize="8" fontFamily={FONT} fontWeight="600">
-                                  {new Date(t.start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} → {new Date(t.end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {st.label}
+                                <rect x={visSx - 10} y={t.y + (above ? -36 : 20)} width={170} height={22} rx={6} fill={isBeingDragged ? '#F97316' : '#1E293B'} filter="url(#strategy-ds)" />
+                                <text x={visSx} y={t.y + (above ? -23 : 33)} fill="white" fontSize="8" fontFamily={FONT} fontWeight="600">
+                                  {isBeingDragged ? '→ ' : ''}{new Date(projStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} → {new Date(projEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {st.label}
                                 </text>
                               </g>
+                            )}
+                            {/* Drag indicator lines during active drag */}
+                            {isBeingDragged && (
+                              <>
+                                <line x1={visSx} y1={t.y - 14} x2={visSx} y2={t.y + 14} stroke="#F97316" strokeWidth="1" strokeDasharray="2 2" opacity="0.6" />
+                                <line x1={visEx} y1={t.y - 14} x2={visEx} y2={t.y + 14} stroke="#F97316" strokeWidth="1" strokeDasharray="2 2" opacity="0.6" />
+                              </>
                             )}
                           </g>
                         )
@@ -476,35 +689,71 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                   )
                 })}
 
-                {/* River */}
-                {aft.map((s, i) => <path key={`aft-${i}`} d={riverSegPath(s.x1, ry, s.w1, s.x2, s.w2)} fill={`url(#rd-${so.id})`} />)}
-                {bef.map((s, i) => <path key={`bef-${i}`} d={riverSegPath(s.x1, ry, s.w1, s.x2, s.w2)} fill={`url(#rg-${so.id})`} />)}
+                {/* River — pointer-events: none so clicks pass through to tasks underneath */}
+                {aft.map((s, i) => <path key={`aft-${i}`} d={riverSegPath(s.x1, ry, s.w1, s.x2, s.w2)} fill={`url(#rd-${so.id})`} pointerEvents="none" />)}
+                {bef.map((s, i) => <path key={`bef-${i}`} d={riverSegPath(s.x1, ry, s.w1, s.x2, s.w2)} fill={`url(#rg-${so.id})`} pointerEvents="none" />)}
 
                 {/* Milestones */}
                 {objs.map((obj) => {
-                  const isH = hovObj === obj.id
+                  const isMsDragged = dragState?.isDragging && dragState.type === 'milestone' && dragState.id === obj.id
+                  const isH = hovObj === obj.id || isMsDragged
                   const past = new Date(obj.dueDate) <= NOW
                   const td = obj.tasks.filter((t) => t.status === 'done').length
                   const tp = obj.tasks.length > 0 ? Math.round((td / obj.tasks.length) * 100) : 0
                   const dir = obj.side === 'above' ? 1 : -1
                   const rH = obj.rw / 2
                   const gap = Math.max(rH + 20, 26)
+                  const canDragMs = !!onMilestoneDateChange
+
+                  // Visual position during drag
+                  const msDragDelta = isMsDragged ? (dragState.currentSvgX - dragState.startSvgX) : 0
+                  const visCx = obj.cx + msDragDelta
+                  const projDate = isMsDragged ? xToDate(clamp(visCx, x0, x1), globalStart, globalEnd, x0, x1) : obj.dueDate
+
                   return (
-                    <g key={obj.id} tabIndex={0} role="button" aria-label={`Milestone: ${obj.title} — ${tp}% complete, ${obj.tasks.length} tasks`} onMouseEnter={() => setHovObj(obj.id)} onMouseLeave={() => setHovObj(null)} onClick={() => toggleMilestone(obj.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMilestone(obj.id) } }} style={{ cursor: 'pointer' }}>
-                      {past && <circle cx={obj.cx} cy={ry} r={18} fill={so.color} opacity=".07" />}
-                      <circle cx={obj.cx} cy={ry} r={isH ? 13 : 10} fill={obj.isExpanded ? so.color : 'white'} stroke={so.color} strokeWidth={past ? 3 : 2} filter="url(#strategy-ds)" />
-                      <circle cx={obj.cx} cy={ry} r={past ? 4 : 2} fill={obj.isExpanded ? 'white' : (past ? so.color : '#CBD5E1')} />
+                    <g
+                      key={obj.id}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`Milestone: ${obj.title} — ${tp}% complete, ${obj.tasks.length} tasks`}
+                      onMouseEnter={() => { if (!dragState) setHovObj(obj.id) }}
+                      onMouseLeave={() => { if (!dragState) setHovObj(null) }}
+                      onClick={() => { if (!dragState?.isDragging) toggleMilestone(obj.id) }}
+                      onMouseDown={canDragMs ? (e) => {
+                        handleDragStart(e, 'milestone', obj.id, undefined, obj.dueDate)
+                      } : undefined}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMilestone(obj.id) } }}
+                      style={{ cursor: canDragMs ? (isMsDragged ? 'grabbing' : 'grab') : 'pointer' }}
+                    >
+                      {/* Invisible hit area for milestone */}
+                      <rect
+                        x={visCx - 25}
+                        y={ry - 25}
+                        width={50}
+                        height={50}
+                        fill="transparent"
+                        pointerEvents="all"
+                      />
+                      {past && <circle cx={visCx} cy={ry} r={18} fill={so.color} opacity=".07" />}
+                      <circle cx={visCx} cy={ry} r={isH ? 13 : 10} fill={obj.isExpanded ? so.color : 'white'} stroke={so.color} strokeWidth={past ? 3 : 2} filter="url(#strategy-ds)" />
+                      <circle cx={visCx} cy={ry} r={past ? 4 : 2} fill={obj.isExpanded ? 'white' : (past ? so.color : '#CBD5E1')} />
+                      {/* Milestone title — clickable for details */}
                       <text
-                        x={obj.cx} y={ry + dir * gap} textAnchor="middle"
-                        fill={isH ? '#0F172A' : '#475569'} fontSize="10" fontFamily={FONT} fontWeight="800"
+                        x={visCx} y={ry + dir * gap} textAnchor="middle"
+                        fill={isMsDragged ? '#F97316' : (isH ? '#0F172A' : '#475569')} fontSize="10" fontFamily={FONT} fontWeight="800"
                         style={{ cursor: 'pointer', textDecoration: isH ? 'underline' : 'none' }}
-                        onClick={(e) => { e.stopPropagation(); onMilestoneClick?.(obj.id) }}
+                        onClick={(e) => { e.stopPropagation(); if (!dragState?.isDragging) onMilestoneClick?.(obj.id) }}
                         role="link"
                         aria-label={`View details for milestone: ${obj.title}`}
                       >{obj.title}</text>
-                      <text x={obj.cx} y={ry + dir * (gap + 12)} textAnchor="middle" fill="#94A3B8" fontSize="8.5" fontFamily={FONT} fontWeight="600">
-                        {new Date(obj.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {tp}% · {obj.tasks.length} tasks
+                      {/* Date + progress label */}
+                      <text x={visCx} y={ry + dir * (gap + 12)} textAnchor="middle" fill={isMsDragged ? '#F97316' : '#94A3B8'} fontSize="8.5" fontFamily={FONT} fontWeight="600">
+                        {isMsDragged ? '→ ' : ''}{new Date(projDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {tp}% · {obj.tasks.length} tasks
                       </text>
+                      {/* Vertical snap line during drag */}
+                      {isMsDragged && (
+                        <line x1={visCx} y1={ry - 30} x2={visCx} y2={ry + 30} stroke="#F97316" strokeWidth="1.5" strokeDasharray="3 3" opacity="0.5" />
+                      )}
                     </g>
                   )
                 })}

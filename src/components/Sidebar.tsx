@@ -228,7 +228,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     }
 
     return (
-        <div className="hidden sm:flex h-screen w-64 flex-col bg-background border-r border-slate-100 text-foreground">
+        <div className="hidden sm:flex h-screen w-64 shrink-0 flex-col bg-background border-r border-slate-100 text-foreground">
             {/* App Header — ForgeOS Branding */}
             <div className="px-5 pt-8 pb-2">
                 <div className="flex items-center justify-between">
