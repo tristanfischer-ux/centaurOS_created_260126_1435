@@ -11,6 +11,11 @@ import {
   Heart,
   AlertCircle,
   TrendingUp,
+  Hammer,
+  BookOpen,
+  Clock,
+  Wrench,
+  DollarSign,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -35,6 +40,17 @@ import { IndustrySelector } from './components/industry-selector'
 import { INDUSTRY_CATEGORIES, packMatchesCategory } from './components/utils'
 import { TechniquesExplorer } from '@/components/techniques'
 import { ALL_TECHNIQUES } from '@/lib/manufacturing-techniques'
+import { getProjectTemplates, type ProjectTemplateListItem } from '@/actions/project-templates'
+import { getTutorials, type TutorialListItem } from '@/actions/tutorials'
+import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 // ---------------------------------------------------------------------------
 // Context-aware recommendation engine
@@ -263,6 +279,46 @@ export function InspirationPageNew({
   // "By Need" selected category
   const [selectedNeed, setSelectedNeed] = useState<string | null>(null)
 
+  // Projects & Tutorials state (lazy-loaded on tab switch)
+  const [projectTemplates, setProjectTemplates] = useState<ProjectTemplateListItem[]>([])
+  const [projectsTotal, setProjectsTotal] = useState(0)
+  const [projectsLoaded, setProjectsLoaded] = useState(false)
+  const [projectsLoading, setProjectsLoading] = useState(false)
+  const [tutorials, setTutorials] = useState<TutorialListItem[]>([])
+  const [tutorialsTotal, setTutorialsTotal] = useState(0)
+  const [tutorialsLoaded, setTutorialsLoaded] = useState(false)
+  const [tutorialsLoading, setTutorialsLoading] = useState(false)
+  const [selectedProject, setSelectedProject] = useState<ProjectTemplateListItem | null>(null)
+  const [selectedTutorial, setSelectedTutorial] = useState<TutorialListItem | null>(null)
+
+  // Load projects when tab is selected
+  useEffect(() => {
+    if (activeTab !== 'projects' || projectsLoaded || projectsLoading) return
+    setProjectsLoading(true)
+    getProjectTemplates({ pageSize: 50 }).then((result) => {
+      if ('data' in result) {
+        setProjectTemplates(result.data)
+        setProjectsTotal(result.total)
+      }
+      setProjectsLoaded(true)
+      setProjectsLoading(false)
+    })
+  }, [activeTab, projectsLoaded, projectsLoading])
+
+  // Load tutorials when tab is selected
+  useEffect(() => {
+    if (activeTab !== 'learn' || tutorialsLoaded || tutorialsLoading) return
+    setTutorialsLoading(true)
+    getTutorials({ pageSize: 50 }).then((result) => {
+      if ('data' in result) {
+        setTutorials(result.data)
+        setTutorialsTotal(result.total)
+      }
+      setTutorialsLoaded(true)
+      setTutorialsLoading(false)
+    })
+  }, [activeTab, tutorialsLoaded, tutorialsLoading])
+
   // Search & filter (for by-need tab)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -463,6 +519,8 @@ export function InspirationPageNew({
         popularCount={popularPacks.length}
         savedCount={savedPackIds.size}
         techniquesCount={ALL_TECHNIQUES.length}
+        projectsCount={projectsTotal}
+        tutorialsCount={tutorialsTotal}
         gapCount={ctx?.gapCategories.length}
         showTechniques={isManufacturingIndustry}
       />
@@ -745,6 +803,331 @@ export function InspirationPageNew({
       {/* TECHNIQUES tab — Manufacturing Techniques Explorer                 */}
       {/* ================================================================== */}
       {activeTab === 'techniques' && <TechniquesExplorer />}
+
+      {/* ================================================================== */}
+      {/* PROJECTS tab — Starter project templates with BOM and steps        */}
+      {/* ================================================================== */}
+      {activeTab === 'projects' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Hammer className="h-5 w-5 text-chart-4" />
+            <h2 className="text-lg font-semibold">Project Templates</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-5">
+            Complete starter projects with bill of materials, step-by-step instructions, and cost estimates.
+          </p>
+
+          {projectsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-48 rounded-xl" />
+              ))}
+            </div>
+          ) : projectTemplates.length === 0 ? (
+            <EmptyState
+              title="Project templates are being prepared"
+              description="Check back soon as new project templates are added."
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
+              {projectTemplates.map((project) => (
+                <Card
+                  key={project.id}
+                  className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 hover:border-international-orange/30"
+                  onClick={() => setSelectedProject(project)}
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug">
+                        {project.title}
+                      </h3>
+                      {project.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {project.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {project.difficulty && (
+                        <Badge
+                          variant={
+                            project.difficulty === 'beginner' ? 'success' :
+                            project.difficulty === 'intermediate' ? 'warning' :
+                            'destructive'
+                          }
+                          className="text-[10px]"
+                        >
+                          {project.difficulty}
+                        </Badge>
+                      )}
+                      {project.category && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {project.category}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1 border-t border-muted">
+                      {project.estimated_hours != null && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {project.estimated_hours}h
+                        </span>
+                      )}
+                      {project.estimated_cost_usd != null && (
+                        <span className="flex items-center gap-1">
+                          <DollarSign className="h-3 w-3" />
+                          ${project.estimated_cost_usd}
+                        </span>
+                      )}
+                      {project.step_count > 0 && (
+                        <span>{project.step_count} steps</span>
+                      )}
+                      {project.bom_count > 0 && (
+                        <span>{project.bom_count} parts</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Project Detail Dialog */}
+          <Dialog open={!!selectedProject} onOpenChange={(open) => !open && setSelectedProject(null)}>
+            <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Hammer className="h-5 w-5 text-chart-4" />
+                  {selectedProject?.title}
+                </DialogTitle>
+              </DialogHeader>
+              {selectedProject && (
+                <div className="flex-1 overflow-y-auto space-y-6 pb-4">
+                  {selectedProject.description && (
+                    <p className="text-sm text-muted-foreground">{selectedProject.description}</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    {selectedProject.difficulty && (
+                      <Badge variant={
+                        selectedProject.difficulty === 'beginner' ? 'success' :
+                        selectedProject.difficulty === 'intermediate' ? 'warning' :
+                        'destructive'
+                      }>
+                        {selectedProject.difficulty}
+                      </Badge>
+                    )}
+                    {selectedProject.estimated_hours != null && (
+                      <Badge variant="secondary">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {selectedProject.estimated_hours} hours
+                      </Badge>
+                    )}
+                    {selectedProject.estimated_cost_usd != null && (
+                      <Badge variant="secondary">
+                        <DollarSign className="h-3 w-3 mr-1" />
+                        ${selectedProject.estimated_cost_usd} estimated
+                      </Badge>
+                    )}
+                  </div>
+
+                  {selectedProject.tools_required.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground mb-2">Tools Required</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedProject.tools_required.map((tool, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs">
+                            <Wrench className="h-3 w-3 mr-1" />
+                            {tool}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedProject.skills_required.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground mb-2">Skills Required</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedProject.skills_required.map((skill, i) => (
+                          <Badge key={i} variant="outline" className="text-xs">{skill}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedProject.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedProject.tags.map((tag, i) => (
+                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSelectedProject(null)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+
+      {/* ================================================================== */}
+      {/* LEARN tab — Tutorials, how-tos, and safety guides                  */}
+      {/* ================================================================== */}
+      {activeTab === 'learn' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-1">
+            <BookOpen className="h-5 w-5 text-electric-blue" />
+            <h2 className="text-lg font-semibold">Tutorials &amp; Guides</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-5">
+            Step-by-step tutorials, safety guides, and best practices for hardware engineering.
+          </p>
+
+          {tutorialsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-44 rounded-xl" />
+              ))}
+            </div>
+          ) : tutorials.length === 0 ? (
+            <EmptyState
+              title="Tutorials are being prepared"
+              description="Check back soon as new tutorials are added."
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
+              {tutorials.map((tutorial) => (
+                <Card
+                  key={tutorial.id}
+                  className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 hover:border-electric-blue/30"
+                  onClick={() => setSelectedTutorial(tutorial)}
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug">
+                        {tutorial.title}
+                      </h3>
+                      {tutorial.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {tutorial.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {tutorial.difficulty && (
+                        <Badge
+                          variant={
+                            tutorial.difficulty === 'beginner' ? 'success' :
+                            tutorial.difficulty === 'intermediate' ? 'warning' :
+                            'destructive'
+                          }
+                          className="text-[10px]"
+                        >
+                          {tutorial.difficulty}
+                        </Badge>
+                      )}
+                      {tutorial.topic && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {tutorial.topic}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1 border-t border-muted">
+                      {tutorial.estimated_read_minutes != null && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {tutorial.estimated_read_minutes} min read
+                        </span>
+                      )}
+                    </div>
+
+                    {tutorial.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {tutorial.tags.slice(0, 3).map((tag, i) => (
+                          <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                            {tag}
+                          </span>
+                        ))}
+                        {tutorial.tags.length > 3 && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                            +{tutorial.tags.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Tutorial Detail Dialog */}
+          <Dialog open={!!selectedTutorial} onOpenChange={(open) => !open && setSelectedTutorial(null)}>
+            <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-electric-blue" />
+                  {selectedTutorial?.title}
+                </DialogTitle>
+              </DialogHeader>
+              {selectedTutorial && (
+                <div className="flex-1 overflow-y-auto space-y-6 pb-4">
+                  {selectedTutorial.description && (
+                    <p className="text-sm text-muted-foreground">{selectedTutorial.description}</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTutorial.difficulty && (
+                      <Badge variant={
+                        selectedTutorial.difficulty === 'beginner' ? 'success' :
+                        selectedTutorial.difficulty === 'intermediate' ? 'warning' :
+                        'destructive'
+                      }>
+                        {selectedTutorial.difficulty}
+                      </Badge>
+                    )}
+                    {selectedTutorial.topic && (
+                      <Badge variant="secondary">{selectedTutorial.topic}</Badge>
+                    )}
+                    {selectedTutorial.estimated_read_minutes != null && (
+                      <Badge variant="secondary">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {selectedTutorial.estimated_read_minutes} min read
+                      </Badge>
+                    )}
+                  </div>
+
+                  {selectedTutorial.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedTutorial.tags.map((tag, i) => (
+                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSelectedTutorial(null)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
 
       {/* ================================================================== */}
       {/* ALL PACKS tab                                                      */}

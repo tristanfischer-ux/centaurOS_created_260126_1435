@@ -745,3 +745,102 @@ export async function bridgeToCadLab(
 
   return { projectId: result.projectId }
 }
+
+// ─── Assembly Enrichment Data ────────────────────────────────────────
+
+/** Pricing data from the component_pricing table */
+export interface ComponentPricingData {
+  component_name: string
+  manufacturer: string | null
+  pricing_tiers: unknown[]
+  moq: number | null
+  lead_time_days: unknown
+  currency: string
+}
+
+/** Certification entry from the component_certifications table */
+export interface ComponentCertData {
+  component_name: string
+  certifications: unknown[]
+  compliance_summary: Record<string, unknown> | null
+  export_control: Record<string, unknown> | null
+}
+
+/** Compatibility pair from the component_compatibility table */
+export interface ComponentCompatData {
+  component_a: string
+  component_b: string
+  relationship: string
+  confidence: number | null
+  notes: string | null
+}
+
+/** Full enrichment payload for the Assembly Builder */
+export interface AssemblyEnrichment {
+  pricing: ComponentPricingData[]
+  certifications: ComponentCertData[]
+  compatibility: ComponentCompatData[]
+}
+
+/**
+ * Fetches enrichment data (pricing, certifications, compatibility) for a set
+ * of placed component names. Used by the Assembly Builder workbench to surface
+ * live market data alongside the schematic.
+ *
+ * @param componentNames - Array of component names from placedComponents
+ * @returns Enrichment data or error
+ *
+ * @security Requires authenticated user. All tables have public SELECT RLS.
+ */
+export async function getAssemblyEnrichment(
+  componentNames: string[],
+): Promise<AssemblyEnrichment | { error: string }> {
+  if (componentNames.length === 0) {
+    return { pricing: [], certifications: [], compatibility: [] }
+  }
+
+  const supabase = await createClient()
+
+  // AUTH: Verify user is authenticated
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: "Authentication required" }
+  }
+
+  try {
+    const [pricingResult, certsResult, compatResult] = await Promise.all([
+      // Pricing for placed components
+      supabase
+        .from("component_pricing")
+        .select("component_name, manufacturer, pricing_tiers, moq, lead_time_days, currency")
+        .in("component_name", componentNames),
+
+      // Certifications for placed components
+      supabase
+        .from("component_certifications")
+        .select("component_name, certifications, compliance_summary, export_control")
+        .in("component_name", componentNames),
+
+      // Compatibility pairs where both sides are in the placed list
+      supabase
+        .from("component_compatibility")
+        .select("component_a, component_b, relationship, confidence, notes")
+        .or(
+          componentNames
+            .map((n) => `component_a.eq.${n},component_b.eq.${n}`)
+            .join(","),
+        ),
+    ])
+
+    return {
+      pricing: (pricingResult.data ?? []) as ComponentPricingData[],
+      certifications: (certsResult.data ?? []) as ComponentCertData[],
+      compatibility: (compatResult.data ?? []) as ComponentCompatData[],
+    }
+  } catch (err) {
+    console.error("[AssemblyBuilder] Enrichment fetch failed:", err)
+    return { error: "Failed to load enrichment data" }
+  }
+}

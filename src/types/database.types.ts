@@ -3661,6 +3661,84 @@ export type Database = {
           },
         ]
       }
+      component_certifications: {
+        Row: {
+          certifications: Json
+          compliance_summary: Json | null
+          component_name: string
+          created_at: string
+          export_control: Json | null
+          id: string
+          manufacturer: string | null
+          material_declarations: string[] | null
+          regulatory_notes: string | null
+        }
+        Insert: {
+          certifications?: Json
+          compliance_summary?: Json | null
+          component_name: string
+          created_at?: string
+          export_control?: Json | null
+          id?: string
+          manufacturer?: string | null
+          material_declarations?: string[] | null
+          regulatory_notes?: string | null
+        }
+        Update: {
+          certifications?: Json
+          compliance_summary?: Json | null
+          component_name?: string
+          created_at?: string
+          export_control?: Json | null
+          id?: string
+          manufacturer?: string | null
+          material_declarations?: string[] | null
+          regulatory_notes?: string | null
+        }
+        Relationships: []
+      }
+      component_compatibility: {
+        Row: {
+          component_a: string
+          component_a_category: string | null
+          component_b: string
+          component_b_category: string | null
+          confidence: number | null
+          created_at: string
+          domain: string | null
+          id: string
+          notes: string | null
+          relationship: string
+          source_url: string | null
+        }
+        Insert: {
+          component_a: string
+          component_a_category?: string | null
+          component_b: string
+          component_b_category?: string | null
+          confidence?: number | null
+          created_at?: string
+          domain?: string | null
+          id?: string
+          notes?: string | null
+          relationship: string
+          source_url?: string | null
+        }
+        Update: {
+          component_a?: string
+          component_a_category?: string | null
+          component_b?: string
+          component_b_category?: string | null
+          confidence?: number | null
+          created_at?: string
+          domain?: string | null
+          id?: string
+          notes?: string | null
+          relationship?: string
+          source_url?: string | null
+        }
+        Relationships: []
+      }
       component_geometry_types: {
         Row: {
           bbox_expressions: Json
@@ -3724,6 +3802,75 @@ export type Database = {
           verified?: boolean | null
           version?: number | null
           visual_tags?: string[] | null
+        }
+        Relationships: []
+      }
+      component_pricing: {
+        Row: {
+          component_name: string
+          created_at: string
+          currency: string | null
+          id: string
+          last_verified: string | null
+          lead_time_days: Json | null
+          manufacturer: string | null
+          moq: number | null
+          pricing_tiers: Json
+          shipping_notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          component_name: string
+          created_at?: string
+          currency?: string | null
+          id?: string
+          last_verified?: string | null
+          lead_time_days?: Json | null
+          manufacturer?: string | null
+          moq?: number | null
+          pricing_tiers?: Json
+          shipping_notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          component_name?: string
+          created_at?: string
+          currency?: string | null
+          id?: string
+          last_verified?: string | null
+          lead_time_days?: Json | null
+          manufacturer?: string | null
+          moq?: number | null
+          pricing_tiers?: Json
+          shipping_notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      component_recommendations: {
+        Row: {
+          bundle_suggestion: Json | null
+          created_at: string
+          id: string
+          primary_category: string | null
+          primary_product: string
+          recommendations: Json
+        }
+        Insert: {
+          bundle_suggestion?: Json | null
+          created_at?: string
+          id?: string
+          primary_category?: string | null
+          primary_product: string
+          recommendations?: Json
+        }
+        Update: {
+          bundle_suggestion?: Json | null
+          created_at?: string
+          id?: string
+          primary_category?: string | null
+          primary_product?: string
+          recommendations?: Json
         }
         Relationships: []
       }
@@ -4603,6 +4750,57 @@ export type Database = {
           message?: string
           page_route?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      entity_reviews: {
+        Row: {
+          body: string
+          cons: string[] | null
+          created_at: string
+          entity_name: string
+          entity_type: string
+          helpful_count: number | null
+          id: string
+          pros: string[] | null
+          rating: number
+          reviewer_company: string | null
+          reviewer_name: string | null
+          reviewer_role: string | null
+          title: string | null
+          verified_purchase: boolean | null
+        }
+        Insert: {
+          body: string
+          cons?: string[] | null
+          created_at?: string
+          entity_name: string
+          entity_type: string
+          helpful_count?: number | null
+          id?: string
+          pros?: string[] | null
+          rating: number
+          reviewer_company?: string | null
+          reviewer_name?: string | null
+          reviewer_role?: string | null
+          title?: string | null
+          verified_purchase?: boolean | null
+        }
+        Update: {
+          body?: string
+          cons?: string[] | null
+          created_at?: string
+          entity_name?: string
+          entity_type?: string
+          helpful_count?: number | null
+          id?: string
+          pros?: string[] | null
+          rating?: number
+          reviewer_company?: string | null
+          reviewer_name?: string | null
+          reviewer_role?: string | null
+          title?: string | null
+          verified_purchase?: boolean | null
         }
         Relationships: []
       }
@@ -9523,6 +9721,63 @@ export type Database = {
           },
         ]
       }
+      project_templates: {
+        Row: {
+          bom: Json | null
+          category: string | null
+          created_at: string
+          description: string | null
+          difficulty: string | null
+          estimated_cost_usd: number | null
+          estimated_hours: number | null
+          id: string
+          references: string[] | null
+          safety_warnings: string[] | null
+          skills_required: string[] | null
+          slug: string
+          steps: Json
+          tags: string[] | null
+          title: string
+          tools_required: string[] | null
+        }
+        Insert: {
+          bom?: Json | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          difficulty?: string | null
+          estimated_cost_usd?: number | null
+          estimated_hours?: number | null
+          id?: string
+          references?: string[] | null
+          safety_warnings?: string[] | null
+          skills_required?: string[] | null
+          slug: string
+          steps?: Json
+          tags?: string[] | null
+          title: string
+          tools_required?: string[] | null
+        }
+        Update: {
+          bom?: Json | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          difficulty?: string | null
+          estimated_cost_usd?: number | null
+          estimated_hours?: number | null
+          id?: string
+          references?: string[] | null
+          safety_warnings?: string[] | null
+          skills_required?: string[] | null
+          slug?: string
+          steps?: Json
+          tags?: string[] | null
+          title?: string
+          tools_required?: string[] | null
+        }
+        Relationships: []
+      }
       provider_applications: {
         Row: {
           application_data: Json | null
@@ -12843,6 +13098,60 @@ export type Database = {
           },
         ]
       }
+      tutorials: {
+        Row: {
+          common_mistakes: string[] | null
+          created_at: string
+          description: string | null
+          difficulty: string | null
+          estimated_read_minutes: number | null
+          further_reading: string[] | null
+          id: string
+          key_takeaways: string[] | null
+          prerequisites: string[] | null
+          sections: Json
+          slug: string
+          tags: string[] | null
+          title: string
+          tools_mentioned: string[] | null
+          topic: string | null
+        }
+        Insert: {
+          common_mistakes?: string[] | null
+          created_at?: string
+          description?: string | null
+          difficulty?: string | null
+          estimated_read_minutes?: number | null
+          further_reading?: string[] | null
+          id?: string
+          key_takeaways?: string[] | null
+          prerequisites?: string[] | null
+          sections?: Json
+          slug: string
+          tags?: string[] | null
+          title: string
+          tools_mentioned?: string[] | null
+          topic?: string | null
+        }
+        Update: {
+          common_mistakes?: string[] | null
+          created_at?: string
+          description?: string | null
+          difficulty?: string | null
+          estimated_read_minutes?: number | null
+          further_reading?: string[] | null
+          id?: string
+          key_takeaways?: string[] | null
+          prerequisites?: string[] | null
+          sections?: Json
+          slug?: string
+          tags?: string[] | null
+          title?: string
+          tools_mentioned?: string[] | null
+          topic?: string | null
+        }
+        Relationships: []
+      }
       universal_subsystems: {
         Row: {
           category: string
@@ -14020,6 +14329,112 @@ export type Database = {
       get_daily_pulse: {
         Args: { p_date?: string; p_profile_id: string }
         Returns: Json
+      }
+      get_directory_expert_by_slug: {
+        Args: { p_slug: string }
+        Returns: {
+          accepts_trial: boolean
+          average_rating: number
+          bio: string
+          company_stages: string[]
+          currency: string
+          day_rate: number
+          featured_until: string
+          headline: string
+          hourly_rate: number
+          id: string
+          industries: string[]
+          is_verified: boolean
+          linkedin_url: string
+          location: string
+          minimum_engagement_hours: number
+          profile_completeness: number
+          profile_slug: string
+          specializations: string[]
+          tier: string
+          timezone: string
+          total_reviews: number
+          total_transactions: number
+          trial_rate_discount: number
+          user_avatar: string
+          user_name: string
+          username: string
+          video_thumbnail_url: string
+          video_url: string
+          website_url: string
+          years_experience: number
+        }[]
+      }
+      get_directory_expert_case_studies: {
+        Args: { p_provider_id: string }
+        Returns: {
+          approach: string
+          challenge: string
+          client_industry: string
+          client_name: string
+          company_stage: string
+          engagement_type: string
+          hours_per_week: number
+          id: string
+          is_featured: boolean
+          metrics: Json
+          outcome: string
+          testimonial_author: string
+          testimonial_quote: string
+          testimonial_role: string
+          title: string
+        }[]
+      }
+      get_directory_expert_count: {
+        Args: { p_location?: string; p_role?: string; p_search?: string }
+        Returns: number
+      }
+      get_directory_experts: {
+        Args: {
+          p_limit?: number
+          p_location?: string
+          p_offset?: number
+          p_role?: string
+          p_search?: string
+        }
+        Returns: {
+          average_rating: number
+          bio: string
+          company_stages: string[]
+          currency: string
+          day_rate: number
+          featured_until: string
+          headline: string
+          hourly_rate: number
+          id: string
+          industries: string[]
+          is_verified: boolean
+          location: string
+          profile_completeness: number
+          profile_slug: string
+          specializations: string[]
+          tier: string
+          total_reviews: number
+          total_transactions: number
+          user_avatar: string
+          user_name: string
+          username: string
+          years_experience: number
+        }[]
+      }
+      get_directory_locations: {
+        Args: never
+        Returns: {
+          expert_count: number
+          location_name: string
+        }[]
+      }
+      get_directory_roles: {
+        Args: never
+        Returns: {
+          expert_count: number
+          role_name: string
+        }[]
       }
       get_domain_tasks: {
         Args: { p_domain_id: string }

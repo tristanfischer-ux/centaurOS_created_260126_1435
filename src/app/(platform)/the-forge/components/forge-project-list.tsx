@@ -28,6 +28,7 @@ import {
   Blocks,
   PlayCircle,
   Flame,
+  Package,
   Clock,
 } from "lucide-react"
 
@@ -87,6 +88,7 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
       <HeroSection />
       <PipelinePreview />
       <AssemblyBuilderLink />
+      <ComponentLibraryLink />
 
       {projects.length === 0 ? (
         <EmptyState
@@ -311,6 +313,33 @@ function AssemblyBuilderLink(): React.ReactNode {
           <p className="text-sm font-medium text-foreground">Assembly Builder</p>
           <p className="text-xs text-muted-foreground">
             Pick a design skeleton and fill its slots with 256+ parametric parts
+          </p>
+        </div>
+      </div>
+      <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+    </Link>
+  )
+}
+
+// ─── Component Library Link ───────────────────────────────────────────
+
+/**
+ * ComponentLibraryLink — Secondary link to the Component Library.
+ */
+function ComponentLibraryLink(): React.ReactNode {
+  return (
+    <Link
+      href="/the-forge/components"
+      className="group flex items-center justify-between rounded-xl border p-4 transition-colors hover:bg-muted/50"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-international-orange-light text-international-orange">
+          <Package className="h-4 w-4" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">Component Library</p>
+          <p className="text-xs text-muted-foreground">
+            Browse 1,000+ components with specs, pricing, and certifications
           </p>
         </div>
       </div>

@@ -27,6 +27,8 @@ interface MarketCardProps {
     onSizeChange?: (id: string, size: CardSize) => void
     isSaved?: boolean
     onSaveToggle?: (id: string, isSaved: boolean) => void
+    /** Optional review summary (avg rating + count) for this listing */
+    reviewData?: { avg: number; count: number } | null
 }
 
 // Avatar gradients now imported from shared lib (marketplace-colors.ts)
@@ -39,6 +41,7 @@ export const MarketCard = memo(function MarketCard({
     onSizeChange,
     isSaved = false,
     onSaveToggle,
+    reviewData = null,
 }: MarketCardProps) {
     const [isHovered, setIsHovered] = useState(false)
     const [internalSize, setInternalSize] = useState<CardSize>(size)
@@ -336,6 +339,31 @@ export const MarketCard = memo(function MarketCard({
                                         +{allTags.length - 3}
                                     </span>
                                 )}
+                            </div>
+                        )}
+
+                        {/* Star Rating */}
+                        {reviewData && reviewData.count > 0 && (
+                            <div className="flex items-center gap-1.5 mb-3">
+                                <div className="flex items-center gap-0.5">
+                                    {[1, 2, 3, 4, 5].map((s) => (
+                                        <Star
+                                            key={s}
+                                            className={cn(
+                                                "h-3 w-3",
+                                                s <= Math.round(reviewData.avg)
+                                                    ? "fill-amber-400 text-amber-400"
+                                                    : "text-muted-foreground"
+                                            )}
+                                        />
+                                    ))}
+                                </div>
+                                <span className="text-xs font-medium text-foreground">
+                                    {reviewData.avg.toFixed(1)}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    ({reviewData.count})
+                                </span>
                             </div>
                         )}
 

@@ -21,6 +21,7 @@ import { CadLabDiagnostics } from "@/components/cad/cad-lab-diagnostics"
 import { CadLabSupplyChain } from "@/components/cad/cad-lab-supply-chain"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 import { CadLabContracting } from "@/components/cad/cad-lab-contracting"
+import { ProcurementEnrichment } from "@/components/cad/procurement-enrichment"
 
 import { useCadLab } from "../cad-lab-context"
 
@@ -41,6 +42,9 @@ export default function CadLabProcurementPage(): React.ReactNode {
   }, [generatedModuleCount, router])
 
   if (generatedModuleCount === 0) return null
+
+  // Extract component names from modules for enrichment data lookup
+  const componentNames = modules.map((m) => m.name).filter(Boolean)
 
   return (
     <div className="space-y-6">
@@ -68,6 +72,7 @@ export default function CadLabProcurementPage(): React.ReactNode {
       />
       <CadLabSupplyChain modules={modules} diagnosticAnswers={diagnosticAnswers} />
       <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
+      <ProcurementEnrichment componentNames={componentNames} />
       <CadLabContracting
         modules={modules}
         projectName={subject}

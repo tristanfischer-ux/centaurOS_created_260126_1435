@@ -19,10 +19,14 @@ import {
   ArrowLeft,
   Save,
   Rocket,
+  PoundSterling,
+  ShieldCheck,
+  Link2,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
 import { ComponentCatalog } from "./component-catalog"
@@ -36,6 +40,7 @@ import {
   assignComponentToSlot,
   removeComponentFromSlot,
   bridgeToCadLab,
+  getAssemblyEnrichment,
 } from "@/actions/assembly-builder"
 
 import type {
@@ -44,6 +49,7 @@ import type {
   CatalogStats,
   TemplateSlot,
   PlacedComponent,
+  AssemblyEnrichment,
 } from "@/actions/assembly-builder"
 
 // ─── Props ───────────────────────────────────────────────────────────
@@ -85,6 +91,10 @@ export function AssemblyWorkbench({
     byCategory: {},
   })
 
+  // Enrichment state (pricing, certs, compatibility from new tables)
+  const [enrichment, setEnrichment] = useState<AssemblyEnrichment | null>(null)
+  const [enrichmentLoading, setEnrichmentLoading] = useState(false)
+
   // Interaction state
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null)
   const [showSlotPopover, setShowSlotPopover] = useState(false)
@@ -118,6 +128,37 @@ export function AssemblyWorkbench({
 
     void load()
   }, [assemblyId])
+
+  // ─── Fetch Enrichment Data ──────────────────────────────────────
+
+  const placedNames = useMemo(
+    () => (assembly?.placedComponents ?? []).map((p) => p.componentName).filter(Boolean),
+    [assembly?.placedComponents],
+  )
+
+  useEffect(() => {
+    if (placedNames.length === 0) {
+      setEnrichment(null)
+      return
+    }
+
+    let cancelled = false
+    setEnrichmentLoading(true)
+
+    void getAssemblyEnrichment(placedNames).then((result) => {
+      if (cancelled) return
+      setEnrichmentLoading(false)
+      if ("error" in result) {
+        console.warn("[AssemblyWorkbench] Enrichment fetch:", result.error)
+        return
+      }
+      setEnrichment(result)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [placedNames])
 
   // ─── Component Lookup Map ────────────────────────────────────────
 
@@ -376,8 +417,137 @@ export function AssemblyWorkbench({
             slots={assembly.slots}
             placedComponents={assembly.placedComponents}
             componentLookup={componentLookup}
+            enrichment={enrichment}
+            enrichmentLoading={enrichmentLoading}
           />
         </div>
+      </div>
+
+      {/* Cost Footer — live pricing from database */}
+      <CostFooter
+        placedComponents={assembly.placedComponents}
+        componentLookup={componentLookup}
+        enrichment={enrichment}
+        enrichmentLoading={enrichmentLoading}
+      />
+    </div>
+  )
+}
+
+// ─── Cost Footer ─────────────────────────────────────────────────────
+
+/**
+ * Persistent footer bar showing live pricing, certification summary,
+ * and compatibility count from enrichment data.
+ */
+function CostFooter({
+  placedComponents,
+  componentLookup,
+  enrichment,
+  enrichmentLoading,
+}: {
+  placedComponents: PlacedComponent[]
+  componentLookup: Map<string, CatalogComponent>
+  enrichment: AssemblyEnrichment | null
+  enrichmentLoading: boolean
+}): React.ReactNode {
+  if (placedComponents.length === 0) return null
+
+  // Estimated cost from component catalog (embedded in geometry library)
+  const estimatedTotal = placedComponents.reduce((sum, pc) => {
+    if (!pc.geometryTypeSlug) return sum
+    const comp = componentLookup.get(pc.geometryTypeSlug)
+    const cost = (comp?.procurement?.typical_cost_gbp as number) ?? 0
+    return sum + cost * pc.quantity
+  }, 0)
+
+  // Live cost from pricing table (lowest tier / MOQ=1 price)
+  let liveCostAvailable = false
+  let liveTotal = 0
+  if (enrichment?.pricing?.length) {
+    for (const pc of placedComponents) {
+      const pricingRow = enrichment.pricing.find(
+        (p) => p.component_name === pc.componentName,
+      )
+      if (pricingRow) {
+        const tiers = Array.isArray(pricingRow.pricing_tiers)
+          ? pricingRow.pricing_tiers
+          : []
+        // Take first tier's unit price
+        const firstTier = tiers[0] as Record<string, unknown> | undefined
+        const unitPrice =
+          (firstTier?.unit_price as number) ??
+          (firstTier?.price as number) ??
+          0
+        if (unitPrice > 0) {
+          liveTotal += unitPrice * pc.quantity
+          liveCostAvailable = true
+        }
+      }
+    }
+  }
+
+  const certCount = enrichment?.certifications?.length ?? 0
+  const compatCount = enrichment?.compatibility?.length ?? 0
+
+  return (
+    <div className="border-t px-4 py-2.5 bg-muted/30 flex items-center gap-6 text-xs shrink-0">
+      {/* Estimated Cost */}
+      <div className="flex items-center gap-2">
+        <PoundSterling className="h-3.5 w-3.5 text-muted-foreground" />
+        <div>
+          <span className="text-muted-foreground">Est: </span>
+          <span className="font-mono font-medium text-foreground">
+            {estimatedTotal > 0 ? `£${estimatedTotal.toFixed(2)}` : "—"}
+          </span>
+        </div>
+      </div>
+
+      {/* Live Pricing (if available) */}
+      {enrichmentLoading ? (
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>Loading market data...</span>
+        </div>
+      ) : liveCostAvailable ? (
+        <div className="flex items-center gap-2">
+          <div className="h-3 w-px bg-muted" />
+          <span className="text-muted-foreground">Market: </span>
+          <span className="font-mono font-medium text-international-orange">
+            £{liveTotal.toFixed(2)}
+          </span>
+          <Badge variant="info" className="text-[9px] px-1.5 py-0">
+            Live
+          </Badge>
+        </div>
+      ) : null}
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Certification count */}
+      {certCount > 0 && (
+        <div className="flex items-center gap-1.5">
+          <ShieldCheck className="h-3.5 w-3.5 text-status-success" />
+          <span className="text-muted-foreground">
+            {certCount} cert{certCount !== 1 ? "s" : ""}
+          </span>
+        </div>
+      )}
+
+      {/* Compatibility count */}
+      {compatCount > 0 && (
+        <div className="flex items-center gap-1.5">
+          <Link2 className="h-3.5 w-3.5 text-electric-blue" />
+          <span className="text-muted-foreground">
+            {compatCount} compat pair{compatCount !== 1 ? "s" : ""}
+          </span>
+        </div>
+      )}
+
+      {/* Component count */}
+      <div className="text-muted-foreground font-mono">
+        {placedComponents.length} component{placedComponents.length !== 1 ? "s" : ""}
       </div>
     </div>
   )

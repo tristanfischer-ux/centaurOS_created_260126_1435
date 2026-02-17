@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { MarketplaceListing } from '@/actions/marketplace'
 import { contactExpert } from '@/actions/messaging'
 import { toast } from 'sonner'
@@ -35,6 +35,7 @@ import {
     Sparkles,
     Store,
     ArrowRight,
+    ThumbsUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -52,6 +53,7 @@ import { cn } from '@/lib/utils'
 import { getCategoryBadgeClasses, type MarketplaceCategory } from '@/lib/marketplace-colors'
 import { InviteToCompanyButton } from '@/components/marketplace/invite-to-company-button'
 import Link from 'next/link'
+import { getEntityReviews, type EntityReview, type ReviewSummary } from '@/actions/reviews'
 
 /**
  * MarketplaceListingDialog - Displays marketplace listing details in a centered modal.
@@ -96,12 +98,33 @@ export function MarketplaceListingDialog({
 }: MarketplaceListingDialogProps) {
     const [internalOpen, setInternalOpen] = useState(false)
     const [isContacting, setIsContacting] = useState(false)
-    const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview')
+    const [activeTab, setActiveTab] = useState<'overview' | 'details' | 'reviews'>('overview')
+    const [reviews, setReviews] = useState<EntityReview[]>([])
+    const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null)
+    const [reviewsLoading, setReviewsLoading] = useState(false)
 
     // Support both controlled and uncontrolled modes
     const isControlled = controlledOpen !== undefined
     const open = isControlled ? controlledOpen : internalOpen
     const setOpen = isControlled ? (controlledOnOpenChange ?? (() => {})) : setInternalOpen
+
+    // Load reviews when tab switches to reviews
+    useEffect(() => {
+        if (activeTab !== 'reviews' || reviews.length > 0 || reviewsLoading) return
+        setReviewsLoading(true)
+        const entityType = listing.category === 'People'
+            ? 'marketplace_person'
+            : listing.category === 'Products'
+                ? 'marketplace_product'
+                : 'marketplace_service'
+        getEntityReviews(entityType, listing.title).then((result) => {
+            if ('reviews' in result) {
+                setReviews(result.reviews)
+                setReviewSummary(result.summary)
+            }
+            setReviewsLoading(false)
+        })
+    }, [activeTab, listing.title, listing.category, reviews.length, reviewsLoading])
 
     const attrs = listing.attributes || {}
     const category = listing.category
@@ -178,8 +201,8 @@ export function MarketplaceListingDialog({
                     </DialogTitle>
                 </DialogHeader>
 
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'details')} className="mt-4">
-                    <TabsList className="grid w-full grid-cols-2">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'details' | 'reviews')} className="mt-4">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="overview" className="gap-2">
                             <Info className="h-4 w-4" />
                             Overview
@@ -187,6 +210,10 @@ export function MarketplaceListingDialog({
                         <TabsTrigger value="details" className="gap-2">
                             <CheckCircle2 className="h-4 w-4" />
                             Details
+                        </TabsTrigger>
+                        <TabsTrigger value="reviews" className="gap-2">
+                            <Star className="h-4 w-4" />
+                            Reviews
                         </TabsTrigger>
                     </TabsList>
 
@@ -248,6 +275,130 @@ export function MarketplaceListingDialog({
 
                         {/* Additional attributes */}
                         <AdditionalAttributes attrs={attrs} category={category} />
+                    </TabsContent>
+
+                    {/* REVIEWS TAB */}
+                    <TabsContent value="reviews" className="mt-4 space-y-4">
+                        {reviewsLoading ? (
+                            <div className="flex items-center justify-center py-12">
+                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : reviews.length === 0 ? (
+                            <div className="py-12 text-center">
+                                <Star className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                                <p className="text-sm text-muted-foreground">No reviews yet for this listing</p>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Rating summary */}
+                                {reviewSummary && (
+                                    <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                                        <div className="text-center">
+                                            <p className="text-3xl font-bold text-foreground">
+                                                {reviewSummary.avg_rating.toFixed(1)}
+                                            </p>
+                                            <div className="flex items-center gap-0.5 mt-1">
+                                                {[1, 2, 3, 4, 5].map((s) => (
+                                                    <Star
+                                                        key={s}
+                                                        className={cn(
+                                                            'h-4 w-4',
+                                                            s <= Math.round(reviewSummary.avg_rating)
+                                                                ? 'fill-amber-400 text-amber-400'
+                                                                : 'text-muted-foreground'
+                                                        )}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                {reviewSummary.total_count} review{reviewSummary.total_count !== 1 ? 's' : ''}
+                                            </p>
+                                        </div>
+                                        {/* Distribution bars */}
+                                        <div className="flex-1 space-y-1">
+                                            {[5, 4, 3, 2, 1].map((star) => {
+                                                const count = reviewSummary.distribution[star] ?? 0
+                                                const pct = reviewSummary.total_count > 0
+                                                    ? (count / reviewSummary.total_count) * 100
+                                                    : 0
+                                                return (
+                                                    <div key={star} className="flex items-center gap-2 text-xs">
+                                                        <span className="w-3 text-muted-foreground">{star}</span>
+                                                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-amber-400 rounded-full"
+                                                                style={{ width: `${pct}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="w-6 text-right text-muted-foreground">{count}</span>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Individual reviews */}
+                                {reviews.map((review) => (
+                                    <div key={review.id} className="border-b border-muted pb-4 last:border-0">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-0.5">
+                                                    {[1, 2, 3, 4, 5].map((s) => (
+                                                        <Star
+                                                            key={s}
+                                                            className={cn(
+                                                                'h-3 w-3',
+                                                                s <= review.rating
+                                                                    ? 'fill-amber-400 text-amber-400'
+                                                                    : 'text-muted-foreground'
+                                                            )}
+                                                        />
+                                                    ))}
+                                                </div>
+                                                {review.verified_purchase && (
+                                                    <Badge variant="success" className="text-[10px]">
+                                                        <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                                                        Verified
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            {review.helpful_count > 0 && (
+                                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                    <ThumbsUp className="h-3 w-3" />
+                                                    {review.helpful_count}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {review.title && (
+                                            <p className="text-sm font-semibold text-foreground">{review.title}</p>
+                                        )}
+                                        <p className="text-sm text-muted-foreground mt-0.5">{review.body}</p>
+                                        {(review.pros.length > 0 || review.cons.length > 0) && (
+                                            <div className="flex gap-4 mt-2">
+                                                {review.pros.length > 0 && (
+                                                    <div className="text-xs">
+                                                        <span className="text-status-success font-medium">Pros: </span>
+                                                        <span className="text-muted-foreground">{review.pros.join(', ')}</span>
+                                                    </div>
+                                                )}
+                                                {review.cons.length > 0 && (
+                                                    <div className="text-xs">
+                                                        <span className="text-destructive font-medium">Cons: </span>
+                                                        <span className="text-muted-foreground">{review.cons.join(', ')}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-muted-foreground mt-2">
+                                            {review.reviewer_name}
+                                            {review.reviewer_role && ` · ${review.reviewer_role}`}
+                                            {review.reviewer_company && ` at ${review.reviewer_company}`}
+                                        </p>
+                                    </div>
+                                ))}
+                            </>
+                        )}
                     </TabsContent>
                 </Tabs>
 

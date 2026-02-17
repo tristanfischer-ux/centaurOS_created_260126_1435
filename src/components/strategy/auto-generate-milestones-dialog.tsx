@@ -79,7 +79,7 @@ interface AutoGenerateMilestonesDialogProps {
 // CONSTANTS
 // ============================================================================
 
-const STEPS: { id: WizardStep; title: string; icon: React.ElementType }[] = [
+const STEPS: { id: WizardStep; title: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'configure', title: 'Configure', icon: Sparkles },
   { id: 'review', title: 'Review Plan', icon: Eye },
   { id: 'confirm', title: 'Confirm', icon: CheckCircle2 },

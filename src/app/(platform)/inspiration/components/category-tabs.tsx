@@ -7,6 +7,8 @@ import {
   TrendingUp,
   Heart,
   Factory,
+  Hammer,
+  BookOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -15,7 +17,7 @@ import { cn } from '@/lib/utils'
 // Tabs organised around user needs rather than content source.
 // ---------------------------------------------------------------------------
 
-export type TabId = 'for-you' | 'by-need' | 'by-industry' | 'popular' | 'saved' | 'techniques'
+export type TabId = 'for-you' | 'by-need' | 'by-industry' | 'popular' | 'saved' | 'techniques' | 'projects' | 'learn'
 
 interface Tab {
   id: TabId
@@ -37,6 +39,10 @@ interface CategoryTabsProps {
   savedCount: number
   /** Number of manufacturing techniques */
   techniquesCount?: number
+  /** Number of project templates */
+  projectsCount?: number
+  /** Number of tutorials */
+  tutorialsCount?: number
   /** Number of identified gaps to display as a badge on "By Need" */
   gapCount?: number
   /** Whether to show the manufacturing-specific Techniques tab */
@@ -51,6 +57,8 @@ export function CategoryTabs({
   popularCount,
   savedCount,
   techniquesCount,
+  projectsCount,
+  tutorialsCount,
   gapCount,
   showTechniques = false,
 }: CategoryTabsProps) {
@@ -90,6 +98,22 @@ export function CategoryTabs({
       activeClasses:
         'bg-international-orange/10 text-international-orange border-international-orange',
     }] : []),
+    {
+      id: 'projects',
+      label: 'Projects',
+      icon: Hammer,
+      count: projectsCount,
+      iconColor: 'text-chart-4',
+      activeClasses: 'bg-chart-4/10 text-chart-4 border-chart-4',
+    },
+    {
+      id: 'learn',
+      label: 'Learn',
+      icon: BookOpen,
+      count: tutorialsCount,
+      iconColor: 'text-electric-blue',
+      activeClasses: 'bg-electric-blue/10 text-electric-blue border-electric-blue',
+    },
     {
       id: 'popular',
       label: 'All Packs',
