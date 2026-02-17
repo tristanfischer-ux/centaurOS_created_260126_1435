@@ -816,20 +816,20 @@ function HowItWorksSection() {
 function PricingPreviewSection() {
   const TIERS = [
     {
-      name: "Free",
+      name: "Explorer",
       price: "£0",
       period: "forever",
-      description: "Get started and explore the platform",
+      description: "For solo founders testing the waters",
       features: ["5 orders/month", "20 smart assists/month", "Basic marketplace"],
       cta: "Start Free",
       href: "/join",
       highlight: false,
     },
     {
-      name: "Starter",
+      name: "Startup Team",
       price: "£49",
       period: "/month",
-      description: "For growing hardware ventures",
+      description: "For early-stage startups needing essentials",
       features: [
         "25 orders/month",
         "100 smart assists/month",
@@ -844,7 +844,7 @@ function PricingPreviewSection() {
       name: "Professional",
       price: "£149",
       period: "/month",
-      description: "For serious hardware companies",
+      description: "For growing teams that need more power",
       features: [
         "Unlimited orders",
         "500 smart assists/month",

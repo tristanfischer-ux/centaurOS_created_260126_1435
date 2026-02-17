@@ -21,6 +21,8 @@ export interface SubscriptionPlan {
   tier: SubscriptionTier
   name: string
   description: string
+  /** Short persona-based subtitle explaining who this plan is for */
+  bestFor: string
   priceMonthlyGBP: number // in pence
   priceAnnualGBP: number // in pence (annual price, usually discounted)
   features: string[]
@@ -65,8 +67,9 @@ export interface UserSubscription {
 export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
   free: {
     tier: 'free',
-    name: 'Free',
+    name: 'Explorer',
     description: 'Get started with ForgeOS',
+    bestFor: 'For solo founders testing the waters and exploring the marketplace.',
     priceMonthlyGBP: 0,
     priceAnnualGBP: 0,
     features: [
@@ -90,8 +93,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
   },
   starter: {
     tier: 'starter',
-    name: 'Starter',
+    name: 'Startup Team',
     description: 'For growing businesses',
+    bestFor: 'Best for early-stage startups needing essential features and small team support.',
     priceMonthlyGBP: 4900, // £49/month
     priceAnnualGBP: 47000, // £470/year (save ~20%)
     features: [
@@ -121,6 +125,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     tier: 'professional',
     name: 'Professional',
     description: 'For established companies',
+    bestFor: 'Built for growing teams that need more AI power, unlimited orders, and API access.',
     priceMonthlyGBP: 14900, // £149/month
     priceAnnualGBP: 142800, // £1,428/year (save ~20%)
     features: [
@@ -152,6 +157,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     tier: 'enterprise',
     name: 'Enterprise',
     description: 'For large organizations',
+    bestFor: 'Built for large teams with complex needs: automation, branding, and dedicated support.',
     priceMonthlyGBP: 49900, // £499/month
     priceAnnualGBP: 478800, // £4,788/year (save ~20%)
     features: [
