@@ -122,7 +122,7 @@ export function FoundrySwitcher({
     const displayName = currentFoundryName || 'My Foundry'
 
     return (
-      <div className="px-1 pb-3">
+      <div className="px-1 pb-2">
         <div className="flex items-center gap-3">
           <FoundryLogo logoUrl={logoUrl} name={displayName} />
           <div className="min-w-0 flex-1">
@@ -144,7 +144,7 @@ export function FoundrySwitcher({
   const activeLogo = activeFoundry?.logoUrl || currentFoundryLogoUrl
 
   return (
-    <div className="px-1 pb-3">
+    <div className="px-1 pb-2">
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <button

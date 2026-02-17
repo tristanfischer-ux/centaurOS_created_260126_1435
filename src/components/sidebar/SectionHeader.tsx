@@ -37,7 +37,7 @@ export function SectionHeader({ label, introRoute, hasNew = false, className }: 
     const isActive = pathname === introRoute
 
     return (
-        <div className={cn("px-3 pt-2 pb-1.5", className)}>
+        <div className={cn("px-3 pt-1 pb-1", className)}>
             <Link
                 href={introRoute}
                 className={cn(

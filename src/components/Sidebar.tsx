@@ -280,7 +280,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 2: "Plan" — Strategy and execution         */}
                 {/* ══════════════════════════════════════════════════ */}
-                <div className="my-2 border-t border-slate-100" />
+                <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
 
                 <SectionHeader label="Plan" introRoute="/plan" hasNew={badges.plan} />
                 {planNavigation.map(renderNavItem)}
@@ -288,7 +288,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 3: "Workshop" — Where the work happens     */}
                 {/* ══════════════════════════════════════════════════ */}
-                <div className="my-2 border-t border-slate-100" />
+                <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
 
                 <SectionHeader label="Workshop" introRoute="/workshop" hasNew={badges.workshop} />
                 {workshopNavigation.map(renderNavItem)}
@@ -296,7 +296,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 4: "Marketplace" — Recruits and supplies   */}
                 {/* ══════════════════════════════════════════════════ */}
-                <div className="my-2 border-t border-slate-100" />
+                <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
 
                 <SectionHeader label="Marketplace" introRoute="/marketplace-hub" hasNew={badges.marketplace} />
 
