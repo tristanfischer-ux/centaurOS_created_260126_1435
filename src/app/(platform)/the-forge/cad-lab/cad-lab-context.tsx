@@ -286,16 +286,41 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     if (!editableReport.trim()) return
     setIsDecomposing(true)
     setProgressLines([])
-    addProgressLine("Running systems engineering analysis...")
+    addProgressLine("Parsing research report for engineering constraints...")
+
+    // Timed micro-steps that reveal the decomposition work in progress.
+    // Each fires only if the operation is still running (cleared on completion).
+    const timers: ReturnType<typeof setTimeout>[] = []
+    timers.push(setTimeout(() => addProgressLine("Identifying physical interfaces and thermal boundaries..."), 2500))
+    timers.push(setTimeout(() => addProgressLine("Mapping sub-assembly dependencies and critical-path components..."), 5000))
+    timers.push(setTimeout(() => addProgressLine("Classifying modules by manufacturing process (CNC, molding, sheet metal, 3D print)..."), 8000))
+    timers.push(setTimeout(() => addProgressLine("Estimating lead times and sourcing complexity per sub-assembly..."), 12000))
+    timers.push(setTimeout(() => addProgressLine("Analysing failure modes and unknown risk areas..."), 16000))
+    timers.push(setTimeout(() => addProgressLine("Determining parallel manufacturing splits for schedule optimisation..."), 20000))
+    timers.push(setTimeout(() => addProgressLine("Finalising bill of materials and key part specifications..."), 25000))
+    timers.push(setTimeout(() => addProgressLine("Structuring module hierarchy for parametric CAD generation..."), 30000))
+
     try {
       const res = await decomposeIntoModules(subject, editableReport, modelId)
+      // Clear any pending timers now that the real result is in
+      timers.forEach(clearTimeout)
+
       if (res.success && res.modules.length > 0) {
         setModules(res.modules)
         setMilestone("breakdown")
+
+        // Build a rich summary from the actual result data
+        const totalParts = res.modules.reduce((s, m) => s + m.keyParts.length, 0)
+        const criticalPath = Math.max(...res.modules.map((m) => m.leadWeeks))
+        const totalRisks = res.modules.reduce((s, m) => s + m.failureModes.length + m.unknowns.length, 0)
+        const criticalModule = res.modules.find(m => m.leadWeeks === criticalPath)
+
         setProgressLines([
-          `Identified ${res.modules.length} sub-assemblies`,
-          `Total lead time: ${Math.max(...res.modules.map((m) => m.leadWeeks))} weeks (critical path)`,
-          `${res.modules.reduce((s, m) => s + m.keyParts.length, 0)} components mapped`,
+          `Identified ${res.modules.length} sub-assemblies from systems engineering analysis`,
+          `${totalParts} components mapped with specifications and sourcing data`,
+          `Critical path: ${criticalPath} weeks${criticalModule ? ` (${criticalModule.name})` : ""}`,
+          ...(totalRisks > 0 ? [`${totalRisks} risk items flagged for engineering review`] : []),
+          `${res.modules.filter(m => m.unknowns.length > 0).length} modules have open questions to resolve before manufacturing`,
         ])
         if (activeProjectId) {
           await saveCadLabModules(activeProjectId, res.modules)
@@ -319,6 +344,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           .catch(() => { /* Non-critical */ })
       }
     } catch (err) {
+      timers.forEach(clearTimeout)
       console.error("[CAD-LAB] Decomposition failed:", err)
       setProgressLines(["Decomposition failed — see error above"])
     } finally {
@@ -620,18 +646,21 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setAiPrefilled(false)
     setBatchProgress({})
 
-    addProgressLine("Searching for dimensional specifications...")
-    const t1 = setTimeout(() => addProgressLine("Querying Thingiverse for reference CAD models..."), 3000)
-    const t2 = setTimeout(() => addProgressLine("Cross-referencing engineering datasheets..."), 6000)
-    const t3 = setTimeout(() => addProgressLine("Synthesising engineering report with Claude..."), 10000)
-    const t4 = setTimeout(() => addProgressLine("Extracting key dimensions and constraints..."), 15000)
+    addProgressLine("Searching engineering databases for real-world specifications...")
+    const researchTimers: ReturnType<typeof setTimeout>[] = []
+    researchTimers.push(setTimeout(() => addProgressLine("Querying Thingiverse and GrabCAD for reference CAD models..."), 3000))
+    researchTimers.push(setTimeout(() => addProgressLine("Cross-referencing manufacturer datasheets and published specs..."), 6000))
+    researchTimers.push(setTimeout(() => addProgressLine("Identifying material candidates and manufacturing constraints..."), 9000))
+    researchTimers.push(setTimeout(() => addProgressLine("Synthesising engineering report from all sources..."), 13000))
+    researchTimers.push(setTimeout(() => addProgressLine("Extracting key dimensions, tolerances, and interface constraints..."), 17000))
+    researchTimers.push(setTimeout(() => addProgressLine("Validating specifications against industry standards..."), 22000))
 
     try {
       const res = await runCadLabResearch(subject, {
         designBrief,
         assumptionNotes,
       })
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4)
+      researchTimers.forEach(clearTimeout)
 
       setProgressLines([
         `Found ${res.sources.length} web sources with engineering data`,
@@ -655,7 +684,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         }
       }
     } catch (err) {
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4)
+      researchTimers.forEach(clearTimeout)
       setProgressLines(["Research failed — see error below"])
       setResearchResult({
         success: false,

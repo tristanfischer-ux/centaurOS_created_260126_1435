@@ -154,7 +154,7 @@ export default async function PlatformLayout({
                         <MobileZoomControl />
                         <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} />
                         <ZoomableContent className="flex-1 overflow-y-auto bg-background">
-                            <main className="p-4 pt-14 sm:p-6 lg:p-8 pb-32 sm:pb-8">
+                            <main className="p-4 pt-14 sm:p-6 sm:pt-6 lg:p-8 lg:pt-8 pb-32 sm:pb-8">
                                 {needsProfileRepair ? (
                                     <ProfileSetupRequired userRole={profile?.role} />
                                 ) : (

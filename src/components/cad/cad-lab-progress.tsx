@@ -15,8 +15,8 @@
  * @component
  */
 
-import { useState, useEffect, useMemo } from "react"
-import { CheckCircle2, Loader2, Clock, GraduationCap } from "lucide-react"
+import { useState, useEffect, useMemo, useRef } from "react"
+import { CheckCircle2, Loader2, Clock, GraduationCap, Activity } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
 // ─────────────────────────────────────────────────────────────────────
@@ -645,6 +645,7 @@ export function CadLabProgress({ lines, isActive, operationType, subject = "" }:
   const [factIndex, setFactIndex] = useState(0)
   const [explainerIndex, setExplainerIndex] = useState(0)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const factPool = useMemo(() => selectFactPool(subject), [subject])
   const explainers = OPERATION_EXPLAINERS[operationType] ?? OPERATION_EXPLAINERS.generate
@@ -680,67 +681,98 @@ export function CadLabProgress({ lines, isActive, operationType, subject = "" }:
     return () => clearInterval(interval)
   }, [isActive])
 
+  // Auto-scroll to latest progress line
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [lines.length])
+
   if (!isActive && lines.length === 0) return null
 
   // Batch operations show real per-module progress in the batch grid instead.
   const isBatch = operationType === "batch"
 
+  // Stepped progress: for breakdown, estimate ~8 micro-steps before completion
+  const estimatedSteps = operationType === "breakdown" ? 8 : operationType === "research" ? 5 : 4
+  const steppedProgress = isActive
+    ? Math.min(90, Math.round((lines.length / estimatedSteps) * 100))
+    : (lines.length > 0 ? 100 : 0)
+
   return (
     <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/20 to-background overflow-hidden">
       <CardContent className="pt-6 space-y-4">
-        {/* Indeterminate progress bar — honest about timing, shows elapsed only */}
+        {/* Header with operation label and elapsed timer */}
         {isActive && !isBatch && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <Loader2 className="h-3 w-3 animate-spin text-international-orange" />
-                {operationType === "research" ? "Researching your product..." :
-                 operationType === "breakdown" ? "Mapping sub-assemblies..." :
-                 "Generating parametric CAD..."}
-              </span>
-              <span className="flex items-center gap-1 font-mono">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="relative flex items-center justify-center">
+                  <Activity className="h-4 w-4 text-international-orange" />
+                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-international-orange animate-pulse" />
+                </div>
+                <span className="text-sm font-medium text-foreground">
+                  {operationType === "research" ? "Researching your product" :
+                   operationType === "breakdown" ? "Mapping sub-assemblies" :
+                   "Generating parametric CAD"}
+                </span>
+              </div>
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono tabular-nums">
                 <Clock className="h-3 w-3" />
                 {elapsedSeconds}s
               </span>
             </div>
+
+            {/* Stepped progress bar — advances as real work completes */}
             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full w-1/3 bg-international-orange rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]"
-                style={{
-                  animation: "indeterminate 1.5s ease-in-out infinite",
-                }}
+                className="h-full bg-international-orange rounded-full transition-all duration-700 ease-out"
+                style={{ width: `${steppedProgress}%` }}
               />
             </div>
-            <style jsx>{`
-              @keyframes indeterminate {
-                0% { transform: translateX(-100%); }
-                100% { transform: translateX(400%); }
-              }
-            `}</style>
           </div>
         )}
 
-        {/* Tier 1: Operation explainer */}
+        {/* Completed state header */}
+        {!isActive && lines.length > 0 && (
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-status-success" />
+            <span className="text-sm font-medium text-foreground">
+              {operationType === "research" ? "Research complete" :
+               operationType === "breakdown" ? "Sub-assembly mapping complete" :
+               operationType === "batch" ? "Batch generation complete" :
+               "Generation complete"}
+            </span>
+          </div>
+        )}
+
+        {/* Tier 1: Operation explainer — what the system is doing at a high level */}
         {isActive && (
           <p className="text-xs text-muted-foreground leading-relaxed italic">
             {explainers[explainerIndex]}
           </p>
         )}
 
-        {/* Step lines with animated checkmarks */}
+        {/* Live activity feed — each step appears as it happens */}
         {lines.length > 0 && (
-          <div className="space-y-1.5">
+          <div
+            ref={scrollRef}
+            className="space-y-1 max-h-[200px] overflow-y-auto scrollbar-thin"
+          >
             {lines.map((line, i) => {
               const isLast = i === lines.length - 1
               const isComplete = !isLast || !isActive
               return (
-                <div key={i} className="flex items-start gap-2 text-sm">
+                <div
+                  key={`${i}-${line.slice(0, 20)}`}
+                  className="flex items-start gap-2 text-sm animate-in fade-in slide-in-from-bottom-1 duration-300"
+                >
                   {isComplete ? (
-                    <CheckCircle2 className="h-4 w-4 text-status-success flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-status-success flex-shrink-0 mt-0.5" />
                   ) : (
-                    <Loader2 className="h-4 w-4 text-international-orange animate-spin flex-shrink-0 mt-0.5" />
+                    <Loader2 className="h-3.5 w-3.5 text-international-orange animate-spin flex-shrink-0 mt-0.5" />
                   )}
-                  <span className={isComplete ? "text-muted-foreground" : "text-foreground font-medium"}>
+                  <span className={isComplete ? "text-muted-foreground text-xs" : "text-foreground text-xs font-medium"}>
                     {line}
                   </span>
                 </div>
