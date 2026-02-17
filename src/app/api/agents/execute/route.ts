@@ -438,6 +438,25 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
         }
     }
 
+    // Knowledge Vault: inject relevant organizational knowledge
+    if (foundryId && specialistId) {
+        try {
+            const { searchKnowledgeForSpecialist } = await import("@/lib/knowledge-vault")
+            const vaultContext = await searchKnowledgeForSpecialist(
+                foundryId,
+                input || finalPrompt.slice(0, 500),
+                specialistId,
+                8
+            )
+            if (vaultContext) {
+                systemPromptWithContext += `\n\n${vaultContext}`
+            }
+        } catch (err) {
+            // Non-critical — Knowledge Vault is supplementary context
+            console.warn("[agents/execute] Could not load Knowledge Vault context:", err)
+        }
+    }
+
     // Temporal awareness: what time/day it is, how to adjust behavior
     // Also includes milestone awareness if we know when the foundry was created
     let foundryCreatedAt: string | null = null
@@ -531,6 +550,27 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
                 processMemory(threadId!, foundryId).catch((err) => {
                     console.warn("[agents/execute] Memory processing failed:", err)
                 })
+
+                // Knowledge extraction: extract atomic notes from the conversation
+                // Runs asynchronously — doesn't block the response
+                if (specialistId && foundryId) {
+                    import("@/lib/knowledge-vault").then(({ extractKnowledge }) => {
+                        const userMsg = input.trim() || finalPrompt.slice(0, 500)
+                        extractKnowledge({
+                            messages: [
+                                { role: "user", content: userMsg },
+                                { role: "assistant", content: cleanOutput || fullOutput },
+                            ],
+                            specialistId: specialistId!,
+                            threadId: threadId!,
+                            foundryId,
+                        }).catch((err) => {
+                            console.warn("[agents/execute] Knowledge extraction failed:", err)
+                        })
+                    }).catch(() => {
+                        // Module loading failed — non-critical
+                    })
+                }
             } catch (err) {
                 console.warn("[agents/execute] Failed to record assistant message:", err)
             }

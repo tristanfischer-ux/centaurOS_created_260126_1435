@@ -35,6 +35,7 @@ import {
     ShoppingBag,
     Flame,
     CalendarDays,
+    Brain,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -76,6 +77,7 @@ const workshopMoreNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame },
     { name: "Team", href: "/team", icon: Users },
     { name: "Specialists", href: "/agents", icon: UsersRound },
+    { name: "Knowledge", href: "/knowledge", icon: Brain },
 ]
 
 // "More" dropdown — Marketplace section

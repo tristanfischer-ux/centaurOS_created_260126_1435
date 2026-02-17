@@ -46,6 +46,7 @@ import {
     Settings,
     LogOut,
     CalendarDays,
+    Brain,
 } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
@@ -105,6 +106,7 @@ const workshopNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame, tooltip: "Turn product ideas into manufacturing-ready engineering packages" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Specialists", href: "/agents", icon: UsersRound, tooltip: "Your on-demand team of experts — brief them on anything" },
+    { name: "Knowledge", href: "/knowledge", icon: Brain, tooltip: "Your organizational second brain — everything your AI team has learned" },
     { name: "Deliverables", href: "/agents/artifacts", icon: FileOutput, tooltip: "Documents, reports, and deliverables from your specialists" },
 ]
 
