@@ -29,6 +29,7 @@ import {
   AlertTriangle, TrendingUp, ArrowRight, Plus, XCircle, ChevronRight,
   MessageSquare,
 } from 'lucide-react'
+import { CreateStrategicGoalDialog } from '@/components/strategy/create-strategic-goal-dialog'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import { StrategyHealthReview } from '@/components/specialists/strategy-health-review'
 import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
@@ -103,13 +104,21 @@ export function StrategyDashboard({
   regularObjectives,
 }: StrategyDashboardProps) {
   const router = useRouter()
-  // Default to River view when strategic data exists — the River is the showcase
+  // Default to River view when river bundles exist, otherwise Dashboard shows pillar cards
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
     initialBundles.length > 0 ? 'river' : 'dashboard'
   )
 
   // ── Strategy River state ──
   const riverData = useMemo(() => goalBundlesToRiverData(initialBundles), [initialBundles])
+
+  // If pillars exist but no river data, ensure we're not stuck on river empty state
+  const effectiveViewMode = viewMode === 'river' && riverData.length === 0 && pillars.length > 0
+    ? 'dashboard'
+    : viewMode
+
+  // ── Create Strategic Goal dialog ──
+  const [isCreateGoalOpen, setIsCreateGoalOpen] = useState(false)
   const [expandedObjectiveIds, setExpandedObjectiveIds] = useState<Set<string>>(() => {
     if (riverData.length > 0) {
       return new Set(riverData[0].objectives.map((o) => o.id))
@@ -239,7 +248,7 @@ export function StrategyDashboard({
             specialistName="Sage"
             label="Discuss Strategy"
           />
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+          <Tabs value={effectiveViewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
             <TabsList className="h-9">
               <TabsTrigger value="dashboard" className="text-xs gap-1.5 px-3">
                 <LayoutDashboard className="h-3.5 w-3.5" />
@@ -255,11 +264,18 @@ export function StrategyDashboard({
               </TabsTrigger>
             </TabsList>
           </Tabs>
+          <Button
+            onClick={() => setIsCreateGoalOpen(true)}
+            className="bg-international-orange hover:bg-international-orange-hover"
+          >
+            <Plus className="h-4 w-4 mr-1.5" />
+            New Goal
+          </Button>
         </div>
       </div>
 
       {/* ── Dashboard View ── */}
-      {viewMode === 'dashboard' && (
+      {effectiveViewMode === 'dashboard' && (
         <div className="space-y-8">
           {/* Company Purpose Hero */}
           <CompanyPurposeWrapper
@@ -331,12 +347,13 @@ export function StrategyDashboard({
               title="Your strategic direction starts here"
               description="Define what matters most. Strategic goals become the pillars that everything else aligns to — objectives, tasks, and progress all cascade from here."
               action={
-                <Link href="/new-objectives?mode=strategic">
-                  <Button className="bg-international-orange hover:bg-international-orange-hover">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Your First Strategy
-                  </Button>
-                </Link>
+                <Button
+                  onClick={() => setIsCreateGoalOpen(true)}
+                  className="bg-international-orange hover:bg-international-orange-hover"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Your First Strategy
+                </Button>
               }
             />
           ) : (
@@ -383,7 +400,7 @@ export function StrategyDashboard({
       )}
 
       {/* ── Strategy River View ── */}
-      {viewMode === 'river' && (
+      {effectiveViewMode === 'river' && (
         <div className="-mx-4 sm:-mx-6 lg:-mx-8">
           {riverData.length === 0 ? (
             <div className="px-4 sm:px-6 lg:px-8">
@@ -392,12 +409,13 @@ export function StrategyDashboard({
                 title="Your strategy, visualized as a river"
                 description="Create a strategic goal with milestones and tasks to watch them flow through time. Goals become rivers, milestones become confluences, and tasks become tributaries — all on a single, living timeline."
                 action={
-                  <Link href="/new-objectives?mode=strategic">
-                    <Button className="bg-international-orange hover:bg-international-orange-hover">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Strategic Goal
-                    </Button>
-                  </Link>
+                  <Button
+                    onClick={() => setIsCreateGoalOpen(true)}
+                    className="bg-international-orange hover:bg-international-orange-hover"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Strategic Goal
+                  </Button>
                 }
               />
             </div>
@@ -418,7 +436,7 @@ export function StrategyDashboard({
       )}
 
       {/* ── Link Objectives View ── */}
-      {viewMode === 'link' && (
+      {effectiveViewMode === 'link' && (
         <div className="-mx-4 sm:-mx-6 lg:-mx-8">
           <StrategyLinkView
             strategicObjectives={strategicObjectives}
@@ -450,6 +468,12 @@ export function StrategyDashboard({
         }
         milestones={milestoneOptions}
         onCreated={handleDialogUpdate}
+      />
+
+      {/* Create Strategic Goal dialog */}
+      <CreateStrategicGoalDialog
+        open={isCreateGoalOpen}
+        onOpenChange={setIsCreateGoalOpen}
       />
     </div>
   )

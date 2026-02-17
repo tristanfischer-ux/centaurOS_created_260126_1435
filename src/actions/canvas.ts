@@ -48,6 +48,8 @@ import type {
 function revalidateCanvas(): void {
   revalidatePath('/canvas')
   revalidatePath('/objectives')
+  revalidatePath('/new-objectives')
+  revalidatePath('/strategy')
   revalidatePath('/tasks')
 }
 
@@ -74,6 +76,7 @@ export async function getStrategicGoals(): Promise<
       .select('*')
       .eq('foundry_id', foundryId)
       .eq('is_strategic_goal', true)
+      .eq('is_ghost', false)
       .is('deleted_at', null)
       .order('milestone_date', { ascending: true, nullsFirst: false })
 
