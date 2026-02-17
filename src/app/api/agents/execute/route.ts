@@ -656,6 +656,55 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
     }
 }
 
+// ─── Error Classification ────────────────────────────────────────────
+
+/**
+ * Classifies a raw streaming error into a user-friendly message.
+ *
+ * @description Maps provider-specific errors to actionable messages the
+ * client can display. Never leaks API keys, internal paths, or raw
+ * stack traces — only returns safe, helpful error descriptions.
+ *
+ * @param rawError - The raw error string from the provider or stream
+ * @returns A user-friendly error message
+ */
+function classifyStreamError(rawError: string): string {
+    const lower = rawError.toLowerCase()
+
+    // Context window / prompt too long
+    if (lower.includes("too many tokens") || lower.includes("context_length") || lower.includes("maximum context") || lower.includes("too long")) {
+        return "The conversation is too long for this model. Try starting a new conversation or using a shorter message."
+    }
+
+    // Rate limiting from the AI provider
+    if (lower.includes("rate_limit") || lower.includes("rate limit") || lower.includes("429") || lower.includes("too many requests")) {
+        return "The AI provider is rate-limiting requests. Please wait a moment and try again."
+    }
+
+    // Authentication / API key issues
+    if (lower.includes("authentication") || lower.includes("invalid api key") || lower.includes("unauthorized") || lower.includes("401")) {
+        return "AI provider authentication failed. The platform API key may need to be updated."
+    }
+
+    // Provider overloaded
+    if (lower.includes("overloaded") || lower.includes("503") || lower.includes("capacity") || lower.includes("server_error")) {
+        return "The AI provider is temporarily overloaded. Please try again in a few seconds."
+    }
+
+    // Network / connection issues
+    if (lower.includes("econnrefused") || lower.includes("enotfound") || lower.includes("timeout") || lower.includes("network") || lower.includes("fetch failed")) {
+        return "Could not reach the AI provider. This is usually temporary — please try again."
+    }
+
+    // Content filtering / safety
+    if (lower.includes("content_filter") || lower.includes("safety") || lower.includes("blocked") || lower.includes("content_policy")) {
+        return "The response was blocked by the AI provider's content filter. Try rephrasing your message."
+    }
+
+    // Generic fallback — don't leak raw error details
+    return "Stream interrupted. Please try sending your message again."
+}
+
 // ─── Text Streaming Handler ──────────────────────────────────────────
 
 /**
@@ -724,18 +773,20 @@ async function handleTextStreaming(
                         }
                     },
                     onError(error) {
-                        const safeErrorMessage = "Stream interrupted"
                         console.error("[agents/execute] stream error:", error)
+                        const errorDetail = classifyStreamError(error)
                         controller.enqueue(
-                            encoder.encode(`data: ${JSON.stringify({ error: safeErrorMessage })}\n\n`)
+                            encoder.encode(`data: ${JSON.stringify({ error: errorDetail })}\n\n`)
                         )
                         controller.close()
                     },
                 })
             } catch (err) {
                 console.error("[agents/execute] stream setup failed:", err)
+                const errorStr = err instanceof Error ? err.message : String(err)
+                const errorDetail = classifyStreamError(errorStr)
                 controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ error: "Stream interrupted" })}\n\n`)
+                    encoder.encode(`data: ${JSON.stringify({ error: errorDetail })}\n\n`)
                 )
                 controller.close()
             }

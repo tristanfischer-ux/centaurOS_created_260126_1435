@@ -103,6 +103,18 @@ function normalizeSpecialistError(error: string, specialistName: string): string
     ) {
         return `${specialistName} is having trouble connecting right now. Try again in a moment, or check your AI provider settings.`
     }
+    if (error.includes("Stream interrupted")) {
+        return `${specialistName} lost connection mid-response. This is usually temporary — try sending your message again.`
+    }
+    if (error.includes("rate-limiting") || error.includes("rate limit")) {
+        return `${specialistName} is being rate-limited by the AI provider. Wait a moment and try again.`
+    }
+    if (error.includes("conversation is too long")) {
+        return `The conversation with ${specialistName} has gotten too long. Try starting a fresh conversation.`
+    }
+    if (error.includes("overloaded") || error.includes("temporarily overloaded")) {
+        return `${specialistName}'s AI provider is temporarily overloaded. Try again in a few seconds.`
+    }
     return error
 }
 

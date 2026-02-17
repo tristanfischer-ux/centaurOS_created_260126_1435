@@ -269,8 +269,10 @@ describe('agent error-response sanitization regressions', () => {
     const source = await readFile(executeRoutePath, 'utf-8')
 
     expect(source).toContain('{ error: "Failed to execute prompt" }')
-    expect(source).toContain('const safeErrorMessage = "Stream interrupted"')
-    expect(source).toContain('JSON.stringify({ error: safeErrorMessage })')
+    // Stream errors are classified through classifyStreamError() which returns
+    // safe, user-friendly messages — never raw error details or stack traces
+    expect(source).toContain('classifyStreamError')
+    expect(source).toContain('JSON.stringify({ error: errorDetail })')
     expect(source).not.toContain('return NextResponse.json({ error: message }, { status: 500 })')
     expect(source).not.toContain('JSON.stringify({ error })')
   })

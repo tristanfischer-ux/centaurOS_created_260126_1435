@@ -27,23 +27,32 @@ import { stripThinkTags, stripPartialThinkTags } from "@/lib/utils/strip-think-t
 // ─── SSE Parsing ─────────────────────────────────────────────────────────────
 
 /**
- * Parse SSE lines from a chunk of streamed data.
- * Extracts text tokens from `data: {...}` lines.
+ * Result of parsing an SSE chunk — either text content or an error.
  */
-function parseSSEChunk(chunk: string): string {
+interface SSEParseResult {
+    text: string
+    error?: string
+}
+
+/**
+ * Parse SSE lines from a chunk of streamed data.
+ * Extracts text tokens from `data: {...}` lines and detects error events.
+ */
+function parseSSEChunk(chunk: string): SSEParseResult {
     let text = ""
     for (const line of chunk.split("\n")) {
         if (!line.startsWith("data: ")) continue
         const data = line.slice(6)
         if (data === "[DONE]") continue
         try {
-            const parsed = JSON.parse(data) as { text?: string }
+            const parsed = JSON.parse(data) as { text?: string; error?: string }
+            if (parsed.error) return { text, error: parsed.error }
             if (parsed.text) text += parsed.text
         } catch {
             text += data
         }
     }
-    return text
+    return { text }
 }
 
 /**
@@ -150,7 +159,12 @@ class TextChatEngine implements ConversationEngine {
                 if (done) break
 
                 const chunk = decoder.decode(value, { stream: true })
-                const text = parseSSEChunk(chunk)
+                const { text, error: sseError } = parseSSEChunk(chunk)
+
+                if (sseError) {
+                    // Server sent an error event — surface it to the user
+                    throw new Error(sseError)
+                }
 
                 if (text) {
                     fullResponse += text

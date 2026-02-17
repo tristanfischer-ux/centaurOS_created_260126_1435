@@ -97,19 +97,25 @@ async function streamOpenAI(opts: StreamingTextOptions): Promise<void> {
 
     const messages = buildMessages(opts)
 
-    const stream = await client.chat.completions.create({
-        model: opts.modelId,
-        messages,
-        stream: true,
-        max_tokens: opts.maxTokens ?? 4096,
-    })
+    try {
+        const stream = await client.chat.completions.create({
+            model: opts.modelId,
+            messages,
+            stream: true,
+            max_tokens: opts.maxTokens ?? 4096,
+        })
 
-    for await (const chunk of stream) {
-        if (opts.signal?.aborted) break
-        const text = chunk.choices[0]?.delta?.content ?? ""
-        if (text) opts.onChunk(text)
+        for await (const chunk of stream) {
+            if (opts.signal?.aborted) break
+            const text = chunk.choices[0]?.delta?.content ?? ""
+            if (text) opts.onChunk(text)
+        }
+        opts.onDone()
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        console.error("[streamOpenAI] Stream failed:", { model: opts.modelId, error: errorMessage })
+        opts.onError(errorMessage)
     }
-    opts.onDone()
 }
 
 async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
@@ -146,17 +152,28 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
         }),
     }
 
-    const stream = await client.messages.stream(streamParams)
+    try {
+        const stream = await client.messages.stream(streamParams)
 
-    for await (const event of stream) {
-        if (opts.signal?.aborted) break
-        // Only stream text deltas to the user -- thinking blocks are internal
-        // reasoning that improves quality silently without exposing raw chain-of-thought.
-        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            opts.onChunk(event.delta.text)
+        for await (const event of stream) {
+            if (opts.signal?.aborted) break
+            // Only stream text deltas to the user -- thinking blocks are internal
+            // reasoning that improves quality silently without exposing raw chain-of-thought.
+            if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+                opts.onChunk(event.delta.text)
+            }
         }
+        opts.onDone()
+    } catch (err) {
+        // Extract meaningful error details from Anthropic SDK errors
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        console.error("[streamAnthropic] Stream failed:", {
+            model: opts.modelId,
+            enableThinking: opts.enableThinking,
+            error: errorMessage,
+        })
+        opts.onError(errorMessage)
     }
-    opts.onDone()
 }
 
 async function streamGoogle(opts: StreamingTextOptions): Promise<void> {
@@ -180,19 +197,25 @@ async function streamGoogle(opts: StreamingTextOptions): Promise<void> {
 
     contents.push({ role: "user", parts: [{ text: opts.userPrompt }] })
 
-    const result = await model.generateContentStream({
-        contents,
-        generationConfig: {
-            maxOutputTokens: opts.maxTokens ?? 4096,
-        },
-    })
+    try {
+        const result = await model.generateContentStream({
+            contents,
+            generationConfig: {
+                maxOutputTokens: opts.maxTokens ?? 4096,
+            },
+        })
 
-    for await (const chunk of result.stream) {
-        if (opts.signal?.aborted) break
-        const text = chunk.text()
-        if (text) opts.onChunk(text)
+        for await (const chunk of result.stream) {
+            if (opts.signal?.aborted) break
+            const text = chunk.text()
+            if (text) opts.onChunk(text)
+        }
+        opts.onDone()
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        console.error("[streamGoogle] Stream failed:", { model: opts.modelId, error: errorMessage })
+        opts.onError(errorMessage)
     }
-    opts.onDone()
 }
 
 // ─── Image Generation Providers ──────────────────────────────────────
