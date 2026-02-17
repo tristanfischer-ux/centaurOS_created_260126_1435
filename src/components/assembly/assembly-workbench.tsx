@@ -307,13 +307,13 @@ export function AssemblyWorkbench({
             }
             onClick={() => {
               startTransition(async () => {
-                toast.info("Creating CAD Lab project...")
+                toast.info("Creating Forge project...")
                 const result = await bridgeToCadLab(assemblyId)
                 if ("error" in result) {
                   toast.error(result.error)
                   return
                 }
-                toast.success("CAD Lab project created! Redirecting...")
+                toast.success("Forge project created! Redirecting...")
                 router.push("/the-forge/cad-lab")
               })
             }}

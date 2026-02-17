@@ -102,7 +102,7 @@ const planNavigation = [
 // Section 3: "Workshop" — Where the work happens
 // ─────────────────────────────────────────────────────────────────────────────
 const workshopNavigation = [
-    { name: "The Forge", href: "/the-forge", icon: Flame, tooltip: "Design-to-RFQ workspace: guided intake, CAD, drawing packs, and supplier handoff" },
+    { name: "The Forge", href: "/the-forge", icon: Flame, tooltip: "Turn product ideas into manufacturing-ready engineering packages" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Specialists", href: "/agents", icon: UsersRound, tooltip: "Your on-demand team of experts — brief them on anything" },
     { name: "Deliverables", href: "/agents/artifacts", icon: FileOutput, tooltip: "Documents, reports, and deliverables from your specialists" },

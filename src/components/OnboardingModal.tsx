@@ -175,10 +175,22 @@ export function OnboardingModal({ userRole, accountType: initialAccountType }: O
     setOpen(false)
   }
 
-  const handleSkip = () => {
+  const handleSkip = useCallback(() => {
     localStorage.setItem(ONBOARDING_KEY, 'true')
     setOpen(false)
-  }
+  }, [])
+
+  // Allow Escape key to dismiss the onboarding modal
+  useEffect(() => {
+    if (!open) return
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        handleSkip()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [open, handleSkip])
 
   if (!open) return null
 
@@ -222,8 +234,8 @@ export function OnboardingModal({ userRole, accountType: initialAccountType }: O
           />
         </div>
 
-        {/* Skip link (available after step 2) */}
-        {currentStepIndex >= 2 && currentStep !== 'celebration' && (
+        {/* Skip link (available on all steps except celebration) */}
+        {currentStep !== 'celebration' && (
           <motion.button
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

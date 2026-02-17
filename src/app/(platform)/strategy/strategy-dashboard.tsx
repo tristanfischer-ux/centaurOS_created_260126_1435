@@ -440,7 +440,7 @@ export function StrategyDashboard({
         />
       )}
 
-      {/* Add-to-river dialog */}
+      {/* Add-to-river dialog (supports creating milestones AND objectives) */}
       <AddToRiverDialog
         open={!!addToRiverGoalId}
         onOpenChange={(open) => { if (!open) setAddToRiverGoalId(null) }}
@@ -448,6 +448,7 @@ export function StrategyDashboard({
         strategicObjectiveTitle={
           strategicObjectives.find((so) => so.id === addToRiverGoalId)?.title ?? ''
         }
+        milestones={milestoneOptions}
         onCreated={handleDialogUpdate}
       />
     </div>

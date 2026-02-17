@@ -28,6 +28,8 @@ import {
   Link2,
   AlertTriangle,
   Save,
+  Target,
+  Plus,
 } from 'lucide-react'
 
 import {
@@ -75,6 +77,7 @@ import {
   linkTaskToObjective,
   getFoundryMembers,
   getObjectivesForLinking,
+  createCanvasObjective,
 } from '@/actions/canvas'
 
 import type {
@@ -219,7 +222,7 @@ export function NodeDetailsDialog({
     (field: string, value: string) => {
       if (!details) return
       setDetails((prev) => (prev ? { ...prev, [field]: value } : prev))
-      pendingChangesRef.current[field] = value || undefined
+      pendingChangesRef.current[field] = value || null
       setIsDirty(true)
     },
     [details]
@@ -307,6 +310,23 @@ export function NodeDetailsDialog({
     }
     setConfirmDelete(false)
   }, [nodeId, onUpdate, onOpenChange])
+
+  // -- Create objective under a milestone --
+  const handleCreateObjectiveUnderMilestone = useCallback(
+    async (milestoneId: string, title: string) => {
+      const result = await createCanvasObjective({
+        title,
+        milestone_id: milestoneId,
+      })
+      if ('error' in result) {
+        toast.error(result.error)
+      } else {
+        toast.success(`Objective "${title}" created`)
+        onUpdate()
+      }
+    },
+    [onUpdate]
+  )
 
   // -- Link objective to milestone --
   const handleLinkObjectiveToMilestone = useCallback(
@@ -404,6 +424,7 @@ export function NodeDetailsDialog({
                   onFieldChange={handleFieldChange}
                   onSelectChange={handleSelectChange}
                   onDateChange={handleDateChange}
+                  onCreateObjective={handleCreateObjectiveUnderMilestone}
                 />
               )}
 
@@ -649,6 +670,7 @@ interface MilestoneFieldsProps {
   onFieldChange: (field: string, value: string) => void
   onSelectChange: (field: string, value: string) => void
   onDateChange: (field: string, date: Date | undefined) => void
+  onCreateObjective: (milestoneId: string, title: string) => Promise<void>
 }
 
 function MilestoneFields({
@@ -657,7 +679,23 @@ function MilestoneFields({
   onFieldChange,
   onSelectChange,
   onDateChange,
+  onCreateObjective,
 }: MilestoneFieldsProps) {
+  const [newObjTitle, setNewObjTitle] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+
+  const handleCreateObjective = async (): Promise<void> => {
+    const trimmed = newObjTitle.trim()
+    if (!trimmed) return
+    setIsCreating(true)
+    try {
+      await onCreateObjective(details.id, trimmed)
+      setNewObjTitle('')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
   return (
     <>
       {/* Title */}
@@ -730,6 +768,42 @@ function MilestoneFields({
           Position #{details.milestone_order_index + 1} on spine
         </p>
       )}
+
+      <Separator />
+
+      {/* Quick-add objective under this milestone */}
+      <div className="space-y-2">
+        <Label className="flex items-center gap-1.5">
+          <Target className="h-3.5 w-3.5 text-international-orange" />
+          Add Objective
+        </Label>
+        <div className="flex gap-2">
+          <Input
+            value={newObjTitle}
+            onChange={(e) => setNewObjTitle(e.target.value)}
+            placeholder="New objective title..."
+            maxLength={200}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); handleCreateObjective() }
+            }}
+          />
+          <Button
+            size="sm"
+            onClick={handleCreateObjective}
+            disabled={isCreating || !newObjTitle.trim()}
+            className="shrink-0"
+          >
+            {isCreating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Create an objective under this milestone
+        </p>
+      </div>
     </>
   )
 }

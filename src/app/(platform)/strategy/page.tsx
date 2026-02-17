@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getStrategicGoals, getGoalBundle } from '@/actions/canvas'
 import { StrategyDashboard } from './strategy-dashboard'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
+import { StrategyError } from './strategy-error'
 import type { StrategicGoal, GoalBundle } from '@/types/canvas'
 import type { FoundryPurposeData } from '@/types/foundry'
 
@@ -49,26 +50,74 @@ export default async function StrategyPage() {
   }
 
   // Fetch strategic goals, objectives, and tasks in parallel
-  const [goalsResult, objectivesResult, tasksResult] = await Promise.all([
-    getStrategicGoals(),
-    supabase
-      .from('objectives')
-      .select('id, title, description, parent_objective_id, is_strategic_goal, status, progress')
-      .eq('foundry_id', foundryId)
-      .eq('is_ghost', false)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('tasks')
-      .select('id, status, end_date, start_date, created_at, objective_id')
-      .eq('foundry_id', foundryId)
-      .eq('is_ghost', false)
-      .is('deleted_at', null)
-      .not('objective_id', 'is', null),
-  ])
+  let goalsResult: Awaited<ReturnType<typeof getStrategicGoals>>
+  let objectivesResult: { data: Array<{
+    id: string; title: string; description: string | null;
+    parent_objective_id: string | null; is_strategic_goal: boolean | null;
+    status: string | null; progress: number | null;
+  }> | null; error: { message: string } | null }
+  let tasksResult: { data: Array<{
+    id: string; status: string; end_date: string | null;
+    start_date: string | null; created_at: string; objective_id: string | null;
+  }> | null; error: { message: string } | null }
 
+  try {
+    const results = await Promise.all([
+      getStrategicGoals(),
+      supabase
+        .from('objectives')
+        .select('id, title, description, parent_objective_id, is_strategic_goal, status, progress')
+        .eq('foundry_id', foundryId)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('tasks')
+        .select('id, status, end_date, start_date, created_at, objective_id')
+        .eq('foundry_id', foundryId)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
+        .not('objective_id', 'is', null),
+    ])
+    goalsResult = results[0]
+    objectivesResult = results[1] as typeof objectivesResult
+    tasksResult = results[2] as typeof tasksResult
+  } catch (fetchError) {
+    console.error('[Strategy] Critical data fetch failure:', {
+      foundryId,
+      error: fetchError instanceof Error ? fetchError.message : 'Unknown error',
+    })
+    return (
+      <StrategyError
+        message="Failed to load strategy data. This may be a temporary issue."
+        detail={fetchError instanceof Error ? fetchError.message : undefined}
+      />
+    )
+  }
+
+  // Surface errors clearly instead of silently showing empty state
+  const goalsError = goalsResult && typeof goalsResult === 'object' && 'error' in goalsResult
+    ? (goalsResult as { error: string }).error
+    : null
+
+  if (goalsError) {
+    console.error('[Strategy] Failed to load strategic goals:', { foundryId, error: goalsError })
+  }
   if (objectivesResult.error) {
     console.error('[Strategy] Error loading objectives:', { foundryId, error: objectivesResult.error.message })
+  }
+  if (tasksResult.error) {
+    console.error('[Strategy] Error loading tasks:', { foundryId, error: tasksResult.error.message })
+  }
+
+  // If ALL data sources failed, show error UI
+  if (goalsError && objectivesResult.error && tasksResult.error) {
+    return (
+      <StrategyError
+        message="Unable to load strategy data. Please try refreshing the page."
+        detail={goalsError}
+      />
+    )
   }
 
   // Extract goals from server action result

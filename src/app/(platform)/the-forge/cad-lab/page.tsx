@@ -42,6 +42,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Markdown } from "@/components/ui/markdown"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { CLAUDE_MODELS } from "@/lib/cad-lab-types"
 import type { ClaudeModelId } from "@/lib/cad-lab-types"
 
@@ -323,59 +330,75 @@ export default function CadLabResearchPage(): React.ReactNode {
               <Label htmlFor="target-process" className="flex items-center gap-1.5">
                 <Factory className="h-3.5 w-3.5" /> Process
               </Label>
-              <select
-                id="target-process"
+              <Select
                 value={designBrief.targetProcess}
-                onChange={(e) => setDesignBrief((prev) => ({ ...prev, targetProcess: e.target.value }))}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                onValueChange={(v) => setDesignBrief((prev) => ({ ...prev, targetProcess: v }))}
                 disabled={isAnyLoading}
               >
-                <option value="">Select process</option>
-                {TARGET_PROCESS_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
+                <SelectTrigger id="target-process">
+                  <SelectValue placeholder="Select process" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TARGET_PROCESS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="target-material" className="flex items-center gap-1.5">
                 <Box className="h-3.5 w-3.5" /> Material
               </Label>
-              <select
-                id="target-material"
+              <Select
                 value={designBrief.targetMaterial}
-                onChange={(e) => setDesignBrief((prev) => ({ ...prev, targetMaterial: e.target.value }))}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                onValueChange={(v) => setDesignBrief((prev) => ({ ...prev, targetMaterial: v }))}
                 disabled={isAnyLoading}
               >
-                <option value="">Select material</option>
-                {TARGET_MATERIAL_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
+                <SelectTrigger id="target-material">
+                  <SelectValue placeholder="Select material" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TARGET_MATERIAL_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="target-tolerance" className="flex items-center gap-1.5">
                 <Scale className="h-3.5 w-3.5" /> Tolerance
               </Label>
-              <select
-                id="target-tolerance"
+              <Select
                 value={designBrief.toleranceTarget}
-                onChange={(e) => setDesignBrief((prev) => ({ ...prev, toleranceTarget: e.target.value }))}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                onValueChange={(v) => setDesignBrief((prev) => ({ ...prev, toleranceTarget: v }))}
                 disabled={isAnyLoading}
               >
-                <option value="">Select tolerance</option>
-                {TOLERANCE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
+                <SelectTrigger id="target-tolerance">
+                  <SelectValue placeholder="Select tolerance" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TOLERANCE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="target-quantity">Quantity target</Label>
-              <select
-                id="target-quantity"
+              <Select
                 value={designBrief.quantityTarget}
-                onChange={(e) => setDesignBrief((prev) => ({ ...prev, quantityTarget: e.target.value }))}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                onValueChange={(v) => setDesignBrief((prev) => ({ ...prev, quantityTarget: v }))}
                 disabled={isAnyLoading}
               >
-                <option value="">Select quantity</option>
-                {QUANTITY_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
+                <SelectTrigger id="target-quantity">
+                  <SelectValue placeholder="Select quantity" />
+                </SelectTrigger>
+                <SelectContent>
+                  {QUANTITY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="space-y-2">
@@ -408,17 +431,20 @@ export default function CadLabResearchPage(): React.ReactNode {
             </div>
             <div className="w-64 space-y-2">
               <Label htmlFor="model">Claude Model</Label>
-              <select
-                id="model"
+              <Select
                 value={modelId}
-                onChange={(e) => setModelId(e.target.value as ClaudeModelId)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onValueChange={(v) => setModelId(v as ClaudeModelId)}
                 disabled={isAnyLoading}
               >
-                {CLAUDE_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
-              </select>
+                <SelectTrigger id="model">
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CLAUDE_MODELS.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>

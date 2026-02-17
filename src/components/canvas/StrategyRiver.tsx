@@ -494,7 +494,14 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                       {past && <circle cx={obj.cx} cy={ry} r={18} fill={so.color} opacity=".07" />}
                       <circle cx={obj.cx} cy={ry} r={isH ? 13 : 10} fill={obj.isExpanded ? so.color : 'white'} stroke={so.color} strokeWidth={past ? 3 : 2} filter="url(#strategy-ds)" />
                       <circle cx={obj.cx} cy={ry} r={past ? 4 : 2} fill={obj.isExpanded ? 'white' : (past ? so.color : '#CBD5E1')} />
-                      <text x={obj.cx} y={ry + dir * gap} textAnchor="middle" fill={isH ? '#0F172A' : '#475569'} fontSize="10" fontFamily={FONT} fontWeight="800">{obj.title}</text>
+                      <text
+                        x={obj.cx} y={ry + dir * gap} textAnchor="middle"
+                        fill={isH ? '#0F172A' : '#475569'} fontSize="10" fontFamily={FONT} fontWeight="800"
+                        style={{ cursor: 'pointer', textDecoration: isH ? 'underline' : 'none' }}
+                        onClick={(e) => { e.stopPropagation(); onMilestoneClick?.(obj.id) }}
+                        role="link"
+                        aria-label={`View details for milestone: ${obj.title}`}
+                      >{obj.title}</text>
                       <text x={obj.cx} y={ry + dir * (gap + 12)} textAnchor="middle" fill="#94A3B8" fontSize="8.5" fontFamily={FONT} fontWeight="600">
                         {new Date(obj.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {tp}% · {obj.tasks.length} tasks
                       </text>

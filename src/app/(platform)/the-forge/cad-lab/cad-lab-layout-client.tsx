@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   Loader2,
@@ -19,6 +20,7 @@ import {
   Trash2,
   Clock,
   Plus,
+  ChevronRight,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -44,7 +46,26 @@ export function CadLabProviderWrapper({ children }: { children: React.ReactNode 
   )
 }
 
+// ─── Stage label mapping for breadcrumbs ────────────────────────────
+
+const STAGE_LABELS: Record<string, string> = {
+  "": "Research",
+  build: "Build",
+  analysis: "Analysis",
+  procurement: "Procurement",
+  review: "Review",
+}
+
+/**
+ * Derives the current pipeline stage label from the URL pathname.
+ */
+function getCurrentStageLabel(pathname: string): string {
+  const segment = pathname.replace("/the-forge/cad-lab", "").replace(/^\//, "").split("/")[0]
+  return STAGE_LABELS[segment] ?? "Research"
+}
+
 function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.ReactNode {
+  const pathname = usePathname()
   const {
     // Header
     sector, subject,
@@ -60,9 +81,24 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
   } = useCadLab()
 
   const isAnyActive = isResearching || isDecomposing || isBatchRunning || activeModuleId !== null
+  const currentStageLabel = getCurrentStageLabel(pathname)
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {/* ── Breadcrumb ── */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
+        <Link
+          href="/the-forge"
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          The Forge
+        </Link>
+        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-muted-foreground">Pipeline</span>
+        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-foreground font-medium">{currentStageLabel}</span>
+      </nav>
+
       {/* ── Header ── */}
       <div className="pb-4 border-b border-muted">
         <div className="flex items-center justify-between">

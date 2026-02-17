@@ -114,7 +114,10 @@ function bundleToRiverSO(
     color: SO_COLORS[colorIndex % SO_COLORS.length],
     startDate,
     targetDate: goal.milestone_date?.slice(0, 10) ?? todayISO,
-    objectives: riverObjectives.filter((o) => o.tasks.length > 0), // skip empty milestones
+    // Show all milestones, even those without tasks yet.
+    // This ensures the river structure is always visible so users can
+    // see their strategic plan and add tasks/objectives as needed.
+    objectives: riverObjectives,
   }
 }
 
@@ -124,7 +127,8 @@ export function goalBundlesToRiverData(
 ): RiverStrategicObjective[] {
   return bundles
     .map((bundle, i) => bundleToRiverSO(bundle, i))
-    .filter((so) => so.objectives.length > 0) // skip goals with no milestones
+    // Show goals that have milestones, even if those milestones have no tasks yet
+    .filter((so) => so.objectives.length > 0)
 }
 
 // ─── Single bundle adapter (for when you only have one goal selected) ────────
@@ -133,5 +137,6 @@ export function singleBundleToRiverData(
   colorIndex = 0
 ): RiverStrategicObjective[] {
   const so = bundleToRiverSO(bundle, colorIndex)
+  // Show the goal even if milestones have no tasks yet
   return so.objectives.length > 0 ? [so] : []
 }

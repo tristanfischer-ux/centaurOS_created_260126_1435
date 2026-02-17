@@ -33,39 +33,35 @@ describe("ForgeProjectList", () => {
     jest.clearAllMocks()
   })
 
-  it("keeps Design-to-RFQ entrypoint visible when project load fails", async () => {
+  it("shows error message when project load fails", async () => {
     mockedListScansAction.mockResolvedValue({ error: "Failed to load projects" })
 
     render(await ForgeProjectList())
 
-    expect(screen.getByRole("heading", { name: "Design-to-RFQ Lab" })).toBeInTheDocument()
-    expect(screen.getByText("Recommended path")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: /Open Design-to-RFQ Lab/i })).toHaveAttribute(
-      "href",
-      "/the-forge/cad-lab",
-    )
+    expect(screen.getByRole("heading", { name: "The Forge" })).toBeInTheDocument()
     expect(screen.getByText("Failed to load projects")).toBeInTheDocument()
   })
 
-  it("shows entrypoint and empty state when no projects exist", async () => {
+  it("shows empty state when no projects exist", async () => {
     mockedListScansAction.mockResolvedValue({ scans: [] })
 
     render(await ForgeProjectList())
 
-    expect(screen.getByRole("heading", { name: "Design-to-RFQ Lab" })).toBeInTheDocument()
-    expect(screen.getByRole("heading", { name: "No forge projects yet" })).toBeInTheDocument()
-    const createConceptLinks = screen.getAllByRole("link", { name: /Create Concept/i })
-    expect(createConceptLinks.some((link) => link.getAttribute("href") === "/the-forge/new")).toBe(
+    expect(screen.getByRole("heading", { name: "The Forge" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "No designs yet" })).toBeInTheDocument()
+    const startLinks = screen.getAllByRole("link", { name: /Start Your First Design/i })
+    expect(startLinks.some((link) => link.getAttribute("href") === "/the-forge/cad-lab")).toBe(
       true,
     )
   })
 
-  it("renders project cards while keeping the entrypoint visible", async () => {
+  it("renders project cards with pipeline preview", async () => {
     mockedListScansAction.mockResolvedValue({ scans: [sampleScan] })
 
     render(await ForgeProjectList())
 
-    expect(screen.getByRole("heading", { name: "Design-to-RFQ Lab" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "The Forge" })).toBeInTheDocument()
     expect(screen.getByTestId("project-scan-1")).toBeInTheDocument()
+    expect(screen.getByText("Recent Projects")).toBeInTheDocument()
   })
 })
