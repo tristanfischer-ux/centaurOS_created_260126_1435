@@ -30,6 +30,12 @@ const ERROR_MESSAGES: Record<string, string> = {
     rate_limited: 'Too many connection attempts. Please try again in a few minutes.',
     consent_denied: 'You declined the Google permissions request. Click Connect to try again.',
     missing_params: 'The Google sign-in response was incomplete. Please try again.',
+    state_invalid: 'Your connection request expired or was invalid. Please try again.',
+    user_mismatch: 'Session mismatch — please sign in again and retry.',
+    foundry_mismatch: 'Your workspace context changed. Please try connecting again.',
+    no_token: 'Google did not return an access token. Please try again.',
+    save_failed: 'Failed to save your Google connection. Please try again.',
+    exchange_failed: 'Failed to complete the Google sign-in. Please try again.',
     oauth_error: 'Something went wrong connecting your Google account. Please try again.',
 } satisfies Record<string, string>
 

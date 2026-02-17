@@ -75,7 +75,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (!stateData) {
         console.error('[GoogleCallback] Invalid or expired state parameter')
         return NextResponse.redirect(
-            new URL('/google-apps?error=oauth_error', req.nextUrl.origin)
+            new URL('/google-apps?error=state_invalid', req.nextUrl.origin)
         )
     }
 
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             authUserId: user.id,
         })
         return NextResponse.redirect(
-            new URL('/google-apps?error=oauth_error', req.nextUrl.origin)
+            new URL('/google-apps?error=user_mismatch', req.nextUrl.origin)
         )
     }
 
@@ -104,7 +104,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             foundryId: stateData.foundryId,
         })
         return NextResponse.redirect(
-            new URL('/google-apps?error=oauth_error', req.nextUrl.origin)
+            new URL('/google-apps?error=foundry_mismatch', req.nextUrl.origin)
         )
     }
 
@@ -119,7 +119,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         if (!tokens.access_token) {
             console.error('[GoogleCallback] No access token received')
             return NextResponse.redirect(
-                new URL('/google-apps?error=oauth_error', req.nextUrl.origin)
+                new URL('/google-apps?error=no_token', req.nextUrl.origin)
             )
         }
 
@@ -146,7 +146,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         if (!saveResult.success) {
             console.error('[GoogleCallback] Failed to save token:', saveResult.error)
             return NextResponse.redirect(
-                new URL('/google-apps?error=oauth_error', req.nextUrl.origin)
+                new URL('/google-apps?error=save_failed', req.nextUrl.origin)
             )
         }
 
@@ -176,7 +176,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             error: err instanceof Error ? err.message : 'Unknown error',
         })
         return NextResponse.redirect(
-            new URL('/google-apps?error=oauth_error', req.nextUrl.origin)
+            new URL('/google-apps?error=exchange_failed', req.nextUrl.origin)
         )
     }
 }
