@@ -47,6 +47,7 @@ import {
     LogOut,
     CalendarDays,
     Brain,
+    Package,
 } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
@@ -104,6 +105,7 @@ const planNavigation = [
 // ─────────────────────────────────────────────────────────────────────────────
 const workshopNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame, tooltip: "Turn product ideas into manufacturing-ready engineering packages" },
+    { name: "Components", href: "/the-forge/components", icon: Package, tooltip: "Browse 1,000+ components with pricing, certifications, and compatibility" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Specialists", href: "/agents", icon: UsersRound, tooltip: "Your on-demand team of experts — brief them on anything" },
     { name: "Knowledge", href: "/knowledge", icon: Brain, tooltip: "Your organizational second brain — everything your AI team has learned" },
@@ -224,7 +226,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     return (
         <div className="hidden sm:flex h-screen w-64 flex-col bg-background border-r border-slate-100 text-foreground">
             {/* App Header — ForgeOS Branding */}
-            <div className="px-5 pt-8 pb-4">
+            <div className="px-5 pt-8 pb-2">
                 <div className="flex items-center justify-between">
                     <Link href="/today" className="group flex items-center gap-2">
                         <span className="font-display text-2xl font-bold tracking-[0.05em] text-foreground group-hover:text-international-orange transition-colors">
@@ -254,7 +256,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
             </div>
 
             {/* Scrollable navigation */}
-            <nav className="flex-1 overflow-y-auto px-3 py-1 space-y-1">
+            <nav className="flex-1 overflow-y-auto px-3 space-y-0.5">
                 {/* Company identity — foundry name + logo */}
                 <FoundrySwitcher
                     foundries={userFoundries || []}
