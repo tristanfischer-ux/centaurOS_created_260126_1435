@@ -26,8 +26,8 @@ import { AgentWorkspace } from "@/components/specialists/workspace/agent-workspa
  *
  * @description Renders as a fixed-width column (sidebar) or full-width split
  * view (chat + workspace). Uses BriefSpecialistDialog in "panel" renderMode.
- * When expanded, main content area is hidden and the panel shows chat (left)
- * and workspace (right).
+ * When expanded, main content area is hidden and the panel shows workspace (left)
+ * and chat (right), keeping the chat in its familiar right-hand position.
  */
 export function AdvisorPanel(): React.ReactElement {
   const {
@@ -37,7 +37,6 @@ export function AdvisorPanel(): React.ReactElement {
     referredBy,
     contextLabel,
     panelViewMode,
-    panelPosition,
     closePanel,
     switchSpecialist,
   } = useAdvisorPanel()
@@ -54,13 +53,12 @@ export function AdvisorPanel(): React.ReactElement {
   return (
     <div
       className={cn(
-        "hidden lg:flex flex-col h-full bg-background transition-[width,border,order] duration-200 ease-out overflow-hidden",
-        panelPosition === "left" ? "order-1 border-r" : "order-2 border-l",
+        "hidden lg:flex flex-col h-full border-l bg-background transition-[width,border] duration-200 ease-out overflow-hidden",
         isOpen && activeSpecialist
           ? isExpanded
             ? "flex-1 min-w-0"
             : "w-[380px] xl:w-[420px] flex-shrink-0"
-          : panelPosition === "left" ? "w-0 border-r-0" : "w-0 border-l-0",
+          : "w-0 border-l-0",
       )}
       role="complementary"
       aria-label="Advisor panel"
@@ -68,7 +66,10 @@ export function AdvisorPanel(): React.ReactElement {
       {activeSpecialist && (
         isExpanded ? (
           <div className="flex flex-1 min-h-0 min-w-0">
-            <div className="flex flex-col w-[40%] min-w-0 border-r shrink-0">
+            <div className="flex-1 min-w-0 flex flex-col border-r">
+              <AgentWorkspace />
+            </div>
+            <div className="flex flex-col w-[40%] min-w-0 shrink-0">
               <BriefSpecialistDialog
                 specialist={activeSpecialist}
                 open={isOpen}
@@ -82,9 +83,6 @@ export function AdvisorPanel(): React.ReactElement {
                 renderMode="panel"
                 panelHeaderActions={<PanelExpandToggle />}
               />
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col">
-              <AgentWorkspace />
             </div>
           </div>
         ) : (

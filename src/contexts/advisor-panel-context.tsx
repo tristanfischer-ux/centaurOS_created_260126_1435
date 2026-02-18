@@ -40,7 +40,6 @@ interface OpenPanelOptions {
 }
 
 export type PanelViewMode = "sidebar" | "expanded"
-export type PanelPosition = "left" | "right"
 
 interface AdvisorPanelState {
   /** Whether the panel is visible */
@@ -55,8 +54,6 @@ interface AdvisorPanelState {
   contextLabel: string | null
   /** Sidebar (narrow) vs expanded (full-width) view */
   panelViewMode: PanelViewMode
-  /** Which side of the main content the panel appears on */
-  panelPosition: PanelPosition
 }
 
 interface AdvisorPanelContextValue extends AdvisorPanelState {
@@ -72,8 +69,6 @@ interface AdvisorPanelContextValue extends AdvisorPanelState {
   expandPanel: () => void
   /** Collapse panel back to sidebar width */
   collapsePanel: () => void
-  /** Set which side the panel renders on (used by Specialists page to show panel on left) */
-  setPanelPosition: (pos: PanelPosition) => void
 }
 
 // ─── Context ────────────────────────────────────────────────────────────────
@@ -109,7 +104,6 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     referredBy: null,
     contextLabel: null,
     panelViewMode: getStoredPanelViewMode(),
-    panelPosition: "right",
   }))
 
   const openPanel = useCallback((specialistId: string, options?: OpenPanelOptions) => {
@@ -188,10 +182,6 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     }
   }, [])
 
-  const setPanelPosition = useCallback((pos: PanelPosition) => {
-    setState((prev) => ({ ...prev, panelPosition: pos }))
-  }, [])
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "e") {
@@ -220,9 +210,8 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
       switchSpecialist,
       expandPanel,
       collapsePanel,
-      setPanelPosition,
     }),
-    [state, openPanel, closePanel, togglePanel, switchSpecialist, expandPanel, collapsePanel, setPanelPosition],
+    [state, openPanel, closePanel, togglePanel, switchSpecialist, expandPanel, collapsePanel],
   )
 
   return (
