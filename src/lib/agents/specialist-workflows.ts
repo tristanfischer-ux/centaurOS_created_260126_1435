@@ -107,6 +107,9 @@ Write this as a polished, ready-to-share document. Be specific and actionable.`,
             "competitive analysis",
             "competitive landscape",
             "map the competition",
+            "deep dive on competitors",
+            "who are our competitors",
+            "market competition",
         ],
         promptTemplate: `Based on our conversation, produce a competitive analysis document.
 
@@ -132,6 +135,69 @@ Context from our conversation:
         outputFormat: "document",
         autoSave: true,
         icon: "Target",
+    },
+    {
+        id: "full-strategic-analysis",
+        name: "Full Strategic Analysis",
+        description: "Produces a comprehensive market and competitive strategic analysis (market sizing, landscape, SWOT, moat, risks, executive brief)",
+        specialistId: "strategist",
+        triggers: [
+            "run strategic analysis",
+            "full market analysis",
+            "analyze my market",
+            "McKinsey analysis",
+            "strategic deep dive",
+            "competitive market analysis",
+        ],
+        promptTemplate: `You are Sage, the strategist. Use your direct, opinionated voice. Based on our conversation and the company context you have, produce a complete strategic market analysis in one document. Be specific and actionable. Label what is [ASSUMPTION] vs. [FACT] where it matters; flag where real data would strengthen the analysis.
+
+Structure your response as follows:
+
+## 1. Market Overview & Sizing
+- TAM, SAM, SOM with logic and data sources (or [ASSUMPTION] where estimated).
+- Market growth rate and key dynamics.
+- Ground this in the company's actual product, geography, and segments from context.
+
+## 2. Competitive Landscape
+- Top 5 competitors: positioning, strengths, weaknesses, pricing, go-to-market.
+- Comparison matrix (table).
+- Suggested positioning map axes (e.g., price vs. features) and where the company fits.
+- Only include competitor details from context or widely known public information; note where validated competitive intelligence would help.
+
+## 3. SWOT + TOWS Matrix
+- Strengths, Weaknesses, Opportunities, Threats — each ranked by impact; be honest about weaknesses.
+- Strategic actions: SO (strengths → opportunities), WO (weaknesses → opportunities), ST (strengths → threats), WT (weaknesses → threats).
+- Top 3 priority actions with owners and timelines.
+
+## 4. Competitive Moat Assessment
+- Score the company on Helmer's 7 Powers (Scale Economies, Network Effects, Counter-Positioning, Switching Costs, Brand, Cornered Resource, Process Power): None / Weak / Moderate / Strong, with evidence.
+- Which 1–2 moats to build in the next 12–18 months and how.
+
+## 5. Strategic Opportunities & Risks
+- 3 go-to-market or strategic plays to pursue.
+- Top 5 risks with likelihood, impact, and mitigation.
+- White space or gaps in the market the company could capture.
+
+## 6. Executive Brief & Recommended Actions
+- McKinsey-style pyramid: lead with the answer, then support with evidence (2–3 paragraphs max).
+- 3 priority actions with owners and timelines, ready for board or investor presentation.
+
+**Data integrity:** Do not fabricate competitor metrics or market share. Mark assumptions clearly. Say when "real data would strengthen this" where applicable.
+
+**PROPOSED_ACTIONS:** At the end of your response, you MUST include a PROPOSED_ACTIONS block so the founder can one-click create objectives or tasks from your top recommendations. Use the exact format:
+<!-- PROPOSED_ACTIONS
+[
+  { "type": "objective", "title": "...", "description": "...", "strategicGoalTitle": "Existing strategic goal name" },
+  { "type": "task", "title": "...", "description": "...", "objectiveTitle": "Parent objective name" }
+]
+-->
+Include 2–4 actions (objectives and/or tasks) that correspond to your top strategic recommendations. Every objective must have "strategicGoalTitle" matching an existing strategic goal; every task must have "objectiveTitle" matching an existing objective. If no suitable parent exists, include an objective (with strategicGoalTitle) in the same block before any tasks that depend on it.
+
+Context from our conversation and company:
+{{context}}`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "Telescope",
     },
 
     // ── Finance (Finn) ───────────────────────────────────────────

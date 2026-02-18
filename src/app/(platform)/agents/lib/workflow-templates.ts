@@ -18,7 +18,7 @@ const NODE_SPACING_Y = 160
 
 // ─── Default provider/model for all AI nodes ────────────────────────
 const DEFAULT_PROVIDER = "anthropic"
-const DEFAULT_MODEL = "claude-opus-4-6"
+const DEFAULT_MODEL = "claude-sonnet-4-6"
 const IMAGE_PROVIDER = "google"
 const IMAGE_MODEL = "gemini-3-pro-image-preview"
 const VIDEO_PROVIDER = "minimax"
@@ -1016,6 +1016,61 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             edges,
             whyItMatters: "Most strategy offsites end with enthusiasm but no concrete outcomes. This workflow structures the entire process — from pre-read materials through SWOT, scenario planning, OKRs, and prioritisation — so you leave with decisions, not just discussions.",
             estimatedTime: "4-8 hours",
+        }
+    })(),
+
+    (() => {
+        const steps: StepDefinition[] = [
+            {
+                type: "human-task",
+                label: "Gather Market Intelligence",
+                guidance: "The quality of your strategic analysis depends on the data you feed it. Collect competitor and market information before running the AI steps.\n\nOnce you've completed the checklist, open the next step (Market Sizing) and paste your data into its Input Data field.",
+                checklist: [
+                    "Collect competitor pricing, positioning, and key differentiators",
+                    "Gather customer feedback or win/loss notes",
+                    "Pull any market reports or industry data you have",
+                    "Note key financial or traction metrics for your company",
+                ],
+            },
+            { type: "prompt", promptId: "startup-market-sizing", label: "Market Sizing (TAM/SAM/SOM)", category: "startup-strategy", icon: "PieChart" },
+            { type: "prompt", promptId: "strategy-competitive-landscape", label: "Competitive Landscape Mapper", category: "strategy", icon: "Map" },
+            { type: "prompt", promptId: "strategy-swot", label: "SWOT Analysis", category: "strategy", icon: "Grid3x3" },
+            { type: "prompt", promptId: "startup-competitive-moat", label: "Competitive Moat Analyzer", category: "startup-strategy", icon: "Shield" },
+            {
+                type: "human-task",
+                label: "Review & Challenge",
+                guidance: "The previous steps generated Market Sizing, Competitive Landscape, SWOT, and Moat analysis. Click each step above to review.\n\nChallenge assumptions before continuing. Validate competitor data where possible and identify blind spots.",
+                checklist: [
+                    "Review each analysis and flag any assumptions that need validation",
+                    "Cross-check competitor details against public or internal sources",
+                    "Identify 2–3 blind spots or questions the analysis didn't address",
+                ],
+            },
+            { type: "prompt", promptId: "strategy-risk-assessment", label: "Risk Assessment", category: "strategy", icon: "AlertTriangle" },
+            { type: "prompt", promptId: "data-executive-summary", label: "Executive Summary", category: "data-analytics", icon: "FileText" },
+            {
+                type: "human-task",
+                label: "Act on Findings",
+                guidance: "An Executive Summary has been generated. Use it as the foundation for decisions and communication.\n\nTurn the top recommendations into objectives and tasks in ForgeOS, and schedule follow-up to track progress.",
+                checklist: [
+                    "Share the Executive Summary with your team or board",
+                    "Create objectives or tasks from the top 3 strategic recommendations",
+                    "Schedule a follow-up review (e.g., quarterly) to reassess the market",
+                ],
+            },
+        ]
+        const { nodes, edges } = buildTemplate(steps)
+        return {
+            id: "strategic-market-analysis",
+            name: "Strategic Market Analysis",
+            description: "End-to-end market and competitive analysis: market sizing, competitive landscape, SWOT, moat assessment, risk assessment, and executive summary — with human checkpoints to gather data and challenge assumptions.",
+            category: "business" as const,
+            icon: "Telescope",
+            nodeCount: steps.length,
+            nodes,
+            edges,
+            whyItMatters: "Strategic analysis is only as good as the data you put in and the rigor you apply. This workflow guides you from gathering intelligence through structured analyses to an investor-ready executive summary and concrete next steps.",
+            estimatedTime: "2-4 hours",
         }
     })(),
 
