@@ -68,6 +68,14 @@ export function SpecialistsLanding({
     const router = useRouter()
     const advisorPanel = useAdvisorPanel()
 
+    // Show advisor panel on the left on the Specialists page so
+    // the specialist grid stays on the right while chatting.
+    useEffect(() => {
+        advisorPanel.setPanelPosition("left")
+        return () => advisorPanel.setPanelPosition("right")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     // Desktop detection for panel vs dialog routing
     const [isDesktop, setIsDesktop] = useState(false)
     useEffect(() => {

@@ -18,6 +18,7 @@ import { ZoomProvider, MobileZoomControl } from "@/components/ZoomProvider";
 import { MainContentArea } from "@/components/MainContentArea";
 import { ScreenContextProvider } from "@/contexts/screen-context";
 import { AdvisorPanelProvider } from "@/contexts/advisor-panel-context";
+import { WorkspaceProvider } from "@/contexts/workspace-context";
 import { BrowseContextProvider } from "@/contexts/browse-context";
 import { AdvisorPanel } from "@/components/specialists/advisor-panel";
 import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
@@ -152,6 +153,7 @@ export default async function PlatformLayout({
             <PresenceProvider>
                 <ZoomProvider>
                   <AdvisorPanelProvider>
+                  <WorkspaceProvider>
                   <BrowseContextProvider>
                   <ScreenContextProvider>
                     <div className="flex h-screen overflow-hidden gap-0">
@@ -196,6 +198,7 @@ export default async function PlatformLayout({
                     </div>
                   </ScreenContextProvider>
                   </BrowseContextProvider>
+                  </WorkspaceProvider>
                   </AdvisorPanelProvider>
                 </ZoomProvider>
             </PresenceProvider>

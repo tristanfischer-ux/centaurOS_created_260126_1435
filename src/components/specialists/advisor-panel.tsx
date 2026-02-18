@@ -37,6 +37,7 @@ export function AdvisorPanel(): React.ReactElement {
     referredBy,
     contextLabel,
     panelViewMode,
+    panelPosition,
     closePanel,
     switchSpecialist,
   } = useAdvisorPanel()
@@ -53,12 +54,13 @@ export function AdvisorPanel(): React.ReactElement {
   return (
     <div
       className={cn(
-        "hidden lg:flex flex-col h-full border-l bg-background transition-[width,border] duration-200 ease-out overflow-hidden",
+        "hidden lg:flex flex-col h-full bg-background transition-[width,border,order] duration-200 ease-out overflow-hidden",
+        panelPosition === "left" ? "order-1 border-r" : "order-2 border-l",
         isOpen && activeSpecialist
           ? isExpanded
             ? "flex-1 min-w-0"
             : "w-[380px] xl:w-[420px] flex-shrink-0"
-          : "w-0 border-l-0",
+          : panelPosition === "left" ? "w-0 border-r-0" : "w-0 border-l-0",
       )}
       role="complementary"
       aria-label="Advisor panel"

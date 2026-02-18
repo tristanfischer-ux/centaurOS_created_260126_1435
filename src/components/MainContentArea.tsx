@@ -15,13 +15,14 @@ interface MainContentAreaProps {
 }
 
 export function MainContentArea({ children, className }: MainContentAreaProps): React.ReactElement {
-  const { panelViewMode, isOpen } = useAdvisorPanel()
+  const { panelViewMode, panelPosition, isOpen } = useAdvisorPanel()
   const isExpanded = isOpen && panelViewMode === "expanded"
 
   return (
     <ZoomableContent
       className={cn(
-        "overflow-y-auto bg-background transition-[width] duration-200 ease-out",
+        "overflow-y-auto bg-background transition-[width,order] duration-200 ease-out",
+        panelPosition === "left" ? "order-2" : "order-1",
         isExpanded ? "w-0 min-w-0 overflow-hidden" : "flex-1 min-w-0",
         className,
       )}

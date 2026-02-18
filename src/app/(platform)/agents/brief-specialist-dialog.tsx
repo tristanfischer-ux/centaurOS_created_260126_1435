@@ -40,10 +40,29 @@ import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import { useScreenContext } from "@/contexts/screen-context"
 import { useBrowseContext } from "@/contexts/browse-context"
+import { useWorkspace } from "@/contexts/workspace-context"
+import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
+import { parseSlideDeckFromText } from "@/lib/ai-providers/slide-parser"
+import type { PresentationData } from "@/components/specialists/workspace/presentation-view"
 import { SpecialistChatAvatar } from "@/components/specialists/specialist-presentation"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { PromptTemplate } from "./lib/agent-types"
 import type { Specialist } from "./specialists-data"
+
+// ─── Presentation Intent Detection ───────────────────────────────────────────
+// When the user's message contains presentation-related keywords, we switch
+// the API modality from "text" to "slides" so the response comes back as a
+// structured JSON slide deck instead of prose.
+
+const PRESENTATION_KEYWORDS = [
+    "presentation", "slides", "slide deck", "pitch deck",
+    "deck", "powerpoint", "pptx",
+] as const
+
+function detectPresentationIntent(message: string): boolean {
+    const lower = message.toLowerCase()
+    return PRESENTATION_KEYWORDS.some((kw) => lower.includes(kw))
+}
 
 // ─── Conversation Mode (Feature Flag) ────────────────────────────────────────
 // When NEXT_PUBLIC_ENABLE_VOICE_AVATAR is set, users with eligible tiers
@@ -466,6 +485,10 @@ export function BriefSpecialistDialog({
     const [error, setError] = useState<string | null>(null)
     const [copied, setCopied] = useState(false)
     const [threadId, setThreadId] = useState<string | null>(null)
+    const [contextGrounding, setContextGrounding] = useState<{
+        availableSections: string[]
+        missingContextHints: string[]
+    } | null>(null)
     const [isLoadingThread, setIsLoadingThread] = useState(false)
     const [crossSpecialistContext, setCrossSpecialistContext] = useState("")
     const [showHistory, setShowHistory] = useState(false)
@@ -535,6 +558,10 @@ export function BriefSpecialistDialog({
             clearTimeout(phase3Timer)
         }
     }, [isExecuting, isStreaming])
+
+    // ─── Workspace Context (push content to Document/Presentation/Chart tabs) ──
+    const workspace = useWorkspace()
+    const { expandPanel, panelViewMode } = useAdvisorPanel()
 
     // ─── Screen Awareness ─────────────────────────────────────────────────
     const { serializeScreenContext, screenContext } = useScreenContext()
@@ -1081,6 +1108,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
 
         // Determine if we should stream TTS (declared before try so catch can stop it)
         const isTtsStreaming = tts.voiceEnabled && !!specialist.voice
+        const isSlideRequest = detectPresentationIntent(userInput)
 
         try {
             // Auto-retry: one transparent retry for transient stream failures
@@ -1112,7 +1140,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         providerId: getSpecialistModel(specialist).providerId,
                         modelId: getSpecialistModel(specialist).modelId,
                         modelTier: specialist.modelTier,
-                        modality: "text",
+                        modality: isSlideRequest ? "slides" : "text",
                         threadId: threadId ?? undefined,
                         specialistId: specialist.id,
                         customSystemPromptSuffix: systemExtras.join(""),
@@ -1158,11 +1186,19 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 const data = line.slice(6)
                                 if (data === "[DONE]") continue
                                 try {
-                                    const parsed = JSON.parse(data) as { text?: string; error?: string; rawHint?: string; errorCategory?: string }
+                                    const parsed = JSON.parse(data) as {
+                                        text?: string
+                                        error?: string
+                                        rawHint?: string
+                                        errorCategory?: string
+                                        grounding?: { availableSections: string[]; missingContextHints: string[] }
+                                    }
+                                    if (parsed.grounding) {
+                                        setContextGrounding(parsed.grounding)
+                                        continue
+                                    }
                                     if (parsed.error) {
                                         streamError = parsed.error
-                                        // Log raw provider error for debugging — the classified
-                                        // message hides the actual cause from the UI.
                                         if (parsed.rawHint || parsed.errorCategory) {
                                             console.error("[BriefDialog] Provider error detail:", {
                                                 classified: parsed.error,
@@ -1294,6 +1330,18 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             // Finish streaming TTS with the cleaned display text (plays any remaining sentence)
             if (isTtsStreaming) {
                 tts.finishStreaming(displayResponse)
+            }
+
+            // Push parsed slides to workspace when a presentation was requested.
+            // SlideDeckContent and PresentationData are structurally identical
+            // (title, slides[], theme?) so the cast is safe.
+            if (isSlideRequest) {
+                const parsedSlides = parseSlideDeckFromText(fullResponse)
+                if (parsedSlides) {
+                    workspace.setPresentationData(parsedSlides as PresentationData)
+                    workspace.setActiveTab("presentation")
+                    if (panelViewMode === "sidebar") expandPanel()
+                }
             }
 
             // Auto-save to deliverables (fire and forget)

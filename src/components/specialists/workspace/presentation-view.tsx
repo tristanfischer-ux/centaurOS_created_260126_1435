@@ -11,7 +11,7 @@ export interface SlideData {
   subtitle?: string
   bullets?: string[]
   notes?: string
-  layout?: "title" | "content" | "two-column" | "closing"
+  layout?: "title" | "content" | "two-column" | "image" | "closing"
 }
 
 export interface PresentationData {
