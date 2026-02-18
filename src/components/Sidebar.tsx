@@ -46,8 +46,6 @@ import {
     Settings,
     LogOut,
     CalendarDays,
-    Brain,
-    Package,
     AppWindow,
     Globe,
 } from "lucide-react"
@@ -108,10 +106,8 @@ const planNavigation = [
 // ─────────────────────────────────────────────────────────────────────────────
 const workshopNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame, tooltip: "Turn product ideas into manufacturing-ready engineering packages" },
-    { name: "Components", href: "/the-forge/components", icon: Package, tooltip: "Browse 1,000+ components with pricing, certifications, and compatibility" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Specialists", href: "/agents", icon: UsersRound, tooltip: "Your on-demand team of experts — brief them on anything" },
-    { name: "Knowledge", href: "/knowledge", icon: Brain, tooltip: "Your organizational second brain — everything your AI team has learned" },
     { name: "Deliverables", href: "/agents/artifacts", icon: FileOutput, tooltip: "Documents, reports, and deliverables from your specialists" },
     { name: "Browse", href: "/browse", icon: Globe, tooltip: "Browse the web with your specialist — get real-time guidance and analysis" },
 ]

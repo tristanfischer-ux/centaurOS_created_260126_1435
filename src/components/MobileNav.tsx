@@ -35,8 +35,8 @@ import {
     ShoppingBag,
     Flame,
     CalendarDays,
-    Brain,
     AppWindow,
+    FileOutput,
     Globe,
 } from "lucide-react"
 import {
@@ -84,7 +84,7 @@ const workshopMoreNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame },
     { name: "Team", href: "/team", icon: Users },
     { name: "Specialists", href: "/agents", icon: UsersRound },
-    { name: "Knowledge", href: "/knowledge", icon: Brain },
+    { name: "Deliverables", href: "/agents/artifacts", icon: FileOutput },
     { name: "Browse", href: "/browse", icon: Globe },
 ]
 
