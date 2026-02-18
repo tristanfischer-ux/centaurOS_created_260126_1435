@@ -2,6 +2,7 @@
 
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
 
 interface MarkdownProps {
@@ -44,6 +45,7 @@ function MarkdownInner({ content, className }: MarkdownProps) {
   return (
     <div className={cn('markdown-content', className)}>
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         components={{
         p: ({ children }) => (
           <p className="my-2.5 leading-relaxed text-inherit">{children}</p>
