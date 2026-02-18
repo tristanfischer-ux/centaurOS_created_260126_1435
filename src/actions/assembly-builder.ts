@@ -548,6 +548,90 @@ export async function removeComponentFromSlot(
   return { success: true }
 }
 
+// ─── autoFillAssembly ────────────────────────────────────────────────
+
+/**
+ * Auto-fills empty slots with the best-matching component from the catalog.
+ *
+ * @description For each empty slot, finds compatible components (category + tier)
+ * and assigns the top-ranked one (preferring components with pricing and
+ * physical properties). Runs server-side in one batch.
+ *
+ * @param assemblyId - The assembly to auto-fill
+ * @returns Count of slots filled and updated assembly, or error
+ *
+ * @security Verifies assembly ownership via RLS
+ * @audit Modifies placed_components table
+ */
+export async function autoFillAssembly(
+  assemblyId: string,
+): Promise<
+  | { filled: number; total: number; assembly: UserAssembly }
+  | { error: string }
+> {
+  const assemblyResult = await getAssembly(assemblyId)
+  if ("error" in assemblyResult) return assemblyResult
+  const assembly = assemblyResult
+
+  const catalogResult = await getComponentCatalog({ limit: 500 })
+  const components = catalogResult.components
+  const placedSlotIds = new Set(
+    assembly.placedComponents.map((p) => p.slotId).filter(Boolean),
+  )
+  const emptySlots = assembly.slots.filter((s) => !placedSlotIds.has(s.id))
+  if (emptySlots.length === 0) {
+    return { filled: 0, total: assembly.slots.length, assembly }
+  }
+
+  function isCompatible(
+    slot: TemplateSlot,
+    comp: CatalogComponent,
+  ): boolean {
+    const categoryMatch =
+      slot.compatibleCategories.length === 0 ||
+      slot.compatibleCategories.some((cat) =>
+        comp.category.toLowerCase().includes(cat.toLowerCase()),
+      )
+    const tierMatch =
+      slot.compatibleTiers.length === 0 ||
+      slot.compatibleTiers.includes(comp.tier)
+    return categoryMatch && tierMatch
+  }
+
+  function scoreComponent(comp: CatalogComponent): number {
+    let score = 0
+    const cost = (comp.procurement?.typical_cost_gbp as number) ?? 0
+    const mass = (comp.physicalProperties?.mass as Record<string, unknown>)
+      ?.typical_g as number | undefined
+    if (cost > 0) score += 10
+    if (mass != null && mass > 0) score += 5
+    return score
+  }
+
+  let filled = 0
+  for (const slot of emptySlots) {
+    const compatible = components
+      .filter((c) => isCompatible(slot, c))
+      .sort((a, b) => scoreComponent(b) - scoreComponent(a))
+    const best = compatible[0]
+    if (!best) continue
+    const result = await assignComponentToSlot(
+      assemblyId,
+      slot.id,
+      best.slug,
+      best.name,
+    )
+    if ("error" in result) continue
+    filled++
+  }
+
+  const updated = await getAssembly(assemblyId)
+  if ("error" in updated) {
+    return { filled, total: assembly.slots.length, assembly }
+  }
+  return { filled, total: assembly.slots.length, assembly: updated }
+}
+
 // ─── generateSkeletonFromDescription ─────────────────────────────────
 
 /**

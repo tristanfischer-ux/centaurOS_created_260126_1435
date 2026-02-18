@@ -1,11 +1,11 @@
 "use client"
 
 /**
- * @file schematic-view.tsx — 2D SVG schematic with interactive component slots.
+ * @file schematic-view.tsx — React Flow schematic with draggable assembly slots.
  *
- * @description Renders an SVG diagram of the assembly with clickable slots.
- * Empty slots pulse gently (like RPG equipment slots). Filled slots show
- * the component name and a colored indicator. Slots are color-coded by group.
+ * @description Renders an interactive diagram of the assembly with clickable,
+ * draggable slot nodes, group-colored edges, and completion indicator.
+ * Replaces the previous static SVG implementation.
  *
  * @component
  * @example
@@ -17,10 +17,26 @@
  * />
  */
 
-import { useMemo } from "react"
+import { useMemo, useCallback, useEffect } from "react"
+import {
+  ReactFlow,
+  Background,
+  BackgroundVariant,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+} from "@xyflow/react"
+import "@xyflow/react/dist/style.css"
+
 import { cn } from "@/lib/utils"
 
+import { AssemblySlotNode } from "./assembly-slot-node"
+import type { AssemblySlotNodeData } from "./assembly-slot-node"
+import { computeAssemblyLayout } from "./assembly-auto-layout"
+
 import type { TemplateSlot, PlacedComponent } from "@/actions/assembly-builder"
+import type { Node, Edge } from "@xyflow/react"
 
 // ─── Group Colors ────────────────────────────────────────────────────
 
@@ -35,9 +51,6 @@ const GROUP_COLORS: Record<string, { fill: string; stroke: string; text: string 
   default: { fill: "#f8fafc", stroke: "#94a3b8", text: "#475569" },
 }
 
-/**
- * Gets color scheme for a slot group.
- */
 function getGroupColor(group: string): { fill: string; stroke: string; text: string } {
   return GROUP_COLORS[group.toLowerCase()] ?? GROUP_COLORS.default
 }
@@ -53,17 +66,78 @@ interface SchematicViewProps {
   activeSlotId: string | null
   /** Called when a slot is clicked */
   onSlotClick: (slotId: string) => void
-  /** Custom SVG from template (rendered as background) */
+  /** Custom SVG from template (optional; not used in React Flow version) */
   customSvg?: string | null
   /** Optional className */
   className?: string
 }
 
-// ─── Slot Dimensions ─────────────────────────────────────────────────
+// ─── Node types ──────────────────────────────────────────────────────
 
-const SLOT_WIDTH = 120
-const SLOT_HEIGHT = 56
-const SLOT_RADIUS = 10
+const nodeTypes = {
+  assemblySlot: AssemblySlotNode,
+}
+
+// ─── Build nodes and edges ───────────────────────────────────────────
+
+function buildNodesAndEdges(
+  slots: TemplateSlot[],
+  placedBySlot: Map<string, PlacedComponent>,
+  activeSlotId: string | null,
+  layout: Map<string, { x: number; y: number }>,
+): { nodes: Node[]; edges: Edge[] } {
+  const nodes: Node[] = []
+  const grouped = new Map<string, TemplateSlot[]>()
+  for (const slot of slots) {
+    const g = slot.group.toLowerCase()
+    if (!grouped.has(g)) grouped.set(g, [])
+    grouped.get(g)!.push(slot)
+  }
+
+  for (const slot of slots) {
+    const pos = layout.get(slot.id) ?? { x: slot.position.x, y: slot.position.y }
+    const placed = placedBySlot.get(slot.id)
+    const isFilled = !!placed
+    const color = getGroupColor(slot.group)
+    const data: AssemblySlotNodeData = {
+      slotId: slot.id,
+      label: slot.label,
+      group: slot.group,
+      required: slot.required,
+      isFilled,
+      componentName: placed?.componentName,
+      isActive: activeSlotId === slot.id,
+      groupFill: color.fill,
+      groupStroke: color.stroke,
+      groupText: color.text,
+    }
+    nodes.push({
+      id: slot.id,
+      type: "assemblySlot",
+      position: pos,
+      data,
+      draggable: true,
+    })
+  }
+
+  const edges: Edge[] = []
+  for (const [, groupSlots] of grouped) {
+    if (groupSlots.length < 2) continue
+    const color = getGroupColor(groupSlots[0].group)
+    for (let i = 0; i < groupSlots.length - 1; i++) {
+      edges.push({
+        id: `edge-${groupSlots[i].id}-${groupSlots[i + 1].id}`,
+        source: groupSlots[i].id,
+        target: groupSlots[i + 1].id,
+        type: "smoothstep",
+        animated: true,
+        style: { stroke: color.stroke, strokeWidth: 1.5 },
+      })
+    }
+  }
+
+  return { nodes, edges }
+}
 
 // ─── Component ───────────────────────────────────────────────────────
 
@@ -72,10 +146,8 @@ export function SchematicView({
   placedComponents,
   activeSlotId,
   onSlotClick,
-  customSvg,
   className,
 }: SchematicViewProps): React.ReactNode {
-  // Build a lookup of slotId -> placed component
   const placedBySlot = useMemo(() => {
     const map = new Map<string, PlacedComponent>()
     for (const pc of placedComponents) {
@@ -84,45 +156,56 @@ export function SchematicView({
     return map
   }, [placedComponents])
 
-  // Calculate SVG viewBox from slot positions
-  const viewBox = useMemo(() => {
-    if (slots.length === 0) return "0 0 600 400"
-    const padding = 80
-    let minX = Infinity
-    let minY = Infinity
-    let maxX = -Infinity
-    let maxY = -Infinity
-    for (const slot of slots) {
-      minX = Math.min(minX, slot.position.x)
-      minY = Math.min(minY, slot.position.y)
-      maxX = Math.max(maxX, slot.position.x + SLOT_WIDTH)
-      maxY = Math.max(maxY, slot.position.y + SLOT_HEIGHT)
-    }
-    return `${minX - padding} ${minY - padding} ${maxX - minX + padding * 2} ${maxY - minY + padding * 2}`
-  }, [slots])
+  const layout = useMemo(() => computeAssemblyLayout(slots), [slots])
 
-  // Group slots by group for rendering connection lines
-  const groupedSlots = useMemo(() => {
-    const groups = new Map<string, TemplateSlot[]>()
-    for (const slot of slots) {
-      const existing = groups.get(slot.group) ?? []
-      existing.push(slot)
-      groups.set(slot.group, existing)
-    }
-    return groups
-  }, [slots])
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(
+    () => buildNodesAndEdges(slots, placedBySlot, activeSlotId, layout),
+    [slots, placedBySlot, activeSlotId, layout],
+  )
 
-  // Completion percentage for the ring
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+
+  // Sync node data when slots/placed/activeSlotId change; preserve drag positions
+  useEffect(() => {
+    const next = buildNodesAndEdges(slots, placedBySlot, activeSlotId, layout)
+    setNodes((current) =>
+      next.nodes.map((nextNode) => {
+        const existing = current.find((n) => n.id === nextNode.id)
+        return {
+          ...nextNode,
+          position: existing?.position ?? nextNode.position,
+        }
+      }),
+    )
+    setEdges(next.edges)
+  }, [slots, placedBySlot, activeSlotId, layout, setNodes, setEdges])
+
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      onSlotClick(node.id)
+    },
+    [onSlotClick],
+  )
+
   const filledCount = placedComponents.filter((pc) =>
     slots.some((s) => s.id === pc.slotId),
   ).length
   const totalCount = slots.length
   const completionPct = totalCount > 0 ? (filledCount / totalCount) * 100 : 0
 
+  if (slots.length === 0) {
+    return (
+      <div className={cn("flex items-center justify-center w-full h-full min-h-[300px]", className)}>
+        <p className="text-sm text-muted-foreground">No slots in this assembly.</p>
+      </div>
+    )
+  }
+
   return (
-    <div className={cn("relative w-full h-full flex items-center justify-center", className)}>
-      {/* Completion ring (background) */}
-      <div className="absolute top-4 right-4 flex items-center gap-2">
+    <div className={cn("relative w-full h-full", className)}>
+      {/* Completion ring */}
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
         <svg width="36" height="36" viewBox="0 0 36 36">
           <circle
             cx="18"
@@ -137,7 +220,11 @@ export function SchematicView({
             cy="18"
             r="14"
             fill="none"
-            stroke={completionPct === 100 ? "hsl(var(--status-success))" : "hsl(var(--international-orange))"}
+            stroke={
+              completionPct === 100
+                ? "hsl(var(--status-success))"
+                : "hsl(var(--international-orange))"
+            }
             strokeWidth="3"
             strokeDasharray={`${(completionPct / 100) * 87.96} 87.96`}
             strokeLinecap="round"
@@ -150,194 +237,37 @@ export function SchematicView({
         </span>
       </div>
 
-      <svg
-        viewBox={viewBox}
-        className="w-full h-full max-h-[600px]"
-        style={{ minHeight: 300 }}
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.2 }}
+        minZoom={0.2}
+        maxZoom={1.5}
+        defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+        className="bg-muted/10"
       >
-        {/* CSS Animations */}
-        <defs>
-          <style>{`
-            @keyframes slotPulse {
-              0%, 100% { opacity: 0.6; }
-              50% { opacity: 1; }
-            }
-            .slot-empty { animation: slotPulse 2s ease-in-out infinite; }
-            .slot-active { filter: drop-shadow(0 0 8px rgba(255, 69, 0, 0.5)); }
-          `}</style>
-        </defs>
+        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+        <Controls showInteractive={false} />
+        <MiniMap
+          nodeColor={(n) => {
+            const d = n.data as AssemblySlotNodeData
+            return d.groupStroke ?? "#94a3b8"
+          }}
+          maskColor="hsl(var(--background) / 0.8)"
+        />
+      </ReactFlow>
 
-        {/* Custom SVG background (if template provides one) */}
-        {customSvg && (
-          <g opacity="0.15" dangerouslySetInnerHTML={{ __html: customSvg }} />
-        )}
-
-        {/* Group connection lines */}
-        {Array.from(groupedSlots.entries()).map(([group, groupSlots]) => {
-          if (groupSlots.length < 2) return null
-          const color = getGroupColor(group)
-          const points = groupSlots.map(
-            (s) => `${s.position.x + SLOT_WIDTH / 2},${s.position.y + SLOT_HEIGHT / 2}`,
-          )
-          return (
-            <polyline
-              key={`line-${group}`}
-              points={points.join(" ")}
-              fill="none"
-              stroke={color.stroke}
-              strokeWidth="1.5"
-              strokeDasharray="6 4"
-              opacity="0.3"
-            />
-          )
-        })}
-
-        {/* Group labels */}
-        {Array.from(groupedSlots.entries()).map(([group, groupSlots]) => {
-          const color = getGroupColor(group)
-          const avgX =
-            groupSlots.reduce((sum, s) => sum + s.position.x, 0) /
-            groupSlots.length
-          const minY = Math.min(...groupSlots.map((s) => s.position.y))
-          return (
-            <text
-              key={`label-${group}`}
-              x={avgX + SLOT_WIDTH / 2}
-              y={minY - 14}
-              textAnchor="middle"
-              fill={color.text}
-              fontSize="10"
-              fontWeight="600"
-              fontFamily="monospace"
-              letterSpacing="0.1em"
-            >
-              {group.toUpperCase()}
-            </text>
-          )
-        })}
-
-        {/* Slots */}
-        {slots.map((slot) => {
-          const placed = placedBySlot.get(slot.id)
-          const isFilled = !!placed
-          const isActive = activeSlotId === slot.id
-          const color = getGroupColor(slot.group)
-
-          return (
-            <g
-              key={slot.id}
-              transform={`translate(${slot.position.x}, ${slot.position.y})`}
-              onClick={() => onSlotClick(slot.id)}
-              style={{ cursor: "pointer" }}
-              role="button"
-              aria-label={`${slot.label}${isFilled ? ` — ${placed.componentName}` : " — empty"}`}
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault()
-                  onSlotClick(slot.id)
-                }
-              }}
-            >
-              {/* Slot background */}
-              <rect
-                x="0"
-                y="0"
-                width={SLOT_WIDTH}
-                height={SLOT_HEIGHT}
-                rx={SLOT_RADIUS}
-                fill={isFilled ? color.fill : "white"}
-                stroke={isActive ? "#ff4500" : isFilled ? color.stroke : "#cbd5e1"}
-                strokeWidth={isActive ? 2.5 : 1.5}
-                className={cn(
-                  !isFilled && !isActive && "slot-empty",
-                  isActive && "slot-active",
-                )}
-                style={
-                  isFilled
-                    ? {}
-                    : { strokeDasharray: "4 3" }
-                }
-              />
-
-              {/* Required indicator */}
-              {slot.required && !isFilled && (
-                <circle
-                  cx={SLOT_WIDTH - 8}
-                  cy="8"
-                  r="3"
-                  fill="#ef4444"
-                />
-              )}
-
-              {/* Content */}
-              {isFilled ? (
-                <>
-                  {/* Filled: component name */}
-                  <text
-                    x={SLOT_WIDTH / 2}
-                    y="22"
-                    textAnchor="middle"
-                    fill={color.text}
-                    fontSize="10"
-                    fontWeight="600"
-                  >
-                    {truncateText(placed.componentName, 16)}
-                  </text>
-                  <text
-                    x={SLOT_WIDTH / 2}
-                    y="38"
-                    textAnchor="middle"
-                    fill={color.stroke}
-                    fontSize="8"
-                    opacity="0.7"
-                  >
-                    {slot.label}
-                  </text>
-                  {/* Filled indicator dot */}
-                  <circle
-                    cx="10"
-                    cy={SLOT_HEIGHT / 2}
-                    r="3"
-                    fill={color.stroke}
-                  />
-                </>
-              ) : (
-                <>
-                  {/* Empty: slot label */}
-                  <text
-                    x={SLOT_WIDTH / 2}
-                    y="24"
-                    textAnchor="middle"
-                    fill="#94a3b8"
-                    fontSize="10"
-                    fontWeight="500"
-                  >
-                    {truncateText(slot.label, 16)}
-                  </text>
-                  <text
-                    x={SLOT_WIDTH / 2}
-                    y="40"
-                    textAnchor="middle"
-                    fill="#cbd5e1"
-                    fontSize="8"
-                  >
-                    Click to assign
-                  </text>
-                </>
-              )}
-            </g>
-          )
-        })}
-      </svg>
+      {/* Hint */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
+        <p className="text-xs text-muted-foreground bg-background/90 rounded-full px-3 py-1.5 shadow-sm border">
+          Drag nodes to rearrange · Click a slot to assign a component
+        </p>
+      </div>
     </div>
   )
-}
-
-/**
- * Truncates text with ellipsis.
- */
-function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text
-  return text.slice(0, maxLength - 1) + "…"
 }

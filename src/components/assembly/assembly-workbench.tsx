@@ -27,7 +27,6 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
 
 import { ComponentCatalog } from "./component-catalog"
 import { SchematicView } from "./schematic-view"
@@ -41,6 +40,7 @@ import {
   removeComponentFromSlot,
   bridgeToCadLab,
   getAssemblyEnrichment,
+  autoFillAssembly,
 } from "@/actions/assembly-builder"
 
 import type {
@@ -336,6 +336,29 @@ export function AssemblyWorkbench({
           <Button
             variant="outline"
             size="sm"
+            disabled={isPending || assembly.slots.length === 0}
+            onClick={() => {
+              startTransition(async () => {
+                toast.info("Auto-filling slots...")
+                const result = await autoFillAssembly(assemblyId)
+                if ("error" in result) {
+                  toast.error(result.error)
+                  return
+                }
+                setAssembly(result.assembly)
+                toast.success(
+                  result.filled > 0
+                    ? `Auto-filled ${result.filled} of ${result.total} slots`
+                    : "No empty slots to fill",
+                )
+              })
+            }}
+          >
+            Auto-Fill Slots
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             disabled={isPending}
           >
             <Save className="h-3.5 w-3.5 mr-1.5" />
@@ -401,12 +424,37 @@ export function AssemblyWorkbench({
             </div>
           )}
 
-          {/* Hint when no slot selected */}
-          {!activeSlotId && assembly.placedComponents.length === 0 && (
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
-              <p className="text-sm text-muted-foreground bg-background/90 rounded-full px-4 py-2 shadow-sm border">
-                Click a slot on the schematic to start building
-              </p>
+          {/* Auto-fill prompt when no components placed */}
+          {assembly.placedComponents.length === 0 && (
+            <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10">
+              <div className="bg-background/95 rounded-lg border shadow-md px-4 py-3 flex items-center gap-3">
+                <p className="text-sm text-muted-foreground">
+                  Auto-fill recommended components?
+                </p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={isPending}
+                  onClick={() => {
+                    startTransition(async () => {
+                      toast.info("Auto-filling slots...")
+                      const result = await autoFillAssembly(assemblyId)
+                      if ("error" in result) {
+                        toast.error(result.error)
+                        return
+                      }
+                      setAssembly(result.assembly)
+                      toast.success(
+                        result.filled > 0
+                          ? `Auto-filled ${result.filled} of ${result.total} slots`
+                          : "No compatible components found for empty slots",
+                      )
+                    })
+                  }}
+                >
+                  Auto-Fill
+                </Button>
+              </div>
             </div>
           )}
         </div>
