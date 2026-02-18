@@ -22,6 +22,8 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database.types'
 import { countTokens, countMessagesTokens } from './token-counter'
 import { runObserver } from './observer'
 import { runReflector } from './reflector'
@@ -169,24 +171,30 @@ export async function addMemoryMessage(
 
 // ─── Get Memory Context ─────────────────────────────────────────────
 
+/** Number of most recent messages to include in conversation context regardless of observation status. */
+const RECENT_MESSAGES_FOR_CONTEXT = 20
+
 /**
  * Assembles the memory context for injection into an AI prompt.
  *
- * @description Fetches observations and recent unobserved messages for a
- * thread, returning them as a formatted block ready for system prompt
- * injection. Optionally merges in foundry-level observations.
+ * @description Fetches observations and the N most recent messages (regardless of
+ * is_observed) so conversation history survives observation cycles. Observations
+ * provide compressed background; recent messages provide actual multi-turn context.
+ * Optionally merges in foundry-level observations.
  *
  * @param threadId - The thread to get context for
  * @param foundryId - The foundry for RLS isolation
  * @param includeFoundryMemory - Whether to merge foundry-level observations
+ * @param supabaseClient - Optional client (e.g. admin client for Telegram); when omitted, uses authenticated server client
  * @returns The assembled memory context
  */
 export async function getMemoryContext(
   threadId: string,
   foundryId: string,
-  includeFoundryMemory: boolean = false
+  includeFoundryMemory: boolean = false,
+  supabaseClient?: SupabaseClient<Database>
 ): Promise<MemoryContext> {
-  const supabase = await createClient()
+  const supabase = supabaseClient ?? (await createClient())
   const emptyContext: MemoryContext = { observations: '', recentMessages: [], totalTokens: 0 }
 
   // Fetch observations for this thread
@@ -226,18 +234,21 @@ export async function getMemoryContext(
     }
   }
 
-  // Fetch recent unobserved messages
+  // Fetch the N most recent messages regardless of is_observed so conversation
+  // history survives observation cycles (observed messages stay in context).
   const { data: messageRows } = await supabase
     .from('agent_memory_messages')
     .select('role, content')
     .eq('thread_id', threadId)
-    .eq('is_observed', false)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
+    .limit(RECENT_MESSAGES_FOR_CONTEXT)
 
-  const recentMessages = (messageRows ?? []).map((m) => ({
-    role: m.role as 'system' | 'user' | 'assistant' | 'tool',
-    content: m.content as string,
-  }))
+  const recentMessages = (messageRows ?? [])
+    .reverse()
+    .map((m) => ({
+      role: m.role as 'system' | 'user' | 'assistant' | 'tool',
+      content: m.content as string,
+    }))
 
   const obsTokens = countTokens(observations)
   const msgTokens = countMessagesTokens(recentMessages)

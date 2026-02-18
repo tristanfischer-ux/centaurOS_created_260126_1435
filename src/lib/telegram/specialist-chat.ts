@@ -28,6 +28,11 @@ import { compilePersonalityPrompt, compileRelationshipContext } from '@/lib/agen
 import { compileTemporalPrompt } from '@/lib/agents/temporal-context'
 import { compileEmotionalPrompt } from '@/lib/agents/emotional-context'
 import { buildAIContext } from '@/lib/ai-context/builder'
+import {
+    getMemoryContext,
+    formatObservationsForPrompt,
+    getConversationHistory,
+} from '@/lib/agent-memory'
 
 import type { AIProviderId } from '@/lib/ai-providers/types'
 
@@ -258,6 +263,7 @@ export async function sendToSpecialist(
             includeObjectives: true,
             includeUserProfile: false,
             includeInsightHistory: false,
+            includeEngineeringHistory: true,
         })
         if (companyContext) {
             systemPrompt += `\n\n${companyContext}`
@@ -266,21 +272,21 @@ export async function sendToSpecialist(
         console.warn('[Telegram/SpecialistChat] Could not load company context:', err)
     }
 
-    // 8. Memory context (recent messages from this thread)
+    // 8. Observational memory (compressed observations + recent messages as multi-turn context)
+    let conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = []
     try {
-        const { data: recentMessages } = await supabase
-            .from('agent_memory_messages')
-            .select('role, content')
-            .eq('thread_id', session.threadId)
-            .eq('foundry_id', session.foundryId)
-            .order('created_at', { ascending: false })
-            .limit(20)
-
-        if (recentMessages && recentMessages.length > 0) {
-            const reversed = recentMessages.reverse()
-            const memoryLines = reversed.map(m => `${m.role}: ${m.content}`).join('\n')
-            systemPrompt += `\n\n## Conversation History\n${memoryLines}`
+        const adminClient = createAdminClient()
+        const memoryContext = await getMemoryContext(
+            session.threadId,
+            session.foundryId,
+            false,
+            adminClient,
+        )
+        const observationsBlock = formatObservationsForPrompt(memoryContext)
+        if (observationsBlock) {
+            systemPrompt += `\n\n## Agent Memory\n${observationsBlock}`
         }
+        conversationHistory = getConversationHistory(memoryContext)
     } catch (err) {
         console.warn('[Telegram/SpecialistChat] Could not load memory:', err)
     }
@@ -314,6 +320,7 @@ export async function sendToSpecialist(
         modelId,
         systemPrompt,
         userPrompt: userMessage,
+        conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
         maxTokens: 4096,
         onChunk(text: string) {
             fullOutput += text

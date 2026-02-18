@@ -640,8 +640,8 @@ export function BriefSpecialistDialog({
                 // Pre-populate chat with recent history so users see previous discussion
                 if (historyResult.data && historyResult.data.length > 0) {
                     setHistoryMessages(historyResult.data)
-                    // Show the last 6 messages (3 exchanges) as inline historical context
-                    const recentHistory = historyResult.data.slice(-6)
+                    // Show the last 10 messages (5 exchanges) as inline historical context
+                    const recentHistory = historyResult.data.slice(-10)
                     const historicalMessages: ChatMessage[] = recentHistory.map((msg) => ({
                         role: msg.role as "user" | "assistant",
                         content: msg.content,
