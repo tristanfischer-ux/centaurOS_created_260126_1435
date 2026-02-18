@@ -35,6 +35,7 @@ export interface ComponentListItem {
   geometry_type_slug: string
   material: string | null
   verified: boolean | null
+  thumbnail_url: string | null
   price_min: number | null
   price_max: number | null
   currency: string | null
@@ -76,7 +77,7 @@ export async function getComponents(
   // Base query on component_catalogue
   let query = supabase
     .from("component_catalogue")
-    .select("id, name, manufacturer, geometry_type_slug, material, verified, tags", { count: "exact" })
+    .select("id, name, manufacturer, geometry_type_slug, material, verified, thumbnail_url, tags", { count: "exact" })
 
   // Apply search filter
   if (search) {
@@ -192,6 +193,7 @@ export async function getComponents(
       geometry_type_slug: comp.geometry_type_slug,
       material: comp.material,
       verified: comp.verified,
+      thumbnail_url: comp.thumbnail_url ?? null,
       price_min: pricing?.min ?? null,
       price_max: pricing?.max ?? null,
       currency: pricing?.currency ?? null,

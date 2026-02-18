@@ -21,6 +21,8 @@ interface STLViewerProps {
   stlData: string
   /** Optional background color (default: dark gray) */
   backgroundColor?: string
+  /** Optional class name for the wrapper (e.g. min-h-0 for fixed-height containers) */
+  className?: string
 }
 
 function STLModel({ stlData }: { stlData: string }) {
@@ -122,9 +124,9 @@ function STLModel({ stlData }: { stlData: string }) {
   )
 }
 
-export function STLViewer({ stlData, backgroundColor = "#f5f5f5" }: STLViewerProps) {
+export function STLViewer({ stlData, backgroundColor = "#f5f5f5", className }: STLViewerProps) {
   return (
-    <div className="w-full h-full min-h-[400px] rounded-lg overflow-hidden border border-border">
+    <div className={`w-full h-full min-h-[400px] rounded-lg overflow-hidden border border-border ${className ?? ""}`}>
       <Canvas
         shadows
         style={{ background: backgroundColor }}

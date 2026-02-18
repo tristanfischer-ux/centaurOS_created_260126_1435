@@ -3472,6 +3472,8 @@ export type Database = {
           foundry_id: string
           generated_code: string | null
           id: string
+          integrated_assembly_stl_url: string | null
+          integrated_assembly_step_url: string | null
           interface_definition: string | null
           model_id: string
           modules: Json | null
@@ -3492,6 +3494,8 @@ export type Database = {
           foundry_id: string
           generated_code?: string | null
           id?: string
+          integrated_assembly_stl_url?: string | null
+          integrated_assembly_step_url?: string | null
           interface_definition?: string | null
           model_id?: string
           modules?: Json | null
@@ -3512,6 +3516,8 @@ export type Database = {
           foundry_id?: string
           generated_code?: string | null
           id?: string
+          integrated_assembly_stl_url?: string | null
+          integrated_assembly_step_url?: string | null
           interface_definition?: string | null
           model_id?: string
           modules?: Json | null
@@ -3522,6 +3528,51 @@ export type Database = {
           status?: string
           subject?: string
           thumbnail_svg?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      reference_models: {
+        Row: {
+          id: string
+          category: string
+          name: string
+          step_url: string | null
+          stl_url: string | null
+          thumbnail_svg: string | null
+          description: string | null
+          search_keywords: string[]
+          module_template: Json
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          category: string
+          name: string
+          step_url?: string | null
+          stl_url?: string | null
+          thumbnail_svg?: string | null
+          description?: string | null
+          search_keywords?: string[]
+          module_template?: Json
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          category?: string
+          name?: string
+          step_url?: string | null
+          stl_url?: string | null
+          thumbnail_svg?: string | null
+          description?: string | null
+          search_keywords?: string[]
+          module_template?: Json
+          sort_order?: number
+          created_at?: string
           updated_at?: string
         }
         Relationships: []
@@ -3765,6 +3816,7 @@ export type Database = {
           part_number: string | null
           sources: Json | null
           tags: string[] | null
+          thumbnail_url: string | null
           updated_at: string | null
           verified: boolean | null
           weight_g: number | null
@@ -3786,6 +3838,7 @@ export type Database = {
           part_number?: string | null
           sources?: Json | null
           tags?: string[] | null
+          thumbnail_url?: string | null
           updated_at?: string | null
           verified?: boolean | null
           weight_g?: number | null
@@ -3807,6 +3860,7 @@ export type Database = {
           part_number?: string | null
           sources?: Json | null
           tags?: string[] | null
+          thumbnail_url?: string | null
           updated_at?: string | null
           verified?: boolean | null
           weight_g?: number | null
@@ -15879,15 +15933,10 @@ export type Database = {
         Args: { p_company_profile: Json; p_foundry_id: string }
         Returns: Json
       }
-      update_foundry_purpose:
-        | {
-            Args: { p_foundry_id: string; p_purpose_data: Json }
-            Returns: Json
-          }
-        | {
-            Args: { p_foundry_id: string; p_purpose_data: Json }
-            Returns: Json
-          }
+      update_foundry_purpose: {
+        Args: { p_foundry_id: string; p_purpose_data: Json }
+        Returns: Json
+      }
       update_foundry_sector: {
         Args: { p_foundry_id: string; p_sector: string }
         Returns: undefined

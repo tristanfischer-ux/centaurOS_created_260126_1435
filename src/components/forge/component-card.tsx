@@ -34,13 +34,13 @@ export function ComponentCard({ component, onClick, className }: ComponentCardPr
     manufacturer,
     price_min,
     price_max,
-    currency,
     avg_rating,
     review_count,
     cert_count,
     compat_count,
     geometry_type_slug,
     verified,
+    thumbnail_url,
   } = component
 
   const priceLabel = price_min != null && price_max != null
@@ -68,6 +68,20 @@ export function ComponentCard({ component, onClick, className }: ComponentCardPr
       )}
     >
       <CardContent className="p-4 space-y-3">
+        {/* Thumbnail or placeholder */}
+        <div className="h-24 w-full rounded-md border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
+          {thumbnail_url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={thumbnail_url}
+              alt=""
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <Package className="h-8 w-8 text-muted-foreground" />
+          )}
+        </div>
+
         {/* Header: Name + Category */}
         <div className="space-y-1">
           <div className="flex items-start justify-between gap-2">

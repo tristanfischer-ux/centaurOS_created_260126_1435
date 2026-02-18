@@ -34,6 +34,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { getComponentDetail } from '@/actions/component-library'
 import type { ComponentDetail } from '@/actions/component-library'
+import { STLViewer } from '@/components/cad/stl-viewer'
+import { AssemblyPickerDialog } from '@/components/forge/assembly-picker-dialog'
 
 // ============================================================================
 // CONSTANTS
@@ -112,6 +114,9 @@ export function ComponentDetailDialog({
   const [detail, setDetail] = useState<ComponentDetail | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [stlData, setStlData] = useState<string | null>(null)
+  const [assemblyPickerOpen, setAssemblyPickerOpen] = useState(false)
 
   const loadDetail = useCallback(async () => {
     if (!componentId) return
@@ -132,8 +137,35 @@ export function ComponentDetailDialog({
     } else {
       setDetail(null)
       setError(null)
+      setStlData(null)
     }
   }, [open, componentId, loadDetail])
+
+  const handleGeneratePreview = useCallback(async () => {
+    if (!componentId) return
+    setPreviewLoading(true)
+    setStlData(null)
+    try {
+      const res = await fetch('/api/components/generate-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ componentId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error ?? 'Preview failed')
+      }
+      setStlData(data.stlData)
+      if (data.svgUrl) {
+        loadDetail()
+      }
+    } catch (err) {
+      console.error('[ComponentDetailDialog] Preview failed:', err)
+      setError(err instanceof Error ? err.message : 'Preview failed')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }, [componentId, loadDetail])
 
   const comp = detail?.component
   const pricing = detail?.pricing
@@ -209,7 +241,15 @@ export function ComponentDetailDialog({
             <div className="flex-1 overflow-y-auto mt-4">
               {/* Overview Tab */}
               <TabsContent value="overview" className="space-y-4 m-0">
-                <OverviewTab component={comp} componentName={displayName} />
+                <OverviewTab
+                  component={comp}
+                  componentName={displayName}
+                  thumbnailUrl={(comp?.thumbnail_url as string) ?? null}
+                  previewLoading={previewLoading}
+                  stlData={stlData}
+                  onGeneratePreview={handleGeneratePreview}
+                  onClearPreview={() => setStlData(null)}
+                />
               </TabsContent>
 
               {/* Pricing Tab */}
@@ -278,8 +318,11 @@ export function ComponentDetailDialog({
                 </Button>
               )}
 
-              {/* Add to Assembly placeholder */}
-              <Button size="sm">
+              <Button
+                size="sm"
+                onClick={() => componentId && setAssemblyPickerOpen(true)}
+                disabled={!componentId}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add to Assembly
               </Button>
@@ -287,6 +330,15 @@ export function ComponentDetailDialog({
           </div>
         </DialogFooter>
       </DialogContent>
+      {componentId && (
+        <AssemblyPickerDialog
+          open={assemblyPickerOpen}
+          onOpenChange={setAssemblyPickerOpen}
+          componentId={componentId}
+          componentName={displayName}
+          onSuccess={() => onOpenChange(false)}
+        />
+      )}
     </Dialog>
   )
 }
@@ -373,9 +425,19 @@ function humanizeSlug(slug: string): string {
 function OverviewTab({
   component,
   componentName,
+  thumbnailUrl,
+  previewLoading,
+  stlData,
+  onGeneratePreview,
+  onClearPreview,
 }: {
   component: Record<string, unknown> | undefined
   componentName: string
+  thumbnailUrl: string | null
+  previewLoading: boolean
+  stlData: string | null
+  onGeneratePreview: () => Promise<void>
+  onClearPreview: () => void
 }) {
   if (!component) return <EmptyTabMessage message="No component data available." />
 
@@ -403,6 +465,69 @@ function OverviewTab({
 
   return (
     <div className="space-y-6">
+      {/* 3D Preview section */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-foreground uppercase tracking-wider">
+          Preview
+        </p>
+        {stlData ? (
+          <div className="space-y-2">
+            <div className="h-[200px] w-full rounded-lg overflow-hidden border border-border">
+              <STLViewer stlData={stlData} className="!min-h-0 h-full" />
+            </div>
+            <Button variant="outline" size="sm" onClick={onClearPreview}>
+              Close 3D view
+            </Button>
+          </div>
+        ) : thumbnailUrl ? (
+          <div className="flex flex-col gap-2">
+            <div className="h-[120px] w-full rounded-lg overflow-hidden border border-border bg-muted/30 flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={thumbnailUrl}
+                alt={`${componentName} preview`}
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onGeneratePreview}
+              disabled={previewLoading}
+            >
+              {previewLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                'View in 3D'
+              )}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="h-[120px] w-full rounded-lg border border-border bg-muted/30 flex items-center justify-center">
+              <Package className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <Button
+              size="sm"
+              onClick={onGeneratePreview}
+              disabled={previewLoading}
+            >
+              {previewLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                'Generate 3D Preview'
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Component summary */}
       <p className="text-sm text-muted-foreground leading-relaxed">
         {summary}
