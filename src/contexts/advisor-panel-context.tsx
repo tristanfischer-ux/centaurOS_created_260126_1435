@@ -82,20 +82,8 @@ const AdvisorPanelContext = createContext<AdvisorPanelContextValue | null>(null)
  *
  * @description Wraps the platform layout so any component can open,
  * close, or switch the advisor panel without managing local dialog state.
+ * Panel always opens in sidebar mode; expand is session-only (not persisted).
  */
-const PANEL_VIEW_MODE_KEY = "forgeOS-advisor-panel-view-mode"
-
-function getStoredPanelViewMode(): PanelViewMode {
-  if (typeof window === "undefined") return "sidebar"
-  try {
-    const stored = localStorage.getItem(PANEL_VIEW_MODE_KEY)
-    if (stored === "expanded" || stored === "sidebar") return stored
-  } catch {
-    /* ignore */
-  }
-  return "sidebar"
-}
-
 export function AdvisorPanelProvider({ children }: { children: ReactNode }): React.ReactElement {
   const [state, setState] = useState<AdvisorPanelState>(() => ({
     isOpen: false,
@@ -103,7 +91,7 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     handoffContext: null,
     referredBy: null,
     contextLabel: null,
-    panelViewMode: getStoredPanelViewMode(),
+    panelViewMode: "sidebar",
   }))
 
   const openPanel = useCallback((specialistId: string, options?: OpenPanelOptions) => {
@@ -166,35 +154,20 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
 
   const expandPanel = useCallback(() => {
     setState((prev) => ({ ...prev, panelViewMode: "expanded" }))
-    try {
-      localStorage.setItem(PANEL_VIEW_MODE_KEY, "expanded")
-    } catch {
-      /* ignore */
-    }
   }, [])
 
   const collapsePanel = useCallback(() => {
     setState((prev) => ({ ...prev, panelViewMode: "sidebar" }))
-    try {
-      localStorage.setItem(PANEL_VIEW_MODE_KEY, "sidebar")
-    } catch {
-      /* ignore */
-    }
   }, [])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "e") {
         e.preventDefault()
-        setState((prev) => {
-          const next = prev.panelViewMode === "expanded" ? "sidebar" : "expanded"
-          try {
-            localStorage.setItem(PANEL_VIEW_MODE_KEY, next)
-          } catch {
-            /* ignore */
-          }
-          return { ...prev, panelViewMode: next }
-        })
+        setState((prev) => ({
+          ...prev,
+          panelViewMode: prev.panelViewMode === "expanded" ? "sidebar" : "expanded",
+        }))
       }
     }
     window.addEventListener("keydown", handleKeyDown)
