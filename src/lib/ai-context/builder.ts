@@ -73,6 +73,8 @@ export interface AIContextOptions {
   includeBriefings?: boolean
   /** Specialist ID when building context for a specific specialist (enables includeBriefings) */
   specialistId?: string
+  /** Include engineering history: past CAD Lab projects, recommendation preferences */
+  includeEngineeringHistory?: boolean
 }
 
 /**
@@ -441,6 +443,53 @@ async function buildAIContextUncached(
         }
       } catch (err) {
         console.debug('[AIContextBuilder] Failed to load specialist briefing:', err)
+      }
+    }
+
+    // ── 13. Engineering history (optional) ──────────────────────────
+    if (options.includeEngineeringHistory) {
+      try {
+        const engParts: string[] = []
+
+        const { data: cadProjects } = await supabase
+          .from('cad_lab_projects')
+          .select('subject, name, status, stage, modules')
+          .eq('foundry_id', foundryId)
+          .order('updated_at', { ascending: false })
+          .limit(10)
+
+        if (cadProjects && cadProjects.length > 0) {
+          const projectLines = cadProjects.map((p) => {
+            const mods = p.modules as Array<{ name?: string }> | null
+            const modNames = mods?.map((m) => m.name).filter(Boolean).slice(0, 4).join(', ')
+            const modSuffix = modNames ? ` [${modNames}]` : ''
+            return `- ${p.subject} (${p.status})${modSuffix}`
+          })
+          engParts.push(`Past CAD Lab projects:\n${projectLines.join('\n')}`)
+        }
+
+        const { data: feedback } = await supabase
+          .from('recommendation_feedback')
+          .select('source_type, feedback_type, source_id, metadata')
+          .eq('foundry_id', foundryId)
+          .in('feedback_type', ['thumbs_up', 'component_swap', 'module_built'])
+          .order('created_at', { ascending: false })
+          .limit(15)
+
+        if (feedback && feedback.length > 0) {
+          const prefLines = feedback.map((f) => {
+            const meta = f.metadata as Record<string, unknown> | null
+            const swap = meta?.replacement_component_id ? ` → ${String(meta.replacement_component_id)}` : ''
+            return `- ${f.feedback_type} on ${f.source_type}${f.source_id ? ` (${f.source_id})` : ''}${swap}`
+          })
+          engParts.push(`Recommendation preferences (from feedback):\n${prefLines.join('\n')}`)
+        }
+
+        if (engParts.length > 0) {
+          sections.push(`Engineering context:\n${engParts.join('\n\n')}`)
+        }
+      } catch (err) {
+        console.debug('[AIContextBuilder] Failed to load engineering history:', err)
       }
     }
   } catch (err) {

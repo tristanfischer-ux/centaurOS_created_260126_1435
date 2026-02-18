@@ -1,0 +1,5 @@
+[11:20:49]     ⏱️  Response in 400.0s (12332 chars)
+[11:20:49]   ✅ 19/19 valid pricing entries
+[11:20:49] 
+[6/10] 💰 Generating pricing: Connectors & Cables (25 items)
+[11:20:49]     🤖 Streaming from qwen3:14b...

@@ -1056,6 +1056,57 @@ export type Database = {
           },
         ]
       }
+      agent_file_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_url: string
+          foundry_id: string
+          id: string
+          message_index: number
+          mime_type: string
+          size_bytes: number
+          thread_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_url: string
+          foundry_id: string
+          id?: string
+          message_index?: number
+          mime_type: string
+          size_bytes: number
+          thread_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_url?: string
+          foundry_id?: string
+          id?: string
+          message_index?: number
+          mime_type?: string
+          size_bytes?: number
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_file_attachments_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_file_attachments_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "agent_memory_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_insights: {
         Row: {
           acted_on: boolean
@@ -1125,6 +1176,7 @@ export type Database = {
           foundry_id: string
           id: string
           is_observed: boolean
+          metadata: Json
           role: string
           thread_id: string
           token_count: number
@@ -1135,6 +1187,7 @@ export type Database = {
           foundry_id: string
           id?: string
           is_observed?: boolean
+          metadata?: Json
           role?: string
           thread_id: string
           token_count?: number
@@ -1145,6 +1198,7 @@ export type Database = {
           foundry_id?: string
           id?: string
           is_observed?: boolean
+          metadata?: Json
           role?: string
           thread_id?: string
           token_count?: number
@@ -3697,7 +3751,10 @@ export type Database = {
         Row: {
           colour_override: string | null
           created_at: string | null
+          datasheet_extracted_at: string | null
+          datasheet_specs: Json | null
           datasheet_url: string | null
+          embedding: string | null
           geometry_params: Json
           geometry_type_slug: string
           id: string
@@ -3715,7 +3772,10 @@ export type Database = {
         Insert: {
           colour_override?: string | null
           created_at?: string | null
+          datasheet_extracted_at?: string | null
+          datasheet_specs?: Json | null
           datasheet_url?: string | null
+          embedding?: string | null
           geometry_params?: Json
           geometry_type_slug: string
           id?: string
@@ -3733,7 +3793,10 @@ export type Database = {
         Update: {
           colour_override?: string | null
           created_at?: string | null
+          datasheet_extracted_at?: string | null
+          datasheet_specs?: Json | null
           datasheet_url?: string | null
+          embedding?: string | null
           geometry_params?: Json
           geometry_type_slug?: string
           id?: string
@@ -3803,6 +3866,7 @@ export type Database = {
           confidence: number | null
           created_at: string
           domain: string | null
+          embedding: string | null
           id: string
           notes: string | null
           relationship: string
@@ -3816,6 +3880,7 @@ export type Database = {
           confidence?: number | null
           created_at?: string
           domain?: string | null
+          embedding?: string | null
           id?: string
           notes?: string | null
           relationship: string
@@ -3829,6 +3894,7 @@ export type Database = {
           confidence?: number | null
           created_at?: string
           domain?: string | null
+          embedding?: string | null
           id?: string
           notes?: string | null
           relationship?: string
@@ -6545,6 +6611,7 @@ export type Database = {
           created_at: string | null
           created_by_provider_id: string | null
           description: string | null
+          embedding: string | null
           id: string
           image_url: string | null
           is_demo: boolean
@@ -6564,6 +6631,7 @@ export type Database = {
           created_at?: string | null
           created_by_provider_id?: string | null
           description?: string | null
+          embedding?: string | null
           id?: string
           image_url?: string | null
           is_demo?: boolean
@@ -6583,6 +6651,7 @@ export type Database = {
           created_at?: string | null
           created_by_provider_id?: string | null
           description?: string | null
+          embedding?: string | null
           id?: string
           image_url?: string | null
           is_demo?: boolean
@@ -9831,6 +9900,7 @@ export type Database = {
           created_at: string
           description: string | null
           difficulty: string | null
+          embedding: string | null
           estimated_cost_usd: number | null
           estimated_hours: number | null
           id: string
@@ -9849,6 +9919,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           difficulty?: string | null
+          embedding?: string | null
           estimated_cost_usd?: number | null
           estimated_hours?: number | null
           id?: string
@@ -9867,6 +9938,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           difficulty?: string | null
+          embedding?: string | null
           estimated_cost_usd?: number | null
           estimated_hours?: number | null
           id?: string
@@ -10483,6 +10555,64 @@ export type Database = {
           },
           {
             foreignKeyName: "recent_searches_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recommendation_feedback: {
+        Row: {
+          comment: string | null
+          created_at: string
+          feedback_type: string
+          foundry_id: string
+          id: string
+          metadata: Json | null
+          source_id: string | null
+          source_type: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          feedback_type: string
+          foundry_id: string
+          id?: string
+          metadata?: Json | null
+          source_id?: string | null
+          source_type: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          feedback_type?: string
+          foundry_id?: string
+          id?: string
+          metadata?: Json | null
+          source_id?: string | null
+          source_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recommendation_feedback_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recommendation_feedback_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "recommendation_feedback_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -11451,6 +11581,58 @@ export type Database = {
           provider_type?: Database["public"]["Enums"]["provider_type"]
         }
         Relationships: []
+      }
+      shared_artifacts: {
+        Row: {
+          artifact_id: string
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          share_token: string
+          view_count: number
+        }
+        Insert: {
+          artifact_id: string
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          share_token: string
+          view_count?: number
+        }
+        Update: {
+          artifact_id?: string
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          share_token?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_artifacts_artifact_id_fkey"
+            columns: ["artifact_id"]
+            isOneToOne: false
+            referencedRelation: "agent_artifacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shared_artifacts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "shared_artifacts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       signup_intents: {
         Row: {
@@ -13207,6 +13389,7 @@ export type Database = {
           created_at: string
           description: string | null
           difficulty: string | null
+          embedding: string | null
           estimated_read_minutes: number | null
           further_reading: string[] | null
           id: string
@@ -13224,6 +13407,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           difficulty?: string | null
+          embedding?: string | null
           estimated_read_minutes?: number | null
           further_reading?: string[] | null
           id?: string
@@ -13241,6 +13425,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           difficulty?: string | null
+          embedding?: string | null
           estimated_read_minutes?: number | null
           further_reading?: string[] | null
           id?: string
@@ -14846,6 +15031,86 @@ export type Database = {
       mark_conversation_read: {
         Args: { conv_id: string; user_id: string }
         Returns: undefined
+      }
+      match_component_compatibility: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          component_a: string
+          component_b: string
+          confidence: number
+          domain: string
+          id: string
+          notes: string
+          relationship: string
+          similarity: number
+        }[]
+      }
+      match_components: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          geometry_type_slug: string
+          id: string
+          manufacturer: string
+          name: string
+          part_number: string
+          similarity: number
+          tags: string[]
+        }[]
+      }
+      match_marketplace_listings: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          category: string
+          description: string
+          id: string
+          similarity: number
+          subcategory: string
+          title: string
+        }[]
+      }
+      match_project_templates: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          category: string
+          description: string
+          difficulty: string
+          id: string
+          similarity: number
+          slug: string
+          title: string
+        }[]
+      }
+      match_tutorials: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          description: string
+          difficulty: string
+          id: string
+          similarity: number
+          slug: string
+          title: string
+          topic: string
+        }[]
       }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
