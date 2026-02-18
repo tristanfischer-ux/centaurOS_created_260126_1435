@@ -1887,7 +1887,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                             <SpecialistChatAvatar specialist={specialist} state="speaking" />
                                         </div>
                                         <div className="max-w-[90%] rounded-lg px-3 py-2.5 bg-muted/50 border border-muted">
-                                            <Markdown content={streamingResponse} className="text-sm" />
+                                            <Markdown content={stripProposedActionsBlock(streamingResponse)} className="text-sm" />
                                         </div>
                                     </div>
                                 )}
@@ -2674,7 +2674,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                             />
                                         </div>
                                         <div className="max-w-[85%] rounded-lg px-4 py-3 bg-muted/50 border border-muted">
-                                            <Markdown content={streamingResponse} className="text-sm" />
+                                            <Markdown content={stripProposedActionsBlock(streamingResponse)} className="text-sm" />
                                         </div>
                                     </div>
                                 )}

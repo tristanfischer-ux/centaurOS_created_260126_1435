@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Target, CheckSquare, Loader2, Check, X, Archive, Trash2, AlertTriangle } from "lucide-react"
+import { Target, CheckSquare, Loader2, Check, X, Archive, Trash2, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { createObjective, createStrategicObjective } from "@/actions/objectives"
@@ -172,6 +172,8 @@ async function executeCreateActions(params: {
     executed: ExecutedState
     userId: string
     rolloutId?: string | null
+    onProgress?: (completed: number, total: number, currentTitle: string) => void
+    onItemComplete?: (index: number, result: { success: boolean; id?: string }) => void
 }): Promise<{
     results: ExecutedState
     rejectedObjectives: string[]
@@ -180,7 +182,7 @@ async function executeCreateActions(params: {
     autoCreatedGoals: string[]
     autoCreatedObjectives: string[]
 }> {
-    const { proposals, createIndices, selected, executed, userId, rolloutId } = params
+    const { proposals, createIndices, selected, executed, userId, rolloutId, onProgress, onItemComplete } = params
     const results: ExecutedState = { ...executed }
     const rejectedObjectives: string[] = []
     const rejectedTasks: string[] = []
@@ -248,14 +250,21 @@ async function executeCreateActions(params: {
     }
 
     // ── Phase 1: Create objectives ───────────────────────────────────────────
+    const totalItems = createIndices.filter((i) => selected.has(i) && !executed[i]).length
+    let completedItems = 0
+
     for (const i of createIndices) {
         if (!selected.has(i) || executed[i]) continue
         const p = proposals[i]
         if (p.type !== "objective") continue
 
+        onProgress?.(completedItems, totalItems, p.title)
+
         if (!p.strategicGoalTitle?.trim()) {
             rejectedObjectives.push(p.title)
             results[i] = { success: false }
+            onItemComplete?.(i, { success: false })
+            completedItems++
             console.warn("[ProposedActions] Rejected objective — missing strategicGoalTitle:", { title: p.title })
             continue
         }
@@ -264,6 +273,8 @@ async function executeCreateActions(params: {
         if (!goalId) {
             rejectedObjectives.push(p.title)
             results[i] = { success: false }
+            onItemComplete?.(i, { success: false })
+            completedItems++
             console.warn("[ProposedActions] Rejected objective — strategic goal not found:", {
                 title: p.title,
                 strategicGoalTitle: p.strategicGoalTitle,
@@ -281,12 +292,16 @@ async function executeCreateActions(params: {
         const result = await createObjective(fd)
         if (result.error) {
             results[i] = { success: false }
+            onItemComplete?.(i, { success: false })
+            completedItems++
             console.warn("[ProposedActions] Failed to create objective:", { title: p.title, error: result.error })
             continue
         }
         if ("objectiveId" in result && result.objectiveId) {
             results[i] = { success: true, id: result.objectiveId }
             objectiveTitleToId.set(p.title.trim(), result.objectiveId)
+            onItemComplete?.(i, { success: true, id: result.objectiveId })
+            completedItems++
         }
     }
 
@@ -355,9 +370,13 @@ async function executeCreateActions(params: {
         const p = proposals[i]
         if (p.type !== "task") continue
 
+        onProgress?.(completedItems, totalItems, p.title)
+
         if (!p.objectiveTitle?.trim()) {
             rejectedTasks.push(p.title)
             results[i] = { success: false }
+            onItemComplete?.(i, { success: false })
+            completedItems++
             console.warn("[ProposedActions] Rejected task — missing objectiveTitle:", { title: p.title })
             continue
         }
@@ -370,6 +389,8 @@ async function executeCreateActions(params: {
         if (!objectiveId) {
             rejectedTasks.push(p.title)
             results[i] = { success: false }
+            onItemComplete?.(i, { success: false })
+            completedItems++
             console.warn("[ProposedActions] Rejected task — objective not found:", {
                 title: p.title,
                 objectiveTitle: p.objectiveTitle,
@@ -391,11 +412,15 @@ async function executeCreateActions(params: {
         if (result.error) {
             results[i] = { success: false }
             failedTasks.push({ title: p.title, error: result.error })
+            onItemComplete?.(i, { success: false })
+            completedItems++
             console.warn("[ProposedActions] Failed to create task:", { title: p.title, error: result.error })
             continue
         }
         if ("taskId" in result && result.taskId) {
             results[i] = { success: true, id: result.taskId }
+            onItemComplete?.(i, { success: true, id: result.taskId })
+            completedItems++
         }
     }
 
@@ -421,6 +446,12 @@ export function ProposedActionsCard({
         () => new Set(proposals.map((_, i) => i))
     )
 
+    // Collapsible groups (strategic goals) — start collapsed
+    const [expandedGoals, setExpandedGoals] = useState<Set<string>>(() => new Set())
+
+    // Progress indicator during execution
+    const [progress, setProgress] = useState<{ completed: number; total: number; current: string } | null>(null)
+
     const toggleItem = useCallback((index: number) => {
         setSelected((prev) => {
             const next = new Set(prev)
@@ -428,6 +459,18 @@ export function ProposedActionsCard({
                 next.delete(index)
             } else {
                 next.add(index)
+            }
+            return next
+        })
+    }, [])
+
+    const toggleGoal = useCallback((goalTitle: string) => {
+        setExpandedGoals((prev) => {
+            const next = new Set(prev)
+            if (next.has(goalTitle)) {
+                next.delete(goalTitle)
+            } else {
+                next.add(goalTitle)
             }
             return next
         })
@@ -464,6 +507,83 @@ export function ProposedActionsCard({
         () => createIndices.length > 0 && createIndices.every((i) => executed[i] !== undefined),
         [createIndices, executed]
     )
+
+    /** Groups create-actions into strategic goal → objectives → tasks hierarchy for display. */
+    const hierarchyGroups = useMemo(() => {
+        type ObjectiveGroup = {
+            title: string
+            index: number // proposal index (-1 if not in batch, just referenced by tasks)
+            tasks: number[] // proposal indices
+        }
+        type GoalGroup = {
+            title: string
+            objectives: ObjectiveGroup[]
+            allIndices: number[] // all proposal indices under this goal
+        }
+
+        const goalMap = new Map<string, { objectives: Map<string, ObjectiveGroup> }>()
+
+        // Pass 1: register objectives under their strategic goals
+        for (const i of createIndices) {
+            const p = proposals[i]
+            if (p.type !== "objective") continue
+            const goalTitle = p.strategicGoalTitle?.trim() || "Uncategorized"
+            if (!goalMap.has(goalTitle)) goalMap.set(goalTitle, { objectives: new Map() })
+            goalMap.get(goalTitle)!.objectives.set(normalizeTitle(p.title), {
+                title: p.title.trim(),
+                index: i,
+                tasks: [],
+            })
+        }
+
+        // Pass 2: assign tasks to their objectives using fuzzy matching
+        for (const i of createIndices) {
+            const p = proposals[i]
+            if (p.type !== "task") continue
+            const objTitleNorm = normalizeTitle(p.objectiveTitle || "")
+            let placed = false
+
+            for (const [, group] of goalMap) {
+                // Exact normalized match
+                if (group.objectives.has(objTitleNorm)) {
+                    group.objectives.get(objTitleNorm)!.tasks.push(i)
+                    placed = true
+                    break
+                }
+                // Substring fuzzy match
+                for (const [normKey, obj] of group.objectives) {
+                    if (objTitleNorm.includes(normKey) || normKey.includes(objTitleNorm)) {
+                        obj.tasks.push(i)
+                        placed = true
+                        break
+                    }
+                }
+                if (placed) break
+            }
+
+            if (!placed && p.objectiveTitle?.trim()) {
+                const fallbackGoal = "Other"
+                if (!goalMap.has(fallbackGoal)) goalMap.set(fallbackGoal, { objectives: new Map() })
+                const objGroup = goalMap.get(fallbackGoal)!.objectives
+                if (!objGroup.has(objTitleNorm)) {
+                    objGroup.set(objTitleNorm, { title: p.objectiveTitle.trim(), index: -1, tasks: [] })
+                }
+                objGroup.get(objTitleNorm)!.tasks.push(i)
+            }
+        }
+
+        // Convert to array sorted by first objective index
+        const groups: GoalGroup[] = []
+        for (const [goalTitle, { objectives }] of goalMap) {
+            const objs = Array.from(objectives.values())
+            const allIndices = objs.flatMap((o) => [
+                ...(o.index >= 0 ? [o.index] : []),
+                ...o.tasks,
+            ])
+            groups.push({ title: goalTitle, objectives: objs, allIndices })
+        }
+        return groups
+    }, [proposals, createIndices])
 
     // ─── Execute only archive actions ────────────────────────────────────────────
     const handleExecuteArchives = useCallback(async () => {
@@ -534,6 +654,7 @@ export function ProposedActionsCard({
 
         setIsExecuting(true)
         setActiveSection("create")
+        setProgress({ completed: 0, total: 0, current: "" })
 
         try {
             const {
@@ -550,6 +671,8 @@ export function ProposedActionsCard({
                 executed,
                 userId: user.id,
                 rolloutId,
+                onProgress: (completed, total, current) => setProgress({ completed, total, current }),
+                onItemComplete: (index, result) => setExecuted((prev) => ({ ...prev, [index]: result })),
             })
 
             setExecuted(results)
@@ -596,6 +719,7 @@ export function ProposedActionsCard({
         } finally {
             setIsExecuting(false)
             setActiveSection(null)
+            setProgress(null)
         }
     }, [proposals, selected, executed, createIndices, onCreated, rolloutId])
 
@@ -617,6 +741,7 @@ export function ProposedActionsCard({
 
         setIsExecuting(true)
         setActiveSection("all")
+        setProgress({ completed: 0, total: 0, current: "" })
         const archiveResults: ExecutedState = { ...executed }
 
         try {
@@ -660,6 +785,8 @@ export function ProposedActionsCard({
                 executed: archiveResults,
                 userId: user.id,
                 rolloutId,
+                onProgress: (completed, total, current) => setProgress({ completed, total, current }),
+                onItemComplete: (index, result) => setExecuted((prev) => ({ ...prev, [index]: result })),
             })
 
             const allResults = { ...archiveResults, ...createResults }
@@ -711,6 +838,7 @@ export function ProposedActionsCard({
         } finally {
             setIsExecuting(false)
             setActiveSection(null)
+            setProgress(null)
         }
     }, [proposals, selected, executed, archiveIndices, createIndices, onCreated, rolloutId])
 
@@ -901,16 +1029,12 @@ export function ProposedActionsCard({
                 </div>
             ) : null}
 
-            {/* ─── Create section ────────────────────────────────────────────────── */}
+            {/* ─── Create section (grouped by strategic goal → objective → tasks) ── */}
             {hasCreateActions ? (
                 <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                         <p className="text-xs font-medium text-status-success flex items-center gap-1">
-                            {hasArchiveActions ? (
-                                <Target className="h-3 w-3" />
-                            ) : (
-                                <Target className="h-3 w-3" />
-                            )}
+                            <Target className="h-3 w-3" />
                             {hasArchiveActions ? "Replace with" : "Suggested actions"}
                         </p>
                         {!allCreatesDone ? (
@@ -934,115 +1058,190 @@ export function ProposedActionsCard({
                         )}
                     </div>
 
+                    {/* Progress indicator during execution */}
+                    {isExecuting && progress && progress.total > 0 ? (
+                        <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                <span className="truncate flex-1 mr-2">Creating: {progress.current}</span>
+                                <span className="flex-shrink-0 font-medium">{progress.completed}/{progress.total}</span>
+                            </div>
+                            <div className="h-1 rounded-full bg-muted overflow-hidden">
+                                <div
+                                    className="h-full bg-international-orange rounded-full transition-all duration-300"
+                                    style={{ width: `${Math.round((progress.completed / progress.total) * 100)}%` }}
+                                />
+                            </div>
+                        </div>
+                    ) : null}
+
                     {allCreatesDone ? (
                         <p className="text-xs text-muted-foreground">
                             {createIndices.length} item{createIndices.length > 1 ? "s" : ""} created
                         </p>
                     ) : (
-                        proposals.map((p, i) => {
-                            if (isDestructiveAction(p)) return null
-                            const isObjective = p.type === "objective"
-                            const isTask = p.type === "task"
-                            const isSelected = selected.has(i)
-                            const result = executed[i]
-                            const isDone = result !== undefined
+                        <div className="space-y-1">
+                            {hierarchyGroups.map((group) => {
+                                const isExpanded = expandedGoals.has(group.title)
+                                const groupDoneCount = group.allIndices.filter((i) => executed[i]?.success).length
+                                const groupTotal = group.allIndices.length
+                                const groupAllDone = groupTotal > 0 && group.allIndices.every((i) => executed[i] !== undefined)
 
-                            // Hierarchy validation: objectives need strategicGoalTitle, tasks need objectiveTitle
-                            const isMissingHierarchy = (isObjective && !p.strategicGoalTitle?.trim()) ||
-                                (isTask && !p.objectiveTitle?.trim())
+                                return (
+                                    <div key={group.title} className="rounded-md border border-muted overflow-hidden">
+                                        {/* Strategic goal header — collapsible */}
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleGoal(group.title)}
+                                            className={cn(
+                                                "flex items-center gap-2 w-full px-3 py-2 text-left text-xs font-semibold transition-colors",
+                                                groupAllDone
+                                                    ? "bg-status-success-light/50 text-status-success-dark"
+                                                    : "bg-muted/30 text-foreground hover:bg-muted/50"
+                                            )}
+                                        >
+                                            {isExpanded ? (
+                                                <ChevronDown className="h-3 w-3 flex-shrink-0" />
+                                            ) : (
+                                                <ChevronRight className="h-3 w-3 flex-shrink-0" />
+                                            )}
+                                            <Target className="h-3 w-3 flex-shrink-0 text-international-orange" />
+                                            <span className="truncate flex-1">{group.title}</span>
+                                            <span className="flex-shrink-0 text-[10px] font-normal text-muted-foreground">
+                                                {groupAllDone ? (
+                                                    <span className="flex items-center gap-1 text-status-success">
+                                                        <Check className="h-3 w-3" /> {groupDoneCount}/{groupTotal}
+                                                    </span>
+                                                ) : groupDoneCount > 0 ? (
+                                                    `${groupDoneCount}/${groupTotal} done`
+                                                ) : (
+                                                    `${groupTotal} item${groupTotal > 1 ? "s" : ""}`
+                                                )}
+                                            </span>
+                                        </button>
 
-                            return (
-                                <button
-                                    type="button"
-                                    key={`${p.type}-${i}-${p.title}`}
-                                    onClick={() => { if (!isDone && !isExecuting) toggleItem(i) }}
-                                    disabled={isDone || isExecuting}
-                                    className={cn(
-                                        "flex items-center gap-2 rounded-md border px-3 py-2 text-sm w-full text-left transition-colors",
-                                        isDone && result.success
-                                            ? "bg-status-success-light border-status-success"
-                                            : isDone && !result.success
-                                              ? "bg-status-error-light border-destructive"
-                                              : isMissingHierarchy
-                                                ? "bg-status-warning-light border-status-warning opacity-60"
-                                                : isSelected
-                                                  ? "bg-background border-muted hover:bg-muted/30"
-                                                  : "bg-muted/30 border-muted opacity-50 hover:opacity-70"
-                                    )}
-                                >
-                                    {!isDone ? (
-                                        <Checkbox
-                                            checked={isSelected}
-                                            onCheckedChange={() => toggleItem(i)}
-                                            disabled={isExecuting}
-                                            className="flex-shrink-0"
-                                            aria-label={`${isSelected ? "Deselect" : "Select"}: ${p.title}`}
-                                        />
-                                    ) : isObjective ? (
-                                        <Target className="h-3.5 w-3.5 text-international-orange flex-shrink-0" />
-                                    ) : (
-                                        <CheckSquare className="h-3.5 w-3.5 text-electric-blue flex-shrink-0" />
-                                    )}
-                                    <div className="min-w-0 flex-1">
-                                        <p className={cn(
-                                            "font-medium truncate",
-                                            isDone && !result.success ? "text-destructive" : "text-foreground"
-                                        )}>
-                                            {p.title}
-                                        </p>
-                                        {p.description ? (
-                                            <p className="text-xs text-muted-foreground truncate">
-                                                {p.description}
-                                            </p>
-                                        ) : null}
-                                        {/* Show hierarchy link: objective → strategic goal */}
-                                        {isObjective && p.strategicGoalTitle ? (
-                                            <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
-                                                <Target className="h-2.5 w-2.5 inline-block" />
-                                                Under: {p.strategicGoalTitle}
-                                            </p>
-                                        ) : null}
-                                        {/* Show hierarchy link: task → objective */}
-                                        {isTask && p.objectiveTitle ? (
-                                            <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
-                                                <Target className="h-2.5 w-2.5 inline-block" />
-                                                Under: {p.objectiveTitle}
-                                            </p>
-                                        ) : null}
-                                        {/* Warning when hierarchy is missing */}
-                                        {isMissingHierarchy ? (
-                                            <p className="text-[10px] text-status-warning-dark truncate flex items-center gap-1 mt-0.5">
-                                                <AlertTriangle className="h-2.5 w-2.5 inline-block" />
-                                                {isObjective ? "Missing strategic goal — will be rejected" : "Missing objective — will be rejected"}
-                                            </p>
-                                        ) : null}
-                                        {/* Show rejection reason after execution */}
-                                        {isDone && !result.success ? (
-                                            <p className="text-[10px] text-destructive truncate flex items-center gap-1 mt-0.5">
-                                                <AlertTriangle className="h-2.5 w-2.5 inline-block" />
-                                                {isObjective ? "Rejected — no strategic goal" : "Rejected — no objective"}
-                                            </p>
+                                        {/* Expanded content: objectives and tasks */}
+                                        {isExpanded ? (
+                                            <div className="px-2 py-1 space-y-0.5">
+                                                {group.objectives.map((obj) => {
+                                                    const objProposal = obj.index >= 0 ? proposals[obj.index] : null
+                                                    const objResult = obj.index >= 0 ? executed[obj.index] : undefined
+                                                    const objDone = objResult !== undefined
+                                                    const objSelected = obj.index >= 0 && selected.has(obj.index)
+
+                                                    return (
+                                                        <div key={obj.title} className="space-y-0.5">
+                                                            {/* Objective row */}
+                                                            {objProposal ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => { if (!objDone && !isExecuting && obj.index >= 0) toggleItem(obj.index) }}
+                                                                    disabled={objDone || isExecuting}
+                                                                    className={cn(
+                                                                        "flex items-center gap-2 rounded px-2 py-1.5 text-xs w-full text-left transition-colors",
+                                                                        objDone && objResult?.success
+                                                                            ? "bg-status-success-light/50"
+                                                                            : objDone
+                                                                              ? "bg-status-error-light/50"
+                                                                              : objSelected
+                                                                                ? "hover:bg-muted/30"
+                                                                                : "opacity-50"
+                                                                    )}
+                                                                >
+                                                                    {!objDone ? (
+                                                                        <Checkbox
+                                                                            checked={objSelected}
+                                                                            onCheckedChange={() => obj.index >= 0 && toggleItem(obj.index)}
+                                                                            disabled={isExecuting}
+                                                                            className="flex-shrink-0 h-3.5 w-3.5"
+                                                                            aria-label={`${objSelected ? "Deselect" : "Select"}: ${obj.title}`}
+                                                                        />
+                                                                    ) : (
+                                                                        <Target className={cn("h-3.5 w-3.5 flex-shrink-0", objResult?.success ? "text-status-success" : "text-destructive")} />
+                                                                    )}
+                                                                    <span className={cn("font-semibold truncate flex-1", objDone && !objResult?.success ? "text-destructive" : "text-foreground")}>
+                                                                        {obj.title}
+                                                                    </span>
+                                                                    {objDone && objResult?.success && objResult.id ? (
+                                                                        <Link
+                                                                            href={`/new-objectives?objectiveId=${objResult.id}`}
+                                                                            className="text-[10px] text-international-orange hover:underline flex-shrink-0"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            View
+                                                                        </Link>
+                                                                    ) : null}
+                                                                </button>
+                                                            ) : (
+                                                                <p className="px-2 py-1 text-xs font-semibold text-muted-foreground flex items-center gap-2">
+                                                                    <Target className="h-3 w-3 flex-shrink-0" />
+                                                                    {obj.title}
+                                                                </p>
+                                                            )}
+
+                                                            {/* Tasks under this objective */}
+                                                            {obj.tasks.map((taskIdx) => {
+                                                                const tp = proposals[taskIdx]
+                                                                const taskResult = executed[taskIdx]
+                                                                const taskDone = taskResult !== undefined
+                                                                const taskSelected = selected.has(taskIdx)
+
+                                                                return (
+                                                                    <button
+                                                                        type="button"
+                                                                        key={`task-${taskIdx}`}
+                                                                        onClick={() => { if (!taskDone && !isExecuting) toggleItem(taskIdx) }}
+                                                                        disabled={taskDone || isExecuting}
+                                                                        className={cn(
+                                                                            "flex items-center gap-2 rounded px-2 py-1.5 ml-5 text-xs w-full text-left transition-colors",
+                                                                            taskDone && taskResult?.success
+                                                                                ? "bg-status-success-light/50"
+                                                                                : taskDone
+                                                                                  ? "bg-status-error-light/50"
+                                                                                  : taskSelected
+                                                                                    ? "hover:bg-muted/30"
+                                                                                    : "opacity-50"
+                                                                        )}
+                                                                    >
+                                                                        {!taskDone ? (
+                                                                            <Checkbox
+                                                                                checked={taskSelected}
+                                                                                onCheckedChange={() => toggleItem(taskIdx)}
+                                                                                disabled={isExecuting}
+                                                                                className="flex-shrink-0 h-3.5 w-3.5"
+                                                                                aria-label={`${taskSelected ? "Deselect" : "Select"}: ${tp.title}`}
+                                                                            />
+                                                                        ) : (
+                                                                            <CheckSquare className={cn("h-3 w-3 flex-shrink-0", taskResult?.success ? "text-status-success" : "text-destructive")} />
+                                                                        )}
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <p className={cn("truncate", taskDone && !taskResult?.success ? "text-destructive" : "text-foreground")}>
+                                                                                {tp.title}
+                                                                            </p>
+                                                                            {tp.description ? (
+                                                                                <p className="text-[10px] text-muted-foreground truncate">{tp.description}</p>
+                                                                            ) : null}
+                                                                        </div>
+                                                                        {taskDone && taskResult?.success && taskResult.id ? (
+                                                                            <Link
+                                                                                href={`/new-tasks?taskId=${taskResult.id}`}
+                                                                                className="text-[10px] text-international-orange hover:underline flex-shrink-0"
+                                                                                onClick={(e) => e.stopPropagation()}
+                                                                            >
+                                                                                View
+                                                                            </Link>
+                                                                        ) : null}
+                                                                    </button>
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
                                         ) : null}
                                     </div>
-                                    {isDone && result.success && result.id ? (
-                                        <div className="flex items-center gap-1 flex-shrink-0">
-                                            <Check className="h-4 w-4 text-status-success" />
-                                            <Link
-                                                href={
-                                                    isObjective
-                                                        ? `/new-objectives?objectiveId=${result.id}`
-                                                        : `/new-tasks?taskId=${result.id}`
-                                                }
-                                                className="text-xs font-medium text-international-orange hover:underline"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                View
-                                            </Link>
-                                        </div>
-                                    ) : null}
-                                </button>
-                            )
-                        })
+                                )
+                            })}
+                        </div>
                     )}
                 </div>
             ) : null}
