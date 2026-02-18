@@ -27,7 +27,7 @@ export function TelegramLink({ initialLink, botUsername }: TelegramLinkProps) {
     const [isLinking, setIsLinking] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    const isLinked = link?.verified_at !== null
+    const isLinked = link != null && link.verified_at != null
 
     // Generate verification code
     const generateCode = async () => {
