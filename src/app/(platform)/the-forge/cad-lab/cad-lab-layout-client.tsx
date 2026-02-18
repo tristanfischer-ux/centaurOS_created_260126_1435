@@ -81,11 +81,16 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     milestone, setMilestone,
   } = useCadLab()
 
-  // Auto-load project from URL ?project=<id> parameter
+  // Auto-load project: URL ?project=<id> takes precedence; else restore last active from localStorage
   const projectParam = searchParams.get("project")
   useEffect(() => {
-    if (projectParam && !activeProjectId) {
+    if (projectParam) {
       handleLoadProject(projectParam)
+      return
+    }
+    const stored = typeof window !== "undefined" ? localStorage.getItem("forgeos:cad-lab:active-project") : null
+    if (stored && !activeProjectId) {
+      handleLoadProject(stored)
     }
   }, [projectParam, activeProjectId, handleLoadProject])
 

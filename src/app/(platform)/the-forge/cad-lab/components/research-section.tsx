@@ -17,10 +17,12 @@ import {
   ExternalLink,
 } from "lucide-react"
 
+import { useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Markdown } from "@/components/ui/markdown"
+import { CadLabResearchReport } from "@/components/cad/cad-lab-research-report"
 import type { CadLabResearchResult } from "@/lib/cad-lab-types"
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -51,6 +53,8 @@ export function ResearchSection({
   handleReset,
 }: ResearchSectionProps): React.ReactNode {
   if (!hasResearch && !researchResult?.error) return null
+
+  const useStructuredReport = useMemo(() => /^##\s+/m.test(editableReport), [editableReport])
 
   return (
     <>
@@ -90,7 +94,16 @@ export function ResearchSection({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="border rounded-md p-4 bg-muted/30">
-              <Markdown content={editableReport} className="text-sm text-foreground" />
+              {useStructuredReport ? (
+                <CadLabResearchReport report={editableReport} />
+              ) : (
+                <Markdown content={editableReport} className="text-sm text-foreground" />
+              )}
+              {useStructuredReport && (
+                <div className="mt-2 text-[11px] text-muted-foreground">
+                  Report parsed into sections. Use “Edit raw markdown” below to change the source text.
+                </div>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">
               {editableReport.length.toLocaleString()} characters

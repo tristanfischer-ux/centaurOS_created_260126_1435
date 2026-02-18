@@ -50,6 +50,10 @@ import type {
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { Sector } from "@/types/foundry"
 
+// ─── Persistence key for last active project (restore on return) ─────
+
+const CAD_LAB_ACTIVE_PROJECT_KEY = "forgeos:cad-lab:active-project"
+
 // ─── Context Shape ───────────────────────────────────────────────────
 
 type MilestoneType = "research" | "breakdown" | "generate" | "batch" | null
@@ -265,6 +269,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   }, [])
 
   useEffect(() => { refreshProjects() }, [refreshProjects])
+
+  // Persist active project ID so returning users can restore (cleared only on explicit reset)
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (activeProjectId) {
+      localStorage.setItem(CAD_LAB_ACTIVE_PROJECT_KEY, activeProjectId)
+    }
+  }, [activeProjectId])
 
   // ── Ensure project exists for auto-save ──
   const ensureProject = useCallback(async (): Promise<string | null> => {
@@ -778,6 +790,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Reset ──
   const handleReset = useCallback(() => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(CAD_LAB_ACTIVE_PROJECT_KEY)
+    }
     setResearchResult(null)
     setEditableReport("")
     setActiveProjectId(null)
