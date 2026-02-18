@@ -3472,8 +3472,8 @@ export type Database = {
           foundry_id: string
           generated_code: string | null
           id: string
-          integrated_assembly_stl_url: string | null
           integrated_assembly_step_url: string | null
+          integrated_assembly_stl_url: string | null
           interface_definition: string | null
           model_id: string
           modules: Json | null
@@ -3494,8 +3494,8 @@ export type Database = {
           foundry_id: string
           generated_code?: string | null
           id?: string
-          integrated_assembly_stl_url?: string | null
           integrated_assembly_step_url?: string | null
+          integrated_assembly_stl_url?: string | null
           interface_definition?: string | null
           model_id?: string
           modules?: Json | null
@@ -3516,8 +3516,8 @@ export type Database = {
           foundry_id?: string
           generated_code?: string | null
           id?: string
-          integrated_assembly_stl_url?: string | null
           integrated_assembly_step_url?: string | null
+          integrated_assembly_stl_url?: string | null
           interface_definition?: string | null
           model_id?: string
           modules?: Json | null
@@ -3528,51 +3528,6 @@ export type Database = {
           status?: string
           subject?: string
           thumbnail_svg?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      reference_models: {
-        Row: {
-          id: string
-          category: string
-          name: string
-          step_url: string | null
-          stl_url: string | null
-          thumbnail_svg: string | null
-          description: string | null
-          search_keywords: string[]
-          module_template: Json
-          sort_order: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          category: string
-          name: string
-          step_url?: string | null
-          stl_url?: string | null
-          thumbnail_svg?: string | null
-          description?: string | null
-          search_keywords?: string[]
-          module_template?: Json
-          sort_order?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          category?: string
-          name?: string
-          step_url?: string | null
-          stl_url?: string | null
-          thumbnail_svg?: string | null
-          description?: string | null
-          search_keywords?: string[]
-          module_template?: Json
-          sort_order?: number
-          created_at?: string
           updated_at?: string
         }
         Relationships: []
@@ -10673,6 +10628,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reference_models: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          module_template: Json | null
+          name: string
+          search_keywords: string[]
+          sort_order: number
+          step_url: string | null
+          stl_url: string | null
+          thumbnail_svg: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          module_template?: Json | null
+          name: string
+          search_keywords?: string[]
+          sort_order?: number
+          step_url?: string | null
+          stl_url?: string | null
+          thumbnail_svg?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          module_template?: Json | null
+          name?: string
+          search_keywords?: string[]
+          sort_order?: number
+          step_url?: string | null
+          stl_url?: string | null
+          thumbnail_svg?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       report_preferences: {
         Row: {
