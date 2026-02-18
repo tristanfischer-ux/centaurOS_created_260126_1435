@@ -127,13 +127,13 @@ export async function getProfileHubData(): Promise<ProfileHubData | null> {
           .eq('id', providerProfile.listing_id)
           .single()
       : Promise.resolve({ data: null }),
-    // Get foundry name
+    // Get foundry name (maybeSingle avoids error when RLS returns 0 rows)
     foundryId
       ? supabase
           .from('foundries')
           .select('name')
           .eq('id', foundryId)
-          .single()
+          .maybeSingle()
       : Promise.resolve({ data: null }),
     // Task counts (scoped to foundry)
     foundryId

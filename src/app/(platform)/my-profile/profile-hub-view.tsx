@@ -102,6 +102,13 @@ export function ProfileHubView({ data, foundries, telegramLink, botUsername, enr
   // LinkedIn URL: prefer provider profile, fall back to profiles table
   const linkedinUrl = providerProfile?.linkedin_url ?? profile?.linkedin_url ?? null
 
+  // Company name: prefer profile-hub data, fall back to foundries list (fixes RLS/missing lookup)
+  const resolvedFoundryName =
+    data.foundryName ??
+    foundries.find((f) => f.isActive)?.foundryName ??
+    foundries[0]?.foundryName ??
+    null
+
   return (
     <div className="max-w-4xl space-y-8">
       {/* Page Header */}
@@ -123,7 +130,7 @@ export function ProfileHubView({ data, foundries, telegramLink, botUsername, enr
         avatarUrl={profile?.avatar_url ?? null}
         location={providerProfile?.location ?? null}
         memberSince={profile?.created_at ?? new Date().toISOString()}
-        foundryName={foundryName}
+        foundryName={resolvedFoundryName}
         linkedinUrl={linkedinUrl}
         websiteUrl={providerProfile?.website_url ?? null}
         profileSlug={providerProfile?.profile_slug ?? null}
@@ -156,7 +163,7 @@ export function ProfileHubView({ data, foundries, telegramLink, botUsername, enr
             fullName={profile?.full_name ?? null}
             email={profile?.email ?? ''}
             role={profile?.role ?? 'Member'}
-            foundryName={foundryName}
+            foundryName={resolvedFoundryName}
             bio={profile?.bio ?? null}
             phoneNumber={profile?.phone_number ?? null}
             linkedinUrl={linkedinUrl}
