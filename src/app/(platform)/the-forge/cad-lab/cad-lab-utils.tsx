@@ -7,7 +7,7 @@
  * Metric, InlineSvg, SvgView, FullscreenOverlay, and formatRelativeTime.
  */
 
-import { useRef, useEffect, useCallback } from "react"
+import { useRef, useEffect, useCallback, useState } from "react"
 import dynamic from "next/dynamic"
 import type { CadLabResult } from "@/lib/cad-lab-types"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -64,21 +64,35 @@ export function InlineSvg({
   onClick?: (e: React.MouseEvent) => void
 }): React.ReactNode {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [renderError, setRenderError] = useState<string | null>(null)
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
+    setRenderError(null)
 
-    const base64Match = src.match(/^data:image\/svg\+xml;base64,(.+)$/)
+    if (!src || src.length < 50) {
+      console.warn("[InlineSvg] SVG source too short or empty:", src?.slice(0, 80))
+      setRenderError("No SVG data available")
+      container.innerHTML = ""
+      return
+    }
+
+    const base64Match = src.match(/^data:image\/svg\+xml;base64,([\s\S]+)$/)
     if (!base64Match) {
+      console.warn("[InlineSvg] Source does not match data URI pattern:", src.slice(0, 80))
+      setRenderError("Invalid SVG format")
       container.innerHTML = ""
       return
     }
 
     let decoded: string
     try {
-      decoded = atob(base64Match[1])
-    } catch {
+      const cleanBase64 = base64Match[1].replace(/\s/g, "")
+      decoded = atob(cleanBase64)
+    } catch (err) {
+      console.warn("[InlineSvg] Base64 decode failed:", err)
+      setRenderError("Failed to decode SVG")
       container.innerHTML = ""
       return
     }
@@ -88,6 +102,8 @@ export function InlineSvg({
     const parsedSvg = doc.documentElement
 
     if (parsedSvg.querySelector("parsererror") || parsedSvg.tagName !== "svg") {
+      console.warn("[InlineSvg] SVG parse error:", parsedSvg.querySelector("parsererror")?.textContent)
+      setRenderError("Invalid SVG content")
       container.innerHTML = ""
       return
     }
@@ -143,7 +159,14 @@ export function InlineSvg({
   }, [src])
 
   return (
-    <div ref={containerRef} className={className} onClick={onClick} role="img" aria-label={alt} />
+    <div className={`relative ${className ?? ""}`} onClick={onClick} role="img" aria-label={alt}>
+      <div ref={containerRef} className="w-full h-full" />
+      {renderError && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <p className="text-xs text-muted-foreground font-mono">{renderError}</p>
+        </div>
+      )}
+    </div>
   )
 }
 

@@ -806,6 +806,23 @@ function ModuleResultsView({
   moduleId: string
   onDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
 }): React.ReactNode {
+  // Auto-select first available tab when current tab has no matching content
+  useEffect(() => {
+    const availableTabs: ViewTab[] = []
+    if (result.stlData) availableTabs.push("3d")
+    if (result.svgIso) availableTabs.push("iso")
+    if (result.svgExploded) availableTabs.push("exploded")
+    if (result.svgFront) availableTabs.push("front")
+    if (result.svgBack) availableTabs.push("back")
+    if (result.svgLeft) availableTabs.push("left")
+    if (result.svgRight) availableTabs.push("right")
+    if (result.svgTop) availableTabs.push("top")
+
+    if (availableTabs.length > 0 && !availableTabs.includes(activeViewTab)) {
+      setActiveViewTab(availableTabs[0])
+    }
+  }, [result, activeViewTab, setActiveViewTab])
+
   const handleDownloadFromUrl = (url: string, filename: string): void => {
     const link = document.createElement("a")
     link.href = url
