@@ -24,25 +24,23 @@ import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 
 /**
  * Organises specialists into a hierarchical org chart structure.
+ * Groups by reporting line: Strategy (reports to Sage), Technology (reports to Max),
+ * Legal/Finance/People (reports to Leo).
  */
 function getOrgChartHierarchy() {
+    // Reporting groups: each group shows specialists who report to this lead
     const departments = [
-        { id: 'strategy', name: 'Strategy', color: 'bg-chart-5' },
-        { id: 'technology', name: 'Technology', color: 'bg-chart-2' },
-        { id: 'product', name: 'Product', color: 'bg-chart-6' },
-        { id: 'growth', name: 'Growth', color: 'bg-chart-3' },
-        { id: 'operations', name: 'Operations', color: 'bg-chart-4' },
-        { id: 'finance', name: 'Finance', color: 'bg-chart-1' },
-        { id: 'people', name: 'People', color: 'bg-chart-3' },
-        { id: 'legal', name: 'Legal', color: 'bg-chart-2' },
+        { id: 'strategist', name: 'Strategy', color: 'bg-chart-5' },
+        { id: 'cto', name: 'Technology', color: 'bg-chart-2' },
+        { id: 'legal-counsel', name: 'Legal, Finance & People', color: 'bg-chart-1' },
     ]
 
-    // Build hierarchy: direct reports first, then by department
     const directReports = SPECIALISTS.filter(s => s.reportsTo === null)
     const byDepartment = SPECIALISTS.filter(s => s.reportsTo !== null).reduce((acc, specialist) => {
-        const dept = departments.find(d => d.id === specialist.department.toLowerCase())?.id || 'other'
-        if (!acc[dept]) acc[dept] = []
-        acc[dept].push(specialist)
+        const leadId = specialist.reportsTo
+        if (!leadId) return acc
+        if (!acc[leadId]) acc[leadId] = []
+        acc[leadId].push(specialist)
         return acc
     }, {} as Record<string, typeof SPECIALISTS>)
 
@@ -84,7 +82,7 @@ export function SpecialistsLanding({
 
     const [handoffContext, setHandoffContext] = useState<string | null>(null)
     const [referredByName, setReferredByName] = useState<string | null>(null)
-    const [showOrgChart, setShowOrgChart] = useState(false)
+    const [showOrgChart, setShowOrgChart] = useState(true)
     const [specialistActivities, setSpecialistActivities] = useState<Record<string, SpecialistActivity>>({})
     const [unreadInsights, setUnreadInsights] = useState<AgentInsight[]>([])
     const [showCatchUp, setShowCatchUp] = useState(true)
@@ -137,6 +135,15 @@ export function SpecialistsLanding({
     const totalBriefs = useMemo(() => {
         return Object.values(capabilityCounts).reduce((sum, count) => sum + count, 0)
     }, [capabilityCounts])
+
+    // Leadership first (Sage, Max, Cal, Finn, Leo), then everyone else
+    const LEADERSHIP_IDS = ["strategist", "cto", "chief-of-staff", "finance-lead", "legal-counsel"] as const
+    const sortedSpecialists = useMemo(() => {
+        const byId = new Map(SPECIALISTS.map((s) => [s.id, s]))
+        const leadership = LEADERSHIP_IDS.map((id) => byId.get(id)).filter(Boolean) as typeof SPECIALISTS
+        const rest = SPECIALISTS.filter((s) => !LEADERSHIP_IDS.includes(s.id as (typeof LEADERSHIP_IDS)[number]))
+        return [...leadership, ...rest]
+    }, [])
 
     const selectedSpecialist = SPECIALISTS.find((s) => s.id === briefSpecialistId)
 
@@ -209,25 +216,25 @@ export function SpecialistsLanding({
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="space-y-4"
+                    className="space-y-2"
                 >
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2">
                         {/* CEO Row */}
                         <div className="flex justify-center">
                             <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-full bg-international-orange flex items-center justify-center text-white text-sm font-bold">
+                                <div className="h-7 w-7 rounded-full bg-international-orange flex items-center justify-center text-white text-xs font-bold">
                                     CEO
                                 </div>
                             </div>
                         </div>
                         
                         {/* Direct Reports Row */}
-                        <div className="flex flex-wrap justify-center gap-3">
+                        <div className="flex flex-wrap justify-center gap-2">
                             {orgHierarchy.directReports.map((specialist) => (
                                 <button
                                     key={specialist.id}
                                     onClick={() => handleBrief(specialist.id)}
-                                    className="flex flex-col items-center gap-1 p-3 rounded-lg border bg-card hover:bg-muted hover:shadow-md transition-all min-w-[100px]"
+                                    className="flex flex-col items-center gap-1 p-2 rounded-lg border bg-card hover:bg-muted hover:shadow-md transition-all min-w-[80px]"
                                 >
                                     <span className="text-sm font-semibold text-foreground">{specialist.name}</span>
                                     <span className="text-xs text-muted-foreground">{specialist.title}</span>
@@ -236,29 +243,24 @@ export function SpecialistsLanding({
                         </div>
 
                         {/* Department Groups */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-                            {orgHierarchy.departments.filter(dept => 
-                                SPECIALISTS.some(s => s.department.toLowerCase() === dept.id)
-                            ).map((dept) => {
-                                const deptSpecialists = SPECIALISTS.filter(s => 
-                                    s.department.toLowerCase() === dept.id && s.reportsTo !== null
-                                )
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                            {orgHierarchy.departments.map((dept) => {
+                                const deptSpecialists = orgHierarchy.byDepartment[dept.id] ?? []
                                 if (deptSpecialists.length === 0) return null
-                                
                                 return (
-                                    <div key={dept.id} className="p-3 rounded-lg border bg-card">
-                                        <div className="flex items-center gap-2 mb-2">
+                                    <div key={dept.id} className="p-2 rounded-lg border bg-card">
+                                        <div className="flex items-center gap-2 mb-1">
                                             <div className={cn("h-2 w-2 rounded-full", dept.color)} />
                                             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                                 {dept.name}
                                             </span>
                                         </div>
-                                        <div className="space-y-2">
+                                        <div className="space-y-1">
                                             {deptSpecialists.map((specialist) => (
                                                 <button
                                                     key={specialist.id}
                                                     onClick={() => handleBrief(specialist.id)}
-                                                    className="w-full text-left p-2 rounded hover:bg-muted transition-colors"
+                                                    className="w-full text-left p-1.5 rounded hover:bg-muted transition-colors"
                                                 >
                                                     <div className="text-sm font-medium text-foreground">{specialist.name}</div>
                                                     <div className="text-xs text-muted-foreground">{specialist.title}</div>
@@ -343,7 +345,7 @@ export function SpecialistsLanding({
 
             {/* ── Specialist Grid ──────────────────────────────────────── */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {SPECIALISTS.map((specialist, idx) => (
+                {sortedSpecialists.map((specialist, idx) => (
                     <SpecialistCard
                         key={specialist.id}
                         specialist={specialist}
