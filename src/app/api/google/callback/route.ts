@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createOAuth2Client } from '@/lib/google/client'
-import { saveGoogleToken } from '@/lib/google/tokens'
+import { getGoogleToken, saveGoogleToken } from '@/lib/google/tokens'
 import { verifySignedOAuthState } from '@/lib/security/oauth-state'
 import { rateLimit } from '@/lib/security/rate-limit'
 import { google } from 'googleapis'
@@ -136,6 +136,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             })
         }
 
+        // Scopes: Google sometimes omits "scope" in the token response (e.g. re-auth). Use state or existing, never [].
+        let scopesToSave: string[] = tokens.scope?.trim() ? tokens.scope.trim().split(/\s+/) : []
+        if (scopesToSave.length === 0) {
+            scopesToSave = stateData.requestedScopes ?? (await getGoogleToken(user.id, stateData.foundryId))?.scopes ?? []
+            if (scopesToSave.length > 0) {
+                console.info('[GoogleCallback] Token response had no scope; using requested/existing scopes:', {
+                    scopeCount: scopesToSave.length,
+                    source: stateData.requestedScopes?.length ? 'state' : 'existing',
+                })
+            }
+        }
+
         // Store the token
         const saveResult = await saveGoogleToken({
             userId: user.id,
@@ -145,7 +157,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             expiresAt: tokens.expiry_date
                 ? new Date(tokens.expiry_date)
                 : new Date(Date.now() + 3600 * 1000),
-            scopes: tokens.scope ? tokens.scope.split(' ') : [],
+            scopes: scopesToSave,
             googleEmail,
         })
 

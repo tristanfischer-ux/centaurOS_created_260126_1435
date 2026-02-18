@@ -12,6 +12,8 @@ export interface OAuthStatePayload {
   nonce: string
   /** Millisecond timestamp when state was issued */
   issuedAt: number
+  /** Scopes we requested (so callback can save them if Google omits scope in token response) */
+  requestedScopes?: string[]
 }
 
 /**
@@ -103,11 +105,17 @@ export function verifySignedOAuthState(
       return null
     }
 
+    const requestedScopes =
+      Array.isArray(parsed.requestedScopes) && parsed.requestedScopes.every((s): s is string => typeof s === 'string')
+        ? parsed.requestedScopes
+        : undefined
+
     return {
       userId: parsed.userId,
       foundryId: parsed.foundryId,
       nonce: parsed.nonce,
       issuedAt: parsed.issuedAt,
+      ...(requestedScopes && requestedScopes.length > 0 ? { requestedScopes } : {}),
     }
   } catch {
     return null
@@ -123,13 +131,19 @@ export function verifySignedOAuthState(
  * @param {Object} params - Core state parameters
  * @param {string} params.userId - Authenticated user ID
  * @param {string} params.foundryId - Foundry context ID
+ * @param {string[]} [params.requestedScopes] - Scopes we requested (used in callback if Google omits scope)
  * @returns {OAuthStatePayload} Freshly generated OAuth state payload
  */
-export function buildOAuthStatePayload(params: { userId: string; foundryId: string }): OAuthStatePayload {
+export function buildOAuthStatePayload(params: {
+  userId: string
+  foundryId: string
+  requestedScopes?: string[]
+}): OAuthStatePayload {
   return {
     userId: params.userId,
     foundryId: params.foundryId,
     nonce: randomUUID(),
     issuedAt: Date.now(),
+    ...(params.requestedScopes?.length ? { requestedScopes: params.requestedScopes } : {}),
   }
 }

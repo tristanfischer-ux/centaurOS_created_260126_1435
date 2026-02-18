@@ -86,7 +86,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         return redirectWithError('not_configured')
     }
 
-    const statePayload = buildOAuthStatePayload({ userId: user.id, foundryId })
+    const statePayload = buildOAuthStatePayload({ userId: user.id, foundryId, requestedScopes: scopes })
     const stateEncoded = createSignedOAuthState(statePayload, oauthStateSecret)
 
     console.info('[GoogleConnect] Initiating OAuth flow:', {
