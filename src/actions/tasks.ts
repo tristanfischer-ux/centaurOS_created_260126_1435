@@ -283,8 +283,18 @@ export async function createTask(formData: FormData) {
               if (result.error) throw result.error
               return result.data
           })
-      } catch (error) {
-          return { error: error instanceof Error ? error.message : 'Failed to create task' }
+      } catch (error: unknown) {
+          const message = error instanceof Error
+              ? error.message
+              : (error && typeof error === 'object' && 'message' in error)
+                  ? String((error as { message: unknown }).message)
+                  : 'Failed to create task'
+          console.error('[TaskService] Task insert failed:', {
+              title: validatedTitle,
+              objectiveId: validatedObjectiveId,
+              error: message,
+          })
+          return { error: message }
       }
 
       if (!data) return { error: 'Failed to create task' }

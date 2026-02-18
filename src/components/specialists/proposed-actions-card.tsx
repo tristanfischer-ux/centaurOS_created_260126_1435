@@ -176,6 +176,7 @@ async function executeCreateActions(params: {
     results: ExecutedState
     rejectedObjectives: string[]
     rejectedTasks: string[]
+    failedTasks: { title: string; error: string }[]
     autoCreatedGoals: string[]
     autoCreatedObjectives: string[]
 }> {
@@ -183,6 +184,7 @@ async function executeCreateActions(params: {
     const results: ExecutedState = { ...executed }
     const rejectedObjectives: string[] = []
     const rejectedTasks: string[] = []
+    const failedTasks: { title: string; error: string }[] = []
     const autoCreatedGoals: string[] = []
     const autoCreatedObjectives: string[] = []
 
@@ -191,6 +193,21 @@ async function executeCreateActions(params: {
 
     const newGoalTitleToId = new Map<string, string>()
     const objectiveTitleToId = new Map<string, string>()
+
+    /** Fuzzy-match against batch-created objectives (handles "&" vs "and", etc.) */
+    function resolveBatchObjective(llmTitle: string): string | undefined {
+        const norm = normalizeTitle(llmTitle)
+        // Exact normalized match first
+        for (const [key, id] of objectiveTitleToId) {
+            if (normalizeTitle(key) === norm) return id
+        }
+        // Substring containment fallback
+        for (const [key, id] of objectiveTitleToId) {
+            const normKey = normalizeTitle(key)
+            if (norm.includes(normKey) || normKey.includes(norm)) return id
+        }
+        return undefined
+    }
 
     // ── Phase 0: Auto-create missing strategic goals ─────────────────────────
     // Collect all strategic goal titles referenced by proposed objectives and
@@ -283,7 +300,7 @@ async function executeCreateActions(params: {
         if (p.type !== "task" || !p.objectiveTitle?.trim()) continue
 
         const objTitle = p.objectiveTitle.trim()
-        if (!objectiveTitleToId.has(objTitle) && !resolveExistingObjective(objTitle)) {
+        if (!resolveBatchObjective(objTitle) && !resolveExistingObjective(objTitle)) {
             neededObjectiveTitles.add(objTitle)
         }
     }
@@ -345,7 +362,7 @@ async function executeCreateActions(params: {
             continue
         }
 
-        let objectiveId = objectiveTitleToId.get(p.objectiveTitle.trim())
+        let objectiveId = resolveBatchObjective(p.objectiveTitle)
         if (!objectiveId) {
             objectiveId = resolveExistingObjective(p.objectiveTitle)
         }
@@ -373,6 +390,7 @@ async function executeCreateActions(params: {
         const result = await createTask(fd)
         if (result.error) {
             results[i] = { success: false }
+            failedTasks.push({ title: p.title, error: result.error })
             console.warn("[ProposedActions] Failed to create task:", { title: p.title, error: result.error })
             continue
         }
@@ -381,7 +399,7 @@ async function executeCreateActions(params: {
         }
     }
 
-    return { results, rejectedObjectives, rejectedTasks, autoCreatedGoals, autoCreatedObjectives }
+    return { results, rejectedObjectives, rejectedTasks, failedTasks, autoCreatedGoals, autoCreatedObjectives }
 }
 
 export function ProposedActionsCard({
@@ -522,6 +540,7 @@ export function ProposedActionsCard({
                 results,
                 rejectedObjectives,
                 rejectedTasks,
+                failedTasks,
                 autoCreatedGoals,
                 autoCreatedObjectives,
             } = await executeCreateActions({
@@ -560,6 +579,12 @@ export function ProposedActionsCard({
             if (rejectedTasks.length > 0) {
                 toast.error(
                     `${rejectedTasks.length} task${rejectedTasks.length > 1 ? "s" : ""} rejected — must belong to an objective`,
+                    { duration: 6000 }
+                )
+            }
+            if (failedTasks.length > 0) {
+                toast.error(
+                    `${failedTasks.length} task${failedTasks.length > 1 ? "s" : ""} failed: ${failedTasks[0].error}`,
                     { duration: 6000 }
                 )
             }
@@ -625,6 +650,7 @@ export function ProposedActionsCard({
                 results: createResults,
                 rejectedObjectives,
                 rejectedTasks,
+                failedTasks,
                 autoCreatedGoals,
                 autoCreatedObjectives,
             } = await executeCreateActions({
@@ -668,6 +694,12 @@ export function ProposedActionsCard({
             if (rejectedTasks.length > 0) {
                 toast.error(
                     `${rejectedTasks.length} task${rejectedTasks.length > 1 ? "s" : ""} rejected — must belong to an objective`,
+                    { duration: 6000 }
+                )
+            }
+            if (failedTasks.length > 0) {
+                toast.error(
+                    `${failedTasks.length} task${failedTasks.length > 1 ? "s" : ""} failed: ${failedTasks[0].error}`,
                     { duration: 6000 }
                 )
             }
