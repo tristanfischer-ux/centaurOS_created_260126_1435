@@ -84,6 +84,7 @@ const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number 
   'gpt-4o-mini': { input: 0.15, output: 0.60 },
   'gpt-4-turbo': { input: 10.00, output: 30.00 },
   'whisper-1': { input: 0.006, output: 0 }, // per second, approximated
+  'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
   'claude-opus-4-6': { input: 15.00, output: 75.00 },
   'claude-haiku-4-5': { input: 0.80, output: 4.00 },
   // MiniMax models — dramatically cheaper than OpenAI/Anthropic
@@ -133,6 +134,20 @@ export function estimateRealtimeCost(
     ? (REALTIME_COSTS_PER_MINUTE[avatarProvider] ?? 0.07) * minutes
     : 0
   return Number((voiceCost + avatarCost).toFixed(6))
+}
+
+/** Anthropic web search cost: $10 per 1,000 searches = $0.01 per search */
+export const WEB_SEARCH_COST_PER_REQUEST = 0.01
+
+/**
+ * Estimate the cost of Anthropic web search usage.
+ *
+ * @param webSearchRequests - Number of web search requests executed
+ * @returns Estimated cost in USD
+ */
+export function estimateWebSearchCost(webSearchRequests: number): number {
+  if (webSearchRequests <= 0) return 0
+  return Number((webSearchRequests * WEB_SEARCH_COST_PER_REQUEST).toFixed(6))
 }
 
 /**
