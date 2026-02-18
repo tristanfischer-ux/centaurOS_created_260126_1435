@@ -62,7 +62,7 @@ export async function createRollout(params: CreateRolloutParams): Promise<string
         thread_id: params.threadId ?? null,
         prompt_id: params.promptId ?? null,
         status: 'running',
-        metadata: params.metadata ?? {},
+        metadata: (params.metadata ?? {}) as import('@/types/database.types').Json,
       })
       .select('id')
       .single()
@@ -93,7 +93,7 @@ export async function addSpan(params: AddSpanParams): Promise<void> {
       response_snapshot: truncate(params.responseSnapshot),
       prompt_tokens: params.promptTokens ?? null,
       completion_tokens: params.completionTokens ?? null,
-      metadata: params.metadata ?? {},
+      metadata: (params.metadata ?? {}) as import('@/types/database.types').Json,
     })
     if (error) {
       console.warn('[agent-spans] addSpan failed:', { rolloutId: params.rolloutId, error: error.message })

@@ -137,7 +137,7 @@ async function streamOpenAI(opts: StreamingTextOptions): Promise<void> {
     try {
         const stream = await client.chat.completions.create({
             model: opts.modelId,
-            messages,
+            messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
             stream: true,
             max_tokens: opts.maxTokens ?? 4096,
         })
@@ -451,7 +451,7 @@ async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
 
     const stream = await client.chat.completions.create({
         model: opts.modelId,
-        messages,
+        messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
         stream: true,
         max_tokens: opts.maxTokens ?? 4096,
     })
@@ -500,7 +500,7 @@ async function streamQwen(opts: StreamingTextOptions): Promise<void> {
 
     const stream = await client.chat.completions.create({
         model: opts.modelId,
-        messages,
+        messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
         stream: true,
         max_tokens: opts.maxTokens ?? 8192,
         ...extraParams,
@@ -543,7 +543,7 @@ async function streamQwenLocal(opts: StreamingTextOptions): Promise<void> {
 
     const stream = await client.chat.completions.create({
         model: opts.modelId,
-        messages,
+        messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
         stream: true,
         // Ollama handles max_tokens differently; cap at a reasonable default
         ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),

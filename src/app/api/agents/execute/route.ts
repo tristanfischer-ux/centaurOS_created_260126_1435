@@ -368,6 +368,7 @@ export async function POST(request: Request) {
                     includeObjectives: true,
                     includeUserProfile: false, // Skip heavy profile for streaming performance
                     includeInsightHistory: false,
+                    includeEngineeringHistory: true,
                 })
             }
         } catch (err) {

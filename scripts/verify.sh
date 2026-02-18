@@ -172,7 +172,7 @@ fi
 echo -e "  ${CYAN}→${NC} Running Playwright smoke tests..."
 echo ""
 
-if SMOKE_ROUTES="$ROUTES" npx playwright test e2e/smoke.spec.ts --project=smoke --reporter=list 2>&1; then
+if SMOKE_ROUTES="$ROUTES" PLAYWRIGHT_SKIP_WEB_SERVER=1 npx playwright test e2e/smoke.spec.ts --project=smoke --reporter=list 2>&1; then
   echo ""
   echo -e "  ${GREEN}✓${NC} Smoke tests: all pages render correctly"
 else

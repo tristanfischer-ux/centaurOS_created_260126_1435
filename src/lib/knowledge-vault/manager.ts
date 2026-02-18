@@ -60,8 +60,8 @@ export async function queryKnowledgeNotes(
     pageSize = 20,
   } = params
 
-  let query = supabase
-    .from('knowledge_notes')
+  let query = (supabase as any)
+      .from('knowledge_notes')
     .select(SUMMARY_FIELDS, { count: 'exact' })
     .eq('foundry_id', foundryId)
 
@@ -141,8 +141,8 @@ export async function getKnowledgeNote(
 ): Promise<KnowledgeNote | null> {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .from('knowledge_notes')
+  const { data, error } = await (supabase as any)
+      .from('knowledge_notes')
     .select('*')
     .eq('id', noteId)
     .maybeSingle()
@@ -172,8 +172,8 @@ export async function getKnowledgeNoteWithLinks(
   const supabase = await createClient()
 
   // Fetch note
-  const { data: note, error: noteError } = await supabase
-    .from('knowledge_notes')
+  const { data: note, error: noteError } = await (supabase as any)
+      .from('knowledge_notes')
     .select('*')
     .eq('id', noteId)
     .maybeSingle()
@@ -187,8 +187,8 @@ export async function getKnowledgeNoteWithLinks(
   }
 
   // Fetch outgoing links (this note -> others)
-  const { data: outgoing } = await supabase
-    .from('knowledge_links')
+  const { data: outgoing } = await (supabase as any)
+      .from('knowledge_links')
     .select(`
       id, foundry_id, source_note_id, target_note_id,
       relationship, description, discovered_by, created_at,
@@ -197,8 +197,8 @@ export async function getKnowledgeNoteWithLinks(
     .eq('source_note_id', noteId)
 
   // Fetch incoming links (others -> this note)
-  const { data: incoming } = await supabase
-    .from('knowledge_links')
+  const { data: incoming } = await (supabase as any)
+      .from('knowledge_links')
     .select(`
       id, foundry_id, source_note_id, target_note_id,
       relationship, description, discovered_by, created_at,
@@ -243,8 +243,8 @@ export async function getKnowledgeNoteWithLinks(
   }
 
   // Increment view count (fire and forget)
-  supabase
-    .from('knowledge_notes')
+(supabase as any)
+      .from('knowledge_notes')
     .update({ view_count: (note.view_count as number) + 1 })
     .eq('id', noteId)
     .then(() => { /* intentionally fire-and-forget */ })
@@ -285,8 +285,8 @@ export async function createKnowledgeNote(
 ): Promise<KnowledgeNote | null> {
   const supabase = await createClient()
 
-  const { data: note, error } = await supabase
-    .from('knowledge_notes')
+  const { data: note, error } = await (supabase as any)
+      .from('knowledge_notes')
     .insert({
       foundry_id: foundryId,
       title: data.title,
@@ -335,8 +335,8 @@ export async function updateKnowledgeNote(
 ): Promise<KnowledgeNote | null> {
   const supabase = await createClient()
 
-  const { data: note, error } = await supabase
-    .from('knowledge_notes')
+  const { data: note, error } = await (supabase as any)
+      .from('knowledge_notes')
     .update(data)
     .eq('id', noteId)
     .select()
@@ -369,8 +369,8 @@ export async function archiveKnowledgeNote(
 ): Promise<boolean> {
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('knowledge_notes')
+  const { error } = await (supabase as any)
+      .from('knowledge_notes')
     .update({ is_archived: archived })
     .eq('id', noteId)
 
@@ -395,8 +395,8 @@ export async function archiveKnowledgeNote(
 export async function deleteKnowledgeNote(noteId: string): Promise<boolean> {
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('knowledge_notes')
+  const { error } = await (supabase as any)
+      .from('knowledge_notes')
     .delete()
     .eq('id', noteId)
 
@@ -427,8 +427,8 @@ export async function pinKnowledgeNote(
 ): Promise<boolean> {
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('knowledge_notes')
+  const { error } = await (supabase as any)
+      .from('knowledge_notes')
     .update({ is_pinned: pinned })
     .eq('id', noteId)
 
@@ -463,8 +463,8 @@ export async function verifyKnowledgeNote(
 ): Promise<boolean> {
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('knowledge_notes')
+  const { error } = await (supabase as any)
+      .from('knowledge_notes')
     .update({
       is_verified: verified,
       verified_by: verified ? userId : null,
@@ -508,8 +508,8 @@ export async function createKnowledgeLink(
 ): Promise<boolean> {
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('knowledge_links')
+  const { error } = await (supabase as any)
+      .from('knowledge_links')
     .insert({
       foundry_id: foundryId,
       source_note_id: sourceNoteId,
@@ -545,8 +545,8 @@ export async function createKnowledgeLink(
 export async function removeKnowledgeLink(linkId: string): Promise<boolean> {
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('knowledge_links')
+  const { error } = await (supabase as any)
+      .from('knowledge_links')
     .delete()
     .eq('id', linkId)
 
@@ -679,8 +679,8 @@ export async function searchKnowledgeForSpecialist(
   }
 
   // Full-text search with ranking
-  let searchQuery = supabase
-    .from('knowledge_notes')
+  let searchQuery = (supabase as any)
+      .from('knowledge_notes')
     .select('title, content, description, note_type, source_specialist, confidence, is_verified, tags, created_at')
     .eq('foundry_id', foundryId)
     .eq('is_archived', false)
@@ -699,9 +699,10 @@ export async function searchKnowledgeForSpecialist(
     searchQuery = searchQuery.neq('source_specialist', specialistId)
   }
 
-  const { data: notes } = await searchQuery
+  const { data: rawNotes } = await searchQuery
+  const notes = (rawNotes ?? []) as Array<{ title: string; content: string | null; description: string | null; note_type: string; source_specialist: string | null; confidence: number | null; is_verified: boolean | null; tags: string[] | null; created_at: string | null }>
 
-  if (!notes || notes.length === 0) {
+  if (notes.length === 0) {
     return ''
   }
 
@@ -714,7 +715,7 @@ export async function searchKnowledgeForSpecialist(
   for (const note of notes) {
     const verifiedTag = note.is_verified ? ' ✓ VERIFIED' : ''
     const specialist = note.source_specialist ? ` (from ${note.source_specialist})` : ''
-    const date = new Date(note.created_at as string).toLocaleDateString('en-US', {
+    const date = new Date(note.created_at ?? '').toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
     })
@@ -722,7 +723,7 @@ export async function searchKnowledgeForSpecialist(
     lines.push(`### ${note.title}${verifiedTag}`)
     lines.push(`*${note.note_type}${specialist} — ${date}*`)
     lines.push('')
-    lines.push(note.content as string)
+    lines.push(note.content ?? '')
     lines.push('')
   }
 
@@ -739,12 +740,15 @@ export async function searchKnowledgeForSpecialist(
  *
  * @security RLS enforces foundry isolation
  */
+/** Row shape for knowledge_notes stats query (table may be missing from generated DB types). */
+type KnowledgeNoteStatsRow = { note_type: string | null; source_specialist: string | null; is_verified: boolean | null }
+
 export async function getVaultStats(
   foundryId: string
 ): Promise<VaultStats> {
   const supabase = await createClient()
-
-  // Parallel queries for stats
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes/knowledge_links missing from generated DB types
+  const db = supabase as any
   const [
     notesResult,
     linksResult,
@@ -752,12 +756,12 @@ export async function getVaultStats(
     recentResult,
     pinnedResult,
   ] = await Promise.allSettled([
-    supabase
+    db
       .from('knowledge_notes')
       .select('note_type, source_specialist, is_verified', { count: 'exact' })
       .eq('foundry_id', foundryId)
       .eq('is_archived', false),
-    supabase
+    db
       .from('knowledge_links')
       .select('id', { count: 'exact', head: true })
       .eq('foundry_id', foundryId),
@@ -766,14 +770,14 @@ export async function getVaultStats(
       .select('*')
       .eq('foundry_id', foundryId)
       .order('sort_order', { ascending: true }),
-    supabase
+    db
       .from('knowledge_notes')
       .select(SUMMARY_FIELDS)
       .eq('foundry_id', foundryId)
       .eq('is_archived', false)
       .order('created_at', { ascending: false })
       .limit(5),
-    supabase
+    db
       .from('knowledge_notes')
       .select(SUMMARY_FIELDS)
       .eq('foundry_id', foundryId)
@@ -783,7 +787,7 @@ export async function getVaultStats(
       .limit(10),
   ])
 
-  const notes = notesResult.status === 'fulfilled' ? notesResult.value.data ?? [] : []
+  const notes = (notesResult.status === 'fulfilled' ? notesResult.value.data ?? [] : []) as unknown as KnowledgeNoteStatsRow[]
   const totalLinks = linksResult.status === 'fulfilled' ? linksResult.value.count ?? 0 : 0
   const domains = domainsResult.status === 'fulfilled'
     ? (domainsResult.value.data ?? []) as unknown as KnowledgeDomain[]
@@ -802,12 +806,11 @@ export async function getVaultStats(
   let unverifiedCount = 0
 
   for (const note of notes) {
-    const nt = note.note_type as string
+    const nt = note.note_type ?? ''
     notesByType[nt] = (notesByType[nt] ?? 0) + 1
 
     if (note.source_specialist) {
-      const sid = note.source_specialist as string
-      specialistCounts[sid] = (specialistCounts[sid] ?? 0) + 1
+      specialistCounts[note.source_specialist] = (specialistCounts[note.source_specialist] ?? 0) + 1
     }
 
     if (note.is_verified) {
