@@ -740,8 +740,10 @@ export function TeamMeetingDialog({
     const [speakingEntryIdx, setSpeakingEntryIdx] = useState<number | null>(null)
     const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set())
     const [wantsToSpeak, setWantsToSpeak] = useState<Set<string>>(new Set())
+    const [debateCancelRequested, setDebateCancelRequested] = useState(false)
 
     const scrollRef = useRef<HTMLDivElement>(null)
+    const debateCancelRef = useRef(false)
 
     // ─── Voice Hooks ──────────────────────────────────────────────────────
     const tts = useTts()
