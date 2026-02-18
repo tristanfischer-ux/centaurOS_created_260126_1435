@@ -13,6 +13,9 @@ const config: Config = {
     setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
+        // remark-gfm is ESM-only and next/jest's default transformIgnorePatterns
+        // blocks it from being transformed. Provide a no-op mock for unit tests.
+        '^remark-gfm$': '<rootDir>/src/__mocks__/remark-gfm.ts',
     },
     // Allow transforming ES modules from node_modules
     transformIgnorePatterns: [
