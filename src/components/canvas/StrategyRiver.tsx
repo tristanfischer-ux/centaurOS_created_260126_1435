@@ -650,12 +650,12 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTaskClick?.(t.id) } }}
                             style={{ cursor: canDrag ? (isBeingDragged ? 'grabbing' : 'grab') : 'pointer' }}
                           >
-                            {/* Invisible hit area rect covering the full task region */}
+                            {/* Invisible hit area rect covering the full task region including label */}
                             <rect
                               x={visSx - 15}
-                              y={t.y - (BAND_W / 2 + 8)}
+                              y={t.y - 18}
                               width={visEx - visSx + 30}
-                              height={BAND_W + 16}
+                              height={36}
                               fill="transparent"
                               pointerEvents="all"
                             />

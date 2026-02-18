@@ -249,7 +249,7 @@ export function VoiceSessionDialog({
                 const providerConfig = backend === "personaplex"
                     ? { providerId: "personaplex", modelId: "personaplex-7b-v1" }
                     : specialist.modelTier === "claude"
-                        ? { providerId: "anthropic", modelId: "claude-opus-4-6" }
+                        ? { providerId: "anthropic", modelId: "claude-sonnet-4-6" }
                         : { providerId: "minimax", modelId: "MiniMax-M2.5" }
 
                 await engine.connect({

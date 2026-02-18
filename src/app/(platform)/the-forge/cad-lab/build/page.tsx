@@ -67,7 +67,7 @@ export default function CadLabBuildPage(): React.ReactNode {
     modules, expandedModuleId, setExpandedModuleId,
     activeModuleId,
     isDecomposing, handleDecompose,
-    handleModuleGenerate, handleGenerateAllModules,
+    handleModuleGenerate, handleGenerateSingleModule, handleGenerateAllModules,
     isBatchRunning, batchProgress,
     generatedModuleCount,
     diagCompletedCount,
@@ -141,6 +141,7 @@ export default function CadLabBuildPage(): React.ReactNode {
         <ProductOverview
           subject={subject}
           report={editableReport}
+          modules={modules}
           moduleCount={modules.length}
           totalComponents={modules.reduce((s, m) => s + m.keyParts.length, 0)}
           criticalPathWeeks={Math.max(...modules.map((m) => m.leadWeeks))}
@@ -373,9 +374,41 @@ export default function CadLabBuildPage(): React.ReactNode {
                         <div className="h-full bg-international-orange rounded-full animate-pulse" style={{ width: status === "interface" ? "35%" : "70%" }} />
                       </div>
                     )}
+
+                    {/* Retry button for failed modules */}
+                    {isError && !isBatchRunning && (
+                      <div className="mt-2 flex items-center justify-between">
+                        <p className="text-xs text-destructive">Generation failed. You can retry this module individually.</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs gap-1"
+                          disabled={activeModuleId !== null}
+                          onClick={() => handleGenerateSingleModule(mod.id)}
+                        >
+                          <RotateCcw className="h-3 w-3" /> Retry
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {/* Batch failure summary — shown after batch with errors */}
+          {!isBatchRunning && Object.keys(batchProgress).length > 0 && Object.values(batchProgress).some((s) => s === "error") && (
+            <div className="border border-destructive/30 rounded-lg bg-status-error-light/20 p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <p className="text-sm font-semibold text-destructive">
+                  {Object.values(batchProgress).filter((s) => s === "error").length} module{Object.values(batchProgress).filter((s) => s === "error").length !== 1 ? "s" : ""} failed during generation
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This can happen due to temporary service issues, complex geometry that times out, or high demand. 
+                Use the &quot;Retry&quot; button on individual failed modules above, or click &quot;Generate All Modules&quot; again to retry all failed modules.
+              </p>
             </div>
           )}
 
@@ -392,7 +425,7 @@ export default function CadLabBuildPage(): React.ReactNode {
           {modules.length > 0 && (
             <div className="space-y-2 mt-4">
               {modules.map((mod) => (
-                <div key={mod.id} className="border rounded-md overflow-hidden">
+                <div key={mod.id} id={`module-${mod.id}`} className="border rounded-md overflow-hidden">
                   {/* Module header */}
                   <button
                     onClick={() => setExpandedModuleId(expandedModuleId === mod.id ? null : mod.id)}
@@ -418,6 +451,30 @@ export default function CadLabBuildPage(): React.ReactNode {
                         <Puzzle className="h-3 w-3" />
                         {mod.keyParts.length} parts
                       </span>
+                      {/* Per-module Generate button */}
+                      {mod.status !== "generated" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs gap-1"
+                          disabled={activeModuleId !== null || isBatchRunning}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleGenerateSingleModule(mod.id)
+                          }}
+                        >
+                          {activeModuleId === mod.id ? (
+                            <><Loader2 className="h-3 w-3 animate-spin" /> Generating...</>
+                          ) : (
+                            <><Zap className="h-3 w-3" /> Generate</>
+                          )}
+                        </Button>
+                      )}
+                      {mod.status === "generated" && (
+                        <span className="text-xs text-status-success flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" /> Done
+                        </span>
+                      )}
                       {expandedModuleId === mod.id
                         ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
                         : <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -588,15 +645,18 @@ export default function CadLabBuildPage(): React.ReactNode {
 // ─── Product Overview ────────────────────────────────────────────────
 
 /**
- * ProductOverview — Summarises the main product before listing its modules.
+ * ProductOverview — Prominent product hero card before the module breakdown.
  *
- * @description Shows the product name, a brief excerpt from the research
- * report, and aggregate stats so the user understands the whole before
- * diving into individual sub-assemblies.
+ * @description Large visual card showing the product name, summary excerpt
+ * from the research report, and aggregate engineering stats. Gives the user
+ * a clear "this is the thing we're building" moment before they drill into
+ * individual sub-assemblies. Includes a mini module map showing how the
+ * modules are distributed by manufacturing process.
  */
 function ProductOverview({
   subject,
   report,
+  modules,
   moduleCount,
   totalComponents,
   criticalPathWeeks,
@@ -605,6 +665,7 @@ function ProductOverview({
 }: {
   subject: string
   report: string
+  modules: CadLabModule[]
   moduleCount: number
   totalComponents: number
   criticalPathWeeks: number
@@ -613,57 +674,101 @@ function ProductOverview({
 }): React.ReactNode {
   const summary = extractProductSummary(report)
 
+  // Group modules by lead-time for a visual weight map
+  const processGroups = useMemo(() => {
+    const groups: Record<string, { name: string; count: number; color: string }> = {}
+    for (const mod of modules) {
+      // Use the module's key parts count as a proxy for complexity
+      const key = mod.leadWeeks <= 2 ? "fast" : mod.leadWeeks <= 4 ? "medium" : "long"
+      if (!groups[key]) {
+        groups[key] = {
+          name: key === "fast" ? "Quick Turn (1-2 wk)" : key === "medium" ? "Standard (3-4 wk)" : "Long Lead (5+ wk)",
+          count: 0,
+          color: key === "fast" ? "bg-status-success" : key === "medium" ? "bg-status-info" : "bg-international-orange",
+        }
+      }
+      groups[key].count++
+    }
+    return Object.values(groups)
+  }, [modules])
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Layers className="h-4 w-4" />
-          Product Overview
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Product name */}
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">{subject}</h3>
-          {summary && (
-            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{summary}</p>
-          )}
+    <Card className="overflow-hidden">
+      <div className="bg-gradient-to-br from-international-orange-light/10 via-background to-status-info-light/5 p-6 sm:p-8">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-8 w-1 rounded-full bg-international-orange flex-shrink-0" />
+              <h2 className="text-xl font-bold text-foreground truncate">{subject}</h2>
+            </div>
+            {summary && (
+              <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">
+                {summary}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Aggregate stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3 border rounded-md bg-muted/20">
-          <div className="space-y-1">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="bg-background rounded-lg border p-3 space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Puzzle className="h-3 w-3" /> Sub-Assemblies
             </p>
-            <p className="text-sm font-semibold text-foreground font-mono">{moduleCount}</p>
+            <p className="text-lg font-bold text-foreground font-mono">{moduleCount}</p>
           </div>
-          <div className="space-y-1">
+          <div className="bg-background rounded-lg border p-3 space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Box className="h-3 w-3" /> Components
             </p>
-            <p className="text-sm font-semibold text-foreground font-mono">{totalComponents}</p>
+            <p className="text-lg font-bold text-foreground font-mono">{totalComponents}</p>
           </div>
-          <div className="space-y-1">
+          <div className="bg-background rounded-lg border p-3 space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Clock className="h-3 w-3" /> Critical Path
             </p>
-            <p className="text-sm font-semibold text-foreground font-mono">{criticalPathWeeks}w</p>
+            <p className="text-lg font-bold text-foreground font-mono">{criticalPathWeeks}w</p>
           </div>
-          <div className="space-y-1">
+          <div className="bg-background rounded-lg border p-3 space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <AlertTriangle className="h-3 w-3" /> Failure Modes
             </p>
-            <p className="text-sm font-semibold text-foreground font-mono">{totalRisks}</p>
+            <p className="text-lg font-bold text-foreground font-mono">{totalRisks}</p>
           </div>
-          <div className="space-y-1">
+          <div className="bg-background rounded-lg border p-3 space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Info className="h-3 w-3" /> Open Questions
             </p>
-            <p className="text-sm font-semibold text-foreground font-mono">{totalUnknowns}</p>
+            <p className="text-lg font-bold text-foreground font-mono">{totalUnknowns}</p>
           </div>
         </div>
-      </CardContent>
+
+        {/* Lead time distribution bar */}
+        {processGroups.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="text-xs text-muted-foreground font-medium">Lead Time Distribution</p>
+            <div className="flex h-3 rounded-full overflow-hidden border">
+              {processGroups.map((g) => (
+                <div
+                  key={g.name}
+                  className={cn("h-full transition-all duration-500", g.color)}
+                  style={{ width: `${(g.count / moduleCount) * 100}%` }}
+                  title={`${g.name}: ${g.count} module${g.count !== 1 ? "s" : ""}`}
+                />
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-4 text-[10px] text-muted-foreground">
+              {processGroups.map((g) => (
+                <span key={g.name} className="flex items-center gap-1.5">
+                  <div className={cn("h-2 w-6 rounded-full", g.color)} />
+                  {g.name} ({g.count})
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </Card>
   )
 }

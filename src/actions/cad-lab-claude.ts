@@ -763,7 +763,7 @@ Generate the FULL CadQuery Python code. Requirements:
 9. CRITICAL: Every function you call must either come from the provided component library list OR be defined with def in your script.
 
 This code will be executed in a CadQuery sandbox. The "result" variable must be a cq.Workplane or cq.Compound containing the complete assembled model. If using cq.Assembly(), call .toCompound() to convert it.`,
-      "claude-opus-4-6",
+      "claude-sonnet-4-6",
       64000,
     )
 
@@ -907,7 +907,7 @@ export async function executeCode(code: string): Promise<ExecutionResult> {
 async function callClaude(
   systemPrompt: string,
   userPrompt: string,
-  modelId: string = "claude-opus-4-6",
+  modelId: string = "claude-sonnet-4-6",
   maxTokens: number = 64000,
 ): Promise<{ text: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY

@@ -811,7 +811,7 @@ function AgentsFlowInner({
             }
 
             const providerId = data.providerId ?? "anthropic"
-            const modelId = data.modelId ?? "claude-opus-4-6"
+            const modelId = data.modelId ?? "claude-sonnet-4-6"
             const modality = data.outputModality ?? "text"
 
             // Set running state — clear any previous media outputs

@@ -14,7 +14,8 @@ import { ActivityTracker } from "@/components/ActivityTracker";
 import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
-import { ZoomProvider, MobileZoomControl, ZoomableContent } from "@/components/ZoomProvider";
+import { ZoomProvider, MobileZoomControl } from "@/components/ZoomProvider";
+import { MainContentArea } from "@/components/MainContentArea";
 import { ScreenContextProvider } from "@/contexts/screen-context";
 import { AdvisorPanelProvider } from "@/contexts/advisor-panel-context";
 import { BrowseContextProvider } from "@/contexts/browse-context";
@@ -158,7 +159,7 @@ export default async function PlatformLayout({
                         <KeyboardShortcutsDialog />
                         <MobileZoomControl />
                         <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} />
-                        <ZoomableContent className="flex-1 min-w-0 overflow-y-auto bg-background">
+                        <MainContentArea>
                             <main className="p-4 pt-14 sm:py-6 sm:pr-6 sm:pl-5 sm:pt-6 lg:py-8 lg:pr-8 lg:pl-6 lg:pt-8 pb-32 sm:pb-8">
                                 {needsProfileRepair ? (
                                     <ProfileSetupRequired userRole={profile?.role} />
@@ -171,7 +172,7 @@ export default async function PlatformLayout({
                                     </>
                                 )}
                             </main>
-                        </ZoomableContent>
+                        </MainContentArea>
                         <Suspense fallback={null}>
                             <AdvisorPanel />
                         </Suspense>

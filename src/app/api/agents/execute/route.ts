@@ -25,6 +25,7 @@ import {
     compileFounderPreferencesPrompt,
     recordInteraction,
 } from "@/lib/agents/founder-preferences"
+import { createRollout, addSpan, finishRollout } from "@/lib/agent-spans"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -99,7 +100,7 @@ interface ProviderTarget {
  */
 const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
     claude: [
-        { providerId: "anthropic", modelId: "claude-opus-4-6" },
+        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
         { providerId: "openai", modelId: "gpt-4o" },
         { providerId: "google", modelId: "gemini-2.0-flash" },
     ],
@@ -206,13 +207,14 @@ export async function POST(request: Request) {
     let videoConfig: { duration?: number; resolution?: string; promptOptimizer?: boolean } | undefined
     let firstFrameImage: string | undefined
     let modelTier: ModelTier | undefined
+    let attachments: Array<{ path?: string; url?: string | null; filename?: string; mimeType?: string }> | undefined
 
     try {
         const body = await request.json()
         prompt = body.prompt
         input = body.input ?? ""
         providerId = body.providerId ?? "anthropic"
-        modelId = body.modelId ?? "claude-opus-4-6"
+        modelId = body.modelId ?? "claude-sonnet-4-6"
         modality = body.modality ?? "text"
         threadId = body.threadId ?? undefined
         customSystemPromptSuffix =
@@ -225,6 +227,12 @@ export async function POST(request: Request) {
         firstFrameImage = typeof body.firstFrameImage === "string" ? body.firstFrameImage : undefined
         modelTier = (typeof body.modelTier === "string" && body.modelTier in FALLBACK_CHAINS)
             ? body.modelTier as ModelTier
+            : undefined
+        attachments = Array.isArray(body.attachments)
+            ? body.attachments.filter(
+                (a: unknown): a is { path?: string; url?: string | null; filename?: string; mimeType?: string } =>
+                    typeof a === "object" && a !== null && (typeof (a as { url?: unknown }).url === "string" || (a as { url?: unknown }).url === null)
+            )
             : undefined
 
         if (!prompt || typeof prompt !== "string") {
@@ -305,6 +313,18 @@ export async function POST(request: Request) {
         }
     }
 
+    // 4a2. Create agent rollout for training/optimization (best-effort, non-blocking)
+    const rolloutId =
+        foundryId != null
+            ? await createRollout({
+                  foundryId,
+                  userId: user.id,
+                  agentId: specialistId ? `specialist:${specialistId}` : "workflow",
+                  threadId: threadId ?? null,
+                  metadata: { modality, providerId, modelId },
+              })
+            : null
+
     // 4b. Fast-path detection for short conversational follow-ups.
     // When a user sends a quick message like "hi", "thanks", or "what about X?"
     // in an existing conversation, skip the ~15 DB queries for company context,
@@ -356,8 +376,66 @@ export async function POST(request: Request) {
         }
     }
 
+    // 4b. Enrich input with attachment context (for prompt only; memory stores original input)
+    const MAX_ATTACHMENT_CONTEXT_CHARS = 25_000
+    let inputForPrompt = input
+    if (attachments && attachments.length > 0) {
+        const parts: string[] = []
+        let totalChars = 0
+        for (const a of attachments) {
+            const name = typeof a.filename === "string" ? a.filename : "file"
+            const mime = typeof a.mimeType === "string" ? a.mimeType : ""
+            const url = a.url
+            if (!url) {
+                parts.push(`[User attached file: ${name}]`)
+                continue
+            }
+            try {
+                const res = await fetch(url, { signal: AbortSignal.timeout(15_000) })
+                if (!res.ok) {
+                    parts.push(`[User attached file: ${name} — could not load]`)
+                    continue
+                }
+                if (mime.startsWith("image/")) {
+                    parts.push(`[User attached image: ${name}]`)
+                    continue
+                }
+                if (mime === "text/plain" || mime === "text/csv") {
+                    const text = await res.text()
+                    const slice = text.slice(0, MAX_ATTACHMENT_CONTEXT_CHARS - totalChars)
+                    if (slice.length > 0) {
+                        parts.push(`### Contents of "${name}"\n\n${slice}`)
+                        totalChars += slice.length
+                    }
+                    if (totalChars >= MAX_ATTACHMENT_CONTEXT_CHARS) break
+                    continue
+                }
+                if (mime === "application/pdf") {
+                    const buf = await res.arrayBuffer()
+                    // eslint-disable-next-line @typescript-eslint/no-require-imports
+                    const pdfParse = require("pdf-parse") as (buffer: Buffer) => Promise<{ text: string }>
+                    const data = await pdfParse(Buffer.from(buf))
+                    const text = (data.text ?? "").slice(0, MAX_ATTACHMENT_CONTEXT_CHARS - totalChars)
+                    if (text.length > 0) {
+                        parts.push(`### Contents of "${name}" (PDF)\n\n${text}`)
+                        totalChars += text.length
+                    }
+                    if (totalChars >= MAX_ATTACHMENT_CONTEXT_CHARS) break
+                    continue
+                }
+                parts.push(`[User attached file: ${name}]`)
+            } catch (err) {
+                console.warn("[agents/execute] Attachment fetch failed:", name, err)
+                parts.push(`[User attached file: ${name} — could not load]`)
+            }
+        }
+        if (parts.length > 0) {
+            inputForPrompt = `## Attached files\n\n${parts.join("\n\n")}\n\n## User message\n\n${input}`
+        }
+    }
+
     // 5. Build the final prompt
-    let finalPrompt = prompt.replace(/\{\{input\}\}/g, input)
+    let finalPrompt = prompt.replace(/\{\{input\}\}/g, inputForPrompt)
     finalPrompt = finalPrompt.replace(/\{\{company_context\}\}/g, companyContext)
 
     // 6. Build system prompt with agent memory (observations only) and
@@ -456,8 +534,15 @@ In the same response where you explain your recommendation in prose, include thi
 ### Action types
 - \`"archive_objective"\` — Remove an existing objective (soft-delete). Use the EXACT title from the objectives list above.
 - \`"archive_task"\` — Remove an existing task (soft-delete). Use the EXACT title.
-- \`"objective"\` — Create a new objective. Set \`"strategicGoalTitle"\` to nest it under the right parent.
-- \`"task"\` — Create a new task. Set \`"objectiveTitle"\` to link it to an objective.
+- \`"objective"\` — Create a new objective. \`"strategicGoalTitle"\` is **REQUIRED** — every objective MUST belong to a strategic goal. Use an existing strategic goal title from the list above.
+- \`"task"\` — Create a new task. \`"objectiveTitle"\` is **REQUIRED** — every task MUST belong to an objective. Use an existing objective title from the list above, or the title of a new objective you are creating in the same batch.
+
+### MANDATORY HIERARCHY RULE
+Every item must fit into the strategy hierarchy: **Strategic Goal → Objective → Task**. 
+- You CANNOT create a task without specifying which objective it belongs to (\`"objectiveTitle"\` is required).
+- You CANNOT create an objective without specifying which strategic goal it belongs to (\`"strategicGoalTitle"\` is required).
+- If no suitable strategic goal or objective exists, create one in the same PROPOSED_ACTIONS batch BEFORE the items that depend on it.
+- Items missing these required fields will be REJECTED by the system and will not be created.
 
 ### Example: Recommending to kill a feature and consolidate strategy
 If the user has duplicate objectives like "raise 50m funding" and "raise 60m funding", and you recommend consolidating:
@@ -479,9 +564,11 @@ This renders as interactive cards with checkboxes. The user ticks which ones to 
 2. **When recommending cleanup or strategy changes, include BOTH archive AND create actions.** Archive the old, create the new — in one block.
 3. **Use EXACT titles from the objectives/tasks list** for archive actions. Title matching is case-insensitive but must be exact otherwise.
 4. **Put archive actions BEFORE create actions** in the array.
-5. **For new objectives, always set "strategicGoalTitle"** to an existing strategic goal title so they nest correctly.
-6. Only skip the block for purely informational responses with zero actionable recommendations.
-7. The visible prose should read naturally. The PROPOSED_ACTIONS block is supplementary — describe actions in words, then include the structured block at the end.`
+5. **Every objective MUST have "strategicGoalTitle"** set to an existing strategic goal title. This is REQUIRED — objectives without a strategic goal will be rejected.
+6. **Every task MUST have "objectiveTitle"** set to an existing or newly-created objective title. This is REQUIRED — tasks without an objective will be rejected.
+7. If you need to create a task under a new objective, create the objective first in the same batch, then reference its title in the task's "objectiveTitle".
+8. Only skip the block for purely informational responses with zero actionable recommendations.
+9. The visible prose should read naturally. The PROPOSED_ACTIONS block is supplementary — describe actions in words, then include the structured block at the end.`
 
             // Reinforce PROPOSED_ACTIONS format for non-Claude models that struggle
             // with HTML comment syntax. MiniMax and Qwen need extra emphasis and
@@ -504,15 +591,18 @@ ABSOLUTE REQUIREMENTS for the block:
 - Start with exactly: <!-- PROPOSED_ACTIONS
 - End with exactly: -->
 - The JSON array MUST be valid JSON (use double quotes for keys and string values)
-- Every objective MUST include "strategicGoalTitle" matching an existing strategic goal name
-- Every task MUST include "objectiveTitle" matching the parent objective
+- Every objective MUST include "strategicGoalTitle" matching an existing strategic goal name — REQUIRED, not optional
+- Every task MUST include "objectiveTitle" matching the parent objective — REQUIRED, not optional
+- Items missing "strategicGoalTitle" (objectives) or "objectiveTitle" (tasks) will be REJECTED
 - Place the block at the END of your response, after all prose
 
 DO NOT:
 - Wrap the block in markdown code fences (\`\`\`)
 - Omit the <!-- or --> delimiters
 - Use single quotes in the JSON
-- Skip the block when you recommend concrete actions`
+- Skip the block when you recommend concrete actions
+- Create tasks without "objectiveTitle" — they will fail
+- Create objectives without "strategicGoalTitle" — they will fail`
             }
 
             // Workflow capabilities: let the specialist know what they can produce
@@ -780,10 +870,42 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
             }
             // AUDIT: Log usage after successful completion
             await logUsageAfterCompletion(fullOutput.length)
+            // Agent rollouts: record span and mark rollout finished (best-effort)
+            if (rolloutId) {
+                const estimatedInputTokens = Math.ceil((finalPrompt.length + systemPromptWithContext.length) / 4)
+                const estimatedOutputTokens = Math.ceil(fullOutput.length / 4)
+                const promptSnapshot = `${systemPromptWithContext}\n\n---\n\n${finalPrompt}`
+                addSpan({
+                    rolloutId,
+                    kind: "llm_call",
+                    promptSnapshot,
+                    responseSnapshot: fullOutput,
+                    promptTokens: estimatedInputTokens,
+                    completionTokens: estimatedOutputTokens,
+                    metadata: { modality, providerId, modelId },
+                }).catch(() => {})
+                finishRollout(rolloutId, "finished").catch(() => {})
+            }
         }
         : async (fullOutput: string) => {
             // Even without memory thread, log usage for billing
             await logUsageAfterCompletion(fullOutput.length)
+            // Agent rollouts: record span and mark rollout finished (best-effort)
+            if (rolloutId) {
+                const estimatedInputTokens = Math.ceil((finalPrompt.length + systemPromptWithContext.length) / 4)
+                const estimatedOutputTokens = Math.ceil(fullOutput.length / 4)
+                const promptSnapshot = `${systemPromptWithContext}\n\n---\n\n${finalPrompt}`
+                addSpan({
+                    rolloutId,
+                    kind: "llm_call",
+                    promptSnapshot,
+                    responseSnapshot: fullOutput,
+                    promptTokens: estimatedInputTokens,
+                    completionTokens: estimatedOutputTokens,
+                    metadata: { modality, providerId, modelId },
+                }).catch(() => {})
+                finishRollout(rolloutId, "finished").catch(() => {})
+            }
         }
 
     // Build the fallback chain for text modalities.
@@ -794,31 +916,36 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
 
     try {
         if (modality === "text") {
-            return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory)
+            return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId)
         }
         if (modality === "slides") {
             // Slides use text generation with a structured output prompt (no conversation history needed)
-            return await handleTextStreaming(fallbackChain, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback)
+            return await handleTextStreaming(fallbackChain, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback, enableThinking, undefined, rolloutId)
         }
         if (modality === "image") {
             const result = await handleImageGeneration(apiKey, providerId, modelId, finalPrompt)
-            // Log usage for non-streaming modalities
             logUsageAfterCompletion(0).catch(() => {})
+            if (rolloutId) finishRollout(rolloutId, "finished").catch(() => {})
             return result
         }
         if (modality === "audio") {
             const result = await handleAudioGeneration(apiKey, providerId, modelId, finalPrompt)
             logUsageAfterCompletion(0).catch(() => {})
+            if (rolloutId) finishRollout(rolloutId, "finished").catch(() => {})
             return result
         }
         if (modality === "video") {
             const result = await handleVideoGeneration(apiKey, providerId, modelId, finalPrompt, videoConfig, firstFrameImage)
             logUsageAfterCompletion(0).catch(() => {})
+            if (rolloutId) finishRollout(rolloutId, "finished").catch(() => {})
             return result
         }
 
         return NextResponse.json({ error: `Unsupported modality: ${modality}` }, { status: 400 })
     } catch (err) {
+        if (rolloutId) {
+            finishRollout(rolloutId, "failed").catch(() => {})
+        }
         console.error(`[agents/execute] ${providerId}/${modality} error:`, err)
         return NextResponse.json(
             { error: "Failed to execute prompt" },
@@ -918,7 +1045,8 @@ async function handleTextStreaming(
     customSystemPrompt?: string,
     onComplete?: (fullOutput: string) => Promise<void>,
     enableThinking?: boolean,
-    history?: ConversationMessage[]
+    history?: ConversationMessage[],
+    rolloutId?: string | null
 ): Promise<Response> {
     // Convert ConversationMessage[] to ChatMessage[] for the provider (shared across attempts)
     const conversationHistory = history?.map((msg) => ({
@@ -1003,6 +1131,7 @@ async function handleTextStreaming(
                             onError(error) {
                                 if (hasStartedStreaming) {
                                     // Mid-stream error — can't failover, surface to client
+                                    if (rolloutId) finishRollout(rolloutId, "failed").catch(() => {})
                                     clearInterval(heartbeatInterval)
                                     console.error("[agents/execute] Mid-stream error (no failover):", {
                                         provider: target.providerId,
@@ -1052,6 +1181,7 @@ async function handleTextStreaming(
                     }
 
                     // Non-retryable error OR last provider in chain — surface to client
+                    if (rolloutId) finishRollout(rolloutId, "failed").catch(() => {})
                     clearInterval(heartbeatInterval)
                     if (!isRetryableError(errorStr)) {
                         console.error("[agents/execute] Non-retryable error:", {
@@ -1103,6 +1233,7 @@ async function handleTextStreaming(
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
             Connection: "keep-alive",
+            ...(rolloutId ? { "X-Rollout-Id": rolloutId } : {}),
         },
     })
 }

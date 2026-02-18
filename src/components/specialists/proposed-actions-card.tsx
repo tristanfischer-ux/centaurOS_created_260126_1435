@@ -22,6 +22,8 @@ interface ProposedActionsCardProps {
     specialist: Specialist
     onDismiss: () => void
     onCreated?: (count: number) => void
+    /** Rollout id from execute response; attached to created tasks for reward attribution. */
+    rolloutId?: string | null
 }
 
 /** Tracks which proposals have been executed (by index). */
@@ -44,18 +46,69 @@ function normalizeTitle(title: string): string {
 }
 
 /**
- * Looks up active strategic goals in the user's foundry with fuzzy title matching.
+ * Creates a fuzzy title resolver from a list of {id, title} records.
  *
- * @description Fetches all objectives where is_strategic_goal = true
- * and deleted_at is null. Returns a resolver function that tries:
+ * @description Returns a resolver function that tries:
  * 1. Exact case-insensitive match
  * 2. Normalized match (strips punctuation, collapses whitespace)
- * 3. Substring match (LLM title contains a strategic goal title or vice versa)
+ * 3. Substring match (LLM title contains a record title or vice versa)
  *
  * This handles common LLM mismatches like extra punctuation, slight rephrasing,
  * or partial title references.
  *
- * @returns Object with the raw map and a resolve function for fuzzy matching
+ * @param records - Array of {id, title} to build the resolver from
+ * @param label - Label for logging (e.g. "strategic goal", "objective")
+ * @returns Resolver function for fuzzy matching
+ */
+function buildFuzzyResolver(
+    records: { id: string; title: string }[],
+    label: string
+): (llmTitle: string) => string | undefined {
+    const exactMap = new Map<string, string>()
+    const normalizedMap = new Map<string, string>()
+    const items: { id: string; title: string; normalized: string }[] = []
+
+    for (const row of records) {
+        const trimmed = row.title.trim()
+        exactMap.set(trimmed.toLowerCase(), row.id)
+        const norm = normalizeTitle(trimmed)
+        normalizedMap.set(norm, row.id)
+        items.push({ id: row.id, title: trimmed, normalized: norm })
+    }
+
+    return function resolve(llmTitle: string): string | undefined {
+        const lower = llmTitle.trim().toLowerCase()
+        // 1. Exact case-insensitive match
+        const exactId = exactMap.get(lower)
+        if (exactId) return exactId
+
+        // 2. Normalized match (strips punctuation, collapses whitespace)
+        const norm = normalizeTitle(llmTitle)
+        const normId = normalizedMap.get(norm)
+        if (normId) return normId
+
+        // 3. Substring / containment match (LLM might abbreviate or extend)
+        for (const item of items) {
+            if (norm.includes(item.normalized) || item.normalized.includes(norm)) {
+                console.info(`[ProposedActions] Fuzzy-matched ${label}:`, {
+                    llmTitle,
+                    matched: item.title,
+                })
+                return item.id
+            }
+        }
+
+        return undefined
+    }
+}
+
+/**
+ * Looks up active strategic goals in the user's foundry with fuzzy title matching.
+ *
+ * @description Fetches all objectives where is_strategic_goal = true
+ * and deleted_at is null.
+ *
+ * @returns Object with the resolver and list of goal titles
  */
 async function fetchStrategicGoalMap(): Promise<{
     resolve: (llmTitle: string) => string | undefined
@@ -68,47 +121,31 @@ async function fetchStrategicGoalMap(): Promise<{
         .eq("is_strategic_goal", true)
         .is("deleted_at", null)
 
-    const exactMap = new Map<string, string>()
-    const normalizedMap = new Map<string, string>()
-    const goals: { id: string; title: string; normalized: string }[] = []
-
-    if (data) {
-        for (const row of data) {
-            const trimmed = row.title.trim()
-            exactMap.set(trimmed.toLowerCase(), row.id)
-            const norm = normalizeTitle(trimmed)
-            normalizedMap.set(norm, row.id)
-            goals.push({ id: row.id, title: trimmed, normalized: norm })
-        }
-    }
-
+    const records = data ?? []
     return {
-        goalTitles: goals.map((g) => g.title),
-        resolve(llmTitle: string): string | undefined {
-            const lower = llmTitle.trim().toLowerCase()
-            // 1. Exact case-insensitive match
-            const exactId = exactMap.get(lower)
-            if (exactId) return exactId
-
-            // 2. Normalized match (strips punctuation, collapses whitespace)
-            const norm = normalizeTitle(llmTitle)
-            const normId = normalizedMap.get(norm)
-            if (normId) return normId
-
-            // 3. Substring / containment match (LLM might abbreviate or extend)
-            for (const goal of goals) {
-                if (norm.includes(goal.normalized) || goal.normalized.includes(norm)) {
-                    console.info("[ProposedActions] Fuzzy-matched strategic goal:", {
-                        llmTitle,
-                        matchedGoal: goal.title,
-                    })
-                    return goal.id
-                }
-            }
-
-            return undefined
-        },
+        goalTitles: records.map((g) => g.title.trim()),
+        resolve: buildFuzzyResolver(records, "strategic goal"),
     }
+}
+
+/**
+ * Looks up active objectives (non-strategic-goal, non-milestone) in the user's
+ * foundry with fuzzy title matching.
+ *
+ * @description Used to resolve task → objective links when the specialist
+ * references an existing objective by title.
+ *
+ * @returns Resolver function for fuzzy matching objective titles to IDs
+ */
+async function fetchObjectiveMap(): Promise<(llmTitle: string) => string | undefined> {
+    const supabase = createClient()
+    const { data } = await supabase
+        .from("objectives")
+        .select("id, title")
+        .is("deleted_at", null)
+        .eq("is_strategic_goal", false)
+
+    return buildFuzzyResolver(data ?? [], "objective")
 }
 
 export function ProposedActionsCard({
@@ -116,6 +153,7 @@ export function ProposedActionsCard({
     specialist,
     onDismiss,
     onCreated,
+    rolloutId,
 }: ProposedActionsCardProps) {
     const [isExecuting, setIsExecuting] = useState(false)
     const [dismissed, setDismissed] = useState(false)
@@ -245,33 +283,45 @@ export function ProposedActionsCard({
         const results: ExecutedState = { ...executed }
 
         try {
-            // Fetch strategic goals with fuzzy resolver for LLM title matching
+            // Fetch strategic goals and existing objectives with fuzzy resolvers
             const { resolve: resolveGoal } = await fetchStrategicGoalMap()
+            const resolveExistingObjective = await fetchObjectiveMap()
             const objectiveTitleToId = new Map<string, string>()
-            const unlinkWarnings: string[] = []
+            const rejectedObjectives: string[] = []
+            const rejectedTasks: string[] = []
 
-            // Phase 1: Create objectives
+            // Phase 1: Create objectives (MUST have strategic goal)
             for (const i of createIndices) {
                 if (!selected.has(i)) continue
                 if (executed[i]) continue
                 const p = proposals[i]
                 if (p.type !== "objective") continue
 
+                // RULE: Every objective must belong to a strategic goal
+                if (!p.strategicGoalTitle?.trim()) {
+                    rejectedObjectives.push(p.title)
+                    results[i] = { success: false }
+                    console.warn("[ProposedActions] Rejected objective — missing strategicGoalTitle:", { title: p.title })
+                    continue
+                }
+
+                const goalId = resolveGoal(p.strategicGoalTitle)
+                if (!goalId) {
+                    rejectedObjectives.push(p.title)
+                    results[i] = { success: false }
+                    console.warn("[ProposedActions] Rejected objective — strategic goal not found:", {
+                        title: p.title,
+                        strategicGoalTitle: p.strategicGoalTitle,
+                    })
+                    continue
+                }
+
                 const fd = new FormData()
                 fd.set("title", p.title.trim().slice(0, 200))
                 if (p.description?.trim()) {
                     fd.set("description", p.description.trim().slice(0, 10000))
                 }
-
-                // Link to strategic goal if specified (fuzzy matching handles LLM variations)
-                if (p.strategicGoalTitle?.trim()) {
-                    const goalId = resolveGoal(p.strategicGoalTitle)
-                    if (goalId) {
-                        fd.set("parent_objective_id", goalId)
-                    } else {
-                        unlinkWarnings.push(p.title)
-                    }
-                }
+                fd.set("parent_objective_id", goalId)
 
                 const result = await createObjective(fd)
                 if (result.error) {
@@ -286,12 +336,36 @@ export function ProposedActionsCard({
                 }
             }
 
-            // Phase 2: Create tasks (link to objective by objectiveTitle when present)
+            // Phase 2: Create tasks (MUST have objective)
             for (const i of createIndices) {
                 if (!selected.has(i)) continue
                 if (executed[i]) continue
                 const p = proposals[i]
                 if (p.type !== "task") continue
+
+                // RULE: Every task must belong to an objective
+                if (!p.objectiveTitle?.trim()) {
+                    rejectedTasks.push(p.title)
+                    results[i] = { success: false }
+                    console.warn("[ProposedActions] Rejected task — missing objectiveTitle:", { title: p.title })
+                    continue
+                }
+
+                // Try batch-created objectives first, then existing objectives
+                let objectiveId = objectiveTitleToId.get(p.objectiveTitle.trim())
+                if (!objectiveId) {
+                    objectiveId = resolveExistingObjective(p.objectiveTitle)
+                }
+
+                if (!objectiveId) {
+                    rejectedTasks.push(p.title)
+                    results[i] = { success: false }
+                    console.warn("[ProposedActions] Rejected task — objective not found:", {
+                        title: p.title,
+                        objectiveTitle: p.objectiveTitle,
+                    })
+                    continue
+                }
 
                 const fd = new FormData()
                 fd.set("title", p.title.trim().slice(0, 500))
@@ -300,13 +374,8 @@ export function ProposedActionsCard({
                 }
                 fd.set("assignee_id", user.id)
                 fd.set("assignee_ids", JSON.stringify([user.id]))
-
-                if (p.objectiveTitle?.trim()) {
-                    const linkedId = objectiveTitleToId.get(p.objectiveTitle.trim())
-                    if (linkedId) {
-                        fd.set("objective_id", linkedId)
-                    }
-                }
+                fd.set("objective_id", objectiveId)
+                if (rolloutId) fd.set("rollout_id", rolloutId)
 
                 const result = await createTask(fd)
                 if (result.error) {
@@ -326,10 +395,16 @@ export function ProposedActionsCard({
             if (createdCount > 0) {
                 toast.success(`${createdCount} item${createdCount > 1 ? "s" : ""} created`)
             }
-            if (unlinkWarnings.length > 0) {
-                toast.warning(
-                    `${unlinkWarnings.length} objective${unlinkWarnings.length > 1 ? "s" : ""} created but not linked to a strategic goal (no matching goal found)`,
-                    { duration: 5000 }
+            if (rejectedObjectives.length > 0) {
+                toast.error(
+                    `${rejectedObjectives.length} objective${rejectedObjectives.length > 1 ? "s" : ""} rejected — must belong to a strategic goal`,
+                    { duration: 6000 }
+                )
+            }
+            if (rejectedTasks.length > 0) {
+                toast.error(
+                    `${rejectedTasks.length} task${rejectedTasks.length > 1 ? "s" : ""} rejected — must belong to an objective`,
+                    { duration: 6000 }
                 )
             }
 
@@ -389,10 +464,12 @@ export function ProposedActionsCard({
                 }
             }
 
-            // Phase 2: Create objectives (link to strategic goals with fuzzy matching)
+            // Phase 2: Create objectives (MUST have strategic goal)
             const { resolve: resolveGoal } = await fetchStrategicGoalMap()
+            const resolveExistingObjective = await fetchObjectiveMap()
             const objectiveTitleToId = new Map<string, string>()
-            const unlinkWarnings: string[] = []
+            const rejectedObjectives: string[] = []
+            const rejectedTasks: string[] = []
 
             for (const i of createIndices) {
                 if (!selected.has(i)) continue
@@ -400,20 +477,31 @@ export function ProposedActionsCard({
                 const p = proposals[i]
                 if (p.type !== "objective") continue
 
+                // RULE: Every objective must belong to a strategic goal
+                if (!p.strategicGoalTitle?.trim()) {
+                    rejectedObjectives.push(p.title)
+                    results[i] = { success: false }
+                    console.warn("[ProposedActions] Rejected objective — missing strategicGoalTitle:", { title: p.title })
+                    continue
+                }
+
+                const goalId = resolveGoal(p.strategicGoalTitle)
+                if (!goalId) {
+                    rejectedObjectives.push(p.title)
+                    results[i] = { success: false }
+                    console.warn("[ProposedActions] Rejected objective — strategic goal not found:", {
+                        title: p.title,
+                        strategicGoalTitle: p.strategicGoalTitle,
+                    })
+                    continue
+                }
+
                 const fd = new FormData()
                 fd.set("title", p.title.trim().slice(0, 200))
                 if (p.description?.trim()) {
                     fd.set("description", p.description.trim().slice(0, 10000))
                 }
-
-                if (p.strategicGoalTitle?.trim()) {
-                    const goalId = resolveGoal(p.strategicGoalTitle)
-                    if (goalId) {
-                        fd.set("parent_objective_id", goalId)
-                    } else {
-                        unlinkWarnings.push(p.title)
-                    }
-                }
+                fd.set("parent_objective_id", goalId)
 
                 const result = await createObjective(fd)
                 if (result.error) {
@@ -428,12 +516,36 @@ export function ProposedActionsCard({
                 }
             }
 
-            // Phase 3: Create tasks
+            // Phase 3: Create tasks (MUST have objective)
             for (const i of createIndices) {
                 if (!selected.has(i)) continue
                 if (executed[i]) continue
                 const p = proposals[i]
                 if (p.type !== "task") continue
+
+                // RULE: Every task must belong to an objective
+                if (!p.objectiveTitle?.trim()) {
+                    rejectedTasks.push(p.title)
+                    results[i] = { success: false }
+                    console.warn("[ProposedActions] Rejected task — missing objectiveTitle:", { title: p.title })
+                    continue
+                }
+
+                // Try batch-created objectives first, then existing objectives
+                let objectiveId = objectiveTitleToId.get(p.objectiveTitle.trim())
+                if (!objectiveId) {
+                    objectiveId = resolveExistingObjective(p.objectiveTitle)
+                }
+
+                if (!objectiveId) {
+                    rejectedTasks.push(p.title)
+                    results[i] = { success: false }
+                    console.warn("[ProposedActions] Rejected task — objective not found:", {
+                        title: p.title,
+                        objectiveTitle: p.objectiveTitle,
+                    })
+                    continue
+                }
 
                 const fd = new FormData()
                 fd.set("title", p.title.trim().slice(0, 500))
@@ -442,13 +554,8 @@ export function ProposedActionsCard({
                 }
                 fd.set("assignee_id", user.id)
                 fd.set("assignee_ids", JSON.stringify([user.id]))
-
-                if (p.objectiveTitle?.trim()) {
-                    const linkedId = objectiveTitleToId.get(p.objectiveTitle.trim())
-                    if (linkedId) {
-                        fd.set("objective_id", linkedId)
-                    }
-                }
+                fd.set("objective_id", objectiveId)
+                if (rolloutId) fd.set("rollout_id", rolloutId)
 
                 const result = await createTask(fd)
                 if (result.error) {
@@ -472,10 +579,16 @@ export function ProposedActionsCard({
             if (createdCount > 0) parts.push(`${createdCount} created`)
             if (parts.length > 0) toast.success(parts.join(", "), { duration: 3000 })
 
-            if (unlinkWarnings.length > 0) {
-                toast.warning(
-                    `${unlinkWarnings.length} objective${unlinkWarnings.length > 1 ? "s" : ""} not linked to a strategic goal`,
-                    { duration: 5000 }
+            if (rejectedObjectives.length > 0) {
+                toast.error(
+                    `${rejectedObjectives.length} objective${rejectedObjectives.length > 1 ? "s" : ""} rejected — must belong to a strategic goal`,
+                    { duration: 6000 }
+                )
+            }
+            if (rejectedTasks.length > 0) {
+                toast.error(
+                    `${rejectedTasks.length} task${rejectedTasks.length > 1 ? "s" : ""} rejected — must belong to an objective`,
+                    { duration: 6000 }
                 )
             }
 
@@ -717,9 +830,14 @@ export function ProposedActionsCard({
                         proposals.map((p, i) => {
                             if (isDestructiveAction(p)) return null
                             const isObjective = p.type === "objective"
+                            const isTask = p.type === "task"
                             const isSelected = selected.has(i)
                             const result = executed[i]
                             const isDone = result !== undefined
+
+                            // Hierarchy validation: objectives need strategicGoalTitle, tasks need objectiveTitle
+                            const isMissingHierarchy = (isObjective && !p.strategicGoalTitle?.trim()) ||
+                                (isTask && !p.objectiveTitle?.trim())
 
                             return (
                                 <button
@@ -731,9 +849,13 @@ export function ProposedActionsCard({
                                         "flex items-center gap-2 rounded-md border px-3 py-2 text-sm w-full text-left transition-colors",
                                         isDone && result.success
                                             ? "bg-status-success-light border-status-success"
-                                            : isSelected
-                                              ? "bg-background border-muted hover:bg-muted/30"
-                                              : "bg-muted/30 border-muted opacity-50 hover:opacity-70"
+                                            : isDone && !result.success
+                                              ? "bg-status-error-light border-destructive"
+                                              : isMissingHierarchy
+                                                ? "bg-status-warning-light border-status-warning opacity-60"
+                                                : isSelected
+                                                  ? "bg-background border-muted hover:bg-muted/30"
+                                                  : "bg-muted/30 border-muted opacity-50 hover:opacity-70"
                                     )}
                                 >
                                     {!isDone ? (
@@ -750,7 +872,10 @@ export function ProposedActionsCard({
                                         <CheckSquare className="h-3.5 w-3.5 text-electric-blue flex-shrink-0" />
                                     )}
                                     <div className="min-w-0 flex-1">
-                                        <p className="font-medium text-foreground truncate">
+                                        <p className={cn(
+                                            "font-medium truncate",
+                                            isDone && !result.success ? "text-destructive" : "text-foreground"
+                                        )}>
                                             {p.title}
                                         </p>
                                         {p.description ? (
@@ -758,10 +883,32 @@ export function ProposedActionsCard({
                                                 {p.description}
                                             </p>
                                         ) : null}
+                                        {/* Show hierarchy link: objective → strategic goal */}
                                         {isObjective && p.strategicGoalTitle ? (
                                             <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
-                                                <AlertTriangle className="h-2.5 w-2.5 inline-block" />
+                                                <Target className="h-2.5 w-2.5 inline-block" />
                                                 Under: {p.strategicGoalTitle}
+                                            </p>
+                                        ) : null}
+                                        {/* Show hierarchy link: task → objective */}
+                                        {isTask && p.objectiveTitle ? (
+                                            <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                                                <Target className="h-2.5 w-2.5 inline-block" />
+                                                Under: {p.objectiveTitle}
+                                            </p>
+                                        ) : null}
+                                        {/* Warning when hierarchy is missing */}
+                                        {isMissingHierarchy ? (
+                                            <p className="text-[10px] text-status-warning-dark truncate flex items-center gap-1 mt-0.5">
+                                                <AlertTriangle className="h-2.5 w-2.5 inline-block" />
+                                                {isObjective ? "Missing strategic goal — will be rejected" : "Missing objective — will be rejected"}
+                                            </p>
+                                        ) : null}
+                                        {/* Show rejection reason after execution */}
+                                        {isDone && !result.success ? (
+                                            <p className="text-[10px] text-destructive truncate flex items-center gap-1 mt-0.5">
+                                                <AlertTriangle className="h-2.5 w-2.5 inline-block" />
+                                                {isObjective ? "Rejected — no strategic goal" : "Rejected — no objective"}
                                             </p>
                                         ) : null}
                                     </div>

@@ -741,6 +741,58 @@ export async function exportArtifactToGoogleDocs(artifactId: string): Promise<{
 }
 
 /**
+ * Create a shareable link for an artifact.
+ *
+ * @param artifactId - UUID of the artifact to share
+ * @param expiresInDays - Number of days until the link expires (default 7)
+ * @returns The public share URL or error
+ * @security Requires authenticated user; only artifact access is checked via getArtifact RLS
+ */
+export async function createArtifactShareLink(
+  artifactId: string,
+  expiresInDays: number = 7
+): Promise<{ shareUrl: string | null; error: string | null }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { shareUrl: null, error: 'Not authenticated' }
+  }
+
+  const { data: artifact, error: fetchError } = await getArtifact(artifactId)
+  if (fetchError || !artifact) {
+    return { shareUrl: null, error: fetchError || 'Artifact not found' }
+  }
+
+  const token = crypto.randomUUID().replace(/-/g, '')
+  const expiresAt = new Date()
+  expiresAt.setDate(expiresAt.getDate() + expiresInDays)
+
+  const { error: insertError } = await supabase
+    .from('shared_artifacts')
+    .insert({
+      artifact_id: artifactId,
+      share_token: token,
+      created_by: user.id,
+      expires_at: expiresAt.toISOString(),
+    })
+
+  if (insertError) {
+    console.error('[AgentArtifacts] Failed to create share link:', { artifactId, error: insertError.message })
+    return { shareUrl: null, error: 'Failed to create share link' }
+  }
+
+  const base = process.env.NEXT_PUBLIC_APP_URL
+    ? process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : ''
+  const shareUrl = base ? `${base}/shared/${token}` : `/shared/${token}`
+
+  return { shareUrl, error: null }
+}
+
+/**
  * Send an artifact as an email via Resend.
  *
  * @param artifactId - UUID of the artifact to send

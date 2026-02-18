@@ -187,6 +187,7 @@ export async function createTask(formData: FormData) {
       const fileCountRaw = formData.get('file_count') as string || '0'
       const isPrivate = formData.get('is_private') === 'true'
       const shareWithJson = formData.get('share_with') as string
+      const rolloutId = (formData.get('rollout_id') as string)?.trim() || null
 
       // Parse multiple assignees (if provided)
       let assigneeIds: string[] = [assigneeId]
@@ -231,12 +232,16 @@ export async function createTask(formData: FormData) {
           }
       }
 
+      // VALIDATION: Every task must belong to an objective (enforced at schema + DB level)
+      if (!objectiveId?.trim()) {
+          return { error: 'Objective is required — every task must belong to an objective' }
+      }
+
       // Validate using Zod schema
-      // Convert empty strings to null/undefined for optional fields
       const rawData = {
           title: title || '',
           description: description?.trim() || undefined,
-          objectiveId: objectiveId?.trim() ? objectiveId.trim() : undefined,
+          objectiveId: objectiveId.trim(),
           assigneeIds: assigneeIds.filter(id => id), // Filter out empty strings
           deadline: endDate?.trim() ? endDate.trim() : null,
           riskLevel: (riskLevelRaw as RiskLevel) || 'Medium',
@@ -249,10 +254,6 @@ export async function createTask(formData: FormData) {
       }
 
       const { title: validatedTitle, description: validatedDescription, assigneeIds: validatedAssigneeIds, objectiveId: validatedObjectiveId, deadline, riskLevel, fileCount } = validation.data
-
-      if (!validatedObjectiveId) {
-          return { error: 'Objective is required' }
-      }
 
       const primaryAssigneeId = validatedAssigneeIds[0]
       // Ensure we have at least one assignee after validation
@@ -277,6 +278,7 @@ export async function createTask(formData: FormData) {
                   risk_level: riskLevel,
                   client_visible: false, // Always hidden initially
                   is_private: isPrivate,
+                  metadata: rolloutId ? { rollout_id: rolloutId } : undefined,
               }).select().single()
               if (result.error) throw result.error
               return result.data
@@ -894,10 +896,10 @@ export async function completeTask(taskId: string) {
             .eq('id', user.id)
             .single()
 
-        // Fetch Risk Level - only from user's foundry
+        // Fetch Risk Level and metadata (for rollout reward) - only from user's foundry
         const { data: task, error: fetchError } = await supabase
             .from('tasks')
-            .select('risk_level, status')
+            .select('risk_level, status, metadata')
             .eq('id', taskId)
             .eq('foundry_id', foundryId)
             .single()
@@ -955,6 +957,15 @@ export async function completeTask(taskId: string) {
             await recalculateObjectiveProgress(supabase, taskId, foundryId)
         } catch (rollupError) {
             console.error('[TaskService] Failed to recalculate objective progress:', { error: rollupError instanceof Error ? rollupError.message : 'Unknown error' })
+        }
+
+        // Agent rollouts: attach reward when task was created from a specialist suggestion
+        if (nextStatus === 'Completed' && task.metadata && typeof task.metadata === 'object' && 'rollout_id' in task.metadata) {
+            const rid = (task.metadata as { rollout_id?: string }).rollout_id
+            if (typeof rid === 'string' && rid) {
+                const { addReward } = await import('@/lib/agent-spans')
+                addReward(rid, 1.0, 'task_completed').catch(() => {})
+            }
         }
 
         revalidatePath('/tasks')

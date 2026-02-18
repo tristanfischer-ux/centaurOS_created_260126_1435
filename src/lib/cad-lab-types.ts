@@ -9,6 +9,7 @@
 
 /** Available Claude models for CAD generation */
 export const CLAUDE_MODELS = [
+  { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (recommended)" },
   { id: "claude-opus-4-6", label: "Claude Opus 4.6 (best quality)" },
   { id: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5 (fast)" },
 ] as const

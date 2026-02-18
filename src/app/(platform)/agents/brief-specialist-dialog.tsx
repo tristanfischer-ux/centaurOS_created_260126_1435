@@ -10,11 +10,22 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
     Loader2, Send, AlertCircle, Copy, Check, Eye, AlertTriangle,
     MessageSquareQuote, ArrowRight, Clock, ChevronDown, ChevronUp,
     History, Mic, MicOff, Volume2, VolumeX, Sparkles, Brain, X,
     HelpCircle,
+    Paperclip,
+    FileIcon,
+    ImageIcon,
+    MoreVertical,
 } from "lucide-react"
+import { validateFile, formatFileSize, isImageFile } from "@/lib/file-upload"
 import { cn } from "@/lib/utils"
 import { stripThinkTags, stripPartialThinkTags } from "@/lib/utils/strip-think-tags"
 import { toast } from "sonner"
@@ -22,7 +33,8 @@ import { Markdown } from "@/components/ui/markdown"
 import { getPromptsByCategory } from "./lib/prompt-library"
 import { getOrCreateSpecialistThread, getRecentSpecialistOutputs, getSpecialistThreadHistory } from "@/actions/agent-memory"
 import type { SpecialistHistoryMessage } from "@/actions/agent-memory"
-import { createArtifact } from "@/actions/agent-artifacts"
+import { createArtifact, exportArtifactToGoogleDocs } from "@/actions/agent-artifacts"
+import { exportAsPDF } from "@/lib/export-utils"
 import { getSpecialistById, SPECIALISTS } from "./specialists-data"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
@@ -49,7 +61,7 @@ const ENABLE_ADVANCED_MODES = typeof window !== "undefined"
 // Each specialist declares its tier in specialists-data.ts via `modelTier`.
 
 const MODEL_TIERS = {
-    claude: { providerId: "anthropic", modelId: "claude-opus-4-6" },
+    claude: { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
     qwen: { providerId: "qwen", modelId: "qwen3.5-plus" },
     "qwen-local": { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },
     minimax: { providerId: "minimax", modelId: "MiniMax-M2.5" },
@@ -93,6 +105,90 @@ function getFallbackGreeting(specialist: Specialist): string {
     return phrase
         ? `${specialist.tagline} ${phrase}`
         : `${specialist.tagline} What's the one thing we should focus on first?`
+}
+
+/** Per-message export menu: Copy, Save as artifact, Export PDF, Google Drive. */
+function MessageExportMenu({ content }: { content: string }) {
+    const [open, setOpen] = useState(false)
+    const handleCopy = useCallback(async () => {
+        try {
+            await navigator.clipboard.writeText(content)
+            toast.success("Copied to clipboard")
+            setOpen(false)
+        } catch {
+            toast.error("Failed to copy")
+        }
+    }, [content])
+    const handleSaveAsArtifact = useCallback(async () => {
+        const { data, error } = await createArtifact({
+            title: "Message export",
+            content,
+            contentType: "document",
+            metadata: { source: "specialist-message-export" },
+        })
+        if (error) {
+            toast.error(error)
+            return
+        }
+        toast.success("Saved to Deliverables")
+        setOpen(false)
+    }, [content])
+    const handleExportPdf = useCallback(async () => {
+        try {
+            await exportAsPDF(content, "message-export.pdf")
+            toast.success("PDF downloaded")
+            setOpen(false)
+        } catch {
+            toast.error("Failed to export PDF")
+        }
+    }, [content])
+    const handleGoogleDrive = useCallback(async () => {
+        const { data: artifact, error: createErr } = await createArtifact({
+            title: "Message export",
+            content,
+            contentType: "document",
+            metadata: { source: "specialist-message-export" },
+        })
+        if (createErr || !artifact) {
+            toast.error(createErr ?? "Failed to save")
+            return
+        }
+        const { docUrl, error: driveErr } = await exportArtifactToGoogleDocs(artifact.id)
+        if (driveErr) {
+            toast.error(driveErr)
+            return
+        }
+        if (docUrl) window.open(docUrl, "_blank")
+        toast.success("Opened in Google Docs")
+        setOpen(false)
+    }, [content])
+    return (
+        <DropdownMenu open={open} onOpenChange={setOpen}>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Export message">
+                    <MoreVertical className="h-3.5 w-3.5" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleCopy}>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy text
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSaveAsArtifact}>
+                    <FileIcon className="h-4 w-4 mr-2" />
+                    Save as artifact
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPdf}>
+                    <FileIcon className="h-4 w-4 mr-2" />
+                    Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleGoogleDrive}>
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Send to Google Drive
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    )
 }
 
 /**
@@ -184,6 +280,15 @@ export function isDestructiveAction(action: ProposedAction): boolean {
     return action.type === "archive_objective" || action.type === "archive_task"
 }
 
+/** Attachment returned from /api/agents/upload, sent with execute request. */
+interface PendingAttachment {
+    path: string
+    url: string | null
+    filename: string
+    size: number
+    mimeType: string
+}
+
 interface ChatMessage {
     role: "user" | "assistant"
     content: string
@@ -192,6 +297,8 @@ interface ChatMessage {
     historical?: boolean
     /** Parsed from PROPOSED_ACTIONS in assistant messages; shown as inline approval cards. */
     proposals?: ProposedAction[]
+    /** Rollout id from execute response; used to attach rewards when tasks from this message are completed. */
+    rolloutId?: string | null
 }
 
 /**
@@ -322,6 +429,8 @@ interface BriefSpecialistDialogProps {
     contextLabel?: string | null
     /** Render mode: "dialog" for centered modal (default), "panel" for sidebar layout */
     renderMode?: SpecialistRenderMode
+    /** Optional actions to render in the panel header (e.g. expand/collapse toggle) */
+    panelHeaderActions?: React.ReactNode
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -345,6 +454,7 @@ export function BriefSpecialistDialog({
     referredBy,
     contextLabel,
     renderMode = "dialog",
+    panelHeaderActions,
 }: BriefSpecialistDialogProps) {
     const isPanel = renderMode === "panel"
     // ─── State ────────────────────────────────────────────────────────────
@@ -387,8 +497,13 @@ export function BriefSpecialistDialog({
             return false
         }
     })
+    /** Files attached to the next message (uploaded to storage, sent with execute). */
+    const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([])
+    const [isDraggingOver, setIsDraggingOver] = useState(false)
+    const [isUploadingFile, setIsUploadingFile] = useState(false)
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const panelFileInputRef = useRef<HTMLInputElement>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
     const videoIntroRef = useRef<HTMLVideoElement>(null)
     /** Tracks whether we've already generated a proactive greeting for this specialist session */
@@ -888,6 +1003,8 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
         setMessages((prev) => [...prev, userMessage])
         setBriefText("")
         setSelectedPrompt(null)
+        const attachmentsToSend = [...pendingAttachments]
+        setPendingAttachments([])
         setIsExecuting(true)
         setStreamingResponse("")
         setError(null)
@@ -971,6 +1088,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             // rate limit, content) surface immediately.
             const MAX_ATTEMPTS = 2
             let fullResponse = ""
+            let rolloutIdFromResponse: string | null = null
 
             for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
                 // Fresh AbortController per attempt — a previous TTFB timeout
@@ -999,6 +1117,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         specialistId: specialist.id,
                         customSystemPromptSuffix: systemExtras.join(""),
                         enableThinking: deepThinkEnabled,
+                        attachments: attachmentsToSend.length > 0
+                            ? attachmentsToSend.map((a) => ({ path: a.path, url: a.url, filename: a.filename, mimeType: a.mimeType }))
+                            : undefined,
                     }),
                     signal: controller.signal,
                 })
@@ -1009,6 +1130,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                     const rawError = errData.error || `HTTP ${res.status}`
                     throw new Error(normalizeSpecialistError(rawError, specialist.name))
                 }
+
+                rolloutIdFromResponse = res.headers.get("X-Rollout-Id")
 
                 // Handle streaming response
                 const reader = res.body?.getReader()
@@ -1163,6 +1286,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 content: displayResponse,
                 timestamp: new Date(),
                 ...(proposals.length > 0 ? { proposals } : {}),
+                ...(rolloutIdFromResponse ? { rolloutId: rolloutIdFromResponse } : {}),
             }
             setMessages((prev) => [...prev, assistantMessage])
             setStreamingResponse("")
@@ -1206,7 +1330,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             setIsExecuting(false)
             setIsUrgentMessage(false)
         }
-    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext, formatBrowseContext])
+    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, pendingAttachments, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext, formatBrowseContext])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
@@ -1227,6 +1351,55 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
         setError(null)
         textareaRef.current?.focus()
     }, [])
+
+    const MAX_ATTACHMENTS = 5
+
+    /** Upload a file to agent-attachments and add to pending attachments. */
+    const handleFileAttach = useCallback(
+        async (file: File) => {
+            const validation = validateFile(file)
+            if (!validation.valid) {
+                toast.error(validation.error ?? "Invalid file")
+                return
+            }
+            if (!threadId) {
+                toast.error("Start the conversation first, then attach files.")
+                return
+            }
+            if (pendingAttachments.length >= MAX_ATTACHMENTS) {
+                toast.error(`Maximum ${MAX_ATTACHMENTS} files per message.`)
+                return
+            }
+            setIsUploadingFile(true)
+            try {
+                const formData = new FormData()
+                formData.set("file", file)
+                formData.set("threadId", threadId)
+                const res = await fetch("/api/agents/upload", {
+                    method: "POST",
+                    body: formData,
+                })
+                const data = await res.json().catch(() => ({}))
+                if (!res.ok) {
+                    toast.error(data.error ?? "Upload failed")
+                    return
+                }
+                setPendingAttachments((prev) => [
+                    ...prev,
+                    {
+                        path: data.path,
+                        url: data.url ?? null,
+                        filename: data.filename,
+                        size: data.size,
+                        mimeType: data.mimeType,
+                    },
+                ])
+            } finally {
+                setIsUploadingFile(false)
+            }
+        },
+        [threadId, pendingAttachments.length],
+    )
 
     /** "Walk me through this page" starter — shown when page knowledge is available */
     const pageGuidanceStarter = useMemo(() => {
@@ -1478,6 +1651,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         <History className="h-3.5 w-3.5" />
                     </Button>
                 )}
+                {panelHeaderActions}
                 <Button
                     variant="ghost"
                     size="sm"
@@ -1642,7 +1816,14 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 {msg.role === "user" ? (
                                                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                                                 ) : (
-                                                    <Markdown content={msg.content} className="text-sm" />
+                                                    <>
+                                                        <Markdown content={msg.content} className="text-sm" />
+                                                        {!msg.historical && (
+                                                            <div className="mt-2 flex justify-end">
+                                                                <MessageExportMenu content={msg.content} />
+                                                            </div>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         </div>
@@ -1717,6 +1898,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 <ProposedActionsCard
                                     proposals={lastAssistantMessage.proposals}
                                     specialist={specialist}
+                                    rolloutId={lastAssistantMessage.rolloutId ?? undefined}
                                     onDismiss={() => {
                                         setMessages((prev) => {
                                             const idx = prev.map((m, i) => ({ m, i }))
@@ -1940,8 +2122,73 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         )}
 
                         {/* Text Input (pinned to bottom) */}
-                        <div className="p-4 pt-2 border-t bg-background space-y-2 mt-auto">
+                        <div
+                            className={cn(
+                                "p-4 pt-2 border-t bg-background space-y-2 mt-auto",
+                                isDraggingOver && "ring-2 ring-inset ring-international-orange/50 rounded-lg",
+                            )}
+                            onDragOver={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                if (!isExecuting) setIsDraggingOver(true)
+                            }}
+                            onDragLeave={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setIsDraggingOver(false)
+                            }}
+                            onDrop={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setIsDraggingOver(false)
+                                if (isExecuting) return
+                                const files = Array.from(e.dataTransfer.files)
+                                files.slice(0, MAX_ATTACHMENTS - pendingAttachments.length).forEach((file) => handleFileAttach(file))
+                            }}
+                        >
+                            {pendingAttachments.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {pendingAttachments.map((a) => (
+                                        <span
+                                            key={a.path}
+                                            className="inline-flex items-center gap-1.5 rounded-md border border-muted bg-muted/50 px-2 py-1 text-xs text-foreground"
+                                        >
+                                            {isImageFile(a.mimeType) ? (
+                                                <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                                            ) : (
+                                                <FileIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                                            )}
+                                            <span className="max-w-[120px] truncate" title={a.filename}>{a.filename}</span>
+                                            <span className="text-muted-foreground">{formatFileSize(a.size)}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPendingAttachments((prev) => prev.filter((p) => p.path !== a.path))}
+                                                className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                aria-label={`Remove ${a.filename}`}
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                             <div className="relative">
+                                <input
+                                    id="panel-file-input"
+                                    type="file"
+                                    className="hidden"
+                                    ref={panelFileInputRef}
+                                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+                                    multiple
+                                    disabled={isExecuting || isUploadingFile}
+                                    onChange={(e) => {
+                                        const files = e.target.files
+                                        if (files) {
+                                            Array.from(files).slice(0, MAX_ATTACHMENTS - pendingAttachments.length).forEach((file) => handleFileAttach(file))
+                                            e.target.value = ""
+                                        }
+                                    }}
+                                />
                                 <Textarea
                                     ref={textareaRef}
                                     id="panel-brief-text"
@@ -1968,6 +2215,17 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     disabled={isExecuting}
                                 />
                                 <div className="absolute bottom-2 right-2 flex items-center gap-1">
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        disabled={isExecuting || isUploadingFile || !threadId || pendingAttachments.length >= MAX_ATTACHMENTS}
+                                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                        aria-label="Attach file"
+                                        onClick={() => panelFileInputRef.current?.click()}
+                                    >
+                                        {isUploadingFile ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+                                    </Button>
                                     <Button
                                         size="icon"
                                         variant="ghost"
@@ -1999,7 +2257,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         size="icon"
                                         variant="ghost"
                                         onClick={handleExecute}
-                                        disabled={isExecuting || !briefText.trim()}
+                                        disabled={isExecuting || (!briefText.trim() && pendingAttachments.length === 0)}
                                         className="h-7 w-7 text-muted-foreground hover:text-international-orange"
                                         aria-label="Send message"
                                     >
@@ -2340,7 +2598,14 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 {msg.role === "user" ? (
                                                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                                                 ) : (
-                                                    <Markdown content={msg.content} className="text-sm" />
+                                                    <>
+                                                        <Markdown content={msg.content} className="text-sm" />
+                                                        {!msg.historical && (
+                                                            <div className="mt-2 flex justify-end">
+                                                                <MessageExportMenu content={msg.content} />
+                                                            </div>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         </div>
@@ -2435,6 +2700,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             <ProposedActionsCard
                                 proposals={lastAssistantMessage.proposals}
                                 specialist={specialist}
+                                rolloutId={lastAssistantMessage.rolloutId ?? undefined}
                                 onDismiss={() => {
                                     setMessages((prev) => {
                                         const idx = prev.map((m, i) => ({ m, i }))

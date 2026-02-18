@@ -52,6 +52,7 @@ import {
   Loader2,
   Send,
   X,
+  Share2,
 } from 'lucide-react'
 
 import type {
@@ -67,9 +68,11 @@ import {
   sendArtifactAsEmail,
   getArtifactVersions,
   restoreArtifactVersion,
+  createArtifactShareLink,
 } from '@/actions/agent-artifacts'
 
 import { exportAsPDF, exportAsDOCX } from '@/lib/export-utils'
+import { parseSlideDeckFromText, downloadSlideDeck } from '@/lib/ai-providers/slide-renderer'
 
 // ============================================================================
 // TYPES
@@ -140,6 +143,8 @@ export function ArtifactDetailDialog({
   const [isExportingPDF, setIsExportingPDF] = useState<boolean>(false)
   const [isExportingDOCX, setIsExportingDOCX] = useState<boolean>(false)
   const [isExportingGDocs, setIsExportingGDocs] = useState<boolean>(false)
+  const [isSharingLink, setIsSharingLink] = useState<boolean>(false)
+  const [isExportingPPTX, setIsExportingPPTX] = useState<boolean>(false)
 
   // ---- State: Email inline form ----
   const [showEmailForm, setShowEmailForm] = useState<boolean>(false)
@@ -329,6 +334,55 @@ export function ArtifactDetailDialog({
       toast.error(message)
     } finally {
       setIsExportingGDocs(false)
+    }
+  }, [artifact])
+
+  /**
+   * Create a share link and copy to clipboard.
+   */
+  const handleShareLink = useCallback(async (): Promise<void> => {
+    if (!artifact) return
+
+    setIsSharingLink(true)
+    try {
+      const { shareUrl, error } = await createArtifactShareLink(artifact.id, 7)
+      if (error) {
+        toast.error(error)
+        return
+      }
+      if (shareUrl) {
+        await navigator.clipboard.writeText(shareUrl)
+        toast.success('Share link copied (expires in 7 days)')
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create share link'
+      toast.error(message)
+    } finally {
+      setIsSharingLink(false)
+    }
+  }, [artifact])
+
+  /**
+   * Export as PPTX (for presentation-type or slide-parseable content).
+   */
+  const handleExportPPTX = useCallback(async (): Promise<void> => {
+    if (!artifact) return
+
+    const deck = parseSlideDeckFromText(artifact.content)
+    if (!deck) {
+      toast.error('Content could not be parsed as a presentation')
+      return
+    }
+
+    setIsExportingPPTX(true)
+    try {
+      await downloadSlideDeck(deck, `${artifact.title}.pptx`)
+      toast.success('PPTX downloaded')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Export failed'
+      toast.error(message)
+    } finally {
+      setIsExportingPPTX(false)
     }
   }, [artifact])
 
@@ -891,6 +945,22 @@ export function ArtifactDetailDialog({
               <span className="ml-1">Google Docs</span>
             </Button>
 
+            {/* Share link */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleShareLink}
+              disabled={isSharingLink}
+              aria-label="Copy share link"
+            >
+              {isSharingLink ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Share2 className="h-4 w-4" />
+              )}
+              <span className="ml-1">Share</span>
+            </Button>
+
             {/* Email */}
             <Button
               variant="ghost"
@@ -901,6 +971,24 @@ export function ArtifactDetailDialog({
               <Mail className="h-4 w-4" />
               <span className="ml-1">Email</span>
             </Button>
+
+            {/* PPTX (presentations) */}
+            {isPresentation && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleExportPPTX}
+                disabled={isExportingPPTX}
+                aria-label="Export as PPTX"
+              >
+                {isExportingPPTX ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                <span className="ml-1">PPTX</span>
+              </Button>
+            )}
 
             {/* Gamma (presentations only) */}
             {isPresentation && (

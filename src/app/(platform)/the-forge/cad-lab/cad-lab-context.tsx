@@ -106,6 +106,7 @@ export interface CadLabContextValue {
   aiPrefilled: boolean
   handleDecompose: () => Promise<void>
   handleModuleGenerate: (moduleId: string, step: "interface" | "generate") => Promise<void>
+  handleGenerateSingleModule: (moduleId: string) => Promise<void>
   handleGenerateAllModules: () => Promise<void>
 
   // Batch pipeline
@@ -178,7 +179,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Input state ──
   const [subject, setSubject] = useState("")
-  const [modelId, setModelId] = useState<ClaudeModelId>("claude-opus-4-6")
+  const [modelId, setModelId] = useState<ClaudeModelId>("claude-sonnet-4-6")
   const [designBrief, setDesignBrief] = useState<CadLabDesignBrief>({
     useCase: "",
     targetProcess: "",
@@ -411,6 +412,75 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setActiveModuleId(null)
   }, [modules, editableReport, modelId, activeProjectId])
 
+  /**
+   * Single-click handler that runs the full pipeline for one module
+   * (interface definition -> CAD generation) without needing the user
+   * to click two separate buttons.
+   *
+   * @param moduleId - The module to generate
+   */
+  const handleGenerateSingleModule = useCallback(async (moduleId: string) => {
+    const mod = modules.find((m) => m.id === moduleId)
+    if (!mod || !activeProjectId) return
+
+    setActiveModuleId(moduleId)
+    setProgressLines([])
+    addProgressLine(`Starting pipeline for ${mod.name}...`)
+
+    const moduleResearchText = mod.moduleResearch ||
+      `Module: ${mod.name}\nPurpose: ${mod.purpose}\nKey Parts: ${mod.keyParts.join(", ")}\nDescription: ${mod.description}\n\nFrom parent research:\n${editableReport}`
+
+    try {
+      // Step 1: Interface definition (if not already done)
+      let currentModules = modules
+      if (mod.status === "pending") {
+        addProgressLine(`Planning dimensions for ${mod.name}...`)
+        const res = await generateCadLabInterface(`${mod.name} — ${mod.purpose}`, moduleResearchText, modelId)
+        if (res.success) {
+          currentModules = modules.map((m) =>
+            m.id === moduleId ? { ...m, interfaceDefinition: res.interfaceDefinition, status: "interface_ready" as const } : m,
+          )
+          setModules(currentModules)
+          await saveCadLabModules(activeProjectId, currentModules)
+          setLastSaved(new Date().toISOString())
+          addProgressLine(`Dimensions planned for ${mod.name}. Generating CAD...`)
+        } else {
+          addProgressLine(`Failed to plan dimensions for ${mod.name}.`)
+          setActiveModuleId(null)
+          return
+        }
+      }
+
+      // Step 2: CAD generation
+      addProgressLine(`Generating CAD model for ${mod.name}...`)
+      const response = await fetch("/api/cad-lab/generate-module", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: activeProjectId, moduleId }),
+      })
+
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({ error: "Unknown error" })) as { error?: string }
+        throw new Error(errBody.error || `HTTP ${response.status}`)
+      }
+
+      const data = await response.json() as { done: boolean; module: CadLabModule }
+      const updated = currentModules.map((m) =>
+        m.id === moduleId ? data.module : m,
+      )
+      setModules(updated)
+      await saveCadLabModules(activeProjectId, updated)
+      setLastSaved(new Date().toISOString())
+      addProgressLine(`${mod.name} generated successfully!`)
+      setExpandedModuleId(moduleId)
+    } catch (err) {
+      console.error("[CAD-LAB] Single module generation failed:", err)
+      addProgressLine(`Failed to generate ${mod.name}: ${err instanceof Error ? err.message : "Unknown error"}`)
+    } finally {
+      setActiveModuleId(null)
+    }
+  }, [modules, editableReport, modelId, activeProjectId, addProgressLine])
+
   // ── Detect running batch on project load ──
   // If user reloads while modules were generating, check DB for any
   // modules that are still in progress and start polling to catch completions.
@@ -517,11 +587,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setProgressLines([])
     addProgressLine(`Starting pipeline for ${pending.length} modules...`)
 
-    // Request notification permission so we can alert when done
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission().catch(() => { /* Non-critical */ })
-    }
-
     // Initialize progress UI — mark all non-generated as queued
     const progress: Record<string, "queued" | "interface" | "generating" | "done" | "error"> = {}
     for (const mod of modules) {
@@ -595,6 +660,18 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         addProgressLine(
           `${mod.name} complete (${(data.elapsedMs / 1000).toFixed(0)}s) — ${completedCount}/${modules.length} done`,
         )
+
+        // Auto-expand and scroll to the completed module
+        setExpandedModuleId(mod.id)
+        requestAnimationFrame(() => {
+          const el = document.getElementById(`module-${mod.id}`)
+          el?.scrollIntoView({ behavior: "smooth", block: "start" })
+        })
+
+        // Request notification permission after the first success (less disruptive)
+        if (completedCount === 1 && typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+          Notification.requestPermission().catch(() => { /* Non-critical */ })
+        }
       } catch (err) {
         console.error("[CAD-LAB] Module generation failed:", mod.name, err instanceof Error ? err.message : err)
         setBatchProgress((prev) => ({ ...prev, [mod.id]: "error" }))
@@ -854,7 +931,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isDecomposing, modules, setModules,
     expandedModuleId, setExpandedModuleId, activeModuleId,
     diagnosticAnswers, setDiagnosticAnswers, aiPrefilled,
-    handleDecompose, handleModuleGenerate, handleGenerateAllModules,
+    handleDecompose, handleModuleGenerate, handleGenerateSingleModule, handleGenerateAllModules,
     isBatchRunning, batchProgress,
     progressLines, milestone, setMilestone,
     isAnyLoading, generatedModuleCount, riskCount, diagCompletedCount,

@@ -95,7 +95,7 @@ export const RATE_LIMIT_CONFIGS = {
     // AI server actions — prevent cost abuse
     aiAdvisory: { limit: 10, window: 60 * 1000 },        // 10 advisory answers per minute
     aiAnalysis: { limit: 5, window: 60 * 1000 },          // 5 business plan analyses per minute  
-    aiCadLab: { limit: 10, window: 60 * 1000 },           // 10 The Forge generations per minute
+    aiCadLab: { limit: 30, window: 60 * 1000 },           // 30 The Forge generations per minute (batch generates 2 calls per module × up to 10 modules)
     aiSmartGoal: { limit: 10, window: 60 * 1000 },        // 10 SMART goal suggestions per minute
     aiStrategicPlan: { limit: 5, window: 60 * 1000 },     // 5 strategic plans per minute
     

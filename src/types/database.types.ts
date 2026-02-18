@@ -1412,6 +1412,103 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_rollouts: {
+        Row: {
+          agent_id: string
+          created_at: string
+          foundry_id: string
+          id: string
+          metadata: Json | null
+          prompt_id: string | null
+          reward: number | null
+          reward_source: string | null
+          rewarded_at: string | null
+          status: string
+          thread_id: string | null
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          foundry_id: string
+          id?: string
+          metadata?: Json | null
+          prompt_id?: string | null
+          reward?: number | null
+          reward_source?: string | null
+          rewarded_at?: string | null
+          status?: string
+          thread_id?: string | null
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          metadata?: Json | null
+          prompt_id?: string | null
+          reward?: number | null
+          reward_source?: string | null
+          rewarded_at?: string | null
+          status?: string
+          thread_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_rollouts_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_spans: {
+        Row: {
+          completion_tokens: number | null
+          created_at: string
+          id: string
+          kind: string
+          metadata: Json | null
+          prompt_snapshot: string | null
+          prompt_tokens: number | null
+          response_snapshot: string | null
+          rollout_id: string
+        }
+        Insert: {
+          completion_tokens?: number | null
+          created_at?: string
+          id?: string
+          kind?: string
+          metadata?: Json | null
+          prompt_snapshot?: string | null
+          prompt_tokens?: number | null
+          response_snapshot?: string | null
+          rollout_id: string
+        }
+        Update: {
+          completion_tokens?: number | null
+          created_at?: string
+          id?: string
+          kind?: string
+          metadata?: Json | null
+          prompt_snapshot?: string | null
+          prompt_tokens?: number | null
+          response_snapshot?: string | null
+          rollout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_spans_rollout_id_fkey"
+            columns: ["rollout_id"]
+            isOneToOne: false
+            referencedRelation: "agent_rollouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_sweep_log: {
         Row: {
           completed_at: string | null

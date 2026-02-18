@@ -81,7 +81,7 @@ async function lookupUserSector(
 async function callClaude(
   systemPrompt: string,
   userPrompt: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-sonnet-4-6",
   maxTokens: number = 16384,
 ): Promise<{
   text: string
@@ -585,7 +585,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
 export async function generateCadLabInterface(
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-sonnet-4-6",
 ): Promise<CadLabInterfaceResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -728,7 +728,7 @@ export async function generateCadLabModel(
   description: string,
   researchReport: string,
   interfaceDefinition: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-sonnet-4-6",
 ): Promise<CadLabResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -1040,7 +1040,7 @@ RULES:
 export async function decomposeIntoModules(
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-sonnet-4-6",
 ): Promise<CadLabDecompositionResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -1166,7 +1166,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
 export async function prefillDiagnostics(
   modules: CadLabModule[],
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-sonnet-4-6",
 ): Promise<{ success: boolean; answers: Record<string, Record<string, string>>; error?: string }> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -1273,7 +1273,7 @@ export async function generateCadLabModelSmart(
   description: string,
   researchReport: string,
   interfaceDefinition: string,
-  modelId: ClaudeModelId = "claude-opus-4-6",
+  modelId: ClaudeModelId = "claude-sonnet-4-6",
 ): Promise<CadLabResult & { grammarUsed?: string }> {
   // ── Try grammar-based generation first ──
   console.info("[THE-FORGE] Smart generation: attempting grammar-based path...")

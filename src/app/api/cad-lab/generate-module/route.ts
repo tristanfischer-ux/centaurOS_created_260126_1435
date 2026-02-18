@@ -179,7 +179,7 @@ export async function POST(request: Request): Promise<NextResponse<GenerateModul
     return NextResponse.json({ error: "Module already generated", moduleId }, { status: 400 })
   }
 
-  const modelIdVal = (project.model_id || "claude-opus-4-6") as ClaudeModelId
+  const modelIdVal = (project.model_id || "claude-sonnet-4-6") as ClaudeModelId
   const researchReport = (project.research as { report?: string } | null)?.report ?? ""
 
   // AUDIT: Log module generation start

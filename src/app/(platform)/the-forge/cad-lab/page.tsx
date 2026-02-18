@@ -53,18 +53,23 @@ export default function CadLabResearchPage(): React.ReactNode {
     showSources, setShowSources,
     hasResearch, isAnyLoading,
     handleResearch, handleReset, handleDecompose,
-    modules, isDecomposing, milestone,
+    modules, isDecomposing, milestone, setMilestone,
   } = useCadLab()
 
-  // Auto-decompose after research completes (only if no modules yet)
+  // Auto-decompose after research completes (only if no modules yet).
+  // Delay 4s so the "Research Complete" milestone is visible before
+  // the progress card switches to the decomposition phase.
   const hasAutoDecomposed = useRef(false)
   useEffect(() => {
     if (hasResearch && modules.length === 0 && !isDecomposing && !hasAutoDecomposed.current) {
       hasAutoDecomposed.current = true
-      const timer = setTimeout(() => { handleDecompose() }, 1500)
+      const timer = setTimeout(() => {
+        setMilestone(null)
+        handleDecompose()
+      }, 4000)
       return () => clearTimeout(timer)
     }
-  }, [hasResearch, modules.length, isDecomposing, handleDecompose])
+  }, [hasResearch, modules.length, isDecomposing, handleDecompose, setMilestone])
 
   // Reset auto-decompose flag when starting fresh
   useEffect(() => {
@@ -94,16 +99,18 @@ export default function CadLabResearchPage(): React.ReactNode {
 
   return (
     <div className="space-y-6">
-      {/* ── Primary input + templates ── */}
-      <HeroSection
-        subject={subject}
-        setSubject={setSubject}
-        isAnyLoading={isAnyLoading}
-        isResearching={isResearching}
-        hasResearch={hasResearch}
-        onResearch={handleResearch}
-        onSelectTemplate={handleSelectTemplate}
-      />
+      {/* ── Primary input + templates (hidden once research is complete) ── */}
+      {!hasResearch && (
+        <HeroSection
+          subject={subject}
+          setSubject={setSubject}
+          isAnyLoading={isAnyLoading}
+          isResearching={isResearching}
+          hasResearch={hasResearch}
+          onResearch={handleResearch}
+          onSelectTemplate={handleSelectTemplate}
+        />
+      )}
 
       {/* ── Pipeline preview during research wait ── */}
       {isResearching && (

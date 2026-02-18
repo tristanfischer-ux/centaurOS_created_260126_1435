@@ -22,6 +22,7 @@ import {
   useState,
   useCallback,
   useMemo,
+  useEffect,
   type ReactNode,
 } from "react"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
@@ -38,6 +39,8 @@ interface OpenPanelOptions {
   contextLabel?: string | null
 }
 
+export type PanelViewMode = "sidebar" | "expanded"
+
 interface AdvisorPanelState {
   /** Whether the panel is visible */
   isOpen: boolean
@@ -49,6 +52,8 @@ interface AdvisorPanelState {
   referredBy: string | null
   /** Badge label for what's being discussed */
   contextLabel: string | null
+  /** Sidebar (narrow) vs expanded (full-width) view */
+  panelViewMode: PanelViewMode
 }
 
 interface AdvisorPanelContextValue extends AdvisorPanelState {
@@ -60,6 +65,10 @@ interface AdvisorPanelContextValue extends AdvisorPanelState {
   togglePanel: (specialistId?: string) => void
   /** Switch to a different specialist without closing */
   switchSpecialist: (specialistId: string, handoffCtx?: string) => void
+  /** Expand panel to full width (chat + workspace) */
+  expandPanel: () => void
+  /** Collapse panel back to sidebar width */
+  collapsePanel: () => void
 }
 
 // ─── Context ────────────────────────────────────────────────────────────────
@@ -74,14 +83,28 @@ const AdvisorPanelContext = createContext<AdvisorPanelContextValue | null>(null)
  * @description Wraps the platform layout so any component can open,
  * close, or switch the advisor panel without managing local dialog state.
  */
+const PANEL_VIEW_MODE_KEY = "forgeOS-advisor-panel-view-mode"
+
+function getStoredPanelViewMode(): PanelViewMode {
+  if (typeof window === "undefined") return "sidebar"
+  try {
+    const stored = localStorage.getItem(PANEL_VIEW_MODE_KEY)
+    if (stored === "expanded" || stored === "sidebar") return stored
+  } catch {
+    /* ignore */
+  }
+  return "sidebar"
+}
+
 export function AdvisorPanelProvider({ children }: { children: ReactNode }): React.ReactElement {
-  const [state, setState] = useState<AdvisorPanelState>({
+  const [state, setState] = useState<AdvisorPanelState>(() => ({
     isOpen: false,
     activeSpecialist: null,
     handoffContext: null,
     referredBy: null,
     contextLabel: null,
-  })
+    panelViewMode: getStoredPanelViewMode(),
+  }))
 
   const openPanel = useCallback((specialistId: string, options?: OpenPanelOptions) => {
     const specialist = getSpecialistById(specialistId)
@@ -89,13 +112,14 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
       console.warn("[AdvisorPanel] Unknown specialist:", specialistId)
       return
     }
-    setState({
+    setState((prev) => ({
+      ...prev,
       isOpen: true,
       activeSpecialist: specialist,
       handoffContext: options?.handoffContext ?? null,
       referredBy: options?.referredBy ?? null,
       contextLabel: options?.contextLabel ?? null,
-    })
+    }))
   }, [])
 
   const closePanel = useCallback(() => {
@@ -107,11 +131,11 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
       if (prev.isOpen) {
         return { ...prev, isOpen: false }
       }
-      // If a specialist ID is provided, open with that specialist
       if (specialistId) {
         const specialist = getSpecialistById(specialistId)
         if (specialist) {
           return {
+            ...prev,
             isOpen: true,
             activeSpecialist: specialist,
             handoffContext: null,
@@ -120,7 +144,6 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
           }
         }
       }
-      // If we have a previous specialist, reopen with them
       if (prev.activeSpecialist) {
         return { ...prev, isOpen: true }
       }
@@ -133,12 +156,49 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     if (!specialist) return
 
     setState((prev) => ({
+      ...prev,
       isOpen: true,
       activeSpecialist: specialist,
       handoffContext: handoffCtx ?? null,
       referredBy: handoffCtx ? prev.activeSpecialist?.name ?? null : null,
-      contextLabel: prev.contextLabel,
     }))
+  }, [])
+
+  const expandPanel = useCallback(() => {
+    setState((prev) => ({ ...prev, panelViewMode: "expanded" }))
+    try {
+      localStorage.setItem(PANEL_VIEW_MODE_KEY, "expanded")
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const collapsePanel = useCallback(() => {
+    setState((prev) => ({ ...prev, panelViewMode: "sidebar" }))
+    try {
+      localStorage.setItem(PANEL_VIEW_MODE_KEY, "sidebar")
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "e") {
+        e.preventDefault()
+        setState((prev) => {
+          const next = prev.panelViewMode === "expanded" ? "sidebar" : "expanded"
+          try {
+            localStorage.setItem(PANEL_VIEW_MODE_KEY, next)
+          } catch {
+            /* ignore */
+          }
+          return { ...prev, panelViewMode: next }
+        })
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
 
   const value = useMemo<AdvisorPanelContextValue>(
@@ -148,8 +208,10 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
       closePanel,
       togglePanel,
       switchSpecialist,
+      expandPanel,
+      collapsePanel,
     }),
-    [state, openPanel, closePanel, togglePanel, switchSpecialist],
+    [state, openPanel, closePanel, togglePanel, switchSpecialist, expandPanel, collapsePanel],
   )
 
   return (

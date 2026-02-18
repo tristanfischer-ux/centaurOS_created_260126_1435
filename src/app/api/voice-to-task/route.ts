@@ -6,6 +6,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { sanitizeFileName } from "@/lib/security/sanitize";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { aiGuard } from "@/lib/ai/guard";
+import { createRollout, addSpan, finishRollout } from "@/lib/agent-spans";
 
 let openaiClient: OpenAI | null = null
 
@@ -32,6 +33,7 @@ const TaskSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+    let rolloutId: string | null = null;
     try {
         // SECURITY: Check if OpenAI is configured before processing
         if (!process.env.OPENAI_API_KEY) {
@@ -103,6 +105,22 @@ export async function POST(req: NextRequest) {
             console.warn(`[SECURITY] Filename sanitized from "${file.name}" to "${sanitizedName}"`);
         }
 
+        // Fetch foundry_id early for rollout and for task creation when not parse mode
+        const { data: profileForRollout } = await supabase
+            .from('profiles')
+            .select('foundry_id')
+            .eq('id', user.id)
+            .single();
+
+        if (profileForRollout?.foundry_id) {
+            rolloutId = await createRollout({
+                foundryId: profileForRollout.foundry_id,
+                userId: user.id,
+                agentId: 'voice_to_task',
+                metadata: { model: 'gpt-4o-2024-08-06' },
+            });
+        }
+
         // 1. Transcribe with Whisper
         const transcription = await openai.audio.transcriptions.create({
             file: file,
@@ -139,6 +157,30 @@ export async function POST(req: NextRequest) {
             completionTokens: completion.usage?.completion_tokens || 200,
         })
 
+        if (rolloutId) {
+            const systemPrompt = `You are an executive assistant for a fractional foundry OS. 
+          Extract task details from the voice transcript.
+          
+          If the user mentions "Legal AI", map to assignee_type="Legal_AI".
+          If "General Assistant" or "AI", map to "General_AI".
+          If "My task" or "Me", map to "Self".
+          Otherwise "Unassigned".
+          
+          Current Date: ${new Date().toISOString()}`;
+            const promptSnapshot = `${systemPrompt}\n\n[user]\n${transcriptText}`;
+            const responseSnapshot = JSON.stringify(completion.choices[0]?.message?.parsed ?? null);
+            await addSpan({
+                rolloutId,
+                kind: 'llm_call',
+                promptSnapshot,
+                responseSnapshot,
+                promptTokens: completion.usage?.prompt_tokens ?? null,
+                completionTokens: completion.usage?.completion_tokens ?? null,
+                metadata: { model: 'gpt-4o-2024-08-06' },
+            });
+            await finishRollout(rolloutId, 'finished');
+        }
+
         if (!completion.choices || completion.choices.length === 0) {
             return NextResponse.json({ error: "AI returned no response" }, { status: 500 });
         }
@@ -154,13 +196,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: true, task: taskData, transcript: transcriptText });
         }
 
-        // 3. Get user's foundry_id from database (NOT from user_metadata which is client-writable)
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('foundry_id')
-            .eq('id', user.id)
-            .single();
-
+        // 3. Use foundry_id from profile (already fetched for rollout)
+        const profile = profileForRollout;
         if (!profile?.foundry_id) {
             return NextResponse.json({ error: 'User not associated with a foundry' }, { status: 403 });
         }
@@ -250,6 +287,9 @@ export async function POST(req: NextRequest) {
 
     } catch (error) {
         console.error("Voice-to-Task Error:", error);
+        if (typeof rolloutId === "string") {
+            void finishRollout(rolloutId, "failed");
+        }
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
