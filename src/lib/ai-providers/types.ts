@@ -318,6 +318,28 @@ export interface ExecutionResult {
     error?: string
 }
 
+// ─── Tool / function calling (agent orchestration) ────────────────────
+
+/** JSON Schema for a tool's input parameters (OpenAI/Anthropic format). */
+export interface ToolDefinition {
+    name: string
+    description: string
+    parameters: Record<string, unknown>
+}
+
+/** A tool invocation requested by the model during a turn. */
+export interface ToolCall {
+    id: string
+    name: string
+    arguments: Record<string, unknown>
+}
+
+/** Result of executing a tool, sent back to the model. */
+export interface ToolResult {
+    tool_call_id: string
+    content: string
+}
+
 // ─── Stored provider key (DB shape) ──────────────────────────────────
 
 export interface StoredProviderKey {

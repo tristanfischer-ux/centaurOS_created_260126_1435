@@ -91,6 +91,8 @@ The master preferences document is the most important read -- it tells you how T
 
 ## 6. Session End / Memory Logging
 
+**If you are about to give your final response and have not yet logged to the daily file, LOG NOW before responding.**
+
 When completing significant work:
 1. Log entries to `~/.memory/daily/YYYY-MM-DD.md` with appropriate tags (#ForgeOS)
 2. **Include Preference Signals** in log entries when corrections or preferences were expressed

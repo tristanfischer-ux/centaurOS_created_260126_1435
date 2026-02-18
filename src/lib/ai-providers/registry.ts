@@ -4,15 +4,32 @@
  * This is server-only code, imported by the API route.
  */
 
-import type { AIProviderId, OutputModality } from "./types"
+import type {
+    AIProviderId,
+    OutputModality,
+    ToolCall,
+    ToolDefinition,
+} from "./types"
 
 // ─── Common types for provider implementations ──────────────────────
 
-/** A single message in a multi-turn conversation */
-export interface ChatMessage {
-    role: "system" | "user" | "assistant"
-    content: string
+/** Assistant message with optional tool calls (for tool-use loops). */
+export interface AssistantToolCallPart {
+    id: string
+    name: string
+    arguments: Record<string, unknown>
 }
+
+/** A single message in a multi-turn conversation. */
+export type ChatMessage =
+    | { role: "system"; content: string }
+    | { role: "user"; content: string }
+    | {
+          role: "assistant"
+          content: string
+          tool_calls?: AssistantToolCallPart[]
+      }
+    | { role: "tool"; content: string; tool_call_id: string }
 
 export interface StreamingTextOptions {
     apiKey: string
@@ -31,6 +48,12 @@ export interface StreamingTextOptions {
     enableThinking?: boolean
     /** Token budget for extended thinking (default: 10000). Only used when enableThinking is true. */
     thinkingBudget?: number
+    /** Tool definitions for function/tool calling. When set, the model may request tool execution. */
+    tools?: ToolDefinition[]
+    /** When tools are provided: "auto" (default), "none", or "required". */
+    toolChoice?: "auto" | "none" | "required"
+    /** Called when the model requests a tool execution (streaming pauses until tool results are sent). */
+    onToolCall?: (toolCall: ToolCall) => void
     onChunk: (text: string) => void
     onDone: () => void
     onError: (error: string) => void
@@ -81,7 +104,21 @@ function buildMessages(opts: StreamingTextOptions): ChatMessage[] {
 
     if (opts.conversationHistory && opts.conversationHistory.length > 0) {
         for (const msg of opts.conversationHistory) {
-            messages.push({ role: msg.role, content: msg.content })
+            if (msg.role === "tool") {
+                messages.push({
+                    role: "tool",
+                    content: msg.content,
+                    tool_call_id: msg.tool_call_id,
+                })
+            } else if (msg.role === "assistant" && msg.tool_calls?.length) {
+                messages.push({
+                    role: "assistant",
+                    content: msg.content,
+                    tool_calls: msg.tool_calls,
+                })
+            } else {
+                messages.push({ role: msg.role, content: msg.content })
+            }
         }
     }
 
