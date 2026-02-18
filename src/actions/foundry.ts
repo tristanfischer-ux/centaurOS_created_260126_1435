@@ -52,10 +52,10 @@ export async function updateFoundryPurpose(
   purposeData: FoundryPurposeData
 ): Promise<ActionResult> {
   return withAuth(async ({ supabase, user }) => {
-    // AUTH: Get current user's profile to check role
+    // AUTH: Get current user's profile to check role and name (for upsert fallback)
     const { data: currentProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, role, foundry_id')
+      .select('id, role, foundry_id, full_name')
       .eq('id', user.id)
       .single()
     
@@ -98,21 +98,33 @@ export async function updateFoundryPurpose(
     }
     
     try {
-      // Update foundry purpose_data via RPC function (SECURITY DEFINER)
-      // SECURITY: The DB function verifies auth.uid(), foundry ownership, and Founder role internally.
-      // This avoids needing a service role key / admin client entirely.
-      const { data, error: rpcError } = await supabase.rpc('update_foundry_purpose', {
-        p_foundry_id: foundryId,
-        p_purpose_data: purposeData as unknown as Json,
-      })
+      // Update foundry purpose_data via direct table upsert (RLS allows founders to update their foundry).
+      // Bypasses broken update_foundry_purpose RPC when search_path is empty in production.
+      const foundryName =
+        currentProfile.full_name?.trim()
+          ? `${currentProfile.full_name}'s Foundry`
+          : 'My Foundry'
+      const { error: updateError } = await supabase
+        .from('foundries')
+        .upsert(
+          {
+            id: foundryId,
+            name: foundryName,
+            purpose_data: purposeData as unknown as Json,
+          },
+          { onConflict: 'id' }
+        )
       
-      if (rpcError) {
-        console.error('[FoundryActions] Failed to update purpose via RPC:', {
+      if (updateError) {
+        console.error('[FoundryActions] Failed to update purpose:', {
           foundryId,
-          error: rpcError.message,
-          code: rpcError.code,
+          error: updateError.message,
+          code: updateError.code,
         })
-        return { success: false, error: `Failed to update company purpose: ${rpcError.message}` }
+        return {
+          success: false,
+          error: `Failed to update company purpose: ${updateError.message}`,
+        }
       }
       
       // AUDIT: Log the purpose update
@@ -129,10 +141,10 @@ export async function updateFoundryPurpose(
       revalidatePath('/new-objectives')
       revalidatePath(`/foundry/${foundryId}`)
       
-      return { 
-        success: true, 
+      return {
+        success: true,
         error: null,
-        data 
+        data: purposeData,
       }
     } catch (error) {
       console.error('[FoundryActions] Unexpected error updating purpose:', {
@@ -186,10 +198,13 @@ export async function getFoundryPurpose(
     }
     
     try {
-      // Fetch foundry with purpose_data via RPC (bypasses RLS issue on foundries table)
-      const { data, error: fetchError } = await supabase.rpc('ensure_foundry_exists', {
-        p_foundry_id: foundryId,
-      })
+      // Fetch purpose_data via direct table select (RLS allows users to view their own foundry).
+      // Bypasses broken ensure_foundry_exists RPC when search_path is empty in production.
+      const { data: row, error: fetchError } = await supabase
+        .from('foundries')
+        .select('purpose_data')
+        .eq('id', foundryId)
+        .maybeSingle()
       
       if (fetchError) {
         console.error('[FoundryActions] Failed to fetch purpose:', {
@@ -199,19 +214,19 @@ export async function getFoundryPurpose(
         return { success: false, error: 'Failed to fetch company purpose' }
       }
       
-      return { 
-        success: true, 
+      return {
+        success: true,
         error: null,
-        data: (data as { purpose_data?: FoundryPurposeData | null })?.purpose_data ?? null
+        data: (row?.purpose_data as FoundryPurposeData | null) ?? null,
       }
     } catch (error) {
       console.error('[FoundryActions] Unexpected error fetching purpose:', {
         foundryId,
         error: error instanceof Error ? error.message : 'Unknown error',
       })
-      return { 
-        success: false, 
-        error: 'An unexpected error occurred' 
+      return {
+        success: false,
+        error: 'An unexpected error occurred',
       }
     }
   })
@@ -243,10 +258,10 @@ export async function updateCompanyProfile(
   sector?: Sector | null,
 ): Promise<ActionResult> {
   return withAuth(async ({ supabase, user }) => {
-    // AUTH: Get current user's profile to check role
+    // AUTH: Get current user's profile to check role and name (for upsert fallback)
     const { data: currentProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, role, foundry_id')
+      .select('id, role, foundry_id, full_name')
       .eq('id', user.id)
       .single()
 
@@ -284,36 +299,37 @@ export async function updateCompanyProfile(
     }
 
     try {
-      const { data, error: rpcError } = await supabase.rpc('update_company_profile', {
-        p_foundry_id: foundryId,
-        p_company_profile: profileData as unknown as Json,
-      })
-
-      if (rpcError) {
-        console.error('[FoundryActions] Failed to update company profile via RPC:', {
-          foundryId,
-          error: rpcError.message,
-          code: rpcError.code,
-        })
-        return { success: false, error: `Failed to update company profile: ${rpcError.message}` }
+      // Update company_profile (and sector when provided) via direct table upsert.
+      // Bypasses broken update_company_profile / update_foundry_sector RPCs when search_path is empty.
+      const foundryName =
+        currentProfile.full_name?.trim()
+          ? `${currentProfile.full_name}'s Foundry`
+          : 'My Foundry'
+      const upsertPayload: {
+        id: string
+        name: string
+        company_profile: Json
+        sector?: string
+      } = {
+        id: foundryId,
+        name: foundryName,
+        company_profile: profileData as unknown as Json,
       }
-
-      // Update sector if provided (separate column on foundries table)
       if (sector !== undefined && sector !== null) {
-        const { error: sectorError } = await supabase.rpc('update_foundry_sector', {
-          p_foundry_id: foundryId,
-          p_sector: sector,
+        upsertPayload.sector = sector
+      }
+      const { error: updateError } = await supabase
+        .from('foundries')
+        .upsert(upsertPayload, { onConflict: 'id' })
+      if (updateError) {
+        console.error('[FoundryActions] Failed to update company profile:', {
+          foundryId,
+          error: updateError.message,
+          code: updateError.code,
         })
-
-        if (sectorError) {
-          console.error('[FoundryActions] Failed to update sector via RPC:', {
-            foundryId,
-            sector,
-            error: sectorError.message,
-            code: sectorError.code,
-          })
-          // Non-fatal: profile was saved successfully, sector update is secondary
-          console.warn('[FoundryActions] Profile saved but sector update failed')
+        return {
+          success: false,
+          error: `Failed to update company profile: ${updateError.message}`,
         }
       }
 
@@ -336,7 +352,7 @@ export async function updateCompanyProfile(
       return {
         success: true,
         error: null,
-        data,
+        data: profileData,
       }
     } catch (error) {
       console.error('[FoundryActions] Unexpected error updating company profile:', {
@@ -384,10 +400,13 @@ export async function getCompanyProfile(
     }
 
     try {
-      // Fetch foundry data via RPC (bypasses RLS issue on foundries table)
-      const { data, error: fetchError } = await supabase.rpc('ensure_foundry_exists', {
-        p_foundry_id: foundryId,
-      })
+      // Fetch company_profile and sector via direct table select (RLS allows users to view their own foundry).
+      // Bypasses broken ensure_foundry_exists RPC when search_path is empty in production.
+      const { data: row, error: fetchError } = await supabase
+        .from('foundries')
+        .select('company_profile, sector')
+        .eq('id', foundryId)
+        .maybeSingle()
 
       if (fetchError) {
         console.error('[FoundryActions] Failed to fetch company profile:', {
@@ -397,15 +416,12 @@ export async function getCompanyProfile(
         return { success: false, error: 'Failed to fetch company profile' }
       }
 
-      // Also fetch sector from the foundries table
-      const foundryData = data as { company_profile?: CompanyProfile | null; sector?: string | null }
-
       return {
         success: true,
         error: null,
         data: {
-          profile: foundryData?.company_profile ?? null,
-          sector: (foundryData?.sector as Sector) ?? null,
+          profile: (row?.company_profile as CompanyProfile | null) ?? null,
+          sector: (row?.sector as Sector) ?? null,
         },
       }
     } catch (error) {
