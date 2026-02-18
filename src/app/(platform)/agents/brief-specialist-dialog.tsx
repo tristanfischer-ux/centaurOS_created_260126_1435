@@ -1780,16 +1780,17 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 {/* Content — fills remaining space */}
                 {!isLoadingThread && (
                     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                        {/* Chat Messages Area */}
-                        {(hasConversation || hasHistoricalMessages) && (
-                            <div
-                                ref={scrollRef}
-                                onScroll={handleChatScroll}
-                                role="log"
-                                aria-live="polite"
-                                aria-label="Conversation with specialist"
-                                className="flex-1 min-h-0 overflow-y-auto space-y-4 p-4"
-                            >
+                        {/* Scrollable content — messages, cards, suggestions (single scroll container) */}
+                        <div
+                            ref={scrollRef}
+                            onScroll={handleChatScroll}
+                            role="log"
+                            aria-live="polite"
+                            aria-label="Conversation with specialist"
+                            className="flex-1 min-h-0 overflow-y-auto space-y-4 p-4"
+                        >
+                            {(hasConversation || hasHistoricalMessages) && (
+                                <>
                                 {/* Handoff Briefing Card */}
                                 {referredBy && handoffContext && (
                                     <div className="rounded-lg border border-international-orange/20 bg-international-orange/5 overflow-hidden mb-2">
@@ -1937,8 +1938,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         </div>
                                     </div>
                                 )}
-                            </div>
-                        )}
+                                </>
+                            )}
 
                         {/* Proposed actions */}
                         {lastAssistantMessage && !isExecuting && lastAssistantMessage.proposals && lastAssistantMessage.proposals.length > 0 && (
@@ -2169,10 +2170,12 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             </div>
                         )}
 
+                        </div>
+
                         {/* Text Input (pinned to bottom) */}
                         <div
                             className={cn(
-                                "p-4 pt-2 border-t bg-background space-y-2 mt-auto",
+                                "flex-shrink-0 p-4 pt-2 border-t bg-background space-y-2",
                                 isDraggingOver && "ring-2 ring-inset ring-international-orange/50 rounded-lg",
                             )}
                             onDragOver={(e) => {
@@ -2559,17 +2562,17 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             </div>
                         )}
 
-                        {/* Chat Messages Area */}
-                        {(hasConversation || hasHistoricalMessages) && (
-                            <div
-                                ref={scrollRef}
-                                onScroll={handleChatScroll}
-                                role="log"
-                                aria-live="polite"
-                                aria-label="Conversation with specialist"
-                                className="flex-1 min-h-0 overflow-y-auto space-y-4 mb-4 pr-1"
-                                style={{ maxHeight: "45vh" }}
-                            >
+                        {/* Scrollable content — messages, cards, suggestions (single scroll container) */}
+                        <div
+                            ref={scrollRef}
+                            onScroll={handleChatScroll}
+                            role="log"
+                            aria-live="polite"
+                            aria-label="Conversation with specialist"
+                            className="flex-1 min-h-0 overflow-y-auto space-y-4 mb-4 pr-1"
+                        >
+                            {(hasConversation || hasHistoricalMessages) && (
+                                <>
                                 {/* Handoff Briefing Card — shows what context was passed from referring specialist */}
                                 {referredBy && handoffContext && (
                                     <div className="rounded-lg border border-international-orange/20 bg-international-orange/5 overflow-hidden mb-2">
@@ -2740,8 +2743,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         </div>
                                     </div>
                                 )}
-                            </div>
-                        )}
+                                </>
+                            )}
 
                         {/* Proposed actions (tasks/objectives) from Specialist response */}
                         {lastAssistantMessage && !isExecuting && lastAssistantMessage.proposals && lastAssistantMessage.proposals.length > 0 && (
@@ -2990,8 +2993,10 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             </div>
                         )}
 
+                        </div>
+
                         {/* Text Input (always visible at bottom) */}
-                        <div className="space-y-2">
+                        <div className="flex-shrink-0 space-y-2">
                             {!hasNonHistoricalMessages && !isGeneratingGreeting && !hasHistoricalMessages && (
                                 <Label htmlFor="brief-text" className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                                     {selectedPrompt?.inputLabel ?? "Describe what you need"}
