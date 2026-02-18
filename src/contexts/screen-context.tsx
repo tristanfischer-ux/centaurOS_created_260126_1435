@@ -331,7 +331,11 @@ export function ScreenContextProvider({ children }: { children: ReactNode }) {
 
   const serializeScreenContext = useCallback((): string => {
     const lines: string[] = []
-    lines.push(`## What the User Is Looking At`)
+    lines.push(`## Screen Awareness (Live)`)
+    lines.push(
+      `You can see what the user is looking at right now. This is your live view of their screen.`,
+    )
+    lines.push("")
     lines.push(`**Page:** ${screenContext.pageTitle}`)
     lines.push(`**Route:** ${screenContext.route}`)
     if (screenContext.isFirstVisit) {
@@ -363,7 +367,7 @@ export function ScreenContextProvider({ children }: { children: ReactNode }) {
 
     lines.push("")
     lines.push(
-      "Reference what the user is looking at when relevant — it shows you understand their current focus.",
+      "You have real-time screen awareness. If the user asks whether you can see their screen, confirm that you can and reference specific details from above to prove it. Proactively reference what they're looking at when relevant.",
     )
 
     return lines.join("\n")
