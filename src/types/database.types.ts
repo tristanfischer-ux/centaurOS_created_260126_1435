@@ -14291,6 +14291,25 @@ export type Database = {
         }
         Returns: string
       }
+      component_bom_from_root: {
+        Args: { max_depth?: number; root_component: string }
+        Returns: {
+          component_id: string
+          depth: number
+          path: string[]
+          relationship: string
+        }[]
+      }
+      component_compatibility_multi_hop: {
+        Args: { max_depth?: number; start_component: string }
+        Returns: {
+          depth: number
+          node: string
+          notes: string
+          related: string
+          relationship: string
+        }[]
+      }
       count_active_founders: {
         Args: { target_foundry_id: string }
         Returns: number
