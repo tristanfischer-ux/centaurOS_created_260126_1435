@@ -4,9 +4,8 @@ CI Backfill: Generate STL for templates missing them.
 =====================================================
 
 Queries Supabase for step_templates with step_url but no stl_url,
-downloads each STEP, converts to STL via the existing Modal mashup
-endpoint (no new endpoints needed), uploads the STL to Supabase
-Storage, and updates the DB row.
+downloads each STEP, converts to STL via the Modal /convert-step
+endpoint, uploads the STL to Supabase Storage, and updates the DB row.
 
 Designed to run in GitHub Actions — no CadQuery install needed locally.
 
@@ -22,7 +21,8 @@ Usage:
 Requires env vars:
   SUPABASE_URL             — e.g. https://xxx.supabase.co
   SUPABASE_KEY             — service role key
-  MODAL_CAD_ENDPOINT_URL   — main Modal CAD endpoint (mashup URL auto-derived)
+  MODAL_CAD_ENDPOINT_URL   — unified Modal CAD web app base URL
+                             (e.g. https://tristan-fischer--forgeos-cad-cad-web.modal.run)
 """
 
 import argparse
@@ -43,26 +43,18 @@ except ImportError:
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-MODAL_BASE_URL = os.environ.get("MODAL_CAD_ENDPOINT_URL", "")
+MODAL_BASE_URL = os.environ.get("MODAL_CAD_ENDPOINT_URL", "").rstrip("/")
 
 BUCKET = "xray-images"
 STORAGE_PREFIX = "cad-lab/templates"
 
-# Trivial CadQuery code that just imports the STEP and assigns it as result.
-# The Modal export wrapper then produces model.stl alongside model.step.
-CONVERT_CODE = 'import cadquery as cq\nresult = cq.importers.importStep(SOURCE_DIR + "/input.step")'
 
-
-def get_mashup_url() -> str:
-    """Derive the mashup endpoint URL from the main CAD endpoint."""
+def get_convert_url() -> str:
+    """Build the /convert-step endpoint URL from the base CAD web app URL."""
     if not MODAL_BASE_URL:
         print("ERROR: MODAL_CAD_ENDPOINT_URL not set")
         sys.exit(1)
-    url = os.environ.get("MODAL_CAD_MASHUP_ENDPOINT_URL") or MODAL_BASE_URL.replace(
-        "generate-cad-endpoint",
-        "mashup-generate-endpoint",
-    )
-    return url
+    return f"{MODAL_BASE_URL}/convert-step"
 
 
 def download_step(url: str) -> bytes | None:
@@ -76,18 +68,17 @@ def download_step(url: str) -> bytes | None:
         return None
 
 
-def convert_step_to_stl(step_b64: str) -> str | None:
+def convert_step_to_stl(step_b64: str, tolerance: float = 0.1) -> str | None:
     """
-    Convert a STEP file to STL via the existing Modal mashup endpoint.
+    Convert a STEP file to STL via the Modal /convert-step endpoint.
 
-    Sends the STEP as a mashup source and trivial CadQuery code that
-    just imports and re-exports it. The export wrapper produces STL.
+    Sends base64-encoded STEP and receives base64-encoded STL.
+    Uses the dedicated conversion function (CadQuery importStep + exportSTL).
     """
-    endpoint = get_mashup_url()
+    endpoint = get_convert_url()
     payload = json.dumps({
-        "sources": [{"name": "input", "step_b64": step_b64}],
-        "mashup_code": CONVERT_CODE,
-        "module_id": "stl-backfill",
+        "step_b64": step_b64,
+        "tolerance": tolerance,
     }).encode("utf-8")
 
     req = urllib.request.Request(
@@ -131,6 +122,7 @@ def upload_stl(supabase_client, template: dict, stl_b64: str) -> str | None:
 def main():
     parser = argparse.ArgumentParser(description="CI backfill STL for step_templates")
     parser.add_argument("--limit", type=int, default=0, help="Max templates to process (0 = all)")
+    parser.add_argument("--tolerance", type=float, default=0.1, help="STL mesh tolerance in mm")
     parser.add_argument("--dry-run", action="store_true", help="Count missing STLs without converting")
     args = parser.parse_args()
 
@@ -141,11 +133,11 @@ def main():
     supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
     print("=" * 60)
-    print("CI Backfill: STEP → STL via Modal Mashup Endpoint")
+    print("CI Backfill: STEP → STL via Modal /convert-step")
     print("=" * 60)
-    print(f"  Mashup URL: {get_mashup_url()[:60]}...")
+    print(f"  Endpoint:  {get_convert_url()[:60]}...")
+    print(f"  Tolerance: {args.tolerance} mm")
 
-    # Fetch templates missing stl_url
     query = (
         supabase_client.table("step_templates")
         .select("id, slug, category, step_url, source_path")
@@ -174,7 +166,6 @@ def main():
     for i, t in enumerate(templates):
         slug = t["slug"]
 
-        # Download STEP
         step_bytes = download_step(t["step_url"])
         if not step_bytes:
             failed += 1
@@ -182,20 +173,17 @@ def main():
 
         step_b64 = base64.b64encode(step_bytes).decode("utf-8")
 
-        # Convert via Modal mashup endpoint
-        stl_b64 = convert_step_to_stl(step_b64)
+        stl_b64 = convert_step_to_stl(step_b64, tolerance=args.tolerance)
         if not stl_b64:
             failed += 1
             print(f"  FAIL: {slug}")
             continue
 
-        # Upload STL to Supabase Storage
         stl_url = upload_stl(supabase_client, t, stl_b64)
         if not stl_url:
             failed += 1
             continue
 
-        # Update DB
         try:
             supabase_client.table("step_templates").update(
                 {"stl_url": stl_url}
@@ -213,7 +201,6 @@ def main():
                 f"({converted} ok, {failed} failed, {elapsed:.0f}s)"
             )
 
-        # Small delay to avoid hammering Modal
         time.sleep(0.5)
 
     elapsed = time.time() - start
