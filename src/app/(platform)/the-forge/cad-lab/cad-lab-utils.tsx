@@ -65,11 +65,13 @@ export function InlineSvg({
 }): React.ReactNode {
   const containerRef = useRef<HTMLDivElement>(null)
   const [renderError, setRenderError] = useState<string | null>(null)
+  const [fallbackToImg, setFallbackToImg] = useState(false)
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
     setRenderError(null)
+    setFallbackToImg(false)
 
     if (!src || src.length < 50) {
       console.warn("[InlineSvg] SVG source too short or empty:", src?.slice(0, 80))
@@ -101,9 +103,16 @@ export function InlineSvg({
     const doc = parser.parseFromString(decoded, "image/svg+xml")
     const parsedSvg = doc.documentElement
 
-    if (parsedSvg.querySelector("parsererror") || parsedSvg.tagName !== "svg") {
-      console.warn("[InlineSvg] SVG parse error:", parsedSvg.querySelector("parsererror")?.textContent)
+    if (parsedSvg.querySelector("parsererror") || parsedSvg.localName !== "svg") {
+      const parserMsg = parsedSvg.querySelector("parsererror")?.textContent ?? null
+      console.warn("[InlineSvg] Parse failed:", {
+        parsererror: parserMsg,
+        rootLocalName: parsedSvg.localName,
+        decodedLength: decoded.length,
+        decodedPreview: decoded.slice(0, 300),
+      })
       setRenderError("Invalid SVG content")
+      setFallbackToImg(true)
       container.innerHTML = ""
       return
     }
@@ -158,10 +167,20 @@ export function InlineSvg({
     return () => { container.innerHTML = "" }
   }, [src])
 
+  const showImgFallback =
+    fallbackToImg && src && src.length >= 50 && /^data:image\/svg\+xml;base64,/.test(src)
+
   return (
     <div className={`relative ${className ?? ""}`} onClick={onClick} role="img" aria-label={alt}>
       <div ref={containerRef} className="w-full h-full" />
-      {renderError && (
+      {showImgFallback && (
+        <img
+          src={src}
+          alt={alt}
+          className="absolute inset-0 w-full h-full object-contain"
+        />
+      )}
+      {renderError && !fallbackToImg && (
         <div className="absolute inset-0 flex items-center justify-center">
           <p className="text-xs text-muted-foreground font-mono">{renderError}</p>
         </div>

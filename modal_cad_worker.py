@@ -26,6 +26,10 @@ import tempfile
 import traceback
 import xml.etree.ElementTree as ET
 
+# Preserve default SVG namespace when rewriting (avoid ns0:svg prefix)
+ET.register_namespace("", "http://www.w3.org/2000/svg")
+ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+
 # ─── Container Image ──────────────────────────────────────────────────
 
 cadquery_image = (
@@ -304,7 +308,23 @@ def _refit_svg_viewbox(svg_path: str, padding_pct: float = 0.10) -> None:
         root.set("width", "100%")
         root.set("height", "100%")
 
+        # Read original before overwriting so we can revert if write produces invalid XML
+        with open(svg_path, "rb") as f:
+            original_content = f.read()
+
         tree.write(svg_path, xml_declaration=True, encoding="unicode")
+
+        # Validate written file: re-parse and ensure root is svg
+        try:
+            tree2 = ET.parse(svg_path)
+            root2 = tree2.getroot()
+            local_name = root2.tag.split("}")[-1] if "}" in root2.tag else root2.tag
+            if local_name != "svg":
+                raise ValueError(f"root tag is {local_name}, not svg")
+        except Exception as e:
+            with open(svg_path, "wb") as f:
+                f.write(original_content)
+            print(f"WARNING: SVG refit produced invalid output for {svg_path}, reverted: {e}")
 
     except Exception as e:
         print(f"WARNING: SVG viewBox refit failed for {svg_path}: {e}")
