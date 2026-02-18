@@ -207,18 +207,32 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
 
   const x0 = PAD_L, x1 = SVG_W - PAD_R
 
-  // ── Global timeline bounds ──
-  const globalStart = useMemo(() => {
-    if (strategicObjectives.length === 0) return NOW.toISOString().slice(0, 10)
-    const dates = strategicObjectives.map((s) => new Date(s.startDate).getTime())
-    return new Date(Math.min(...dates)).toISOString().slice(0, 10)
-  }, [strategicObjectives])
+  // ── Global timeline bounds (enforce minimum span so items don't collapse to one X) ──
+  const { globalStart, globalEnd } = useMemo(() => {
+    const todayISO = NOW.toISOString().slice(0, 10)
+    if (strategicObjectives.length === 0) return { globalStart: todayISO, globalEnd: todayISO }
 
-  const globalEnd = useMemo(() => {
-    if (strategicObjectives.length === 0) return NOW.toISOString().slice(0, 10)
-    const dates = strategicObjectives.map((s) => new Date(s.targetDate).getTime())
-    return new Date(Math.max(...dates)).toISOString().slice(0, 10)
-  }, [strategicObjectives])
+    const allDates: string[] = [
+      ...strategicObjectives.map((s) => s.startDate),
+      ...strategicObjectives.map((s) => s.targetDate),
+      ...strategicObjectives.flatMap((so) => so.objectives.map((o) => o.dueDate)),
+      ...strategicObjectives.flatMap((so) => so.objectives.flatMap((o) => o.tasks.map((t) => t.start))),
+      ...strategicObjectives.flatMap((so) => so.objectives.flatMap((o) => o.tasks.map((t) => t.end))),
+    ].filter(Boolean)
+    const times = allDates.map((d) => new Date(d).getTime())
+    const minT = Math.min(...times)
+    const maxT = Math.max(...times)
+    const start = new Date(minT).toISOString().slice(0, 10)
+    let end = new Date(maxT).toISOString().slice(0, 10)
+
+    const MIN_TIMELINE_DAYS = 30
+    if (daysBetween(start, end) < MIN_TIMELINE_DAYS) {
+      const d = new Date(start)
+      d.setDate(d.getDate() + MIN_TIMELINE_DAYS)
+      end = d.toISOString().slice(0, 10)
+    }
+    return { globalStart: start, globalEnd: end }
+  }, [strategicObjectives, NOW])
 
   const tx = (d: string): number => dateToX(d, globalStart, globalEnd, x0, x1)
   const nowX = clamp(tx(NOW.toISOString().slice(0, 10)), x0, x1)

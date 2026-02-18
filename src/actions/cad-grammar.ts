@@ -574,16 +574,10 @@ async function executeGrammarOnModal(
   grammar: CadGrammar,
   params: Record<string, unknown>,
 ): Promise<ModalGrammarResponse> {
-  // SECURITY: Use separate endpoint URL for grammar-based generation
-  const endpointUrl = process.env.MODAL_CAD_GRAMMAR_ENDPOINT_URL
-    ?? process.env.MODAL_CAD_ENDPOINT_URL?.replace(
-      "generate-cad-endpoint",
-      "generate-from-grammar-endpoint",
-    )
+  const baseUrl = process.env.MODAL_CAD_ENDPOINT_URL?.replace(/\/$/, "")
+  if (!baseUrl) throw new Error("MODAL_CAD_ENDPOINT_URL not configured")
 
-  if (!endpointUrl) throw new Error("MODAL_CAD_GRAMMAR_ENDPOINT_URL not configured")
-
-  const response = await fetch(endpointUrl, {
+  const response = await fetch(`${baseUrl}/grammar`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

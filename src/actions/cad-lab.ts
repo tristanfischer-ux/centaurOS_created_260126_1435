@@ -24,6 +24,9 @@ import type {
   CadLabDecompositionResult,
   CadLabModule,
   CadLabDesignBrief,
+  MashupSourceInput,
+  MashupPlan,
+  MashupResult,
 } from "@/lib/cad-lab-types"
 import { generateFromGrammar } from "@/actions/cad-grammar"
 import { checkRateLimit } from "@/lib/security/rate-limit"
@@ -40,6 +43,13 @@ import {
   getDiagnosticsSystemPrompt,
 } from "@/lib/cad-lab/domain-prompts"
 import { runMaterialConsensus } from "@/lib/cad-lab/multi-model-consensus"
+import {
+  getMashupPlanningSystemPrompt,
+  getMashupPlanningUserPrompt,
+  getMashupCodeGenSystemPrompt,
+  getMashupCodeGenUserPrompt,
+} from "@/lib/cad-lab/mashup-prompts"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 // ─── Sector Lookup ───────────────────────────────────────────────────
 
@@ -320,11 +330,15 @@ interface ModalResponse {
  * @param code - Complete CadQuery Python code (must assign `result`)
  * @returns Modal execution result with exports and analysis
  */
-async function executeOnModal(code: string): Promise<ModalResponse> {
-  const endpointUrl = process.env.MODAL_CAD_ENDPOINT_URL
-  if (!endpointUrl) throw new Error("MODAL_CAD_ENDPOINT_URL not configured")
+/** Base URL for unified CAD API (single Modal web endpoint). */
+function getModalCadBaseUrl(): string {
+  const url = process.env.MODAL_CAD_ENDPOINT_URL
+  if (!url) throw new Error("MODAL_CAD_ENDPOINT_URL not configured")
+  return url.replace(/\/$/, "")
+}
 
-  const response = await fetch(endpointUrl, {
+async function executeOnModal(code: string): Promise<ModalResponse> {
+  const response = await fetch(`${getModalCadBaseUrl()}/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -341,6 +355,48 @@ async function executeOnModal(code: string): Promise<ModalResponse> {
   }
 
   return (await response.json()) as ModalResponse
+}
+
+/** Mashup Modal response shape */
+interface MashupModalResponse {
+  error?: string | null
+  step?: string | null
+  stl?: string | null
+  svg_iso?: string | null
+  analysis?: unknown
+}
+
+/**
+ * Calls the Modal mashup endpoint with source STEPs (base64) and mashup CadQuery code.
+ *
+ * @param sources - Array of { name, step_b64 }
+ * @param mashupCode - CadQuery code that uses SOURCE_DIR and importStep()
+ * @param materialDensity - kg/m³
+ * @returns Modal response with step/stl/svg_iso/analysis
+ */
+async function executeMashupOnModal(
+  sources: Array<{ name: string; step_b64: string }>,
+  mashupCode: string,
+  materialDensity: number = 1240,
+): Promise<MashupModalResponse> {
+  const response = await fetch(`${getModalCadBaseUrl()}/mashup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sources,
+      mashup_code: mashupCode,
+      module_id: "mashup",
+      material_density: materialDensity,
+    }),
+    signal: AbortSignal.timeout(600_000),
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`Modal mashup error (${response.status}): ${errText.slice(0, 300)}`)
+  }
+
+  return (await response.json()) as MashupModalResponse
 }
 
 // ─── Code Extraction ─────────────────────────────────────────────────
@@ -1227,6 +1283,216 @@ export async function generateCadLabModelSmart(
 
   // ── Fallback to existing raw CadQuery pipeline ──
   return generateCadLabModel(description, researchReport, interfaceDefinition, modelId)
+}
+
+// ─── Mashup Generation ────────────────────────────────────────────────
+
+/**
+ * Generates a mashup from 2+ source STEP files and a concept description.
+ *
+ * @description Pipeline: (1) Claude produces a structured mashup plan from concept + source info,
+ * (2) Claude generates CadQuery code that imports STEPs and combines them per the plan,
+ * (3) Modal executes the code and returns STEP/STL/SVG, (4) results are uploaded to storage.
+ *
+ * @param sources - Array of { name, step_url?, step_b64?, bounding_box?, description? }
+ * @param concept - User's mashup concept (e.g. "radio player inside a toaster")
+ * @param mashupProjectId - Optional project ID for storage path
+ * @param modelId - Claude model for planning and code gen
+ * @returns MashupResult with plan, code, step_url, stl_url, analysis
+ *
+ * @security Requires authenticated user. Rate limited.
+ */
+export async function generateMashup(
+  sources: MashupSourceInput[],
+  concept: string,
+  options?: {
+    mashupProjectId?: string
+    modelId?: ClaudeModelId
+    materialDensity?: number
+  },
+): Promise<MashupResult> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const rateLimitError = await checkRateLimit("aiCadLab", `mashup:${user.id}`)
+  if (rateLimitError) {
+    return { success: false, error: rateLimitError }
+  }
+
+  if (!concept?.trim()) {
+    return { success: false, error: "Mashup concept is required" }
+  }
+  if (!Array.isArray(sources) || sources.length < 2) {
+    return { success: false, error: "At least two sources are required" }
+  }
+
+  const modelId = options?.modelId ?? "claude-sonnet-4-6"
+  const materialDensity = options?.materialDensity ?? 1240
+  const startTime = Date.now()
+  let tokensIn = 0
+  let tokensOut = 0
+
+  try {
+    // ── Resolve source STEPs to base64 ──
+    const modalSources: Array<{ name: string; step_b64: string }> = []
+    const sourceInfos: Array<{ name: string; description?: string; bounding_box?: { xLen: number; yLen: number; zLen: number } }> = []
+
+    for (let i = 0; i < sources.length; i++) {
+      const s = sources[i]
+      const name = (s?.name ?? `source_${i}`).trim().replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || `source_${i}`
+      let step_b64: string
+
+      if (s?.step_b64) {
+        step_b64 = s.step_b64
+      } else if (s?.step_url) {
+        const res = await fetch(s.step_url, { signal: AbortSignal.timeout(30_000) })
+        if (!res.ok) throw new Error(`Failed to fetch source ${name}: ${res.status}`)
+        const buf = Buffer.from(await res.arrayBuffer())
+        step_b64 = buf.toString("base64")
+      } else {
+        return { success: false, error: `Source "${name}" must have step_url or step_b64` }
+      }
+
+      modalSources.push({ name, step_b64 })
+      sourceInfos.push({
+        name,
+        description: s?.description,
+        bounding_box: s?.bounding_box,
+      })
+    }
+
+    // ── Step 1: Mashup planning ──
+    const planSys = getMashupPlanningSystemPrompt()
+    const planUser = getMashupPlanningUserPrompt(sourceInfos, concept)
+    const planResult = await callClaude(planSys, planUser, modelId, 4096)
+    tokensIn += planResult.tokensIn
+    tokensOut += planResult.tokensOut
+
+    let plan: MashupPlan
+    try {
+      const cleaned = planResult.text.replace(/```json\s*/i, "").replace(/```\s*/g, "").trim()
+      plan = JSON.parse(cleaned) as MashupPlan
+    } catch {
+      return {
+        success: false,
+        error: "Failed to parse mashup plan from Claude response",
+        tokensIn,
+        tokensOut,
+        elapsedMs: Date.now() - startTime,
+      }
+    }
+
+    if (!plan.strategy || !Array.isArray(plan.steps)) {
+      return {
+        success: false,
+        error: "Invalid mashup plan: missing strategy or steps",
+        mashup_plan: plan,
+        tokensIn,
+        tokensOut,
+        elapsedMs: Date.now() - startTime,
+      }
+    }
+
+    // ── Step 2: Code generation ──
+    const sourceNames = modalSources.map((s) => s.name)
+    const codeSys = getMashupCodeGenSystemPrompt(sourceNames)
+    const codeUser = getMashupCodeGenUserPrompt(plan, sourceNames)
+    const codeResult = await callClaude(codeSys, codeUser, modelId, 16384)
+    tokensIn += codeResult.tokensIn
+    tokensOut += codeResult.tokensOut
+
+    let mashupCode = extractCode(codeResult.text)
+    mashupCode = mashupCode
+      .split("\n")
+      .filter((line: string) => {
+        const t = line.trim()
+        if (/^print\s*\(/.test(t)) return false
+        if (t.startsWith("import os") || t.startsWith("from os")) return false
+        if (t.includes("cq.exporters")) return false
+        return true
+      })
+      .join("\n")
+
+    // ── Step 3: Execute on Modal ──
+    const modalResult = await executeMashupOnModal(modalSources, mashupCode, materialDensity)
+
+    if (modalResult.error && !modalResult.step) {
+      return {
+        success: false,
+        error: modalResult.error,
+        mashup_plan: plan,
+        mashup_code: mashupCode,
+        tokensIn,
+        tokensOut,
+        elapsedMs: Date.now() - startTime,
+      }
+    }
+
+    // ── Step 4: Upload to storage ──
+    const pathPrefix = options?.mashupProjectId
+      ? `cad-lab/mashup/${options.mashupProjectId}`
+      : `cad-lab/mashup/${user.id}/${startTime}`
+    const bucket = "xray-images"
+    const admin = createAdminClient()
+    let stepUrl = ""
+    let stlUrl = ""
+
+    if (modalResult.step) {
+      const { error: stepErr } = await admin.storage
+        .from(bucket)
+        .upload(`${pathPrefix}/mashup.step`, Buffer.from(modalResult.step, "base64"), {
+          contentType: "application/step",
+          upsert: true,
+        })
+      if (!stepErr) {
+        const { data: d } = admin.storage.from(bucket).getPublicUrl(`${pathPrefix}/mashup.step`)
+        stepUrl = d.publicUrl
+      }
+    }
+    if (modalResult.stl) {
+      const { error: stlErr } = await admin.storage
+        .from(bucket)
+        .upload(`${pathPrefix}/mashup.stl`, Buffer.from(modalResult.stl, "base64"), {
+          contentType: "model/stl",
+          upsert: true,
+        })
+      if (!stlErr) {
+        const { data: d } = admin.storage.from(bucket).getPublicUrl(`${pathPrefix}/mashup.stl`)
+        stlUrl = d.publicUrl
+      }
+    }
+
+    const elapsedMs = Date.now() - startTime
+    console.info("[THE-FORGE] Mashup generation complete:", { elapsedMs, sourceCount: sources.length })
+
+    return {
+      success: true,
+      mashup_plan: plan,
+      mashup_code: mashupCode,
+      step_url: stepUrl || undefined,
+      stl_url: stlUrl || undefined,
+      step_b64: modalResult.step ?? undefined,
+      stl_b64: modalResult.stl ?? undefined,
+      svg_iso: modalResult.svg_iso ?? undefined,
+      analysis: modalResult.analysis,
+      elapsedMs,
+      tokensIn,
+      tokensOut,
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error"
+    console.error("[THE-FORGE] Mashup generation failed:", msg)
+    return {
+      success: false,
+      error: msg,
+      elapsedMs: Date.now() - startTime,
+      tokensIn,
+      tokensOut,
+    }
+  }
 }
 
 // ─── System Assembly (Integration Step) ───────────────────────────────

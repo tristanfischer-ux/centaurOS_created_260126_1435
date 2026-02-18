@@ -42,6 +42,9 @@ cadquery_image = (
     .pip_install("fastapi[standard]")
 )
 
+# Lightweight image for the unified CAD API router (single web endpoint).
+router_image = modal.Image.debian_slim().pip_install("fastapi[standard]")
+
 app = modal.App("forgeos-cad")
 
 # ─── Security: Code Validation ────────────────────────────────────────
@@ -787,7 +790,6 @@ def generate_cad(
     timeout=600,   # 10 min — building/architectural models with 50+ components need extended time
     memory=8192,   # 8 GB — large assemblies with many boolean ops need headroom
 )
-@modal.fastapi_endpoint(method="POST")
 def generate_cad_endpoint(item: dict) -> dict:
     """
     HTTP POST endpoint for CadQuery generation + analysis.
@@ -818,7 +820,6 @@ def generate_cad_endpoint(item: dict) -> dict:
     timeout=600,   # Match main endpoint timeout for consistency
     memory=8192,
 )
-@modal.fastapi_endpoint(method="POST")
 def analyze_cad_endpoint(item: dict) -> dict:
     """
     HTTP POST endpoint for analysis-only (no file export).
@@ -848,6 +849,198 @@ def analyze_cad_endpoint(item: dict) -> dict:
         "analysis": result.get("analysis"),
         "module_id": module_id,
     }
+
+
+# ─── Mashup CAD Generation (STEP import + combine) ──────────────────────
+
+# Limits: 5 sources, 20MB each (decoded bytes)
+MASHUP_MAX_SOURCES = 5
+MASHUP_MAX_BYTES_PER_SOURCE = 20 * 1024 * 1024  # 20 MB
+
+
+MASHUP_PREAMBLE_TEMPLATE = '''
+# === ForgeOS mashup preamble (trusted, injected) ===
+# Source STEP files have been written to SOURCE_DIR by the host.
+# Your code must use cq.importers.importStep(SOURCE_DIR + "/<name>.step") to load them.
+# Valid source names: {source_names}
+import cadquery as cq
+import os as _os
+
+SOURCE_DIR = "{source_dir}"
+'''
+
+
+@app.function(
+    image=cadquery_image,
+    timeout=600,
+    memory=8192,
+)
+def mashup_generate(
+    sources: list[dict],
+    mashup_code: str,
+    module_id: str = "mashup",
+    material_density: float = 1240.0,
+) -> dict:
+    """
+    Executes mashup CadQuery code that imports source STEP files and combines them.
+    Source STEP files are provided as base64; the host writes them to a temp dir
+    before execution. The mashup code can use cq.importers.importStep(SOURCE_DIR + "/<name>.step").
+
+    Args:
+        sources: List of {{"name": str, "step_b64": str}}. name is used for filename (name.step).
+        mashup_code: Python CadQuery code. Must define SOURCE_DIR and use importStep() to load sources,
+                     then produce a variable `result` (Workplane or Compound).
+        module_id: Identifier for logging.
+        material_density: Material density in kg/m³.
+
+    Returns:
+        Same shape as generate_cad: step, stl, svg_*, analysis, error.
+    """
+    if len(sources) > MASHUP_MAX_SOURCES:
+        result = _empty_result()
+        result["error"] = f"Too many sources: max {MASHUP_MAX_SOURCES}"
+        return result
+
+    # SECURITY: Validate mashup code (AI-generated but still sandboxed)
+    violations = validate_code(mashup_code)
+    if violations:
+        result = _empty_result()
+        result["error"] = f"Mashup code validation failed: {'; '.join(violations)}"
+        return result
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        source_dir = os.path.join(tmpdir, "mashup_sources")
+        os.mkdir(source_dir, 0o755)
+
+        # Write source STEP files (trusted code path — no user control over paths)
+        source_names: list[str] = []
+        for i, src in enumerate(sources):
+            name = (src.get("name") or f"source_{i}").strip()
+            if not name:
+                name = f"source_{i}"
+            # Sanitize: only alphanumeric and underscore
+            name = re.sub(r"[^a-zA-Z0-9_-]", "_", name)[:64] or f"source_{i}"
+            step_b64 = src.get("step_b64") or ""
+            try:
+                raw = base64.b64decode(step_b64)
+            except Exception as e:
+                result = _empty_result()
+                result["error"] = f"Invalid base64 for source '{name}': {e}"
+                return result
+            if len(raw) > MASHUP_MAX_BYTES_PER_SOURCE:
+                result = _empty_result()
+                result["error"] = f"Source '{name}' exceeds {MASHUP_MAX_BYTES_PER_SOURCE // (1024*1024)} MB limit"
+                return result
+            step_path = os.path.join(source_dir, f"{name}.step")
+            with open(step_path, "wb") as f:
+                f.write(raw)
+            source_names.append(name)
+
+        preamble = MASHUP_PREAMBLE_TEMPLATE.format(
+            source_dir=source_dir,
+            source_names=", ".join(f'"{n}"' for n in source_names),
+        )
+        combined_code = preamble + "\n" + mashup_code
+
+        export_code = EXPORT_TEMPLATE.format(
+            output_dir=tmpdir,
+            material_density=material_density,
+        )
+
+        namespace: dict = {}
+        user_exec_error: str | None = None
+        try:
+            exec(combined_code, namespace)  # noqa: S102 — intentional sandboxed exec
+        except Exception:
+            user_exec_error = traceback.format_exc()[-1500:]
+
+        export_exec_error: str | None = None
+        try:
+            exec(export_code, namespace)  # noqa: S102 — intentional sandboxed exec
+        except Exception:
+            export_exec_error = traceback.format_exc()[-1500:]
+
+        exec_error: str | None = None
+        if export_exec_error:
+            exec_error = (
+                f"Mashup export failed for '{module_id}': {export_exec_error}"
+            )
+        elif user_exec_error:
+            exec_error = (
+                f"Mashup execution warning for '{module_id}': {user_exec_error}"
+            )
+
+        for svg_name in ["iso", "top", "front", "back", "right", "left", "exploded_iso"]:
+            svg_path = os.path.join(tmpdir, f"{svg_name}.svg")
+            if os.path.exists(svg_path):
+                _refit_svg_viewbox(svg_path)
+
+        file_map = {
+            "step": "model.step",
+            "stl": "model.stl",
+            "svg_iso": "iso.svg",
+            "svg_top": "top.svg",
+            "svg_front": "front.svg",
+            "svg_back": "back.svg",
+            "svg_right": "right.svg",
+            "svg_left": "left.svg",
+            "svg_exploded": "exploded_iso.svg",
+        }
+
+        result = {"error": exec_error}
+        has_any_file = False
+        for key, filename in file_map.items():
+            filepath = os.path.join(tmpdir, filename)
+            if os.path.exists(filepath):
+                with open(filepath, "rb") as f:
+                    file_bytes = f.read()
+                    result[key] = base64.b64encode(file_bytes).decode("utf-8")
+                has_any_file = True
+            else:
+                result[key] = None
+
+        if exec_error and has_any_file:
+            result["error"] = None
+
+        analysis_path = os.path.join(tmpdir, "analysis.json")
+        if os.path.exists(analysis_path):
+            with open(analysis_path, "r") as f:
+                result["analysis"] = json.loads(f.read())
+        else:
+            result["analysis"] = None
+
+        return result
+
+
+@app.function(
+    image=cadquery_image,
+    timeout=600,
+    memory=8192,
+)
+def mashup_generate_endpoint(item: dict) -> dict:
+    """
+    HTTP POST endpoint for mashup CAD generation.
+
+    Expects JSON body:
+        {
+            "sources": [{"name": "toaster", "step_b64": "..."}, ...],
+            "mashup_code": "...",
+            "module_id": "mashup",
+            "material_density": 1240
+        }
+    Returns JSON with base64-encoded STEP/STL/SVG and analysis.
+    """
+    sources = item.get("sources") or []
+    mashup_code = item.get("mashup_code") or ""
+    module_id = item.get("module_id") or "mashup"
+    material_density = float(item.get("material_density", 1240.0))
+
+    if not mashup_code.strip():
+        return {"error": "No mashup_code provided"}
+    if not sources:
+        return {"error": "No sources provided"}
+
+    return mashup_generate.remote(sources, mashup_code, module_id, material_density)
 
 
 # ─── Grammar-Based CAD Generation ─────────────────────────────────────
@@ -1032,7 +1225,6 @@ def generate_from_grammar(
     timeout=600,   # 10 min — grammar-based models with complex assemblies need extended time
     memory=8192,   # 8 GB — large assemblies with many boolean ops need headroom
 )
-@modal.fastapi_endpoint(method="POST")
 def generate_from_grammar_endpoint(item: dict) -> dict:
     """
     HTTP POST endpoint for grammar-based CadQuery generation + analysis.
@@ -1058,6 +1250,189 @@ def generate_from_grammar_endpoint(item: dict) -> dict:
         return {"error": "No grammar code provided"}
 
     return generate_from_grammar.remote(core_code, grammar_code, params, material_density)
+
+
+# ─── STEP → STL Conversion (for pre-baking library assets) ────────────
+
+
+STEP_TO_STL_MAX_BYTES = 20 * 1024 * 1024  # 20 MB per file
+
+
+@app.function(
+    image=cadquery_image,
+    timeout=120,
+    memory=4096,
+)
+def convert_step_to_stl(
+    step_b64: str,
+    tolerance: float = 0.1,
+) -> dict:
+    """
+    Pure STEP → STL conversion. No code execution, no analysis.
+    Takes base64-encoded STEP, returns base64-encoded STL.
+
+    @param step_b64: Base64-encoded STEP file content.
+    @param tolerance: Mesh tessellation tolerance in mm (lower = finer).
+    @returns dict with stl (base64 string) and error (None on success).
+    """
+    try:
+        raw = base64.b64decode(step_b64)
+    except Exception as e:
+        return {"stl": None, "error": f"Invalid base64: {e}"}
+
+    if len(raw) > STEP_TO_STL_MAX_BYTES:
+        return {"stl": None, "error": f"File exceeds {STEP_TO_STL_MAX_BYTES // (1024*1024)} MB limit"}
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        step_path = os.path.join(tmpdir, "input.step")
+        stl_path = os.path.join(tmpdir, "output.stl")
+
+        with open(step_path, "wb") as f:
+            f.write(raw)
+
+        try:
+            import cadquery as cq
+            shape = cq.importers.importStep(step_path)
+            cq.exporters.export(shape, stl_path, exportType="STL", tolerance=tolerance)
+        except Exception as e:
+            return {"stl": None, "error": f"Conversion failed: {str(e)[:500]}"}
+
+        if not os.path.exists(stl_path):
+            return {"stl": None, "error": "STL file was not produced"}
+
+        with open(stl_path, "rb") as f:
+            stl_bytes = f.read()
+
+        return {
+            "stl": base64.b64encode(stl_bytes).decode("utf-8"),
+            "error": None,
+        }
+
+
+@app.function(
+    image=cadquery_image,
+    timeout=120,
+    memory=4096,
+)
+def convert_step_to_stl_endpoint(item: dict) -> dict:
+    """
+    HTTP POST endpoint for STEP → STL conversion.
+
+    Expects JSON body:
+        {
+            "step_b64": "...",
+            "tolerance": 0.1   // optional, mm
+        }
+    Returns JSON: { "stl": "<base64>", "error": null }
+    """
+    step_b64 = item.get("step_b64", "")
+    tolerance = float(item.get("tolerance", 0.1))
+
+    if not step_b64:
+        return {"stl": None, "error": "No step_b64 provided"}
+
+    return convert_step_to_stl.remote(step_b64, tolerance)
+
+
+@app.function(
+    image=cadquery_image,
+    timeout=600,
+    memory=4096,
+)
+def batch_convert_step_to_stl_endpoint(item: dict) -> dict:
+    """
+    HTTP POST endpoint for batch STEP → STL conversion.
+    Converts up to 20 files in parallel using Modal's .map().
+
+    Expects JSON body:
+        {
+            "files": [
+                { "id": "template-uuid", "step_b64": "..." },
+                ...
+            ],
+            "tolerance": 0.1
+        }
+    Returns JSON: { "results": [ { "id": "...", "stl": "...", "error": null }, ... ] }
+    """
+    files = item.get("files", [])
+    tolerance = float(item.get("tolerance", 0.1))
+
+    if not files:
+        return {"results": [], "error": "No files provided"}
+
+    if len(files) > 20:
+        return {"results": [], "error": "Maximum 20 files per batch"}
+
+    results = []
+    for out, inp in zip(
+        convert_step_to_stl.map(
+            [f["step_b64"] for f in files],
+            kwargs={"tolerance": tolerance},
+        ),
+        files,
+    ):
+        results.append({
+            "id": inp.get("id", ""),
+            "stl": out.get("stl"),
+            "error": out.get("error"),
+        })
+
+    return {"results": results}
+
+
+# ─── Unified CAD API (single web endpoint, stays within 8-endpoint limit) ─
+
+
+def _make_cad_web_app():
+    """Build FastAPI app that routes to the six CAD endpoint functions (one Modal web endpoint)."""
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
+    web = FastAPI(title="ForgeOS CAD API", version="1.0")
+    web.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @web.post("/generate")
+    def route_generate(item: dict) -> dict:
+        return generate_cad_endpoint.remote(item)
+
+    @web.post("/analyze")
+    def route_analyze(item: dict) -> dict:
+        return analyze_cad_endpoint.remote(item)
+
+    @web.post("/mashup")
+    def route_mashup(item: dict) -> dict:
+        return mashup_generate_endpoint.remote(item)
+
+    @web.post("/grammar")
+    def route_grammar(item: dict) -> dict:
+        return generate_from_grammar_endpoint.remote(item)
+
+    @web.post("/convert-step")
+    def route_convert_step(item: dict) -> dict:
+        return convert_step_to_stl_endpoint.remote(item)
+
+    @web.post("/batch-convert-step")
+    def route_batch_convert_step(item: dict) -> dict:
+        return batch_convert_step_to_stl_endpoint.remote(item)
+
+    return web
+
+
+@app.function(
+    image=router_image,
+    timeout=60,
+    allow_concurrent_inputs=100,
+)
+@modal.asgi_app()
+def cad_web():
+    """Single web endpoint: POST /generate, /analyze, /mashup, /grammar, /convert-step, /batch-convert-step."""
+    return _make_cad_web_app()
 
 
 # ─── Local Test ───────────────────────────────────────────────────────

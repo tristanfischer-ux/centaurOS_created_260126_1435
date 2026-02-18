@@ -565,8 +565,8 @@ async function executeCadQueryOnModal(
   moduleId: string,
   materialDensity: number = 1240,
 ): Promise<ModalCadResponse> {
-  const endpointUrl = process.env.MODAL_CAD_ENDPOINT_URL
-  if (!endpointUrl) {
+  const baseUrl = process.env.MODAL_CAD_ENDPOINT_URL?.replace(/\/$/, "")
+  if (!baseUrl) {
     throw new Error("[XRayCadGen] MODAL_CAD_ENDPOINT_URL is not configured")
   }
 
@@ -579,7 +579,7 @@ async function executeCadQueryOnModal(
   const timeoutId = setTimeout(() => controller.abort(), MODAL_TIMEOUT_MS)
 
   try {
-    const response = await fetch(endpointUrl, {
+    const response = await fetch(`${baseUrl}/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, module_id: moduleId, material_density: materialDensity }),

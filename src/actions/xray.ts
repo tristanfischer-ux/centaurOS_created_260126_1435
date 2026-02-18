@@ -1060,13 +1060,11 @@ export async function analyzeModulesAction(
       return { error: "No modules with CAD code found to analyze" }
     }
 
-    // Re-run analysis via the Modal analysis endpoint
-    const analysisEndpoint = process.env.MODAL_CAD_ANALYSIS_ENDPOINT_URL
-      || process.env.MODAL_CAD_ENDPOINT_URL
-
-    if (!analysisEndpoint) {
-      return { error: "Analysis endpoint not configured" }
+    const baseUrl = process.env.MODAL_CAD_ENDPOINT_URL?.replace(/\/$/, "")
+    if (!baseUrl) {
+      return { error: "MODAL_CAD_ENDPOINT_URL not configured" }
     }
+    const analysisEndpoint = `${baseUrl}/analyze`
 
     const BATCH_SIZE = 3
     for (let batch = 0; batch < targetIndices.length; batch += BATCH_SIZE) {

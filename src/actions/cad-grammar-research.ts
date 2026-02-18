@@ -494,18 +494,13 @@ async function validateGrammarOnModal(
   grammarCode: string,
   params: Record<string, unknown>,
 ): Promise<{ success: boolean; error?: string }> {
-  const endpointUrl = process.env.MODAL_CAD_GRAMMAR_ENDPOINT_URL
-    ?? process.env.MODAL_CAD_ENDPOINT_URL?.replace(
-      "generate-cad-endpoint",
-      "generate-from-grammar-endpoint",
-    )
-
-  if (!endpointUrl) {
-    return { success: false, error: "MODAL_CAD_GRAMMAR_ENDPOINT_URL not configured" }
+  const baseUrl = process.env.MODAL_CAD_ENDPOINT_URL?.replace(/\/$/, "")
+  if (!baseUrl) {
+    return { success: false, error: "MODAL_CAD_ENDPOINT_URL not configured" }
   }
 
   try {
-    const response = await fetch(endpointUrl, {
+    const response = await fetch(`${baseUrl}/grammar`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

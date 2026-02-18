@@ -102,8 +102,8 @@ export async function POST(
     slug,
   )
 
-  const endpointUrl = process.env.MODAL_CAD_ENDPOINT_URL
-  if (!endpointUrl) {
+  const baseUrl = process.env.MODAL_CAD_ENDPOINT_URL?.replace(/\/$/, "")
+  if (!baseUrl) {
     console.error("[component-preview] MODAL_CAD_ENDPOINT_URL not set")
     return NextResponse.json(
       { error: "Preview service not configured" },
@@ -120,7 +120,7 @@ export async function POST(
     svg_iso?: string | null
   }
   try {
-    const res = await fetch(endpointUrl, {
+    const res = await fetch(`${baseUrl}/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -846,10 +846,10 @@ export async function executeCode(code: string): Promise<ExecutionResult> {
       })
     }
 
-    const endpointUrl = process.env.MODAL_CAD_ENDPOINT_URL
-    if (!endpointUrl) throw new Error("MODAL_CAD_ENDPOINT_URL not configured")
+    const baseUrl = process.env.MODAL_CAD_ENDPOINT_URL?.replace(/\/$/, "")
+    if (!baseUrl) throw new Error("MODAL_CAD_ENDPOINT_URL not configured")
 
-    const response = await fetch(endpointUrl, {
+    const response = await fetch(`${baseUrl}/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code: combinedCode, module_id: "cad-lab-claude", material_density: 1240 }),
