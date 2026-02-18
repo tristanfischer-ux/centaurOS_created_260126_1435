@@ -70,6 +70,10 @@ export interface CadLabProjectData {
   /** Linked RFQ created from this project (if any) */
   linkedRfqId: string | null
 
+  /** Integrated system assembly (after all modules generated) */
+  integratedAssemblyStlUrl: string | null
+  integratedAssemblyStepUrl: string | null
+
   createdAt: string
   updatedAt: string
 }
@@ -168,6 +172,8 @@ export async function loadCadLabProject(
         generatedCode: project.generated_code,
         modules,
         linkedRfqId,
+        integratedAssemblyStlUrl: project.integrated_assembly_stl_url ?? null,
+        integratedAssemblyStepUrl: project.integrated_assembly_step_url ?? null,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },
@@ -377,6 +383,41 @@ export async function saveCadLabModules(
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save modules:", error.message)
       return { error: `Failed to save modules: ${error.message}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Save Integrated Assembly URLs ────────────────────────────────────
+
+/**
+ * Persists integrated system assembly file URLs after the integration step.
+ *
+ * @param projectId - Project to update
+ * @param stlUrl - URL to combined assembly STL
+ * @param stepUrl - URL to combined assembly STEP
+ * @returns Success or error
+ */
+export async function saveCadLabIntegratedAssembly(
+  projectId: string,
+  stlUrl: string,
+  stepUrl: string,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({
+        integrated_assembly_stl_url: stlUrl,
+        integrated_assembly_step_url: stepUrl,
+      })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save integrated assembly:", error.message)
+      return { error: `Failed to save: ${error.message}` }
     }
 
     return { success: true as const }

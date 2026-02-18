@@ -64,42 +64,34 @@ export function AdvisorPanel(): React.ReactElement {
       aria-label="Advisor panel"
     >
       {activeSpecialist && (
-        isExpanded ? (
-          <div className="flex flex-1 min-h-0 min-w-0">
+        <div className="flex flex-1 min-h-0 min-w-0">
+          {/* BriefSpecialistDialog always first child - preserves React identity and state across expand/collapse */}
+          <div
+            className={cn(
+              "flex flex-col min-w-0",
+              isExpanded ? "w-[40%] shrink-0 order-last" : "flex-1"
+            )}
+          >
+            <BriefSpecialistDialog
+              specialist={activeSpecialist}
+              open={isOpen}
+              onOpenChange={(open) => {
+                if (!open) closePanel()
+              }}
+              onSwitchSpecialist={handleSwitchSpecialist}
+              handoffContext={handoffContext}
+              referredBy={referredBy}
+              contextLabel={contextLabel}
+              renderMode="panel"
+              panelHeaderActions={<PanelExpandToggle />}
+            />
+          </div>
+          {isExpanded && (
             <div className="flex-1 min-w-0 flex flex-col border-r">
               <AgentWorkspace />
             </div>
-            <div className="flex flex-col w-[40%] min-w-0 shrink-0">
-              <BriefSpecialistDialog
-                specialist={activeSpecialist}
-                open={isOpen}
-                onOpenChange={(open) => {
-                  if (!open) closePanel()
-                }}
-                onSwitchSpecialist={handleSwitchSpecialist}
-                handoffContext={handoffContext}
-                referredBy={referredBy}
-                contextLabel={contextLabel}
-                renderMode="panel"
-                panelHeaderActions={<PanelExpandToggle />}
-              />
-            </div>
-          </div>
-        ) : (
-          <BriefSpecialistDialog
-            specialist={activeSpecialist}
-            open={isOpen}
-            onOpenChange={(open) => {
-              if (!open) closePanel()
-            }}
-            onSwitchSpecialist={handleSwitchSpecialist}
-            handoffContext={handoffContext}
-            referredBy={referredBy}
-            contextLabel={contextLabel}
-            renderMode="panel"
-            panelHeaderActions={<PanelExpandToggle />}
-          />
-        )
+          )}
+        </div>
       )}
     </div>
   )

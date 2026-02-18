@@ -28,7 +28,11 @@ import {
   generateCadLabInterface,
   decomposeIntoModules,
   prefillDiagnostics,
+  generateSystemAssembly,
 } from "@/actions/cad-lab"
+import { matchReferenceModel } from "@/actions/reference-models"
+import { saveCadLabIntegratedAssembly } from "@/actions/cad-lab-projects"
+import type { ReferenceModel } from "@/actions/reference-models"
 import {
   listCadLabProjects,
   loadCadLabProject,
@@ -75,6 +79,9 @@ export interface CadLabContextValue {
 
   // Foundry sector
   sector: Sector | null
+
+  // Reference model (instant visual match from subject)
+  referenceModel: ReferenceModel | null
 
   // Input
   subject: string
@@ -127,6 +134,14 @@ export interface CadLabContextValue {
   generatedModuleCount: number
   riskCount: number
   diagCompletedCount: number
+
+  // Integration (combined system assembly)
+  integratedAssemblyStlUrl: string | null
+  integratedAssemblyStepUrl: string | null
+  isIntegrating: boolean
+  integrationError: string | null
+  setIntegrationError: (v: string | null) => void
+  handleGenerateIntegration: () => Promise<void>
 
   // Utility
   handleDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
@@ -184,6 +199,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Input state ──
   const [subject, setSubject] = useState("")
   const [modelId, setModelId] = useState<ClaudeModelId>("claude-sonnet-4-6")
+
+  // ── Reference model (matched from subject for instant 3D preview) ──
+  const [referenceModel, setReferenceModel] = useState<ReferenceModel | null>(null)
   const [designBrief, setDesignBrief] = useState<CadLabDesignBrief>({
     useCase: "",
     targetProcess: "",
@@ -217,6 +235,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Progress storytelling ──
   const [progressLines, setProgressLines] = useState<string[]>([])
   const [milestone, setMilestone] = useState<MilestoneType>(null)
+
+  // ── Integration (combined assembly) ──
+  const [integratedAssemblyStlUrl, setIntegratedAssemblyStlUrl] = useState<string | null>(null)
+  const [integratedAssemblyStepUrl, setIntegratedAssemblyStepUrl] = useState<string | null>(null)
+  const [isIntegrating, setIsIntegrating] = useState(false)
+  const [integrationError, setIntegrationError] = useState<string | null>(null)
 
   // ── Browser notification helper ──
   const sendNotification = useCallback((title: string, body: string) => {
@@ -269,6 +293,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   }, [])
 
   useEffect(() => { refreshProjects() }, [refreshProjects])
+
+  // Match reference model when subject changes (debounced)
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      if (!subject.trim()) {
+        setReferenceModel(null)
+        return
+      }
+      const match = await matchReferenceModel(subject)
+      setReferenceModel(match ?? null)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [subject])
 
   // Persist active project ID so returning users can restore (cleared only on explicit reset)
   useEffect(() => {
@@ -815,6 +852,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setBatchProgress({})
     setAiPrefilled(false)
     setMilestone(null)
+    setIntegratedAssemblyStlUrl(null)
+    setIntegratedAssemblyStepUrl(null)
+    setIntegrationError(null)
   }, [])
 
   // ── Load a saved project ──
@@ -873,6 +913,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setShowProjects(false)
       setMilestone(null)
       setProgressLines([])
+      setIntegratedAssemblyStlUrl(p.integratedAssemblyStlUrl ?? null)
+      setIntegratedAssemblyStepUrl(p.integratedAssemblyStepUrl ?? null)
     } catch {
       console.error("[CAD-LAB] Failed to load project")
     }
@@ -911,6 +953,31 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     await refreshProjects()
   }, [activeProjectId, refreshProjects])
 
+  // ── Generate integrated assembly ──
+  const handleGenerateIntegration = useCallback(async () => {
+    if (!activeProjectId) return
+    setIntegrationError(null)
+    setIsIntegrating(true)
+    try {
+      const res = await generateSystemAssembly(activeProjectId)
+      if (res.success) {
+        const saveRes = await saveCadLabIntegratedAssembly(activeProjectId, res.stlUrl, res.stepUrl)
+        if (!("error" in saveRes)) {
+          setIntegratedAssemblyStlUrl(res.stlUrl)
+          setIntegratedAssemblyStepUrl(res.stepUrl)
+          setLastSaved(new Date().toISOString())
+          refreshProjects()
+        } else {
+          setIntegrationError(saveRes.error)
+        }
+      } else {
+        setIntegrationError(res.error)
+      }
+    } finally {
+      setIsIntegrating(false)
+    }
+  }, [activeProjectId, refreshProjects])
+
   // ── Download helper ──
   const handleDownload = useCallback((filename: string, base64Data: string, isBinary: boolean = true) => {
     try {
@@ -938,6 +1005,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isLoadingProjects, isSaving, lastSaved,
     refreshProjects, handleLoadProject, handleDeleteProject, linkRfqToProject,
     sector,
+    referenceModel,
     subject, setSubject, modelId, setModelId,
     designBrief, setDesignBrief, assumptionNotes, setAssumptionNotes, designReadinessPct,
     isResearching, researchResult, editableReport, setEditableReport,
@@ -950,6 +1018,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isBatchRunning, batchProgress,
     progressLines, milestone, setMilestone,
     isAnyLoading, generatedModuleCount, riskCount, diagCompletedCount,
+    integratedAssemblyStlUrl, integratedAssemblyStepUrl, isIntegrating, integrationError, setIntegrationError, handleGenerateIntegration,
     handleDownload,
   }
 

@@ -31,6 +31,15 @@ import { createClient } from "@/lib/supabase/server"
 import { CAD_INSTRUCTIONS } from "@/lib/cad-instructions"
 import { fetchLibrarySummary, formatLibraryForPrompt, prepareCodeWithLibrary } from "@/actions/component-library"
 import type { Sector } from "@/types/foundry"
+import {
+  type CadLabDomain,
+  detectDomainFromProductDescription,
+  detectDomainFromResearchReport,
+  getResearchSynthesisPrompt,
+  getModuleDecompositionPrompt,
+  getDiagnosticsSystemPrompt,
+} from "@/lib/cad-lab/domain-prompts"
+import { runMaterialConsensus } from "@/lib/cad-lab/multi-model-consensus"
 
 // ─── Sector Lookup ───────────────────────────────────────────────────
 
@@ -374,55 +383,6 @@ function extractAssumptions(
   return Array.from(assumptionLines).slice(0, 12)
 }
 
-// ─── Research Synthesis Prompt ────────────────────────────────────────
-
-const RESEARCH_SYNTHESIS_PROMPT = `You are a senior mechanical engineer preparing a research brief for a 3D CAD modelling project. Your job is to synthesize raw research data into a precise, structured engineering specification.
-
-Your report will be used by a CAD pipeline to generate an accurate 3D model, so dimensional precision is critical. Every number must come from the source data — never invent dimensions.
-
-Output format (follow exactly):
-
-# Engineering Research Report: {Product Name}
-
-## Executive Summary
-One paragraph: what this product is, its primary function, and its defining physical characteristics.
-
-## Overall Dimensions
-- Folded: W × D × H mm (if applicable)
-- Unfolded/Deployed: W × D × H mm
-- Weight: X g
-
-## Primary Structure
-Describe the main body/frame with precise dimensions. Include wall thickness, material if known.
-
-## Components
-For each major component, list:
-- **Name**: exact dimensions (W × D × H mm or Ø × H mm)
-- Position relative to body center
-- Mounting/attachment method if known
-- Quantity
-
-## Critical Constraints
-- Key critical dimension (motor-to-motor diagonal, tube inner diameter, etc.): X mm
-- Clearance requirements: X mm
-- Any symmetry axes or alignment requirements
-
-## Material & Manufacturing Notes
-Primary materials, wall thicknesses, manufacturing method if known.
-
-## Dimensional Confidence
-Rate each major dimension:
-- ✅ Confirmed (from official specs or multiple sources)
-- ⚠️ Approximate (single source or estimated)
-- ❓ Unknown (not found in research)
-
-RULES:
-- Use millimetres for all dimensions
-- Round to nearest 0.5mm for sub-mm precision
-- If two sources disagree, state both and note the discrepancy
-- Never invent a dimension — mark it as Unknown
-- Include source attribution for key numbers`
-
 // ─── Step 1: Research (exported) ─────────────────────────────────────
 
 function formatDesignBriefForPrompt(
@@ -525,10 +485,12 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
 
     const rawContext = rawDataSections.join("\n\n")
 
-    // 3. Send to Claude for synthesis
-    console.info("[THE-FORGE] Step 1: Synthesizing report with Claude...")
+    // 3. Domain-specific synthesis: detect domain from description, then use domain prompt
+    const domain = await detectDomainFromProductDescription(description)
+    const synthesisPrompt = getResearchSynthesisPrompt(domain)
+    console.info("[THE-FORGE] Step 1: Synthesizing report with Claude (domain: %s)...", domain)
     const claudeResult = await callClaude(
-      RESEARCH_SYNTHESIS_PROMPT,
+      synthesisPrompt,
       `Product to research: ${description}\n\n${rawContext}`,
     )
 
@@ -988,43 +950,6 @@ If the research report or interface definition contains any unresolved questions
 
 // ─── Module Decomposition (exported) ─────────────────────────────────
 
-/** Prompt for decomposing a product into modules */
-const MODULE_DECOMPOSITION_PROMPT = `You are a senior systems engineer decomposing a product into physical sub-assemblies (modules) for engineering analysis and 3D CAD modelling.
-
-Given a product description and research report, break the product down into 4-8 distinct physical modules. Each module represents a sub-assembly that could be:
-- Designed independently
-- Procured from different suppliers
-- Tested separately
-- Modelled as its own 3D CAD model
-
-Output STRICTLY as a JSON array with this exact structure for each module:
-
-[
-  {
-    "id": "lowercase_no_spaces",
-    "name": "Human Readable Name",
-    "purpose": "One sentence: what this module does",
-    "inputs": ["Input stream or signal 1", "Input 2"],
-    "outputs": ["Output stream or signal 1"],
-    "keyParts": ["Part 1 with spec", "Part 2 with spec", "Part 3"],
-    "leadWeeks": 6,
-    "description": "1-2 paragraph technical description of what this module physically is, its operating principle, and key material choices.",
-    "whyItMatters": "Why this module is critical to the overall system.",
-    "failureModes": ["Failure mode 1", "Failure mode 2"],
-    "unknowns": ["Open question 1", "Open question 2"]
-  }
-]
-
-RULES:
-- Generate 4-8 modules (more for complex products, fewer for simple ones)
-- Each module MUST have at least 3 keyParts
-- leadWeeks should be realistic (1-2 for off-the-shelf, 4-8 for custom, 12+ for specialised)
-- Every module must have at least 1 input and 1 output
-- Modules should cover the ENTIRE product — no gaps
-- Use dimensions from the research report — do not invent new ones
-- If the research report mentions sub-components, those are good module candidates
-- Output ONLY the JSON array — no markdown, no explanation`
-
 /**
  * Decomposes a product into physical modules based on the research report.
  *
@@ -1041,6 +966,7 @@ export async function decomposeIntoModules(
   description: string,
   researchReport: string,
   modelId: ClaudeModelId = "claude-sonnet-4-6",
+  domainHint?: CadLabDomain,
 ): Promise<CadLabDecompositionResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -1054,7 +980,9 @@ export async function decomposeIntoModules(
   const start = Date.now()
 
   try {
-    console.info("[THE-FORGE] Decomposing product into modules...")
+    const domain = domainHint ?? (await detectDomainFromResearchReport(researchReport))
+    console.info("[THE-FORGE] Decomposing product into modules (domain: %s)...", domain)
+    const modulePrompt = getModuleDecompositionPrompt(domain)
 
     const userPrompt = `Product: ${description}
 
@@ -1064,7 +992,7 @@ ${researchReport}
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
     const { text, tokensIn, tokensOut } = await callClaude(
-      MODULE_DECOMPOSITION_PROMPT,
+      modulePrompt,
       userPrompt,
       modelId,
       8192,
@@ -1167,6 +1095,8 @@ export async function prefillDiagnostics(
   modules: CadLabModule[],
   researchReport: string,
   modelId: ClaudeModelId = "claude-sonnet-4-6",
+  domainHint?: CadLabDomain,
+  options?: { useConsensusForMaterial?: boolean },
 ): Promise<{ success: boolean; answers: Record<string, Record<string, string>>; error?: string }> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -1178,33 +1108,13 @@ export async function prefillDiagnostics(
   if (rateLimitError) return { success: false, answers: {}, error: rateLimitError }
 
   try {
+    const domain = domainHint ?? (await detectDomainFromResearchReport(researchReport))
+    console.info("[THE-FORGE] Pre-filling diagnostics (domain: %s)...", domain)
+    const systemPrompt = getDiagnosticsSystemPrompt(domain)
+
     const moduleSummaries = modules.map((m) =>
       `Module "${m.name}" (${m.id}): ${m.purpose}. Key parts: ${m.keyParts.join(", ")}. Description: ${m.description.slice(0, 200)}`
     ).join("\n")
-
-    const systemPrompt = `You are an expert manufacturing engineer. Given a research report and module list, recommend diagnostic answers for each module.
-
-For each module, output exactly these 6 fields:
-- mfg_process: One of: FDM 3D Print, SLA/Resin Print, SLS/Powder Print, CNC Machining, Sheet Metal, Injection Molding, Casting, Manual/Assembly, Other
-- material: One of: PLA/PETG, ABS/Nylon, Aluminium, Steel/Iron, Stainless Steel, Copper/Brass, Titanium, Carbon Fiber Composite, CFRP/GFRP, Wood/Plywood, Silicone/Rubber, Glass/Ceramic, PCB/Electronic, Other
-- tolerance: One of: ±1mm (hobby), ±0.5mm (standard), ±0.1mm (precision), ±0.01mm (ultra-precision)
-- surface_finish: One of: As-printed (rough), Sanded/Deburred, Painted/Coated, Anodised/Plated, Polished (mirror), Textured (mold)
-- batch_size: One of: 1-10 (prototyping), 10-100 (small batch), 100-1000 (pilot), 1000-10000 (production), 10000+ (mass production)
-- environment: One of: Indoor (office/home), Indoor (industrial), Outdoor (sheltered), Outdoor (exposed), High-temp (>80°C), Wet/Submerged, Food-safe, Medical/Cleanroom
-
-Return a JSON object mapping module IDs to their answers. Example:
-{
-  "motor_assembly": {
-    "mfg_process": "CNC Machining",
-    "material": "Aluminium",
-    "tolerance": "±0.1mm (precision)",
-    "surface_finish": "Anodised/Plated",
-    "batch_size": "10-100 (small batch)",
-    "environment": "Indoor (industrial)"
-  }
-}
-
-Only output valid JSON. No explanation.`
 
     const userPrompt = `Research Report:
 ${researchReport.slice(0, 3000)}
@@ -1235,6 +1145,24 @@ Recommend diagnostic answers for each module. Output JSON only.`
       for (const [qId, answer] of Object.entries(answers)) {
         if (validQuestionIds.has(qId) && typeof answer === "string") {
           cleanAnswers[moduleId][qId] = answer
+        }
+      }
+    }
+
+    if (options?.useConsensusForMaterial) {
+      const materialSystem = `You recommend exactly one material from this list for a manufacturing module: PLA/PETG, ABS/Nylon, Aluminium, Steel/Iron, Stainless Steel, Copper/Brass, Titanium, Carbon Fiber Composite, CFRP/GFRP, Wood/Plywood, Silicone/Rubber, Glass/Ceramic, PCB/Electronic, Other. Reply with only the single choice, nothing else.`
+      for (const mod of modules) {
+        if (!cleanAnswers[mod.id]?.material) continue
+        try {
+          const consensusUser = `Research excerpt:\n${researchReport.slice(0, 1500)}\n\nModule: ${mod.name} (${mod.id}). Purpose: ${mod.purpose}. Key parts: ${mod.keyParts.join(", ")}. Recommend the single best material.`
+          const result = await runMaterialConsensus(materialSystem, consensusUser)
+          const material = result.consensus ?? result.alternatives[0]?.output ?? cleanAnswers[mod.id].material
+          cleanAnswers[mod.id].material = material
+          if (!result.agreed) {
+            console.info(`[THE-FORGE] Material consensus disagreed for ${mod.id}, using: ${material}`)
+          }
+        } catch (err) {
+          console.warn("[THE-FORGE] Material consensus failed for module", mod.id, err instanceof Error ? err.message : err)
         }
       }
     }
@@ -1299,4 +1227,35 @@ export async function generateCadLabModelSmart(
 
   // ── Fallback to existing raw CadQuery pipeline ──
   return generateCadLabModel(description, researchReport, interfaceDefinition, modelId)
+}
+
+// ─── System Assembly (Integration Step) ───────────────────────────────
+
+/**
+ * Generates a combined system assembly from all generated module STEP files.
+ *
+ * @description When all modules have CAD, this step acts as a "systems architect":
+ * combines module STEPs into a single assembly (e.g. via CadQuery import/position).
+ * Currently a stub; full implementation will call Modal with an assembly script.
+ *
+ * @param projectId - CAD Lab project ID (must have all modules generated)
+ * @returns Assembly STL/STEP URLs on success, or error
+ *
+ * @security Requires authenticated user; project must belong to user's foundry.
+ */
+export async function generateSystemAssembly(
+  projectId: string,
+): Promise<
+  | { success: true; stlUrl: string; stepUrl: string }
+  | { success: false; error: string }
+> {
+  // Stub: assembly generation not yet implemented.
+  // TODO: Load project and modules, fetch each module STEP URL, generate
+  // a CadQuery script that imports and positions them, run on Modal, upload result.
+  console.info("[THE-FORGE] generateSystemAssembly called (stub)", { projectId })
+  return {
+    success: false,
+    error:
+      "Assembly generation is not yet implemented. It will combine all module STEP files into a single system assembly.",
+  }
 }

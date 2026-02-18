@@ -9,10 +9,12 @@
  */
 
 import Image from "next/image"
-import { Search, ArrowRight, Loader2, RotateCcw } from "lucide-react"
+import { Search, ArrowRight, Loader2, RotateCcw, Box } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ReferenceModelViewer } from "./reference-model-viewer"
+import type { ReferenceModel } from "@/actions/reference-models"
 
 // ─── Quick-start templates ───────────────────────────────────────────
 
@@ -32,6 +34,8 @@ interface HeroSectionProps {
   subject: string
   /** Callback to update the subject input */
   setSubject: (value: string) => void
+  /** Matched reference model for instant visual (from matchReferenceModel) */
+  referenceModel?: ReferenceModel | null
   /** Whether any operation is currently loading */
   isAnyLoading: boolean
   /** Whether research is currently in progress */
@@ -51,6 +55,7 @@ interface HeroSectionProps {
 export function HeroSection({
   subject,
   setSubject,
+  referenceModel,
   isAnyLoading,
   isResearching,
   hasResearch,
@@ -117,6 +122,22 @@ export function HeroSection({
             )}
           </Button>
         </div>
+        {referenceModel && !hasResearch && (
+          <>
+            <div className="flex items-center gap-2 pt-2 border-t border-border">
+              <Box className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-foreground">Reference: {referenceModel.name}</span>
+                {referenceModel.description && (
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{referenceModel.description}</p>
+                )}
+              </div>
+            </div>
+            <div className="pt-2">
+              <ReferenceModelViewer stlUrl={referenceModel.stlUrl} minHeight={220} />
+            </div>
+          </>
+        )}
       </div>
 
       {/* Quick-start templates */}

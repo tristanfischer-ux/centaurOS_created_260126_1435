@@ -37,6 +37,8 @@ import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
 import { DesignIntakeForm } from "./components/design-intake-form"
 import { ResearchSection } from "./components/research-section"
+import { SystemVisualOverview } from "./components/system-visual-overview"
+import { ProcessFlowDiagram } from "./components/process-flow-diagram"
 
 // ─── Pipeline preview shown during research wait ─────────────────────
 
@@ -54,6 +56,7 @@ export default function CadLabResearchPage(): React.ReactNode {
   const router = useRouter()
   const {
     subject, setSubject,
+    referenceModel,
     modelId, setModelId,
     designBrief, setDesignBrief,
     assumptionNotes, setAssumptionNotes,
@@ -113,6 +116,7 @@ export default function CadLabResearchPage(): React.ReactNode {
         <HeroSection
           subject={subject}
           setSubject={setSubject}
+          referenceModel={referenceModel}
           isAnyLoading={isAnyLoading}
           isResearching={isResearching}
           hasResearch={hasResearch}
@@ -166,7 +170,15 @@ export default function CadLabResearchPage(): React.ReactNode {
         />
       )}
 
-      {/* ── Research results (report + sources) ── */}
+      {/* ── System overview: central 3D + module cards (visual-first) ── */}
+      {hasResearch && (
+        <div className="space-y-4">
+          <h2 className="text-base font-semibold text-foreground">System overview</h2>
+          <SystemVisualOverview referenceModel={referenceModel ?? null} modules={modules} />
+        </div>
+      )}
+
+      {/* ── Narrated description (research report) ── */}
       <ResearchSection
         hasResearch={hasResearch}
         isAnyLoading={isAnyLoading}
@@ -177,6 +189,11 @@ export default function CadLabResearchPage(): React.ReactNode {
         setShowSources={setShowSources}
         handleReset={handleReset}
       />
+
+      {/* ── Process flow: how modules integrate ── */}
+      {hasResearch && modules.length > 0 && (
+        <ProcessFlowDiagram modules={modules} />
+      )}
 
       {/* ── Map Sub-Assemblies: manual trigger after research ── */}
       {hasResearch && modules.length === 0 && !isDecomposing && !isResearching && (

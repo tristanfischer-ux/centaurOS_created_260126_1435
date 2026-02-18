@@ -53,6 +53,8 @@ import type { CadLabResult, CadLabModule } from "@/lib/cad-lab-types"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { useCadLab } from "../cad-lab-context"
 import { Metric, SvgView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
+import { ModuleCarousel } from "../components/module-carousel"
+import { IntegrationView } from "../components/integration-view"
 
 // ─── View Tab Type ───────────────────────────────────────────────────
 
@@ -65,6 +67,7 @@ export default function CadLabBuildPage(): React.ReactNode {
   const {
     hasResearch, isAnyLoading,
     subject, editableReport,
+    referenceModel,
     modules, expandedModuleId, setExpandedModuleId,
     activeModuleId,
     isDecomposing, handleDecompose,
@@ -72,6 +75,11 @@ export default function CadLabBuildPage(): React.ReactNode {
     isBatchRunning, batchProgress,
     generatedModuleCount,
     diagCompletedCount,
+    integratedAssemblyStlUrl,
+    isIntegrating,
+    integrationError,
+    setIntegrationError,
+    handleGenerateIntegration,
     handleDownload,
   } = useCadLab()
 
@@ -132,6 +140,19 @@ export default function CadLabBuildPage(): React.ReactNode {
 
   return (
     <div className="space-y-6">
+      {/* ── Integration: combined system assembly (when all modules generated) ── */}
+      {modules.length > 0 && generatedModuleCount === modules.length && (
+        <IntegrationView
+          allModulesGenerated
+          referenceModel={referenceModel ?? null}
+          integratedAssemblyStlUrl={integratedAssemblyStlUrl}
+          isIntegrating={isIntegrating}
+          onGenerateIntegration={handleGenerateIntegration}
+          integrationError={integrationError}
+          onClearError={() => setIntegrationError(null)}
+        />
+      )}
+
       {/* ── All modules generated celebration ── */}
       {generatedModuleCount > 0 && generatedModuleCount === modules.length && (
         <div className="rounded-xl border border-status-success/30 bg-gradient-to-r from-status-success-light/20 via-background to-status-info-light/10 p-5">
@@ -182,6 +203,19 @@ export default function CadLabBuildPage(): React.ReactNode {
           subject={subject}
           modules={modules}
           onModuleClick={(moduleId) => setExpandedModuleId(expandedModuleId === moduleId ? null : moduleId)}
+        />
+      )}
+
+      {/* ── Progressive module carousel: one module at a time, read while previous builds ── */}
+      {modules.length > 0 && (
+        <ModuleCarousel
+          modules={modules}
+          batchProgress={batchProgress}
+          isBatchRunning={isBatchRunning}
+          activeModuleId={activeModuleId}
+          onGenerate={handleGenerateSingleModule}
+          onViewResult={(moduleId) => setExpandedModuleId(moduleId)}
+          autoAdvanceOnGenerate
         />
       )}
 
