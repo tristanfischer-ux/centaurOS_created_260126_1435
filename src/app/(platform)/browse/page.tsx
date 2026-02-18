@@ -108,6 +108,7 @@ export default function BrowsePage(): React.ReactElement {
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
+  const navigationIdRef = useRef(0)
 
   const { openPanel, isOpen } = useAdvisorPanel()
   const { setPageContext, clearPageContext } = useBrowseContext()
@@ -151,6 +152,9 @@ export default function BrowsePage(): React.ReactElement {
     const url = normalizeUrl(rawUrl)
     if (!url) return
 
+    // Increment navigation ID so any in-flight request becomes stale
+    const thisNavId = ++navigationIdRef.current
+
     setCurrentUrl(url)
     setUrlInput(url)
     setViewMode("loading")
@@ -159,6 +163,9 @@ export default function BrowsePage(): React.ReactElement {
     setIsEmbeddable(false)
 
     const result = await fetchWebPage(url)
+
+    // Discard result if user navigated away while we were fetching
+    if (navigationIdRef.current !== thisNavId) return
 
     if (!result.success || !result.data) {
       setViewMode("error")
@@ -169,14 +176,12 @@ export default function BrowsePage(): React.ReactElement {
     setPageData(result.data)
     setIsEmbeddable(result.data.embeddable)
 
-    // Show iframe for embeddable sites, reader view for everything else
     if (result.data.embeddable) {
       setViewMode("iframe")
     } else {
       setViewMode("reader")
     }
 
-    // Add to history
     setHistory((prev) => {
       const newEntry: HistoryEntry = {
         url,
