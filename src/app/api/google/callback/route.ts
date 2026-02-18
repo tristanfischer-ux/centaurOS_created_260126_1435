@@ -136,16 +136,25 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             })
         }
 
-        // Scopes: Google sometimes omits "scope" in the token response (e.g. re-auth). Use state or existing, never [].
-        let scopesToSave: string[] = tokens.scope?.trim() ? tokens.scope.trim().split(/\s+/) : []
-        if (scopesToSave.length === 0) {
-            scopesToSave = stateData.requestedScopes ?? (await getGoogleToken(user.id, stateData.foundryId))?.scopes ?? []
-            if (scopesToSave.length > 0) {
-                console.info('[GoogleCallback] Token response had no scope; using requested/existing scopes:', {
-                    scopeCount: scopesToSave.length,
-                    source: stateData.requestedScopes?.length ? 'state' : 'existing',
-                })
-            }
+        // Scopes: Merge token response with state/existing so we never overwrite with a subset.
+        // Google often returns only newly granted scopes (e.g. drive.readonly); we must keep openid, email, profile, etc.
+        const existing = await getGoogleToken(user.id, stateData.foundryId)
+        const base =
+            stateData.requestedScopes && stateData.requestedScopes.length > 0
+                ? stateData.requestedScopes
+                : (existing?.scopes ?? [])
+        const tokenScopes = tokens.scope?.trim() ? tokens.scope.trim().split(/\s+/) : []
+        const scopesToSave =
+            tokenScopes.length > 0 ? [...new Set([...base, ...tokenScopes])] : base
+
+        if (scopesToSave.length > 0) {
+            const baseSource = stateData.requestedScopes?.length ? 'state' : 'existing'
+            console.info('[GoogleCallback] Scopes to save:', {
+                tokenScopeCount: tokenScopes.length,
+                baseCount: base.length,
+                finalScopeCount: scopesToSave.length,
+                baseSource,
+            })
         }
 
         // Store the token
