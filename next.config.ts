@@ -1,23 +1,13 @@
 import type { NextConfig } from "next";
 
 import { withSentryConfig } from "@sentry/nextjs";
-import withPWAInit from "next-pwa";
 import withBundleAnalyzer from "@next/bundle-analyzer";
-
-const withPWA = withPWAInit({
-  dest: "public",
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === "development",
-});
 
 const analyzeBundles = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
 const nextConfig: NextConfig = {
-  // Turbopack config for dev mode
-  // Production builds use --webpack (required by next-pwa which injects webpack plugins)
   turbopack: {},
   
   // Type checking runs separately via `npm run typecheck` in CI
@@ -137,8 +127,8 @@ const nextConfig: NextConfig = {
 };
 
 // Wrap with Sentry for error tracking and source maps
-// Chain: nextConfig -> PWA -> Bundle Analyzer -> Sentry
-export default withSentryConfig(analyzeBundles(withPWA(nextConfig)), {
+// Chain: nextConfig -> Bundle Analyzer -> Sentry
+export default withSentryConfig(analyzeBundles(nextConfig), {
   // Sentry organization and project
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,

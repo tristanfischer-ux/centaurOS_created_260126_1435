@@ -16,6 +16,7 @@ public/workbox-*.js.map
 __pycache__/
 drone_output/
 experiments/
+data/step-library-staging/
 
 # Playwright
 /playwright-report/

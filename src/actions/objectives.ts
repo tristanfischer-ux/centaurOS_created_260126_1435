@@ -6,6 +6,7 @@ import { Database } from '@/types/database.types'
 import { createObjectiveSchema, updateObjectiveSchema, validate } from '@/lib/validations'
 import { withAuth } from '@/lib/server-action-utils'
 import { withRetry } from '@/lib/retry'
+import { scheduleTaskDates } from '@/lib/schedule-task-dates'
 
 
 
@@ -168,12 +169,17 @@ export async function createObjective(formData: FormData) {
                     return { error: 'One or more pack items are missing required fields (title)' }
                 }
 
-                // Create task objects from pack items
-                const now = new Date()
-                const nextWeek = new Date(now)
-                nextWeek.setDate(now.getDate() + 7)
+                // Create task objects from pack items with staggered timeline dates
+                const scheduleInputs = packItems.map(item => {
+                    const hours = 'estimated_hours' in item ? (item as { estimated_hours?: number | null }).estimated_hours : undefined
+                    return {
+                        title: item.title?.trim() ?? '',
+                        estimatedDays: hours != null && hours > 0 ? Math.max(1, Math.ceil(hours / 8)) : undefined,
+                    }
+                })
+                const scheduledDates = scheduleTaskDates(scheduleInputs)
 
-                const packTasks = packItems.map(item => {
+                const packTasks = packItems.map((item, index) => {
                     // Validate title (should already be validated above, but double-check)
                     if (!item.title || item.title.trim().length === 0) {
                         throw new Error(`Pack item ${item.id} has invalid title`)
@@ -185,6 +191,7 @@ export async function createObjective(formData: FormData) {
                         ? selectedAssignee
                         : user.id
 
+                    const dates = scheduledDates[index]
                     return {
                         title: item.title.trim(),
                         description: item.description?.trim() || '',
@@ -193,8 +200,8 @@ export async function createObjective(formData: FormData) {
                         foundry_id: foundryId,
                         status: 'Pending' as const,
                         assignee_id: assigneeId,
-                        start_date: now.toISOString(),
-                        end_date: nextWeek.toISOString()
+                        start_date: dates.start_date,
+                        end_date: dates.end_date,
                     }
                 })
 
@@ -223,17 +230,28 @@ export async function createObjective(formData: FormData) {
                 }
             }
 
+            const aiScheduleInputs = aiTasks.map((task: { title: string; estimatedDays?: number }) => ({
+                title: task.title?.trim() ?? '',
+                estimatedDays: task.estimatedDays,
+            }))
+            const aiScheduledDates = scheduleTaskDates(aiScheduleInputs)
+
             tasksToInsert = [
                 ...tasksToInsert,
-                ...aiTasks.map(task => ({
-                    title: task.title.trim(),
-                    description: typeof task.description === 'string' ? task.description.trim() : '',
-                    objective_id: objective.id,
-                    creator_id: user.id,
-                    foundry_id: foundryId,
-                    status: 'Pending' as const,
-                    assignee_id: user.id
-                }))
+                ...aiTasks.map((task: { title: string; description?: string }, index: number) => {
+                    const dates = aiScheduledDates[index]
+                    return {
+                        title: task.title.trim(),
+                        description: typeof task.description === 'string' ? task.description.trim() : '',
+                        objective_id: objective.id,
+                        creator_id: user.id,
+                        foundry_id: foundryId,
+                        status: 'Pending' as const,
+                        assignee_id: user.id,
+                        start_date: dates.start_date,
+                        end_date: dates.end_date,
+                    }
+                }),
             ]
         }
 
@@ -244,6 +262,21 @@ export async function createObjective(formData: FormData) {
                     if (result.error) throw result.error
                     return result
                 })
+                const withDates = tasksToInsert.filter(
+                    (t): t is typeof t & { start_date: string; end_date: string } =>
+                        t.start_date != null && t.end_date != null
+                )
+                if (withDates.length > 0) {
+                    const starts = withDates.map((t) => new Date(t.start_date).getTime())
+                    const ends = withDates.map((t) => new Date(t.end_date).getTime())
+                    await supabase
+                        .from('objectives')
+                        .update({
+                            start_date: new Date(Math.min(...starts)).toISOString(),
+                            end_date: new Date(Math.max(...ends)).toISOString(),
+                        })
+                        .eq('id', objective.id)
+                }
             } catch (taskError) {
                 console.error('Error creating tasks:', taskError)
                 // Delete the objective to prevent partial creation
@@ -760,26 +793,31 @@ export async function createObjectiveFromSubsystem(input: {
                 return { error: objError?.message || 'Failed to create objective' }
             }
 
-            // 2. Create tasks from the selected pack tasks
-            const tasksToInsert = selectedTasks.map((task) => {
-                // Assign Executive tasks to creator, leave Apprentice tasks
-                // unassigned for manual team assignment
+            // 2. Create tasks from the selected pack tasks with staggered timeline dates
+            const scheduleInputs = selectedTasks.map((task) => ({
+                title: task.title,
+                estimatedDays: task.estimated_hours
+                    ? Math.max(1, Math.ceil(task.estimated_hours / 8))
+                    : undefined,
+            }))
+            const scheduledDates = scheduleTaskDates(scheduleInputs)
+
+            const tasksToInsert = selectedTasks.map((task, index) => {
                 let assignee_id: string | null = null
                 if (task.role === 'Executive') {
                     assignee_id = user.id
                 }
-                // Apprentice and other tasks left unassigned for team assignment
 
-                // Add marketplace context to description if it's a marketplace task
                 let description = task.description
                 if (task.is_marketplace_task && task.marketplace_filter) {
-                    const filterType = task.marketplace_filter.type === 'advice' 
-                        ? 'experts and advisors' 
+                    const filterType = task.marketplace_filter.type === 'advice'
+                        ? 'experts and advisors'
                         : 'suppliers and service providers'
                     const categories = task.marketplace_filter.categories?.join(', ') || 'relevant categories'
                     description += `\n\n---\n**Marketplace Discovery Task**\nSearch the ForgeOS marketplace for ${filterType} in: ${categories}`
                 }
 
+                const dates = scheduledDates[index]
                 return {
                     title: task.title,
                     description,
@@ -788,8 +826,8 @@ export async function createObjectiveFromSubsystem(input: {
                     assignee_id,
                     foundry_id: foundryId,
                     status: 'Pending' as const,
-                    start_date: new Date().toISOString(),
-                    end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // +7 days
+                    start_date: dates.start_date,
+                    end_date: dates.end_date,
                 }
             })
 
@@ -800,10 +838,19 @@ export async function createObjectiveFromSubsystem(input: {
 
                 if (tasksError) {
                     console.error('[CreateSubsystemObjective] Failed to create tasks:', tasksError)
-                    // Clean up the objective if task creation fails
                     await supabase.from('objectives').delete().eq('id', objective.id)
                     return { error: `Failed to create tasks: ${tasksError.message}` }
                 }
+
+                const starts = tasksToInsert.map((t) => new Date(t.start_date).getTime())
+                const ends = tasksToInsert.map((t) => new Date(t.end_date).getTime())
+                await supabase
+                    .from('objectives')
+                    .update({
+                        start_date: new Date(Math.min(...starts)).toISOString(),
+                        end_date: new Date(Math.max(...ends)).toISOString(),
+                    })
+                    .eq('id', objective.id)
             }
 
             // AUDIT: Log the objective creation

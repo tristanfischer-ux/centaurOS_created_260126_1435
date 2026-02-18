@@ -229,3 +229,47 @@ export interface CadLabResearchResult {
   /** Explicit assumptions provided by the user */
   assumptionNotes?: string
 }
+
+// ─── Mashup Types ─────────────────────────────────────────────────────
+
+/** One source STEP for a mashup (name + optional metadata for planning) */
+export interface MashupSourceInput {
+  name: string
+  step_url?: string
+  step_b64?: string
+  /** Optional: bounding box in mm for AI planning */
+  bounding_box?: { xLen: number; yLen: number; zLen: number }
+  /** Optional: human-readable description (e.g. from step_templates) */
+  description?: string
+}
+
+/** Structured plan returned by Claude for mashup code generation */
+export interface MashupPlan {
+  strategy: "embed" | "attach" | "morph" | "stack" | "integrate" | "hybrid_shell"
+  steps: Array<{
+    source: string
+    action: "keep" | "cut" | "position" | "orient" | "union" | "subtract" | "add_adapter"
+    detail?: string
+    position_mm?: [number, number, number]
+    rotation_deg?: [number, number, number]
+  }>
+  adapter_geometry?: string
+  notes?: string
+}
+
+/** Result of generateMashup server action */
+export interface MashupResult {
+  success: boolean
+  error?: string
+  mashup_plan?: MashupPlan
+  mashup_code?: string
+  step_url?: string
+  stl_url?: string
+  step_b64?: string
+  stl_b64?: string
+  svg_iso?: string
+  analysis?: unknown
+  elapsedMs?: number
+  tokensIn?: number
+  tokensOut?: number
+}

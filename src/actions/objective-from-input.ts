@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { Database } from '@/types/database.types'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { withRetry } from '@/lib/retry'
+import { scheduleTaskDates, ensureNotInPast } from '@/lib/schedule-task-dates'
 
 type RiskLevel = Database['public']['Enums']['risk_level']
 
@@ -111,16 +112,38 @@ export async function createObjectiveFromInput(input: ObjectiveInput) {
         aiAgentId = aiAgents?.[0]?.id || null
     }
 
+    // Resolve task dates: use provided dates (clamped to not be in past) or schedule via waves
+    const allHaveDates = input.tasks.every((t) => t.start_date && t.end_date)
+    let resolvedDates: Array<{ start_date: string; end_date: string }>
+
+    if (allHaveDates) {
+        resolvedDates = input.tasks.map((t) => {
+            const start = ensureNotInPast(new Date(t.start_date!))
+            let end = new Date(t.end_date!)
+            if (end < start) {
+                end = new Date(start)
+                end.setDate(end.getDate() + 1)
+            }
+            return {
+                start_date: start.toISOString(),
+                end_date: end.toISOString(),
+            }
+        })
+    } else {
+        const scheduleInputs = input.tasks.map((t) => ({ title: t.title?.trim() ?? '' }))
+        resolvedDates = scheduleTaskDates(scheduleInputs)
+    }
+
     // Create tasks
-    const tasksToInsert: Database['public']['Tables']['tasks']['Insert'][] = input.tasks.map(task => {
-        // Determine assignee
-        let assigneeId = user.id // Default to creator
+    const tasksToInsert: Database['public']['Tables']['tasks']['Insert'][] = input.tasks.map((task, index) => {
+        let assigneeId = user.id
         if (task.assignee_id === 'ai_agent' && aiAgentId) {
             assigneeId = aiAgentId
         } else if (task.assignee_id && task.assignee_id !== 'ai_agent') {
             assigneeId = task.assignee_id
         }
 
+        const dates = resolvedDates[index]
         return {
             title: task.title.trim(),
             description: task.description?.trim() || null,
@@ -129,10 +152,10 @@ export async function createObjectiveFromInput(input: ObjectiveInput) {
             assignee_id: assigneeId,
             foundry_id,
             status: 'Pending' as const,
-            start_date: task.start_date || null,
-            end_date: task.end_date || null,
+            start_date: dates.start_date,
+            end_date: dates.end_date,
             risk_level: task.risk_level || 'Medium',
-            client_visible: false
+            client_visible: false,
         }
     })
 
@@ -144,10 +167,19 @@ export async function createObjectiveFromInput(input: ObjectiveInput) {
         })
     } catch (taskError) {
         console.error('Error creating tasks:', taskError)
-        // Rollback: delete the objective
         await supabase.from('objectives').delete().eq('id', objective.id)
         return { error: taskError instanceof Error ? taskError.message : 'Failed to create tasks' }
     }
+
+    const starts = resolvedDates.map((d) => new Date(d.start_date).getTime())
+    const ends = resolvedDates.map((d) => new Date(d.end_date).getTime())
+    await supabase
+        .from('objectives')
+        .update({
+            start_date: new Date(Math.min(...starts)).toISOString(),
+            end_date: new Date(Math.max(...ends)).toISOString(),
+        })
+        .eq('id', objective.id)
 
     // Insert into task_assignees for each task
     // First, fetch created tasks to get their IDs

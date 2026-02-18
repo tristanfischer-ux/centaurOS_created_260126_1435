@@ -35,8 +35,8 @@ STAGING_DIR = Path(__file__).parent.parent / "data" / "step-library-staging"
 BUCKET = "xray-images"
 STORAGE_PREFIX = "cad-lab/templates"
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB Supabase limit
-MAX_TEMPLATES_PER_CATEGORY = 15   # Small batch for proof of concept
-CONCURRENT_UPLOADS = 1            # Sequential to avoid rate limits
+MAX_TEMPLATES_PER_CATEGORY = 9999   # Small batch for proof of concept
+CONCURRENT_UPLOADS = 2            # Sequential to avoid rate limits
 UPLOAD_DELAY = 0.3                # Seconds between uploads
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")

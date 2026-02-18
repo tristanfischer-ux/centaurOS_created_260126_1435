@@ -57,6 +57,28 @@ def get_convert_url() -> str:
     return f"{MODAL_BASE_URL}/convert-step"
 
 
+# Consecutive failure threshold — abort early if the endpoint is unreachable
+CONSECUTIVE_FAIL_LIMIT = 5
+
+
+def preflight_check() -> bool:
+    """Verify the Modal endpoint is reachable before processing the full batch."""
+    endpoint = get_convert_url()
+    try:
+        req = urllib.request.Request(endpoint, method="OPTIONS")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status < 500
+    except urllib.error.HTTPError as e:
+        # 405 Method Not Allowed is fine — means the route exists
+        if e.code == 405:
+            return True
+        print(f"  WARN: Preflight returned HTTP {e.code}")
+        return e.code < 500
+    except Exception as e:
+        print(f"  ERROR: Preflight failed — endpoint unreachable: {e}")
+        return False
+
+
 def download_step(url: str) -> bytes | None:
     """Download a STEP file from a public Supabase Storage URL."""
     try:
@@ -138,6 +160,14 @@ def main():
     print(f"  Endpoint:  {get_convert_url()[:60]}...")
     print(f"  Tolerance: {args.tolerance} mm")
 
+    print("  Preflight check...", end=" ", flush=True)
+    if not preflight_check():
+        print("FAILED")
+        print("  Aborting — Modal endpoint is not reachable.")
+        print("  Verify MODAL_CAD_ENDPOINT_URL and that the Modal app is deployed.")
+        sys.exit(1)
+    print("OK")
+
     query = (
         supabase_client.table("step_templates")
         .select("id, slug, category, step_url, source_path")
@@ -162,6 +192,7 @@ def main():
     start = time.time()
     converted = 0
     failed = 0
+    consecutive_failures = 0
 
     for i, t in enumerate(templates):
         slug = t["slug"]
@@ -169,6 +200,10 @@ def main():
         step_bytes = download_step(t["step_url"])
         if not step_bytes:
             failed += 1
+            consecutive_failures += 1
+            if consecutive_failures >= CONSECUTIVE_FAIL_LIMIT:
+                print(f"\n  CIRCUIT BREAKER: {CONSECUTIVE_FAIL_LIMIT} consecutive failures — aborting.")
+                break
             continue
 
         step_b64 = base64.b64encode(step_bytes).decode("utf-8")
@@ -176,8 +211,14 @@ def main():
         stl_b64 = convert_step_to_stl(step_b64, tolerance=args.tolerance)
         if not stl_b64:
             failed += 1
+            consecutive_failures += 1
             print(f"  FAIL: {slug}")
+            if consecutive_failures >= CONSECUTIVE_FAIL_LIMIT:
+                print(f"\n  CIRCUIT BREAKER: {CONSECUTIVE_FAIL_LIMIT} consecutive failures — aborting.")
+                break
             continue
+
+        consecutive_failures = 0
 
         stl_url = upload_stl(supabase_client, t, stl_b64)
         if not stl_url:

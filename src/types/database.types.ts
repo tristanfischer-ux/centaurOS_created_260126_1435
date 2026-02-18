@@ -3925,6 +3925,9 @@ export type Database = {
           name: string
           param_schema: Json
           physical_properties: Json
+          preview_step_url: string | null
+          preview_stl_url: string | null
+          preview_svg: string | null
           procurement: Json
           slug: string
           tier: string
@@ -3946,6 +3949,9 @@ export type Database = {
           name: string
           param_schema?: Json
           physical_properties?: Json
+          preview_step_url?: string | null
+          preview_stl_url?: string | null
+          preview_svg?: string | null
           procurement?: Json
           slug: string
           tier: string
@@ -3967,6 +3973,9 @@ export type Database = {
           name?: string
           param_schema?: Json
           physical_properties?: Json
+          preview_step_url?: string | null
+          preview_stl_url?: string | null
+          preview_svg?: string | null
           procurement?: Json
           slug?: string
           tier?: string
@@ -11949,6 +11958,80 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      step_templates: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          file_size_bytes: number | null
+          foundry_id: string | null
+          id: string
+          is_assembly: boolean | null
+          license: string
+          metadata: Json | null
+          name: string
+          slug: string
+          source_path: string
+          source_repo: string
+          step_url: string | null
+          stl_url: string | null
+          subcategory: string | null
+          tags: string[] | null
+          thumbnail_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description?: string | null
+          file_size_bytes?: number | null
+          foundry_id?: string | null
+          id?: string
+          is_assembly?: boolean | null
+          license: string
+          metadata?: Json | null
+          name: string
+          slug: string
+          source_path: string
+          source_repo: string
+          step_url?: string | null
+          stl_url?: string | null
+          subcategory?: string | null
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          file_size_bytes?: number | null
+          foundry_id?: string | null
+          id?: string
+          is_assembly?: boolean | null
+          license?: string
+          metadata?: Json | null
+          name?: string
+          slug?: string
+          source_path?: string
+          source_repo?: string
+          step_url?: string | null
+          stl_url?: string | null
+          subcategory?: string | null
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "step_templates_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
             referencedColumns: ["id"]
           },
         ]

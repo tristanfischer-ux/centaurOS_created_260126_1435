@@ -2,6 +2,14 @@
  * Utility functions for objective planning
  */
 
+export {
+  scheduleTaskDates,
+  ensureNotInPast,
+  clampToWorkday,
+  addWorkingDays,
+  type TaskScheduleInput,
+} from '@/lib/schedule-task-dates'
+
 /**
  * Helper function to calculate task dates based on dependencies
  * Takes a start date and array of task durations, returns dates for each task

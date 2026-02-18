@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { getLiveSupplierPricing } from '@/actions/supplier-pricing'
 
 // ============================================================================
 // TYPES
@@ -84,6 +85,7 @@ export function ProcurementEnrichment({
   const [pricing, setPricing] = useState<PricingData[]>([])
   const [certifications, setCertifications] = useState<CertificationData[]>([])
   const [supplierReviews, setSupplierReviews] = useState<Record<string, { avg: number; count: number }>>({})
+  const [liveSupplierResults, setLiveSupplierResults] = useState<Awaited<ReturnType<typeof getLiveSupplierPricing>>>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isPricingExpanded, setIsPricingExpanded] = useState(true)
   const [isCertsExpanded, setIsCertsExpanded] = useState(true)
@@ -136,6 +138,16 @@ export function ProcurementEnrichment({
         }
         setSupplierReviews(mapped)
       }
+
+      if (componentNames.length > 0) {
+        try {
+          const firstQuery = componentNames[0]
+          const live = await getLiveSupplierPricing(firstQuery)
+          setLiveSupplierResults(live)
+        } catch {
+          setLiveSupplierResults([])
+        }
+      }
       setIsLoading(false)
     }
 
@@ -154,13 +166,51 @@ export function ProcurementEnrichment({
   const hasPricing = pricing.length > 0
   const hasCerts = certifications.length > 0
   const hasReviews = Object.keys(supplierReviews).length > 0
+  const hasLiveSupplier = liveSupplierResults.length > 0
 
-  if (!hasPricing && !hasCerts && !hasReviews) {
+  if (!hasPricing && !hasCerts && !hasReviews && !hasLiveSupplier) {
     return null
   }
 
   return (
     <div className="space-y-4">
+      {/* Live supplier pricing (DigiKey, Mouser) */}
+      {hasLiveSupplier && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <ExternalLink className="h-4 w-4 text-international-orange" />
+              Live supplier pricing
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-2">
+            {liveSupplierResults.slice(0, 5).map((r, i) => (
+              <div key={`${r.supplierId}-${r.partNumber}-${i}`} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{r.description || r.partNumber}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{r.supplierId}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {r.unitPrice != null && (
+                    <span className="text-sm font-semibold text-foreground">
+                      ${r.unitPrice.toFixed(2)}
+                    </span>
+                  )}
+                  <a
+                    href={r.productUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-electric-blue hover:underline flex items-center gap-1"
+                  >
+                    View <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Real Market Pricing */}
       {hasPricing && (
         <Card>
