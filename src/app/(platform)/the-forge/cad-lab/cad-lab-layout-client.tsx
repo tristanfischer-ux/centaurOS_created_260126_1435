@@ -21,9 +21,12 @@ import {
   Clock,
   Plus,
   ChevronRight,
+  AlertTriangle,
+  Store,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Dialog,
   DialogContent,
@@ -154,9 +157,28 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
           </div>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          From a single sentence to supplier-ready engineering drawings.
+          Explore concepts and get ideas—then bring in experts to validate and finalise.
         </p>
       </div>
+
+      {/* ── Disclaimer: outputs are for exploration, not final; recruit experts via marketplace ── */}
+      <Alert variant="default" className="border-status-warning bg-status-warning-light/30">
+        <AlertTriangle className="h-4 w-4 text-status-warning" />
+        <AlertTitle className="text-sm font-semibold text-foreground">
+          For exploration only—not final drawings
+        </AlertTitle>
+        <AlertDescription className="text-sm text-foreground/90">
+          The information and drawings from this pipeline are to help you get an idea of the things to think about. They are <strong>not</strong> actual final drawings and <strong>must be checked by qualified people</strong> before use. Recruit relevant experts via the marketplace to validate and finalise your design.
+          <div className="mt-2">
+            <Button variant="outline" size="sm" className="gap-1.5 border-electric-blue text-electric-blue hover:bg-electric-blue-light/20" asChild>
+              <Link href="/marketplace">
+                <Store className="h-3.5 w-3.5" />
+                Find experts in the marketplace
+              </Link>
+            </Button>
+          </div>
+        </AlertDescription>
+      </Alert>
 
       {/* ── Project Browser Dialog ── */}
       <Dialog open={showProjects} onOpenChange={setShowProjects}>

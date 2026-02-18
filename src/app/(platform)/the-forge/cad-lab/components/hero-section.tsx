@@ -69,7 +69,8 @@ export function HeroSection({
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             Describe any physical product or sub-assembly. The system will research real-world
-            specs, generate parametric CAD, and produce manufacturing-ready files.
+            specs and generate concept-level parametric CAD to help you explore ideas—always
+            have outputs checked by qualified people; use the marketplace to recruit experts.
           </p>
         </div>
 
