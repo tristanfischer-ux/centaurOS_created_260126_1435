@@ -89,6 +89,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const statePayload = buildOAuthStatePayload({ userId: user.id, foundryId })
     const stateEncoded = createSignedOAuthState(statePayload, oauthStateSecret)
 
+    console.info('[GoogleConnect] Initiating OAuth flow:', {
+        userId: user.id,
+        foundryId,
+        redirectUri,
+        features,
+        scopeCount: scopes.length,
+    })
+
     const authUrl = oauth2Client.generateAuthUrl({
         access_type: 'offline',
         scope: scopes,

@@ -71,9 +71,21 @@ export async function getGoogleToken(
     return data as GoogleTokenRecord
 }
 
+const UPSERT_PAYLOAD = (params: SaveTokenParams) => ({
+    user_id: params.userId,
+    foundry_id: params.foundryId,
+    access_token: params.accessToken,
+    refresh_token: params.refreshToken,
+    token_expires_at: params.expiresAt.toISOString(),
+    scopes: params.scopes,
+    google_email: params.googleEmail,
+    updated_at: new Date().toISOString(),
+})
+
 /**
  * Save or update a Google OAuth token for a user-foundry pair.
- * Uses upsert to handle both new connections and token refreshes.
+ * Tries the regular RLS client first (user is authenticated during callback);
+ * falls back to admin client if RLS blocks the write (e.g. legacy key issues).
  *
  * @param params - Token data to save
  * @returns Success status
@@ -83,53 +95,55 @@ export async function getGoogleToken(
 export async function saveGoogleToken(
     params: SaveTokenParams
 ): Promise<{ success: boolean; error?: string }> {
-    // SECURITY: Use admin client to bypass RLS for server-side token storage.
-    // The caller (OAuth callback) has already verified the user's identity
-    // via the signed state parameter, so RLS is not needed here.
-    // The cookie-based client's auth.uid() may not be available during
-    // the OAuth redirect round-trip, causing silent RLS INSERT failures.
-    let supabase
+    const payload = UPSERT_PAYLOAD(params)
+    const upsertOptions = { onConflict: 'user_id,foundry_id' as const }
+
+    // Try regular client first (user is authenticated during OAuth callback).
+    const supabase = await createClient()
+    const { error: rlsError } = await supabase
+        .from('google_oauth_tokens')
+        .upsert(payload, upsertOptions)
+
+    if (!rlsError) {
+        console.info('[GoogleTokens] Token saved (RLS client):', {
+            userId: params.userId,
+            foundryId: params.foundryId,
+            googleEmail: params.googleEmail,
+            scopes: params.scopes,
+        })
+        return { success: true }
+    }
+
+    // Fallback: admin client (bypasses RLS). Use when RLS blocks or admin key is required.
+    let adminClient
     try {
-        supabase = createAdminClient()
+        adminClient = createAdminClient()
     } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error creating admin client'
         console.error('[GoogleTokens] Admin client creation failed:', msg)
-        return { success: false, error: msg }
+        return { success: false, error: `${rlsError.message}; admin fallback: ${msg}` }
     }
 
-    const { error } = await supabase
+    const { error: adminError } = await adminClient
         .from('google_oauth_tokens')
-        .upsert(
-            {
-                user_id: params.userId,
-                foundry_id: params.foundryId,
-                access_token: params.accessToken,
-                refresh_token: params.refreshToken,
-                token_expires_at: params.expiresAt.toISOString(),
-                scopes: params.scopes,
-                google_email: params.googleEmail,
-                updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'user_id,foundry_id' }
-        )
+        .upsert(payload, upsertOptions)
 
-    if (error) {
-        console.error('[GoogleTokens] Failed to save token:', {
+    if (adminError) {
+        console.error('[GoogleTokens] Failed to save token (RLS and admin):', {
             userId: params.userId,
             foundryId: params.foundryId,
-            error: error.message,
+            rlsError: rlsError.message,
+            adminError: adminError.message,
         })
-        return { success: false, error: error.message }
+        return { success: false, error: adminError.message }
     }
 
-    // AUDIT: Log token save
-    console.info('[GoogleTokens] Token saved:', {
+    console.info('[GoogleTokens] Token saved (admin client fallback):', {
         userId: params.userId,
         foundryId: params.foundryId,
         googleEmail: params.googleEmail,
         scopes: params.scopes,
     })
-
     return { success: true }
 }
 

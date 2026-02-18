@@ -123,12 +123,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             )
         }
 
-        // Fetch the user's Google email from the token info
-        oauth2Client.setCredentials(tokens)
-        const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client })
-        const { data: userInfo } = await oauth2.userinfo.get()
-
-        const googleEmail = userInfo.email || user.email || 'unknown'
+        // Fetch the user's Google email from the token info; fallback to Supabase email if API fails
+        let googleEmail = user.email || 'unknown'
+        try {
+            oauth2Client.setCredentials(tokens)
+            const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client })
+            const { data: userInfo } = await oauth2.userinfo.get()
+            googleEmail = userInfo.email || googleEmail
+        } catch (infoErr) {
+            console.warn('[GoogleCallback] Could not fetch Google user info, using Supabase email:', {
+                error: infoErr instanceof Error ? infoErr.message : 'Unknown',
+            })
+        }
 
         // Store the token
         const saveResult = await saveGoogleToken({
