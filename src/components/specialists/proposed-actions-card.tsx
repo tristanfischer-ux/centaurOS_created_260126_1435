@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Target, CheckSquare, Loader2, Check, X, Archive, Trash2, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { createObjective } from "@/actions/objectives"
+import { createObjective, createStrategicObjective } from "@/actions/objectives"
 import { archiveObjectiveByTitle } from "@/actions/objectives"
 import { createTask } from "@/actions/tasks"
 import { archiveTaskByTitle } from "@/actions/tasks"
@@ -148,6 +148,242 @@ async function fetchObjectiveMap(): Promise<(llmTitle: string) => string | undef
     return buildFuzzyResolver(data ?? [], "objective")
 }
 
+/**
+ * Executes the "create" portion of proposed actions with automatic hierarchy creation.
+ *
+ * @description Handles the full hierarchy: if a proposed objective references a
+ * strategic goal that doesn't exist, it's auto-created first. If a proposed task
+ * references an objective that doesn't exist (and wasn't created in this batch),
+ * the objective is auto-created under the best-fit strategic goal.
+ *
+ * Phases:
+ *   0 — Auto-create missing strategic goals
+ *   1 — Create proposed objectives (linking to existing or auto-created strategic goals)
+ *   1.5 — Auto-create missing objectives for orphan tasks
+ *   2 — Create proposed tasks (linking to existing, batch-created, or auto-created objectives)
+ *
+ * @param params - All parameters needed for the creation flow
+ * @returns Results map, rejection lists, and auto-created item names
+ */
+async function executeCreateActions(params: {
+    proposals: ProposedAction[]
+    createIndices: number[]
+    selected: Set<number>
+    executed: ExecutedState
+    userId: string
+    rolloutId?: string | null
+}): Promise<{
+    results: ExecutedState
+    rejectedObjectives: string[]
+    rejectedTasks: string[]
+    autoCreatedGoals: string[]
+    autoCreatedObjectives: string[]
+}> {
+    const { proposals, createIndices, selected, executed, userId, rolloutId } = params
+    const results: ExecutedState = { ...executed }
+    const rejectedObjectives: string[] = []
+    const rejectedTasks: string[] = []
+    const autoCreatedGoals: string[] = []
+    const autoCreatedObjectives: string[] = []
+
+    const { resolve: resolveGoal } = await fetchStrategicGoalMap()
+    const resolveExistingObjective = await fetchObjectiveMap()
+
+    const newGoalTitleToId = new Map<string, string>()
+    const objectiveTitleToId = new Map<string, string>()
+
+    // ── Phase 0: Auto-create missing strategic goals ─────────────────────────
+    // Collect all strategic goal titles referenced by proposed objectives and
+    // check if they exist. Create any that are missing so Phase 1 always succeeds.
+    const neededGoalTitles = new Set<string>()
+    for (const i of createIndices) {
+        if (!selected.has(i) || executed[i]) continue
+        const p = proposals[i]
+        if (p.type === "objective" && p.strategicGoalTitle?.trim()) {
+            if (!resolveGoal(p.strategicGoalTitle)) {
+                neededGoalTitles.add(p.strategicGoalTitle.trim())
+            }
+        }
+    }
+
+    for (const goalTitle of neededGoalTitles) {
+        const result = await createStrategicObjective(goalTitle)
+        if (result && "data" in result && result.data) {
+            newGoalTitleToId.set(goalTitle, result.data.id)
+            autoCreatedGoals.push(goalTitle)
+            console.info("[ProposedActions] Auto-created strategic goal:", { title: goalTitle, id: result.data.id })
+        } else {
+            const errorMsg = result && "error" in result ? result.error : "Unknown error"
+            console.warn("[ProposedActions] Failed to auto-create strategic goal:", { title: goalTitle, error: errorMsg })
+        }
+    }
+
+    // Combined resolver: checks auto-created goals first, then existing
+    function resolveGoalCombined(llmTitle: string): string | undefined {
+        const norm = normalizeTitle(llmTitle)
+        for (const [title, id] of newGoalTitleToId) {
+            const normTitle = normalizeTitle(title)
+            if (normTitle === norm || norm.includes(normTitle) || normTitle.includes(norm)) {
+                return id
+            }
+        }
+        return resolveGoal(llmTitle)
+    }
+
+    // ── Phase 1: Create objectives ───────────────────────────────────────────
+    for (const i of createIndices) {
+        if (!selected.has(i) || executed[i]) continue
+        const p = proposals[i]
+        if (p.type !== "objective") continue
+
+        if (!p.strategicGoalTitle?.trim()) {
+            rejectedObjectives.push(p.title)
+            results[i] = { success: false }
+            console.warn("[ProposedActions] Rejected objective — missing strategicGoalTitle:", { title: p.title })
+            continue
+        }
+
+        const goalId = resolveGoalCombined(p.strategicGoalTitle)
+        if (!goalId) {
+            rejectedObjectives.push(p.title)
+            results[i] = { success: false }
+            console.warn("[ProposedActions] Rejected objective — strategic goal not found:", {
+                title: p.title,
+                strategicGoalTitle: p.strategicGoalTitle,
+            })
+            continue
+        }
+
+        const fd = new FormData()
+        fd.set("title", p.title.trim().slice(0, 200))
+        if (p.description?.trim()) {
+            fd.set("description", p.description.trim().slice(0, 10000))
+        }
+        fd.set("parent_objective_id", goalId)
+
+        const result = await createObjective(fd)
+        if (result.error) {
+            results[i] = { success: false }
+            console.warn("[ProposedActions] Failed to create objective:", { title: p.title, error: result.error })
+            continue
+        }
+        if ("objectiveId" in result && result.objectiveId) {
+            results[i] = { success: true, id: result.objectiveId }
+            objectiveTitleToId.set(p.title.trim(), result.objectiveId)
+        }
+    }
+
+    // ── Phase 1.5: Auto-create missing objectives for orphan tasks ───────────
+    // If a task references an objective title that wasn't in the batch and doesn't
+    // exist yet, auto-create it under the best-fit strategic goal.
+    const neededObjectiveTitles = new Set<string>()
+    for (const i of createIndices) {
+        if (!selected.has(i) || executed[i]) continue
+        const p = proposals[i]
+        if (p.type !== "task" || !p.objectiveTitle?.trim()) continue
+
+        const objTitle = p.objectiveTitle.trim()
+        if (!objectiveTitleToId.has(objTitle) && !resolveExistingObjective(objTitle)) {
+            neededObjectiveTitles.add(objTitle)
+        }
+    }
+
+    if (neededObjectiveTitles.size > 0) {
+        // Pick the best default strategic goal: prefer the first auto-created one,
+        // then fall back to any existing one, then create "General" as last resort.
+        let defaultGoalId: string | undefined
+        if (newGoalTitleToId.size > 0) {
+            defaultGoalId = newGoalTitleToId.values().next().value as string
+        }
+        if (!defaultGoalId) {
+            const supabase = createClient()
+            const { data: anyGoal } = await supabase
+                .from("objectives")
+                .select("id")
+                .eq("is_strategic_goal", true)
+                .is("deleted_at", null)
+                .limit(1)
+                .single()
+            defaultGoalId = anyGoal?.id
+        }
+        if (!defaultGoalId) {
+            const result = await createStrategicObjective("General")
+            if (result && "data" in result && result.data) {
+                defaultGoalId = result.data.id
+                autoCreatedGoals.push("General")
+            }
+        }
+
+        if (defaultGoalId) {
+            for (const objTitle of neededObjectiveTitles) {
+                const fd = new FormData()
+                fd.set("title", objTitle.slice(0, 200))
+                fd.set("parent_objective_id", defaultGoalId)
+
+                const result = await createObjective(fd)
+                if ("objectiveId" in result && result.objectiveId) {
+                    objectiveTitleToId.set(objTitle, result.objectiveId)
+                    autoCreatedObjectives.push(objTitle)
+                    console.info("[ProposedActions] Auto-created objective:", { title: objTitle, id: result.objectiveId })
+                } else {
+                    console.warn("[ProposedActions] Failed to auto-create objective:", { title: objTitle, error: result.error })
+                }
+            }
+        }
+    }
+
+    // ── Phase 2: Create tasks ────────────────────────────────────────────────
+    for (const i of createIndices) {
+        if (!selected.has(i) || executed[i]) continue
+        const p = proposals[i]
+        if (p.type !== "task") continue
+
+        if (!p.objectiveTitle?.trim()) {
+            rejectedTasks.push(p.title)
+            results[i] = { success: false }
+            console.warn("[ProposedActions] Rejected task — missing objectiveTitle:", { title: p.title })
+            continue
+        }
+
+        let objectiveId = objectiveTitleToId.get(p.objectiveTitle.trim())
+        if (!objectiveId) {
+            objectiveId = resolveExistingObjective(p.objectiveTitle)
+        }
+
+        if (!objectiveId) {
+            rejectedTasks.push(p.title)
+            results[i] = { success: false }
+            console.warn("[ProposedActions] Rejected task — objective not found:", {
+                title: p.title,
+                objectiveTitle: p.objectiveTitle,
+            })
+            continue
+        }
+
+        const fd = new FormData()
+        fd.set("title", p.title.trim().slice(0, 500))
+        if (p.description?.trim()) {
+            fd.set("description", p.description.trim().slice(0, 10000))
+        }
+        fd.set("assignee_id", userId)
+        fd.set("assignee_ids", JSON.stringify([userId]))
+        fd.set("objective_id", objectiveId)
+        if (rolloutId) fd.set("rollout_id", rolloutId)
+
+        const result = await createTask(fd)
+        if (result.error) {
+            results[i] = { success: false }
+            console.warn("[ProposedActions] Failed to create task:", { title: p.title, error: result.error })
+            continue
+        }
+        if ("taskId" in result && result.taskId) {
+            results[i] = { success: true, id: result.taskId }
+        }
+    }
+
+    return { results, rejectedObjectives, rejectedTasks, autoCreatedGoals, autoCreatedObjectives }
+}
+
 export function ProposedActionsCard({
     proposals,
     specialist,
@@ -280,120 +516,40 @@ export function ProposedActionsCard({
 
         setIsExecuting(true)
         setActiveSection("create")
-        const results: ExecutedState = { ...executed }
 
         try {
-            // Fetch strategic goals and existing objectives with fuzzy resolvers
-            const { resolve: resolveGoal } = await fetchStrategicGoalMap()
-            const resolveExistingObjective = await fetchObjectiveMap()
-            const objectiveTitleToId = new Map<string, string>()
-            const rejectedObjectives: string[] = []
-            const rejectedTasks: string[] = []
-
-            // Phase 1: Create objectives (MUST have strategic goal)
-            for (const i of createIndices) {
-                if (!selected.has(i)) continue
-                if (executed[i]) continue
-                const p = proposals[i]
-                if (p.type !== "objective") continue
-
-                // RULE: Every objective must belong to a strategic goal
-                if (!p.strategicGoalTitle?.trim()) {
-                    rejectedObjectives.push(p.title)
-                    results[i] = { success: false }
-                    console.warn("[ProposedActions] Rejected objective — missing strategicGoalTitle:", { title: p.title })
-                    continue
-                }
-
-                const goalId = resolveGoal(p.strategicGoalTitle)
-                if (!goalId) {
-                    rejectedObjectives.push(p.title)
-                    results[i] = { success: false }
-                    console.warn("[ProposedActions] Rejected objective — strategic goal not found:", {
-                        title: p.title,
-                        strategicGoalTitle: p.strategicGoalTitle,
-                    })
-                    continue
-                }
-
-                const fd = new FormData()
-                fd.set("title", p.title.trim().slice(0, 200))
-                if (p.description?.trim()) {
-                    fd.set("description", p.description.trim().slice(0, 10000))
-                }
-                fd.set("parent_objective_id", goalId)
-
-                const result = await createObjective(fd)
-                if (result.error) {
-                    toast.error(result.error)
-                    setIsExecuting(false)
-                    setActiveSection(null)
-                    return
-                }
-                if ("objectiveId" in result && result.objectiveId) {
-                    results[i] = { success: true, id: result.objectiveId }
-                    objectiveTitleToId.set(p.title.trim(), result.objectiveId)
-                }
-            }
-
-            // Phase 2: Create tasks (MUST have objective)
-            for (const i of createIndices) {
-                if (!selected.has(i)) continue
-                if (executed[i]) continue
-                const p = proposals[i]
-                if (p.type !== "task") continue
-
-                // RULE: Every task must belong to an objective
-                if (!p.objectiveTitle?.trim()) {
-                    rejectedTasks.push(p.title)
-                    results[i] = { success: false }
-                    console.warn("[ProposedActions] Rejected task — missing objectiveTitle:", { title: p.title })
-                    continue
-                }
-
-                // Try batch-created objectives first, then existing objectives
-                let objectiveId = objectiveTitleToId.get(p.objectiveTitle.trim())
-                if (!objectiveId) {
-                    objectiveId = resolveExistingObjective(p.objectiveTitle)
-                }
-
-                if (!objectiveId) {
-                    rejectedTasks.push(p.title)
-                    results[i] = { success: false }
-                    console.warn("[ProposedActions] Rejected task — objective not found:", {
-                        title: p.title,
-                        objectiveTitle: p.objectiveTitle,
-                    })
-                    continue
-                }
-
-                const fd = new FormData()
-                fd.set("title", p.title.trim().slice(0, 500))
-                if (p.description?.trim()) {
-                    fd.set("description", p.description.trim().slice(0, 10000))
-                }
-                fd.set("assignee_id", user.id)
-                fd.set("assignee_ids", JSON.stringify([user.id]))
-                fd.set("objective_id", objectiveId)
-                if (rolloutId) fd.set("rollout_id", rolloutId)
-
-                const result = await createTask(fd)
-                if (result.error) {
-                    toast.error(result.error)
-                    setIsExecuting(false)
-                    setActiveSection(null)
-                    return
-                }
-                if ("taskId" in result && result.taskId) {
-                    results[i] = { success: true, id: result.taskId }
-                }
-            }
+            const {
+                results,
+                rejectedObjectives,
+                rejectedTasks,
+                autoCreatedGoals,
+                autoCreatedObjectives,
+            } = await executeCreateActions({
+                proposals,
+                createIndices,
+                selected,
+                executed,
+                userId: user.id,
+                rolloutId,
+            })
 
             setExecuted(results)
 
             const createdCount = createIndices.filter((i) => results[i]?.success).length
             if (createdCount > 0) {
                 toast.success(`${createdCount} item${createdCount > 1 ? "s" : ""} created`)
+            }
+            if (autoCreatedGoals.length > 0) {
+                toast.info(
+                    `Auto-created ${autoCreatedGoals.length} strategic goal${autoCreatedGoals.length > 1 ? "s" : ""}: ${autoCreatedGoals.join(", ")}`,
+                    { duration: 5000 }
+                )
+            }
+            if (autoCreatedObjectives.length > 0) {
+                toast.info(
+                    `Auto-created ${autoCreatedObjectives.length} objective${autoCreatedObjectives.length > 1 ? "s" : ""}: ${autoCreatedObjectives.join(", ")}`,
+                    { duration: 5000 }
+                )
             }
             if (rejectedObjectives.length > 0) {
                 toast.error(
@@ -416,7 +572,7 @@ export function ProposedActionsCard({
             setIsExecuting(false)
             setActiveSection(null)
         }
-    }, [proposals, selected, executed, createIndices, onCreated])
+    }, [proposals, selected, executed, createIndices, onCreated, rolloutId])
 
     // ─── Execute all: archive first, then create ─────────────────────────────────
     const handleExecuteAll = useCallback(async () => {
@@ -436,7 +592,7 @@ export function ProposedActionsCard({
 
         setIsExecuting(true)
         setActiveSection("all")
-        const results: ExecutedState = { ...executed }
+        const archiveResults: ExecutedState = { ...executed }
 
         try {
             // Phase 1: Archive actions first
@@ -449,136 +605,60 @@ export function ProposedActionsCard({
                     const result = await archiveObjectiveByTitle(p.title)
                     if ("error" in result) {
                         console.warn("[ProposedActions] Failed to archive objective:", { title: p.title, error: result.error })
-                        results[i] = { success: false }
+                        archiveResults[i] = { success: false }
                     } else {
-                        results[i] = { success: true, id: result.objectiveId }
+                        archiveResults[i] = { success: true, id: result.objectiveId }
                     }
                 } else if (p.type === "archive_task") {
                     const result = await archiveTaskByTitle(p.title)
                     if ("error" in result) {
                         console.warn("[ProposedActions] Failed to archive task:", { title: p.title, error: result.error })
-                        results[i] = { success: false }
+                        archiveResults[i] = { success: false }
                     } else {
-                        results[i] = { success: true, id: result.taskId }
+                        archiveResults[i] = { success: true, id: result.taskId }
                     }
                 }
             }
 
-            // Phase 2: Create objectives (MUST have strategic goal)
-            const { resolve: resolveGoal } = await fetchStrategicGoalMap()
-            const resolveExistingObjective = await fetchObjectiveMap()
-            const objectiveTitleToId = new Map<string, string>()
-            const rejectedObjectives: string[] = []
-            const rejectedTasks: string[] = []
+            // Phase 2+: Create with auto-hierarchy (strategic goals + objectives auto-created)
+            const {
+                results: createResults,
+                rejectedObjectives,
+                rejectedTasks,
+                autoCreatedGoals,
+                autoCreatedObjectives,
+            } = await executeCreateActions({
+                proposals,
+                createIndices,
+                selected,
+                executed: archiveResults,
+                userId: user.id,
+                rolloutId,
+            })
 
-            for (const i of createIndices) {
-                if (!selected.has(i)) continue
-                if (executed[i]) continue
-                const p = proposals[i]
-                if (p.type !== "objective") continue
+            const allResults = { ...archiveResults, ...createResults }
+            setExecuted(allResults)
 
-                // RULE: Every objective must belong to a strategic goal
-                if (!p.strategicGoalTitle?.trim()) {
-                    rejectedObjectives.push(p.title)
-                    results[i] = { success: false }
-                    console.warn("[ProposedActions] Rejected objective — missing strategicGoalTitle:", { title: p.title })
-                    continue
-                }
-
-                const goalId = resolveGoal(p.strategicGoalTitle)
-                if (!goalId) {
-                    rejectedObjectives.push(p.title)
-                    results[i] = { success: false }
-                    console.warn("[ProposedActions] Rejected objective — strategic goal not found:", {
-                        title: p.title,
-                        strategicGoalTitle: p.strategicGoalTitle,
-                    })
-                    continue
-                }
-
-                const fd = new FormData()
-                fd.set("title", p.title.trim().slice(0, 200))
-                if (p.description?.trim()) {
-                    fd.set("description", p.description.trim().slice(0, 10000))
-                }
-                fd.set("parent_objective_id", goalId)
-
-                const result = await createObjective(fd)
-                if (result.error) {
-                    toast.error(result.error)
-                    setIsExecuting(false)
-                    setActiveSection(null)
-                    return
-                }
-                if ("objectiveId" in result && result.objectiveId) {
-                    results[i] = { success: true, id: result.objectiveId }
-                    objectiveTitleToId.set(p.title.trim(), result.objectiveId)
-                }
-            }
-
-            // Phase 3: Create tasks (MUST have objective)
-            for (const i of createIndices) {
-                if (!selected.has(i)) continue
-                if (executed[i]) continue
-                const p = proposals[i]
-                if (p.type !== "task") continue
-
-                // RULE: Every task must belong to an objective
-                if (!p.objectiveTitle?.trim()) {
-                    rejectedTasks.push(p.title)
-                    results[i] = { success: false }
-                    console.warn("[ProposedActions] Rejected task — missing objectiveTitle:", { title: p.title })
-                    continue
-                }
-
-                // Try batch-created objectives first, then existing objectives
-                let objectiveId = objectiveTitleToId.get(p.objectiveTitle.trim())
-                if (!objectiveId) {
-                    objectiveId = resolveExistingObjective(p.objectiveTitle)
-                }
-
-                if (!objectiveId) {
-                    rejectedTasks.push(p.title)
-                    results[i] = { success: false }
-                    console.warn("[ProposedActions] Rejected task — objective not found:", {
-                        title: p.title,
-                        objectiveTitle: p.objectiveTitle,
-                    })
-                    continue
-                }
-
-                const fd = new FormData()
-                fd.set("title", p.title.trim().slice(0, 500))
-                if (p.description?.trim()) {
-                    fd.set("description", p.description.trim().slice(0, 10000))
-                }
-                fd.set("assignee_id", user.id)
-                fd.set("assignee_ids", JSON.stringify([user.id]))
-                fd.set("objective_id", objectiveId)
-                if (rolloutId) fd.set("rollout_id", rolloutId)
-
-                const result = await createTask(fd)
-                if (result.error) {
-                    toast.error(result.error)
-                    setIsExecuting(false)
-                    setActiveSection(null)
-                    return
-                }
-                if ("taskId" in result && result.taskId) {
-                    results[i] = { success: true, id: result.taskId }
-                }
-            }
-
-            setExecuted(results)
-
-            // Summary toast
-            const archivedCount = archiveIndices.filter((i) => results[i]?.success).length
-            const createdCount = createIndices.filter((i) => results[i]?.success).length
+            // Summary toasts
+            const archivedCount = archiveIndices.filter((i) => allResults[i]?.success).length
+            const createdCount = createIndices.filter((i) => allResults[i]?.success).length
             const parts: string[] = []
             if (archivedCount > 0) parts.push(`${archivedCount} archived`)
             if (createdCount > 0) parts.push(`${createdCount} created`)
             if (parts.length > 0) toast.success(parts.join(", "), { duration: 3000 })
 
+            if (autoCreatedGoals.length > 0) {
+                toast.info(
+                    `Auto-created ${autoCreatedGoals.length} strategic goal${autoCreatedGoals.length > 1 ? "s" : ""}: ${autoCreatedGoals.join(", ")}`,
+                    { duration: 5000 }
+                )
+            }
+            if (autoCreatedObjectives.length > 0) {
+                toast.info(
+                    `Auto-created ${autoCreatedObjectives.length} objective${autoCreatedObjectives.length > 1 ? "s" : ""}: ${autoCreatedObjectives.join(", ")}`,
+                    { duration: 5000 }
+                )
+            }
             if (rejectedObjectives.length > 0) {
                 toast.error(
                     `${rejectedObjectives.length} objective${rejectedObjectives.length > 1 ? "s" : ""} rejected — must belong to a strategic goal`,
@@ -600,7 +680,7 @@ export function ProposedActionsCard({
             setIsExecuting(false)
             setActiveSection(null)
         }
-    }, [proposals, selected, executed, archiveIndices, createIndices, onCreated])
+    }, [proposals, selected, executed, archiveIndices, createIndices, onCreated, rolloutId])
 
     const handleDismiss = useCallback(() => {
         setDismissed(true)

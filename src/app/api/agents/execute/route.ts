@@ -535,15 +535,17 @@ In the same response where you explain your recommendation in prose, include thi
 ### Action types
 - \`"archive_objective"\` — Remove an existing objective (soft-delete). Use the EXACT title from the objectives list above.
 - \`"archive_task"\` — Remove an existing task (soft-delete). Use the EXACT title.
-- \`"objective"\` — Create a new objective. \`"strategicGoalTitle"\` is **REQUIRED** — every objective MUST belong to a strategic goal. Use an existing strategic goal title from the list above.
-- \`"task"\` — Create a new task. \`"objectiveTitle"\` is **REQUIRED** — every task MUST belong to an objective. Use an existing objective title from the list above, or the title of a new objective you are creating in the same batch.
+- \`"objective"\` — Create a new objective. \`"strategicGoalTitle"\` is **REQUIRED** — every objective MUST belong to a strategic goal. Use an existing strategic goal title, OR provide a NEW strategic goal title and the system will auto-create it.
+- \`"task"\` — Create a new task. \`"objectiveTitle"\` is **REQUIRED** — every task MUST belong to an objective. Use an existing objective title, a new objective you are creating in the same batch, OR provide a new title and the system will auto-create the objective.
 
 ### MANDATORY HIERARCHY RULE
 Every item must fit into the strategy hierarchy: **Strategic Goal → Objective → Task**. 
 - You CANNOT create a task without specifying which objective it belongs to (\`"objectiveTitle"\` is required).
 - You CANNOT create an objective without specifying which strategic goal it belongs to (\`"strategicGoalTitle"\` is required).
-- If no suitable strategic goal or objective exists, create one in the same PROPOSED_ACTIONS batch BEFORE the items that depend on it.
-- Items missing these required fields will be REJECTED by the system and will not be created.
+- If no suitable strategic goal exists, use a clear descriptive title for \`"strategicGoalTitle"\` — the system will auto-create the strategic goal.
+- If no suitable objective exists for a task, create one in the same batch BEFORE the task, OR reference a clear title and the system will auto-create it.
+- Items missing the required \`"strategicGoalTitle"\` or \`"objectiveTitle"\` fields will be REJECTED.
+- When extracting many items from a document, ALWAYS organize them into a logical hierarchy — group related tasks under objectives, and group objectives under strategic goals.
 
 ### Example: Recommending to kill a feature and consolidate strategy
 If the user has duplicate objectives like "raise 50m funding" and "raise 60m funding", and you recommend consolidating:
@@ -565,8 +567,8 @@ This renders as interactive cards with checkboxes. The user ticks which ones to 
 2. **When recommending cleanup or strategy changes, include BOTH archive AND create actions.** Archive the old, create the new — in one block.
 3. **Use EXACT titles from the objectives/tasks list** for archive actions. Title matching is case-insensitive but must be exact otherwise.
 4. **Put archive actions BEFORE create actions** in the array.
-5. **Every objective MUST have "strategicGoalTitle"** set to an existing strategic goal title. This is REQUIRED — objectives without a strategic goal will be rejected.
-6. **Every task MUST have "objectiveTitle"** set to an existing or newly-created objective title. This is REQUIRED — tasks without an objective will be rejected.
+5. **Every objective MUST have "strategicGoalTitle"** — use an existing title or a new one (the system auto-creates missing strategic goals). This is REQUIRED — objectives without it will be rejected.
+6. **Every task MUST have "objectiveTitle"** — use an existing, batch-created, or new title (the system auto-creates missing objectives). This is REQUIRED — tasks without it will be rejected.
 7. If you need to create a task under a new objective, create the objective first in the same batch, then reference its title in the task's "objectiveTitle".
 8. Only skip the block for purely informational responses with zero actionable recommendations.
 9. The visible prose should read naturally. The PROPOSED_ACTIONS block is supplementary — describe actions in words, then include the structured block at the end.`
@@ -592,8 +594,8 @@ ABSOLUTE REQUIREMENTS for the block:
 - Start with exactly: <!-- PROPOSED_ACTIONS
 - End with exactly: -->
 - The JSON array MUST be valid JSON (use double quotes for keys and string values)
-- Every objective MUST include "strategicGoalTitle" matching an existing strategic goal name — REQUIRED, not optional
-- Every task MUST include "objectiveTitle" matching the parent objective — REQUIRED, not optional
+- Every objective MUST include "strategicGoalTitle" (existing or new — system auto-creates missing ones) — REQUIRED, not optional
+- Every task MUST include "objectiveTitle" (existing, batch-created, or new — system auto-creates missing ones) — REQUIRED, not optional
 - Items missing "strategicGoalTitle" (objectives) or "objectiveTitle" (tasks) will be REJECTED
 - Place the block at the END of your response, after all prose
 
@@ -603,7 +605,8 @@ DO NOT:
 - Use single quotes in the JSON
 - Skip the block when you recommend concrete actions
 - Create tasks without "objectiveTitle" — they will fail
-- Create objectives without "strategicGoalTitle" — they will fail`
+- Create objectives without "strategicGoalTitle" — they will fail
+- When extracting from documents, organize items into a hierarchy (strategic goal → objective → task)`
             }
 
             // Workflow capabilities: let the specialist know what they can produce
