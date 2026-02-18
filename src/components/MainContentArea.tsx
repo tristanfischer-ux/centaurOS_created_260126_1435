@@ -15,8 +15,8 @@ interface MainContentAreaProps {
 }
 
 export function MainContentArea({ children, className }: MainContentAreaProps): React.ReactElement {
-  const { panelViewMode } = useAdvisorPanel()
-  const isExpanded = panelViewMode === "expanded"
+  const { panelViewMode, isOpen } = useAdvisorPanel()
+  const isExpanded = isOpen && panelViewMode === "expanded"
 
   return (
     <ZoomableContent
