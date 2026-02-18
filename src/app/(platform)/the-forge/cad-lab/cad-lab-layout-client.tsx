@@ -37,6 +37,7 @@ import { CadLabProgress } from "@/components/cad/cad-lab-progress"
 import { CadLabMilestone } from "@/components/cad/cad-lab-milestone"
 import { SECTOR_LABELS } from "@/types/foundry"
 
+import { cn } from "@/lib/utils"
 import { CadLabProvider, useCadLab } from "./cad-lab-context"
 import { CadLabNav } from "./cad-lab-nav"
 import { formatRelativeTime } from "./cad-lab-utils"
@@ -57,6 +58,8 @@ const STAGE_LABELS: Record<string, string> = {
   analysis: "Analysis",
   procurement: "Procurement",
   review: "Review",
+  mashup: "Mashup Lab",
+  templates: "Template Library",
 }
 
 /**
@@ -255,7 +258,33 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
       </Dialog>
 
       {/* ── Pipeline stepper nav ── */}
-      <CadLabNav />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <CadLabNav />
+        <div className="flex items-center gap-1 self-center sm:self-auto">
+          <Link
+            href="/the-forge/cad-lab/templates"
+            className={cn(
+              "text-sm font-medium transition-colors rounded-md px-3 py-2",
+              pathname === "/the-forge/cad-lab/templates"
+                ? "text-international-orange font-semibold bg-orange-50"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted",
+            )}
+          >
+            Template Library
+          </Link>
+          <Link
+            href="/the-forge/cad-lab/mashup"
+            className={cn(
+              "text-sm font-medium transition-colors rounded-md px-3 py-2",
+              pathname === "/the-forge/cad-lab/mashup"
+                ? "text-international-orange font-semibold bg-orange-50"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted",
+            )}
+          >
+            Mashup Lab
+          </Link>
+        </div>
+      </div>
 
       {/* ── Milestone celebration ── */}
       {milestone && (
