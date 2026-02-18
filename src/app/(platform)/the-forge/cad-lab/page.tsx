@@ -11,6 +11,7 @@
  */
 
 import { useRouter } from "next/navigation"
+import { useMemo } from "react"
 import {
   Loader2,
   Search,
@@ -31,6 +32,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
+import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
 import { DesignIntakeForm } from "./components/design-intake-form"
@@ -63,6 +65,35 @@ export default function CadLabResearchPage(): React.ReactNode {
     modules, isDecomposing,
     expandedModuleId, setExpandedModuleId,
   } = useCadLab()
+
+  useRegisterScreenContext(
+    useMemo(() => {
+      const parts: string[] = []
+      if (hasResearch) {
+        parts.push(`Research complete for "${subject}".`)
+        if (modules.length > 0) {
+          parts.push(`${modules.length} sub-assemblies mapped.`)
+        }
+      } else if (isResearching) {
+        parts.push(`Running research for "${subject}".`)
+      } else {
+        parts.push(`Viewing the CAD Lab research stage.`)
+        if (subject) parts.push(`Subject: "${subject}".`)
+      }
+      return {
+        pageTitle: `The Forge — Research${subject ? `: ${subject}` : ""}`,
+        summary: parts.join(" "),
+        entities:
+          modules.length > 0
+            ? modules.map((m) => ({
+                type: "module",
+                title: m.name,
+                status: m.status === "generated" ? "CAD generated" : "pending",
+              }))
+            : undefined,
+      }
+    }, [hasResearch, isResearching, subject, modules]),
+  )
 
   /**
    * Handles quick-start template selection — sets subject and auto-triggers research.

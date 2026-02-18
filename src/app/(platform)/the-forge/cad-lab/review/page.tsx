@@ -9,6 +9,7 @@
  * Gate: redirects to /the-forge/cad-lab/build if no generated modules.
  */
 
+import { useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
   ClipboardCheck,
@@ -24,6 +25,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { CadLabReviewPackage } from "@/components/cad/cad-lab-review-package"
 import { CadLabPeople } from "@/components/cad/cad-lab-people"
 import { CadLabDrawingPackage } from "@/components/cad/cad-lab-drawing-package"
+import { useRegisterScreenContext } from "@/contexts/screen-context"
 
 import { useCadLab } from "../cad-lab-context"
 
@@ -33,6 +35,22 @@ export default function CadLabReviewPage(): React.ReactNode {
     modules, generatedModuleCount, subject,
     editableReport, diagnosticAnswers,
   } = useCadLab()
+
+  useRegisterScreenContext(
+    useMemo(() => {
+      const parts: string[] = [`Viewing the Review stage for "${subject}".`]
+      parts.push(`Supplier-ready documentation for ${modules.length} modules.`)
+      return {
+        pageTitle: `The Forge — Review: ${subject}`,
+        summary: parts.join(" "),
+        entities: modules.slice(0, 15).map((m) => ({
+          type: "module",
+          title: m.name,
+          status: m.status === "generated" ? "CAD generated" : "pending",
+        })),
+      }
+    }, [subject, modules, generatedModuleCount]),
+  )
 
   // Show empty state instead of redirect
   if (generatedModuleCount === 0) {

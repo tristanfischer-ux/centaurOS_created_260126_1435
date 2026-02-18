@@ -120,6 +120,113 @@ const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
     title: "Strategic Planner",
     summary: "The user is viewing the strategic planner for a specific goal — AI suggestions, task breakdown, and progress.",
   },
+  // The Forge & CAD Lab pipeline
+  "/the-forge": {
+    title: "The Forge",
+    summary: "The user is in The Forge — turning product ideas into manufacturing-ready packages.",
+  },
+  "/the-forge/cad-lab": {
+    title: "The Forge — Research",
+    summary: "The user is in the CAD Lab research stage — defining what to build and running AI-powered engineering research.",
+  },
+  "/the-forge/cad-lab/build": {
+    title: "The Forge — Build",
+    summary: "The user is in the CAD Lab build stage — decomposing a product into modules and generating parametric CAD for each.",
+  },
+  "/the-forge/cad-lab/analysis": {
+    title: "The Forge — Analysis",
+    summary: "The user is viewing engineering analysis — risk register, timeline, and design quality metrics.",
+  },
+  "/the-forge/cad-lab/procurement": {
+    title: "The Forge — Procurement",
+    summary: "The user is in procurement — supply chain diagnostics, cost estimation, and contracting.",
+  },
+  "/the-forge/cad-lab/review": {
+    title: "The Forge — Review",
+    summary: "The user is reviewing the final package — supplier-ready documentation and expert discipline matching.",
+  },
+  "/the-forge/components": {
+    title: "Component Library",
+    summary: "The user is browsing the component library — parametric parts with specs and pricing.",
+  },
+  "/the-forge/assembly-builder": {
+    title: "Assembly Builder",
+    summary: "The user is in the assembly builder — combining components into assemblies.",
+  },
+  "/knowledge": {
+    title: "Knowledge Vault",
+    summary: "The user is viewing the knowledge vault — organizational notes and documents.",
+  },
+  "/updates": {
+    title: "Activity Feed",
+    summary: "The user is viewing the activity feed — recent changes across the organization.",
+  },
+  "/browse": {
+    title: "In-App Browser",
+    summary: "The user is using the in-app browser — researching external content.",
+  },
+  "/guild": {
+    title: "Guild Hub",
+    summary: "The user is viewing the guild hub — community events and peer learning.",
+  },
+  "/apprenticeship": {
+    title: "Apprenticeship",
+    summary: "The user is on the apprenticeship dashboard — training progress and OTJT.",
+  },
+  "/recruits": {
+    title: "People Marketplace",
+    summary: "The user is browsing the people marketplace — finding talent and recommendations.",
+  },
+  "/marketplace-orders": {
+    title: "Orders",
+    summary: "The user is viewing orders — tracking active and completed bookings.",
+  },
+  "/provider-portal": {
+    title: "Provider Portal",
+    summary: "The user is in the provider portal — managing listings and availability.",
+  },
+  "/retainers": {
+    title: "Retainers",
+    summary: "The user is viewing retainers — ongoing service engagements.",
+  },
+  "/rfq": {
+    title: "RFQ",
+    summary: "The user is viewing requests for quotation.",
+  },
+  "/advisory": {
+    title: "Advisory",
+    summary: "The user is viewing advisory — expert guidance and reviews.",
+  },
+  "/inspiration": {
+    title: "Inspiration Hub",
+    summary: "The user is in the inspiration hub — templates and packs.",
+  },
+}
+
+/** Returns true if the segment looks like a UUID or other dynamic route param */
+function isUuidLike(segment: string): boolean {
+  if (segment.length < 8) return false
+  const hexOrDash = /^[a-fA-F0-9-]+$/.test(segment)
+  const looksLikeId = segment.length > 12 || (hexOrDash && segment.length >= 8)
+  return looksLikeId
+}
+
+/**
+ * Derives a meaningful title and summary from the URL pathname when no explicit
+ * route description exists. Ensures every page gets usable context for specialists.
+ */
+function deriveFromPathname(pathname: string): { title: string; summary: string } {
+  const segments = pathname.split("/").filter(Boolean)
+  const meaningful = segments.filter((s) => !isUuidLike(s))
+  const titleParts = meaningful.map((s) =>
+    s.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+  )
+  const title = titleParts.join(" > ") || "ForgeOS Platform"
+  const lastPart = titleParts[titleParts.length - 1] || "a page"
+  return {
+    title,
+    summary: `The user is viewing ${lastPart} on the ForgeOS platform.`,
+  }
 }
 
 /**
@@ -131,17 +238,16 @@ function getRouteDescription(pathname: string): { title: string; summary: string
     return ROUTE_DESCRIPTIONS[pathname]
   }
 
-  // Check prefix matches for nested routes (e.g. /strategic-planner/[id])
+  // Check prefix matches for nested routes — use longest matching prefix
+  let best: { route: string; desc: { title: string; summary: string } } | null = null
   for (const [route, desc] of Object.entries(ROUTE_DESCRIPTIONS)) {
-    if (pathname.startsWith(route)) {
-      return desc
+    if (pathname.startsWith(route) && (!best || route.length > best.route.length)) {
+      best = { route, desc }
     }
   }
+  if (best) return best.desc
 
-  return {
-    title: "ForgeOS Platform",
-    summary: "The user is browsing the ForgeOS platform.",
-  }
+  return deriveFromPathname(pathname)
 }
 
 // ─── Context ────────────────────────────────────────────────────────────────

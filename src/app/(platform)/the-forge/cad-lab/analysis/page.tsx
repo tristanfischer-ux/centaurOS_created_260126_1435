@@ -9,6 +9,7 @@
  * Gate: redirects to /the-forge/cad-lab/build if no generated modules.
  */
 
+import { useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
   BarChart3,
@@ -24,12 +25,30 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { CadLabAnalysisDashboard } from "@/components/cad/cad-lab-analysis-dashboard"
 import { CadLabTimeline } from "@/components/cad/cad-lab-timeline"
 import { CadLabRiskRegister } from "@/components/cad/cad-lab-risk-register"
+import { useRegisterScreenContext } from "@/contexts/screen-context"
 
 import { useCadLab } from "../cad-lab-context"
 
 export default function CadLabAnalysisPage(): React.ReactNode {
   const router = useRouter()
   const { modules, generatedModuleCount, subject, riskCount } = useCadLab()
+
+  useRegisterScreenContext(
+    useMemo(() => {
+      const parts: string[] = [`Viewing the Analysis stage for "${subject}".`]
+      parts.push(`${modules.length} modules, ${generatedModuleCount} generated.`)
+      parts.push(`${riskCount} risk items in the register.`)
+      return {
+        pageTitle: `The Forge — Analysis: ${subject}`,
+        summary: parts.join(" "),
+        entities: modules.slice(0, 15).map((m) => ({
+          type: "module",
+          title: m.name,
+          status: m.status === "generated" ? "CAD generated" : "pending",
+        })),
+      }
+    }, [subject, modules, generatedModuleCount, riskCount]),
+  )
 
   // Show empty state instead of redirect
   if (generatedModuleCount === 0) {

@@ -9,7 +9,7 @@
  * Gate: redirects to /the-forge/cad-lab/build if no generated modules.
  */
 
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
   ShoppingCart,
@@ -22,6 +22,7 @@ import { CadLabSupplyChain } from "@/components/cad/cad-lab-supply-chain"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 import { CadLabContracting } from "@/components/cad/cad-lab-contracting"
 import { ProcurementEnrichment } from "@/components/cad/procurement-enrichment"
+import { useRegisterScreenContext } from "@/contexts/screen-context"
 
 import { useCadLab } from "../cad-lab-context"
 
@@ -33,6 +34,22 @@ export default function CadLabProcurementPage(): React.ReactNode {
     diagCompletedCount, activeProjectId, linkedRfqId, linkRfqToProject,
     designBrief, assumptionNotes,
   } = useCadLab()
+
+  useRegisterScreenContext(
+    useMemo(() => {
+      const parts: string[] = [`Viewing the Procurement stage for "${subject}".`]
+      parts.push(`${modules.length} modules, ${diagCompletedCount}/${modules.length} diagnostics completed.`)
+      return {
+        pageTitle: `The Forge — Procurement: ${subject}`,
+        summary: parts.join(" "),
+        entities: modules.slice(0, 15).map((m) => ({
+          type: "module",
+          title: m.name,
+          status: m.status === "generated" ? "CAD generated" : "pending",
+        })),
+      }
+    }, [subject, modules, generatedModuleCount, diagCompletedCount]),
+  )
 
   // Gate: need at least one generated module
   useEffect(() => {

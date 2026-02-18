@@ -50,6 +50,7 @@ import { STLViewer } from "@/components/cad/stl-viewer"
 import { CadLabWhileYouWait } from "@/components/cad/cad-lab-while-you-wait"
 import type { CadLabResult, CadLabModule } from "@/lib/cad-lab-types"
 
+import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { useCadLab } from "../cad-lab-context"
 import { Metric, SvgView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
 
@@ -80,6 +81,31 @@ export default function CadLabBuildPage(): React.ReactNode {
   const [viewingModuleId, setViewingModuleId] = useState<string | null>(null)
   const [showCode, setShowCode] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
+
+  // Register screen context so specialists can see what the user is working on
+  useRegisterScreenContext(
+    useMemo(() => {
+      if (!hasResearch) return null
+      const parts: string[] = [`Viewing the Build stage for "${subject}".`]
+      parts.push(`${modules.length} sub-assemblies decomposed.`)
+      parts.push(`${generatedModuleCount} of ${modules.length} modules have generated CAD.`)
+      if (isBatchRunning) parts.push("Batch generation is currently running.")
+      return {
+        pageTitle: `The Forge — Build: ${subject}`,
+        summary: parts.join(" "),
+        entities: modules.map((m) => ({
+          type: "module",
+          title: m.name,
+          status:
+            m.status === "generated"
+              ? "CAD generated"
+              : m.status === "interface_ready"
+                ? "dimensions planned"
+                : "pending",
+        })),
+      }
+    }, [hasResearch, subject, modules, generatedModuleCount, isBatchRunning]),
+  )
 
   // Gate: redirect if no research
   useEffect(() => {
