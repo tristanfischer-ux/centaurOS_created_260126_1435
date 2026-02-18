@@ -77,16 +77,21 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     showProjects, setShowProjects, refreshProjects,
     // Projects
     projects, isLoadingProjects,
-    handleLoadProject, handleDeleteProject,
+    handleLoadProject, handleDeleteProject, handleReset,
     // Progress
     progressLines, isResearching, isDecomposing, isBatchRunning, activeModuleId,
     // Milestone
     milestone, setMilestone,
   } = useCadLab()
 
-  // Auto-load project: URL ?project=<id> takes precedence; else restore last active from localStorage
+  // Auto-load project: ?new=true → start fresh; ?project=<id> → load that project; else restore last active from localStorage
   const projectParam = searchParams.get("project")
+  const newParam = searchParams.get("new")
   useEffect(() => {
+    if (newParam === "true") {
+      handleReset()
+      return
+    }
     if (projectParam) {
       handleLoadProject(projectParam)
       return
@@ -95,7 +100,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     if (stored && !activeProjectId) {
       handleLoadProject(stored)
     }
-  }, [projectParam, activeProjectId, handleLoadProject])
+  }, [projectParam, newParam, activeProjectId, handleLoadProject, handleReset])
 
   const isAnyActive = isResearching || isDecomposing || isBatchRunning || activeModuleId !== null
   const currentStageLabel = getCurrentStageLabel(pathname)

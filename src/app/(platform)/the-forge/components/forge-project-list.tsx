@@ -242,7 +242,7 @@ function HeroSection(): React.ReactNode {
         </p>
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <Button asChild size="lg" className="gap-2">
-            <Link href="/the-forge/cad-lab">
+            <Link href="/the-forge/cad-lab?new=true">
               Start New Design
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -364,7 +364,7 @@ function PageHeader(): React.ReactNode {
       </div>
 
       <Button asChild>
-        <Link href="/the-forge/cad-lab">
+        <Link href="/the-forge/cad-lab?new=true">
           <Plus className="h-4 w-4 mr-2" />
           New Design
         </Link>
