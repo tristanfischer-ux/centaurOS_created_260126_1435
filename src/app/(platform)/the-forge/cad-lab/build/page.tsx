@@ -314,7 +314,7 @@ export default function CadLabBuildPage(): React.ReactNode {
               {/* Per-module status rows */}
               {modules.map((mod, idx) => {
                 const status = batchProgress[mod.id] || "queued"
-                const stepIndex = status === "queued" ? 0 : status === "interface" ? 1 : status === "generating" ? 2 : status === "done" ? 3 : -1
+                const stepIndex = status === "queued" ? 0 : status === "interface" ? 1 : status === "generating" ? 2 : status === "done" ? 3 : 0
                 const isError = status === "error"
                 const isActive = status === "interface" || status === "generating"
                 const isDone = status === "done"
