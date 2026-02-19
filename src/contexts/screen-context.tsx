@@ -201,6 +201,242 @@ const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
     title: "Inspiration Hub",
     summary: "The user is in the inspiration hub — templates and packs.",
   },
+  "/the-forge/new": {
+    title: "The Forge — New Design",
+    summary: "The user is creating a new design concept — describing what they want to build.",
+  },
+  "/the-forge/cad-lab/mashup": {
+    title: "The Forge — Mashup Lab",
+    summary: "The user is in the Mashup Lab — uploading and merging existing STEP files into a unified hybrid design.",
+  },
+  "/the-forge/cad-lab/templates": {
+    title: "The Forge — Templates",
+    summary: "The user is browsing design templates — pre-built starting points for common products.",
+  },
+  "/settings/company": {
+    title: "Company Settings",
+    summary: "The user is configuring company-level settings — foundry name, logo, and organizational details.",
+  },
+  "/settings/billing": {
+    title: "Billing Settings",
+    summary: "The user is managing billing — subscription plan, payment methods, and invoices.",
+  },
+  "/settings/intelligence": {
+    title: "AI Intelligence Settings",
+    summary: "The user is configuring AI intelligence preferences — model selection, specialist behavior, and data permissions.",
+  },
+  "/settings/help": {
+    title: "Help & Support",
+    summary: "The user is viewing help and support resources — documentation, FAQs, and contact options.",
+  },
+  "/provider-portal/pricing": {
+    title: "Provider Portal — Pricing",
+    summary: "The user is setting pricing for their marketplace listings — rates, packages, and terms.",
+  },
+  "/provider-portal/analytics": {
+    title: "Provider Portal — Analytics",
+    summary: "The user is viewing provider analytics — engagement, bookings, and revenue metrics.",
+  },
+  "/provider-portal/case-studies": {
+    title: "Provider Portal — Case Studies",
+    summary: "The user is managing case studies — showcasing past work and results for potential clients.",
+  },
+  "/provider-portal/settings": {
+    title: "Provider Portal — Settings",
+    summary: "The user is configuring provider settings — profile, notifications, and account preferences.",
+  },
+  "/provider-portal/discovery-calls": {
+    title: "Provider Portal — Discovery Calls",
+    summary: "The user is managing discovery calls — scheduling availability and reviewing incoming requests.",
+  },
+  "/provider-portal/apply": {
+    title: "Provider Portal — Apply",
+    summary: "The user is applying to become a marketplace provider — filling out their application.",
+  },
+  "/provider-portal/availability": {
+    title: "Provider Portal — Availability",
+    summary: "The user is setting availability — when they're open for bookings and engagements.",
+  },
+  "/provider-portal/profile": {
+    title: "Provider Portal — Profile",
+    summary: "The user is editing their provider profile — bio, expertise, and credentials.",
+  },
+  "/provider-portal/listing": {
+    title: "Provider Portal — Listing",
+    summary: "The user is managing their marketplace listing — service description, pricing, and media.",
+  },
+  "/provider-portal/payments": {
+    title: "Provider Portal — Payments",
+    summary: "The user is managing provider payments — Stripe Connect setup, payout history, and earnings.",
+  },
+  "/provider-portal/portfolio": {
+    title: "Provider Portal — Portfolio",
+    summary: "The user is managing their portfolio — work samples, project history, and testimonials.",
+  },
+  "/tools/cost-of-delay": {
+    title: "Cost of Delay Calculator",
+    summary: "The user is using the cost-of-delay calculator — estimating the financial impact of delaying work.",
+  },
+  "/tools/financial": {
+    title: "Financial Tools",
+    summary: "The user is using financial planning tools — projections, burn rate, and runway calculations.",
+  },
+  "/money-map": {
+    title: "Money Map",
+    summary: "The user is viewing the money map — financial overview, revenue streams, and cost structure.",
+  },
+  "/analytics": {
+    title: "Analytics",
+    summary: "The user is viewing analytics — performance metrics, usage data, and trends.",
+  },
+  "/timeline": {
+    title: "Timeline",
+    summary: "The user is viewing the timeline — chronological view of milestones, events, and progress.",
+  },
+  "/team/new": {
+    title: "Invite Team Member",
+    summary: "The user is inviting a new team member — entering their details and role.",
+  },
+  "/talent": {
+    title: "Talent",
+    summary: "The user is browsing talent — finding people and skill sets for their team.",
+  },
+  "/my-profile": {
+    title: "My Profile",
+    summary: "The user is viewing their own profile — personal details, role, and activity history.",
+  },
+  "/me": {
+    title: "My Account",
+    summary: "The user is viewing their account — personal settings and preferences.",
+  },
+  "/objectives": {
+    title: "Objectives",
+    summary: "The user is viewing objectives — organizational goals and key results.",
+  },
+  "/tasks": {
+    title: "Tasks",
+    summary: "The user is viewing the task list — work items, statuses, and assignments.",
+  },
+  "/blueprints": {
+    title: "Blueprints",
+    summary: "The user is browsing blueprints — pre-built strategic frameworks and templates.",
+  },
+  "/blueprints/explore": {
+    title: "Explore Blueprints",
+    summary: "The user is exploring the blueprint library — discovering frameworks for strategy, operations, and growth.",
+  },
+  "/org-blueprint": {
+    title: "Organizational Blueprint",
+    summary: "The user is viewing the org blueprint — organizational structure, roles, and coverage analysis.",
+  },
+  "/pitch-prep": {
+    title: "Pitch Prep",
+    summary: "The user is in pitch preparation — building investor decks, rehearsing, and refining their story.",
+  },
+  "/pitch-prep/create": {
+    title: "Create Pitch",
+    summary: "The user is creating a new pitch — defining audience, narrative, and key messages.",
+  },
+  "/plan": {
+    title: "Plan",
+    summary: "The user is viewing a plan — structured action items and milestones.",
+  },
+  "/marketplace-hub": {
+    title: "Marketplace Hub",
+    summary: "The user is viewing the marketplace hub — centralized view of all marketplace activity.",
+  },
+  "/marketplace-v2": {
+    title: "Marketplace",
+    summary: "The user is browsing the marketplace — finding services, experts, and suppliers.",
+  },
+  "/marketplace-setup": {
+    title: "Marketplace Setup",
+    summary: "The user is setting up their marketplace presence — configuring listings and provider profile.",
+  },
+  "/orders": {
+    title: "Orders",
+    summary: "The user is viewing orders — tracking purchases, deliveries, and fulfillment.",
+  },
+  "/my-orders": {
+    title: "My Orders",
+    summary: "The user is viewing their personal orders — purchases and booking history.",
+  },
+  "/rfq/create": {
+    title: "Create RFQ",
+    summary: "The user is creating a request for quotation — specifying requirements for suppliers to bid on.",
+  },
+  "/retainers/new": {
+    title: "New Retainer",
+    summary: "The user is setting up a new retainer — ongoing service engagement with a provider.",
+  },
+  "/buyer": {
+    title: "Buyer Dashboard",
+    summary: "The user is in the buyer dashboard — managing procurement, RFQs, and supplier relationships.",
+  },
+  "/buyer/analytics": {
+    title: "Buyer Analytics",
+    summary: "The user is viewing buyer analytics — procurement spend, supplier performance, and savings.",
+  },
+  "/provider-signup": {
+    title: "Provider Signup",
+    summary: "The user is signing up as a marketplace provider — creating their provider account.",
+  },
+  "/saved-resources": {
+    title: "Saved Resources",
+    summary: "The user is viewing saved resources — bookmarked providers, listings, and content.",
+  },
+  "/inbox": {
+    title: "Inbox",
+    summary: "The user is viewing their inbox — notifications, messages, and action items.",
+  },
+  "/new-inbox": {
+    title: "Inbox",
+    summary: "The user is viewing their inbox — notifications, messages, and action items requiring attention.",
+  },
+  "/canvas": {
+    title: "Canvas",
+    summary: "The user is in the canvas workspace — visual collaboration, whiteboarding, and brainstorming.",
+  },
+  "/workshop": {
+    title: "Workshop",
+    summary: "The user is in the workshop — hands-on tools for building and prototyping ideas.",
+  },
+  "/product-xray": {
+    title: "Product X-Ray",
+    summary: "The user is using Product X-Ray — deep analysis of a physical product from photos or descriptions.",
+  },
+  "/agents/artifacts": {
+    title: "Specialist Artifacts",
+    summary: "The user is viewing specialist artifacts — documents, analyses, and outputs created by AI specialists.",
+  },
+  "/home": {
+    title: "Home",
+    summary: "The user is on the home page — overview of their foundry activity and quick navigation.",
+  },
+  "/dashboard": {
+    title: "Dashboard",
+    summary: "The user is on the dashboard — high-level view of foundry metrics and activity.",
+  },
+  "/admin": {
+    title: "Admin",
+    summary: "The user is in the admin panel — system administration and management tools.",
+  },
+  "/admin/waitlist": {
+    title: "Admin — Waitlist",
+    summary: "The user is managing the waitlist — reviewing and approving signups.",
+  },
+  "/help": {
+    title: "Help",
+    summary: "The user is viewing the help center — documentation, guides, and support resources.",
+  },
+  "/whats-new": {
+    title: "What's New",
+    summary: "The user is viewing the changelog — recent updates, new features, and improvements to ForgeOS.",
+  },
+  "/google-apps": {
+    title: "Google Apps Integration",
+    summary: "The user is managing Google Apps integration — connecting Google Workspace services.",
+  },
 }
 
 /** Returns true if the segment looks like a UUID or other dynamic route param */

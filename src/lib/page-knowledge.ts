@@ -454,6 +454,193 @@ const PAGE_KNOWLEDGE: PageKnowledge[] = [
       "Decision discussion: Start thread -> @mention stakeholders -> Attach context -> Reach decision -> Create tasks",
     ],
   },
+  {
+    route: "/settings",
+    title: "Settings",
+    purpose: "Configure your account, company, billing, AI preferences, and integrations.",
+    features: [
+      {
+        name: "Company Settings",
+        description: "Set your foundry name, logo, industry, and organizational details.",
+        howToAccess: "Click 'Company' in the settings sidebar.",
+        whenToUse: "When setting up your foundry or updating company information.",
+      },
+      {
+        name: "Billing & Plans",
+        description: "Manage your subscription, payment methods, and view invoices.",
+        howToAccess: "Click 'Billing' in the settings sidebar.",
+        whenToUse: "When upgrading your plan or managing payments.",
+      },
+      {
+        name: "AI Intelligence",
+        description: "Configure how AI specialists behave — model preferences and data permissions.",
+        howToAccess: "Click 'Intelligence' in the settings sidebar.",
+        whenToUse: "When you want to fine-tune AI behavior or manage data access.",
+      },
+    ],
+    gettingStarted: [
+      "Set up your company profile under Company settings",
+      "Review your billing plan",
+      "Configure AI intelligence preferences",
+    ],
+    workflows: [
+      "Initial setup: Company details -> Billing plan -> Intelligence preferences -> Invite team",
+    ],
+  },
+  {
+    route: "/knowledge",
+    title: "Knowledge Vault",
+    purpose: "Store and organize institutional knowledge — documents, notes, and reference materials that specialists can draw on.",
+    features: [
+      {
+        name: "Add Document",
+        description: "Upload or create a knowledge document that specialists can reference.",
+        howToAccess: "Click '+ Add' or '+ New Document' at the top of the page.",
+        whenToUse: "When you have important information that should inform AI specialist responses.",
+      },
+      {
+        name: "Search Knowledge",
+        description: "Find specific documents or information across your knowledge base.",
+        howToAccess: "Use the search bar at the top of the page.",
+        whenToUse: "When looking for specific reference material or past decisions.",
+      },
+    ],
+    gettingStarted: [
+      "Add your first document — company context, product specs, or competitive analysis",
+      "Specialists automatically reference knowledge vault content in their advice",
+    ],
+    workflows: [
+      "Knowledge capture: Create document -> Tag with category -> Specialists reference it automatically",
+    ],
+  },
+  {
+    route: "/rfq",
+    title: "Requests for Quotation",
+    purpose: "Create and manage RFQs — send engineering packages to suppliers and compare quotes.",
+    features: [
+      {
+        name: "Create RFQ",
+        description: "Start a new request for quotation with specifications and requirements.",
+        howToAccess: "Click '+ New RFQ' or 'Create RFQ' at the top of the page.",
+        whenToUse: "When you have a design ready and need manufacturing quotes.",
+      },
+      {
+        name: "Track Responses",
+        description: "Monitor which suppliers have viewed and responded to your RFQs.",
+        howToAccess: "Click on any RFQ card to see its status and responses.",
+        whenToUse: "When following up on sent quotation requests.",
+      },
+    ],
+    gettingStarted: [
+      "Complete a design in The Forge first — RFQs are generated from engineering packages",
+      "Create an RFQ and send it to relevant suppliers",
+      "Compare responses and select a supplier",
+    ],
+    workflows: [
+      "Procurement: Design in Forge -> Generate RFQ package -> Send to suppliers -> Compare quotes -> Award contract",
+    ],
+  },
+  {
+    route: "/retainers",
+    title: "Retainers",
+    purpose: "Manage ongoing service engagements — track hours, deliverables, and payments with retained providers.",
+    features: [
+      {
+        name: "Create Retainer",
+        description: "Set up a new ongoing service agreement with a provider.",
+        howToAccess: "Click '+ New Retainer' at the top of the page.",
+        whenToUse: "When engaging a provider for ongoing work rather than a one-off project.",
+      },
+      {
+        name: "Track Time",
+        description: "Log and review hours against retainer agreements.",
+        howToAccess: "Click on a retainer, then use the timesheet tab.",
+        whenToUse: "When reviewing provider utilization or approving timesheets.",
+      },
+    ],
+    gettingStarted: [
+      "Find a provider in the marketplace",
+      "Set up a retainer with scope, hours, and terms",
+      "Track progress via the timesheet",
+    ],
+    workflows: [
+      "Retainer lifecycle: Find provider -> Create retainer -> Track work -> Review timesheets -> Renew or close",
+    ],
+  },
+  {
+    route: "/updates",
+    title: "Activity Feed",
+    purpose: "See what's happening across your foundry — recent changes, completions, and team activity in chronological order.",
+    features: [
+      {
+        name: "View Activity",
+        description: "Browse recent changes across tasks, objectives, and team actions.",
+        howToAccess: "Activity loads automatically, newest first.",
+        whenToUse: "When you want to catch up on what happened while you were away.",
+      },
+    ],
+    gettingStarted: [
+      "Scroll through to see what your team has been working on",
+      "Click any activity item to jump to the related task or objective",
+    ],
+    workflows: [
+      "Catch-up: Review activity feed -> Click items needing attention -> Take action",
+    ],
+  },
+  {
+    route: "/pitch-prep",
+    title: "Pitch Prep",
+    purpose: "Prepare investor pitches — build your narrative, rehearse with AI, and refine your deck.",
+    features: [
+      {
+        name: "Create Pitch",
+        description: "Start a new pitch preparation with audience, narrative arc, and key messages.",
+        howToAccess: "Click '+ New Pitch' or 'Create Pitch' at the top.",
+        whenToUse: "When preparing for an investor meeting, demo day, or stakeholder presentation.",
+      },
+      {
+        name: "AI Rehearsal",
+        description: "Practice your pitch with an AI that asks tough questions investors would ask.",
+        howToAccess: "Open a pitch, then click 'Rehearse' or 'Practice'.",
+        whenToUse: "Before your actual presentation to build confidence and anticipate questions.",
+      },
+    ],
+    gettingStarted: [
+      "Create a pitch with your target audience in mind",
+      "Let AI help structure your narrative",
+      "Rehearse with the AI investor to prepare for tough questions",
+    ],
+    workflows: [
+      "Pitch prep: Create pitch -> Define narrative -> Build deck -> AI rehearsal -> Refine -> Present",
+    ],
+  },
+  {
+    route: "/blueprints",
+    title: "Blueprints",
+    purpose: "Pre-built strategic and operational frameworks — templates for common business processes and organizational patterns.",
+    features: [
+      {
+        name: "Browse Blueprints",
+        description: "Explore the library of pre-built frameworks and templates.",
+        howToAccess: "Scroll through the blueprint grid or use category filters.",
+        whenToUse: "When starting a new initiative and want proven frameworks to follow.",
+      },
+      {
+        name: "Apply Blueprint",
+        description: "Apply a blueprint to create pre-configured objectives, tasks, and structures.",
+        howToAccess: "Click 'Apply' or 'Use This Blueprint' on any blueprint card.",
+        whenToUse: "When you've found a framework that fits your situation.",
+      },
+    ],
+    gettingStarted: [
+      "Browse available blueprints to find one matching your current challenge",
+      "Preview what a blueprint creates before applying",
+      "Apply and customize to fit your specific needs",
+    ],
+    workflows: [
+      "Blueprint usage: Browse library -> Preview -> Apply -> Customize -> Execute",
+    ],
+  },
 ]
 
 // ─── Lookup Functions ───────────────────────────────────────────────────────

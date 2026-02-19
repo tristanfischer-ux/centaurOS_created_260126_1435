@@ -24,7 +24,7 @@ import { AdvisorPanel } from "@/components/specialists/advisor-panel";
 import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
 import { ProfileSetupRequired } from "@/components/ProfileSetupRequired";
 import { createClient } from "@/lib/supabase/server";
-import { getUserFoundries } from "@/lib/supabase/foundry-context";
+import { getCachedLayoutData } from "@/lib/supabase/cached-layout-data";
 import { redirect } from "next/navigation";
 
 export default async function PlatformLayout({
@@ -32,6 +32,7 @@ export default async function PlatformLayout({
 }: Readonly<{
     children: React.ReactNode;
 }>) {
+    // AUTH: Auth check runs every request (not cached) — required for security
     const supabase = await createClient();
 
     const {
@@ -42,48 +43,35 @@ export default async function PlatformLayout({
         redirect("/login");
     }
 
-    // Fetch profile and foundry memberships in parallel
-    const [profileResult, foundriesResult] = await Promise.all([
-        supabase
-            .from("profiles")
-            .select("foundry_id, active_foundry_id, full_name, role, account_type, onboarding_data")
-            .eq("id", user.id)
-            .single(),
-        getUserFoundries(),
-    ]);
-    const userFoundries = foundriesResult.foundries;
+    // PERF: All layout data (profile, foundries, permissions) is cached for 60s
+    // per user. This eliminates 3-5 DB round-trips on every page navigation.
+    const layoutData = await getCachedLayoutData(user.id);
 
-    let { data: profile, error: profileError } = profileResult;
+    let { profile } = layoutData;
+    const { foundryName, foundryId, foundryLogoUrl, hasAdminAccess, userFoundries } = layoutData;
 
-    // If the regular profile query fails (e.g. RLS 500), attempt auto-repair
-    // via the SECURITY DEFINER RPC. This transparently fixes broken profiles
-    // without showing the user a manual "Complete Setup" screen.
-    if (profileError) {
-        console.warn("[PlatformLayout] Profile query failed, attempting auto-repair:", profileError.message);
+    // GOTCHA: The cached path uses the admin client (bypasses RLS), so profile
+    // will only be null if the row truly doesn't exist — not due to RLS failures.
+    // Auto-repair is still needed for brand-new users whose profile hasn't been
+    // created yet.
+    if (!profile) {
+        console.warn("[PlatformLayout] Profile not found, attempting auto-repair for user:", user.id);
 
         const { data: rpcResult, error: rpcError } = await supabase.rpc("repair_user_profile");
 
-        // AUTH: Type-narrow the RPC result — the repair_user_profile function
-        // returns { success: boolean, foundry_id: string } or { error: string }
         const repairResult = rpcResult as Record<string, unknown> | null;
         if (!rpcError && repairResult?.success && repairResult?.foundry_id) {
             console.info("[PlatformLayout] Auto-repair succeeded:", repairResult);
 
-            // Re-fetch the profile now that it's been repaired
-            const { data: repairedProfile, error: refetchError } = await supabase
+            const { data: repairedProfile } = await supabase
                 .from("profiles")
                 .select("foundry_id, active_foundry_id, full_name, role, account_type, onboarding_data")
                 .eq("id", user.id)
                 .single();
 
-            if (!refetchError && repairedProfile) {
+            if (repairedProfile) {
                 profile = repairedProfile;
-                profileError = null;
             } else {
-                // The re-fetch also failed (persistent RLS issue). Construct a
-                // minimal profile from auth metadata + RPC result so the layout
-                // can render. This prevents the repair screen from looping.
-                console.warn("[PlatformLayout] Re-fetch failed, using fallback profile:", refetchError?.message);
                 const meta = user.user_metadata ?? {};
                 profile = {
                     foundry_id: repairResult.foundry_id as string,
@@ -93,60 +81,13 @@ export default async function PlatformLayout({
                     account_type: "team_builder" as const,
                     onboarding_data: null,
                 };
-                profileError = null;
             }
         } else {
             console.error("[PlatformLayout] Auto-repair failed:", rpcError?.message ?? repairResult?.error);
         }
     }
 
-    let foundryName = "Forge Foundry";
-    let foundryId = "Unknown";
-    let foundryLogoUrl: string | null = null;
-    let hasAdminAccess = false;
-
-    // PERF: Fetch foundry details and admin permissions in parallel
-    // (previously sequential — saved ~50-100ms)
-    if (profile?.foundry_id) {
-        foundryId = profile.foundry_id;
-
-        const needsAdminCheck = profile.role !== "Founder";
-
-        const [foundryResult, adminPermResult] = await Promise.all([
-            supabase
-                .from("foundries")
-                .select("name, logo_url")
-                .eq("id", profile.foundry_id)
-                .maybeSingle(),
-            needsAdminCheck
-                ? supabase
-                    .from("foundry_admin_permissions")
-                    .select("id")
-                    .eq("foundry_id", profile.foundry_id)
-                    .eq("profile_id", user.id)
-                    .maybeSingle()
-                : Promise.resolve({ data: null, error: null }),
-        ]);
-
-        if (foundryResult.error) {
-            console.error("Failed to fetch foundry:", foundryResult.error.message);
-        }
-
-        if (foundryResult.data) {
-            foundryName = foundryResult.data.name;
-            foundryLogoUrl = foundryResult.data.logo_url || null;
-        }
-
-        hasAdminAccess = !!adminPermResult.data;
-    }
-
-    // Resolve the active foundry display name from multi-foundry data
-    // This is more reliable than the legacy foundryName for switched workspaces
-    const activeFoundry = userFoundries.find(f => f.isActive)
-    const activeFoundryDisplayName = activeFoundry?.foundryName || foundryName
-
     // GUARD: If user has no valid foundry, show recovery screen instead of page content.
-    // The sidebar still renders so the user isn't completely disoriented.
     const needsProfileRepair = !profile?.foundry_id
 
     return (
@@ -188,8 +129,8 @@ export default async function PlatformLayout({
                         <ActivityTracker />
                         {!needsProfileRepair && (
                             <>
-                                <OnboardingModal userRole={profile?.role} accountType={profile?.account_type} />
-                                <ExecutiveProfilePrompt userRole={profile?.role} />
+                                <OnboardingModal userRole={profile?.role ?? undefined} accountType={profile?.account_type} />
+                                <ExecutiveProfilePrompt userRole={profile?.role ?? undefined} />
                             </>
                         )}
                         <Suspense fallback={null}>

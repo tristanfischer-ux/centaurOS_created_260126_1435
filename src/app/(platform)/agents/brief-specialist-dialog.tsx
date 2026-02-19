@@ -992,6 +992,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             const MAX_ATTEMPTS = 2
             let fullResponse = ""
             let rolloutIdFromResponse: string | null = null
+            const useSpeculative = !!(specialist.speculativeEnabled && !isSlideRequest)
 
             for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
                 // Fresh AbortController per attempt — a previous TTFB timeout
@@ -1006,7 +1007,6 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                     if (!controller.signal.aborted) controller.abort()
                 }, MESSAGE_TTFB_TIMEOUT_MS)
 
-                const useSpeculative = !!(specialist.speculativeEnabled && !isSlideRequest)
                 if (useSpeculative && attempt === 1) {
                     setIsSpeculativeMode(true)
                     setSpeculativeFastResponse("")

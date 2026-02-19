@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils"
 import { listCadLabProjects } from "@/actions/cad-lab-projects"
 import { listRecentAssemblies } from "@/actions/assembly-builder"
 import { RecentProjectsGrid } from "./recent-projects-grid"
+import { ForgeScreenContext } from "./forge-screen-context"
 
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 import type { AssemblySummary } from "@/actions/assembly-builder"
@@ -160,6 +161,11 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
 
   return (
     <div className="space-y-10">
+      <ForgeScreenContext
+        projects={projects}
+        assemblies={assemblies}
+        hasInProgressProject={!!inProgressProject}
+      />
       <PageHeader />
 
       {hasLoadError && (
