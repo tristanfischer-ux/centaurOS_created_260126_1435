@@ -16,7 +16,7 @@ import type { ConversationMessage } from "@/lib/agent-memory"
 import { buildAIContext } from "@/lib/ai-context/builder"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
-import { compilePersonalityPrompt } from "@/lib/agents/personality"
+import { compilePersonalityPrompt, compileRelationshipContext } from "@/lib/agents/personality"
 import { compileTemporalPrompt } from "@/lib/agents/temporal-context"
 import { compileEmotionalPrompt } from "@/lib/agents/emotional-context"
 import {
@@ -26,6 +26,22 @@ import {
     recordInteraction,
 } from "@/lib/agents/founder-preferences"
 import { createRollout, addSpan, finishRollout } from "@/lib/agent-spans"
+// AUDIT: Converted 9 dynamic imports to static (2026-02-19, refactor step 5 of 8).
+// Dynamic imports in a server-side API route provide no bundle benefit. Static
+// imports improve readability and eliminate runtime import overhead.
+import { getSpecialistWorkflows } from "@/lib/agents/specialist-workflows"
+import { getSpecialistState, compileSpecialistStatePrompt } from "@/lib/agents/specialist-state"
+import {
+    getRecentDecisions,
+    compileDecisionJournalPrompt,
+    detectDecisionPatterns,
+    containsDecisionSignal,
+    extractDecisionSummary,
+    recordDecision,
+} from "@/lib/agents/decision-journal"
+import { getRecentIntelligenceReports } from "@/lib/agents/intelligence-sweep-orchestrator"
+import { compileIntelligencePrompt } from "@/lib/agents/external-intelligence"
+import { searchKnowledgeForSpecialist } from "@/lib/knowledge-vault"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -476,7 +492,6 @@ export async function POST(request: Request) {
 
             // Inject relationship awareness for cross-specialist dynamics
             if (specialist.personality.relationships) {
-                const { compileRelationshipContext } = await import("@/lib/agents/personality")
                 const relationshipBlock = compileRelationshipContext(
                     specialist.name,
                     specialist.personality.relationships,
@@ -597,7 +612,6 @@ DO NOT:
             }
 
             // Workflow capabilities: let the specialist know what they can produce
-            const { getSpecialistWorkflows } = await import("@/lib/agents/specialist-workflows")
             const workflows = getSpecialistWorkflows(specialistId as SpecialistId)
             if (workflows.length > 0) {
                 const workflowList = workflows
@@ -664,7 +678,6 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
         // Specialist emotional state and relationship depth
         if (foundryId && threadId && specialistId) {
             try {
-                const { getSpecialistState, compileSpecialistStatePrompt } = await import("@/lib/agents/specialist-state")
                 const specialist = getSpecialistById(specialistId)
                 const { emotional, relationship } = await getSpecialistState(threadId, foundryId)
                 const stateBlock = compileSpecialistStatePrompt(emotional, relationship, specialist?.name ?? specialistId)
@@ -680,7 +693,6 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
         // Decision journal: past decisions for "remember when" references
         if (foundryId && specialistId) {
             try {
-                const { getRecentDecisions, compileDecisionJournalPrompt, detectDecisionPatterns } = await import("@/lib/agents/decision-journal")
                 const decisions = await getRecentDecisions(foundryId, specialistId, 10)
                 const journalBlock = compileDecisionJournalPrompt(decisions)
                 if (journalBlock) {
@@ -700,8 +712,6 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
         // External intelligence: recent reports from monitoring sweeps
         if (foundryId && specialistId) {
             try {
-                const { getRecentIntelligenceReports } = await import("@/lib/agents/intelligence-sweep-orchestrator")
-                const { compileIntelligencePrompt } = await import("@/lib/agents/external-intelligence")
                 const reports = await getRecentIntelligenceReports(foundryId, 3, specialistId)
                 const intelligenceBlock = compileIntelligencePrompt(reports, specialistId as SpecialistId)
                 if (intelligenceBlock) {
@@ -716,7 +726,6 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
         // Knowledge Vault: inject relevant organizational knowledge
         if (foundryId && specialistId) {
             try {
-                const { searchKnowledgeForSpecialist } = await import("@/lib/knowledge-vault")
                 const vaultContext = await searchKnowledgeForSpecialist(
                     foundryId,
                     input || finalPrompt.slice(0, 500),
@@ -816,7 +825,6 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
 
                 // Detect and record decisions from the user's message
                 try {
-                    const { containsDecisionSignal, extractDecisionSummary, recordDecision } = await import("@/lib/agents/decision-journal")
                     const userMsg = input.trim() || finalPrompt.slice(0, 500)
                     if (containsDecisionSignal(userMsg) && specialistId) {
                         const summary = extractDecisionSummary(userMsg, fullOutput.slice(0, 500))
