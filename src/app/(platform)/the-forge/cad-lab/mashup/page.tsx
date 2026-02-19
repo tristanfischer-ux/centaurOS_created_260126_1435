@@ -166,42 +166,52 @@ export default function MashupPage(): React.ReactElement {
       )}
 
       {step === "concept" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Step 2: Describe your mashup
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="mashup-concept">What do you want to create?</Label>
-              <Textarea
-                id="mashup-concept"
-                placeholder="e.g. A toaster with a built-in FM radio and speaker grille on the side"
-                value={concept}
-                onChange={(e) => setConcept(e.target.value)}
-                rows={4}
-                className="resize-none"
-              />
-            </div>
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            <div className="flex justify-between">
-              <Button variant="secondary" onClick={() => setStep("sources")}>
-                Back
-              </Button>
-              <Button onClick={handleGenerate} disabled={!canGenerate}>
-                <Sparkles className="h-4 w-4 mr-2" />
-                Generate mashup
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <>
+          <Card className="bg-muted/50">
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">
+                <strong>Selected sources:</strong> {sources.map((s) => s.name).join(", ")}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Step 2: Describe your mashup
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="mashup-concept">What do you want to create?</Label>
+                <Textarea
+                  id="mashup-concept"
+                  placeholder="e.g. A toaster with a built-in FM radio and speaker grille on the side"
+                  value={concept}
+                  onChange={(e) => setConcept(e.target.value)}
+                  rows={4}
+                  className="resize-none"
+                />
+              </div>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              <div className="flex justify-between">
+                <Button variant="secondary" onClick={() => setStep("sources")}>
+                  Back
+                </Button>
+                <Button onClick={handleGenerate} disabled={!canGenerate}>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate mashup
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {step === "generating" && (
@@ -303,15 +313,6 @@ export default function MashupPage(): React.ReactElement {
         </Card>
       )}
 
-      {step === "concept" && (
-        <Card className="bg-muted/50">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">
-              <strong>Selected sources:</strong> {sources.map((s) => s.name).join(", ")}
-            </p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }
