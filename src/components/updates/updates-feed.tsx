@@ -217,7 +217,7 @@ export function UpdatesFeed({
       </div>
 
       {/* Feed content */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 [&>[data-radix-scroll-area-viewport]>div]:!block">
         {isLoading ? (
           <FeedSkeleton />
         ) : timeGroups.length === 0 ? (
