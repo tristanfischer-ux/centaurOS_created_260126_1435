@@ -11,37 +11,10 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { runMorningBriefing } from '@/lib/agents/morning-brief'
 import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
+// AUDIT: verifyCronSecret extracted to shared cron-auth.ts (2026-02-19, refactor step 1 of 8)
+import { verifyCronSecret } from '@/lib/security/cron-auth'
 
 export const dynamic = 'force-dynamic'
-
-/**
- * Verifies cron authorization headers against the configured shared secret.
- *
- * @description Enforces fail-closed authorization for cron invocations. Returns
- * an HTTP response when authorization should be denied and null when the
- * request is authorized to proceed.
- *
- * @param {Request} request - Incoming cron request
- * @returns {NextResponse | null} Authorization failure response or null
- *
- * @security Requires CRON_SECRET and a matching Bearer token
- */
-function verifyCronSecret(request: Request): NextResponse | null {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-
-  // SECURITY: Fail closed when CRON_SECRET is not configured.
-  if (!cronSecret) {
-    console.error('[MorningBriefCron] CRON_SECRET is not configured')
-    return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })
-  }
-
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  return null
-}
 
 /**
  * GET /api/cron/morning-brief

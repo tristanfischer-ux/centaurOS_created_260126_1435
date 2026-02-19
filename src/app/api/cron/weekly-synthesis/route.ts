@@ -17,31 +17,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runWeeklySynthesis } from '@/lib/agents/sweep-synthesis'
 import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
-
-/**
- * Verifies the cron secret to prevent unauthorized access.
- *
- * @param req - Incoming request
- * @returns Unauthorized/configuration response when invalid; otherwise null.
- *
- * @security Fail-closed in all environments when CRON_SECRET is missing.
- */
-function verifyCronSecret(req: NextRequest): NextResponse | null {
-  const cronSecret = process.env.CRON_SECRET
-
-  // SECURITY: Fail closed when cron secret is not configured.
-  if (!cronSecret) {
-    console.error('[SECURITY] CRON_SECRET not configured')
-    return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })
-  }
-
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  return null
-}
+// AUDIT: verifyCronSecret extracted to shared cron-auth.ts (2026-02-19, refactor step 1 of 8)
+import { verifyCronSecret } from '@/lib/security/cron-auth'
 
 /**
  * GET /api/cron/weekly-synthesis

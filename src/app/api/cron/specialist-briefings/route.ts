@@ -14,19 +14,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateSpecialistBriefings, type BriefingType } from '@/lib/agents/specialist-briefings'
 import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
-
-function verifyCronSecret(req: NextRequest): NextResponse | null {
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) {
-    console.error('[SECURITY] CRON_SECRET not configured')
-    return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })
-  }
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  return null
-}
+// AUDIT: verifyCronSecret extracted to shared cron-auth.ts (2026-02-19, refactor step 1 of 8)
+import { verifyCronSecret } from '@/lib/security/cron-auth'
 
 /**
  * Map UTC hour (0-23) to briefing type. 6 = morning, 12 = midday, 17 = evening.
