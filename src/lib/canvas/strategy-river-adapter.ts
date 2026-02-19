@@ -111,10 +111,18 @@ function bundleToRiverSO(
       })
     })
 
+    // Milestone bar never ends before its latest task — auto-extend to max of explicit due and all task ends
+    const explicitDue =
+      milestone.milestone_date?.slice(0, 10) ??
+      goal.milestone_date?.slice(0, 10) ??
+      todayISO
+    const taskEnds = riverTasks.map((t) => t.end)
+    const effectiveDue = [explicitDue, ...taskEnds].sort().pop() ?? explicitDue
+
     return {
       id: milestone.id,
       title: milestone.title,
-      dueDate: milestone.milestone_date?.slice(0, 10) ?? goal.milestone_date?.slice(0, 10) ?? todayISO,
+      dueDate: effectiveDue,
       tasks: riverTasks,
     }
   })
@@ -125,12 +133,20 @@ function bundleToRiverSO(
     ? allStarts.sort()[0]
     : goal.created_at?.slice(0, 10) ?? todayISO
 
+  // Strategic objective bar never ends before latest milestone or task — auto-extend to max of all end dates
+  const allEnds = [
+    goal.milestone_date?.slice(0, 10) ?? todayISO,
+    ...riverObjectives.map((o) => o.dueDate),
+    ...riverObjectives.flatMap((o) => o.tasks.map((t) => t.end)),
+  ]
+  const targetDate = allEnds.sort().pop() ?? goal.milestone_date?.slice(0, 10) ?? todayISO
+
   return {
     id: goal.id,
     title: goal.title,
     color: SO_COLORS[colorIndex % SO_COLORS.length],
     startDate,
-    targetDate: goal.milestone_date?.slice(0, 10) ?? todayISO,
+    targetDate,
     // Show all milestones, even those without tasks yet.
     // This ensures the river structure is always visible so users can
     // see their strategic plan and add tasks/objectives as needed.
