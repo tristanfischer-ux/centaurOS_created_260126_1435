@@ -1,6 +1,7 @@
 ---
 description: Consistent navigation patterns, active states, and menu styling
-alwaysApply: true
+alwaysApply: false
+globs: ["**/*nav*.tsx", "**/*sidebar*.tsx", "**/*header*.tsx", "**/Nav*.tsx", "**/Sidebar*.tsx"]
 ---
 
 # Navigation Consistency Standards

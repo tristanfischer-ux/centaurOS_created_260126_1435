@@ -6,6 +6,9 @@ These patterns establish visual elegance, polish, and consistency across all For
 
 ## 1. Card & Container Patterns
 
+### Whitespace and card quality (Purpose Dialog standard)
+Let content breathe: card padding `p-6` (not `p-3`/`p-4`), section gaps `space-y-6` or `space-y-8`, internal content `space-y-4`. Role colors: use **international-orange** or **neutral** for human roles (Founder/Executive = orange, Apprentice = muted); AI_Agent = violet. Never purple/blue for human roles. Use **conversational** section headers (sentence case), not UPPERCASE. Primary CTAs: `bg-international-orange`. Profile cards: UserAvatar + role badge, spacious metrics grid (`gap-6 p-6 rounded-xl bg-muted/30`), action footer with border-t. Empty states: icon + heading + description (see §3). Reference: `src/components/objectives/company-purpose-dialog.tsx`.
+
 ### Standard Card
 All cards should use rounded-xl with subtle shadows and borders:
 
@@ -344,9 +347,12 @@ Expandable input triggers should be inviting:
 ## Checklist Before Committing
 
 - [ ] Cards use `rounded-xl border shadow-sm`
+- [ ] Card padding `p-6`, section gaps `space-y-6` (not cramped)
+- [ ] Role/avatar colors: orange or neutral (never purple/blue for human roles)
+- [ ] Section headers sentence case, not UPPERCASE
 - [ ] Interactive elements have `duration-200 ease-out` transitions
 - [ ] Section headers have accent bars matching content theme
-- [ ] Empty states use soft `bg-muted/30` with large centered icons
+- [ ] Empty states use soft `bg-muted/30` with large centered icons + heading + description
 - [ ] No harsh dashed borders (use soft dashed: `border-dashed border-muted`)
 - [ ] Hover states use `/50` opacity backgrounds
 - [ ] Selection states use brand colors (`ring-international-orange/50`)
@@ -356,3 +362,4 @@ Expandable input triggers should be inviting:
 - [ ] Large icon containers use `rounded-xl bg-{color}/10`
 - [ ] Chart cards have icon containers in headers
 - [ ] Quick add triggers use inviting styling with hover transitions
+- [ ] Borders use semantic `border` token (not `border-slate-*`)

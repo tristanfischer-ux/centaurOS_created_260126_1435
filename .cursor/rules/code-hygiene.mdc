@@ -24,16 +24,9 @@ async function fetchUser(id: string): Promise<User | null> {
   return data
 }
 
-// ❌ WRONG - Implicit return type, missing parameter types
-function calculateTotal(items, discount) {
-  return items.reduce((sum, item) => sum + item.price, 0) * (1 - discount)
-}
-
-// ❌ WRONG - Relying on inference for non-trivial functions
-const fetchUser = async (id) => {
-  const { data } = await supabase.from('users').select().eq('id', id).single()
-  return data
-}
+// ❌ WRONG - Missing types
+function calculateTotal(items, discount) { ... }
+const fetchUser = async (id) => { ... }
 ```
 
 ### Avoid `any` - Use `unknown` + Type Guards
@@ -58,13 +51,7 @@ function isUser(value: unknown): value is User {
   )
 }
 
-// ❌ WRONG - Using any hides type errors
-function processApiResponse(response: any): User {
-  return response  // No type safety
-}
-
-// ❌ WRONG - Casting any to bypass checks
-const user = response as any as User  // Double cast smell
+// ❌ WRONG - any or as any as User
 ```
 
 ### Use `satisfies` for Type-Safe Object Literals
@@ -81,20 +68,7 @@ const STATUS_COLORS = {
 
 // TypeScript knows: STATUS_COLORS.pending is exactly 'bg-status-warning-light'
 
-// ❌ WRONG - Type annotation loses literal types
-const STATUS_COLORS: Record<TaskStatus, string> = {
-  pending: 'bg-status-warning-light',
-  active: 'bg-status-success-light',
-  cancelled: 'bg-status-error-light',
-}
-// TypeScript only knows: STATUS_COLORS.pending is string
-
-// ❌ WRONG - No type checking at all
-const STATUS_COLORS = {
-  pending: 'bg-status-warning-light',
-  active: 'bg-status-success-light',
-  // Missing 'cancelled' - no error!
-}
+// ❌ WRONG - Type annotation loses literals; or no type = missing keys undetected
 ```
 
 ### Type Assertion Guidelines
@@ -111,14 +85,7 @@ const element = document.getElementById('root')
 if (!element) throw new Error('Root element not found')
 // Now element is HTMLElement, not HTMLElement | null
 
-// ❌ WRONG - Assertion without justification
-const foundryId = user.foundry_id as string  // Why is this safe?
-
-// ❌ WRONG - Bypassing null check with assertion
-const element = document.getElementById('root') as HTMLElement  // Could be null!
-
-// ❌ WRONG - Using ! operator without validation
-const name = user.profile!.name  // Will crash if profile is undefined
+// ❌ WRONG - Assertion without justification; as HTMLElement without null check; profile!.name
 ```
 
 ## 2. Naming Conventions
@@ -138,63 +105,8 @@ const name = user.profile!.name  // Will crash if profile is undefined
 ### Examples
 
 ```tsx
-// ✅ CORRECT - Following naming conventions
-
-// File: TaskCard.tsx (component - PascalCase)
-// File: format-date.ts (utility - kebab-case)
-// File: useTaskList.ts (hook - camelCase with use prefix)
-
-// Constants
-const MAX_RETRY_COUNT = 3
-const DEFAULT_PAGE_SIZE = 20
-const API_TIMEOUT_MS = 5000
-
-// Boolean variables
-const isLoading = status === 'loading'
-const hasPermission = user.role === 'admin'
-const shouldShowBanner = !dismissed && isNewUser
-const canEdit = isOwner || isAdmin
-
-// Functions (verb-first)
-function fetchUserById(id: string): Promise<User> { ... }
-function calculateDiscountedPrice(price: number, discount: number): number { ... }
-function validateEmailFormat(email: string): boolean { ... }
-
-// Event handlers
-function handleFormSubmit(e: FormEvent): void { ... }
-function handleDeleteClick(): void { ... }
-
-// Component with callback props
-interface TaskCardProps {
-  task: Task
-  onClick: () => void      // Callback prop: on prefix
-  onDelete: () => void     // Callback prop: on prefix
-}
-
-function TaskCard({ task, onClick, onDelete }: TaskCardProps) {
-  // Internal handler: handle prefix
-  function handleDeleteClick(): void {
-    if (confirm('Delete?')) {
-      onDelete()
-    }
-  }
-  
-  return (
-    <Card onClick={onClick}>
-      <Button onClick={handleDeleteClick}>Delete</Button>
-    </Card>
-  )
-}
-
-// ❌ WRONG - Naming violations
-
-// File: taskCard.tsx (should be PascalCase for components)
-// File: FormatDate.ts (should be kebab-case for utilities)
-
-const maxRetryCount = 3           // Should be MAX_RETRY_COUNT
-const loading = true              // Should be isLoading
-function userData() { ... }        // Should be fetchUserData (verb-first)
-function clickHandler() { ... }    // Should be handleClick
+// ✅ CORRECT - MAX_RETRY_COUNT, isLoading, fetchUserById, handleDeleteClick, onClick (callback: on prefix)
+// ❌ WRONG - maxRetryCount, loading, userData(), clickHandler(), taskCard.tsx
 ```
 
 ## 3. Error Handling Pattern

@@ -93,17 +93,7 @@ alwaysApply: true
 | **Error** | `text-destructive` | Error messages |
 | **Info** | `text-status-info` | Informational messages |
 
-```tsx
-// ✅ CORRECT
-<h1 className="text-foreground">Page Title</h1>
-<p className="text-muted-foreground">Subtitle text</p>
-<span className="text-destructive">Error message</span>
-
-// ❌ WRONG - Don't hardcode slate/gray colors
-<h1 className="text-slate-900">Page Title</h1>  // Wrong
-<p className="text-slate-600">Subtitle</p>  // Wrong
-<span className="text-red-600">Error</span>  // Wrong
-```
+Use table above. ❌ No `text-slate-*`, `text-gray-*`, `text-red-*` — use semantic tokens.
 
 ## 2. Background Colors
 
@@ -118,17 +108,7 @@ alwaysApply: true
 | **Warning** | `bg-status-warning-light` | Warning badges, alerts |
 | **Error** | `bg-status-error-light` | Error badges, alerts |
 
-```tsx
-// ✅ CORRECT
-<div className="bg-background">
-<Card className="bg-card">
-<Badge className="bg-status-success-light text-status-success-dark">
-
-// ❌ WRONG - Don't hardcode backgrounds
-<div className="bg-white">  // Use bg-background
-<div className="bg-slate-50">  // Use bg-muted or bg-secondary
-<Badge className="bg-green-100 text-green-800">  // Use status tokens
-```
+Use table above. ❌ No `bg-white`, `bg-slate-*`, `bg-green-100` — use semantic tokens.
 
 ## 3. Border Colors
 
@@ -320,6 +300,14 @@ status-info, status-info-light, status-info-dark, status-info-foreground
 ```
 chart-1, chart-2, chart-3, chart-4, chart-5, chart-6
 ```
+
+## Design System Enforcement
+
+**Never build custom components when a UI primitive exists.** Use `Card` (not custom `rounded-lg border` divs), `StatusBadge` (not custom colored spans), and `UserAvatar` (see component-patterns.mdc).
+
+**Navigation active states:** Use **International Orange** only. Never use cyan/blue for active states: `text-international-orange`, `bg-orange-50` for active nav items — not `text-cyan-*` or `bg-cyan-*`.
+
+**Pre-commit grep checks:** Zero matches expected for `text-slate-`, `bg-slate-`, `bg-white`, `text-red-` (use `destructive`), `bg-cyan-` (use international-orange). Use `Card` for containers and `StatusBadge` for status indicators.
 
 ## Quick Checklist
 

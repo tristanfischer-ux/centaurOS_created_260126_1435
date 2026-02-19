@@ -78,25 +78,6 @@ When you create or modify a migration:
 
 This applies in ALL contexts — during feature work, during deploys, during bug fixes. The user should never have to think about Supabase.
 
-## 5. Session Start
+## 5. Session Start / End and Memory
 
-At the start of each session on this project:
-1. **Read `~/.memory/master-preferences.md`** for working style, preferences, and things to avoid
-2. Check `~/.memory/carry-forward.md` for pending items across all projects
-3. **Check `~/.memory/lessons.md`** for coding lessons and pre-flight checklists (scan P0/P1 patterns relevant to ForgeOS -- especially Supabase, UI, Auth, Build categories)
-4. Check `tasks/todo.md` for any in-progress work
-5. Check `AGENT_HANDOVER.md` if continuing from another session
-
-The master preferences document is the most important read -- it tells you how Tristan likes to work, what he values, and what to avoid. Internalize it before starting any work.
-
-## 6. Session End / Memory Logging
-
-**If you are about to give your final response and have not yet logged to the daily file, LOG NOW before responding.**
-
-When completing significant work:
-1. Log entries to `~/.memory/daily/YYYY-MM-DD.md` with appropriate tags (#ForgeOS)
-2. **Include Preference Signals** in log entries when corrections or preferences were expressed
-3. **Run distillation:** Analyze today's log entries, extract preference signals, update `~/.memory/master-preferences.md`
-4. For incomplete work, update carry-forward with clear next steps
-5. See skill: `~/.cursor/skills/project-memory/SKILL.md` for logging protocol
-6. See skill: `~/.cursor/skills/preference-distill/SKILL.md` for distillation protocol
+For session start checklist, memory logging, and distillation protocol, follow the global rule **`~/.cursor/rules/session-memory.mdc`** (read preferences, log to daily file, micro-distill on conversation end).

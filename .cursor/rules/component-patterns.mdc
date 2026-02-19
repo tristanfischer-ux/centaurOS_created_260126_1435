@@ -20,23 +20,7 @@ import { Badge } from '@/components/ui/badge'
 <Badge variant="destructive">Error</Badge>
 <Badge variant="info">Info</Badge>
 
-// ❌ WRONG - Don't override with custom sizes
-<Badge className="text-[10px]">  // Wrong
-<Badge className="text-lg px-4 py-1">  // Wrong
-```
-
-**For status indicators, use StatusBadge instead:**
-
-```tsx
-import { StatusBadge } from '@/components/ui/status-badge'
-
-// ✅ CORRECT - StatusBadge for statuses
-<StatusBadge status="success" size="md">Completed</StatusBadge>
-<StatusBadge status="warning" size="sm" dot>Pending</StatusBadge>
-<StatusBadge status="error" animated>Failed</StatusBadge>
-
-// ❌ WRONG - Don't use Badge for statuses
-<Badge variant="success">Completed</Badge>  // Use StatusBadge
+// ❌ WRONG - Custom sizes (text-[10px], text-lg px-4 py-1). For statuses use StatusBadge, not Badge.
 ```
 
 **Badge variants:**
@@ -74,38 +58,7 @@ import { Button } from '@/components/ui/button'
 - Multiple `secondary` or `ghost` buttons as needed
 - One `destructive` button if delete/remove action exists
 
-**Loading states:**
-
-```tsx
-// ✅ CORRECT - Consistent loading pattern
-<Button disabled={isLoading}>
-  {isLoading ? (
-    <>
-      <Loader2 className="animate-spin" />
-      Loading...
-    </>
-  ) : (
-    'Submit'
-  )}
-</Button>
-
-// ❌ WRONG - Don't create custom loading states
-<Button className={isLoading ? 'opacity-50' : ''}>  // Wrong
-```
-
-**Icon buttons:**
-
-```tsx
-// ✅ CORRECT - Icon-only button
-<Button variant="ghost" size="icon" aria-label="Close">
-  <X className="h-4 w-4" />
-</Button>
-
-// ❌ WRONG - Missing accessible name
-<Button variant="ghost" size="icon">
-  <X className="h-4 w-4" />
-</Button>
-```
+**Loading:** Use `disabled={isLoading}` and spinner + text; not `className={isLoading ? 'opacity-50' : ''}`. **Icon buttons:** Include `aria-label` (e.g. "Close").
 
 ## 3. Card Component
 
@@ -137,28 +90,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 <Card className="p-8">  {/* CardHeader/Content handle padding */}
 ```
 
-**Card without header/footer:**
-
-```tsx
-// ✅ CORRECT - Content-only card
-<Card>
-  <CardContent className="pt-6">
-    <p>Simple card content</p>
-  </CardContent>
-</Card>
-```
-
-**Card borders:**
-
-```tsx
-// ✅ CORRECT - Use semantic border
-<Card className="border">  {/* Uses semantic border token */}
-
-// ❌ WRONG - Don't customize border colors
-<Card className="border-blue-200">  // Wrong
-<Card className="border-foundry-200">  // Wrong
-<Card className="border-slate-200">  // Wrong
-```
+**Card without header/footer:** `<Card><CardContent className="pt-6">...</CardContent></Card>`. **Borders:** Use `border` (semantic token); never `border-blue-200`, `border-slate-200`, etc.
 
 ## 4. Dialog Component
 

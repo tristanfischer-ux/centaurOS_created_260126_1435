@@ -1,0 +1,83 @@
+# Interactive Element Standards (Dialogs, Dropdowns, Popovers)
+
+All dialogs, dropdowns, popovers, modals, and overlay components MUST have solid, opaque backgrounds. Translucent or "see-through" overlays violate design standards and hurt readability.
+
+## Core Principle
+
+**Interactive overlay content must be opaque.** Only the modal backdrop (the dimmed area behind a dialog) may be semi-transparent. No `backdrop-blur` on overlays (causes fuzzy appearance).
+
+## FORBIDDEN Patterns
+
+**NEVER use on interactive content surfaces:**
+
+```tsx
+// ❌ FORBIDDEN - Opacity modifiers
+bg-background/80  bg-background/90  bg-card/50  bg-white/80  bg-white/90
+
+// ❌ FORBIDDEN - Backdrop blur
+backdrop-blur  backdrop-blur-sm  backdrop-blur-md
+```
+
+**Correct alternatives:** Use `bg-background` or `bg-card` (no opacity). Use `shadow-lg` for depth instead of blur.
+
+## When Transparency IS Allowed
+
+1. **Modal overlay only** (the dimmed backdrop behind the dialog): `bg-black/40` — no blur.
+2. **Marketing navbar only** (glass effect): `bg-background/90 backdrop-blur-md` in marketing components only.
+3. **Terminal-style components** (e.g. LivePulse): intentional dark/blur by design.
+4. **Subtle hover tints:** `hover:bg-orange-50/50`, `bg-orange-50/30` for unread indicators.
+
+Modal *content* must always be opaque; only the overlay may be semi-transparent.
+
+## Elements That MUST Be Opaque
+
+- Dialogs/Modals — `bg-background`
+- Popovers, Dropdowns, Select menus — `bg-card` or `bg-background`
+- Search suggestions, Tooltips, Floating controls — `bg-card` with `shadow-lg`
+- Navigation headers (platform) — `bg-background` (marketing exception above)
+
+## Dialogs
+
+- **Content:** Use `DialogContent` with default `bg-background` or explicit `bg-background` / `bg-card`. Do NOT override with opacity (`bg-background/95`, etc.).
+- **Size:** Use `size` prop: `sm` (425px), `md` (600px), `lg` (800px). Avoid custom `max-w-*` unless needed for wide content; if so, still use `!bg-background` or `bg-background`.
+- **Overlay:** Default `bg-black/40` is correct. Do not add `backdrop-blur` to overlay.
+- **Cards inside dialogs:** Use solid `bg-card` or semantic tokens. No `bg-white/50`.
+- **Wide dialogs:** Use `max-w-[95vw] lg:max-w-7xl`, `min-w-max` for tables, `sticky left-0 bg-background z-10` for first column. Include horizontal `ScrollBar` when needed.
+- **z-index:** Dialogs use `z-50`; nested dialogs may use `z-[60]`.
+
+## Dropdowns & Popovers
+
+- **Background:** Use `bg-card` (preferred for elevated surfaces) or `bg-background`. Never opacity modifiers.
+- **Required classes:** `bg-card` (or `bg-background`), `border`, `shadow-lg`, `z-50`, `rounded-lg` or `rounded-md`.
+- **Border:** Use semantic `border` token only (no `border-slate-200`, etc.).
+- **Z-index:** `z-50` for dropdowns, popovers, tooltips; toasts `z-[100]`. No arbitrary `z-[999]`.
+
+Standard pattern:
+
+```tsx
+<div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-lg shadow-lg z-50">
+  <DropdownContent />
+</div>
+```
+
+## Quick Reference
+
+```tsx
+// ✅ CORRECT
+<DialogContent size="md">  // solid by default
+<PopoverContent className="bg-card border shadow-lg">
+<div className="fixed inset-0 bg-black/40">  // overlay only
+
+// ❌ WRONG
+<DialogContent className="bg-background/95">
+<div className="bg-card/50 backdrop-blur-sm">
+```
+
+## Pre-Commit Check
+
+```bash
+rg "bg-(background|card|white)/[0-9]" --type tsx --type ts src/
+rg "backdrop-blur" --type tsx --type ts src/
+```
+
+Fix or document exceptions. See also `z-index-hierarchy.mdc` for layering.

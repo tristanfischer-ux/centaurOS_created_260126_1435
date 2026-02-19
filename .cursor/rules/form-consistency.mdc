@@ -1,6 +1,7 @@
 ---
 description: Consistent form component patterns, validation, and accessibility
-alwaysApply: true
+alwaysApply: false
+globs: ["src/components/**/*.tsx", "**/*form*.tsx", "**/*Form*.tsx"]
 ---
 
 # Form Consistency Standards

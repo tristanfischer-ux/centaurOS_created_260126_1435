@@ -1,6 +1,7 @@
 ---
 description: Standards for multi-step wizard dialogs - the "Purpose Dialog Quality" pattern
-alwaysApply: true
+alwaysApply: false
+globs: ["src/components/**/*.tsx", "**/*dialog*.tsx", "**/*wizard*.tsx"]
 ---
 
 # Multi-Step Wizard Pattern Standards

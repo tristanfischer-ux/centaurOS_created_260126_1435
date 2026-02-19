@@ -1,0 +1,90 @@
+---
+description: Full documentation standards for auditability (templates, examples, checklists)
+alwaysApply: false
+---
+
+# Documentation Standards for Auditability (Full Reference)
+
+For the quick reference applied to every prompt, see `documentation-standards.mdc`. This file contains the full templates, examples, and checklists.
+
+## 1. JSDoc Requirements
+
+**ALL exported functions MUST have complete JSDoc documentation.**
+
+### Required JSDoc Tags
+
+| Tag | Required For | Description |
+|-----|-------------|-------------|
+| `@description` | All functions | What the function does |
+| `@param` | All parameters | Type and purpose of each parameter |
+| `@returns` | All non-void | What gets returned |
+| `@throws` | Error conditions | What errors can be thrown |
+| `@security` | Auth/security code | Security implications |
+| `@audit` | Audit-logged functions | What gets logged to audit tables |
+
+### Complete JSDoc Template
+
+```typescript
+/**
+ * Creates a new task and assigns it to a user within a foundry.
+ * @description Creates a task with proper foundry isolation, validates user permissions, and logs the creation to the audit trail.
+ * @param {Object} params - Task creation parameters
+ * @param {string} params.foundryId - The foundry this task belongs to
+ * @param {string} params.title - Task title (max 200 chars)
+ * @param {string} params.assigneeId - User ID to assign task to
+ * @param {string} [params.description] - Optional task description
+ * @returns {Promise<Task>} The created task with generated ID
+ * @throws {UnauthorizedError} If user lacks task.create permission
+ * @throws {NotFoundError} If foundry or assignee doesn't exist
+ * @throws {ValidationError} If title exceeds 200 characters
+ * @security Requires authenticated user with foundry membership
+ * @audit Logs task_created event with task_id, foundry_id, created_by
+ * @example
+ * const task = await createTask({ foundryId: 'foundry_123', title: 'Review quarterly report', assigneeId: 'user_456' })
+ */
+export async function createTask(params: CreateTaskParams): Promise<Task> {
+  // AUTH: Verify user has permission to create tasks in this foundry
+  await requirePermission(params.foundryId, 'task.create')
+  if (params.title.length > 200) throw new ValidationError('Title must be 200 characters or less')
+  // ... implementation
+}
+```
+
+## 2. Security Annotation Comments
+
+| Prefix | Use For |
+|--------|---------|
+| `// SECURITY:` | Security-sensitive logic |
+| `// AUTH:` | Authentication/authorization |
+| `// AUDIT:` | Audit logging |
+| `// RLS:` | Row-level security notes |
+| `// VALIDATION:` | Input validation |
+| `// SENSITIVE:` | Handling sensitive data |
+
+## 3. Business Logic Comments
+
+Explain the **WHY**, not the **WHAT**. Reference tickets (e.g. PRODUCT-456, INCIDENT-2024-03-15) when relevant.
+
+## 4. Component Documentation
+
+Components: JSDoc with `@description` and `@example`. Props: each prop documented with `/** ... */`.
+
+## 5. File Headers
+
+Required for: API routes (auth/payments), files > 200 lines, security-critical logic, migrations. Include @file, @description, @dependencies, @security, @related, @audit as applicable.
+
+## 6. What NOT to Comment
+
+No obvious comments ("Increment counter", "Check if user is null"). No commented-out code. No TODO/FIXME without ticket reference.
+
+## 7. Comment Decision Tree
+
+1. Security/auth check? → `// AUTH:` or `// SECURITY:`
+2. Logs to audit tables? → `// AUDIT:`
+3. Non-obvious why? → Explanation comment
+4. Business rule? → Context/ticket reference
+5. Otherwise → Usually no comment
+
+## 8. Pre-Commit Checklist & Grep Commands
+
+See full checklist in this file. Auditors: `rg "// SECURITY:"`, `rg "// AUTH:"`, `rg "// AUDIT:"`, `rg "@security"`, `rg "@audit"` in codebase.
