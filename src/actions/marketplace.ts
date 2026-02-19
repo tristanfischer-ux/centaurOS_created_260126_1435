@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { withAuth, withUser, type ActionError } from '@/lib/server-action-utils'
+import { embedText } from '@/lib/search/semantic-search'
 
 
 
@@ -178,12 +179,179 @@ export interface MarketplaceListing {
     created_by_provider_id: string | null
 }
 
+import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
+
+/** When full-text result count is below this, semantic (embedding) fallback is used. */
+const SEMANTIC_FALLBACK_THRESHOLD = 5
+
+/** Max semantic results to fetch when doing hybrid fallback. */
+const SEMANTIC_FALLBACK_MATCH_COUNT = 50
+
+/** Sort options for marketplace search. */
+export type MarketplaceSortOption =
+    | 'relevance'
+    | 'rating'
+    | 'price_asc'
+    | 'price_desc'
+    | 'newest'
+    | 'verified'
+
+export interface SearchMarketplaceListingsParams {
+    query?: string
+    /** Single category filter (e.g. 'Products'). */
+    category?: string
+    /** Multiple categories (OR). When set, category is ignored. */
+    categories?: string[]
+    /** Single subcategory filter. */
+    subcategory?: string
+    /** Multiple subcategories (OR). When set, subcategory is ignored. */
+    subcategories?: string[]
+    sort?: MarketplaceSortOption
+    page?: number
+    pageSize?: number
+}
+
+export interface SearchMarketplaceListingsResult {
+    data: MarketplaceListing[]
+    totalCount: number
+    hasMore: boolean
+}
+
+/**
+ * Paginated server-side search for marketplace listings.
+ *
+ * @description Uses Postgres full-text search (search_vector) when query is provided,
+ * with optional category/subcategory filters and server-side sort. Returns one page
+ * of results and total count for infinite scroll.
+ *
+ * @param {SearchMarketplaceListingsParams} params - Search filters, sort, and pagination
+ * @returns {Promise<SearchMarketplaceListingsResult>} Page of listings plus total count and hasMore
+ */
+export async function searchMarketplaceListings(
+    params: SearchMarketplaceListingsParams
+): Promise<SearchMarketplaceListingsResult> {
+    const supabase = await createClient()
+    const page = Math.max(1, params.page ?? 1)
+    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? MARKETPLACE_PAGE_SIZE))
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = supabase.from('marketplace_listings').select('*', { count: 'exact' })
+
+    const queryTrimmed = params.query?.trim()
+    if (queryTrimmed) {
+        query = query.textSearch('search_vector', queryTrimmed, {
+            type: 'websearch',
+            config: 'english',
+        })
+    }
+
+    if (params.categories?.length) {
+        query = query.in('category', params.categories as ("People" | "Products" | "Services")[])
+    } else if (params.category) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        query = query.eq('category', params.category as any)
+    }
+    if (params.subcategories?.length) {
+        query = query.in('subcategory', params.subcategories)
+    } else if (params.subcategory) {
+        query = query.eq('subcategory', params.subcategory)
+    }
+
+    const sort = params.sort ?? 'verified'
+    switch (sort) {
+        case 'rating':
+            // Order by rating (in attributes) desc; nulls last. PostgREST: attributes->>key.
+            query = query.order('attributes->>rating_average', { ascending: false, nullsFirst: false })
+            query = query.order('is_verified', { ascending: false }).order('created_at', { ascending: false })
+            break
+        case 'price_asc':
+            query = query.order('attributes->>rate', { ascending: true, nullsFirst: false })
+            query = query.order('is_verified', { ascending: false }).order('created_at', { ascending: false })
+            break
+        case 'price_desc':
+            query = query.order('attributes->>rate', { ascending: false, nullsFirst: false })
+            query = query.order('is_verified', { ascending: false }).order('created_at', { ascending: false })
+            break
+        case 'newest':
+            query = query.order('created_at', { ascending: false })
+            query = query.order('is_verified', { ascending: false })
+            break
+        case 'relevance':
+        case 'verified':
+        default:
+            query = query.order('is_verified', { ascending: false }).order('created_at', { ascending: false })
+    }
+
+    query = query.range(from, to)
+
+    const { data, error, count } = await query
+
+    if (error) {
+        console.error('[Marketplace] searchMarketplaceListings error:', error)
+        return { data: [], totalCount: 0, hasMore: false }
+    }
+
+    let totalCount = count ?? 0
+    let listings = (data || []) as MarketplaceListing[]
+    let hasMore = from + listings.length < totalCount
+
+    // Hybrid search: when full-text returns few results and we have a query, add semantic matches
+    if (
+        queryTrimmed &&
+        page === 1 &&
+        listings.length < SEMANTIC_FALLBACK_THRESHOLD
+    ) {
+        const embedding = await embedText(queryTrimmed)
+        if (embedding) {
+            const { data: semanticData } = await supabase.rpc('match_marketplace_listings', {
+                query_embedding: JSON.stringify(embedding),
+                match_threshold: 0.4,
+                match_count: SEMANTIC_FALLBACK_MATCH_COUNT,
+            })
+            const semanticRows = (semanticData ?? []) as { id: string }[]
+            const semanticIds = semanticRows.map((r) => r.id)
+            if (semanticIds.length > 0) {
+                // Fetch full rows for semantic IDs with same category/subcategory filters
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                let semQuery = supabase.from('marketplace_listings').select('*').in('id', semanticIds)
+                if (params.categories?.length) {
+                    semQuery = semQuery.in('category', params.categories as ("People" | "Products" | "Services")[])
+                } else if (params.category) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    semQuery = semQuery.eq('category', params.category as any)
+                }
+                if (params.subcategories?.length) {
+                    semQuery = semQuery.in('subcategory', params.subcategories)
+                } else if (params.subcategory) {
+                    semQuery = semQuery.eq('subcategory', params.subcategory)
+                }
+                const { data: semanticListings } = await semQuery
+                const fullSemantic = (semanticListings ?? []) as MarketplaceListing[]
+                // Preserve similarity order: sort by position in semanticIds
+                const idToIndex = new Map(semanticIds.map((id, i) => [id, i]))
+                fullSemantic.sort((a, b) => (idToIndex.get(a.id) ?? 999) - (idToIndex.get(b.id) ?? 999))
+                const ftIds = new Set(listings.map((l) => l.id))
+                const semanticOnly = fullSemantic.filter((l) => !ftIds.has(l.id))
+                const merged = [...listings, ...semanticOnly].slice(0, pageSize)
+                listings = merged
+                totalCount = totalCount + semanticOnly.length
+                hasMore = totalCount > pageSize
+            }
+        }
+    }
+
+    return { data: listings, totalCount, hasMore }
+}
+
 /**
  * Fetches marketplace listings, optionally filtered by category.
  *
  * @description Queries marketplace_listings with optional category filter, ordered
  * by verification status (verified first), limited to 200 results. Does not require
- * foundry context — uses a raw Supabase client.
+ * foundry context — uses a raw Supabase client. Prefer searchMarketplaceListings()
+ * for paginated search.
  *
  * @param {string} [category] - Optional category filter (e.g., 'People', 'Products')
  * @returns {Promise<MarketplaceListing[]>} Array of marketplace listings

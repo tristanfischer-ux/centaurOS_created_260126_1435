@@ -1,13 +1,32 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import type { MarketplaceListing } from '@/actions/marketplace'
+import type { MarketplaceListing, MarketplaceSortOption } from '@/actions/marketplace'
+import { searchMarketplaceListings } from '@/actions/marketplace'
+import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
 import { getTechniqueById } from '@/lib/manufacturing-techniques'
 import type { ManufacturingTechnique } from '@/lib/manufacturing-techniques/types'
 
 export type MarketplaceCategory = 'All' | 'People' | 'Products' | 'Services'
 export type SortOption = 'relevance' | 'rating' | 'price_low' | 'price_high' | 'newest'
+
+/** Map UI sort option to API sort option. */
+function toApiSort(sort: SortOption): MarketplaceSortOption {
+    switch (sort) {
+        case 'price_low':
+            return 'price_asc'
+        case 'price_high':
+            return 'price_desc'
+        case 'rating':
+            return 'rating'
+        case 'newest':
+            return 'newest'
+        case 'relevance':
+        default:
+            return 'relevance'
+    }
+}
 
 /** All known category definitions (People, Products, Services). */
 export const ALL_CATEGORIES: { id: MarketplaceCategory; label: string; icon: string }[] = [
@@ -35,7 +54,9 @@ export type ContentCategory = Exclude<MarketplaceCategory, 'All'>
 
 interface UseMarketplaceStateProps {
     initialListings: MarketplaceListing[]
-    initialSavedIds: string[]
+    initialTotalCount?: number
+    initialHasMore?: boolean
+    initialSavedIds?: string[]
     /**
      * Restrict which content categories are visible.
      * When omitted, all categories are shown (People, Products, Services).
@@ -45,13 +66,17 @@ interface UseMarketplaceStateProps {
     allowedCategories?: ContentCategory[]
 }
 
-export function useMarketplaceState({ initialListings, initialSavedIds, allowedCategories }: UseMarketplaceStateProps) {
+export function useMarketplaceState({
+    initialListings,
+    initialTotalCount = 0,
+    initialHasMore = false,
+    initialSavedIds = [],
+    allowedCategories,
+}: UseMarketplaceStateProps) {
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
 
-    // PERFORMANCE: Stabilize allowedCategories array reference to prevent
-    // downstream useMemo invalidations on every render
     const allowedCategoriesKey = allowedCategories ? allowedCategories.join(',') : ''
     const stableAllowedCategories = useMemo(
         () => allowedCategories,
@@ -59,17 +84,13 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
         [allowedCategoriesKey]
     )
 
-    // Derive visible categories from allowedCategories prop
     const visibleCategories = useMemo(() => {
         if (!stableAllowedCategories || stableAllowedCategories.length === 0) {
-            // No restriction — show all categories
             return ALL_CATEGORIES
         }
-        // Build category list from allowed entries
         const allowed = ALL_CATEGORIES.filter(
             c => c.id !== 'All' && stableAllowedCategories.includes(c.id as ContentCategory)
         )
-        // Prepend "All" only when there are 2+ content categories
         if (allowed.length >= 2) {
             const allEntry = ALL_CATEGORIES.find(c => c.id === 'All')!
             return [allEntry, ...allowed]
@@ -77,13 +98,11 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
         return allowed
     }, [stableAllowedCategories])
 
-    // Determine default category: "All" if multiple, or the single allowed category
     const defaultCategory: MarketplaceCategory = useMemo(() => {
         if (visibleCategories.length === 1) return visibleCategories[0].id
         return 'All'
     }, [visibleCategories])
 
-    // Core state
     const [activeCategory, setActiveCategory] = useState<MarketplaceCategory>(
         (searchParams?.get('cat') as MarketplaceCategory) || defaultCategory
     )
@@ -91,29 +110,50 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
     const [debouncedQuery, setDebouncedQuery] = useState(searchQuery)
     const [sortBy, setSortBy] = useState<SortOption>('relevance')
     const [savedIds, setSavedIds] = useState<Set<string>>(new Set(initialSavedIds))
-
-    // Filter state
     const [selectedSubcategories, setSelectedSubcategories] = useState<Set<string>>(new Set())
     const [showFilters, setShowFilters] = useState(false)
+    const [selectedListing, setSelectedListing] = useState<MarketplaceListing | null>(null)
+    /** When set, shows "AI interpreted" badge with this explanation. Cleared when user changes filters. */
+    const [aiInterpretation, setAIInterpretation] = useState<string | null>(null)
 
-    // Technique filter: when arriving from Techniques Explorer via ?technique=slug
+    // Server-driven listing state
+    const [listings, setListings] = useState<MarketplaceListing[]>(initialListings)
+    const [totalCount, setTotalCount] = useState(initialTotalCount)
+    const [hasMore, setHasMore] = useState(initialHasMore)
+    const [currentPage, setCurrentPage] = useState(1)
+    const [isLoading, setIsLoading] = useState(false)
+    const [isLoadingMore, setIsLoadingMore] = useState(false)
+    const fetchAbortRef = useRef<AbortController | null>(null)
+
     const techniqueSlug = searchParams?.get('technique') || null
     const activeTechnique: ManufacturingTechnique | null = useMemo(() => {
         if (!techniqueSlug) return null
-        // Look up by slug (which matches the id in most cases)
         return getTechniqueById(techniqueSlug) ?? null
     }, [techniqueSlug])
 
-    // Detail dialog
-    const [selectedListing, setSelectedListing] = useState<MarketplaceListing | null>(null)
+    const isInitialMount = useRef(true)
 
-    // Debounce search
+    useEffect(() => {
+        setListings(initialListings)
+        setTotalCount(initialTotalCount ?? 0)
+        setHasMore(initialHasMore ?? false)
+        setCurrentPage(1)
+    }, [initialListings, initialTotalCount, initialHasMore])
+
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300)
         return () => clearTimeout(timer)
     }, [searchQuery])
 
-    // Update URL when key params change
+    // Refetch first page when search/filter/sort change (skip initial mount to avoid double-fetch)
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false
+            return
+        }
+        fetchPage(1, false)
+    }, [debouncedQuery, activeCategory, sortBy, selectedSubcategories]) // eslint-disable-line react-hooks/exhaustive-deps
+
     const updateURL = useCallback((query: string, category: MarketplaceCategory) => {
         const params = new URLSearchParams()
         if (query) params.set('q', query)
@@ -122,27 +162,103 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
         router.push(newURL, { scroll: false })
     }, [pathname, router])
 
-    // Sync debounced search query to URL
     useEffect(() => {
         updateURL(debouncedQuery, activeCategory)
     }, [debouncedQuery]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Category change handler — auto-expands filters for non-All categories
-    const handleCategoryChange = useCallback((cat: MarketplaceCategory) => {
-        setActiveCategory(cat)
-        setSelectedSubcategories(new Set())
-        // Auto-show filter panel when selecting a specific category so users
-        // can immediately refine by subcategory (replaces the former CategoryGuide)
-        if (cat !== 'All') {
-            setShowFilters(true)
-        } else {
-            setShowFilters(false)
-        }
-        updateURL(searchQuery, cat)
-    }, [searchQuery, updateURL])
+    const buildSearchParams = useCallback(
+        (page: number) => {
+            const categories =
+                stableAllowedCategories && stableAllowedCategories.length > 0
+                    ? stableAllowedCategories
+                    : undefined
+            const category =
+                activeCategory !== 'All' ? (activeCategory as string) : undefined
+            return {
+                query: debouncedQuery.trim() || undefined,
+                categories: category ? undefined : categories,
+                category,
+                subcategories:
+                    selectedSubcategories.size > 0
+                        ? Array.from(selectedSubcategories)
+                        : undefined,
+                sort: toApiSort(sortBy),
+                page,
+                pageSize: MARKETPLACE_PAGE_SIZE,
+            }
+        },
+        [
+            stableAllowedCategories,
+            activeCategory,
+            debouncedQuery,
+            selectedSubcategories,
+            sortBy,
+        ]
+    )
 
-    // Toggle subcategory
+    const fetchPage = useCallback(
+        async (page: number, append: boolean) => {
+            if (fetchAbortRef.current) {
+                fetchAbortRef.current.abort()
+            }
+            fetchAbortRef.current = new AbortController()
+            const params = buildSearchParams(page)
+            if (append) {
+                setIsLoadingMore(true)
+            } else {
+                setIsLoading(true)
+            }
+            try {
+                const result = await searchMarketplaceListings(params)
+                if (append) {
+                    setListings(prev => [...prev, ...result.data])
+                } else {
+                    setListings(result.data)
+                }
+                setTotalCount(result.totalCount)
+                setHasMore(result.hasMore)
+                setCurrentPage(page)
+            } catch (err) {
+                console.error('[Marketplace] searchMarketplaceListings failed:', err)
+                if (!append) {
+                    setListings([])
+                    setTotalCount(0)
+                    setHasMore(false)
+                }
+            } finally {
+                setIsLoading(false)
+                setIsLoadingMore(false)
+                fetchAbortRef.current = null
+            }
+        },
+        [buildSearchParams]
+    )
+
+    useEffect(() => {
+        if (currentPage === 1 && listings === initialListings && !debouncedQuery && activeCategory === defaultCategory && selectedSubcategories.size === 0) {
+            return
+        }
+        fetchPage(1, false)
+    }, [debouncedQuery, activeCategory, sortBy, selectedSubcategories]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const loadMore = useCallback(() => {
+        if (isLoadingMore || !hasMore) return
+        fetchPage(currentPage + 1, true)
+    }, [currentPage, hasMore, isLoadingMore, fetchPage])
+
+    const handleCategoryChange = useCallback(
+        (cat: MarketplaceCategory) => {
+            setActiveCategory(cat)
+            setSelectedSubcategories(new Set())
+            setShowFilters(cat !== 'All')
+            setAIInterpretation(null)
+            updateURL(searchQuery, cat)
+        },
+        [searchQuery, updateURL]
+    )
+
     const toggleSubcategory = useCallback((sub: string) => {
+        setAIInterpretation(null)
         setSelectedSubcategories(prev => {
             const next = new Set(prev)
             if (next.has(sub)) next.delete(sub)
@@ -151,7 +267,21 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
         })
     }, [])
 
-    // Save/unsave toggle
+    /** Apply filters extracted by AI search; refetch is triggered by effect. */
+    const applyAIFilters = useCallback(
+        (params: { category?: ContentCategory; subcategory?: string; explanation?: string }) => {
+            if (params.category) setActiveCategory(params.category)
+            if (params.subcategory != null) {
+                setSelectedSubcategories(new Set([params.subcategory]))
+                setShowFilters(true)
+            }
+            setAIInterpretation(params.explanation ?? null)
+        },
+        []
+    )
+
+    const clearAIInterpretation = useCallback(() => setAIInterpretation(null), [])
+
     const toggleSaved = useCallback((id: string) => {
         setSavedIds(prev => {
             const next = new Set(prev)
@@ -161,12 +291,11 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
         })
     }, [])
 
-    // Clear all filters (including technique from URL)
     const clearFilters = useCallback(() => {
         setSearchQuery('')
         setSelectedSubcategories(new Set())
         setSortBy('relevance')
-        // Also clear technique filter from URL since hasActiveFilters includes it
+        setAIInterpretation(null)
         if (techniqueSlug) {
             const params = new URLSearchParams(searchParams?.toString() || '')
             params.delete('technique')
@@ -175,36 +304,17 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
         }
     }, [techniqueSlug, searchParams, pathname, router])
 
-    // Check if any filters are active
-    const hasActiveFilters = useMemo(() => {
-        return debouncedQuery.trim() !== '' || selectedSubcategories.size > 0 || sortBy !== 'relevance' || activeTechnique !== null
-    }, [debouncedQuery, selectedSubcategories, sortBy, activeTechnique])
+    const hasActiveFilters = useMemo(
+        () =>
+            debouncedQuery.trim() !== '' ||
+            selectedSubcategories.size > 0 ||
+            sortBy !== 'relevance' ||
+            activeTechnique !== null,
+        [debouncedQuery, selectedSubcategories.size, sortBy, activeTechnique]
+    )
 
-    // Exclude AI listings and restrict to allowed categories
-    const browseListings = useMemo(() => {
-        let listings = initialListings.filter(l => l.category !== 'AI')
-        if (stableAllowedCategories && stableAllowedCategories.length > 0) {
-            const allowed = new Set<string>(stableAllowedCategories)
-            listings = listings.filter(l => allowed.has(l.category))
-        }
-        return listings
-    }, [initialListings, stableAllowedCategories])
-
-    // Filter and sort listings
     const filteredListings = useMemo(() => {
-        let filtered = browseListings
-
-        // Category filter
-        if (activeCategory !== 'All') {
-            filtered = filtered.filter(l => l.category === activeCategory)
-        }
-
-        // Subcategory filter
-        if (selectedSubcategories.size > 0) {
-            filtered = filtered.filter(l => selectedSubcategories.has(l.subcategory))
-        }
-
-        // Technique filter: when arriving from Techniques Explorer
+        let result = listings
         if (activeTechnique) {
             const keywords = [
                 activeTechnique.name.toLowerCase(),
@@ -213,7 +323,7 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
                     ? [activeTechnique.subcategory.toLowerCase()]
                     : []),
             ]
-            filtered = filtered.filter(l => {
+            result = result.filter(l => {
                 const title = l.title.toLowerCase()
                 const desc = l.description?.toLowerCase() || ''
                 const sub = l.subcategory?.toLowerCase() || ''
@@ -222,79 +332,35 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
                 const capabilities: string[] = (
                     attrs.capabilities || attrs.techniques || []
                 ).map((c: string) => c.toLowerCase())
-
                 return keywords.some(
                     kw =>
                         title.includes(kw) ||
                         desc.includes(kw) ||
                         sub.includes(kw) ||
                         tags.some(t => t.includes(kw)) ||
-                        capabilities.some(c => c.includes(kw)),
+                        capabilities.some(c => c.includes(kw))
                 )
             })
         }
+        return result
+    }, [listings, activeTechnique])
 
-        // Search filter
-        if (debouncedQuery.trim()) {
-            const q = debouncedQuery.toLowerCase().trim()
-            filtered = filtered.filter(l => {
-                if (l.title.toLowerCase().includes(q)) return true
-                if (l.description?.toLowerCase().includes(q)) return true
-                const attrs = l.attributes || {}
-                const skills = attrs.skills || attrs.expertise || []
-                if (skills.some((s: string) => s.toLowerCase().includes(q))) return true
-                if (l.subcategory?.toLowerCase().includes(q)) return true
-                return false
-            })
-        }
-
-        // Sort
-        switch (sortBy) {
-            case 'rating':
-                filtered = [...filtered].sort((a, b) =>
-                    (b.attributes?.rating_average || 0) - (a.attributes?.rating_average || 0)
-                )
-                break
-            case 'price_low':
-                filtered = [...filtered].sort((a, b) =>
-                    getNumericPrice(a) - getNumericPrice(b)
-                )
-                break
-            case 'price_high':
-                filtered = [...filtered].sort((a, b) =>
-                    getNumericPrice(b) - getNumericPrice(a)
-                )
-                break
-            case 'newest':
-                // Already sorted by the server
-                break
-            case 'relevance':
-            default:
-                // Verified first (server default), then by search relevance
-                break
-        }
-
-        return filtered
-    }, [browseListings, activeCategory, selectedSubcategories, debouncedQuery, sortBy, activeTechnique])
-
-    // Available subcategories for current category
     const availableSubcategories = useMemo(() => {
-        const catListings = activeCategory === 'All'
-            ? browseListings
-            : browseListings.filter(l => l.category === activeCategory)
+        const catListings =
+            activeCategory === 'All'
+                ? listings
+                : listings.filter(l => l.category === activeCategory)
         return [...new Set(catListings.map(l => l.subcategory))].sort()
-    }, [browseListings, activeCategory])
+    }, [listings, activeCategory])
 
-    // Category counts
     const categoryCounts = useMemo(() => {
-        const counts: Record<string, number> = { All: browseListings.length }
-        for (const listing of browseListings) {
+        const counts: Record<string, number> = { All: listings.length }
+        for (const listing of listings) {
             counts[listing.category] = (counts[listing.category] || 0) + 1
         }
         return counts
-    }, [browseListings])
+    }, [listings])
 
-    // Clear technique filter by navigating without the param
     const clearTechniqueFilter = useCallback(() => {
         const params = new URLSearchParams(searchParams?.toString() || '')
         params.delete('technique')
@@ -302,8 +368,11 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
         router.push(newURL, { scroll: false })
     }, [searchParams, pathname, router])
 
+    const setSortByAndRefetch = useCallback((sort: SortOption) => {
+        setSortBy(sort)
+    }, [])
+
     return {
-        // State
         activeCategory,
         searchQuery,
         debouncedQuery,
@@ -313,32 +382,27 @@ export function useMarketplaceState({ initialListings, initialSavedIds, allowedC
         showFilters,
         selectedListing,
         activeTechnique,
-
-        // Computed
         filteredListings,
         availableSubcategories,
         categoryCounts,
         hasActiveFilters,
         visibleCategories,
-
-        // Actions
+        totalCount,
+        hasMore,
+        isLoading,
+        isLoadingMore,
+        loadMore,
         handleCategoryChange,
         setSearchQuery,
-        setSortBy,
+        setSortBy: setSortByAndRefetch,
         toggleSaved,
         toggleSubcategory,
         setShowFilters,
         setSelectedListing,
         clearFilters,
         clearTechniqueFilter,
+        aiInterpretation,
+        applyAIFilters,
+        clearAIInterpretation,
     }
-}
-
-/** Extract a numeric price from listing attributes for sorting */
-function getNumericPrice(listing: MarketplaceListing): number {
-    const attrs = listing.attributes || {}
-    const priceStr = attrs.rate || attrs.cost || attrs.price || attrs.day_rate || ''
-    const match = String(priceStr).match(/[\d,]+/)
-    if (match) return parseInt(match[0].replace(/,/g, ''), 10)
-    return 999999 // No price = sort to end
 }

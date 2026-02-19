@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
-import { getMarketplaceListings, getSavedMarketplaceListings } from '@/actions/marketplace'
+import { searchMarketplaceListings, getSavedMarketplaceListings } from '@/actions/marketplace'
+import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getFoundryContext } from '@/actions/foundry-context'
@@ -30,20 +31,29 @@ function MarketplaceLoading() {
 
 export default async function MarketplacePage() {
     let listings: MarketplaceListing[] = []
+    let totalCount = 0
+    let hasMore = false
     let recommendations: MarketplaceRecommendation[] = []
     let savedIds: string[] = []
     let savedListings: MarketplaceListing[] = []
 
-    // Fetch listings and foundry context in parallel
-    const [listingsResult, foundryContext] = await Promise.allSettled([
-        getMarketplaceListings(),
+    // Fetch first page of listings (Products + Services) and foundry context in parallel
+    const [searchResult, foundryContext] = await Promise.allSettled([
+        searchMarketplaceListings({
+            categories: ['Products', 'Services'],
+            page: 1,
+            pageSize: MARKETPLACE_PAGE_SIZE,
+            sort: 'verified',
+        }),
         getFoundryContext(),
     ])
 
-    if (listingsResult.status === 'fulfilled') {
-        listings = listingsResult.value
+    if (searchResult.status === 'fulfilled') {
+        listings = searchResult.value.data
+        totalCount = searchResult.value.totalCount
+        hasMore = searchResult.value.hasMore
     } else {
-        console.error('[Marketplace] Failed to fetch listings:', listingsResult.reason)
+        console.error('[Marketplace] Failed to fetch listings:', searchResult.reason)
     }
 
     const ctx = foundryContext.status === 'fulfilled' ? foundryContext.value : null
@@ -97,6 +107,8 @@ export default async function MarketplacePage() {
         <Suspense fallback={<MarketplaceLoading />}>
             <MarketplaceBrowse
                 initialListings={listings}
+                initialTotalCount={totalCount}
+                initialHasMore={hasMore}
                 recommendations={recommendations}
                 initialSavedIds={savedIds}
                 initialSavedListings={savedListings}

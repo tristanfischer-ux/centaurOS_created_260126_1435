@@ -19,6 +19,8 @@ import {
     Users,
     Package,
     Wrench,
+    Sparkles,
+    Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SORT_OPTIONS, type SortOption, type MarketplaceCategory } from '../hooks/useMarketplaceState'
@@ -69,8 +71,18 @@ interface MarketplaceToolbarProps {
     hasActiveFilters: boolean
     /** Clear all active filters */
     onClearAll: () => void
-    /** Total number of results matching current filters */
+    /** Number of results currently loaded (for "Showing X of Y") */
     resultCount: number
+    /** Total number of results from server (optional; when set, shows "Showing X of Y") */
+    totalCount?: number
+    /** Callback when user clicks "Interpret with AI" (natural language search). */
+    onAISearchClick?: () => void
+    /** True while AI search is in progress. */
+    isAISearchLoading?: boolean
+    /** When set, show "AI interpreted" badge with this text. */
+    aiInterpretation?: string | null
+    /** Clear the AI interpretation badge. */
+    onClearAIInterpretation?: () => void
     /**
      * Which categories to display as pills. When only one category is
      * provided the pill row is hidden entirely (no point showing a single pill).
@@ -99,6 +111,11 @@ export function MarketplaceToolbar({
     hasActiveFilters,
     onClearAll,
     resultCount,
+    totalCount,
+    onAISearchClick,
+    isAISearchLoading = false,
+    aiInterpretation = null,
+    onClearAIInterpretation,
     visibleCategories,
 }: MarketplaceToolbarProps) {
     const [showSuggestions, setShowSuggestions] = useState(false)
@@ -160,7 +177,7 @@ export function MarketplaceToolbar({
                                         : 'bg-muted text-muted-foreground hover:bg-secondary hover:text-foreground'
                                 )}
                                 aria-pressed={isActive}
-                                aria-label={`${cat === 'All' ? 'All categories' : cat} (${count})`}
+                                aria-label={(`${cat === 'All' ? 'All categories' : cat} (${count})`) as string}
                             >
                                 <Icon className="h-4 w-4" aria-hidden="true" />
                                 <span>{cat}</span>
@@ -180,27 +197,66 @@ export function MarketplaceToolbar({
 
             {/* Row 2: Search + Sort + Filters */}
             <div className="flex flex-col sm:flex-row gap-3">
-                {/* Search input with suggestion chips */}
-                <div className="relative flex-1 max-w-xl">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                    <Input
-                        ref={searchRef}
-                        value={searchQuery}
-                        onChange={(e) => onSearchChange(e.target.value)}
-                        onFocus={handleFocus}
-                        onBlur={handleBlur}
-                        placeholder="Search by name, skill, service, or keyword..."
-                        className="pl-10 pr-10"
-                        aria-label="Search marketplace"
-                    />
-                    {searchQuery && (
-                        <button
-                            onClick={() => onSearchChange('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center -mr-3"
-                            aria-label="Clear search"
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
+                {/* Search input with suggestion chips + AI interpret button */}
+                <div className="relative flex-1 max-w-xl flex flex-col gap-1.5">
+                    <div className="relative flex gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                            <Input
+                                ref={searchRef}
+                                value={searchQuery}
+                                onChange={(e) => onSearchChange(e.target.value)}
+                                onFocus={handleFocus}
+                                onBlur={handleBlur}
+                                placeholder="Search by name, skill, service, or keyword..."
+                                className="pl-10 pr-10"
+                                aria-label="Search marketplace"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => onSearchChange('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center -mr-3"
+                                    aria-label="Clear search"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+                        {onAISearchClick && searchQuery.trim().length >= 8 && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="default"
+                                className="shrink-0 gap-1.5 min-h-[40px]"
+                                onClick={onAISearchClick}
+                                disabled={isAISearchLoading}
+                                aria-label="Interpret search with AI"
+                            >
+                                {isAISearchLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Sparkles className="h-4 w-4" />
+                                )}
+                                <span className="hidden sm:inline">Interpret with AI</span>
+                            </Button>
+                        )}
+                    </div>
+                    {aiInterpretation && onClearAIInterpretation && (
+                        <div className="flex items-start gap-2 text-xs">
+                            <Badge variant="secondary" className="gap-1.5 py-1 px-2 font-normal text-muted-foreground shrink-0">
+                                <Sparkles className="h-3 w-3" />
+                                AI interpreted
+                            </Badge>
+                            <p className="text-muted-foreground line-clamp-2 flex-1 min-w-0">{aiInterpretation}</p>
+                            <button
+                                type="button"
+                                onClick={onClearAIInterpretation}
+                                className="shrink-0 text-muted-foreground hover:text-foreground p-0.5 rounded min-h-[44px] min-w-[44px] flex items-center justify-center"
+                                aria-label="Clear AI interpretation"
+                            >
+                                <X className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
                     )}
 
                     {/* Quick suggestion chips (shown on focus when empty) */}
@@ -259,8 +315,17 @@ export function MarketplaceToolbar({
             {/* Results count + clear */}
             <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">{resultCount}</span>{' '}
-                    {resultCount === 1 ? 'result' : 'results'}
+                    {totalCount != null && totalCount > 0 ? (
+                        <>
+                            Showing <span className="font-medium text-foreground">{resultCount}</span> of{' '}
+                            <span className="font-medium text-foreground">{totalCount}</span> suppliers
+                        </>
+                    ) : (
+                        <>
+                            <span className="font-medium text-foreground">{resultCount}</span>{' '}
+                            {resultCount === 1 ? 'result' : 'results'}
+                        </>
+                    )}
                 </p>
                 {hasActiveFilters && (
                     <Button

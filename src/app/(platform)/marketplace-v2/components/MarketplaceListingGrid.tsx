@@ -32,6 +32,8 @@ import {
 import { saveMarketplaceListing, unsaveMarketplaceListing } from '@/actions/marketplace'
 import { toast } from 'sonner'
 import type { MarketplaceListing } from '@/actions/marketplace'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Loader2 } from 'lucide-react'
 
 interface MarketplaceListingGridProps {
     listings: MarketplaceListing[]
@@ -41,6 +43,12 @@ interface MarketplaceListingGridProps {
     onCompare: (listings: MarketplaceListing[]) => void
     hasActiveFilters: boolean
     onClearFilters: () => void
+    /** Whether more results are available (for infinite scroll). */
+    hasMore?: boolean
+    /** True while the next page is loading. */
+    isLoadingMore?: boolean
+    /** Called when user requests more results (e.g. Load more button or scroll). */
+    onLoadMore?: () => void
 }
 
 type ViewMode = 'cards' | 'list'
@@ -258,6 +266,9 @@ export function MarketplaceListingGrid({
     onCompare,
     hasActiveFilters,
     onClearFilters,
+    hasMore = false,
+    isLoadingMore = false,
+    onLoadMore,
 }: MarketplaceListingGridProps) {
     const [viewMode, setViewMode] = useState<ViewMode>('cards')
     const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set())
@@ -380,6 +391,40 @@ export function MarketplaceListingGrid({
                             onToggleCompare={toggleCompare}
                         />
                     ))}
+                </div>
+            )}
+
+            {/* Load more + loading skeleton */}
+            {hasMore && onLoadMore && (
+                <div className="flex flex-col items-center gap-4 pt-4">
+                    {isLoadingMore ? (
+                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading more…
+                        </div>
+                    ) : (
+                        <Button
+                            variant="secondary"
+                            onClick={onLoadMore}
+                            className="min-h-[44px]"
+                        >
+                            Load more
+                        </Button>
+                    )}
+                    {isLoadingMore && viewMode === 'cards' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
+                            {[1, 2, 3].map((i) => (
+                                <Skeleton key={i} className="h-72 w-full rounded-xl" />
+                            ))}
+                        </div>
+                    )}
+                    {isLoadingMore && viewMode === 'list' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 w-full">
+                            {[1, 2, 3, 4].map((i) => (
+                                <Skeleton key={i} className="h-24 w-full rounded-lg" />
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 

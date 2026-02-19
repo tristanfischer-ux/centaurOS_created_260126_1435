@@ -31,6 +31,10 @@ type MarketplaceTab = 'browse' | 'saved' | 'compare'
 
 interface MarketplaceBrowseProps {
     initialListings: MarketplaceListing[]
+    /** Total count from server (for "Showing X of Y"). */
+    initialTotalCount?: number
+    /** Whether more pages exist (for infinite scroll). */
+    initialHasMore?: boolean
     recommendations: MarketplaceRecommendation[]
     initialSavedIds: string[]
     initialSavedListings: MarketplaceListing[]
@@ -58,6 +62,8 @@ const TABS: { id: MarketplaceTab; label: string; icon: React.ElementType }[] = [
  */
 export function MarketplaceBrowse({
     initialListings,
+    initialTotalCount = 0,
+    initialHasMore = false,
     recommendations: initialRecommendations,
     initialSavedIds,
     initialSavedListings,
@@ -66,7 +72,13 @@ export function MarketplaceBrowse({
     pageTitle = 'Marketplace',
     pageSubtitle = 'Find expert talent, products, and services to grow your business',
 }: MarketplaceBrowseProps) {
-    const state = useMarketplaceState({ initialListings, initialSavedIds, allowedCategories })
+    const state = useMarketplaceState({
+        initialListings,
+        initialTotalCount,
+        initialHasMore,
+        initialSavedIds,
+        allowedCategories,
+    })
     const [activeTab, setActiveTab] = useState<MarketplaceTab>('browse')
     const [compareListings, setCompareListings] = useState<MarketplaceListing[]>([])
     const [compareOrigin, setCompareOrigin] = useState<'browse' | 'saved'>('browse')
@@ -98,6 +110,40 @@ export function MarketplaceBrowse({
     // Handle intent search from recommendations gap suggestions
     const handleIntentSearch = useCallback((query: string) => {
         state.setSearchQuery(query)
+    }, [state])
+
+    const [isAISearchLoading, setIsAISearchLoading] = useState(false)
+    const handleAISearchClick = useCallback(async () => {
+        const query = state.searchQuery.trim()
+        if (!query) return
+        setIsAISearchLoading(true)
+        try {
+            const res = await fetch('/api/marketplace/ai-search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query }),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                toast.error(data.error ?? 'AI search failed')
+                return
+            }
+            if (data.success && data.filters) {
+                const { category, subcategory } = data.filters
+                const explanation = typeof data.explanation === 'string' ? data.explanation : undefined
+                state.applyAIFilters({
+                    category: category ?? undefined,
+                    subcategory: subcategory ?? undefined,
+                    explanation,
+                })
+            } else {
+                toast.error('Could not interpret your search')
+            }
+        } catch {
+            toast.error('AI search failed')
+        } finally {
+            setIsAISearchLoading(false)
+        }
     }, [state])
 
     // Enter compare mode from browse
@@ -180,7 +226,7 @@ export function MarketplaceBrowse({
                             )}
                             aria-current={isActive ? 'page' : undefined}
                         >
-                            <Icon className="w-4 h-4" />
+                            <Icon className="w-4 h-4" aria-hidden />
                             {tab.label}
                             {tab.id === 'saved' && state.savedIds.size > 0 && (
                                 <span className={cn(
@@ -230,6 +276,11 @@ export function MarketplaceBrowse({
                         hasActiveFilters={state.hasActiveFilters}
                         onClearAll={state.clearFilters}
                         resultCount={state.filteredListings.length}
+                        totalCount={state.totalCount}
+                        onAISearchClick={handleAISearchClick}
+                        isAISearchLoading={isAISearchLoading}
+                        aiInterpretation={state.aiInterpretation}
+                        onClearAIInterpretation={state.clearAIInterpretation}
                         visibleCategories={state.visibleCategories}
                     />
 
@@ -307,6 +358,9 @@ export function MarketplaceBrowse({
                         onCompare={handleCompareFromBrowse}
                         hasActiveFilters={state.hasActiveFilters}
                         onClearFilters={state.clearFilters}
+                        hasMore={state.hasMore}
+                        isLoadingMore={state.isLoadingMore}
+                        onLoadMore={state.loadMore}
                     />
                 </>
             )}
