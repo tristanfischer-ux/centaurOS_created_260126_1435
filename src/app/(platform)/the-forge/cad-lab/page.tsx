@@ -11,7 +11,7 @@
  */
 
 import { useRouter } from "next/navigation"
-import { useMemo } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import {
   Loader2,
   Search,
@@ -98,16 +98,21 @@ export default function CadLabResearchPage(): React.ReactNode {
     }, [hasResearch, isResearching, subject, modules]),
   )
 
-  /**
-   * Handles quick-start template selection — sets subject and auto-triggers research.
-   */
+  // When a template is selected, set the subject and flag that research
+  // should auto-trigger on the next render (after state updates).
+  const pendingTemplateResearchRef = useRef(false)
+
   function handleSelectTemplate(templateSubject: string): void {
     setSubject(templateSubject)
-    setTimeout(() => {
-      const btn = document.getElementById("research-btn")
-      if (btn) btn.click()
-    }, 400)
+    pendingTemplateResearchRef.current = true
   }
+
+  useEffect(() => {
+    if (pendingTemplateResearchRef.current && subject.trim()) {
+      pendingTemplateResearchRef.current = false
+      handleResearch()
+    }
+  }, [subject, handleResearch])
 
   return (
     <div className="space-y-6">
