@@ -481,16 +481,18 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     try {
       // Step 1: Interface definition (if not already done)
-      let currentModules = modules
+      let latestModules: CadLabModule[] | null = null
       if (mod.status === "pending") {
         addProgressLine(`Planning dimensions for ${mod.name}...`)
         const res = await generateCadLabInterface(`${mod.name} — ${mod.purpose}`, moduleResearchText, modelId)
         if (res.success) {
-          currentModules = modules.map((m) =>
-            m.id === moduleId ? { ...m, interfaceDefinition: res.interfaceDefinition, status: "interface_ready" as const } : m,
-          )
-          setModules(currentModules)
-          await saveCadLabModules(activeProjectId, currentModules)
+          setModules((prev) => {
+            latestModules = prev.map((m) =>
+              m.id === moduleId ? { ...m, interfaceDefinition: res.interfaceDefinition, status: "interface_ready" as const } : m,
+            )
+            return latestModules
+          })
+          if (latestModules) await saveCadLabModules(activeProjectId, latestModules)
           setLastSaved(new Date().toISOString())
           addProgressLine(`Dimensions planned for ${mod.name}. Generating CAD...`)
         } else {
@@ -514,11 +516,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
 
       const data = await response.json() as { done: boolean; module: CadLabModule }
-      const updated = currentModules.map((m) =>
-        m.id === moduleId ? data.module : m,
-      )
-      setModules(updated)
-      await saveCadLabModules(activeProjectId, updated)
+      setModules((prev) => {
+        latestModules = prev.map((m) => (m.id === moduleId ? data.module : m))
+        return latestModules
+      })
+      if (latestModules) await saveCadLabModules(activeProjectId, latestModules)
       setLastSaved(new Date().toISOString())
       addProgressLine(`${mod.name} generated successfully!`)
       setExpandedModuleId(moduleId)
