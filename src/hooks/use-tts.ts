@@ -149,8 +149,6 @@ export interface UseTtsReturn {
     playChunked: (text: string, voice: string) => Promise<void>
     startStreaming: (voice: string) => void
     feedStreamingText: (fullText: string) => void
-    /** Accept pre-generated audio from server SSE (Layer 3 parallel TTS) */
-    feedServerAudio: (audioData: ArrayBuffer) => void
     finishStreaming: (displayText: string) => void
     stop: () => void
     warmUp: () => void
@@ -383,16 +381,12 @@ export function useTts(): UseTtsReturn {
     const streamFinishedRef = useRef(false)
     const streamPrefetchRef = useRef<Promise<ArrayBuffer | null> | null>(null)
     const browserBridgeActiveRef = useRef(false)
-    const serverAudioQueueRef = useRef<ArrayBuffer[]>([])
 
     /**
      * INTENT: Drain the streaming chunk queue with look-ahead prefetch.
      * While playing chunk N, we kick off the fetch for chunk N+1.
      * On the very first chunk, cancel the browser SpeechSynthesis bridge
      * so the high-quality OpenAI voice takes over seamlessly.
-     *
-     * If server-pushed audio is available (Layer 3), play it directly
-     * without a client-side TTS fetch.
      */
     const drainStreamQueue = useCallback(async () => {
         if (streamPlayingRef.current) return
@@ -428,10 +422,7 @@ export function useTts(): UseTtsReturn {
 
                 let arrayBuffer: ArrayBuffer | null = null
 
-                // Prefer server-pushed audio (Layer 3) over client fetch
-                if (serverAudioQueueRef.current.length > 0) {
-                    arrayBuffer = serverAudioQueueRef.current.shift()!
-                } else if (streamPrefetchRef.current) {
+                if (streamPrefetchRef.current) {
                     arrayBuffer = await streamPrefetchRef.current
                     streamPrefetchRef.current = null
                 } else {
@@ -448,7 +439,7 @@ export function useTts(): UseTtsReturn {
 
                 // Prefetch next chunk while this one plays
                 const nextChunk = streamQueueRef.current[0]?.trim()
-                if (nextChunk && serverAudioQueueRef.current.length === 0) {
+                if (nextChunk) {
                     streamPrefetchRef.current = fetchAudio(nextChunk, voice, controller.signal)
                 }
 
@@ -495,7 +486,6 @@ export function useTts(): UseTtsReturn {
             streamFinishedRef.current = false
             streamPrefetchRef.current = null
             browserBridgeActiveRef.current = false
-            serverAudioQueueRef.current = []
             const controller = new AbortController()
             streamControllerRef.current = controller
             abortRef.current = controller
@@ -559,18 +549,6 @@ export function useTts(): UseTtsReturn {
         [drainStreamQueue],
     )
 
-    /**
-     * Accept pre-generated audio from the server (Layer 3).
-     * Called when the SSE stream delivers an audio_chunk event.
-     */
-    const feedServerAudio = useCallback(
-        (audioData: ArrayBuffer) => {
-            serverAudioQueueRef.current.push(audioData)
-            drainStreamQueue()
-        },
-        [drainStreamQueue],
-    )
-
     const finishStreamingWithText = useCallback(
         (displayText: string) => {
             if (!streamControllerRef.current || streamControllerRef.current.signal.aborted) return
@@ -612,7 +590,6 @@ export function useTts(): UseTtsReturn {
         playChunked,
         startStreaming,
         feedStreamingText,
-        feedServerAudio,
         finishStreaming: finishStreamingWithText,
         stop: stopPlayback,
         warmUp,

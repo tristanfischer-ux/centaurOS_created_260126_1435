@@ -64,7 +64,7 @@ describe("MobileNav dropdown routing", () => {
 
     fireEvent.click(await screen.findByRole("menuitem", { name: /^The Forge$/i }))
 
-    expect(pushMock).toHaveBeenCalledWith("/the-forge")
+    expect(pushMock).toHaveBeenCalledWith("/the-forge/studio")
   })
 
   it("routes Settings from More menu via router push", async () => {
