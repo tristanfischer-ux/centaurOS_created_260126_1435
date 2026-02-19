@@ -231,6 +231,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [batchProgress, setBatchProgress] = useState<Record<string, "queued" | "interface" | "generating" | "done" | "error">>({})
   // Track how many modules are actively running (for concurrency limiting)
   const activeModuleCountRef = useRef(0)
+  // Ref for batch reconnection polling interval (so cleanup always works)
+  const batchPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ── Progress storytelling ──
   const [progressLines, setProgressLines] = useState<string[]>([])
@@ -538,7 +540,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   useEffect(() => {
     if (!activeProjectId || modules.length === 0) return
 
-    let pollInterval: ReturnType<typeof setInterval> | null = null
     let cancelled = false
 
     const checkBatchStatus = async (): Promise<void> => {
@@ -561,9 +562,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             "Waiting for remaining modules to finish...",
           ])
 
+          // Clear any stale interval from a previous effect run
+          if (batchPollIntervalRef.current) {
+            clearInterval(batchPollIntervalRef.current)
+            batchPollIntervalRef.current = null
+          }
+
           // Start lightweight polling to detect completions from in-flight requests
-          pollInterval = setInterval(async () => {
-            if (cancelled) { if (pollInterval) clearInterval(pollInterval); return }
+          batchPollIntervalRef.current = setInterval(async () => {
+            if (cancelled) {
+              if (batchPollIntervalRef.current) clearInterval(batchPollIntervalRef.current)
+              batchPollIntervalRef.current = null
+              return
+            }
             try {
               const pollRes = await loadCadLabBatchStatus(activeProjectId)
               if ("error" in pollRes || cancelled) return
@@ -585,8 +596,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               )
 
               if (allDone || noneQueued || pollRes.batchStatus === "done" || pollRes.batchStatus === "error") {
-                if (pollInterval) clearInterval(pollInterval)
-                pollInterval = null
+                if (batchPollIntervalRef.current) clearInterval(batchPollIntervalRef.current)
+                batchPollIntervalRef.current = null
                 // Reload full modules from DB
                 const projRes = await loadCadLabProject(activeProjectId)
                 if (!("error" in projRes) && projRes.project.modules) {
@@ -608,10 +619,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     checkBatchStatus()
 
-    // Cleanup: stop polling on unmount or dependency change
+    // Cleanup: stop polling on unmount or dependency change.
+    // Using ref ensures cleanup works even if the interval was set
+    // asynchronously after the initial render.
     return () => {
       cancelled = true
-      if (pollInterval) clearInterval(pollInterval)
+      if (batchPollIntervalRef.current) {
+        clearInterval(batchPollIntervalRef.current)
+        batchPollIntervalRef.current = null
+      }
     }
   }, [activeProjectId, modules.length])
 
