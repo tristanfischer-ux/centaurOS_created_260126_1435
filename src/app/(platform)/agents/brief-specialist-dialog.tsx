@@ -295,16 +295,29 @@ export function parseProposedActions(content: string): ProposedAction[] {
 }
 
 /**
- * Remove PROPOSED_ACTIONS blocks (all format variations) from content so they don't render in Markdown.
+ * Matches JSON code blocks containing objective/task-like fields that agents sometimes
+ * redundantly output in prose alongside the PROPOSED_ACTIONS block.
+ */
+const STRIP_REDUNDANT_JSON_PATTERN =
+    /```(?:json)?\s*\n\s*\{[\s\S]*?(?:"objectiveTitle"|"strategicGoalTitle"|"taskTitle"|"objectiveDescription")[\s\S]*?\}\s*\n```/gi
+
+/**
+ * Remove PROPOSED_ACTIONS blocks and redundant JSON code blocks from content
+ * so they don't render in Markdown.
+ *
+ * INTENT: Agents sometimes output raw JSON in prose even when told not to.
+ * We strip both the PROPOSED_ACTIONS block (which becomes interactive cards)
+ * and any leftover JSON code blocks containing objective/task fields.
  *
  * @param content - Raw specialist response with potential PROPOSED_ACTIONS blocks
- * @returns Content with all PROPOSED_ACTIONS blocks stripped
+ * @returns Content with all structured data blocks stripped
  */
 export function stripProposedActionsBlock(content: string): string {
     let result = content
     for (const pattern of STRIP_PROPOSED_ACTIONS_PATTERNS) {
         result = result.replace(pattern, "")
     }
+    result = result.replace(STRIP_REDUNDANT_JSON_PATTERN, "")
     return result.trim()
 }
 

@@ -558,7 +558,8 @@ This renders as interactive cards with checkboxes. The user ticks which ones to 
 6. **Every task MUST have "objectiveTitle"** — use an existing, batch-created, or new title (the system auto-creates missing objectives). This is REQUIRED — tasks without it will be rejected.
 7. If you need to create a task under a new objective, create the objective first in the same batch, then reference its title in the task's "objectiveTitle".
 8. Only skip the block for purely informational responses with zero actionable recommendations.
-9. The visible prose should read naturally. The PROPOSED_ACTIONS block is supplementary — describe actions in words, then include the structured block at the end.`
+9. The visible prose should read naturally. The PROPOSED_ACTIONS block is supplementary — describe actions in words, then include the structured block at the end.
+10. **NEVER show raw JSON, code blocks, or structured data in your prose.** The PROPOSED_ACTIONS HTML comment is the ONLY place JSON should appear. The user sees the structured data as interactive cards — they do NOT need to see the raw JSON. Your conversational text should describe actions in plain language only.`
 
             // Reinforce PROPOSED_ACTIONS format for non-Claude models that struggle
             // with HTML comment syntax. MiniMax and Qwen need extra emphasis and
