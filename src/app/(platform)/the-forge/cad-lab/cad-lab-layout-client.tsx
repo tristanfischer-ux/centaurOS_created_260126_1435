@@ -21,7 +21,7 @@ import {
   Clock,
   Plus,
   ChevronRight,
-  AlertTriangle,
+  Info,
   Store,
 } from "lucide-react"
 
@@ -181,8 +181,8 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
       </div>
 
       {/* ── Disclaimer: outputs are for exploration, not final; recruit experts via marketplace ── */}
-      <Alert variant="default" className="border-status-warning bg-status-warning-light/30">
-        <AlertTriangle className="h-4 w-4 text-status-warning" />
+      <Alert variant="default" className="border-status-info bg-status-info-light/30">
+        <Info className="h-4 w-4 text-status-info" />
         <AlertTitle className="text-sm font-semibold text-foreground">
           For exploration only—not final drawings
         </AlertTitle>
