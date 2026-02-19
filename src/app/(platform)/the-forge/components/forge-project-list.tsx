@@ -138,6 +138,7 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
     listRecentAssemblies(20),
   ])
 
+  const hasLoadError = "error" in cadLabResult || "error" in assembliesResult
   const projects: CadLabProjectSummary[] = "projects" in cadLabResult ? cadLabResult.projects : []
   const assemblies: AssemblySummary[] =
     "assemblies" in assembliesResult ? assembliesResult.assemblies : []
@@ -162,6 +163,13 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
   return (
     <div className="space-y-10">
       <PageHeader />
+
+      {hasLoadError && (
+        <div className="rounded-lg border border-status-warning bg-status-warning-light/20 p-4 text-sm text-foreground">
+          Some recent projects couldn&apos;t be loaded. Your starting paths still work — you can create a new design below.
+        </div>
+      )}
+
       {inProgressProject && <ContinueCard project={inProgressProject} />}
       <StartingPointsSection />
 
