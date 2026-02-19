@@ -66,8 +66,21 @@ describe('cron authorization hardening regressions', () => {
     const morningBriefRoutePath = path.join(process.cwd(), 'src/app/api/cron/morning-brief/route.ts')
     const source = await readFile(morningBriefRoutePath, 'utf-8')
 
+    // @audit Updated 2026-02-19: verifyCronSecret extracted to shared cron-auth.ts (Step 1 of 8).
+    // Routes now import the shared function instead of inlining the check.
+    expect(source).toContain("import { verifyCronSecret } from '@/lib/security/cron-auth'")
+    expect(source).toContain('verifyCronSecret(')
+  })
+
+  it('shared cron-auth module fails closed when CRON_SECRET is missing', async () => {
+    const cronAuthPath = path.join(process.cwd(), 'src/lib/security/cron-auth.ts')
+    const source = await readFile(cronAuthPath, 'utf-8')
+
     expect(source).toContain('if (!cronSecret)')
-    expect(source).toContain("return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })")
+    expect(source).toContain('error: "Cron secret not configured"')
+    expect(source).toContain('status: 503')
+    expect(source).toContain('error: "Unauthorized"')
+    expect(source).toContain('status: 401')
   })
 
   it('uses admin client for morning brief and avoids broken server singleton imports', async () => {
@@ -125,6 +138,8 @@ describe('cron authorization hardening regressions', () => {
   })
 
   it('fails closed for all cron routes when CRON_SECRET is missing', async () => {
+    // @audit Updated 2026-02-19: verifyCronSecret extracted to shared cron-auth.ts (Step 1 of 8).
+    // Routes now import the shared function instead of inlining the check.
     const cronRoutes = [
       'src/app/api/cron/reports/daily/route.ts',
       'src/app/api/cron/weekly-synthesis/route.ts',
@@ -134,8 +149,8 @@ describe('cron authorization hardening regressions', () => {
 
     for (const routePath of cronRoutes) {
       const source = await readFile(path.join(process.cwd(), routePath), 'utf-8')
-      expect(source).toContain('if (!cronSecret)')
-      expect(source).toContain("return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 })")
+      expect(source).toContain("import { verifyCronSecret } from '@/lib/security/cron-auth'")
+      expect(source).toContain('verifyCronSecret(')
     }
   })
 
