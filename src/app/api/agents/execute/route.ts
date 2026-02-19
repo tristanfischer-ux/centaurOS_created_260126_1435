@@ -10,25 +10,20 @@ import {
     formatObservationsForPrompt,
     getConversationHistory,
     addMemoryMessage,
-    processMemory,
 } from "@/lib/agent-memory"
 import type { ConversationMessage } from "@/lib/agent-memory"
 import { buildAIContext } from "@/lib/ai-context/builder"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
 import { compilePersonalityPrompt, compileRelationshipContext } from "@/lib/agents/personality"
-import { recordInteraction } from "@/lib/agents/founder-preferences"
-import { createRollout, addSpan, finishRollout } from "@/lib/agent-spans"
+import { createRollout, finishRollout } from "@/lib/agent-spans"
 // AUDIT: Converted 9 dynamic imports to static (2026-02-19, refactor step 5 of 8).
 // Dynamic imports in a server-side API route provide no bundle benefit. Static
 // imports improve readability and eliminate runtime import overhead.
 import { getSpecialistWorkflows } from "@/lib/agents/specialist-workflows"
-import {
-    containsDecisionSignal,
-    extractDecisionSummary,
-    recordDecision,
-} from "@/lib/agents/decision-journal"
+// AUDIT: Decision journal imports moved to post-response-handler.ts (2026-02-19, refactor step 7 of 8)
 import { buildContextLayers } from "@/lib/agents/prompt-builder"
+import { createPostResponseCallback } from "@/lib/agents/post-response-handler"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -657,17 +652,13 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
         systemPromptWithContext += customSystemPromptSuffix
     }
 
-    // 7. Route to the right provider based on modality
-    // AUDIT: Log usage for metered billing and track AI costs
+    // AUDIT: Usage logging for non-text modalities (image, audio, video)
     const logUsageAfterCompletion = async (outputLength: number): Promise<void> => {
-        if (!foundryId) return // Can't log without a foundry
-
+        if (!foundryId) return
         try {
-            // Estimate token counts: ~4 chars per token is a reasonable approximation
             const estimatedInputTokens = Math.ceil((finalPrompt.length + systemPromptWithContext.length) / 4)
             const estimatedOutputTokens = Math.ceil(outputLength / 4)
             const totalTokens = estimatedInputTokens + estimatedOutputTokens
-
             await supabase.from("ai_usage_log").insert({
                 user_id: user.id,
                 foundry_id: foundryId,
@@ -676,108 +667,33 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
                 prompt_tokens: estimatedInputTokens,
                 completion_tokens: estimatedOutputTokens,
                 total_tokens: totalTokens,
-                estimated_cost_usd: 0, // Will be calculated by billing system
+                estimated_cost_usd: 0,
                 key_source: keySource,
                 metadata: { modality, providerId, modelId },
             })
         } catch (err) {
-            // Non-critical — don't fail the request over usage logging
             console.warn("[agents/execute] Failed to log usage:", err)
         }
     }
 
-    // Memory callback: record assistant response, process memory, and track interaction
-    const memoryCallback = threadId && foundryId
-        ? async (fullOutput: string) => {
-            try {
-                // Strip internal directives before saving to history (NEXT_SPECIALIST, PROPOSED_ACTIONS)
-                let cleanOutput = fullOutput.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
-                cleanOutput = cleanOutput.replace(/<!--\s*PROPOSED_ACTIONS\s*[\s\S]*?\s*-->/gi, "").trim()
-                await addMemoryMessage(threadId!, foundryId, "assistant", cleanOutput || fullOutput)
-
-                // Detect and record decisions from the user's message
-                try {
-                    const userMsg = input.trim() || finalPrompt.slice(0, 500)
-                    if (containsDecisionSignal(userMsg) && specialistId) {
-                        const summary = extractDecisionSummary(userMsg, fullOutput.slice(0, 500))
-                        await recordDecision(foundryId, specialistId, summary, userMsg.slice(0, 500))
-                    }
-                } catch {
-                    // Non-critical — decision tracking is supplementary
-                }
-
-                // Track this interaction for trust level progression (fire-and-forget)
-                recordInteraction(threadId!, foundryId).catch((err) => {
-                    console.warn("[agents/execute] Failed to record interaction:", err)
-                })
-
-                // Process memory asynchronously (observe/reflect if thresholds hit)
-                processMemory(threadId!, foundryId).catch((err) => {
-                    console.warn("[agents/execute] Memory processing failed:", err)
-                })
-
-                // Knowledge extraction: extract atomic notes from the conversation
-                // Runs asynchronously — doesn't block the response
-                if (specialistId && foundryId) {
-                    import("@/lib/knowledge-vault").then(({ extractKnowledge }) => {
-                        const userMsg = input.trim() || finalPrompt.slice(0, 500)
-                        extractKnowledge({
-                            messages: [
-                                { role: "user", content: userMsg },
-                                { role: "assistant", content: cleanOutput || fullOutput },
-                            ],
-                            specialistId: specialistId!,
-                            threadId: threadId!,
-                            foundryId,
-                        }).catch((err) => {
-                            console.warn("[agents/execute] Knowledge extraction failed:", err)
-                        })
-                    }).catch(() => {
-                        // Module loading failed — non-critical
-                    })
-                }
-            } catch (err) {
-                console.warn("[agents/execute] Failed to record assistant message:", err)
-            }
-            // AUDIT: Log usage after successful completion
-            await logUsageAfterCompletion(fullOutput.length)
-            // Agent rollouts: record span and mark rollout finished (best-effort)
-            if (rolloutId) {
-                const estimatedInputTokens = Math.ceil((finalPrompt.length + systemPromptWithContext.length) / 4)
-                const estimatedOutputTokens = Math.ceil(fullOutput.length / 4)
-                const promptSnapshot = `${systemPromptWithContext}\n\n---\n\n${finalPrompt}`
-                addSpan({
-                    rolloutId,
-                    kind: "llm_call",
-                    promptSnapshot,
-                    responseSnapshot: fullOutput,
-                    promptTokens: estimatedInputTokens,
-                    completionTokens: estimatedOutputTokens,
-                    metadata: { modality, providerId, modelId },
-                }).catch(() => {})
-                finishRollout(rolloutId, "finished").catch(() => {})
-            }
-        }
-        : async (fullOutput: string) => {
-            // Even without memory thread, log usage for billing
-            await logUsageAfterCompletion(fullOutput.length)
-            // Agent rollouts: record span and mark rollout finished (best-effort)
-            if (rolloutId) {
-                const estimatedInputTokens = Math.ceil((finalPrompt.length + systemPromptWithContext.length) / 4)
-                const estimatedOutputTokens = Math.ceil(fullOutput.length / 4)
-                const promptSnapshot = `${systemPromptWithContext}\n\n---\n\n${finalPrompt}`
-                addSpan({
-                    rolloutId,
-                    kind: "llm_call",
-                    promptSnapshot,
-                    responseSnapshot: fullOutput,
-                    promptTokens: estimatedInputTokens,
-                    completionTokens: estimatedOutputTokens,
-                    metadata: { modality, providerId, modelId },
-                }).catch(() => {})
-                finishRollout(rolloutId, "finished").catch(() => {})
-            }
-        }
+    // AUDIT: Post-response callback extracted to post-response-handler.ts (2026-02-19, refactor step 7 of 8).
+    // Handles: memory save, decision detection, interaction tracking, knowledge extraction,
+    // usage logging, and rollout tracing. All independently failable — see post-response-handler.ts.
+    const memoryCallback = createPostResponseCallback({
+        supabase,
+        userId: user.id,
+        foundryId,
+        threadId,
+        specialistId,
+        input,
+        finalPrompt,
+        systemPromptWithContext,
+        modality,
+        providerId,
+        modelId,
+        keySource,
+        rolloutId,
+    })
 
     // Build the fallback chain for text modalities.
     // If the client sent modelTier, use that chain. Otherwise fall back to single-provider (no failover).
