@@ -122,7 +122,7 @@ export function UpdatesFeedItem({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <span className={cn(
-                'text-sm truncate',
+                'text-sm truncate min-w-0',
                 isUnread ? 'font-semibold text-foreground' : 'font-medium text-foreground'
               )}>
                 {item.source.title}
@@ -152,14 +152,14 @@ export function UpdatesFeedItem({
 
           {/* Author + metadata */}
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <UserAvatar
                 name={item.author.full_name || '?'}
                 role={item.author.role}
                 avatarUrl={item.author.avatar_url}
                 size="xs"
               />
-              <span className="text-xs text-muted-foreground truncate">
+              <span className="text-xs text-muted-foreground truncate min-w-0">
                 {item.author.full_name || 'Unknown'}
               </span>
             </div>

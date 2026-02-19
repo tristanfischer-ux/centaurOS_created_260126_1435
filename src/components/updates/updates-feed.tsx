@@ -223,7 +223,7 @@ export function UpdatesFeed({
         ) : timeGroups.length === 0 ? (
           <FeedEmptyState filter={filter} />
         ) : (
-          <div>
+          <div className="overflow-x-hidden">
             {timeGroups.map((group) => (
               <div key={group.label}>
                 {/* Time group header */}
