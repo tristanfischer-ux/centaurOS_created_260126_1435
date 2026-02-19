@@ -38,6 +38,7 @@ import {
     AppWindow,
     FileOutput,
     Globe,
+    Map,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -82,6 +83,7 @@ const planMoreNavigation = [
 // "More" dropdown — Workshop section
 const workshopMoreNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame },
+    { name: "Blueprints", href: "/blueprints", icon: Map },
     { name: "Team", href: "/team", icon: Users },
     { name: "AI Team", href: "/agents", icon: UsersRound },
     { name: "AI Outputs", href: "/agents/artifacts", icon: FileOutput },
