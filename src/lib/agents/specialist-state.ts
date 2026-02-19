@@ -6,6 +6,13 @@
  * they remember how past conversations went, they deepen their
  * relationship over time, and they reference shared history.
  *
+ * @audit 2026-02-19 (refactor step 4 of 8): Added Zod schema for thread metadata.
+ *        The metadata column is JSONB in Supabase — previously accessed via unsafe
+ *        `as unknown as Record<string, unknown>` casts. Now validated through
+ *        `parseSpecialistMetadata()` which provides typed access with safe defaults.
+ *        This prevents runtime crashes if metadata is corrupt, missing, or has
+ *        an unexpected shape.
+ *
  * @related
  * - Founder preferences: src/lib/agents/founder-preferences.ts
  * - Personality: src/lib/agents/personality.ts
@@ -13,6 +20,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { z } from 'zod'
 import type { Json } from '@/types/database.types'
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -41,6 +49,47 @@ export interface RelationshipDepth {
     lastConversationSummary: string | null
 }
 
+// ─── Zod Schema for Thread Metadata ─────────────────────────────────
+//
+// The agent_memory_threads.metadata column is JSONB. This schema defines
+// the expected shape for specialist threads. Using .catch() on every field
+// means invalid/missing data falls back to defaults instead of throwing —
+// critical because metadata may have been written by older code versions
+// with a different shape.
+
+const specialistMetadataSchema = z.object({
+    specialist_mood: z.enum(['energized', 'concerned', 'proud', 'thoughtful', 'neutral']).catch('neutral'),
+    mood_trigger: z.string().catch(''),
+    mood_updated_at: z.string().catch(() => new Date().toISOString()),
+    shared_history: z.array(z.string()).catch([]),
+    decisions_made: z.array(z.string()).catch([]),
+    last_conversation_summary: z.string().nullable().catch(null),
+})
+
+/**
+ * The validated shape of specialist thread metadata.
+ * Inferred from the Zod schema so there's a single source of truth.
+ */
+export type SpecialistMetadata = z.infer<typeof specialistMetadataSchema>
+
+/**
+ * Safely parses raw JSONB metadata into a typed SpecialistMetadata object.
+ *
+ * @description Uses Zod's `.catch()` on every field so corrupt, missing, or
+ * unexpectedly-shaped metadata always produces a valid object with defaults.
+ * This replaces the previous `as unknown as Record<string, unknown>` casts
+ * which would crash on null/undefined/wrong-type access.
+ *
+ * @param raw - The raw JSONB value from Supabase (could be null, object, or anything)
+ * @returns A fully typed SpecialistMetadata with defaults for any missing fields
+ */
+export function parseSpecialistMetadata(raw: unknown): SpecialistMetadata {
+    if (!raw || typeof raw !== 'object') {
+        return specialistMetadataSchema.parse({})
+    }
+    return specialistMetadataSchema.parse(raw)
+}
+
 // ─── State Management ───────────────────────────────────────────────
 
 /**
@@ -67,17 +116,15 @@ export async function getSpecialistState(
         .eq('foundry_id', foundryId)
         .single()
 
-    const metadata = (thread?.metadata ?? {}) as unknown as Record<string, unknown>
-    const interactionCount = (thread?.total_interactions ?? 0) as number
+    const metadata = parseSpecialistMetadata(thread?.metadata)
+    const interactionCount = thread?.total_interactions ?? 0
 
-    // Parse emotional state from thread metadata
     const emotional: SpecialistEmotionalState = {
-        mood: (metadata.specialist_mood as SpecialistMood) ?? 'neutral',
-        trigger: (metadata.mood_trigger as string) ?? '',
-        updatedAt: (metadata.mood_updated_at as string) ?? new Date().toISOString(),
+        mood: metadata.specialist_mood,
+        trigger: metadata.mood_trigger,
+        updatedAt: metadata.mood_updated_at,
     }
 
-    // Calculate relationship depth from interaction count
     const level = interactionCount < 3 ? 'new'
         : interactionCount < 8 ? 'building'
         : interactionCount < 20 ? 'established'
@@ -86,9 +133,9 @@ export async function getSpecialistState(
     const relationship: RelationshipDepth = {
         level,
         conversationCount: interactionCount,
-        sharedHistory: (metadata.shared_history as string[]) ?? [],
-        decisionsMade: (metadata.decisions_made as string[]) ?? [],
-        lastConversationSummary: (metadata.last_conversation_summary as string) ?? null,
+        sharedHistory: metadata.shared_history,
+        decisionsMade: metadata.decisions_made,
+        lastConversationSummary: metadata.last_conversation_summary,
     }
 
     return { emotional, relationship }
@@ -123,21 +170,19 @@ export async function updateSpecialistState(
         .eq('foundry_id', foundryId)
         .single()
 
-    const metadata = (existing?.metadata ?? {}) as unknown as Record<string, unknown>
+    const parsed = parseSpecialistMetadata(existing?.metadata)
 
-    // Update emotional state fields
-    metadata.specialist_mood = mood
-    metadata.mood_trigger = trigger
-    metadata.mood_updated_at = new Date().toISOString()
-
-    // Update conversation summary for "last time we talked about..." references
-    if (conversationSummary) {
-        metadata.last_conversation_summary = conversationSummary
+    const updatedMetadata: SpecialistMetadata = {
+        ...parsed,
+        specialist_mood: mood,
+        mood_trigger: trigger,
+        mood_updated_at: new Date().toISOString(),
+        ...(conversationSummary ? { last_conversation_summary: conversationSummary } : {}),
     }
 
     await supabase
         .from('agent_memory_threads')
-        .update({ metadata: metadata as unknown as Json })
+        .update({ metadata: updatedMetadata as unknown as Json })
         .eq('id', threadId)
         .eq('foundry_id', foundryId)
 }
@@ -169,20 +214,21 @@ export async function recordSharedMoment(
         .eq('foundry_id', foundryId)
         .single()
 
-    const metadata = (existing?.metadata ?? {}) as unknown as Record<string, unknown>
+    const parsed = parseSpecialistMetadata(existing?.metadata)
 
     const key = type === 'decision' ? 'decisions_made' : 'shared_history'
-    const existingEntries = (metadata[key] as string[]) ?? []
-
+    const entries = [...parsed[key], entry]
     // Keep last 20 entries to avoid unbounded growth
-    existingEntries.push(entry)
-    if (existingEntries.length > 20) existingEntries.shift()
+    if (entries.length > 20) entries.shift()
 
-    metadata[key] = existingEntries
+    const updatedMetadata: SpecialistMetadata = {
+        ...parsed,
+        [key]: entries,
+    }
 
     await supabase
         .from('agent_memory_threads')
-        .update({ metadata: metadata as unknown as Json })
+        .update({ metadata: updatedMetadata as unknown as Json })
         .eq('id', threadId)
         .eq('foundry_id', foundryId)
 }
