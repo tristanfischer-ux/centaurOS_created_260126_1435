@@ -70,6 +70,15 @@ export default defineConfig({
         storageState: path.join(authDir, 'supplier.json'),
       },
     },
+    {
+      name: 'qa-freya',
+      testMatch: /qa-freya\.spec\.ts/,
+      dependencies: ['auth-setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: path.join(authDir, 'freya.json'),
+      },
+    },
     // Updates page tests (authenticated, uses inline storageState)
     {
       name: 'updates',

@@ -4,6 +4,7 @@ import {
   FOUNDER_STORAGE,
   APPRENTICE_STORAGE,
   SUPPLIER_STORAGE,
+  FREYA_STORAGE,
 } from './auth-storage'
 
 // Test credentials from environment variables
@@ -16,6 +17,8 @@ const APPRENTICE_EMAIL = process.env.TEST_APPRENTICE_EMAIL
 const APPRENTICE_PASSWORD = process.env.TEST_APPRENTICE_PASSWORD
 const SUPPLIER_EMAIL = process.env.TEST_SUPPLIER_EMAIL
 const SUPPLIER_PASSWORD = process.env.TEST_SUPPLIER_PASSWORD
+const FREYA_EMAIL = process.env.TEST_FREYA_EMAIL
+const FREYA_PASSWORD = process.env.TEST_FREYA_PASSWORD
 
 /**
  * Marks ALL onboarding flows as completed in localStorage.
@@ -135,4 +138,8 @@ setup('authenticate apprentice', async ({ page }) => {
 
 setup('authenticate supplier', async ({ page }) => {
   await loginAsSupplier(page, SUPPLIER_EMAIL, SUPPLIER_PASSWORD, SUPPLIER_STORAGE)
+})
+
+setup('authenticate freya', async ({ page }) => {
+  await loginAsPlatformUser(page, FREYA_EMAIL, FREYA_PASSWORD, FREYA_STORAGE, 'Freya')
 })

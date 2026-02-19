@@ -14,6 +14,7 @@ export const EXECUTIVE_STORAGE = path.join(authDir, 'executive.json')
 export const FOUNDER_STORAGE = path.join(authDir, 'founder.json')
 export const APPRENTICE_STORAGE = path.join(authDir, 'apprentice.json')
 export const SUPPLIER_STORAGE = path.join(authDir, 'supplier.json')
+export const FREYA_STORAGE = path.join(authDir, 'freya.json')
 
 /**
  * All localStorage keys that control onboarding modals.
