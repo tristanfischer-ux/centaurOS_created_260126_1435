@@ -10,6 +10,12 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -40,11 +46,10 @@ import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import { useScreenContext } from "@/contexts/screen-context"
 import { useBrowseContext } from "@/contexts/browse-context"
-import { useWorkspace } from "@/contexts/workspace-context"
-import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 import { parseSlideDeckFromText } from "@/lib/ai-providers/slide-parser"
-import type { PresentationData } from "@/components/specialists/workspace/presentation-view"
+import type { SlideDeckContent } from "@/lib/ai-providers/types"
 import { SpecialistChatAvatar } from "@/components/specialists/specialist-presentation"
+import { InlinePresentationCard } from "@/components/specialists/inline-presentation-card"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { PromptTemplate } from "./lib/agent-types"
 import type { Specialist } from "./specialists-data"
@@ -318,6 +323,8 @@ interface ChatMessage {
     proposals?: ProposedAction[]
     /** Rollout id from execute response; used to attach rewards when tasks from this message are completed. */
     rolloutId?: string | null
+    /** Parsed slide deck for presentation messages; rendered as InlinePresentationCard. */
+    slideDeck?: SlideDeckContent | null
 }
 
 /**
@@ -448,8 +455,6 @@ interface BriefSpecialistDialogProps {
     contextLabel?: string | null
     /** Render mode: "dialog" for centered modal (default), "panel" for sidebar layout */
     renderMode?: SpecialistRenderMode
-    /** Optional actions to render in the panel header (e.g. expand/collapse toggle) */
-    panelHeaderActions?: React.ReactNode
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -473,7 +478,6 @@ export function BriefSpecialistDialog({
     referredBy,
     contextLabel,
     renderMode = "dialog",
-    panelHeaderActions,
 }: BriefSpecialistDialogProps) {
     const isPanel = renderMode === "panel"
     // ─── State ────────────────────────────────────────────────────────────
@@ -559,9 +563,6 @@ export function BriefSpecialistDialog({
         }
     }, [isExecuting, isStreaming])
 
-    // ─── Workspace Context (push content to Document/Presentation/Chart tabs) ──
-    const workspace = useWorkspace()
-    const { expandPanel, panelViewMode } = useAdvisorPanel()
 
     // ─── Screen Awareness ─────────────────────────────────────────────────
     const { serializeScreenContext, screenContext } = useScreenContext()
@@ -1316,6 +1317,10 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             }
             displayResponse = stripProposedActionsBlock(displayResponse)
 
+            // Parse slides when a presentation was requested so the inline
+            // card renderer can display a visual carousel instead of raw JSON.
+            const parsedDeck = isSlideRequest ? parseSlideDeckFromText(fullResponse) : null
+
             // Add assistant message to chat (with think tags, recommendation, and proposal block stripped)
             const assistantMessage: ChatMessage = {
                 role: "assistant",
@@ -1323,6 +1328,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 timestamp: new Date(),
                 ...(proposals.length > 0 ? { proposals } : {}),
                 ...(rolloutIdFromResponse ? { rolloutId: rolloutIdFromResponse } : {}),
+                ...(parsedDeck ? { slideDeck: parsedDeck } : {}),
             }
             setMessages((prev) => [...prev, assistantMessage])
             setStreamingResponse("")
@@ -1330,18 +1336,6 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             // Finish streaming TTS with the cleaned display text (plays any remaining sentence)
             if (isTtsStreaming) {
                 tts.finishStreaming(displayResponse)
-            }
-
-            // Push parsed slides to workspace when a presentation was requested.
-            // SlideDeckContent and PresentationData are structurally identical
-            // (title, slides[], theme?) so the cast is safe.
-            if (isSlideRequest) {
-                const parsedSlides = parseSlideDeckFromText(fullResponse)
-                if (parsedSlides) {
-                    workspace.setPresentationData(parsedSlides as PresentationData)
-                    workspace.setActiveTab("presentation")
-                    if (panelViewMode === "sidebar") expandPanel()
-                }
             }
 
             // Auto-save to deliverables (fire and forget)
@@ -1545,45 +1539,57 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
     const [isSwitcherOpen, setIsSwitcherOpen] = useState(false)
 
     // ─── Panel Header (for panel mode) ──────────────────────────────────
+    // Two-row layout: Row 1 = specialist identity (clickable to switch) + close; Row 2 = context badge + actions
     const panelHeader = (
-        <div className="flex items-start gap-3 px-4 py-3 border-b bg-background">
-            <Popover open={isSwitcherOpen} onOpenChange={setIsSwitcherOpen}>
-                <PopoverTrigger asChild>
-                    <button
-                        className="flex items-center gap-3 flex-1 min-w-0 rounded-lg px-1.5 py-1 -mx-1.5 -my-1 hover:bg-muted/60 transition-colors text-left group"
-                        aria-label={`Switch specialist. Current: ${specialist.name}, ${specialist.title}`}
-                    >
-                        <div className="flex-shrink-0 relative h-10 w-10 rounded-full overflow-hidden bg-muted">
-                            {specialist.avatarImage ? (
-                                <Image
-                                    src={specialist.avatarImage}
-                                    alt={specialist.name}
-                                    fill
-                                    className="object-cover"
-                                    sizes="40px"
-                                />
-                            ) : (
-                                <div className="flex items-center justify-center h-full w-full">
-                                    <span className="text-base font-display font-semibold text-foreground">
-                                        {specialist.name.charAt(0)}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h2 className="text-sm font-display font-semibold text-foreground flex items-center gap-1">
-                                {specialist.name}
-                                <span className="text-xs font-normal text-muted-foreground">
-                                    {specialist.title}
-                                </span>
-                                <ChevronDown className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-auto flex-shrink-0" />
-                            </h2>
-                            <p className="text-xs text-muted-foreground italic mt-0.5 truncate">
-                                &ldquo;{specialist.tagline}&rdquo;
-                            </p>
-                        </div>
-                    </button>
-                </PopoverTrigger>
+        <div className="flex flex-col gap-2 px-4 py-3 border-b bg-background">
+            {/* Row 1: Specialist switcher (left) + close (right) */}
+            <div className="flex items-center gap-2 min-w-0">
+                <Popover open={isSwitcherOpen} onOpenChange={setIsSwitcherOpen}>
+                    <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <PopoverTrigger asChild>
+                                    <button
+                                        className="flex items-center gap-3 flex-1 min-w-0 rounded-lg px-2 py-1.5 border border-dashed border-muted-foreground/20 hover:bg-muted/60 hover:border-muted-foreground/40 transition-colors text-left group"
+                                        aria-label={`Switch specialist. Current: ${specialist.name}, ${specialist.title}`}
+                                    >
+                                        <div className="flex-shrink-0 relative h-10 w-10 rounded-full overflow-hidden bg-muted">
+                                            {specialist.avatarImage ? (
+                                                <Image
+                                                    src={specialist.avatarImage}
+                                                    alt={specialist.name}
+                                                    fill
+                                                    className="object-cover"
+                                                    sizes="40px"
+                                                />
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full w-full">
+                                                    <span className="text-base font-display font-semibold text-foreground">
+                                                        {specialist.name.charAt(0)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h2 className="text-sm font-display font-semibold text-foreground flex items-center gap-1.5 flex-wrap">
+                                                {specialist.name}
+                                                <span className="text-xs font-normal text-muted-foreground">
+                                                    {specialist.title}
+                                                </span>
+                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" aria-hidden />
+                                            </h2>
+                                            <p className="text-xs text-muted-foreground italic mt-0.5 truncate">
+                                                &ldquo;{specialist.tagline}&rdquo;
+                                            </p>
+                                        </div>
+                                    </button>
+                                </PopoverTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                                Switch specialist
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                 <PopoverContent
                     align="start"
                     sideOffset={8}
@@ -1651,19 +1657,29 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                     </div>
                 </PopoverContent>
             </Popover>
-            <div className="flex items-center gap-1 flex-shrink-0">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onOpenChange(false)}
+                    className="h-8 w-8 p-0 flex-shrink-0 text-muted-foreground hover:text-foreground"
+                    aria-label="Close advisor panel"
+                >
+                    <X className="h-4 w-4" />
+                </Button>
+            </div>
+            {/* Row 2: Context badge + voice, history, other actions */}
+            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                 {contextLabel ? (
-                    <Badge variant="secondary" className="text-[10px] gap-1 max-w-[120px] truncate">
+                    <Badge variant="secondary" className="text-[10px] gap-1 max-w-[140px] truncate">
                         <MessageSquareQuote className="h-2.5 w-2.5 flex-shrink-0" />
                         {contextLabel}
                     </Badge>
                 ) : screenContext.pageTitle !== "ForgeOS Platform" ? (
-                    <Badge variant="secondary" className="text-[10px] gap-1 max-w-[120px] truncate opacity-70">
+                    <Badge variant="secondary" className="text-[10px] gap-1 max-w-[140px] truncate opacity-70">
                         <Eye className="h-2.5 w-2.5 flex-shrink-0" />
                         {screenContext.pageTitle}
                     </Badge>
                 ) : null}
-                {/* Voice output toggle */}
                 <Button
                     variant="ghost"
                     size="sm"
@@ -1699,16 +1715,6 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         <History className="h-3.5 w-3.5" />
                     </Button>
                 )}
-                {panelHeaderActions}
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onOpenChange(false)}
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                    aria-label="Close advisor panel"
-                >
-                    <X className="h-3.5 w-3.5" />
-                </Button>
             </div>
         </div>
     )
@@ -1864,6 +1870,15 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                             )}>
                                                 {msg.role === "user" ? (
                                                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                                ) : msg.slideDeck ? (
+                                                    <>
+                                                        <InlinePresentationCard deck={msg.slideDeck} />
+                                                        {!msg.historical && (
+                                                            <div className="mt-2 flex justify-end">
+                                                                <MessageExportMenu content={msg.content} />
+                                                            </div>
+                                                        )}
+                                                    </>
                                                 ) : (
                                                     <>
                                                         <Markdown content={msg.content} className="text-sm" />
@@ -2648,6 +2663,15 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                             )}>
                                                 {msg.role === "user" ? (
                                                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                                ) : msg.slideDeck ? (
+                                                    <>
+                                                        <InlinePresentationCard deck={msg.slideDeck} />
+                                                        {!msg.historical && (
+                                                            <div className="mt-2 flex justify-end">
+                                                                <MessageExportMenu content={msg.content} />
+                                                            </div>
+                                                        )}
+                                                    </>
                                                 ) : (
                                                     <>
                                                         <Markdown content={msg.content} className="text-sm" />

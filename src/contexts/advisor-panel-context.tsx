@@ -22,7 +22,6 @@ import {
   useState,
   useCallback,
   useMemo,
-  useEffect,
   type ReactNode,
 } from "react"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
@@ -39,8 +38,6 @@ interface OpenPanelOptions {
   contextLabel?: string | null
 }
 
-export type PanelViewMode = "sidebar" | "expanded"
-
 interface AdvisorPanelState {
   /** Whether the panel is visible */
   isOpen: boolean
@@ -52,8 +49,6 @@ interface AdvisorPanelState {
   referredBy: string | null
   /** Badge label for what's being discussed */
   contextLabel: string | null
-  /** Sidebar (narrow) vs expanded (full-width) view */
-  panelViewMode: PanelViewMode
 }
 
 interface AdvisorPanelContextValue extends AdvisorPanelState {
@@ -65,10 +60,6 @@ interface AdvisorPanelContextValue extends AdvisorPanelState {
   togglePanel: (specialistId?: string) => void
   /** Switch to a different specialist without closing */
   switchSpecialist: (specialistId: string, handoffCtx?: string) => void
-  /** Expand panel to full width (chat + workspace) */
-  expandPanel: () => void
-  /** Collapse panel back to sidebar width */
-  collapsePanel: () => void
 }
 
 // ─── Context ────────────────────────────────────────────────────────────────
@@ -82,7 +73,6 @@ const AdvisorPanelContext = createContext<AdvisorPanelContextValue | null>(null)
  *
  * @description Wraps the platform layout so any component can open,
  * close, or switch the advisor panel without managing local dialog state.
- * Panel always opens in sidebar mode; expand is session-only (not persisted).
  */
 export function AdvisorPanelProvider({ children }: { children: ReactNode }): React.ReactElement {
   const [state, setState] = useState<AdvisorPanelState>(() => ({
@@ -91,7 +81,6 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     handoffContext: null,
     referredBy: null,
     contextLabel: null,
-    panelViewMode: "sidebar",
   }))
 
   const openPanel = useCallback((specialistId: string, options?: OpenPanelOptions) => {
@@ -152,28 +141,6 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     }))
   }, [])
 
-  const expandPanel = useCallback(() => {
-    setState((prev) => ({ ...prev, panelViewMode: "expanded" }))
-  }, [])
-
-  const collapsePanel = useCallback(() => {
-    setState((prev) => ({ ...prev, panelViewMode: "sidebar" }))
-  }, [])
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "e") {
-        e.preventDefault()
-        setState((prev) => ({
-          ...prev,
-          panelViewMode: prev.panelViewMode === "expanded" ? "sidebar" : "expanded",
-        }))
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [])
-
   const value = useMemo<AdvisorPanelContextValue>(
     () => ({
       ...state,
@@ -181,10 +148,8 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
       closePanel,
       togglePanel,
       switchSpecialist,
-      expandPanel,
-      collapsePanel,
     }),
-    [state, openPanel, closePanel, togglePanel, switchSpecialist, expandPanel, collapsePanel],
+    [state, openPanel, closePanel, togglePanel, switchSpecialist],
   )
 
   return (

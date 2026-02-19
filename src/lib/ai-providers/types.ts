@@ -287,6 +287,10 @@ export interface SlideContent {
     bullets?: string[]
     notes?: string
     layout?: "title" | "content" | "two-column" | "image" | "closing"
+    /** AI image generation prompt describing the visual for this slide */
+    imagePrompt?: string
+    /** Generated image URL (populated after image generation completes) */
+    imageUrl?: string
 }
 
 export interface SlideDeckContent {
