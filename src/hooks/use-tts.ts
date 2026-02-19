@@ -44,12 +44,100 @@ function stripMarkdownForTTS(text: string): string {
         .trim()
 }
 
-/** Split text into sentence-sized chunks for chunked TTS. */
+// ─── Chunking Configuration ─────────────────────────────────────────────────
+
+/** Minimum words before the first chunk can be spoken (eagerness for fast start) */
+const FIRST_CHUNK_MIN_WORDS = 5
+/** Minimum words before a clause boundary triggers a split */
+const CLAUSE_SPLIT_MIN_WORDS = 8
+/** Force-split at this many words even without punctuation */
+const FORCE_SPLIT_WORDS = 14
+
+/**
+ * DECISION: Aggressive chunking instead of sentence-only splitting.
+ * The previous `splitIntoSentences` waited for `.!?` which meant 30+ words
+ * could accumulate before TTS started. This splitter also breaks on clause
+ * boundaries (`,;:—`) after enough words, and force-breaks long runs,
+ * cutting time-to-first-audio by 2-5 seconds.
+ */
+function splitIntoSpeakableChunks(text: string): string[] {
+    const trimmed = text.trim()
+    if (!trimmed) return []
+
+    const result: string[] = []
+    let buffer = ""
+    let wordCount = 0
+
+    const tokens = trimmed.split(/(\s+)/)
+
+    for (const token of tokens) {
+        if (/^\s+$/.test(token)) {
+            buffer += token
+            continue
+        }
+
+        buffer += token
+        wordCount++
+
+        if (/[.!?]$/.test(token) && wordCount >= 3) {
+            result.push(buffer.trim())
+            buffer = ""
+            wordCount = 0
+            continue
+        }
+
+        if (/[,;:\u2014\u2013]$/.test(token) && wordCount >= CLAUSE_SPLIT_MIN_WORDS) {
+            result.push(buffer.trim())
+            buffer = ""
+            wordCount = 0
+            continue
+        }
+
+        if (wordCount >= FORCE_SPLIT_WORDS) {
+            result.push(buffer.trim())
+            buffer = ""
+            wordCount = 0
+            continue
+        }
+    }
+
+    if (buffer.trim()) {
+        result.push(buffer.trim())
+    }
+
+    return result
+}
+
+/** Legacy sentence splitter used only by playChunked (non-streaming, full text available). */
 function splitIntoSentences(text: string): string[] {
     const trimmed = text.trim()
     if (!trimmed) return []
     const parts = trimmed.split(/(?<=[.!?])\s+/)
     return parts.filter((p) => p.trim().length > 0)
+}
+
+// ─── Browser SpeechSynthesis Bridge ─────────────────────────────────────────
+
+function hasBrowserSpeechSynthesis(): boolean {
+    if (typeof window === "undefined") return false
+    return typeof window.speechSynthesis !== "undefined"
+}
+
+function speakBrowserTTS(text: string): SpeechSynthesisUtterance | null {
+    if (!hasBrowserSpeechSynthesis()) return null
+    const synth = window.speechSynthesis
+    synth.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 1.05
+    utterance.pitch = 1.0
+    synth.speak(utterance)
+    return utterance
+}
+
+function cancelBrowserTTS(): void {
+    if (hasBrowserSpeechSynthesis()) {
+        window.speechSynthesis.cancel()
+    }
 }
 
 export interface UseTtsReturn {
@@ -61,6 +149,8 @@ export interface UseTtsReturn {
     playChunked: (text: string, voice: string) => Promise<void>
     startStreaming: (voice: string) => void
     feedStreamingText: (fullText: string) => void
+    /** Accept pre-generated audio from server SSE (Layer 3 parallel TTS) */
+    feedServerAudio: (audioData: ArrayBuffer) => void
     finishStreaming: (displayText: string) => void
     stop: () => void
     warmUp: () => void
@@ -101,6 +191,7 @@ export function useTts(): UseTtsReturn {
     }, [])
 
     const stopPlayback = useCallback(() => {
+        cancelBrowserTTS()
         if (abortRef.current) {
             abortRef.current.abort()
             abortRef.current = null
@@ -282,21 +373,26 @@ export function useTts(): UseTtsReturn {
         [stopPlayback, ensureAudioContext, fetchAudio, playAudioBuffer],
     )
 
-    // ─── Streaming TTS (during text generation) with look-ahead ─────────
+    // ─── Streaming TTS with aggressive chunking + browser bridge ────────
 
     const streamVoiceRef = useRef<string | null>(null)
-    const streamSentencesSentRef = useRef<number>(0)
+    const streamChunksSentRef = useRef<number>(0)
     const streamQueueRef = useRef<string[]>([])
     const streamPlayingRef = useRef(false)
     const streamControllerRef = useRef<AbortController | null>(null)
     const streamFinishedRef = useRef(false)
     const streamPrefetchRef = useRef<Promise<ArrayBuffer | null> | null>(null)
+    const browserBridgeActiveRef = useRef(false)
+    const serverAudioQueueRef = useRef<ArrayBuffer[]>([])
 
     /**
-     * INTENT: Drain the streaming sentence queue with look-ahead prefetch.
-     * While playing sentence N, we kick off the fetch for sentence N+1.
-     * This means the next sentence's audio is usually ready by the time
-     * the current one finishes, producing seamless speech.
+     * INTENT: Drain the streaming chunk queue with look-ahead prefetch.
+     * While playing chunk N, we kick off the fetch for chunk N+1.
+     * On the very first chunk, cancel the browser SpeechSynthesis bridge
+     * so the high-quality OpenAI voice takes over seamlessly.
+     *
+     * If server-pushed audio is available (Layer 3), play it directly
+     * without a client-side TTS fetch.
      */
     const drainStreamQueue = useCallback(async () => {
         if (streamPlayingRef.current) return
@@ -318,21 +414,30 @@ export function useTts(): UseTtsReturn {
         while (streamQueueRef.current.length > 0) {
             if (controller.signal.aborted) break
 
-            const sentence = streamQueueRef.current.shift()!
-            if (!sentence.trim()) continue
+            const chunk = streamQueueRef.current.shift()!
+            if (!chunk.trim()) continue
+
+            // Cancel browser bridge when first OpenAI audio is about to play
+            if (browserBridgeActiveRef.current) {
+                cancelBrowserTTS()
+                browserBridgeActiveRef.current = false
+            }
 
             try {
                 setIsLoading(true)
 
-                let bufferPromise: Promise<ArrayBuffer | null>
-                if (streamPrefetchRef.current) {
-                    bufferPromise = streamPrefetchRef.current
+                let arrayBuffer: ArrayBuffer | null = null
+
+                // Prefer server-pushed audio (Layer 3) over client fetch
+                if (serverAudioQueueRef.current.length > 0) {
+                    arrayBuffer = serverAudioQueueRef.current.shift()!
+                } else if (streamPrefetchRef.current) {
+                    arrayBuffer = await streamPrefetchRef.current
                     streamPrefetchRef.current = null
                 } else {
-                    bufferPromise = fetchAudio(sentence, voice, controller.signal)
+                    arrayBuffer = await fetchAudio(chunk, voice, controller.signal)
                 }
 
-                const arrayBuffer = await bufferPromise
                 if (!arrayBuffer || controller.signal.aborted) {
                     setIsLoading(false)
                     continue
@@ -341,9 +446,10 @@ export function useTts(): UseTtsReturn {
                 const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
                 if (controller.signal.aborted) break
 
-                const nextSentence = streamQueueRef.current[0]?.trim()
-                if (nextSentence) {
-                    streamPrefetchRef.current = fetchAudio(nextSentence, voice, controller.signal)
+                // Prefetch next chunk while this one plays
+                const nextChunk = streamQueueRef.current[0]?.trim()
+                if (nextChunk && serverAudioQueueRef.current.length === 0) {
+                    streamPrefetchRef.current = fetchAudio(nextChunk, voice, controller.signal)
                 }
 
                 const source = ctx.createBufferSource()
@@ -365,7 +471,7 @@ export function useTts(): UseTtsReturn {
                 setIsPlaying(false)
             } catch (err) {
                 if (err instanceof Error && err.name === "AbortError") break
-                console.warn("[TTS-Stream] Sentence playback failed:", err instanceof Error ? err.message : err)
+                console.warn("[TTS-Stream] Chunk playback failed:", err instanceof Error ? err.message : err)
                 setIsLoading(false)
                 setIsPlaying(false)
             }
@@ -383,11 +489,13 @@ export function useTts(): UseTtsReturn {
         (voice: string) => {
             stopPlayback()
             streamVoiceRef.current = voice
-            streamSentencesSentRef.current = 0
+            streamChunksSentRef.current = 0
             streamQueueRef.current = []
             streamPlayingRef.current = false
             streamFinishedRef.current = false
             streamPrefetchRef.current = null
+            browserBridgeActiveRef.current = false
+            serverAudioQueueRef.current = []
             const controller = new AbortController()
             streamControllerRef.current = controller
             abortRef.current = controller
@@ -395,22 +503,70 @@ export function useTts(): UseTtsReturn {
         [stopPlayback],
     )
 
+    /**
+     * INTENT: Feed accumulated text and extract speakable chunks aggressively.
+     *
+     * Layer 1 (aggressive chunking): Uses clause boundaries and word-count
+     * thresholds instead of waiting for sentence-ending punctuation.
+     *
+     * Layer 1b (first-chunk eagerness): If nothing has been queued yet and
+     * the text has FIRST_CHUNK_MIN_WORDS words, promote it immediately —
+     * don't wait for a boundary.
+     *
+     * Layer 2 (browser bridge): Before the first OpenAI TTS fetch even starts,
+     * speak the initial words with the browser's built-in SpeechSynthesis API
+     * for near-instant audio (~50ms). The bridge is cancelled when OpenAI
+     * audio arrives in drainStreamQueue.
+     */
     const feedStreamingText = useCallback(
         (fullText: string) => {
             if (!streamControllerRef.current || streamControllerRef.current.signal.aborted) return
 
             const clean = stripMarkdownForTTS(fullText)
-            const sentences = splitIntoSentences(clean)
+            const chunks = splitIntoSpeakableChunks(clean)
 
-            const completeSentences = sentences.slice(0, -1)
-            const alreadySent = streamSentencesSentRef.current
+            // All-but-last are confirmed complete (subsequent text exists)
+            let completeChunks = chunks.slice(0, -1)
+            const alreadySent = streamChunksSentRef.current
 
-            if (completeSentences.length > alreadySent) {
-                const newSentences = completeSentences.slice(alreadySent)
-                streamQueueRef.current.push(...newSentences)
-                streamSentencesSentRef.current = completeSentences.length
+            // First-chunk eagerness: if nothing sent yet and only one chunk
+            // exists with enough words, promote it to "complete" immediately
+            if (alreadySent === 0 && completeChunks.length === 0 && chunks.length === 1) {
+                const words = chunks[0].trim().split(/\s+/)
+                if (words.length >= FIRST_CHUNK_MIN_WORDS) {
+                    completeChunks = [chunks[0]]
+                }
+            }
+
+            // Browser bridge: speak first words instantly while OpenAI loads
+            if (!browserBridgeActiveRef.current && alreadySent === 0 && chunks.length > 0) {
+                const firstText = chunks[0].trim()
+                const wordCount = firstText.split(/\s+/).length
+                if (wordCount >= 3 && hasBrowserSpeechSynthesis()) {
+                    speakBrowserTTS(firstText)
+                    browserBridgeActiveRef.current = true
+                    setIsPlaying(true)
+                }
+            }
+
+            if (completeChunks.length > alreadySent) {
+                const newChunks = completeChunks.slice(alreadySent)
+                streamQueueRef.current.push(...newChunks)
+                streamChunksSentRef.current = completeChunks.length
                 drainStreamQueue()
             }
+        },
+        [drainStreamQueue],
+    )
+
+    /**
+     * Accept pre-generated audio from the server (Layer 3).
+     * Called when the SSE stream delivers an audio_chunk event.
+     */
+    const feedServerAudio = useCallback(
+        (audioData: ArrayBuffer) => {
+            serverAudioQueueRef.current.push(audioData)
+            drainStreamQueue()
         },
         [drainStreamQueue],
     )
@@ -420,13 +576,13 @@ export function useTts(): UseTtsReturn {
             if (!streamControllerRef.current || streamControllerRef.current.signal.aborted) return
 
             const clean = stripMarkdownForTTS(displayText)
-            const sentences = splitIntoSentences(clean)
-            const alreadySent = streamSentencesSentRef.current
+            const chunks = splitIntoSpeakableChunks(clean)
+            const alreadySent = streamChunksSentRef.current
 
-            if (sentences.length > alreadySent) {
-                const remaining = sentences.slice(alreadySent)
+            if (chunks.length > alreadySent) {
+                const remaining = chunks.slice(alreadySent)
                 streamQueueRef.current.push(...remaining)
-                streamSentencesSentRef.current = sentences.length
+                streamChunksSentRef.current = chunks.length
                 drainStreamQueue()
             }
 
@@ -456,6 +612,7 @@ export function useTts(): UseTtsReturn {
         playChunked,
         startStreaming,
         feedStreamingText,
+        feedServerAudio,
         finishStreaming: finishStreamingWithText,
         stop: stopPlayback,
         warmUp,

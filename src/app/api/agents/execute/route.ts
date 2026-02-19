@@ -17,6 +17,7 @@ import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
 import { compilePersonalityPrompt, compileRelationshipContext } from "@/lib/agents/personality"
 import { createRollout, finishRollout } from "@/lib/agent-spans"
+import OpenAI from "openai"
 import { FAST_MODEL_CHAIN, buildSpeculativeFastPrompt, parseComplexityTag } from "@/lib/agents/speculative-prompt"
 // AUDIT: Converted 9 dynamic imports to static (2026-02-19, refactor step 5 of 8).
 // Dynamic imports in a server-side API route provide no bundle benefit. Static
@@ -195,6 +196,7 @@ export async function POST(request: Request) {
     let modelTier: ModelTier | undefined
     let attachments: Array<{ path?: string; url?: string | null; filename?: string; mimeType?: string }> | undefined
     let speculative: boolean
+    let ttsVoice: string | undefined
 
     try {
         const body = await request.json()
@@ -222,6 +224,7 @@ export async function POST(request: Request) {
             )
             : undefined
         speculative = body.speculative === true
+        ttsVoice = typeof body.ttsVoice === "string" ? body.ttsVoice : undefined
 
         if (!prompt || typeof prompt !== "string") {
             return NextResponse.json({ error: "prompt is required" }, { status: 400 })
@@ -721,10 +724,9 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
             )
         }
         if (modality === "text") {
-            return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId)
+            return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId, ttsVoice)
         }
         if (modality === "slides") {
-            // Slides use text generation with a structured output prompt (no conversation history needed)
             return await handleTextStreaming(fallbackChain, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback, enableThinking, undefined, rolloutId)
         }
         if (modality === "image") {
@@ -763,6 +765,142 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
 // (2026-02-19, refactor step 3 of 8). Now independently testable.
 import { classifyStreamError } from "@/lib/agents/error-classification"
 
+// ─── Server-Side Parallel TTS (Layer 3) ──────────────────────────────
+
+const ALLOWED_TTS_VOICES = new Set([
+    "alloy", "ash", "ballad", "coral", "echo",
+    "fable", "nova", "onyx", "sage", "shimmer", "verse",
+])
+
+const SERVER_CLAUSE_SPLIT_MIN_WORDS = 8
+const SERVER_FORCE_SPLIT_WORDS = 14
+
+/**
+ * INTENT: Mirror the client-side aggressive chunking on the server so TTS
+ * generation starts as early as possible — before the text even reaches
+ * the client. Each speakable chunk triggers a fire-and-forget TTS call
+ * whose result is sent as an SSE audio_chunk event.
+ */
+function splitServerSpeakableChunks(text: string): string[] {
+    const trimmed = text.trim()
+    if (!trimmed) return []
+
+    const result: string[] = []
+    let buffer = ""
+    let wordCount = 0
+    const tokens = trimmed.split(/(\s+)/)
+
+    for (const token of tokens) {
+        if (/^\s+$/.test(token)) {
+            buffer += token
+            continue
+        }
+        buffer += token
+        wordCount++
+
+        if (/[.!?]$/.test(token) && wordCount >= 3) {
+            result.push(buffer.trim())
+            buffer = ""
+            wordCount = 0
+            continue
+        }
+        if (/[,;:\u2014\u2013]$/.test(token) && wordCount >= SERVER_CLAUSE_SPLIT_MIN_WORDS) {
+            result.push(buffer.trim())
+            buffer = ""
+            wordCount = 0
+            continue
+        }
+        if (wordCount >= SERVER_FORCE_SPLIT_WORDS) {
+            result.push(buffer.trim())
+            buffer = ""
+            wordCount = 0
+            continue
+        }
+    }
+    if (buffer.trim()) result.push(buffer.trim())
+    return result
+}
+
+let _ttsOpenAI: OpenAI | null = null
+function getTtsOpenAI(): OpenAI | null {
+    const key = process.env.OPENAI_API_KEY
+    if (!key) return null
+    if (!_ttsOpenAI) _ttsOpenAI = new OpenAI({ apiKey: key })
+    return _ttsOpenAI
+}
+
+/**
+ * Creates a server-side TTS accumulator that watches text chunks and
+ * fires parallel TTS requests, sending audio_chunk SSE events.
+ * Returns null if voice is not specified or unsupported.
+ */
+function createServerTtsAccumulator(
+    voice: string | undefined,
+    encoder: TextEncoder,
+    controller: ReadableStreamDefaultController,
+) {
+    if (!voice || !ALLOWED_TTS_VOICES.has(voice)) return null
+
+    const openai = getTtsOpenAI()
+    if (!openai) return null
+
+    let accumulated = ""
+    let chunksSent = 0
+    let closed = false
+
+    function markClosed(): void { closed = true }
+
+    function onText(text: string): void {
+        if (closed) return
+        accumulated += text
+
+        const clean = accumulated
+            .replace(/^#{1,6}\s+/gm, "")
+            .replace(/\*\*(.+?)\*\*/g, "$1")
+            .replace(/\*(.+?)\*/g, "$1")
+            .replace(/`(.+?)`/g, "$1")
+            .replace(/```[\s\S]*?```/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+
+        const chunks = splitServerSpeakableChunks(clean)
+        const complete = chunks.slice(0, -1)
+
+        while (chunksSent < complete.length) {
+            const chunk = complete[chunksSent]
+            const idx = chunksSent
+            chunksSent++
+            generateAudioChunk(chunk, idx)
+        }
+    }
+
+    function generateAudioChunk(text: string, index: number): void {
+        openai!.audio.speech.create({
+            model: "gpt-4o-mini-tts",
+            voice: voice as "alloy",
+            input: text,
+            response_format: "mp3",
+        })
+            .then(async (audioResponse) => {
+                if (closed) return
+                const buffer = Buffer.from(await audioResponse.arrayBuffer())
+                const base64 = buffer.toString("base64")
+                try {
+                    controller.enqueue(encoder.encode(
+                        `data: ${JSON.stringify({ type: "audio_chunk", audio: base64, index })}\n\n`
+                    ))
+                } catch {
+                    // Stream closed before audio arrived — expected for short responses
+                }
+            })
+            .catch((err) => {
+                console.warn("[TTS-Server] Audio chunk failed:", index, err instanceof Error ? err.message : err)
+            })
+    }
+
+    return { onText, markClosed }
+}
+
 // ─── Text Streaming Handler (with Provider Failover) ─────────────────
 
 /**
@@ -792,9 +930,9 @@ async function handleTextStreaming(
     onComplete?: (fullOutput: string) => Promise<void>,
     enableThinking?: boolean,
     history?: ConversationMessage[],
-    rolloutId?: string | null
+    rolloutId?: string | null,
+    ttsVoice?: string,
 ): Promise<Response> {
-    // Convert ConversationMessage[] to ChatMessage[] for the provider (shared across attempts)
     const conversationHistory = history?.map((msg) => ({
         role: msg.role as "system" | "user" | "assistant",
         content: msg.content,
@@ -805,16 +943,16 @@ async function handleTextStreaming(
 
     const readable = new ReadableStream({
         async start(controller) {
-            // SSE keepalive: send a comment every 15s to prevent proxies
-            // (Vercel, Cloudflare, browser) from closing idle connections.
-            // SSE spec: lines starting with ":" are comments — clients ignore them.
             const heartbeatInterval = setInterval(() => {
                 try {
                     controller.enqueue(encoder.encode(": keepalive\n\n"))
                 } catch {
-                    // Stream already closed — safe to ignore
+                    // Stream already closed
                 }
             }, 15_000)
+
+            // Layer 3: server-side parallel TTS
+            const ttsAccumulator = createServerTtsAccumulator(ttsVoice, encoder, controller)
 
             let lastError = "No providers available"
 
@@ -832,9 +970,7 @@ async function handleTextStreaming(
                     continue
                 }
 
-                // Extended thinking requires more output headroom
                 const maxTokens = enableThinking ? 32768 : 16384
-                // Extended thinking only works with Anthropic models
                 const useThinking = enableThinking && target.providerId === "anthropic"
 
                 if (i > 0) {
@@ -847,8 +983,6 @@ async function handleTextStreaming(
                 }
 
                 try {
-                    // Wrap streamFn in a promise so we can catch setup-phase errors
-                    // and distinguish them from mid-stream errors.
                     await new Promise<void>((resolve, reject) => {
                         let hasStartedStreaming = false
 
@@ -864,8 +998,10 @@ async function handleTextStreaming(
                                 hasStartedStreaming = true
                                 fullOutput += text
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
+                                ttsAccumulator?.onText(text)
                             },
                             onDone() {
+                                ttsAccumulator?.markClosed()
                                 clearInterval(heartbeatInterval)
                                 controller.enqueue(encoder.encode("data: [DONE]\n\n"))
                                 controller.close()
@@ -875,8 +1011,8 @@ async function handleTextStreaming(
                                 resolve()
                             },
                             onError(error) {
+                                ttsAccumulator?.markClosed()
                                 if (hasStartedStreaming) {
-                                    // Mid-stream error — can't failover, surface to client
                                     if (rolloutId) finishRollout(rolloutId, "failed").catch(() => {})
                                     clearInterval(heartbeatInterval)
                                     console.error("[agents/execute] Mid-stream error (no failover):", {
@@ -893,13 +1029,12 @@ async function handleTextStreaming(
                                         })}\n\n`)
                                     )
                                     controller.close()
-                                    resolve() // Resolve — we've handled it, no retry
+                                    resolve()
                                 } else {
-                                    // Pre-stream error — candidate for failover
                                     reject(new Error(error))
                                 }
                             },
-                        }).catch(reject) // Catch promise-level rejections from the stream fn
+                        }).catch(reject)
                     })
 
                     // If we reach here, streaming completed successfully

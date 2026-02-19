@@ -1040,6 +1040,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         attachments: attachmentsToSend.length > 0
                             ? attachmentsToSend.map((a) => ({ path: a.path, url: a.url, filename: a.filename, mimeType: a.mimeType }))
                             : undefined,
+                        ttsVoice: isTtsStreaming ? specialist.voice : undefined,
                     }),
                     signal: controller.signal,
                 })
@@ -1091,7 +1092,20 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         done?: boolean
                                         complexity?: "simple" | "complex"
                                         skipped?: boolean
+                                        type?: "audio_chunk"
+                                        audio?: string
+                                        index?: number
                                     }
+
+                                    // Layer 3: server-pushed TTS audio
+                                    if (parsed.type === "audio_chunk" && parsed.audio && isTtsStreaming) {
+                                        const binary = atob(parsed.audio)
+                                        const bytes = new Uint8Array(binary.length)
+                                        for (let b = 0; b < binary.length; b++) bytes[b] = binary.charCodeAt(b)
+                                        tts.feedServerAudio(bytes.buffer as ArrayBuffer)
+                                        continue
+                                    }
+
                                     if (parsed.grounding) {
                                         setContextGrounding(parsed.grounding)
                                         continue
@@ -1331,7 +1345,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             setIsExecuting(false)
             setIsUrgentMessage(false)
         }
-    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, pendingAttachments, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext, formatBrowseContext])
+    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, pendingAttachments, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.feedServerAudio, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext, formatBrowseContext])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
