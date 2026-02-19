@@ -241,6 +241,25 @@ export interface MashupSourceInput {
   bounding_box?: { xLen: number; yLen: number; zLen: number }
   /** Optional: human-readable description (e.g. from step_templates) */
   description?: string
+  /** Optional: thumbnail image URL for display in the UI */
+  thumbnail_url?: string
+}
+
+/**
+ * One AI-suggested STEP template combination for a mashup concept.
+ * Returned by suggestMashupCombinations — shown as a recipe card.
+ */
+export interface MashupSuggestion {
+  /** Display name, e.g. "Quadrotor Humanoid Scout" */
+  name: string
+  /** Short description of how the parts combine */
+  description: string
+  /** Pre-filled concept text for the mashup generation step */
+  concept: string
+  /** Template slugs from step_templates, in combination order */
+  templateSlugs: string[]
+  /** Resolved source inputs (populated server-side from templateSlugs) */
+  sources: MashupSourceInput[]
 }
 
 /** Structured plan returned by Claude for mashup code generation */

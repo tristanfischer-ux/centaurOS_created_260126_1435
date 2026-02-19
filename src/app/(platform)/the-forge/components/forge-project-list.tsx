@@ -35,8 +35,6 @@ import type { LucideIcon } from "lucide-react"
 
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-
 import { listCadLabProjects } from "@/actions/cad-lab-projects"
 import { listRecentAssemblies } from "@/actions/assembly-builder"
 import { RecentProjectsGrid } from "./recent-projects-grid"
@@ -101,7 +99,7 @@ const STARTING_PATHS: StartingPath[] = [
     iconColor: "text-electric-blue",
     accentBorder: "border-l-electric-blue",
     headline: "Start from STEP files",
-    description: "Merge two or more STEP files into a new hybrid geometry using AI.",
+    description: "Upload existing STEP files and combine them into one unified design.",
     href: "/the-forge/cad-lab/mashup",
     cta: "Open Mashup Lab",
     outputs: ["Hybrid STEP", "STL preview", "RFQ package"],
@@ -111,10 +109,10 @@ const STARTING_PATHS: StartingPath[] = [
     iconBg: "bg-status-success-light",
     iconColor: "text-status-success",
     accentBorder: "border-l-status-success",
-    headline: "Start from a skeleton",
-    description: "Pick a design skeleton and fill each slot from 256+ parametric components.",
+    headline: "Start from a template",
+    description: "Choose a pre-built layout and customize each part from the component library.",
     href: "/the-forge/assembly-builder",
-    cta: "Browse skeletons",
+    cta: "Browse templates",
     outputs: ["Assembly BOM", "Cost estimate", "Compatibility check", "RFQ package"],
   },
 ]
@@ -174,20 +172,14 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
       <StartingPointsSection />
 
       {!hasRecent ? (
-        <div className="rounded-xl bg-muted/30 py-16 px-8 flex flex-col items-center text-center">
+        <div className="rounded-xl bg-muted/30 py-12 px-8 flex flex-col items-center text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-international-orange-light mb-5">
             <Flame className="h-7 w-7 text-international-orange" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">No designs yet</h3>
-          <p className="text-sm text-muted-foreground max-w-md mb-6">
-            Choose a starting point above to create your first engineering package — 3D models, specs, analysis, and a manufacturer-ready RFQ.
+          <p className="text-sm text-muted-foreground max-w-md">
+            Pick a starting point above to create your first engineering package.
           </p>
-          <Button asChild>
-            <Link href="/the-forge/cad-lab">
-              <Sparkles className="h-4 w-4 mr-2" />
-              Start your first design
-            </Link>
-          </Button>
         </div>
       ) : (
         <RecentProjectsGrid items={recentItems} />

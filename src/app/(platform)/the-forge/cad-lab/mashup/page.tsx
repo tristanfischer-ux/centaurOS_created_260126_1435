@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { MashupSourceSelector } from "../components/mashup-source-selector"
+import { MashupConceptSearch } from "../components/mashup-concept-search"
 import { STLViewer } from "@/components/cad/stl-viewer"
 import { generateMashup } from "@/actions/cad-lab"
 import { createMashupRfqAction } from "@/actions/cad-lab-rfq"
@@ -139,30 +140,62 @@ export default function MashupPage(): React.ReactElement {
       </header>
 
       {step === "sources" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Box className="h-5 w-5" />
-              Step 1: Select source STEPs
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <MashupSourceSelector
-              selected={sources}
-              onSelectedChange={setSources}
-              maxSources={5}
-            />
-            <div className="flex justify-end">
-              <Button
-                onClick={() => setStep("concept")}
-                disabled={!canProceedFromSources}
-              >
-                Next
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+        <div className="space-y-6">
+          {/* AI concept search */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-international-orange" />
+                Describe what you want to create
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MashupConceptSearch
+                onSelect={(aiSources, aiConcept) => {
+                  setSources(aiSources)
+                  setConcept(aiConcept)
+                  setStep("concept")
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Manual browse divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
             </div>
-          </CardContent>
-        </Card>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-background px-3 text-muted-foreground">or build manually</span>
+            </div>
+          </div>
+
+          {/* Manual source selector */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Box className="h-5 w-5" />
+                Browse &amp; select STEP files
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <MashupSourceSelector
+                selected={sources}
+                onSelectedChange={setSources}
+                maxSources={5}
+              />
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => setStep("concept")}
+                  disabled={!canProceedFromSources}
+                >
+                  Next
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {step === "concept" && (

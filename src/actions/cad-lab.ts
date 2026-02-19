@@ -27,6 +27,7 @@ import type {
   MashupSourceInput,
   MashupPlan,
   MashupResult,
+  MashupSuggestion,
 } from "@/lib/cad-lab-types"
 import { generateFromGrammar } from "@/actions/cad-grammar"
 import { checkRateLimit } from "@/lib/security/rate-limit"
@@ -1523,5 +1524,143 @@ export async function generateSystemAssembly(
     success: false,
     error:
       "Assembly generation is not yet implemented. It will combine all module STEP files into a single system assembly.",
+  }
+}
+
+// ─── Mashup Concept Suggestions ───────────────────────────────────────
+
+/**
+ * Suggests 3–4 STEP template combinations for a given natural language concept.
+ *
+ * @description Fetches all step_templates, sends them + the user's query to
+ * Claude (fast variant for real-time UX), and returns curated mashup "recipes"
+ * each with a name, description, pre-filled concept text, and resolved sources.
+ *
+ * INTENT: Discovery layer for Mashup Lab. Before this, users had to manually
+ * browse 200+ templates with no guidance. Now they describe what they want
+ * and get smart starting combinations in seconds.
+ *
+ * @param query - Natural language description, e.g. "humanoid robot with quadcopter propellers"
+ * @returns Array of MashupSuggestion objects with resolved sources, or error string
+ */
+export async function suggestMashupCombinations(
+  query: string,
+): Promise<{ suggestions: MashupSuggestion[] } | { error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Unauthorized" }
+
+  const trimmedQuery = query.trim()
+  if (!trimmedQuery) return { error: "Query is required" }
+
+  const { data: templates, error: dbError } = await supabase
+    .from("step_templates")
+    .select("id, slug, name, category, subcategory, description, step_url, stl_url, thumbnail_url")
+    .order("name")
+    .limit(500)
+
+  if (dbError) {
+    console.error("[THE-FORGE] suggestMashupCombinations: failed to fetch templates:", dbError.message)
+    return { error: "Failed to load template library" }
+  }
+
+  const templateList = (templates ?? []) as Array<{
+    id: string
+    slug: string
+    name: string
+    category: string
+    subcategory: string | null
+    description: string | null
+    step_url: string | null
+    stl_url: string | null
+    thumbnail_url: string | null
+  }>
+
+  if (templateList.length === 0) return { error: "No templates available" }
+
+  const catalogue = templateList
+    .map((t) => `${t.slug} | ${t.name} | ${t.category}${t.subcategory ? `/${t.subcategory}` : ""}`)
+    .join("\n")
+
+  const systemPrompt = `You are a creative mechanical designer and mashup concept generator for ForgeOS Mashup Lab.
+Your job: given a user's concept description and a library of available STEP template files, suggest 3–4 coherent, imaginative, and physically plausible STEP file combinations.
+
+Rules:
+- ONLY use slugs that appear in the provided template catalogue. Do not invent slugs.
+- Each suggestion must use 2–4 templates.
+- Prefer combinations where the parts can realistically be merged (attach, stack, integrate).
+- The "concept" field should be a vivid 1–2 sentence description of the resulting hybrid product that the AI will use as its generation brief.
+- Return ONLY valid JSON — no markdown fences, no explanation outside the JSON array.
+
+Response format (JSON array):
+[
+  {
+    "name": "Short catchy name for the mashup",
+    "description": "One sentence on how the parts combine",
+    "concept": "2-sentence generation brief describing the hybrid product and how parts relate spatially",
+    "templateSlugs": ["slug-one", "slug-two", "slug-three"]
+  }
+]`
+
+  const userPrompt = `User concept: "${trimmedQuery}"
+
+Available templates (slug | name | category):
+${catalogue}
+
+Return 3–4 suggestions as a JSON array.`
+
+  try {
+    // DECISION: Using claude-sonnet-4-5-20250929 (fast variant) — this is a
+    // lightweight template-matching task, not code generation. Speed matters
+    // here for a real-time UX response.
+    const { text } = await callClaude(systemPrompt, userPrompt, "claude-sonnet-4-5-20250929", 2048)
+
+    const cleaned = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim()
+
+    let raw: Array<{ name: string; description: string; concept: string; templateSlugs: string[] }>
+    try {
+      raw = JSON.parse(cleaned)
+    } catch {
+      console.error("[THE-FORGE] suggestMashupCombinations: JSON parse failed:", cleaned.slice(0, 300))
+      return { error: "Failed to parse suggestions from AI response" }
+    }
+
+    if (!Array.isArray(raw)) return { error: "Unexpected AI response format" }
+
+    const templateBySlug = new Map(templateList.map((t) => [t.slug, t]))
+
+    const suggestions: MashupSuggestion[] = raw
+      .slice(0, 4)
+      .map((s) => {
+        const sourceCandidates = (s.templateSlugs ?? []).map((slug): MashupSourceInput | null => {
+          const t = templateBySlug.get(slug)
+          if (!t) return null
+          const url = t.step_url ?? t.stl_url
+          if (!url) return null
+          return {
+            name: t.slug.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || t.slug,
+            step_url: url,
+            description: t.description ?? t.name,
+            thumbnail_url: t.thumbnail_url ?? undefined,
+          }
+        })
+        const sources: MashupSourceInput[] = sourceCandidates.filter(
+          (x): x is MashupSourceInput => x !== null
+        )
+        return {
+          name: s.name ?? "Unnamed mashup",
+          description: s.description ?? "",
+          concept: s.concept ?? "",
+          templateSlugs: s.templateSlugs ?? [],
+          sources,
+        } satisfies MashupSuggestion
+      })
+      .filter((s) => s.sources.length >= 2)
+
+    return { suggestions }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error"
+    console.error("[THE-FORGE] suggestMashupCombinations failed:", msg)
+    return { error: "Failed to generate suggestions. Please try again." }
   }
 }

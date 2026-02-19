@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useState, useCallback } from "react"
+import Image from "next/image"
 import { Plus, X, Box, Loader2, Search, FileBox, Shapes } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -163,6 +164,7 @@ export function MashupSourceSelector({
         name: name || t.name,
         step_url: url,
         description: t.description ?? t.name,
+        thumbnail_url: t.thumbnail_url ?? undefined,
       },
     ])
     setBrowseOpen(false)
@@ -207,8 +209,19 @@ export function MashupSourceSelector({
         <div className="grid gap-2 sm:grid-cols-2">
           {selected.map((s, i) => (
             <Card key={`${s.name}-${i}`} className="flex flex-row items-center gap-3 p-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-muted">
-                <Box className="h-6 w-6 text-muted-foreground" />
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-muted overflow-hidden">
+                {s.thumbnail_url ? (
+                  <Image
+                    src={s.thumbnail_url}
+                    alt={s.name}
+                    width={48}
+                    height={48}
+                    className="h-full w-full object-cover"
+                    unoptimized
+                  />
+                ) : (
+                  <Box className="h-6 w-6 text-muted-foreground" />
+                )}
               </div>
               <CardContent className="flex-1 min-w-0 p-0">
                 <p className="text-sm font-medium truncate">{s.name}</p>
@@ -373,8 +386,17 @@ export function MashupSourceSelector({
                               className="w-full flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
                               onClick={() => addFromTemplate(t)}
                             >
-                              <div className="h-8 w-8 shrink-0 rounded bg-muted flex items-center justify-center">
-                                {fmt === "STEP" ? (
+                              <div className="h-10 w-10 shrink-0 rounded bg-muted flex items-center justify-center overflow-hidden">
+                                {t.thumbnail_url ? (
+                                  <Image
+                                    src={t.thumbnail_url}
+                                    alt={t.name}
+                                    width={40}
+                                    height={40}
+                                    className="h-full w-full object-cover"
+                                    unoptimized
+                                  />
+                                ) : fmt === "STEP" ? (
                                   <FileBox className="h-4 w-4 text-international-orange" />
                                 ) : (
                                   <Shapes className="h-4 w-4 text-muted-foreground" />
