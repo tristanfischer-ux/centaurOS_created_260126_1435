@@ -1,20 +1,49 @@
+Starting AI safety guardrails test...
 
-node:internal/modules/run_main:107
-    triggerUncaughtException(
-    ^
-Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/Users/tristanfischer/Developer/CentaurOS created 260126 1435/test-ai-safety-guardrails.ts' imported from /Users/tristanfischer/Developer/CentaurOS created 260126 1435/
-    at finalizeResolution (node:internal/modules/esm/resolve:275:11)
-    at moduleResolve (node:internal/modules/esm/resolve:865:10)
-    at defaultResolve (node:internal/modules/esm/resolve:991:11)
-    at nextResolve (node:internal/modules/esm/hooks:769:28)
-    at resolveBase (file:///Users/tristanfischer/.npm/_npx/fd45a72a545557e9/node_modules/tsx/dist/esm/index.mjs?1771413689577:2:3744)
-    at async resolveDirectory (file:///Users/tristanfischer/.npm/_npx/fd45a72a545557e9/node_modules/tsx/dist/esm/index.mjs?1771413689577:2:4237)
-    at async resolve (file:///Users/tristanfischer/.npm/_npx/fd45a72a545557e9/node_modules/tsx/dist/esm/index.mjs?1771413689577:2:5355)
-    at async nextResolve (node:internal/modules/esm/hooks:769:22)
-    at async AsyncLoaderHooksOnLoaderHookWorker.resolve (node:internal/modules/esm/hooks:265:24)
-    at async handleMessage (node:internal/modules/esm/worker:251:18) {
-  code: 'ERR_MODULE_NOT_FOUND',
-  url: 'file:///Users/tristanfischer/Developer/CentaurOS%20created%20260126%201435/test-ai-safety-guardrails.ts'
-}
+0. Logging in as demo founder...
+✓ Login button clicked, waiting for redirect...
+[Browser warning]: Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+✓ Successfully logged in
 
-Node.js v25.6.1
+1. Navigating to http://localhost:3000/agents
+[Browser error]: Failed to load resource: the server responded with a status of 401 ()
+[Browser error]: Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+✓ Agents page loaded
+✓ Login status: Logged in
+
+1.5. Checking for onboarding tour modal...
+✓ Onboarding tour modal detected, clicking skip...
+✓ Tour skipped
+
+2. Looking for specialist cards...
+✓ Found 13 specialist cards
+
+3. Clicking on first specialist card...
+✓ Specialist clicked
+
+4. Waiting for chat interface to load...
+✓ Chat interface loaded
+
+5. Looking for chat input...
+✓ Chat input found
+✓ Message typed
+
+6. Looking for send button...
+✓ Message sent
+
+7. Waiting for AI response...
+⚠ No AI response detected within 15 seconds
+✓ Response screenshot captured
+
+8. Checking for errors...
+⚠ Error messages found:
+  - *
+  - *
+  - 
+
+✓ Final URL: http://localhost:3000/login
+
+✅ Test completed successfully!
+Screenshots saved to screenshots/ directory
+
+Browser will remain open for 30 seconds for manual inspection...

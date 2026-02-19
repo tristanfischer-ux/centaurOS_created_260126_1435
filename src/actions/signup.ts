@@ -114,6 +114,29 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     return { error, values: formValues };
   }
 
+  // Invite-only gate: signup requires a valid waitlist invite token
+  const inviteToken = (formData.get("invite_token") as string)?.trim() || null;
+  if (!inviteToken) {
+    return errorWithValues("Signup is currently invite-only. Join the waitlist to get an invite.");
+  }
+
+  const adminForWaitlist = createAdminClient();
+  const { data: waitlistEntry, error: waitlistError } = await adminForWaitlist
+    .from("waitlist")
+    .select("id, email, status, redeemed_at")
+    .eq("invite_token", inviteToken)
+    .maybeSingle();
+
+  if (waitlistError || !waitlistEntry) {
+    return errorWithValues("This invite link is invalid or could not be found.");
+  }
+  if (waitlistEntry.status !== "approved") {
+    return errorWithValues("This invite has not been approved yet.");
+  }
+  if (waitlistEntry.redeemed_at) {
+    return errorWithValues("This invite link has already been used.");
+  }
+
   // Security: Get client IP for rate limiting
   const headersList = await headers();
   const clientIP = getClientIP(headersList);
@@ -492,7 +515,13 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     redirect(`/login?message=${encodeURIComponent("Account created! Sign in with your email and password.")}`);
   }
 
-  // User is now authenticated — go straight into the app
+  // User is now authenticated — mark invite as redeemed and go into the app
+  if (waitlistEntry?.id) {
+    await adminForWaitlist
+      .from("waitlist")
+      .update({ redeemed_at: new Date().toISOString() })
+      .eq("id", waitlistEntry.id);
+  }
   revalidatePath("/", "layout");
 
   if (role === "supplier") {

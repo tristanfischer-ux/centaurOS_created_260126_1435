@@ -292,6 +292,52 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
             </div>
         `
     }),
+
+    waitlist_admin_notification: (data) => ({
+        subject: `New Waitlist Signup: ${data.email || 'Unknown'}`,
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #1a1a1a;">New Waitlist Signup</h2>
+                <p style="color: #666;">Someone joined the Fractional Forge waitlist.</p>
+                <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <p style="margin: 0;"><strong>Email:</strong> ${data.email || '—'}</p>
+                    <p style="margin: 8px 0 0 0;"><strong>Date:</strong> ${data.createdAt || '—'}</p>
+                </div>
+                <p style="margin-bottom: 12px;">Approve to send them an invite link, or reject to decline.</p>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <a href="${data.approveUrl || '#'}" style="display: inline-block; background: #22c55e; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">Approve</a>
+                    <a href="${data.rejectUrl || '#'}" style="display: inline-block; background: #64748b; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none;">Reject</a>
+                </div>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #888; font-size: 12px;">Fractional Forge waitlist. Links expire in 7 days.</p>
+            </div>
+        `
+    }),
+
+    waitlist_approved: (data) => ({
+        subject: "You're in! Your Fractional Forge invitation",
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 32px; border-radius: 8px 8px 0 0; text-align: center;">
+                    <h1 style="margin: 0; color: white; font-size: 24px;">You're In!</h1>
+                    <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9);">Your Fractional Forge invitation is ready</p>
+                </div>
+                <div style="background: #f8fafc; padding: 32px; border-radius: 0 0 8px 8px;">
+                    <p style="color: #475569; font-size: 16px; margin: 0 0 24px 0;">
+                        You've been approved to join Fractional Forge. Click below to create your account and get started.
+                    </p>
+                    <div style="text-align: center;">
+                        <a href="${data.inviteUrl || '#'}" style="display: inline-block; background: #1e293b; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">Create Account</a>
+                    </div>
+                    <p style="color: #94a3b8; font-size: 13px; margin-top: 24px; text-align: center;">
+                        This link is unique to you. If you didn't request access, you can ignore this email.
+                    </p>
+                </div>
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+                <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">Fractional Forge — Private Beta</p>
+            </div>
+        `
+    }),
     
     generic: (data) => ({
         subject: String(data.subject || data.title || 'Notification from ForgeOS'),

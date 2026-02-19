@@ -13,6 +13,7 @@ const PUBLIC_ROUTES = [
     '/experts',  // Public expert directory (SEO)
     '/expert',   // Individual expert profiles (SEO)
     '/api/health',
+    '/api/waitlist',  // One-click approve/reject from email (token-signed)
     '/api/webhooks',
     '/api/dev-login',  // Dev-only auto-login for AI agents/tests (returns 404 in production)
     '/access-revoked',  // Access revoked page for deactivated users

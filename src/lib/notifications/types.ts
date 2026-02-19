@@ -67,6 +67,8 @@ export type EmailTemplate =
     | 'rfq_awarded_to_you'
     | 'rfq_outbid'
     | 'team_invitation'
+    | 'waitlist_admin_notification'
+    | 'waitlist_approved'
     | 'generic'
 
 export interface PushNotificationOptions {

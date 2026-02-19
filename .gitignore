@@ -17,6 +17,12 @@ __pycache__/
 drone_output/
 experiments/
 data/step-library-staging/
+data/robot-step-staging/
+
+# Ollama seed generation artifacts (intermediate JSON + logs)
+scripts/generated_*/
+scripts/*_log.txt
+scripts/*_stderr.log
 
 # Playwright
 /playwright-report/

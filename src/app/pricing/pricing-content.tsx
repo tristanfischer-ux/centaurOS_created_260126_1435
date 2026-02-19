@@ -145,7 +145,7 @@ export function PricingContent() {
                 Sign In
               </Link>
               <Button asChild size="sm" className="bg-international-orange hover:bg-international-orange-hover">
-                <Link href="/join">Get Started</Link>
+                <Link href="/join">Join the Waitlist</Link>
               </Button>
             </div>
           </div>
@@ -290,11 +290,7 @@ export function PricingContent() {
                         )}
                         variant={isProfessional ? 'default' : 'outline'}
                       >
-                        <Link href="/join">
-                          {plan.priceMonthlyGBP === 0
-                            ? 'Get Started Free'
-                            : `Get started with ${plan.name}`
-                          }
+                        <Link href="/join">Join the Waitlist
                           <ArrowRight className="h-4 w-4 ml-2" />
                         </Link>
                       </Button>

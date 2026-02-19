@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { signup } from "@/actions/signup";
 import type { SignupState } from "@/actions/signup";
+import { joinWaitlist } from "@/actions/waitlist";
 import { getDemoAccountData, type DemoAccountData } from "@/actions/demo-accounts";
 
 /** Total founding member spots available */
@@ -63,10 +64,135 @@ function FoundingMemberCounter() {
 }
 
 /**
+ * Waitlist form — shown when no invite token. Email only, "Join the Waitlist".
+ */
+function WaitlistForm() {
+  const [email, setEmail] = useState("");
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isPending, setIsPending] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim() || isPending) return;
+    setIsPending(true);
+    setResult(null);
+    const res = await joinWaitlist(email.trim());
+    setIsPending(false);
+    setResult(res.success ? { success: true, message: res.message } : { success: false, message: res.error });
+    if (res.success) setEmail("");
+  }
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <nav className="px-4 sm:px-6 py-4 sm:py-6">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <Link
+            href="/"
+            className="text-muted-foreground hover:text-foreground text-sm font-mono uppercase tracking-widest flex items-center gap-2 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Link>
+          <Link
+            href="/login"
+            className="text-muted-foreground hover:text-international-orange text-sm font-mono uppercase tracking-widest transition-colors"
+          >
+            Sign in
+          </Link>
+        </div>
+      </nav>
+      <div className="px-4 sm:px-6 pb-12 sm:pb-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="max-w-2xl mx-auto space-y-8"
+        >
+          <div className="text-center space-y-3">
+            <h1 className="text-3xl sm:text-4xl font-black text-foreground">
+              Join the Waitlist
+            </h1>
+            <p className="text-muted-foreground text-base sm:text-lg max-w-lg mx-auto">
+              Fractional Forge is in private beta. Leave your email and we&apos;ll be in touch when your spot is ready.
+            </p>
+          </div>
+
+          {result && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              role="alert"
+              aria-live="polite"
+              className={`p-4 rounded-lg flex items-center gap-3 text-sm ${
+                result.success
+                  ? "bg-status-success-light border border-status-success text-status-success-dark"
+                  : "bg-status-error-light border border-destructive text-destructive"
+              }`}
+            >
+              {result.message}
+            </motion.div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="waitlist-email" className="text-sm font-medium text-foreground">
+                Email
+                <span className="text-destructive ml-1" aria-label="required">*</span>
+              </Label>
+              <Input
+                id="waitlist-email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                required
+                aria-required="true"
+                disabled={isPending}
+                autoFocus
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={isPending}
+              className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm"
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Joining...
+                </>
+              ) : (
+                "Join the Waitlist"
+              )}
+            </Button>
+          </form>
+
+          <p className="text-xs text-center text-muted-foreground">
+            By joining, you agree to our{" "}
+            <Link href="/terms" className="underline hover:text-foreground">Terms of Service</Link>
+            {" "}and{" "}
+            <Link href="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
+          </p>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * JoinPageInner — The actual join page content (needs searchParams).
+ * With invite token: show full signup form. Without: show waitlist form.
  */
 function JoinPageInner() {
   const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("token");
+
+  // No token → waitlist only
+  if (!inviteToken) {
+    return <WaitlistForm />;
+  }
 
   // Pre-select path from URL (e.g. /join?role=founder or /join?role=executive)
   const roleParam = searchParams.get("role");
@@ -264,6 +390,7 @@ function JoinPageInner() {
               >
                 <form action={formAction} className="space-y-5">
                   <input type="hidden" name="role" value={effectiveRole} />
+                  <input type="hidden" name="invite_token" value={inviteToken} />
 
                   {/* Role sub-selection for Joining path */}
                   {selectedPath === "joining" && (

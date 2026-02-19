@@ -73,6 +73,7 @@ export const RATE_LIMIT_CONFIGS = {
     // Authentication - strict limits
     login: { limit: 5, window: 15 * 60 * 1000 },        // 5 attempts per 15 minutes
     signup: { limit: 3, window: 60 * 60 * 1000 },       // 3 signups per hour per IP
+    waitlist: { limit: 5, window: 60 * 60 * 1000 },      // 5 waitlist joins per hour per IP
     passwordReset: { limit: 3, window: 60 * 60 * 1000 }, // 3 reset requests per hour
     
     // Invitations

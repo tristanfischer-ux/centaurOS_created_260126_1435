@@ -3,3 +3,26 @@
 [11:20:49] 
 [6/10] 💰 Generating pricing: Connectors & Cables (25 items)
 [11:20:49]     🤖 Streaming from qwen3:14b...
+[11:28:55]     ⏱️  Response in 486.3s (12839 chars)
+[11:28:55]     ⚠️  Recovered 20 objects from malformed JSON
+[11:28:55]   ✅ 20/20 valid pricing entries
+[11:28:55] 
+[7/10] 💰 Generating pricing: Mechanical Parts (30 items)
+[11:28:55]     🤖 Streaming from qwen3:14b...
+[11:35:26]     ⏱️  Response in 390.8s (12294 chars)
+[11:35:26]   ✅ 20/20 valid pricing entries
+[11:35:26] 
+[8/10] 💰 Generating pricing: PCBs & Electronics (20 items)
+[11:35:26]     🤖 Streaming from qwen3:14b...
+[11:42:16]     ⏱️  Response in 409.4s (10921 chars)
+[11:42:16]   ✅ 18/18 valid pricing entries
+[11:42:16] 
+[9/10] 💰 Generating pricing: Cooling & Thermal (15 items)
+[11:42:16]     🤖 Streaming from qwen3:14b...
+[11:48:24]     ⏱️  Response in 368.4s (17967 chars)
+[11:48:24]   ✅ 18/18 valid pricing entries
+[11:48:24] 
+[10/10] 💰 Generating pricing: Displays & UI (15 items)
+[11:48:24]     🤖 Streaming from qwen3:14b...
+[11:55:30]     ⏱️  Response in 425.8s (8816 chars)
+[11:55:30]   ✅ 14/14 valid pricing entries

@@ -1,3 +1,4 @@
+Initialising login role...
 export type Json =
   | string
   | number
@@ -13870,6 +13871,39 @@ export type Database = {
           },
         ]
       }
+      waitlist: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          email: string
+          id: string
+          invite_token: string | null
+          redeemed_at: string | null
+          status: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          invite_token?: string | null
+          redeemed_at?: string | null
+          status?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          invite_token?: string | null
+          redeemed_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       whiteboards: {
         Row: {
           created_at: string
@@ -16436,3 +16470,5 @@ export const Constants = {
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.7)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
