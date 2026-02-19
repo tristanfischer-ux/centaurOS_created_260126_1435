@@ -133,34 +133,8 @@ const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
     ],
 }
 
-/**
- * Determines whether a raw provider error is retryable via failover.
- *
- * @description Retryable errors indicate the provider is the problem (overloaded,
- * rate-limited, unreachable). Non-retryable errors indicate the request itself is
- * invalid (too long, content filtered, bad auth) — retrying on another provider
- * would produce the same failure or violate the user's intent.
- *
- * @param rawError - The raw error string from the provider
- * @returns true if the error is retryable on a different provider
- */
-function isRetryableError(rawError: string): boolean {
-    const lower = rawError.toLowerCase()
-
-    // Non-retryable: request-side problems
-    if (lower.includes("too many tokens") || lower.includes("context_length") || lower.includes("maximum context") || lower.includes("too long")) return false
-    if (lower.includes("content_filter") || lower.includes("safety") || lower.includes("blocked") || lower.includes("content_policy")) return false
-    if (lower.includes("authentication") || lower.includes("invalid api key") || lower.includes("unauthorized") || lower.includes("401")) return false
-
-    // Retryable: provider-side problems
-    if (lower.includes("overloaded") || lower.includes("503") || lower.includes("capacity") || lower.includes("server_error")) return true
-    if (lower.includes("rate_limit") || lower.includes("rate limit") || lower.includes("429") || lower.includes("too many requests")) return true
-    if (lower.includes("econnrefused") || lower.includes("enotfound") || lower.includes("timeout") || lower.includes("network") || lower.includes("fetch failed")) return true
-    if (lower.includes("500") || lower.includes("internal server error")) return true
-
-    // Unknown errors default to non-retryable to avoid wasting fallback attempts
-    return false
-}
+// AUDIT: isRetryableError extracted to src/lib/agents/error-classification.ts (2026-02-19, refactor step 3 of 8)
+import { isRetryableError } from "@/lib/agents/error-classification"
 
 /**
  * Resolves the platform API key for a given provider from environment variables.
@@ -971,68 +945,10 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
     }
 }
 
-// ─── Error Classification ────────────────────────────────────────────
-
-/**
- * Classifies a raw streaming error into a user-friendly message.
- *
- * @description Maps provider-specific errors to actionable messages the
- * client can display. Never leaks API keys, internal paths, or raw
- * stack traces — only returns safe, helpful error descriptions.
- *
- * @param rawError - The raw error string from the provider or stream
- * @returns A user-friendly error message
- */
-/**
- * Error classification result with both user-facing message and diagnostic category.
- */
-interface ClassifiedError {
-    /** User-facing error message (safe to display) */
-    message: string
-    /** Machine-readable category for client-side logging */
-    category: "context_length" | "rate_limit" | "auth" | "overloaded" | "network" | "content_filter" | "unknown"
-    /** First 120 chars of raw error for client-side debugging (no secrets — API keys are never in error messages) */
-    rawHint: string
-}
-
-function classifyStreamError(rawError: string): ClassifiedError {
-    const lower = rawError.toLowerCase()
-    const rawHint = rawError.substring(0, 120)
-
-    // Context window / prompt too long
-    if (lower.includes("too many tokens") || lower.includes("context_length") || lower.includes("maximum context") || lower.includes("too long")) {
-        return { message: "The conversation is too long for this model. Try starting a new conversation or using a shorter message.", category: "context_length", rawHint }
-    }
-
-    // Rate limiting from the AI provider
-    if (lower.includes("rate_limit") || lower.includes("rate limit") || lower.includes("429") || lower.includes("too many requests")) {
-        return { message: "The AI provider is rate-limiting requests. Please wait a moment and try again.", category: "rate_limit", rawHint }
-    }
-
-    // Authentication / API key issues
-    if (lower.includes("authentication") || lower.includes("invalid api key") || lower.includes("unauthorized") || lower.includes("401")) {
-        return { message: "AI provider authentication failed. The platform API key may need to be updated.", category: "auth", rawHint }
-    }
-
-    // Provider overloaded
-    if (lower.includes("overloaded") || lower.includes("503") || lower.includes("capacity") || lower.includes("server_error")) {
-        return { message: "The AI provider is temporarily overloaded. Please try again in a few seconds.", category: "overloaded", rawHint }
-    }
-
-    // Network / connection issues
-    if (lower.includes("econnrefused") || lower.includes("enotfound") || lower.includes("timeout") || lower.includes("network") || lower.includes("fetch failed")) {
-        return { message: "Could not reach the AI provider. This is usually temporary — please try again.", category: "network", rawHint }
-    }
-
-    // Content filtering / safety
-    if (lower.includes("content_filter") || lower.includes("safety") || lower.includes("blocked") || lower.includes("content_policy")) {
-        return { message: "The response was blocked by the AI provider's content filter. Try rephrasing your message.", category: "content_filter", rawHint }
-    }
-
-    // Generic fallback — don't leak raw error details in the user message,
-    // but include the rawHint for client-side console logging.
-    return { message: "Stream interrupted. Please try sending your message again.", category: "unknown", rawHint }
-}
+// AUDIT: classifyStreamError + ClassifiedError extracted to src/lib/agents/error-classification.ts
+// (2026-02-19, refactor step 3 of 8). Now independently testable.
+import { classifyStreamError } from "@/lib/agents/error-classification"
+import type { ClassifiedError } from "@/lib/agents/error-classification"
 
 // ─── Text Streaming Handler (with Provider Failover) ─────────────────
 
