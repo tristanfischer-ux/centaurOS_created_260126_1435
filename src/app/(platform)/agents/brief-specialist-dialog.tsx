@@ -397,6 +397,12 @@ export function BriefSpecialistDialog({
     const [isDraggingOver, setIsDraggingOver] = useState(false)
     const [isUploadingFile, setIsUploadingFile] = useState(false)
 
+    // Speculative dual-stream state
+    const [speculativeFastResponse, setSpeculativeFastResponse] = useState("")
+    const [speculativeDeepResponse, setSpeculativeDeepResponse] = useState("")
+    const [speculativeComplexity, setSpeculativeComplexity] = useState<"simple" | "complex" | null>(null)
+    const [isSpeculativeMode, setIsSpeculativeMode] = useState(false)
+
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const panelFileInputRef = useRef<HTMLInputElement>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
@@ -1000,6 +1006,14 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                     if (!controller.signal.aborted) controller.abort()
                 }, MESSAGE_TTFB_TIMEOUT_MS)
 
+                const useSpeculative = !!(specialist.speculativeEnabled && !isSlideRequest)
+                if (useSpeculative && attempt === 1) {
+                    setIsSpeculativeMode(true)
+                    setSpeculativeFastResponse("")
+                    setSpeculativeDeepResponse("")
+                    setSpeculativeComplexity(null)
+                }
+
                 const res = await fetch("/api/agents/execute", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1014,6 +1028,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         specialistId: specialist.id,
                         customSystemPromptSuffix: systemExtras.join(""),
                         enableThinking: deepThinkEnabled,
+                        speculative: useSpeculative || undefined,
                         attachments: attachmentsToSend.length > 0
                             ? attachmentsToSend.map((a) => ({ path: a.path, url: a.url, filename: a.filename, mimeType: a.mimeType }))
                             : undefined,
@@ -1042,6 +1057,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 const decoder = new TextDecoder()
                 fullResponse = ""
                 let streamError: string | null = null
+                let specFastFull = ""
+                let specDeepFull = ""
+                let specComplexity: "simple" | "complex" | null = null
 
                 try {
                     while (true) {
@@ -1061,11 +1079,64 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         rawHint?: string
                                         errorCategory?: string
                                         grounding?: { availableSections: string[]; missingContextHints: string[] }
+                                        stream?: "fast" | "deep"
+                                        done?: boolean
+                                        complexity?: "simple" | "complex"
+                                        skipped?: boolean
                                     }
                                     if (parsed.grounding) {
                                         setContextGrounding(parsed.grounding)
                                         continue
                                     }
+
+                                    // ── Speculative tagged chunks ──
+                                    if (useSpeculative && parsed.stream) {
+                                        if (parsed.error) {
+                                            if (parsed.stream === "deep") {
+                                                console.warn("[BriefDialog] Deep model error:", parsed.error)
+                                            } else {
+                                                streamError = parsed.error
+                                                break
+                                            }
+                                            continue
+                                        }
+
+                                        if (parsed.stream === "fast") {
+                                            if (parsed.done) {
+                                                specComplexity = parsed.complexity ?? "complex"
+                                                setSpeculativeComplexity(specComplexity)
+                                            } else if (parsed.text) {
+                                                specFastFull += parsed.text
+                                                setSpeculativeFastResponse(stripPartialThinkTags(specFastFull))
+                                                setStreamingResponse(stripPartialThinkTags(specFastFull))
+                                                if (isTtsStreaming) {
+                                                    tts.feedStreamingText(stripPartialThinkTags(specFastFull))
+                                                }
+                                            }
+                                        } else if (parsed.stream === "deep") {
+                                            if (parsed.done) {
+                                                if (!parsed.skipped && specDeepFull) {
+                                                    fullResponse = specComplexity === "simple"
+                                                        ? specFastFull
+                                                        : (specFastFull + "\n\n" + stripPartialThinkTags(specDeepFull)).trim()
+                                                } else {
+                                                    fullResponse = specFastFull
+                                                }
+                                            } else if (parsed.text) {
+                                                specDeepFull += parsed.text
+                                                const visibleDeep = stripPartialThinkTags(specDeepFull)
+                                                setSpeculativeDeepResponse(visibleDeep)
+                                                const combinedStreaming = specFastFull + "\n\n" + visibleDeep
+                                                setStreamingResponse(combinedStreaming.trim())
+                                                if (isTtsStreaming) {
+                                                    tts.feedStreamingText(combinedStreaming.trim())
+                                                }
+                                            }
+                                        }
+                                        continue
+                                    }
+
+                                    // ── Standard (non-speculative) SSE handling ──
                                     if (parsed.error) {
                                         streamError = parsed.error
                                         if (parsed.rawHint || parsed.errorCategory) {
@@ -1089,11 +1160,13 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         }
                                     }
                                 } catch {
-                                    fullResponse += data
-                                    const strippedText = stripPartialThinkTags(fullResponse)
-                                    setStreamingResponse(strippedText)
-                                    if (isTtsStreaming) {
-                                        tts.feedStreamingText(strippedText)
+                                    if (!useSpeculative) {
+                                        fullResponse += data
+                                        const strippedText = stripPartialThinkTags(fullResponse)
+                                        setStreamingResponse(strippedText)
+                                        if (isTtsStreaming) {
+                                            tts.feedStreamingText(strippedText)
+                                        }
                                     }
                                 }
                             }
@@ -1131,6 +1204,13 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
 
                 // Stream completed successfully — exit the retry loop
                 break
+            }
+
+            // For speculative mode: assemble fullResponse from fast/deep if not yet set
+            if (useSpeculative && !fullResponse && specFastFull) {
+                fullResponse = specComplexity === "simple"
+                    ? specFastFull
+                    : (specFastFull + (specDeepFull ? "\n\n" + stripPartialThinkTags(specDeepFull) : "")).trim()
             }
 
             if (!fullResponse) {
@@ -1763,14 +1843,38 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     )
                                 })}
 
-                                {/* Streaming indicator */}
+                                {/* Streaming indicator — speculative dual-stream or standard */}
                                 {isStreaming && (
                                     <div className="flex gap-2.5 justify-start">
                                         <div className="flex-shrink-0 mt-1">
                                             <SpecialistChatAvatar specialist={specialist} state="speaking" />
                                         </div>
-                                        <div className="max-w-[90%] rounded-lg px-3 py-2.5 bg-muted/50 border border-muted">
-                                            <Markdown content={stripProposedActionsBlock(streamingResponse)} className="text-sm" />
+                                        <div className="max-w-[90%] space-y-0">
+                                            {/* Fast response (always shown during speculative streaming) */}
+                                            {isSpeculativeMode && speculativeFastResponse ? (
+                                                <>
+                                                    <div className="rounded-lg px-3 py-2.5 bg-muted/50 border border-muted">
+                                                        <Markdown content={stripProposedActionsBlock(speculativeFastResponse)} className="text-sm" />
+                                                    </div>
+                                                    {/* Deep response streams below when complex */}
+                                                    {speculativeComplexity === "complex" && speculativeDeepResponse && (
+                                                        <div className="rounded-lg px-3 py-2.5 bg-muted/50 border border-muted mt-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                                            <Markdown content={stripProposedActionsBlock(speculativeDeepResponse)} className="text-sm" />
+                                                        </div>
+                                                    )}
+                                                    {/* Thinking indicator while waiting for deep response */}
+                                                    {speculativeComplexity === "complex" && !speculativeDeepResponse && (
+                                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2 ml-1 animate-in fade-in duration-300">
+                                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                                            <span>Preparing detailed response...</span>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div className="rounded-lg px-3 py-2.5 bg-muted/50 border border-muted">
+                                                    <Markdown content={stripProposedActionsBlock(streamingResponse)} className="text-sm" />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -2136,7 +2240,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         speechRecognition.isProcessing
                                             ? "Transcribing..."
                                             : speechRecognition.isListening
-                                                ? "Listening... speak now"
+                                                ? (speechRecognition.interimTranscript || "Listening... speak now")
                                                 : hasNonHistoricalMessages
                                                 ? `Follow up with ${specialist.name}...`
                                                 : `What do you need from ${specialist.name}?`
@@ -2556,7 +2660,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     )
                                 })}
 
-                                {/* Streaming indicator */}
+                                {/* Streaming indicator — speculative dual-stream or standard */}
                                 {isStreaming && (
                                     <div className="flex gap-3 justify-start">
                                         <div className="flex-shrink-0 mt-1">
@@ -2565,8 +2669,29 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 state="speaking"
                                             />
                                         </div>
-                                        <div className="max-w-[85%] rounded-lg px-4 py-3 bg-muted/50 border border-muted">
-                                            <Markdown content={stripProposedActionsBlock(streamingResponse)} className="text-sm" />
+                                        <div className="max-w-[85%] space-y-0">
+                                            {isSpeculativeMode && speculativeFastResponse ? (
+                                                <>
+                                                    <div className="rounded-lg px-4 py-3 bg-muted/50 border border-muted">
+                                                        <Markdown content={stripProposedActionsBlock(speculativeFastResponse)} className="text-sm" />
+                                                    </div>
+                                                    {speculativeComplexity === "complex" && speculativeDeepResponse && (
+                                                        <div className="rounded-lg px-4 py-3 bg-muted/50 border border-muted mt-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                                            <Markdown content={stripProposedActionsBlock(speculativeDeepResponse)} className="text-sm" />
+                                                        </div>
+                                                    )}
+                                                    {speculativeComplexity === "complex" && !speculativeDeepResponse && (
+                                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2 ml-1 animate-in fade-in duration-300">
+                                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                                            <span>Preparing detailed response...</span>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div className="rounded-lg px-4 py-3 bg-muted/50 border border-muted">
+                                                    <Markdown content={stripProposedActionsBlock(streamingResponse)} className="text-sm" />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -2908,7 +3033,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         speechRecognition.isProcessing
                                             ? "Transcribing..."
                                             : speechRecognition.isListening
-                                                ? "Listening... speak now"
+                                                ? (speechRecognition.interimTranscript || "Listening... speak now")
                                                 : hasNonHistoricalMessages
                                                 ? `Follow up with ${specialist.name}...`
                                                 : selectedPrompt
