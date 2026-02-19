@@ -17,31 +17,18 @@ import { buildAIContext } from "@/lib/ai-context/builder"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
 import { compilePersonalityPrompt, compileRelationshipContext } from "@/lib/agents/personality"
-import { compileTemporalPrompt } from "@/lib/agents/temporal-context"
-import { compileEmotionalPrompt } from "@/lib/agents/emotional-context"
-import {
-    getFounderPreferences,
-    getSpecialistRelationship,
-    compileFounderPreferencesPrompt,
-    recordInteraction,
-} from "@/lib/agents/founder-preferences"
+import { recordInteraction } from "@/lib/agents/founder-preferences"
 import { createRollout, addSpan, finishRollout } from "@/lib/agent-spans"
 // AUDIT: Converted 9 dynamic imports to static (2026-02-19, refactor step 5 of 8).
 // Dynamic imports in a server-side API route provide no bundle benefit. Static
 // imports improve readability and eliminate runtime import overhead.
 import { getSpecialistWorkflows } from "@/lib/agents/specialist-workflows"
-import { getSpecialistState, compileSpecialistStatePrompt } from "@/lib/agents/specialist-state"
 import {
-    getRecentDecisions,
-    compileDecisionJournalPrompt,
-    detectDecisionPatterns,
     containsDecisionSignal,
     extractDecisionSummary,
     recordDecision,
 } from "@/lib/agents/decision-journal"
-import { getRecentIntelligenceReports } from "@/lib/agents/intelligence-sweep-orchestrator"
-import { compileIntelligencePrompt } from "@/lib/agents/external-intelligence"
-import { searchKnowledgeForSpecialist } from "@/lib/knowledge-vault"
+import { buildContextLayers } from "@/lib/agents/prompt-builder"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -648,132 +635,17 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
         systemPromptWithContext += `\n\n## User Identity\nYou are speaking with ${userProfile.full_name}${roleSuffix}. Address them by name when natural.`
     }
 
-    // ─── Heavy context layers (skipped on fast path) ───────────────────
-    // These each make 1-3 DB queries and are supplementary for conversational
-    // follow-ups where conversation history already provides continuity.
-
-    if (!isConversationalFastPath) {
-        // Founder preferences: learned communication style, trust level, pet peeves
-        if (foundryId && specialistId && threadId) {
-            try {
-                const [founderPrefs, specialistRel] = await Promise.all([
-                    getFounderPreferences(foundryId),
-                    getSpecialistRelationship(threadId, foundryId),
-                ])
-                const specialist = getSpecialistById(specialistId)
-                const prefsBlock = compileFounderPreferencesPrompt(
-                    founderPrefs,
-                    specialistRel,
-                    specialist?.name ?? specialistId,
-                )
-                if (prefsBlock) {
-                    systemPromptWithContext += `\n\n${prefsBlock}`
-                }
-            } catch (err) {
-                // Non-critical — proceed without preferences
-                console.warn("[agents/execute] Could not load founder preferences:", err)
-            }
-        }
-
-        // Specialist emotional state and relationship depth
-        if (foundryId && threadId && specialistId) {
-            try {
-                const specialist = getSpecialistById(specialistId)
-                const { emotional, relationship } = await getSpecialistState(threadId, foundryId)
-                const stateBlock = compileSpecialistStatePrompt(emotional, relationship, specialist?.name ?? specialistId)
-                if (stateBlock) {
-                    systemPromptWithContext += `\n\n${stateBlock}`
-                }
-            } catch (err) {
-                // Non-critical — proceed without state context
-                console.warn("[agents/execute] Could not load specialist state:", err)
-            }
-        }
-
-        // Decision journal: past decisions for "remember when" references
-        if (foundryId && specialistId) {
-            try {
-                const decisions = await getRecentDecisions(foundryId, specialistId, 10)
-                const journalBlock = compileDecisionJournalPrompt(decisions)
-                if (journalBlock) {
-                    systemPromptWithContext += `\n\n${journalBlock}`
-                }
-                // Add pattern recognition for deep relationships
-                const allDecisions = await getRecentDecisions(foundryId, undefined, 50)
-                const patterns = detectDecisionPatterns(allDecisions)
-                if (patterns.length > 0) {
-                    systemPromptWithContext += `\n\n## Founder Decision Patterns\n${patterns.join('\n')}`
-                }
-            } catch (err) {
-                console.warn("[agents/execute] Could not load decision journal:", err)
-            }
-        }
-
-        // External intelligence: recent reports from monitoring sweeps
-        if (foundryId && specialistId) {
-            try {
-                const reports = await getRecentIntelligenceReports(foundryId, 3, specialistId)
-                const intelligenceBlock = compileIntelligencePrompt(reports, specialistId as SpecialistId)
-                if (intelligenceBlock) {
-                    systemPromptWithContext += `\n\n${intelligenceBlock}`
-                }
-            } catch (err) {
-                // Non-critical: intelligence context is supplementary
-                console.warn("[agents/execute] Failed to load intelligence context:", err)
-            }
-        }
-
-        // Knowledge Vault: inject relevant organizational knowledge
-        if (foundryId && specialistId) {
-            try {
-                const vaultContext = await searchKnowledgeForSpecialist(
-                    foundryId,
-                    input || finalPrompt.slice(0, 500),
-                    specialistId,
-                    8
-                )
-                if (vaultContext) {
-                    systemPromptWithContext += `\n\n${vaultContext}`
-                }
-            } catch (err) {
-                // Non-critical — Knowledge Vault is supplementary context
-                console.warn("[agents/execute] Could not load Knowledge Vault context:", err)
-            }
-        }
-
-        // Temporal awareness: what time/day it is, how to adjust behavior
-        // Also includes milestone awareness if we know when the foundry was created
-        let foundryCreatedAt: string | null = null
-        if (foundryId) {
-            try {
-                const { data: foundryData } = await supabase
-                    .from("foundries")
-                    .select("created_at")
-                    .eq("id", foundryId)
-                    .single()
-                foundryCreatedAt = foundryData?.created_at ?? null
-            } catch {
-                // Non-critical
-            }
-        }
-        const temporalBlock = compileTemporalPrompt(undefined, foundryCreatedAt)
-        systemPromptWithContext += `\n\n${temporalBlock}`
-
-        // Emotional awareness: detect founder's emotional state from their message
-        const emotionalBlock = compileEmotionalPrompt(input)
-        if (emotionalBlock) {
-            systemPromptWithContext += `\n\n${emotionalBlock}`
-        }
-    } else {
-        // Fast path: lightweight temporal + emotional only (no DB queries)
-        const temporalBlock = compileTemporalPrompt()
-        systemPromptWithContext += `\n\n${temporalBlock}`
-
-        const emotionalBlock = compileEmotionalPrompt(input)
-        if (emotionalBlock) {
-            systemPromptWithContext += `\n\n${emotionalBlock}`
-        }
-    }
+    // AUDIT: Heavy context layers extracted to prompt-builder.ts (2026-02-19, refactor step 6 of 8).
+    // Each layer is independently failable — see prompt-builder.ts for the full assembly logic.
+    const contextLayers = await buildContextLayers({
+        foundryId,
+        specialistId,
+        threadId,
+        input,
+        finalPrompt,
+        isConversationalFastPath,
+    })
+    systemPromptWithContext += contextLayers
 
     if (companyContext) {
         systemPromptWithContext += `\n\n${companyContext}`
@@ -956,7 +828,6 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
 // AUDIT: classifyStreamError + ClassifiedError extracted to src/lib/agents/error-classification.ts
 // (2026-02-19, refactor step 3 of 8). Now independently testable.
 import { classifyStreamError } from "@/lib/agents/error-classification"
-import type { ClassifiedError } from "@/lib/agents/error-classification"
 
 // ─── Text Streaming Handler (with Provider Failover) ─────────────────
 
