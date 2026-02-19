@@ -34,6 +34,11 @@ import {
 import { validateFile, formatFileSize, isImageFile } from "@/lib/file-upload"
 import { cn } from "@/lib/utils"
 import { stripThinkTags, stripPartialThinkTags } from "@/lib/utils/strip-think-tags"
+
+/** Strip the hidden complexity classification tag the fast model emits for triage. */
+function stripComplexityTags(text: string): string {
+    return text.replace(/<!--\s*complexity\s*:\s*(simple|complex)\s*-->/g, "").trim()
+}
 import { toast } from "sonner"
 import { Markdown } from "@/components/ui/markdown"
 import { getPromptsByCategory } from "./lib/prompt-library"
@@ -1110,26 +1115,28 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 setSpeculativeComplexity(specComplexity)
                                             } else if (parsed.text) {
                                                 specFastFull += parsed.text
-                                                setSpeculativeFastResponse(stripPartialThinkTags(specFastFull))
-                                                setStreamingResponse(stripPartialThinkTags(specFastFull))
+                                                const visibleFast = stripComplexityTags(stripPartialThinkTags(specFastFull))
+                                                setSpeculativeFastResponse(visibleFast)
+                                                setStreamingResponse(visibleFast)
                                                 if (isTtsStreaming) {
-                                                    tts.feedStreamingText(stripPartialThinkTags(specFastFull))
+                                                    tts.feedStreamingText(visibleFast)
                                                 }
                                             }
                                         } else if (parsed.stream === "deep") {
                                             if (parsed.done) {
+                                                const cleanFast = stripComplexityTags(specFastFull)
                                                 if (!parsed.skipped && specDeepFull) {
                                                     fullResponse = specComplexity === "simple"
-                                                        ? specFastFull
-                                                        : (specFastFull + "\n\n" + stripPartialThinkTags(specDeepFull)).trim()
+                                                        ? cleanFast
+                                                        : (cleanFast + "\n\n" + stripPartialThinkTags(specDeepFull)).trim()
                                                 } else {
-                                                    fullResponse = specFastFull
+                                                    fullResponse = cleanFast
                                                 }
                                             } else if (parsed.text) {
                                                 specDeepFull += parsed.text
                                                 const visibleDeep = stripPartialThinkTags(specDeepFull)
                                                 setSpeculativeDeepResponse(visibleDeep)
-                                                const combinedStreaming = specFastFull + "\n\n" + visibleDeep
+                                                const combinedStreaming = stripComplexityTags(specFastFull) + "\n\n" + visibleDeep
                                                 setStreamingResponse(combinedStreaming.trim())
                                                 if (isTtsStreaming) {
                                                     tts.feedStreamingText(combinedStreaming.trim())
@@ -1211,9 +1218,10 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
 
             // For speculative mode: assemble fullResponse from fast/deep if not yet set
             if (useSpeculative && !fullResponse && specFastFull) {
+                const cleanFast = stripComplexityTags(specFastFull)
                 fullResponse = specComplexity === "simple"
-                    ? specFastFull
-                    : (specFastFull + (specDeepFull ? "\n\n" + stripPartialThinkTags(specDeepFull) : "")).trim()
+                    ? cleanFast
+                    : (cleanFast + (specDeepFull ? "\n\n" + stripPartialThinkTags(specDeepFull) : "")).trim()
             }
 
             if (!fullResponse) {
