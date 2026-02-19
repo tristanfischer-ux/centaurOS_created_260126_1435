@@ -143,9 +143,11 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
     "assemblies" in assembliesResult ? assembliesResult.assemblies : []
 
   // Find the most recently updated in-progress project for "Continue" card
-  const inProgressProject = projects.find(
-    (p) => p.status !== "complete" && p.status !== "rfq_created",
-  )
+  // projects is pre-sorted by updated_at DESC from the server, but we sort
+  // explicitly here so the behavior is correct regardless of server ordering.
+  const inProgressProject = [...projects]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .find((p) => p.status !== "complete" && p.status !== "rfq_created")
 
   // Merge and sort by updatedAt desc for Recent Projects grid
   const recentItems: RecentItem[] = [
