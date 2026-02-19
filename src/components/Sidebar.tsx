@@ -109,7 +109,7 @@ const planNavigation = [
 // Section 3: "Workshop" — Where the work happens
 // ─────────────────────────────────────────────────────────────────────────────
 const workshopNavigation = [
-    { name: "The Forge", href: "/the-forge", icon: Flame, tooltip: "Turn product ideas into manufacturing-ready engineering packages" },
+    { name: "The Forge", href: "/the-forge/studio", icon: Flame, tooltip: "Turn product ideas into manufacturing-ready engineering packages" },
     { name: "Blueprints", href: "/blueprints", icon: Map, tooltip: "Product maps, objective packs, and technical domain planning" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Retainers", href: "/retainers", icon: Handshake, tooltip: "Ongoing agreements with freelancers and experts" },
@@ -172,7 +172,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     // with staleTimes (30s dynamic cache), this means the RSC payload is already
     // in the client cache before the user clicks.
     React.useEffect(() => {
-        const topRoutes = ['/today', '/new-tasks', '/new-objectives', '/team', '/the-forge', '/strategy']
+        const topRoutes = ['/today', '/new-tasks', '/new-objectives', '/team', '/the-forge/studio', '/strategy']
         topRoutes.forEach(route => router.prefetch(route))
     }, [router])
 

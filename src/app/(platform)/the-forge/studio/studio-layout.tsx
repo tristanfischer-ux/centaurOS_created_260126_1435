@@ -12,7 +12,7 @@
 import { useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { ChevronRight, Info, Store } from "lucide-react"
+import { Info, Store } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -74,14 +74,7 @@ function StudioShell(): React.ReactNode {
     <div className="space-y-6">
       {/* Breadcrumb */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
-        <Link
-          href="/the-forge"
-          className="text-muted-foreground hover:text-foreground transition-colors"
-        >
-          The Forge
-        </Link>
-        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-foreground font-medium">Product Studio</span>
+        <span className="text-foreground font-medium">The Forge</span>
       </nav>
 
       {/* Header */}

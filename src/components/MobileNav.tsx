@@ -85,7 +85,7 @@ const planMoreNavigation = [
 
 // "More" dropdown — Workshop section
 const workshopMoreNavigation = [
-    { name: "The Forge", href: "/the-forge", icon: Flame },
+    { name: "The Forge", href: "/the-forge/studio", icon: Flame },
     { name: "Blueprints", href: "/blueprints", icon: Map },
     { name: "Team", href: "/team", icon: Users },
     { name: "Retainers", href: "/retainers", icon: Handshake },
