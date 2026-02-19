@@ -12,7 +12,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import * as dotenv from 'dotenv'
-import { v5 as uuidv5 } from 'uuid'
+import { v4 as uuidv4, v5 as uuidv5 } from 'uuid'
 
 const SEED_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8'
 
@@ -164,16 +164,12 @@ async function seed(): Promise<void> {
     .eq('id', FOUNDRY_ID)
     .single()
 
-  // Always upsert so purpose_data and company_profile are applied on re-runs too
-  const { error } = await supabase.from('foundries').upsert({
-    id: FOUNDRY_ID,
+  const foundryPayload = {
     name: 'Freya Miniatures Ltd',
     slug: 'freya-miniatures',
     industry: 'Manufacturing',
     sector: 'manufacturing',
     stage: 'Seed',
-
-    // Matches CompanyProfile interface in src/types/foundry.ts
     company_profile: {
       employee_count: '2-5',
       revenue_range: 'pre_revenue',
@@ -187,8 +183,6 @@ async function seed(): Promise<void> {
       updatedAt: new Date().toISOString(),
       updatedBy: 'seed-script',
     },
-
-    // Matches FoundryPurposeData interface in src/types/foundry.ts
     purpose_data: {
       purpose:
         'We exist to democratise high-quality miniature printing — putting studio-grade results in the hands of every hobbyist and indie game creator, not just those with engineering degrees.',
@@ -211,10 +205,19 @@ async function seed(): Promise<void> {
       updatedAt: new Date().toISOString(),
       updatedBy: 'seed-script',
     },
-  })
+  }
+
+  // Use UPDATE if foundry exists (avoids ensure_foundry_owner trigger on INSERT).
+  // Only INSERT with owner_id when creating fresh.
+  let error
+  if (existingFoundry) {
+    ;({ error } = await supabase.from('foundries').update(foundryPayload).eq('id', FOUNDRY_ID))
+  } else {
+    ;({ error } = await supabase.from('foundries').insert({ id: FOUNDRY_ID, ...foundryPayload }))
+  }
 
   if (error) {
-    console.error(`   ❌ Foundry upsert failed: ${error.message}`)
+    console.error(`   ❌ Foundry ${existingFoundry ? 'update' : 'insert'} failed: ${error.message}`)
     process.exit(1)
   }
   console.log(existingFoundry ? '   ✅ Foundry updated with purpose & profile data' : '   ✅ Foundry created')
