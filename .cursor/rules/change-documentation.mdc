@@ -1,0 +1,29 @@
+# Change Documentation Standard
+
+Every code change made during a session MUST be documented in the memory system (`~/.memory/daily/YYYY-MM-DD.md`) with enough detail for an auditor to understand:
+
+## Required Fields Per Change
+
+1. **What was changed** — File path(s) and line range(s) modified
+2. **Why it was changed** — The problem being solved (with evidence: error message, screenshot, failing test, user report)
+3. **What the fix was** — Exact description of the code change (old behavior → new behavior)
+4. **How it was verified** — What test/check proved the fix works (typecheck, Playwright test, manual browser check, etc.)
+5. **Commit hash** — After committing, record the short hash for traceability
+
+## Format
+
+```markdown
+### HH:MM - #ProjectName [fix] Brief title
+**File(s):** `path/to/file.tsx` (lines X-Y)
+**Problem:** Description of what was wrong and how it was discovered
+**Fix:** Old behavior → New behavior (be specific)
+**Verification:** How correctness was confirmed
+**Commit:** `abc1234`
+```
+
+## Rules
+
+- Log BEFORE moving to the next change (not in a batch at the end)
+- One log entry per logical change (not per file — a single fix touching 2 files = 1 entry)
+- If a fix attempt fails, log that too with what was learned
+- Never skip logging even for "trivial" changes — trivial changes cause the sneakiest regressions
