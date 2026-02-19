@@ -310,7 +310,7 @@ describe('OpenAI key hardening regressions', () => {
 
     expect(source).toContain("let activeProvider: \"openai\" | \"minimax\"")
     expect(source).toContain('if (activeProvider === "minimax" && !getMiniMaxKey())')
-    expect(source).toContain('if (activeProvider === "openai" && !getOpenAIKey())')
+    expect(source).toContain('if (activeProvider === "openai" && !getOpenAI())')
     expect(source).toContain("await rateLimit(\"api\", `tts:${guard.userId}`")
   })
 })
