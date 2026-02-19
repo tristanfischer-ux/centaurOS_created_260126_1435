@@ -75,6 +75,7 @@ const TeamAnalytics = dynamic(
 )
 
 import { useTeamData } from './hooks/use-team-data'
+import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import type { TeamViewMode, BusinessFunction } from './types'
 
 // ─── Types ───────────────────────────────────────
@@ -944,6 +945,22 @@ export function TeamPageView({
                             Functions
                         </Button>
                     )}
+                    <AskSpecialistButton
+                        context={{
+                            type: 'general',
+                            title: 'Team & Hiring',
+                            description: `Team overview: ${totalPeople} members (${founders.length} founders, ${executives.length} executives, ${apprentices.length} apprentices), ${totalTeams} teams, ${avgCapacity}% avg capacity remaining.`,
+                            metadata: {
+                                notes: insights?.overloadedMembers?.length
+                                    ? `${insights.overloadedMembers.length} overloaded members. ${insights.overdueTaskCount || 0} overdue tasks.`
+                                    : undefined,
+                            },
+                        }}
+                        specialistId="hiring-team"
+                        specialistName="Harper"
+                        variant="chip"
+                        label="Ask Harper"
+                    />
                     <RefreshButton />
                     <InviteMemberDialog />
                     <Link href="/team/new">

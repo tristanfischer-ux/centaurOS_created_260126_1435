@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowRight, Layers, Users, MessageSquare, ChevronDown, ChevronRight, Sparkles, X } from "lucide-react"
+import { ArrowRight, Layers, Users, MessageSquare, ChevronDown, ChevronRight, Sparkles, X, Brain, Zap, History, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -192,6 +192,29 @@ export function SpecialistsLanding({
                         </Button>
                     </div>
                 </div>
+            </motion.div>
+
+            {/* ── Capabilities Banner — what can specialists actually do? ── */}
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.2 }}
+                className="grid grid-cols-2 md:grid-cols-4 gap-3"
+            >
+                {[
+                    { icon: Brain, label: "Deep expertise", desc: "Strategy, finance, engineering, legal, and 9 more domains" },
+                    { icon: History, label: "Persistent memory", desc: "They remember every past conversation and build on it" },
+                    { icon: Zap, label: "Propose actions", desc: "They can create objectives, tasks, and strategic plans for you" },
+                    { icon: FileText, label: "Generate deliverables", desc: "Slide decks, analyses, reports — ready to export" },
+                ].map((cap) => (
+                    <div key={cap.label} className="flex items-start gap-3 p-3 rounded-lg bg-muted/40 border border-muted">
+                        <cap.icon className="h-4 w-4 text-international-orange mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground">{cap.label}</p>
+                            <p className="text-xs text-muted-foreground leading-snug mt-0.5">{cap.desc}</p>
+                        </div>
+                    </div>
+                ))}
             </motion.div>
 
             {/* ── Org Chart Toggle ──────────────────────────────────────── */}

@@ -83,8 +83,8 @@ const planMoreNavigation = [
 const workshopMoreNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame },
     { name: "Team", href: "/team", icon: Users },
-    { name: "Specialists", href: "/agents", icon: UsersRound },
-    { name: "Deliverables", href: "/agents/artifacts", icon: FileOutput },
+    { name: "AI Team", href: "/agents", icon: UsersRound },
+    { name: "AI Outputs", href: "/agents/artifacts", icon: FileOutput },
     { name: "Browse", href: "/browse", icon: Globe },
 ]
 

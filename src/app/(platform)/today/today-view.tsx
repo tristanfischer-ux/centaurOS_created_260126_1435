@@ -448,13 +448,16 @@ export function TodayView(): React.ReactElement {
                 </motion.div>
             )}
 
-            {/* Always-On Specialist Intelligence */}
+            {/* AI Team Intelligence — proactive insights from your 13 specialists */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.28, ease: EASE_CURVE }}
             >
-                <SectionHeader icon={Waypoints} label="Specialist Intelligence" color="text-international-orange" />
+                <SectionHeader icon={Waypoints} label="Your AI Team" color="text-international-orange" />
+                <p className="text-xs text-muted-foreground -mt-3 mb-4 ml-7">
+                    Proactive insights from your 13 AI specialists — they&apos;re always analyzing your business.
+                </p>
                 <div className="space-y-6">
                     <WeeklyBrief />
                     <InsightFeed />
@@ -480,10 +483,10 @@ export function TodayView(): React.ReactElement {
                     <CardContent className="pt-5 pb-4">
                         <div className="flex items-center gap-2 mb-3">
                             <Lightbulb className="h-4 w-4 text-international-orange" />
-                            <span className="text-sm font-semibold text-foreground">Ask a Specialist</span>
+                            <span className="text-sm font-semibold text-foreground">Brief Your AI Team</span>
                         </div>
                         <p className="text-xs text-muted-foreground mb-3">
-                            Get expert input on strategy, objectives, or today&apos;s priorities.
+                            Ask any of your 13 AI specialists for advice, analysis, or action plans. They remember your past conversations and can create objectives and tasks for you.
                         </p>
                         <div className="flex flex-wrap gap-2">
                             <AskSpecialistButton

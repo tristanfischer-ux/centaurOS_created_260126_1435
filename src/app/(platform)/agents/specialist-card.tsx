@@ -23,9 +23,29 @@ import {
     Factory,
     Route,
 } from "lucide-react"
-import { Clock, MessageSquare } from "lucide-react"
-import type { Specialist } from "./specialists-data"
+import { Clock, MessageSquare, Zap } from "lucide-react"
+import type { Specialist, SpecialistId } from "./specialists-data"
 import type { SpecialistActivity } from "@/actions/agent-memory"
+
+/**
+ * INTENT: Users don't know what to ask a specialist — these curated examples
+ * make the capability tangible and reduce the blank-page problem.
+ */
+const EXAMPLE_PROMPTS: Record<SpecialistId, string[]> = {
+    "strategist": ["Size my market opportunity", "Stress-test my business model", "Build a go-to-market playbook"],
+    "cto": ["Evaluate our tech stack", "Plan our product roadmap", "Audit our architecture decisions"],
+    "vp-engineering": ["Review our sprint velocity", "Plan a hiring roadmap", "Assess our technical debt"],
+    "vp-manufacturing": ["Design our production workflow", "Find cost reduction opportunities", "Plan a DFM review"],
+    "vp-supply-chain": ["Build a supplier shortlist", "Assess supply chain risks", "Plan inventory strategy"],
+    "product-lead": ["Prioritize our feature backlog", "Run a competitive product analysis", "Create user personas"],
+    "growth-marketer": ["Build a content strategy", "Plan a product launch", "Create a brand positioning"],
+    "sales-lead": ["Build a sales playbook", "Qualify my pipeline", "Design a pricing strategy"],
+    "chief-of-staff": ["Plan my week", "Prepare a board update", "Identify organizational bottlenecks"],
+    "finance-lead": ["Build a financial model", "Analyze our unit economics", "Plan our runway"],
+    "fundraising-advisor": ["Craft my investor pitch", "Build a fundraising timeline", "Review my term sheet"],
+    "hiring-team": ["Write a compelling job post", "Design an interview process", "Plan a compensation strategy"],
+    "legal-counsel": ["Review a contract clause", "Assess IP protection options", "Plan our compliance checklist"],
+}
 
 /**
  * Icon map from string names to Lucide components.
@@ -200,6 +220,21 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
                             </Badge>
                         )}
                     </div>
+
+                    {/* Try Asking — makes capabilities tangible */}
+                    {EXAMPLE_PROMPTS[specialist.id] && (
+                        <div className="mb-4 space-y-1.5">
+                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                                <Zap className="h-3 w-3" />
+                                Try asking
+                            </div>
+                            {EXAMPLE_PROMPTS[specialist.id].map((prompt) => (
+                                <p key={prompt} className="text-xs text-muted-foreground pl-4 leading-snug">
+                                    &ldquo;{prompt}&rdquo;
+                                </p>
+                            ))}
+                        </div>
+                    )}
 
                     {/* Spacer to push CTA to bottom */}
                     <div className="flex-1" />

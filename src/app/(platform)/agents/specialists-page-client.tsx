@@ -65,13 +65,13 @@ export function SpecialistsPageClient({
                         )}
                         <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
                         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
-                            {view === "specialists" ? "Specialists" : "Team Project"}
+                            {view === "specialists" ? "AI Team" : "Team Project"}
                         </h1>
                     </div>
                 </div>
                 <p className="text-muted-foreground text-sm mt-1 ml-4">
                     {view === "specialists"
-                        ? "Your on-demand team of experts"
+                        ? "13 AI specialists ready to help — strategy, engineering, finance, legal, and more"
                         : "Brief multiple specialists in sequence"}
                 </p>
             </div>
