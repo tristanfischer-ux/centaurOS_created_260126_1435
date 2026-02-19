@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -16,19 +17,30 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { getStatusBadgeClass } from '@/lib/status-colors'
-import { acceptTask, completeTask } from '@/actions/tasks'
+import { acceptTask, completeTask, getTaskComments, addTaskComment } from '@/actions/tasks'
 import { toast } from 'sonner'
 import { useCelebration } from '@/hooks/useCelebration'
+import { formatDistanceToNow } from 'date-fns'
 import {
   X, Calendar, Clock, User, Target, FileText, AlertTriangle,
   MessageSquare, Paperclip, Shield, Eye, Pencil, Waypoints, ChevronRight,
-  Sparkles,
+  Sparkles, Send, Loader2,
 } from 'lucide-react'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
 import type { SpecialistContext } from '@/components/specialists/types'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import type { TaskWithData, Member } from './types'
+
+/** Shape of a task comment from getTaskComments */
+interface TaskComment {
+  id: string
+  content: string
+  is_system_log: boolean
+  created_at: string
+  user_id: string
+  user?: { full_name: string | null; role: string | null }
+}
 
 /** Status options a user can move a task to */
 const STATUS_OPTIONS = [
@@ -72,6 +84,51 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
     task.title,
     task.description,
     task.strategy?.title ?? task.objective?.title,
+  )
+
+  // Discussion: comments state and fetch
+  const [comments, setComments] = useState<TaskComment[]>([])
+  const [newComment, setNewComment] = useState('')
+  const [isLoadingComments, setIsLoadingComments] = useState(true)
+  const [isSending, setIsSending] = useState(false)
+
+  useEffect(() => {
+    const fetchComments = async () => {
+      if (!task.id) return
+      setIsLoadingComments(true)
+      const res = await getTaskComments(task.id)
+      if (res.error) {
+        console.error('[TaskDetailPanel] Failed to fetch comments:', res.error)
+        setComments([])
+      } else if (res.data) {
+        setComments(res.data as TaskComment[])
+      }
+      setIsLoadingComments(false)
+    }
+    fetchComments()
+  }, [task.id])
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newComment.trim()) return
+    setIsSending(true)
+    try {
+      const result = await addTaskComment(task.id, newComment)
+      if (result?.error) {
+        toast.error(result.error)
+      } else {
+        setNewComment('')
+        const res = await getTaskComments(task.id)
+        if (res.data) setComments(res.data as TaskComment[])
+        toast.success('Note added')
+      }
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const humanNotes = comments.filter((c) => !c.is_system_log).sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   )
 
   const taskContext: SpecialistContext = {
@@ -378,18 +435,65 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
             </>
           )}
 
-          {/* Messages indicator */}
-          {task.message_count > 0 && (
-            <>
-              <Separator />
-              <div className="flex items-center gap-2 py-2">
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  {task.message_count} message{task.message_count !== 1 ? 's' : ''} in thread
-                </span>
+          {/* Discussion */}
+          <Separator />
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              <MessageSquare className="h-3.5 w-3.5" />
+              Discussion ({humanNotes.length})
+            </div>
+
+            {isLoadingComments ? (
+              <div className="flex items-center justify-center py-4 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <span className="text-xs">Loading...</span>
               </div>
-            </>
-          )}
+            ) : humanNotes.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">No notes yet. Add one below.</p>
+            ) : (
+              <div className="space-y-2">
+                {humanNotes.map((comment) => (
+                  <div key={comment.id} className="bg-muted/30 rounded-lg p-2.5 border">
+                    <div className="flex items-start gap-2">
+                      <UserAvatar
+                        name={comment.user?.full_name ?? undefined}
+                        role={comment.user?.role ?? undefined}
+                        size="xs"
+                        className="shrink-0 mt-0.5"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-xs font-medium text-foreground truncate">
+                            {comment.user?.full_name || 'Unknown'}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground shrink-0">
+                            {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-foreground leading-relaxed break-words whitespace-pre-wrap">
+                          {comment.content}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <form onSubmit={handleSend} className="flex flex-col gap-2">
+              <Textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Add a note..."
+                className="min-h-[72px] text-xs resize-none w-full"
+                disabled={isSending}
+              />
+              <Button type="submit" size="sm" disabled={isSending || !newComment.trim()} className="self-end h-8 gap-1.5" aria-label="Send note">
+                {isSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                Send
+              </Button>
+            </form>
+          </div>
 
           {/* Rejection reason */}
           {task.status === 'Rejected' && task.rejection_reason && (
