@@ -299,7 +299,7 @@ export default function AssemblyBuilderPage(): React.ReactNode {
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5" />
-            <span>256+ components in the library</span>
+            <span>Parametric components auto-generated per assembly</span>
           </div>
         </div>
       )}
