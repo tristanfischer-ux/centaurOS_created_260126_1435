@@ -8,11 +8,14 @@
  * Replaces the previous marketing-heavy hero with a clean action-first layout.
  */
 
+import { useState, useMemo } from "react"
 import Image from "next/image"
-import { Search, ArrowRight, Loader2, RotateCcw, Box } from "lucide-react"
+import { Search, ArrowRight, Loader2, RotateCcw, Box, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-dialog"
+import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import { ReferenceModelViewer } from "./reference-model-viewer"
 import type { ReferenceModel } from "@/actions/reference-models"
 
@@ -73,6 +76,12 @@ export function HeroSection({
   onSelectTemplate,
 }: HeroSectionProps): React.ReactNode {
   const subjectTrimmed = subject.trim().length > 0
+  const [isSpecialistOpen, setIsSpecialistOpen] = useState(false)
+  const fang = useMemo(() => getSpecialistById("vp-manufacturing"), [])
+
+  const specialistContext = subject.trim()
+    ? `The user is designing a product in The Forge. So far they've described it as: "${subject}". Help them refine this into a clear, manufacturing-focused engineering brief — think about materials, process, tolerance, and scale.`
+    : `The user is about to describe a product they want to build in The Forge engineering pipeline. Help them think through what to build and how to describe it clearly for manufacturing research.`
 
   return (
     <div className="space-y-6">
@@ -148,6 +157,19 @@ export function HeroSection({
             ))}
           </div>
         )}
+        {!hasResearch && !isResearching && fang && (
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setIsSpecialistOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Sparkles className="h-3 w-3 text-international-orange" />
+              Not sure how to describe it? Ask {fang.name}
+            </button>
+          </div>
+        )}
+
         {referenceModel && !hasResearch && (
           <>
             <div className="flex items-center gap-2 pt-2 border-t border-border">
@@ -194,6 +216,16 @@ export function HeroSection({
             ))}
           </div>
         </div>
+      )}
+
+      {fang && (
+        <BriefSpecialistDialog
+          specialist={fang}
+          open={isSpecialistOpen}
+          onOpenChange={setIsSpecialistOpen}
+          handoffContext={specialistContext}
+          contextLabel="Design Brief"
+        />
       )}
     </div>
   )

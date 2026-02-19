@@ -57,6 +57,7 @@ import type { Sector } from "@/types/foundry"
 // ─── Persistence key for last active project (restore on return) ─────
 
 const CAD_LAB_ACTIVE_PROJECT_KEY = "forgeos:cad-lab:active-project"
+const CAD_LAB_DRAFT_SUBJECT_KEY = "forgeos:cad-lab:draft-subject"
 
 // ─── Context Shape ───────────────────────────────────────────────────
 
@@ -199,6 +200,26 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Input state ──
   const [subject, setSubject] = useState("")
   const [modelId, setModelId] = useState<ClaudeModelId>("claude-sonnet-4-6")
+
+  // Persist draft subject so it survives navigation before Research is triggered
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const t = setTimeout(() => {
+      if (subject.trim()) {
+        localStorage.setItem(CAD_LAB_DRAFT_SUBJECT_KEY, subject)
+      } else {
+        localStorage.removeItem(CAD_LAB_DRAFT_SUBJECT_KEY)
+      }
+    }, 300)
+    return () => clearTimeout(t)
+  }, [subject])
+
+  // Restore draft subject on mount (project load will override if one exists)
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const stored = localStorage.getItem(CAD_LAB_DRAFT_SUBJECT_KEY)
+    if (stored) setSubject(stored)
+  }, [])
 
   // ── Reference model (matched from subject for instant 3D preview) ──
   const [referenceModel, setReferenceModel] = useState<ReferenceModel | null>(null)
@@ -847,7 +868,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const handleReset = useCallback(() => {
     if (typeof window !== "undefined") {
       localStorage.removeItem(CAD_LAB_ACTIVE_PROJECT_KEY)
+      localStorage.removeItem(CAD_LAB_DRAFT_SUBJECT_KEY)
     }
+    setSubject("")
     setResearchResult(null)
     setEditableReport("")
     setActiveProjectId(null)
