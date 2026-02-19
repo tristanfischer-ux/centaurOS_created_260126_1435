@@ -191,7 +191,7 @@ describe("createCadLabRfqAction", () => {
     const payload = mockedCreateNewRFQ.mock.calls[0][0]
     expect(payload.title).toContain("Orbital Drone Frame")
     expect(payload.rfq_type).toBe("custom")
-    expect(payload.category).toBe("Custom Manufacturing")
+    expect(payload.category).toBe("Products")
     expect(payload.specifications?.attachments).toEqual([
       "https://example.com/frame.step",
       "https://example.com/frame.stl",
