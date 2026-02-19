@@ -107,9 +107,18 @@ function getAvatarColors(role: string | null | undefined): { bg: string; text: s
 
 const BAND_W = 8
 const LANE_GAP = 34
-const PAD_L = 170
+const PAD_L = 190
 const PAD_R = 80
 const SVG_W = 1200
+
+/**
+ * Truncate text to a max character count, appending ellipsis if needed.
+ * Uses approximate character widths per font-size to avoid SVG overflow.
+ */
+function truncText(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text
+  return text.slice(0, maxChars - 1).trimEnd() + '…'
+}
 
 /** Minimum drag distance (in SVG units) before a drag is recognized */
 const DRAG_THRESHOLD = 4
@@ -288,7 +297,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
       // Space only expands on the side that actually has expanded tasks
       const aH = maxA > 0 ? maxA * LANE_GAP + 52 : 0
       const bH = maxB > 0 ? maxB * LANE_GAP + 52 : 0
-      const mL = 64
+      const mL = 80
       const topP = aH + mL, botP = bH + mL
       const lH = topP + botP + 10
       const ry = curY + topP
@@ -679,7 +688,9 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                             <circle cx={visSx - 13} cy={t.y} r={7} fill={avatarC.bg} />
                             <text x={visSx - 13} y={t.y + 0.5} textAnchor="middle" dominantBaseline="central" fill={avatarC.text} fontSize="5.5" fontFamily={FONT} fontWeight="800">{t.assignee}</text>
                             {/* Task title */}
-                            <text x={visSx + 6} y={t.y + (above ? -9 : 13)} fill={isH ? '#0F172A' : '#64748B'} fontSize="8.5" fontFamily={FONT} fontWeight={isH ? '700' : '600'}>{t.title}</text>
+                            <text x={visSx + 6} y={t.y + (above ? -9 : 13)} fill={isH ? '#0F172A' : '#64748B'} fontSize="8.5" fontFamily={FONT} fontWeight={isH ? '700' : '600'}>
+                              <title>{t.title}</title>{truncText(t.title, 42)}
+                            </text>
                             {/* Tooltip — shows projected dates during drag */}
                             {isH && (
                               <g>
@@ -759,7 +770,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                         onClick={(e) => { e.stopPropagation(); if (!dragState?.isDragging) onMilestoneClick?.(obj.id) }}
                         role="link"
                         aria-label={`View details for milestone: ${obj.title}`}
-                      >{obj.title}</text>
+                      ><title>{obj.title}</title>{truncText(obj.title, 28)}</text>
                       {/* Date + progress label */}
                       <text x={visCx} y={ry + dir * (gap + 12)} textAnchor="middle" fill={isMsDragged ? '#F97316' : '#94A3B8'} fontSize="8.5" fontFamily={FONT} fontWeight="600">
                         {isMsDragged ? '→ ' : ''}{new Date(projDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {tp}% · {obj.tasks.length} tasks
@@ -781,7 +792,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                 <circle cx={eX} cy={ry} r={7} fill="white" stroke={so.color} strokeWidth="1.5" filter="url(#strategy-ds)" />
                 <text x={eX} y={ry + 1} textAnchor="middle" dominantBaseline="central" fill={so.color} fontSize="8" fontFamily={FONT} fontWeight="900">◆</text>
                 <g tabIndex={0} role="button" aria-label={`Strategic goal: ${so.title}`} onClick={() => onGoalClick?.(so.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onGoalClick?.(so.id) } }} style={{ cursor: 'pointer' }}>
-                  <text x={eX} y={ry - 18} textAnchor="middle" fill="#0F172A" fontSize="10" fontFamily={FONT} fontWeight="800">{so.title}</text>
+                  <text x={eX} y={ry - 18} textAnchor="middle" fill="#0F172A" fontSize="10" fontFamily={FONT} fontWeight="800"><title>{so.title}</title>{truncText(so.title, 28)}</text>
                   <text x={eX} y={ry + 22} textAnchor="middle" fill={so.color} fontSize="9" fontFamily={FONT} fontWeight="700">
                     {new Date(so.targetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </text>
@@ -789,7 +800,8 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
 
                 {/* SO title (left column) — click toggles expand/collapse of all milestones in this SO */}
                 <g tabIndex={0} role="button" aria-label={`Toggle milestones for ${so.title}`} onClick={() => toggleExpand(so.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(so.id) } }} style={{ cursor: 'pointer' }}>
-                  <text x={14} y={ry - 5} fill="#0F172A" fontSize="12" fontFamily={FONT} fontWeight="800">{so.title}</text>
+                  <title>{so.title}</title>
+                  <text x={14} y={ry - 5} fill="#0F172A" fontSize="12" fontFamily={FONT} fontWeight="800">{truncText(so.title, 22)}</text>
                   <text x={14} y={ry + 9} fill={so.color} fontSize="10" fontFamily={FONT} fontWeight="700">
                     {pct}% · {new Date(so.targetDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
                   </text>
