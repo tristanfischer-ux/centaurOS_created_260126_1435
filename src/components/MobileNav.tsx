@@ -40,6 +40,7 @@ import {
     Globe,
     Map,
     Brain,
+    Handshake,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -87,6 +88,7 @@ const workshopMoreNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame },
     { name: "Blueprints", href: "/blueprints", icon: Map },
     { name: "Team", href: "/team", icon: Users },
+    { name: "Retainers", href: "/retainers", icon: Handshake },
     { name: "AI Team", href: "/agents", icon: UsersRound },
     { name: "AI Outputs", href: "/agents/artifacts", icon: FileOutput },
     { name: "Browse", href: "/browse", icon: Globe },
