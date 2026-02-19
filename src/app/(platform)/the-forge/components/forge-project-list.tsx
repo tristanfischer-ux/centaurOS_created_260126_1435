@@ -23,7 +23,6 @@ import {
   PlayCircle,
   Flame,
   Package,
-  Clock,
   FileBox,
   FileCheck2,
   Search,
@@ -37,12 +36,10 @@ import type { LucideIcon } from "lucide-react"
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { EmptyState } from "@/components/ui/empty-state"
 
 import { listCadLabProjects } from "@/actions/cad-lab-projects"
 import { listRecentAssemblies } from "@/actions/assembly-builder"
+import { RecentProjectsGrid } from "./recent-projects-grid"
 
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 import type { AssemblySummary } from "@/actions/assembly-builder"
@@ -71,9 +68,10 @@ interface StartingPath {
   accentBorder: string
   headline: string
   description: string
-  hint: string
   href: string
   cta: string
+  /** Output deliverables shown as compact tags */
+  outputs: string[]
   /** Optional pipeline stages shown as compact stepper (AI Pipeline card only) */
   pipelineStages?: PipelineStage[]
 }
@@ -85,10 +83,10 @@ const STARTING_PATHS: StartingPath[] = [
     iconColor: "text-international-orange",
     accentBorder: "border-l-international-orange",
     headline: "Start from a description",
-    description: "Describe what you want to build. The Forge researches engineering specs, generates parametric CAD models, runs analysis, and produces a supplier-ready package.",
-    hint: "Best if you have an idea but no existing CAD yet",
+    description: "Describe your product and get research, CAD models, analysis, and a supplier-ready package.",
     href: "/the-forge/cad-lab",
     cta: "Start designing",
+    outputs: ["3D CAD", "STEP files", "Engineering report", "DFM analysis", "RFQ package"],
     pipelineStages: [
       { label: "Research", icon: Search },
       { label: "Build", icon: Box },
@@ -103,10 +101,10 @@ const STARTING_PATHS: StartingPath[] = [
     iconColor: "text-electric-blue",
     accentBorder: "border-l-electric-blue",
     headline: "Start from STEP files",
-    description: "Combine two or more existing STEP files into a hybrid design. Browse the built-in template library or bring your own CAD — AI merges them into a new geometry.",
-    hint: "Best if you have existing CAD files or want to remix a template",
+    description: "Merge two or more STEP files into a new hybrid geometry using AI.",
     href: "/the-forge/cad-lab/mashup",
     cta: "Open Mashup Lab",
+    outputs: ["Hybrid STEP", "STL preview", "RFQ package"],
   },
   {
     icon: Blocks,
@@ -114,10 +112,10 @@ const STARTING_PATHS: StartingPath[] = [
     iconColor: "text-status-success",
     accentBorder: "border-l-status-success",
     headline: "Start from a skeleton",
-    description: "Pick a structural design skeleton — drone, satellite, robot, vehicle, and more — then fill each slot with parts from a library of 256+ parametric components.",
-    hint: "Best if you know the structure and need to specify the parts",
+    description: "Pick a design skeleton and fill each slot from 256+ parametric components.",
     href: "/the-forge/assembly-builder",
     cta: "Browse skeletons",
+    outputs: ["Assembly BOM", "Cost estimate", "Compatibility check", "RFQ package"],
   },
 ]
 
@@ -164,33 +162,25 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
       <PageHeader />
       {inProgressProject && <ContinueCard project={inProgressProject} />}
       <StartingPointsSection />
-      <ReferenceToolsSection />
 
       {!hasRecent ? (
-        <EmptyState
-          title="No designs yet"
-          description="Choose a starting point above to generate your first engineering package — 3D models, specs, analysis, and a manufacturer-ready RFQ."
-        />
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
-              Recent Projects
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                {recentItems.length} project{recentItems.length !== 1 ? "s" : ""}
-              </span>
-            </h2>
+        <div className="rounded-xl bg-muted/30 py-16 px-8 flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-international-orange-light mb-5">
+            <Flame className="h-7 w-7 text-international-orange" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {recentItems.map((entry) =>
-              entry.type === "cad_lab" ? (
-                <CadLabProjectCard key={`cad-${entry.item.id}`} project={entry.item} />
-              ) : (
-                <AssemblyProjectCard key={`asm-${entry.item.id}`} assembly={entry.item} />
-              ),
-            )}
-          </div>
+          <h3 className="text-lg font-semibold text-foreground mb-2">No designs yet</h3>
+          <p className="text-sm text-muted-foreground max-w-md mb-6">
+            Choose a starting point above to create your first engineering package — 3D models, specs, analysis, and a manufacturer-ready RFQ.
+          </p>
+          <Button asChild>
+            <Link href="/the-forge/cad-lab">
+              <Sparkles className="h-4 w-4 mr-2" />
+              Start your first design
+            </Link>
+          </Button>
         </div>
+      ) : (
+        <RecentProjectsGrid items={recentItems} />
       )}
     </div>
   )
@@ -241,95 +231,6 @@ function ContinueCard({ project }: { project: CadLabProjectSummary }): React.Rea
   )
 }
 
-// ─── CAD Lab Project Card ─────────────────────────────────────────────
-
-/**
- * CadLabProjectCard — Card for a CAD Lab project linking back into the pipeline.
- */
-function CadLabProjectCard({ project }: { project: CadLabProjectSummary }): React.ReactNode {
-  const stageConfig = STAGE_CONFIG[project.status] ?? STAGE_CONFIG.draft
-  const displayName = project.subject || project.name || "Untitled Project"
-
-  return (
-    <Link href={`/the-forge/cad-lab?project=${project.id}`}>
-      <Card className="group cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5">
-        <div className="h-32 rounded-t-xl overflow-hidden bg-gradient-to-br from-international-orange/5 to-muted relative">
-          {project.thumbnailSvg ? (
-            <img
-              src={project.thumbnailSvg}
-              alt={`${displayName} thumbnail`}
-              className="w-full h-full object-contain p-4"
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <Flame className="h-10 w-10 text-international-orange/30" />
-            </div>
-          )}
-          <div className="absolute top-3 right-3">
-            <Badge variant={stageConfig.variant} className="gap-1">
-              {stageConfig.label}
-            </Badge>
-          </div>
-        </div>
-        <CardContent className="pt-4">
-          <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-international-orange transition-colors">
-            {displayName}
-          </h3>
-          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  )
-}
-
-/**
- * AssemblyProjectCard — Card for an Assembly Builder design linking to the workbench.
- */
-function AssemblyProjectCard({ assembly }: { assembly: AssemblySummary }): React.ReactNode {
-  const displayName = assembly.name || "Untitled Assembly"
-
-  return (
-    <Link href={`/the-forge/assembly-builder/${assembly.id}`}>
-      <Card className="group cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5">
-        <div className="h-32 rounded-t-xl overflow-hidden bg-gradient-to-br from-status-success/5 to-muted relative">
-          {assembly.thumbnailUrl ? (
-            <img
-              src={assembly.thumbnailUrl}
-              alt={`${displayName} thumbnail`}
-              className="w-full h-full object-contain p-4"
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <Blocks className="h-10 w-10 text-status-success/30" />
-            </div>
-          )}
-          <div className="absolute top-3 right-3">
-            <Badge variant="secondary" className="gap-1">
-              Assembly
-            </Badge>
-          </div>
-        </div>
-        <CardContent className="pt-4">
-          <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-status-success transition-colors">
-            {displayName}
-          </h3>
-          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {formatDistanceToNow(new Date(assembly.updatedAt), { addSuffix: true })}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  )
-}
-
 // ─── Starting Points Section ──────────────────────────────────────────
 
 /**
@@ -357,15 +258,25 @@ function StartingPointsSection(): React.ReactNode {
         ))}
       </div>
 
-      {/* Destination callout */}
-      <div className="flex items-center gap-3 rounded-xl border bg-muted/40 px-5 py-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status-success-light">
-          <FileCheck2 className="h-4 w-4 text-status-success" />
+      {/* Destination callout + Component Library link */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border bg-muted/40 px-5 py-4">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status-success-light">
+            <FileCheck2 className="h-4 w-4 text-status-success" />
+          </div>
+          <p className="text-sm text-muted-foreground leading-snug">
+            <span className="font-medium text-foreground">Every path ends the same way</span>
+            {" "}— a supplier-ready engineering package you can send as an RFQ.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground leading-snug">
-          <span className="font-medium text-foreground">Every path ends the same way</span>
-          {" "}— a supplier-ready engineering package you can send to manufacturers as a Request for Quote (RFQ).
-        </p>
+        <Link
+          href="/the-forge/components"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-international-orange hover:underline shrink-0"
+        >
+          <Package className="h-3.5 w-3.5" />
+          Browse Component Library
+          <ArrowRight className="h-3 w-3" />
+        </Link>
       </div>
     </div>
   )
@@ -402,6 +313,15 @@ function StartingPathCard({ path }: { path: StartingPath }): React.ReactNode {
         {path.description}
       </p>
 
+      {/* Output deliverables */}
+      <div className="flex flex-wrap gap-1.5">
+        {path.outputs.map((output) => (
+          <span key={output} className="text-xs font-medium bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+            {output}
+          </span>
+        ))}
+      </div>
+
       {path.pipelineStages && path.pipelineStages.length > 0 && (
         <div className="flex items-center gap-0.5" aria-label="Pipeline stages">
           {path.pipelineStages.map((stage, index) => {
@@ -423,49 +343,13 @@ function StartingPathCard({ path }: { path: StartingPath }): React.ReactNode {
         </div>
       )}
 
-      <div className="mt-auto space-y-3">
-        <p className="text-xs text-muted-foreground/80 italic">
-          {path.hint}
-        </p>
+      <div className="mt-auto">
         <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", path.iconColor)}>
           {path.cta}
           <ArrowRight className="h-3 w-3" />
         </span>
       </div>
     </Link>
-  )
-}
-
-// ─── Reference Tools Section ──────────────────────────────────────────
-
-/**
- * ReferenceToolsSection — Browse tools that support the design process
- * but are not starting points for a new design.
- */
-function ReferenceToolsSection(): React.ReactNode {
-  return (
-    <div className="space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Reference & Tools
-      </p>
-      <Link
-        href="/the-forge/components"
-        className="group flex items-center justify-between rounded-xl border p-4 transition-colors hover:bg-muted/50"
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-international-orange-light text-international-orange">
-            <Package className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-foreground">Component Library</p>
-            <p className="text-xs text-muted-foreground">
-              Browse 1,000+ components with specs, pricing, and certifications
-            </p>
-          </div>
-        </div>
-        <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-      </Link>
-    </div>
   )
 }
 

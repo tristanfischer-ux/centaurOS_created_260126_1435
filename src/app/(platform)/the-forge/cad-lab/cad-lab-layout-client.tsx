@@ -70,6 +70,11 @@ function getCurrentStageLabel(pathname: string): string {
   return STAGE_LABELS[segment] ?? "Research"
 }
 
+/** Mashup Lab and Template Library are standalone tools, not pipeline stages. */
+function isMashupOrTemplates(pathname: string): boolean {
+  return pathname.includes("/mashup") || pathname.includes("/templates")
+}
+
 function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.ReactNode {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -119,9 +124,15 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
           The Forge
         </Link>
         <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-muted-foreground">Pipeline</span>
-        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-foreground font-medium">{currentStageLabel}</span>
+        {isMashupOrTemplates(pathname) ? (
+          <span className="text-foreground font-medium">{currentStageLabel}</span>
+        ) : (
+          <>
+            <span className="text-muted-foreground">Pipeline</span>
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-foreground font-medium">{currentStageLabel}</span>
+          </>
+        )}
       </nav>
 
       {/* ── Header ── */}

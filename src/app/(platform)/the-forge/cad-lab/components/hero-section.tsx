@@ -16,6 +16,16 @@ import { Input } from "@/components/ui/input"
 import { ReferenceModelViewer } from "./reference-model-viewer"
 import type { ReferenceModel } from "@/actions/reference-models"
 
+// ─── Example prompt chips ────────────────────────────────────────────
+
+const EXAMPLE_PROMPTS = [
+  "CubeSat frame",
+  "Drone arm bracket",
+  "Reaction wheel housing",
+  "EV battery enclosure",
+  "Robotic gripper",
+]
+
 // ─── Quick-start templates ───────────────────────────────────────────
 
 const QUICK_START_TEMPLATES = [
@@ -122,6 +132,22 @@ export function HeroSection({
             )}
           </Button>
         </div>
+
+        {/* Example prompt chips */}
+        {!hasResearch && !isResearching && !subjectTrimmed && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground">Try:</span>
+            {EXAMPLE_PROMPTS.map((prompt) => (
+              <button
+                key={prompt}
+                onClick={() => setSubject(prompt)}
+                className="text-xs px-2.5 py-1 rounded-full border border-muted bg-muted/50 text-muted-foreground hover:border-international-orange/40 hover:text-foreground transition-colors"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        )}
         {referenceModel && !hasResearch && (
           <>
             <div className="flex items-center gap-2 pt-2 border-t border-border">
@@ -161,7 +187,7 @@ export function HeroSection({
                   className="rounded-md group-hover:scale-105 transition-transform"
                 />
                 <span className="text-xs font-medium text-foreground">{t.label}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
                   {t.complexity}
                 </span>
               </button>

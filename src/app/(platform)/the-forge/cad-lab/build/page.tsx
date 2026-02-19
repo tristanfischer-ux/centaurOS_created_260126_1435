@@ -357,7 +357,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                       {/* Pipeline steps — Interface → CAD → Done */}
                       <div className="flex items-center gap-1 flex-shrink-0">
                         {/* Step 1: Interface */}
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
                           stepIndex > 1 ? "bg-status-success-light text-status-success" :
                           stepIndex === 1 ? "bg-international-orange-light text-international-orange" :
                           isError ? "bg-status-error-light text-destructive" :
@@ -376,7 +376,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                         <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
 
                         {/* Step 2: CAD */}
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
                           stepIndex > 2 ? "bg-status-success-light text-status-success" :
                           stepIndex === 2 ? "bg-international-orange-light text-international-orange" :
                           isError && stepIndex >= 2 ? "bg-status-error-light text-destructive" :
@@ -395,7 +395,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                         <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
 
                         {/* Step 3: Complete */}
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
                           isDone ? "bg-status-success-light text-status-success" :
                           isError ? "bg-status-error-light text-destructive" :
                           "bg-muted text-muted-foreground"
@@ -481,8 +481,8 @@ export default function CadLabBuildPage(): React.ReactNode {
             />
           )}
 
-          {/* Module list */}
-          {modules.length > 0 && (
+          {/* Module list — hidden when batch progress is visible to avoid duplication */}
+          {modules.length > 0 && Object.keys(batchProgress).length === 0 && (
             <div className="space-y-2 mt-4">
               {modules.map((mod) => (
                 <div key={mod.id} id={`module-${mod.id}`} className="border rounded-md overflow-hidden">
@@ -818,7 +818,7 @@ function ProductOverview({
                 />
               ))}
             </div>
-            <div className="flex flex-wrap gap-4 text-[10px] text-muted-foreground">
+            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
               {processGroups.map((g) => (
                 <span key={g.name} className="flex items-center gap-1.5">
                   <div className={cn("h-2 w-6 rounded-full", g.color)} />
@@ -1250,19 +1250,19 @@ function SystemArchitecture({
                       <p className="text-xs font-semibold text-foreground truncate">{mod.name}</p>
                     </div>
                     {isCriticalPath && (
-                      <span className="text-[9px] font-mono text-international-orange bg-international-orange-light/30 px-1 py-0.5 rounded flex-shrink-0">
+                      <span className="text-xs font-mono text-international-orange bg-international-orange-light/30 px-1 py-0.5 rounded flex-shrink-0">
                         CP
                       </span>
                     )}
                   </div>
 
                   {/* Purpose */}
-                  <p className="text-[11px] text-muted-foreground line-clamp-2 mb-2 leading-relaxed">
+                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2 leading-relaxed">
                     {mod.purpose}
                   </p>
 
                   {/* Stats row */}
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="flex items-center gap-0.5" title={`${mod.leadWeeks} week lead time`}>
                       <Clock className="h-2.5 w-2.5" />
                       {mod.leadWeeks}w
@@ -1298,7 +1298,7 @@ function SystemArchitecture({
                 <div
                   key={`${conn.fromId}-${conn.toId}-${idx}`}
                   className={cn(
-                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-md border transition-all duration-200",
+                    "flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border transition-all duration-200",
                     (hoveredModuleId === conn.fromId || hoveredModuleId === conn.toId)
                       ? "border-status-info/50 bg-status-info-light/20 text-foreground"
                       : "border-muted bg-muted/20 text-muted-foreground",
@@ -1317,7 +1317,7 @@ function SystemArchitecture({
                   >
                     {conn.toName}
                   </button>
-                  <span className="text-[10px] font-mono opacity-70 ml-0.5">({conn.label})</span>
+                  <span className="text-xs font-mono opacity-70 ml-0.5">({conn.label})</span>
                 </div>
               ))}
             </div>
@@ -1325,7 +1325,7 @@ function SystemArchitecture({
         )}
 
         {/* Legend */}
-        <div className="flex flex-wrap items-center gap-4 pt-2 border-t text-[10px] text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-4 pt-2 border-t text-xs text-muted-foreground">
           <span className="font-medium">Status:</span>
           <span className="flex items-center gap-1">
             <div className="h-2 w-2 rounded-full bg-muted-foreground" /> Pending
@@ -1337,7 +1337,7 @@ function SystemArchitecture({
             <div className="h-2 w-2 rounded-full bg-status-success" /> CAD Generated
           </span>
           <span className="flex items-center gap-1 ml-2">
-            <span className="text-[9px] font-mono text-international-orange bg-international-orange-light/30 px-1 py-0.5 rounded">CP</span> Critical Path
+            <span className="text-xs font-mono text-international-orange bg-international-orange-light/30 px-1 py-0.5 rounded">CP</span> Critical Path
           </span>
         </div>
       </CardContent>
