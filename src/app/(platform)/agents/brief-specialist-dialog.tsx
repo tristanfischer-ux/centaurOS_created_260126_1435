@@ -215,6 +215,11 @@ function MessageExportMenu({ content }: { content: string }) {
     )
 }
 
+// AUDIT: readWithTimeout, isRetryableStreamError, and normalizeSpecialistError were
+// extracted to src/lib/utils/stream-helpers.ts (2026-02-19, refactor step 2 of 8).
+// They are pure functions with no React dependencies — now independently testable.
+import { readWithTimeout, isRetryableStreamError, normalizeSpecialistError } from "@/lib/utils/stream-helpers"
+
 /**
  * Per-chunk timeout for SSE stream reads. If no data arrives within this
  * window, the connection is considered stale (proxy dropped, provider hung).
@@ -226,62 +231,6 @@ const GREETING_TIMEOUT_MS = 15_000
 
 /** Message fetch TTFB timeout — how long to wait for the server to start responding. */
 const MESSAGE_TTFB_TIMEOUT_MS = 60_000
-
-/**
- * Reads from a ReadableStream with a timeout. Rejects if no chunk arrives
- * within `timeoutMs`. This prevents `reader.read()` from hanging indefinitely
- * when a proxy or provider silently drops the connection.
- */
-function readWithTimeout(
-    reader: ReadableStreamDefaultReader<Uint8Array>,
-    timeoutMs: number,
-): Promise<ReadableStreamReadResult<Uint8Array>> {
-    return Promise.race([
-        reader.read(),
-        new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("Stream chunk timeout")), timeoutMs)
-        }),
-    ])
-}
-
-/**
- * Determines if a stream/fetch error is transient and worth retrying.
- * Connection drops, timeouts, and provider overloads are retryable.
- * Auth errors, rate limits, and content issues are not.
- */
-function isRetryableStreamError(error: string): boolean {
-    const lower = error.toLowerCase()
-    if (lower.includes("stream interrupted") || lower.includes("stream chunk timeout")) return true
-    if (lower.includes("overloaded") || lower.includes("temporarily")) return true
-    if (lower.includes("network") || lower.includes("fetch failed")) return true
-    return false
-}
-
-/**
- * Show a friendly, actionable message when the specialist can't connect (e.g. provider unavailable).
- */
-function normalizeSpecialistError(error: string, specialistName: string): string {
-    if (
-        error.includes("temporarily unavailable") ||
-        error.includes("not configured") ||
-        error.includes("PROVIDER_UNAVAILABLE")
-    ) {
-        return `${specialistName} is having trouble connecting right now. Try again in a moment, or check your AI provider settings.`
-    }
-    if (error.includes("Stream interrupted")) {
-        return `${specialistName} lost connection mid-response. This is usually temporary — try sending your message again.`
-    }
-    if (error.includes("rate-limiting") || error.includes("rate limit")) {
-        return `${specialistName} is being rate-limited by the AI provider. Wait a moment and try again.`
-    }
-    if (error.includes("conversation is too long")) {
-        return `The conversation with ${specialistName} has gotten too long. Try starting a fresh conversation.`
-    }
-    if (error.includes("overloaded") || error.includes("temporarily overloaded")) {
-        return `${specialistName}'s AI provider is temporarily overloaded. Try again in a few seconds.`
-    }
-    return error
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
