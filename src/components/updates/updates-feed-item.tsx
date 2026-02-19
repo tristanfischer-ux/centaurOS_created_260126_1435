@@ -97,7 +97,7 @@ export function UpdatesFeedItem({
       onClick={onClick}
       aria-label={`View updates for ${item.source.title}${isUnread ? ' (unread)' : ''}`}
       className={cn(
-        'w-full text-left p-4 transition-colors border-b border-muted',
+        'w-full text-left p-4 transition-colors border-b border-muted overflow-hidden',
         'hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         isSelected && 'bg-muted/70 border-l-2 border-l-international-orange',
         !isSelected && isUnread && 'bg-international-orange/5'

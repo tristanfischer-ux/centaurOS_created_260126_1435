@@ -219,7 +219,7 @@ export function UpdatesLayout({
         {/* Two-panel layout */}
         <div className="flex flex-1 overflow-hidden">
           {/* Left: Feed */}
-          <div className="w-[380px] xl:w-[420px] border-r border-muted flex flex-col">
+          <div className="w-[380px] xl:w-[420px] border-r border-muted flex flex-col overflow-hidden">
             <UpdatesFeed
               items={items}
               selectedItemId={selectedItemKey}
@@ -273,7 +273,7 @@ export function UpdatesLayout({
         {/* Two-panel layout (narrower feed) */}
         <div className="flex flex-1 overflow-hidden">
           {/* Left: Feed */}
-          <div className="w-[320px] border-r border-muted flex flex-col">
+          <div className="w-[320px] border-r border-muted flex flex-col overflow-hidden">
             <UpdatesFeed
               items={items}
               selectedItemId={selectedItemKey}
