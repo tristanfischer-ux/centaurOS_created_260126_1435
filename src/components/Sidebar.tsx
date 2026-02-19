@@ -161,6 +161,15 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
     const [isVideoModalOpen, setIsVideoModalOpen] = React.useState(false)
 
+    // INTENT: Prefetch the most-visited routes immediately after the sidebar
+    // mounts so the first click to any of these pages is near-instant. Combined
+    // with staleTimes (30s dynamic cache), this means the RSC payload is already
+    // in the client cache before the user clicks.
+    React.useEffect(() => {
+        const topRoutes = ['/today', '/new-tasks', '/new-objectives', '/team', '/the-forge', '/strategy']
+        topRoutes.forEach(route => router.prefetch(route))
+    }, [router])
+
     const openFeedback = (featureName?: string) => {
         setFeedbackFeatureName(featureName)
         setIsFeedbackOpen(true)

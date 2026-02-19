@@ -39,6 +39,17 @@ const nextConfig: NextConfig = {
       "framer-motion",
       "react-day-picker",
     ],
+    // INTENT: Keep previously-visited pages in the client router cache so
+    // back/forward navigation is instant. dynamic:30 means a page you left
+    // 30s ago loads from cache while revalidating in the background.
+    staleTimes: {
+      dynamic: 30,
+      static: 300,
+    },
+    // INTENT: Enable the browser-native View Transitions API so page swaps
+    // get a subtle crossfade instead of an abrupt pop. Degrades gracefully
+    // on browsers that don't support it.
+    viewTransition: true,
   },
 
   // Webpack: stub Node.js built-ins that pptxgenjs imports (node:fs, node:https).

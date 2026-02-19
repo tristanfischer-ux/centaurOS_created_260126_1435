@@ -3,62 +3,81 @@
 /**
  * @file use-speech-recognition.ts
  *
- * @description Hook for speech-to-text via OpenAI Whisper. Records audio using
- * the MediaRecorder API, detects silence via AudioContext/AnalyserNode, then
- * sends the recording to /api/agents/stt for transcription.
+ * @description Hook for speech-to-text using the browser's native Web Speech API
+ * as the primary engine (real-time, ~100-300ms latency, zero API cost), with
+ * OpenAI Whisper as a fallback for unsupported browsers (Firefox).
  *
- * Works in ALL modern browsers (Chrome, Firefox, Safari, Edge) — no vendor
- * prefix hacks needed. Falls back gracefully if microphone is denied.
+ * DECISION: Browser Web Speech API instead of Whisper-only. The previous
+ * implementation sent recorded audio blobs to /api/agents/stt -> OpenAI Whisper,
+ * which added 4-6 seconds of latency per utterance. The Web Speech API provides
+ * real-time interim results as the user speaks, making voice input feel instant.
+ * Whisper is kept as a fallback for Firefox (which lacks SpeechRecognition).
  *
  * @returns isListening, isProcessing, transcript, interimTranscript, start, stop, isSupported
  *
  * @related
- * - src/app/api/agents/stt/route.ts - Server-side Whisper proxy
+ * - src/app/api/agents/stt/route.ts - Whisper fallback route
  * - src/app/(platform)/agents/brief-specialist-dialog.tsx - Primary consumer
  */
 
 import { useState, useCallback, useRef, useEffect } from "react"
 
-// ─── Configuration ──────────────────────────────────────────────────────────
-
-/** RMS threshold below which audio is considered silence (0-1 scale) */
-const SILENCE_THRESHOLD = 0.01
-
-/** Maximum recording duration in ms (safety valve) */
-const MAX_RECORDING_MS = 120_000 // 2 minutes
-
-/** Preferred MIME types in order of preference */
-const PREFERRED_MIME_TYPES = [
-    "audio/webm;codecs=opus",  // Chrome, Edge, Firefox
-    "audio/webm",              // Chrome, Edge fallback
-    "audio/ogg;codecs=opus",   // Firefox fallback
-    "audio/mp4",               // Safari
-    "audio/mpeg",              // Fallback
-] as const
-
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+interface SpeechRecognitionEvent {
+    resultIndex: number
+    results: SpeechRecognitionResultList
+}
+
+interface SpeechRecognitionErrorEvent {
+    error: string
+    message?: string
+}
+
+interface SpeechRecognitionInstance extends EventTarget {
+    continuous: boolean
+    interimResults: boolean
+    lang: string
+    maxAlternatives: number
+    start: () => void
+    stop: () => void
+    abort: () => void
+    onresult: ((event: SpeechRecognitionEvent) => void) | null
+    onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
+    onend: (() => void) | null
+    onstart: (() => void) | null
+}
+
+declare global {
+    interface Window {
+        SpeechRecognition: new () => SpeechRecognitionInstance
+        webkitSpeechRecognition: new () => SpeechRecognitionInstance
+    }
+}
+
 interface UseSpeechRecognitionOptions {
-    /** Language hint for recognition (default: "en") — passed to Whisper */
+    /** Language hint for recognition (default: "en-US") */
     lang?: string
-    /** Auto-stop after this many ms of silence (default: 3000) */
+    /** Auto-stop after this many ms of silence (default: 3000) — Whisper fallback only */
     silenceTimeout?: number
     /** Called when final transcript is produced */
     onResult?: (transcript: string) => void
+    /** Called with interim (partial) transcript as user speaks — Web Speech API only */
+    onInterim?: (interim: string) => void
     /** Called when an error occurs */
     onError?: (error: string) => void
 }
 
 interface UseSpeechRecognitionReturn {
-    /** Whether the browser supports audio recording */
+    /** Whether the browser supports any form of speech recognition */
     isSupported: boolean
-    /** Whether currently recording */
+    /** Whether currently recording/listening */
     isListening: boolean
-    /** Whether audio is being transcribed by Whisper */
+    /** Whether audio is being transcribed (Whisper fallback only; always false for native) */
     isProcessing: boolean
     /** The accumulated final transcript */
     transcript: string
-    /** Current interim status text (empty during recording, "Transcribing..." during processing) */
+    /** Current interim text (real-time partial result from Web Speech API) */
     interimTranscript: string
     /** Start listening */
     start: () => void
@@ -68,19 +87,16 @@ interface UseSpeechRecognitionReturn {
     reset: () => void
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Detection ──────────────────────────────────────────────────────────────
 
-/** Pick the best supported MIME type for MediaRecorder */
-function getSupportedMimeType(): string {
-    if (typeof MediaRecorder === "undefined") return ""
-    for (const mime of PREFERRED_MIME_TYPES) {
-        if (MediaRecorder.isTypeSupported(mime)) return mime
-    }
-    return "" // Let MediaRecorder pick its default
+/** Check if the browser supports the native Web Speech API */
+function hasNativeSpeechRecognition(): boolean {
+    if (typeof window === "undefined") return false
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 }
 
-/** Check if the browser supports MediaRecorder + getUserMedia */
-function checkSupport(): boolean {
+/** Check if the browser supports MediaRecorder (for Whisper fallback) */
+function hasMediaRecorder(): boolean {
     if (typeof window === "undefined") return false
     return (
         typeof MediaRecorder !== "undefined" &&
@@ -88,36 +104,67 @@ function checkSupport(): boolean {
     )
 }
 
+// ─── Whisper Fallback Helpers ───────────────────────────────────────────────
+
+const SILENCE_THRESHOLD = 0.01
+const MAX_RECORDING_MS = 120_000
+
+const PREFERRED_MIME_TYPES = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+    "audio/mpeg",
+] as const
+
+function getSupportedMimeType(): string {
+    if (typeof MediaRecorder === "undefined") return ""
+    for (const mime of PREFERRED_MIME_TYPES) {
+        if (MediaRecorder.isTypeSupported(mime)) return mime
+    }
+    return ""
+}
+
 // ─── Hook ───────────────────────────────────────────────────────────────────
 
 /**
- * Hook for speech-to-text via OpenAI Whisper.
+ * Hook for speech-to-text with real-time browser-native recognition.
  *
- * Records audio with MediaRecorder, auto-stops on silence, and sends
- * the recording to the /api/agents/stt endpoint for transcription.
+ * Uses the Web Speech API (Chrome, Edge, Safari) for instant results as the
+ * user speaks. Falls back to OpenAI Whisper via /api/agents/stt for browsers
+ * without native support (Firefox).
  *
  * @example
  * const speech = useSpeechRecognition({
  *   onResult: (text) => setBriefText(prev => prev + " " + text),
+ *   onInterim: (partial) => setInterimText(partial),
  * })
- * // In a button: onClick={() => speech.isListening ? speech.stop() : speech.start()}
  */
 export function useSpeechRecognition(
     options: UseSpeechRecognitionOptions = {}
 ): UseSpeechRecognitionReturn {
-    const { silenceTimeout = 3000, onResult, onError } = options
+    const { lang = "en-US", silenceTimeout = 3000, onResult, onInterim, onError } = options
 
     const [isListening, setIsListening] = useState(false)
     const [isProcessing, setIsProcessing] = useState(false)
     const [transcript, setTranscript] = useState("")
     const [interimTranscript, setInterimTranscript] = useState("")
 
-    // Stable refs for callbacks and resources
     const onResultRef = useRef(onResult)
     onResultRef.current = onResult
+    const onInterimRef = useRef(onInterim)
+    onInterimRef.current = onInterim
     const onErrorRef = useRef(onError)
     onErrorRef.current = onError
 
+    const useNative = hasNativeSpeechRecognition()
+    const isSupported = useNative || hasMediaRecorder()
+
+    // ─── Native Web Speech API refs ─────────────────────────────────────
+    const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+    const isListeningRef = useRef(false)
+
+    // ─── Whisper fallback refs ──────────────────────────────────────────
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const audioChunksRef = useRef<Blob[]>([])
     const streamRef = useRef<MediaStream | null>(null)
@@ -126,35 +173,31 @@ export function useSpeechRecognition(
     const silenceStartRef = useRef<number | null>(null)
     const animFrameRef = useRef<number | null>(null)
     const maxDurationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const isListeningRef = useRef(false)
     const mimeTypeRef = useRef("")
-
-    const isSupported = checkSupport()
 
     // ─── Cleanup ────────────────────────────────────────────────────────
 
     const cleanup = useCallback(() => {
-        // Stop animation frame loop
+        if (recognitionRef.current) {
+            try { recognitionRef.current.abort() } catch { /* ignore */ }
+            recognitionRef.current = null
+        }
         if (animFrameRef.current !== null) {
             cancelAnimationFrame(animFrameRef.current)
             animFrameRef.current = null
         }
-        // Clear max duration timer
         if (maxDurationTimerRef.current) {
             clearTimeout(maxDurationTimerRef.current)
             maxDurationTimerRef.current = null
         }
-        // Stop MediaRecorder
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
             try { mediaRecorderRef.current.stop() } catch { /* ignore */ }
         }
         mediaRecorderRef.current = null
-        // Stop all media tracks (releases microphone)
         if (streamRef.current) {
             streamRef.current.getTracks().forEach((track) => track.stop())
             streamRef.current = null
         }
-        // Close AudioContext
         if (audioContextRef.current && audioContextRef.current.state !== "closed") {
             audioContextRef.current.close().catch(() => { /* ignore */ })
             audioContextRef.current = null
@@ -164,17 +207,98 @@ export function useSpeechRecognition(
         isListeningRef.current = false
     }, [])
 
-    // Cleanup on unmount
     useEffect(() => {
         return () => cleanup()
     }, [cleanup])
 
-    // ─── Transcribe ─────────────────────────────────────────────────────
+    // ─── Native Web Speech API Start ────────────────────────────────────
 
-    /**
-     * Send recorded audio to the Whisper API and deliver the transcript.
-     */
-    const transcribe = useCallback(async (audioBlob: Blob) => {
+    const startNative = useCallback(() => {
+        if (isListeningRef.current) return
+
+        const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition
+        const recognition = new SpeechRecognitionClass()
+
+        recognition.continuous = true
+        recognition.interimResults = true
+        recognition.lang = lang
+        recognition.maxAlternatives = 1
+
+        recognition.onstart = () => {
+            isListeningRef.current = true
+            setIsListening(true)
+            setInterimTranscript("")
+        }
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+            let finalText = ""
+            let interimText = ""
+
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const result = event.results[i]
+                const text = result[0].transcript
+
+                if (result.isFinal) {
+                    finalText += text
+                } else {
+                    interimText += text
+                }
+            }
+
+            if (interimText) {
+                setInterimTranscript(interimText)
+                onInterimRef.current?.(interimText)
+            }
+
+            if (finalText) {
+                const trimmed = finalText.trim()
+                setTranscript(trimmed)
+                setInterimTranscript("")
+                onResultRef.current?.(trimmed)
+            }
+        }
+
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+            if (event.error === "no-speech" || event.error === "aborted") return
+
+            console.warn("[SpeechRecognition] Native error:", event.error)
+
+            if (event.error === "not-allowed") {
+                onErrorRef.current?.("Microphone access denied. Please allow microphone access in your browser settings.")
+            } else {
+                onErrorRef.current?.(event.error)
+            }
+        }
+
+        recognition.onend = () => {
+            isListeningRef.current = false
+            setIsListening(false)
+            setInterimTranscript("")
+        }
+
+        recognitionRef.current = recognition
+
+        try {
+            recognition.start()
+        } catch (err) {
+            console.warn("[SpeechRecognition] Native start failed:", err)
+            onErrorRef.current?.("Speech recognition failed to start")
+            isListeningRef.current = false
+            setIsListening(false)
+        }
+    }, [lang])
+
+    const stopNative = useCallback(() => {
+        if (recognitionRef.current) {
+            try {
+                recognitionRef.current.stop()
+            } catch { /* ignore */ }
+        }
+    }, [])
+
+    // ─── Whisper Fallback Transcribe ────────────────────────────────────
+
+    const transcribeWhisper = useCallback(async (audioBlob: Blob) => {
         if (audioBlob.size === 0) return
 
         setIsProcessing(true)
@@ -214,12 +338,8 @@ export function useSpeechRecognition(
         }
     }, [])
 
-    // ─── Silence Detection ──────────────────────────────────────────────
+    // ─── Whisper Fallback Silence Detection ─────────────────────────────
 
-    /**
-     * Monitor audio levels via AnalyserNode. Auto-stops recording after
-     * `silenceTimeout` ms of continuous silence.
-     */
     const monitorSilence = useCallback(() => {
         const analyser = analyserRef.current
         if (!analyser || !isListeningRef.current) return
@@ -227,7 +347,6 @@ export function useSpeechRecognition(
         const dataArray = new Float32Array(analyser.fftSize)
         analyser.getFloatTimeDomainData(dataArray)
 
-        // Calculate RMS (root mean square) of the audio signal
         let sum = 0
         for (let i = 0; i < dataArray.length; i++) {
             sum += dataArray[i] * dataArray[i]
@@ -235,49 +354,37 @@ export function useSpeechRecognition(
         const rms = Math.sqrt(sum / dataArray.length)
 
         if (rms < SILENCE_THRESHOLD) {
-            // Audio is silent
             if (silenceStartRef.current === null) {
                 silenceStartRef.current = Date.now()
             } else if (Date.now() - silenceStartRef.current > silenceTimeout) {
-                // Silence exceeded threshold — auto-stop
                 if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
                     mediaRecorderRef.current.stop()
                 }
                 return
             }
         } else {
-            // Audio detected — reset silence timer
             silenceStartRef.current = null
         }
 
-        // Continue monitoring
         if (isListeningRef.current) {
             animFrameRef.current = requestAnimationFrame(monitorSilence)
         }
     }, [silenceTimeout])
 
-    // ─── Start Recording ────────────────────────────────────────────────
+    // ─── Whisper Fallback Start ─────────────────────────────────────────
 
-    const start = useCallback(async () => {
-        if (!isSupported) return
+    const startWhisper = useCallback(async () => {
         if (isListeningRef.current) return
 
-        // Clean up any previous session
         cleanup()
         audioChunksRef.current = []
 
         try {
-            // Request microphone access
             const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                },
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
             })
             streamRef.current = stream
 
-            // Set up AudioContext + AnalyserNode for silence detection
             const audioContext = new AudioContext()
             audioContextRef.current = audioContext
             const analyser = audioContext.createAnalyser()
@@ -286,27 +393,20 @@ export function useSpeechRecognition(
             const source = audioContext.createMediaStreamSource(stream)
             source.connect(analyser)
 
-            // Pick best MIME type
             const mimeType = getSupportedMimeType()
             mimeTypeRef.current = mimeType
 
-            // Create MediaRecorder
             const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
             mediaRecorderRef.current = recorder
 
-            // Collect chunks
             recorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunksRef.current.push(event.data)
-                }
+                if (event.data.size > 0) audioChunksRef.current.push(event.data)
             }
 
-            // When recording stops, assemble the blob and transcribe
             recorder.onstop = () => {
                 setIsListening(false)
                 isListeningRef.current = false
 
-                // Stop silence monitoring
                 if (animFrameRef.current !== null) {
                     cancelAnimationFrame(animFrameRef.current)
                     animFrameRef.current = null
@@ -316,23 +416,20 @@ export function useSpeechRecognition(
                     maxDurationTimerRef.current = null
                 }
 
-                // Release microphone
                 stream.getTracks().forEach((track) => track.stop())
                 streamRef.current = null
 
-                // Close AudioContext
                 if (audioContextRef.current && audioContextRef.current.state !== "closed") {
                     audioContextRef.current.close().catch(() => { /* ignore */ })
                 }
 
-                // Build audio blob and send to Whisper
                 const audioBlob = new Blob(audioChunksRef.current, {
                     type: recorder.mimeType || "audio/webm",
                 })
                 audioChunksRef.current = []
 
                 if (audioBlob.size > 0) {
-                    transcribe(audioBlob)
+                    transcribeWhisper(audioBlob)
                 }
             }
 
@@ -343,7 +440,6 @@ export function useSpeechRecognition(
                 onErrorRef.current?.("Recording failed")
             }
 
-            // Start recording (collect data every 250ms for fine-grained chunks)
             recorder.start(250)
             isListeningRef.current = true
             setIsListening(true)
@@ -351,40 +447,51 @@ export function useSpeechRecognition(
             setInterimTranscript("")
             silenceStartRef.current = null
 
-            // Start silence monitoring
             animFrameRef.current = requestAnimationFrame(monitorSilence)
 
-            // Safety valve: auto-stop after max duration
             maxDurationTimerRef.current = setTimeout(() => {
                 if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
                     mediaRecorderRef.current.stop()
                 }
             }, MAX_RECORDING_MS)
-
         } catch (err) {
             const message = err instanceof Error ? err.message : "Microphone access denied"
-            console.warn("[SpeechRecognition] Start failed:", message)
+            console.warn("[SpeechRecognition] Whisper fallback start failed:", message)
             cleanup()
             setIsListening(false)
 
-            // Provide a user-friendly error for common permission issues
             if (message.includes("Permission") || message.includes("NotAllowed")) {
                 onErrorRef.current?.("Microphone access denied. Please allow microphone access in your browser settings.")
             } else {
                 onErrorRef.current?.(message)
             }
         }
-    }, [isSupported, cleanup, transcribe, monitorSilence])
+    }, [cleanup, transcribeWhisper, monitorSilence])
 
-    // ─── Stop Recording ─────────────────────────────────────────────────
-
-    const stop = useCallback(() => {
+    const stopWhisper = useCallback(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
             mediaRecorderRef.current.stop()
         }
     }, [])
 
-    // ─── Reset ──────────────────────────────────────────────────────────
+    // ─── Public API (delegates to native or fallback) ───────────────────
+
+    const start = useCallback(() => {
+        if (!isSupported) return
+        if (useNative) {
+            startNative()
+        } else {
+            startWhisper()
+        }
+    }, [isSupported, useNative, startNative, startWhisper])
+
+    const stop = useCallback(() => {
+        if (useNative) {
+            stopNative()
+        } else {
+            stopWhisper()
+        }
+    }, [useNative, stopNative, stopWhisper])
 
     const reset = useCallback(() => {
         setTranscript("")

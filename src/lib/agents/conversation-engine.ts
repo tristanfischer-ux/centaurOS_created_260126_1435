@@ -37,6 +37,10 @@ export type ConversationMode = (typeof CONVERSATION_MODES)[number]
 export type ConversationEventType =
     | "text_chunk"       // Partial text streamed from the LLM
     | "text_done"        // Full response complete (includes final text)
+    | "fast_chunk"       // Speculative: partial text from fast model
+    | "fast_done"        // Speculative: fast model complete (includes complexity)
+    | "deep_chunk"       // Speculative: partial text from deep model
+    | "deep_done"        // Speculative: deep model complete
     | "audio_chunk"      // Audio data to play (for voice/avatar modes)
     | "audio_done"       // Audio stream complete
     | "video_stream"     // WebRTC MediaStream connected (avatar mode)
@@ -65,6 +69,9 @@ export interface ConversationEvent {
 
     /** Dynamic specialist suggestion parsed from response (for suggestion) */
     suggestion?: { specialistId: string; reason: string }
+
+    /** Speculative complexity classification from fast model (for fast_done) */
+    complexity?: "simple" | "complex"
 }
 
 // ─── Specialist Visual States ────────────────────────────────────────────────
@@ -117,6 +124,11 @@ export interface ConversationEngineConfig {
     /** Model tier for provider failover (e.g., "claude", "qwen", "minimax"). When set, the API
      *  route uses the corresponding fallback chain if the primary provider is unavailable. */
     modelTier?: string
+
+    /** Enable speculative dual-stream: a fast model responds instantly while the deep model
+     *  works in parallel. The fast model triages complexity — answering simple questions fully
+     *  or providing a brief acknowledgment for complex ones. */
+    speculative?: boolean
 
     /** AbortSignal for cancellation */
     signal?: AbortSignal

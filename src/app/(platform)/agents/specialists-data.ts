@@ -99,6 +99,9 @@ export interface Specialist {
     thinkingPhases: [string, string, string]
     /** AI model tier: "claude" for high-stakes reasoning, "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume work */
     modelTier: "claude" | "qwen" | "qwen-local" | "minimax"
+    /** Enable speculative dual-stream: fast model responds instantly while deep model works in parallel.
+     *  Default: true for claude-tier (high latency), false for already-fast tiers. */
+    speculativeEnabled?: boolean
 }
 
 export const SPECIALISTS: Specialist[] = [
@@ -202,6 +205,7 @@ export const SPECIALISTS: Specialist[] = [
             "Almost there — one strong recommendation coming.",
         ],
         modelTier: "claude",
+        speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // TECHNOLOGY — The foundation of making things
@@ -299,6 +303,7 @@ export const SPECIALISTS: Specialist[] = [
             "Found the simplest path — writing it up.",
         ],
         modelTier: "claude",
+        speculativeEnabled: true,
     },
     {
         id: "vp-engineering",
@@ -969,6 +974,7 @@ export const SPECIALISTS: Specialist[] = [
             "Priority stack is clear — here's what matters most.",
         ],
         modelTier: "claude",
+        speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // FINANCE — The fuel
@@ -1066,6 +1072,7 @@ export const SPECIALISTS: Specialist[] = [
             "Building your financial picture.",
         ],
         modelTier: "claude",
+        speculativeEnabled: true,
     },
     {
         id: "fundraising-advisor",
@@ -1357,6 +1364,7 @@ export const SPECIALISTS: Specialist[] = [
             "Triage complete — here's what matters.",
         ],
         modelTier: "claude",
+        speculativeEnabled: true,
     },
 ]
 

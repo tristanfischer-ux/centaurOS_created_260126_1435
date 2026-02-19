@@ -17,6 +17,7 @@ import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
 import { compilePersonalityPrompt, compileRelationshipContext } from "@/lib/agents/personality"
 import { createRollout, finishRollout } from "@/lib/agent-spans"
+import { FAST_MODEL_CHAIN, buildSpeculativeFastPrompt, parseComplexityTag } from "@/lib/agents/speculative-prompt"
 // AUDIT: Converted 9 dynamic imports to static (2026-02-19, refactor step 5 of 8).
 // Dynamic imports in a server-side API route provide no bundle benefit. Static
 // imports improve readability and eliminate runtime import overhead.
@@ -193,6 +194,7 @@ export async function POST(request: Request) {
     let firstFrameImage: string | undefined
     let modelTier: ModelTier | undefined
     let attachments: Array<{ path?: string; url?: string | null; filename?: string; mimeType?: string }> | undefined
+    let speculative: boolean
 
     try {
         const body = await request.json()
@@ -219,6 +221,7 @@ export async function POST(request: Request) {
                     typeof a === "object" && a !== null && (typeof (a as { url?: unknown }).url === "string" || (a as { url?: unknown }).url === null)
             )
             : undefined
+        speculative = body.speculative === true
 
         if (!prompt || typeof prompt !== "string") {
             return NextResponse.json({ error: "prompt is required" }, { status: 400 })
@@ -702,6 +705,21 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
         : [{ providerId, modelId }]
 
     try {
+        if (modality === "text" && speculative && specialistId) {
+            const specialist = getSpecialistById(specialistId)
+            return await handleSpeculativeStreaming(
+                fallbackChain,
+                finalPrompt,
+                systemPromptWithContext,
+                memoryCallback,
+                enableThinking,
+                conversationHistory,
+                rolloutId,
+                specialist?.name ?? "Specialist",
+                specialist?.title ?? "Advisor",
+                specialist?.workingStyle ?? "",
+            )
+        }
         if (modality === "text") {
             return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId)
         }
@@ -953,6 +971,254 @@ async function handleTextStreaming(
                 })}\n\n`)
             )
             controller.close()
+        },
+    })
+
+    return new Response(readable, {
+        headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+            ...(rolloutId ? { "X-Rollout-Id": rolloutId } : {}),
+        },
+    })
+}
+
+// ─── Speculative Dual-Stream Handler ─────────────────────────────────
+
+/**
+ * Runs a fast model and deep model in parallel over a single SSE connection.
+ *
+ * @description The fast model (Gemini Flash) provides an instant response while
+ * the deep model (from the fallback chain) works on a thorough answer. The fast
+ * model self-classifies the question's complexity:
+ *
+ * - **Simple**: Fast model answered fully → deep model call is aborted (cost saved)
+ * - **Complex**: Fast model gave a brief acknowledgment → deep model continues
+ *
+ * SSE chunks are tagged with `{"stream":"fast",...}` or `{"stream":"deep",...}`
+ * so the client can render them in the right place.
+ *
+ * @param chain - Fallback chain for the deep model
+ * @param finalPrompt - User prompt with placeholders resolved
+ * @param systemPrompt - Full system prompt (for deep model)
+ * @param onComplete - Post-response callback (memory, usage logging)
+ * @param enableThinking - Deep thinking for deep model
+ * @param history - Conversation history for multi-turn
+ * @param rolloutId - Rollout tracing ID
+ * @param specialistName - Display name for fast model personality
+ * @param specialistTitle - Role title for fast model personality
+ * @param workingStyle - Working style description for fast model
+ */
+async function handleSpeculativeStreaming(
+    chain: ProviderTarget[],
+    finalPrompt: string,
+    systemPrompt: string,
+    onComplete?: (fullOutput: string) => Promise<void>,
+    enableThinking?: boolean,
+    history?: ConversationMessage[],
+    rolloutId?: string | null,
+    specialistName?: string,
+    specialistTitle?: string,
+    workingStyle?: string,
+): Promise<Response> {
+    const encoder = new TextEncoder()
+    const conversationHistory = history?.map((msg) => ({
+        role: msg.role as "system" | "user" | "assistant",
+        content: msg.content,
+    }))
+
+    // Trim conversation history for the fast model (last 4 messages max)
+    const recentMessages = conversationHistory?.slice(-4).map(m => ({
+        role: m.role,
+        content: m.content.slice(0, 500),
+    }))
+
+    const fastSystemPrompt = buildSpeculativeFastPrompt(
+        specialistName ?? "Specialist",
+        specialistTitle ?? "Advisor",
+        workingStyle ?? "",
+        recentMessages,
+    )
+
+    const readable = new ReadableStream({
+        async start(controller) {
+            const heartbeatInterval = setInterval(() => {
+                try { controller.enqueue(encoder.encode(": keepalive\n\n")) } catch { /* closed */ }
+            }, 15_000)
+
+            let fastFullOutput = ""
+            let deepFullOutput = ""
+            let complexity: "simple" | "complex" = "complex"
+            const deepAbortController = new AbortController()
+            let fastDone = false
+            let deepDone = false
+
+            const sendTaggedChunk = (stream: "fast" | "deep", data: Record<string, unknown>): void => {
+                try {
+                    controller.enqueue(encoder.encode(
+                        `data: ${JSON.stringify({ stream, ...data })}\n\n`
+                    ))
+                } catch { /* stream closed */ }
+            }
+
+            const tryFinalize = (): void => {
+                if (!fastDone || !deepDone) return
+                clearInterval(heartbeatInterval)
+                const combinedOutput = complexity === "simple"
+                    ? fastFullOutput
+                    : (fastFullOutput + "\n\n" + deepFullOutput).trim()
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+                controller.close()
+                if (onComplete && combinedOutput) {
+                    onComplete(combinedOutput).catch(() => {})
+                }
+            }
+
+            // ── Fast model call ──────────────────────────────────────────
+
+            const runFastModel = async (): Promise<void> => {
+                for (const target of FAST_MODEL_CHAIN) {
+                    const streamFn = getTextProvider(target.providerId)
+                    const apiKey = resolveApiKeyForProvider(target.providerId)
+                    if (!streamFn || !apiKey) continue
+
+                    try {
+                        await new Promise<void>((resolve, reject) => {
+                            streamFn({
+                                apiKey,
+                                modelId: target.modelId,
+                                systemPrompt: fastSystemPrompt,
+                                userPrompt: finalPrompt,
+                                maxTokens: 1024,
+                                onChunk(text) {
+                                    fastFullOutput += text
+                                    sendTaggedChunk("fast", { text })
+                                },
+                                onDone() {
+                                    const { cleanResponse, complexity: c } = parseComplexityTag(fastFullOutput)
+                                    complexity = c
+                                    fastFullOutput = cleanResponse
+
+                                    sendTaggedChunk("fast", { done: true, complexity: c })
+
+                                    // INTENT: If simple, abort the deep model to save cost.
+                                    if (c === "simple") {
+                                        deepAbortController.abort()
+                                        deepDone = true
+                                        sendTaggedChunk("deep", { done: true, skipped: true })
+                                    }
+
+                                    fastDone = true
+                                    tryFinalize()
+                                    resolve()
+                                },
+                                onError(error) {
+                                    reject(new Error(error))
+                                },
+                            }).catch(reject)
+                        })
+                        return
+                    } catch (err) {
+                        const msg = err instanceof Error ? err.message : String(err)
+                        console.warn("[speculative] Fast model failed, trying next:", { provider: target.providerId, error: msg })
+                        continue
+                    }
+                }
+
+                // All fast models failed — send fast_done with no content,
+                // let the deep model be the sole responder.
+                fastDone = true
+                sendTaggedChunk("fast", { done: true, complexity: "complex" })
+                tryFinalize()
+            }
+
+            // ── Deep model call ──────────────────────────────────────────
+
+            const runDeepModel = async (): Promise<void> => {
+                for (let i = 0; i < chain.length; i++) {
+                    if (deepAbortController.signal.aborted) {
+                        deepDone = true
+                        tryFinalize()
+                        return
+                    }
+
+                    const target = chain[i]
+                    const streamFn = getTextProvider(target.providerId)
+                    const apiKey = resolveApiKeyForProvider(target.providerId)
+                    if (!streamFn || !apiKey) continue
+
+                    const maxTokens = enableThinking ? 32768 : 16384
+                    const useThinking = enableThinking && target.providerId === "anthropic"
+
+                    try {
+                        await new Promise<void>((resolve, reject) => {
+                            if (deepAbortController.signal.aborted) {
+                                resolve()
+                                return
+                            }
+
+                            streamFn({
+                                apiKey,
+                                modelId: target.modelId,
+                                systemPrompt,
+                                userPrompt: finalPrompt,
+                                conversationHistory,
+                                maxTokens,
+                                enableThinking: useThinking,
+                                onChunk(text) {
+                                    if (deepAbortController.signal.aborted) return
+                                    deepFullOutput += text
+                                    sendTaggedChunk("deep", { text })
+                                },
+                                onDone() {
+                                    deepDone = true
+                                    sendTaggedChunk("deep", { done: true })
+                                    tryFinalize()
+                                    resolve()
+                                },
+                                onError(error) {
+                                    reject(new Error(error))
+                                },
+                            }).catch(reject)
+                        })
+                        return
+                    } catch (err) {
+                        if (deepAbortController.signal.aborted) {
+                            deepDone = true
+                            tryFinalize()
+                            return
+                        }
+                        const msg = err instanceof Error ? err.message : String(err)
+                        if (isRetryableError(msg) && i < chain.length - 1) {
+                            console.warn("[speculative] Deep model failover:", { from: target.providerId, error: msg })
+                            continue
+                        }
+                        // Surface error on the deep stream
+                        sendTaggedChunk("deep", { error: msg })
+                        deepDone = true
+                        tryFinalize()
+                        return
+                    }
+                }
+
+                // All deep providers failed
+                if (!deepDone) {
+                    sendTaggedChunk("deep", { error: "All providers exhausted", done: true })
+                    deepDone = true
+                    tryFinalize()
+                }
+            }
+
+            // Launch both in parallel
+            Promise.all([runFastModel(), runDeepModel()]).catch((err) => {
+                clearInterval(heartbeatInterval)
+                console.error("[speculative] Unexpected error:", err)
+                try {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Speculative streaming failed" })}\n\n`))
+                    controller.close()
+                } catch { /* already closed */ }
+            })
         },
     })
 

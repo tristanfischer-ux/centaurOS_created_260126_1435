@@ -106,6 +106,14 @@ export interface UseSpecialistChatReturn {
     clearError: () => void
     /** Reset the conversation (keep thread, clear messages) */
     resetConversation: () => void
+
+    // ─── Speculative dual-stream state ──────────────────────────────
+    /** Streaming response from the fast model (instant acknowledgment/answer) */
+    fastResponse: string
+    /** Streaming response from the deep model (thorough answer) */
+    deepResponse: string
+    /** Complexity classification from the fast model */
+    speculativeComplexity: "simple" | "complex" | null
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -133,6 +141,11 @@ export function useSpecialistChat({
     } | null>(null)
     const [activeMode, setActiveMode] = useState<ConversationMode>("text")
     const [videoStream, setVideoStream] = useState<MediaStream | null>(null)
+
+    // Speculative dual-stream state
+    const [fastResponse, setFastResponse] = useState("")
+    const [deepResponse, setDeepResponse] = useState("")
+    const [speculativeComplexity, setSpeculativeComplexity] = useState<"simple" | "complex" | null>(null)
 
     // ─── Refs ────────────────────────────────────────────────────────────
     const engineRef = useRef<ConversationEngine | null>(null)
@@ -233,9 +246,32 @@ export function useSpecialistChat({
                         }
                     }
                     setStreamingResponse("")
+                    setFastResponse("")
+                    setDeepResponse("")
+                    setSpeculativeComplexity(null)
                     setIsExecuting(false)
                     break
                 }
+
+                // ─── Speculative dual-stream events ─────────────────
+                case "fast_chunk":
+                    setFastResponse((prev) => prev + (event.text ?? ""))
+                    setStreamingResponse((prev) => prev + (event.text ?? ""))
+                    break
+
+                case "fast_done":
+                    if (event.complexity) {
+                        setSpeculativeComplexity(event.complexity)
+                    }
+                    break
+
+                case "deep_chunk":
+                    setDeepResponse(event.text ?? "")
+                    break
+
+                case "deep_done":
+                    // Deep model finished — text_done will follow from the engine
+                    break
 
                 case "state_change":
                     if (event.state) {
@@ -337,6 +373,9 @@ export function useSpecialistChat({
     const resetConversation = useCallback(() => {
         setMessages((prev) => prev.filter((m) => m.historical))
         setStreamingResponse("")
+        setFastResponse("")
+        setDeepResponse("")
+        setSpeculativeComplexity(null)
         setError(null)
         setDynamicSuggestion(null)
     }, [])
@@ -354,5 +393,8 @@ export function useSpecialistChat({
         sendMessage,
         clearError,
         resetConversation,
+        fastResponse,
+        deepResponse,
+        speculativeComplexity,
     }
 }

@@ -55,6 +55,43 @@ function parseSSEChunk(chunk: string): SSEParseResult {
     return { text }
 }
 
+// ─── Speculative SSE Parsing ─────────────────────────────────────────────────
+
+/**
+ * A tagged SSE event from the speculative dual-stream endpoint.
+ * The `stream` field identifies whether the chunk is from the fast or deep model.
+ */
+interface SpeculativeSSEEvent {
+    stream: "fast" | "deep"
+    text?: string
+    done?: boolean
+    skipped?: boolean
+    complexity?: "simple" | "complex"
+    error?: string
+}
+
+/**
+ * Parse speculative SSE lines that contain tagged `{"stream":"fast"|"deep",...}` chunks.
+ * Returns an array of parsed events — one per `data:` line.
+ */
+function parseSpeculativeSSEChunk(chunk: string): SpeculativeSSEEvent[] {
+    const events: SpeculativeSSEEvent[] = []
+    for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data: ")) continue
+        const data = line.slice(6)
+        if (data === "[DONE]") continue
+        try {
+            const parsed = JSON.parse(data) as SpeculativeSSEEvent
+            if (parsed.stream === "fast" || parsed.stream === "deep") {
+                events.push(parsed)
+            }
+        } catch {
+            // Non-JSON line — ignore in speculative mode
+        }
+    }
+    return events
+}
+
 /**
  * Parse the NEXT_SPECIALIST recommendation from a full response.
  * Returns the cleaned response and any specialist suggestion.
@@ -109,6 +146,13 @@ class TextChatEngine implements ConversationEngine {
         if (!this.config) {
             this.emit({ type: "error", error: "Engine not connected" })
             return
+        }
+
+        // DECISION: Dispatch to speculative path when enabled. The speculative
+        // path uses a completely different SSE parsing flow (tagged chunks)
+        // so it's cleaner as a separate method than branching inline.
+        if (this.config.speculative) {
+            return this.sendTextSpeculative(message, promptTemplate)
         }
 
         // Add user message to transcript
@@ -205,6 +249,105 @@ class TextChatEngine implements ConversationEngine {
             const message = err instanceof Error ? err.message : "Unknown error"
             console.error("[TextChatEngine] Execution failed:", { specialistId, error: message })
             this.emit({ type: "error", error: message })
+            this.setState("error")
+        }
+    }
+
+    /**
+     * Speculative dual-stream send: parses tagged SSE chunks and emits
+     * fast_chunk/fast_done/deep_chunk/deep_done events for the UI to render.
+     */
+    private async sendTextSpeculative(message: string, promptTemplate?: string): Promise<void> {
+        this.transcript.push({ role: "user", content: message })
+        this.setState("thinking")
+
+        this.abortController?.abort()
+        this.abortController = new AbortController()
+
+        const { specialistId, threadId, providerId, modelId, systemPromptSuffix, deepThinkEnabled, modelTier } = this.config!
+
+        try {
+            const res = await fetch("/api/agents/execute", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    prompt: promptTemplate ?? undefined,
+                    input: message,
+                    providerId,
+                    modelId,
+                    modelTier,
+                    modality: "text",
+                    threadId: threadId ?? undefined,
+                    specialistId,
+                    customSystemPromptSuffix: systemPromptSuffix,
+                    enableThinking: deepThinkEnabled,
+                    speculative: true,
+                }),
+                signal: this.abortController.signal,
+            })
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({ error: "Execution failed" }))
+                throw new Error(errData.error || `HTTP ${res.status}`)
+            }
+
+            const reader = res.body?.getReader()
+            if (!reader) throw new Error("No response body")
+
+            const decoder = new TextDecoder()
+            let fastFull = ""
+            let deepFull = ""
+            let complexity: "simple" | "complex" = "complex"
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                const chunk = decoder.decode(value, { stream: true })
+                const events = parseSpeculativeSSEChunk(chunk)
+
+                for (const evt of events) {
+                    if (evt.stream === "fast") {
+                        if (evt.done) {
+                            complexity = evt.complexity ?? "complex"
+                            this.emit({ type: "fast_done", text: fastFull, complexity })
+                        } else if (evt.text) {
+                            fastFull += evt.text
+                            this.setState("speaking")
+                            this.emit({ type: "fast_chunk", text: evt.text })
+                        }
+                    } else if (evt.stream === "deep") {
+                        if (evt.done) {
+                            this.emit({ type: "deep_done", text: deepFull })
+                        } else if (evt.error) {
+                            this.emit({ type: "error", error: evt.error })
+                        } else if (evt.text) {
+                            deepFull += evt.text
+                            const visibleDeep = stripPartialThinkTags(deepFull)
+                            this.emit({ type: "deep_chunk", text: visibleDeep })
+                        }
+                    }
+                }
+            }
+
+            // Assemble final response for transcript
+            const finalText = complexity === "simple"
+                ? stripThinkTags(fastFull)
+                : (stripThinkTags(fastFull) + "\n\n" + stripThinkTags(deepFull)).trim()
+
+            const { cleanResponse, suggestion } = parseSpecialistSuggestion(finalText)
+
+            this.emit({ type: "text_done", text: cleanResponse })
+            if (suggestion) {
+                this.emit({ type: "suggestion", suggestion })
+            }
+            this.transcript.push({ role: "assistant", content: cleanResponse })
+            this.setState("idle")
+        } catch (err) {
+            if (err instanceof Error && err.name === "AbortError") return
+            const msg = err instanceof Error ? err.message : "Unknown error"
+            console.error("[TextChatEngine] Speculative execution failed:", { specialistId, error: msg })
+            this.emit({ type: "error", error: msg })
             this.setState("error")
         }
     }

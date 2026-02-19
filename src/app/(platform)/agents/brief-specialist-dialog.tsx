@@ -993,6 +993,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             let fullResponse = ""
             let rolloutIdFromResponse: string | null = null
             const useSpeculative = !!(specialist.speculativeEnabled && !isSlideRequest)
+            let specFastFull = ""
+            let specDeepFull = ""
+            let specComplexity: "simple" | "complex" | null = null
 
             for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
                 // Fresh AbortController per attempt — a previous TTFB timeout
@@ -1057,9 +1060,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 const decoder = new TextDecoder()
                 fullResponse = ""
                 let streamError: string | null = null
-                let specFastFull = ""
-                let specDeepFull = ""
-                let specComplexity: "simple" | "complex" | null = null
+                specFastFull = ""
+                specDeepFull = ""
+                specComplexity = null
 
                 try {
                     while (true) {
