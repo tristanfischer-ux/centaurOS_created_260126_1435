@@ -275,13 +275,33 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
 
   // 2. Create foundry for Founders, create business for Suppliers, or use shared "forge-guild" for others
   if (role === "founder" && companyName) {
-    accountType = 'team_builder'; // Founders are team builders
-    
-    // Generate a unique slug
+    accountType = 'team_builder';
+
+    // FIX: Profile must exist before foundry (FK: foundries.owner_id → profiles.id).
+    // Create profile with temporary shared foundry, then create the real foundry,
+    // then update the profile to point to the new foundry.
+    const { error: tempProfileError } = await supabase.from("profiles").insert({
+      id: authData.user.id,
+      email,
+      full_name: fullName,
+      role: capitalizeRole(role),
+      foundry_id: "forge-guild",
+      active_foundry_id: "forge-guild",
+      account_type: accountType,
+    });
+
+    if (tempProfileError) {
+      console.error("[Signup] Founder profile creation failed:", {
+        userId: authData.user.id,
+        error: tempProfileError.message,
+        code: tempProfileError.code,
+      });
+      return errorWithValues("Account created but profile setup failed. Please try logging in — your profile will be created automatically.");
+    }
+
     const baseSlug = generateSlug(companyName);
     const uniqueSlug = `${baseSlug}-${authData.user.id.slice(0, 6)}`;
 
-    // Create the foundry record
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: foundry, error: foundryError } = await (supabase as any)
       .from("foundries")
@@ -296,12 +316,15 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
       .single();
 
     if (foundryError) {
-      console.error("Foundry creation error:", foundryError);
-      // Fall back to string-based foundry ID if creation fails
-      foundryId = `foundry_${authData.user.id.slice(0, 8)}`;
+      console.error("[Signup] Foundry creation error:", foundryError);
+      foundryId = "forge-guild";
     } else {
-      // Use the UUID of the created foundry
       foundryId = foundry.id;
+      // Update profile to point to the real foundry
+      await supabase.from("profiles").update({
+        foundry_id: foundryId,
+        active_foundry_id: foundryId,
+      }).eq("id", authData.user.id);
     }
   } else if (role === "supplier" && businessName) {
     accountType = 'supplier'; // Suppliers get supplier account type
@@ -350,28 +373,30 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     }
   }
   
-  const { error: profileError } = await supabase.from("profiles").insert({
-    id: authData.user.id,
-    email,
-    full_name: fullName,
-    role: memberRole,
-    foundry_id: foundryId,
-    active_foundry_id: foundryId,
-    account_type: accountType,
-  });
-
-  if (profileError) {
-    console.error("[Signup] Profile creation failed:", {
-      userId: authData.user.id,
-      foundryId,
+  // Founders already have their profile created in the founder branch above.
+  // Only create a profile here for non-founder roles.
+  if (role !== "founder") {
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: authData.user.id,
+      email,
+      full_name: fullName,
       role: memberRole,
-      error: profileError.message,
-      code: profileError.code,
-      details: profileError.details,
+      foundry_id: foundryId,
+      active_foundry_id: foundryId,
+      account_type: accountType,
     });
-    // CRITICAL: Profile is required for the app to function.
-    // Return error inline so the user can try again or contact support.
-    return errorWithValues("Account created but profile setup failed. Please try logging in — your profile will be created automatically.");
+
+    if (profileError) {
+      console.error("[Signup] Profile creation failed:", {
+        userId: authData.user.id,
+        foundryId,
+        role: memberRole,
+        error: profileError.message,
+        code: profileError.code,
+        details: profileError.details,
+      });
+      return errorWithValues("Account created but profile setup failed. Please try logging in — your profile will be created automatically.");
+    }
   }
 
   // 3b. Create foundry_memberships record for multi-foundry support

@@ -40,6 +40,7 @@ import {
   Puzzle,
   Network,
   ArrowDownRight,
+  Search,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -48,6 +49,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { STLViewer } from "@/components/cad/stl-viewer"
 import { CadLabWhileYouWait } from "@/components/cad/cad-lab-while-you-wait"
+import { EmptyState } from "@/components/ui/empty-state"
 import type { CadLabResult, CadLabModule } from "@/lib/cad-lab-types"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
@@ -115,13 +117,6 @@ export default function CadLabBuildPage(): React.ReactNode {
     }, [hasResearch, subject, modules, generatedModuleCount, isBatchRunning]),
   )
 
-  // Gate: redirect if no research
-  useEffect(() => {
-    if (!hasResearch) {
-      router.replace("/the-forge/cad-lab")
-    }
-  }, [hasResearch, router])
-
   const handleCopyCode = useCallback(async (code: string) => {
     try {
       await navigator.clipboard.writeText(code)
@@ -136,7 +131,22 @@ export default function CadLabBuildPage(): React.ReactNode {
   const viewingModule = viewingModuleId ? modules.find((m) => m.id === viewingModuleId) : null
   const viewingResult = viewingModule?.result as CadLabResult | undefined
 
-  if (!hasResearch) return null
+  if (!hasResearch) {
+    return (
+      <div className="py-12">
+        <EmptyState
+          title="No research completed yet"
+          description="Run product research first to identify modules and sub-assemblies for your design."
+          action={
+            <Button onClick={() => router.push("/the-forge/cad-lab")} className="gap-1.5">
+              <Search className="h-4 w-4" />
+              Go to Research
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
