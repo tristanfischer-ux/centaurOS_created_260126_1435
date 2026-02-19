@@ -11,6 +11,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // Python virtual environment (contains third-party JS like matplotlib)
+    ".venv/**",
     ".vercel/**",
     "out/**",
     "build/**",
