@@ -50,7 +50,7 @@ export default function CadLabProcurementPage(): React.ReactNode {
           status: m.status === "generated" ? "CAD generated" : "pending",
         })),
       }
-    }, [subject, modules, generatedModuleCount, diagCompletedCount]),
+    }, [subject, modules, diagCompletedCount]),
   )
 
   if (generatedModuleCount === 0) {

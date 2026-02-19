@@ -9,6 +9,7 @@
  */
 
 import { useState, useMemo } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { Search, Clock, Flame, Blocks } from "lucide-react"
@@ -156,10 +157,12 @@ function CadLabProjectCard({ project }: { project: CadLabProjectSummary }): Reac
       <Card className="group cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5">
         <div className="h-32 rounded-t-xl overflow-hidden bg-gradient-to-br from-international-orange/5 to-muted relative">
           {project.thumbnailSvg ? (
-            <img
+            <Image
               src={project.thumbnailSvg}
               alt={`${displayName} thumbnail`}
-              className="w-full h-full object-contain p-4"
+              fill
+              className="object-contain p-4"
+              unoptimized
             />
           ) : (
             <div className="flex items-center justify-center h-full">
@@ -207,10 +210,12 @@ function AssemblyProjectCard({ assembly }: { assembly: AssemblySummary }): React
       <Card className="group cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5">
         <div className="h-32 rounded-t-xl overflow-hidden bg-gradient-to-br from-status-success/5 to-muted relative">
           {assembly.thumbnailUrl ? (
-            <img
+            <Image
               src={assembly.thumbnailUrl}
               alt={`${displayName} thumbnail`}
-              className="w-full h-full object-contain p-4"
+              fill
+              className="object-contain p-4"
+              unoptimized
             />
           ) : (
             <div className="flex items-center justify-center h-full">

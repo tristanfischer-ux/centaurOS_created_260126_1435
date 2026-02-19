@@ -28,7 +28,6 @@ import {
   Layers,
   ExternalLink,
   FileBox,
-  Loader2,
   ChevronRight,
   SlidersHorizontal,
 } from "lucide-react"
