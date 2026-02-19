@@ -8,6 +8,12 @@
  * The AudioContext is "unlocked" once during a user gesture (via warmUp()), then
  * all subsequent playback works regardless of timing.
  *
+ * DECISION: The streaming TTS drain queue pre-fetches the next sentence while the
+ * current one plays (look-ahead). Previously each sentence was fetched sequentially
+ * (fetch -> play -> fetch -> play), meaning the user heard silence between every
+ * sentence while waiting for the API. With look-ahead, the next sentence's audio
+ * is already downloaded by the time the current one finishes, eliminating gaps.
+ *
  * @returns play, stop, warmUp, isPlaying, isLoading, voiceEnabled, setVoiceEnabled
  */
 
@@ -15,11 +21,9 @@ import { useState, useCallback, useRef, useEffect } from "react"
 
 const VOICE_ENABLED_KEY = "specialist-voice-enabled"
 
-/** Read the voice-enabled preference from localStorage */
 function getStoredVoiceEnabled(): boolean {
     if (typeof window === "undefined") return true
     const stored = localStorage.getItem(VOICE_ENABLED_KEY)
-    // Default to true for first-time users (delightful first impression)
     return stored === null ? true : stored === "true"
 }
 
@@ -49,45 +53,16 @@ function splitIntoSentences(text: string): string[] {
 }
 
 export interface UseTtsReturn {
-    /** Whether voice output is enabled */
     voiceEnabled: boolean
-    /** Toggle voice output on/off (persisted to localStorage) */
     setVoiceEnabled: (enabled: boolean) => void
-    /** Whether audio is currently loading from the API */
     isLoading: boolean
-    /** Whether audio is currently playing */
     isPlaying: boolean
-    /** Play the given text with the given voice */
     play: (text: string, voice: string) => Promise<void>
-    /**
-     * Play text in sentence-sized chunks for faster time-to-first-audio.
-     * First sentence plays immediately after synthesis; subsequent chunks play in sequence.
-     */
     playChunked: (text: string, voice: string) => Promise<void>
-    /**
-     * Start a streaming TTS session. Sentences are played as they arrive
-     * during text streaming, so speech is simultaneous with the text appearing.
-     * Call feedStreamingText() as accumulated text grows, finish() when done.
-     */
     startStreaming: (voice: string) => void
-    /**
-     * Feed the full accumulated text so far to the streaming TTS session.
-     * Internally extracts new complete sentences and queues them for playback.
-     */
     feedStreamingText: (fullText: string) => void
-    /**
-     * Signal that streaming is complete. Pass the final cleaned display text
-     * to ensure any remaining partial sentence is spoken.
-     */
     finishStreaming: (displayText: string) => void
-    /** Stop any currently playing audio */
     stop: () => void
-    /**
-     * Unlock audio playback by resuming the AudioContext.
-     * MUST be called from a user gesture (click, keypress) to satisfy
-     * browser autoplay policies. Call this when the user clicks "Go" or
-     * any interaction that should enable subsequent audio.
-     */
     warmUp: () => void
 }
 
@@ -97,13 +72,6 @@ export interface UseTtsReturn {
  * Uses Web Audio API (AudioContext) instead of HTMLAudioElement for reliable
  * playback. The AudioContext is created and resumed on the first user gesture
  * (via warmUp), then subsequent play() calls work even after long async gaps.
- *
- * @example
- * const tts = useTts()
- * // On user click:
- * tts.warmUp()
- * // Later, after async work:
- * if (tts.voiceEnabled) await tts.play(responseText, specialist.voice)
  */
 export function useTts(): UseTtsReturn {
     const [voiceEnabled, setVoiceEnabledState] = useState(true)
@@ -114,15 +82,10 @@ export function useTts(): UseTtsReturn {
     const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null)
     const abortRef = useRef<AbortController | null>(null)
 
-    // Initialize from localStorage on mount
     useEffect(() => {
         setVoiceEnabledState(getStoredVoiceEnabled())
     }, [])
 
-    /**
-     * Unlock AudioContext on user gesture. Call this from click/keypress handlers
-     * BEFORE any async work, so subsequent play() calls succeed.
-     */
     const warmUp = useCallback(() => {
         if (typeof window === "undefined") return
         try {
@@ -130,58 +93,37 @@ export function useTts(): UseTtsReturn {
                 audioContextRef.current = new AudioContext()
             }
             if (audioContextRef.current.state === "suspended") {
-                audioContextRef.current.resume().catch(() => {
-                    // Ignore — resume may fail if called outside gesture context
-                })
+                audioContextRef.current.resume().catch(() => {})
             }
         } catch (err) {
             console.warn("[TTS] AudioContext warmUp failed:", err)
         }
     }, [])
 
-    /** Stop any in-flight fetch or active playback */
     const stopPlayback = useCallback(() => {
-        // Abort any in-flight fetch
         if (abortRef.current) {
             abortRef.current.abort()
             abortRef.current = null
         }
-        // Stop current AudioBufferSourceNode
         if (sourceNodeRef.current) {
-            try {
-                sourceNodeRef.current.stop()
-            } catch {
-                // May already be stopped — safe to ignore
-            }
+            try { sourceNodeRef.current.stop() } catch { /* already stopped */ }
             sourceNodeRef.current = null
         }
         setIsLoading(false)
         setIsPlaying(false)
     }, [])
 
-    /** Persist voice preference and stop playback if disabling */
     const setVoiceEnabled = useCallback((enabled: boolean) => {
         setVoiceEnabledState(enabled)
         if (typeof window !== "undefined") {
             localStorage.setItem(VOICE_ENABLED_KEY, String(enabled))
         }
-        if (!enabled) {
-            stopPlayback()
-        }
+        if (!enabled) stopPlayback()
     }, [stopPlayback])
 
-    /**
-     * Play text with a specific voice via the TTS API.
-     * Uses AudioContext.decodeAudioData for reliable playback.
-     * Resolves when audio finishes playing.
-     */
-    const play = useCallback(async (text: string, voice: string): Promise<void> => {
-        // Stop any existing playback first
-        stopPlayback()
+    // ─── Shared: ensure AudioContext is ready ────────────────────────────
 
-        if (!text.trim()) return
-
-        // Ensure AudioContext exists and is running
+    const ensureAudioContext = useCallback(async (): Promise<AudioContext | null> => {
         if (!audioContextRef.current) {
             audioContextRef.current = new AudioContext()
         }
@@ -191,69 +133,91 @@ export function useTts(): UseTtsReturn {
                 await ctx.resume()
             } catch {
                 console.warn("[TTS] AudioContext resume failed — playback may not work")
-                return
+                return null
             }
         }
+        return ctx
+    }, [])
+
+    // ─── Shared: fetch audio from TTS API ───────────────────────────────
+
+    const fetchAudio = useCallback(async (
+        text: string,
+        voice: string,
+        signal: AbortSignal
+    ): Promise<ArrayBuffer | null> => {
+        const res = await fetch("/api/agents/tts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, voice }),
+            signal,
+        })
+        if (!res.ok) return null
+        return res.arrayBuffer()
+    }, [])
+
+    // ─── Shared: play an AudioBuffer and resolve when done ──────────────
+
+    const playAudioBuffer = useCallback((
+        ctx: AudioContext,
+        audioBuffer: AudioBuffer,
+        signal: AbortSignal
+    ): Promise<void> => {
+        return new Promise<void>((resolve) => {
+            if (signal.aborted) { resolve(); return }
+            const source = ctx.createBufferSource()
+            source.buffer = audioBuffer
+            source.connect(ctx.destination)
+            sourceNodeRef.current = source
+            source.onended = () => {
+                sourceNodeRef.current = null
+                resolve()
+            }
+            source.start()
+        })
+    }, [])
+
+    // ─── Single-shot play ───────────────────────────────────────────────
+
+    const play = useCallback(async (text: string, voice: string): Promise<void> => {
+        stopPlayback()
+        if (!text.trim()) return
+
+        const ctx = await ensureAudioContext()
+        if (!ctx) return
 
         const controller = new AbortController()
         abortRef.current = controller
         setIsLoading(true)
 
         try {
-            const res = await fetch("/api/agents/tts", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text, voice }),
-                signal: controller.signal,
-            })
-
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({ error: "TTS failed" }))
-                console.warn("[TTS] API error:", errData.error)
+            const arrayBuffer = await fetchAudio(text, voice, controller.signal)
+            if (controller.signal.aborted || !arrayBuffer) {
                 setIsLoading(false)
                 return
             }
 
-            const arrayBuffer = await res.arrayBuffer()
-
-            // Check if aborted while waiting
-            if (controller.signal.aborted) return
-
-            // Decode audio data via AudioContext
             const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
-
             if (controller.signal.aborted) return
-
-            // Create and play buffer source
-            const source = ctx.createBufferSource()
-            source.buffer = audioBuffer
-            source.connect(ctx.destination)
-            sourceNodeRef.current = source
 
             setIsLoading(false)
             setIsPlaying(true)
-
-            return new Promise<void>((resolve) => {
-                source.onended = () => {
-                    setIsPlaying(false)
-                    sourceNodeRef.current = null
-                    resolve()
-                }
-                source.start()
-            })
+            await playAudioBuffer(ctx, audioBuffer, controller.signal)
+            setIsPlaying(false)
         } catch (err) {
-            if (err instanceof Error && err.name === "AbortError") {
-                return
-            }
+            if (err instanceof Error && err.name === "AbortError") return
             console.warn("[TTS] Play failed:", err instanceof Error ? err.message : err)
             setIsLoading(false)
             setIsPlaying(false)
         }
-    }, [stopPlayback])
+    }, [stopPlayback, ensureAudioContext, fetchAudio, playAudioBuffer])
+
+    // ─── Chunked play (greeting) with look-ahead prefetch ───────────────
 
     /**
-     * Play text in sentence-sized chunks. First chunk plays as soon as synthesized;
-     * reduces perceived delay vs. synthesizing and playing the full response at once.
+     * INTENT: Play text in sentence-sized chunks with look-ahead prefetch.
+     * While the current sentence plays, the next sentence is already being
+     * fetched from the API. This eliminates the dead-air gap between sentences.
      */
     const playChunked = useCallback(
         async (text: string, voice: string): Promise<void> => {
@@ -265,79 +229,46 @@ export function useTts(): UseTtsReturn {
             const chunks = splitIntoSentences(clean)
             if (chunks.length === 0) return
 
-            if (!audioContextRef.current) {
-                audioContextRef.current = new AudioContext()
-            }
-            const ctx = audioContextRef.current
-            if (ctx.state === "suspended") {
-                try {
-                    await ctx.resume()
-                } catch {
-                    console.warn("[TTS] AudioContext resume failed — playback may not work")
-                    return
-                }
-            }
+            const ctx = await ensureAudioContext()
+            if (!ctx) return
 
             const controller = new AbortController()
             abortRef.current = controller
 
-            const fetchAudio = async (chunkText: string): Promise<ArrayBuffer | null> => {
-                const res = await fetch("/api/agents/tts", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ text: chunkText, voice }),
-                    signal: controller.signal,
-                })
-                if (!res.ok) return null
-                return res.arrayBuffer()
-            }
-
-            const playBuffer = (buffer: ArrayBuffer): Promise<void> =>
-                new Promise((resolve, reject) => {
-                    if (controller.signal.aborted) {
-                        resolve()
-                        return
-                    }
-                    ctx.decodeAudioData(buffer)
-                        .then((audioBuffer) => {
-                            if (controller.signal.aborted) {
-                                resolve()
-                                return
-                            }
-                            const source = ctx.createBufferSource()
-                            source.buffer = audioBuffer
-                            source.connect(ctx.destination)
-                            sourceNodeRef.current = source
-                            source.onended = () => {
-                                sourceNodeRef.current = null
-                                resolve()
-                            }
-                            source.start()
-                        })
-                        .catch(reject)
-                })
-
             try {
+                setIsLoading(true)
+                let nextFetch: Promise<ArrayBuffer | null> | null =
+                    fetchAudio(chunks[0].trim(), voice, controller.signal)
+
                 for (let i = 0; i < chunks.length; i++) {
                     if (controller.signal.aborted) return
 
-                    const chunk = chunks[i].trim()
-                    if (!chunk) continue
+                    const buffer = await nextFetch
+                    nextFetch = null
 
-                    setIsLoading(true)
-                    const buffer = await fetchAudio(chunk)
                     if (controller.signal.aborted) return
                     if (!buffer) {
                         console.warn("[TTS] Chunk fetch failed:", i)
+                        if (i + 1 < chunks.length) {
+                            nextFetch = fetchAudio(chunks[i + 1].trim(), voice, controller.signal)
+                        }
                         continue
+                    }
+
+                    const audioBuffer = await ctx.decodeAudioData(buffer)
+                    if (controller.signal.aborted) return
+
+                    if (i + 1 < chunks.length) {
+                        nextFetch = fetchAudio(chunks[i + 1].trim(), voice, controller.signal)
                     }
 
                     setIsLoading(false)
                     setIsPlaying(true)
-                    await playBuffer(buffer)
+                    await playAudioBuffer(ctx, audioBuffer, controller.signal)
                     setIsPlaying(false)
 
                     if (controller.signal.aborted) return
+                    if (i + 1 < chunks.length) setIsLoading(true)
                 }
             } catch (err) {
                 if (err instanceof Error && err.name === "AbortError") return
@@ -348,23 +279,24 @@ export function useTts(): UseTtsReturn {
                 setIsPlaying(false)
             }
         },
-        [stopPlayback],
+        [stopPlayback, ensureAudioContext, fetchAudio, playAudioBuffer],
     )
 
-    // ────────────────────────────────────────────────────────
-    // Streaming TTS — plays sentences as they arrive during text streaming
-    // ────────────────────────────────────────────────────────
+    // ─── Streaming TTS (during text generation) with look-ahead ─────────
+
     const streamVoiceRef = useRef<string | null>(null)
     const streamSentencesSentRef = useRef<number>(0)
     const streamQueueRef = useRef<string[]>([])
     const streamPlayingRef = useRef(false)
     const streamControllerRef = useRef<AbortController | null>(null)
     const streamFinishedRef = useRef(false)
+    const streamPrefetchRef = useRef<Promise<ArrayBuffer | null> | null>(null)
 
     /**
-     * Internal: drain the sentence queue, playing one sentence at a time.
-     * Runs in a loop until the queue is empty, then exits. Re-entered whenever
-     * new sentences are added to the queue.
+     * INTENT: Drain the streaming sentence queue with look-ahead prefetch.
+     * While playing sentence N, we kick off the fetch for sentence N+1.
+     * This means the next sentence's audio is usually ready by the time
+     * the current one finishes, producing seamless speech.
      */
     const drainStreamQueue = useCallback(async () => {
         if (streamPlayingRef.current) return
@@ -377,18 +309,10 @@ export function useTts(): UseTtsReturn {
             return
         }
 
-        if (!audioContextRef.current) {
-            audioContextRef.current = new AudioContext()
-        }
-        const ctx = audioContextRef.current
-        if (ctx.state === "suspended") {
-            try {
-                await ctx.resume()
-            } catch {
-                console.warn("[TTS-Stream] AudioContext resume failed")
-                streamPlayingRef.current = false
-                return
-            }
+        const ctx = await ensureAudioContext()
+        if (!ctx) {
+            streamPlayingRef.current = false
+            return
         }
 
         while (streamQueueRef.current.length > 0) {
@@ -399,23 +323,28 @@ export function useTts(): UseTtsReturn {
 
             try {
                 setIsLoading(true)
-                const res = await fetch("/api/agents/tts", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ text: sentence, voice }),
-                    signal: controller.signal,
-                })
 
-                if (!res.ok || controller.signal.aborted) {
+                let bufferPromise: Promise<ArrayBuffer | null>
+                if (streamPrefetchRef.current) {
+                    bufferPromise = streamPrefetchRef.current
+                    streamPrefetchRef.current = null
+                } else {
+                    bufferPromise = fetchAudio(sentence, voice, controller.signal)
+                }
+
+                const arrayBuffer = await bufferPromise
+                if (!arrayBuffer || controller.signal.aborted) {
                     setIsLoading(false)
                     continue
                 }
 
-                const arrayBuffer = await res.arrayBuffer()
-                if (controller.signal.aborted) break
-
                 const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
                 if (controller.signal.aborted) break
+
+                const nextSentence = streamQueueRef.current[0]?.trim()
+                if (nextSentence) {
+                    streamPrefetchRef.current = fetchAudio(nextSentence, voice, controller.signal)
+                }
 
                 const source = ctx.createBufferSource()
                 source.buffer = audioBuffer
@@ -443,14 +372,13 @@ export function useTts(): UseTtsReturn {
         }
 
         streamPlayingRef.current = false
-        // If queue is truly empty and stream is done, clean up state
         if (streamQueueRef.current.length === 0) {
+            streamPrefetchRef.current = null
             setIsLoading(false)
             setIsPlaying(false)
         }
-    }, [])
+    }, [ensureAudioContext, fetchAudio])
 
-    /** Start a streaming TTS session. Resets internal state and prepares for sentence playback. */
     const startStreaming = useCallback(
         (voice: string) => {
             stopPlayback()
@@ -459,6 +387,7 @@ export function useTts(): UseTtsReturn {
             streamQueueRef.current = []
             streamPlayingRef.current = false
             streamFinishedRef.current = false
+            streamPrefetchRef.current = null
             const controller = new AbortController()
             streamControllerRef.current = controller
             abortRef.current = controller
@@ -466,10 +395,6 @@ export function useTts(): UseTtsReturn {
         [stopPlayback],
     )
 
-    /**
-     * Feed accumulated text to the streaming session. Extracts new complete
-     * sentences and queues them for immediate playback.
-     */
     const feedStreamingText = useCallback(
         (fullText: string) => {
             if (!streamControllerRef.current || streamControllerRef.current.signal.aborted) return
@@ -477,8 +402,6 @@ export function useTts(): UseTtsReturn {
             const clean = stripMarkdownForTTS(fullText)
             const sentences = splitIntoSentences(clean)
 
-            // Only queue sentences we haven't sent yet (excluding the last one
-            // which may be incomplete while streaming continues)
             const completeSentences = sentences.slice(0, -1)
             const alreadySent = streamSentencesSentRef.current
 
@@ -486,17 +409,12 @@ export function useTts(): UseTtsReturn {
                 const newSentences = completeSentences.slice(alreadySent)
                 streamQueueRef.current.push(...newSentences)
                 streamSentencesSentRef.current = completeSentences.length
-                // Kick the drain loop if it's not already running
                 drainStreamQueue()
             }
         },
         [drainStreamQueue],
     )
 
-    /**
-     * Feed the final cleaned display response and close the streaming session.
-     * This ensures any trailing sentence is spoken.
-     */
     const finishStreamingWithText = useCallback(
         (displayText: string) => {
             if (!streamControllerRef.current || streamControllerRef.current.signal.aborted) return
@@ -505,7 +423,6 @@ export function useTts(): UseTtsReturn {
             const sentences = splitIntoSentences(clean)
             const alreadySent = streamSentencesSentRef.current
 
-            // Queue any remaining sentences (including the final partial one)
             if (sentences.length > alreadySent) {
                 const remaining = sentences.slice(alreadySent)
                 streamQueueRef.current.push(...remaining)
@@ -518,21 +435,14 @@ export function useTts(): UseTtsReturn {
         [drainStreamQueue],
     )
 
-    // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (abortRef.current) abortRef.current.abort()
             if (sourceNodeRef.current) {
-                try {
-                    sourceNodeRef.current.stop()
-                } catch {
-                    // Already stopped
-                }
+                try { sourceNodeRef.current.stop() } catch { /* already stopped */ }
             }
             if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-                audioContextRef.current.close().catch(() => {
-                    // Ignore close errors on unmount
-                })
+                audioContextRef.current.close().catch(() => {})
             }
         }
     }, [])

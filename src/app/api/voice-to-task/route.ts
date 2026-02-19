@@ -1,3 +1,19 @@
+/**
+ * @file /api/voice-to-task/route.ts
+ *
+ * @description Voice-to-task API that extracts structured task data from speech.
+ * Accepts either pre-transcribed text (from browser Web Speech API — the fast
+ * path) or an audio file (Whisper fallback for browsers without native STT).
+ *
+ * DECISION: Accept both JSON { text } and multipart/form-data { file } to
+ * support the fast path (native STT sends text directly, skipping Whisper) and
+ * the fallback path (audio file → Whisper → GPT-4o). This keeps the API
+ * backward-compatible while eliminating 4-6s of Whisper latency for most users.
+ *
+ * @security Requires authenticated user. Rate-limited to 5 req/hour per user.
+ * @audit Tracks usage under the 'voice_to_task' AI feature.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
@@ -12,18 +28,13 @@ let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
     const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-        return null
-    }
-
+    if (!apiKey) return null
     if (!openaiClient) {
         openaiClient = new OpenAI({ apiKey })
     }
-
     return openaiClient
 }
 
-// Schema for Task Extraction
 const TaskSchema = z.object({
     title: z.string(),
     description: z.string(),
@@ -32,10 +43,75 @@ const TaskSchema = z.object({
     due_date: z.string().optional().describe("ISO 8601 date string if parsed"),
 });
 
+const MAX_TEXT_LENGTH = 5000
+
+const ALLOWED_MIME_TYPES = [
+    'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/wave', 'audio/x-wav',
+    'audio/ogg', 'audio/webm', 'audio/mp4', 'audio/m4a', 'audio/x-m4a',
+];
+
+/**
+ * INTENT: Extract the transcript text from either a JSON body (fast path from
+ * browser native STT) or a multipart form with an audio file (Whisper fallback).
+ * Returns { transcriptText, mode } or an error Response.
+ */
+async function extractTranscript(
+    req: NextRequest,
+    openai: OpenAI
+): Promise<{ transcriptText: string; mode: string | null } | Response> {
+    const contentType = req.headers.get("content-type") || ""
+
+    if (contentType.includes("application/json")) {
+        const body = await req.json()
+        const { text, mode } = body as { text?: string; mode?: string }
+
+        if (!text || typeof text !== "string" || text.trim().length === 0) {
+            return NextResponse.json({ error: "Text is required" }, { status: 400 })
+        }
+        if (text.length > MAX_TEXT_LENGTH) {
+            return NextResponse.json({ error: "Text too long" }, { status: 400 })
+        }
+
+        return { transcriptText: text.trim(), mode: mode || null }
+    }
+
+    const formData = await req.formData()
+    const file = formData.get("file") as File
+    const mode = formData.get("mode") as string | null
+
+    if (!file) {
+        return NextResponse.json({ error: "No file provided" }, { status: 400 })
+    }
+
+    const MAX_FILE_SIZE = 25 * 1024 * 1024
+    if (file.size > MAX_FILE_SIZE) {
+        return NextResponse.json({
+            error: `File too large. Maximum size is 25MB, got ${Math.round(file.size / 1024 / 1024)}MB`
+        }, { status: 400 })
+    }
+
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+        return NextResponse.json({
+            error: `Invalid file type: ${file.type}. Only audio files are allowed.`
+        }, { status: 400 })
+    }
+
+    const sanitizedName = sanitizeFileName(file.name)
+    if (sanitizedName !== file.name) {
+        console.warn(`[SECURITY] Filename sanitized from "${file.name}" to "${sanitizedName}"`)
+    }
+
+    const transcription = await openai.audio.transcriptions.create({
+        file: file,
+        model: "whisper-1",
+    })
+
+    return { transcriptText: transcription.text, mode }
+}
+
 export async function POST(req: NextRequest) {
     let rolloutId: string | null = null;
     try {
-        // SECURITY: Check if OpenAI is configured before processing
         if (!process.env.OPENAI_API_KEY) {
             console.error('[VOICE-TO-TASK] OpenAI API key not configured')
             return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
@@ -48,13 +124,11 @@ export async function POST(req: NextRequest) {
         
         const supabase = await createClient();
 
-        // AUTH + AI LIMIT: Check subscription tier AI limits
         const guard = await aiGuard(supabase, 'voice_to_task')
         if (guard.denied) return guard.response
 
         const user = { id: guard.userId }
 
-        // SECURITY: Rate limit to prevent OpenAI cost abuse (5 requests per hour per user)
         const rateLimitResult = await rateLimit('api', `voice-to-task:${user.id}`, { limit: 5, window: 3600 * 1000 })
         if (!rateLimitResult.success) {
             return NextResponse.json(
@@ -63,49 +137,11 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const formData = await req.formData();
-        const file = formData.get("file") as File;
-        const mode = formData.get("mode") as string | null; // check for 'parse' mode
+        const result = await extractTranscript(req, openai)
+        if (result instanceof Response) return result
 
-        if (!file) {
-            return NextResponse.json({ error: "No file provided" }, { status: 400 });
-        }
+        const { transcriptText, mode } = result
 
-        // Validate file size (max 25MB)
-        const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB in bytes
-        if (file.size > MAX_FILE_SIZE) {
-            return NextResponse.json({ 
-                error: `File too large. Maximum size is 25MB, got ${Math.round(file.size / 1024 / 1024)}MB` 
-            }, { status: 400 });
-        }
-
-        // Validate file type (audio formats)
-        const ALLOWED_MIME_TYPES = [
-            'audio/mpeg',
-            'audio/mp3',
-            'audio/wav',
-            'audio/wave',
-            'audio/x-wav',
-            'audio/ogg',
-            'audio/webm',
-            'audio/mp4',
-            'audio/m4a',
-            'audio/x-m4a',
-        ];
-        
-        if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-            return NextResponse.json({ 
-                error: `Invalid file type: ${file.type}. Only audio files are allowed.` 
-            }, { status: 400 });
-        }
-
-        // SECURITY: Sanitize filename to prevent path traversal using proper sanitization
-        const sanitizedName = sanitizeFileName(file.name);
-        if (sanitizedName !== file.name) {
-            console.warn(`[SECURITY] Filename sanitized from "${file.name}" to "${sanitizedName}"`);
-        }
-
-        // Fetch foundry_id early for rollout and for task creation when not parse mode
         const { data: profileForRollout } = await supabase
             .from('profiles')
             .select('foundry_id')
@@ -121,15 +157,6 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // 1. Transcribe with Whisper
-        const transcription = await openai.audio.transcriptions.create({
-            file: file,
-            model: "whisper-1",
-        });
-
-        const transcriptText = transcription.text;
-
-        // 2. Extract Task Intent with GPT-4o
         const completion = await openai.chat.completions.parse({
             model: "gpt-4o-2024-08-06",
             messages: [
@@ -150,7 +177,6 @@ export async function POST(req: NextRequest) {
             response_format: zodResponseFormat(TaskSchema, "task"),
         });
 
-        // AUDIT: Track AI usage (both Whisper transcription + GPT-4o parse)
         await guard.trackUsage({
             model: 'gpt-4o',
             promptTokens: completion.usage?.prompt_tokens || 500,
@@ -191,18 +217,15 @@ export async function POST(req: NextRequest) {
             throw new Error("Failed to parse task data");
         }
 
-        // If mode is 'parse', return the data immediately without saving
         if (mode === 'parse') {
             return NextResponse.json({ success: true, task: taskData, transcript: transcriptText });
         }
 
-        // 3. Use foundry_id from profile (already fetched for rollout)
         const profile = profileForRollout;
         if (!profile?.foundry_id) {
             return NextResponse.json({ error: 'User not associated with a foundry' }, { status: 403 });
         }
 
-        // 4. Resolve objective context (tasks.objective_id is required by schema)
         let objectiveId: string | null = null
 
         const { data: defaultObjective } = await supabase
@@ -237,17 +260,12 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        // 5. Resolve Assignee ID
-        let assigneeId = null; // Default unassigned
+        let assigneeId = null;
 
         if (taskData.assignee_type === "Self") {
             assigneeId = user.id;
         } else if (taskData.assignee_type === "Legal_AI" || taskData.assignee_type === "General_AI") {
-            // Look up AI agent profile
-            // Helper: in a real app, cache these IDs or queries.
-            // For MVP, we query profiles by partial email pattern we seeded.
             const rolePattern = taskData.assignee_type === "Legal_AI" ? "ai.legal%" : "ai.general%";
-            // SECURITY: Scope to foundry (RLS disabled on profiles)
             const { data: aiProfile } = await supabase
                 .from('profiles')
                 .select('id')
@@ -261,7 +279,6 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 6. Create Task in DB (foundry_id from step 3)
         const { data: newTask, error } = await supabase
             .from("tasks")
             .insert({
