@@ -49,12 +49,28 @@ export default async function UpdatesPage() {
 
   const isFounder = profile?.role === 'Founder'
 
+  // Fetch team members for conversation @mentions
+  const { data: teamMembers } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, role')
+    .eq('foundry_id', foundryId)
+    .neq('id', user.id)
+    .limit(100)
+
+  const members = teamMembers?.map(m => ({
+    id: m.id,
+    full_name: m.full_name || '',
+    email: m.email || '',
+    role: m.role || ''
+  })) || []
+
   return (
     <UpdatesLayout
       initialItems={initialItems}
       userId={user.id}
       foundryId={foundryId}
       bannerSlot={isFounder ? <FounderRecruitsBanner /> : null}
+      members={members}
     />
   )
 }

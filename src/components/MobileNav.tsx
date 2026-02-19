@@ -24,7 +24,6 @@ import {
     Target,
     MoreHorizontal,
     Lightbulb,
-    Bell,
     UsersRound,
     UserSearch,
     LogOut,
@@ -41,6 +40,7 @@ import {
     Map,
     Brain,
     Handshake,
+    MessageCircle,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -67,7 +67,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 // Primary nav items shown in the bottom bar
 const mainNavigation = [
     { name: "Today", shortName: "Today", href: "/today", icon: CalendarDays },
-    { name: "Updates", shortName: "Updates", href: "/updates", icon: Bell },
+    { name: "Comms", shortName: "Comms", href: "/updates", icon: MessageCircle },
     { name: "Tasks", shortName: "Tasks", href: "/new-tasks", icon: CheckSquare },
 ]
 

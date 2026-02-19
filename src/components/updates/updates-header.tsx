@@ -50,7 +50,7 @@ export function UpdatesHeader({
         <div className="min-w-0 flex-1">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Updates</h1>
+            <h1 className={typography.h1}>Comms</h1>
             {unreadCount > 0 && (
               <Badge
                 className="ml-2 bg-international-orange text-white"
@@ -61,7 +61,7 @@ export function UpdatesHeader({
             )}
           </div>
           <p className={typography.pageSubtitle}>
-            Stay on top of everything happening in your company
+            Activity feed, conversations, and direct messages — all in one place
           </p>
         </div>
 
