@@ -110,10 +110,18 @@ export function RecentProjectsGrid({
       </div>
 
       {filteredItems.length === 0 ? (
-        <div className="text-center py-12 text-sm text-muted-foreground">
-          {searchQuery || activeFilter !== "all"
-            ? "No projects match your filters."
-            : "No projects yet."}
+        <div className="rounded-xl bg-muted/30 py-12 px-8 flex flex-col items-center text-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted mb-4">
+            <Search className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium text-foreground mb-1">
+            {searchQuery || activeFilter !== "all" ? "No projects match your filters" : "No projects yet"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {searchQuery || activeFilter !== "all"
+              ? "Try a different search term or clear your filters."
+              : "Your designs will appear here once you start building."}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
