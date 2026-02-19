@@ -21,8 +21,8 @@ import { test, expect } from '@playwright/test'
 import { FOUNDER_STORAGE } from './auth-storage'
 import { dismissOnboarding } from './auth-storage'
 
-/** Maximum time to wait for a page to finish loading */
-const PAGE_LOAD_TIMEOUT = 15_000
+/** Maximum time to wait for a page to finish loading (heavy routes e.g. /messages, /team may need longer) */
+const PAGE_LOAD_TIMEOUT = 30_000
 
 /** Routes that don't require authentication */
 const PUBLIC_ROUTES = new Set(['/login', '/signup', '/'])

@@ -159,7 +159,6 @@
     "src/components/rfq/RFQTemplatePicker.tsx|TS2322|Type is not assignable to type.",
     "src/components/search/SearchResults.tsx|TS2322|Type is not assignable to type.",
     "src/components/settings/company-profile-dialog.tsx|TS2322|Type is not assignable to type.",
-    "src/components/specialists/workspace/chart-builder.tsx|TS18048|'percent' is possibly 'undefined'.",
     "src/components/strategy/transcript-import-dialog.tsx|TS2322|Type is not assignable to type.",
     "src/components/techniques/technique-card.tsx|TS2322|Type is not assignable to type.",
     "src/components/techniques/technique-compare-dialog.tsx|TS2322|Type is not assignable to type.",
