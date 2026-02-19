@@ -113,7 +113,14 @@ export default function TemplateLibraryPage(): React.ReactElement {
   const [isLoading, setIsLoading] = useState(true)
   const [activeCategory, setActiveCategory] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [page, setPage] = useState(0)
+
+  // Debounce search input so we don't fire a Supabase query on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const fetchTemplates = useCallback(async (category: string, search: string, pageNum: number): Promise<void> => {
     setIsLoading(true)
@@ -150,8 +157,8 @@ export default function TemplateLibraryPage(): React.ReactElement {
   }, [])
 
   useEffect(() => {
-    fetchTemplates(activeCategory, searchQuery, page)
-  }, [activeCategory, searchQuery, page, fetchTemplates])
+    fetchTemplates(activeCategory, debouncedSearch, page)
+  }, [activeCategory, debouncedSearch, page, fetchTemplates])
 
   const handleCategoryChange = (cat: string): void => {
     setActiveCategory(cat)
