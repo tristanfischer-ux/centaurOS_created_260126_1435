@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import {
   Search,
@@ -54,6 +55,7 @@ interface StepTemplate {
   license: string
   step_url: string | null
   stl_url: string | null
+  thumbnail_url: string | null
   file_size_bytes: number | null
   tags: string[]
   is_assembly: boolean
@@ -127,7 +129,7 @@ export default function TemplateLibraryPage(): React.ReactElement {
 
     let query = supabase
       .from("step_templates")
-      .select("id, slug, name, category, subcategory, description, source_repo, license, step_url, stl_url, file_size_bytes, tags, is_assembly", { count: "exact" })
+      .select("id, slug, name, category, subcategory, description, source_repo, license, step_url, stl_url, thumbnail_url, file_size_bytes, tags, is_assembly", { count: "exact" })
 
     if (category !== "all") {
       query = query.eq("category", category)
@@ -270,8 +272,9 @@ export default function TemplateLibraryPage(): React.ReactElement {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 12 }).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="pt-6 space-y-3">
+            <Card key={i} className="overflow-hidden">
+              <Skeleton className="h-40 w-full" />
+              <CardContent className="pt-4 space-y-3">
                 <Skeleton className="h-5 w-3/4" />
                 <Skeleton className="h-4 w-1/2" />
                 <div className="flex gap-2">
@@ -313,32 +316,43 @@ export default function TemplateLibraryPage(): React.ReactElement {
             return (
               <Card
                 key={template.id}
-                className="group hover:border-international-orange/30 transition-colors"
+                className="group overflow-hidden hover:border-international-orange/30 transition-colors"
               >
-                <CardContent className="pt-6 space-y-3">
-                  {/* Icon + name */}
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted group-hover:bg-international-orange-light transition-colors">
-                      <CategoryIcon className="h-5 w-5 text-muted-foreground group-hover:text-international-orange transition-colors" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-foreground truncate" title={template.name}>
-                        {template.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {template.category}
-                        {template.subcategory ? ` / ${template.subcategory}` : ""}
-                      </p>
-                    </div>
+                {/* Thumbnail area */}
+                <div className="relative h-40 bg-muted flex items-center justify-center overflow-hidden">
+                  {template.thumbnail_url ? (
+                    <Image
+                      src={template.thumbnail_url}
+                      alt={template.name}
+                      fill
+                      className="object-contain p-2 group-hover:scale-105 transition-transform duration-200"
+                      unoptimized
+                    />
+                  ) : (
+                    <CategoryIcon className="h-12 w-12 text-muted-foreground/40 group-hover:text-international-orange/40 transition-colors" />
+                  )}
+                  {/* Source badge overlay */}
+                  {source && (
+                    <span className={cn("absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full font-medium", source.color)}>
+                      {source.label}
+                    </span>
+                  )}
+                </div>
+
+                <CardContent className="pt-4 space-y-2.5">
+                  {/* Name + category */}
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate" title={template.name}>
+                      {template.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {template.category}
+                      {template.subcategory ? ` / ${template.subcategory}` : ""}
+                    </p>
                   </div>
 
-                  {/* Badges */}
+                  {/* Meta badges */}
                   <div className="flex flex-wrap items-center gap-1.5">
-                    {source && (
-                      <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", source.color)}>
-                        {source.label}
-                      </span>
-                    )}
                     <Badge variant="outline" className="text-xs">
                       {fileType}
                     </Badge>

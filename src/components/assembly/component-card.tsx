@@ -69,6 +69,8 @@ interface ComponentCardProps {
   component: CatalogComponent
   /** Whether this component is compatible with the active slot */
   isCompatible?: boolean
+  /** Brief reason why incompatible (shown when isCompatible is false) */
+  incompatibleReason?: string
   /** Whether this card is currently selected */
   isSelected?: boolean
   /** Called when user clicks the card */
@@ -108,6 +110,7 @@ function getEstimatedWeight(props: Record<string, unknown>): string | null {
 export const ComponentCard = memo(function ComponentCard({
   component,
   isCompatible,
+  incompatibleReason,
   isSelected,
   onSelect,
 }: ComponentCardProps): React.ReactNode {
@@ -185,6 +188,13 @@ export const ComponentCard = memo(function ComponentCard({
           </Badge>
         )}
       </div>
+
+      {/* Incompatibility reason */}
+      {isCompatible === false && incompatibleReason && (
+        <p className="text-[10px] text-muted-foreground mt-1 opacity-70">
+          {incompatibleReason}
+        </p>
+      )}
     </button>
   )
 })

@@ -24,6 +24,12 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 import { ComponentCard } from "./component-card"
@@ -32,10 +38,10 @@ import type { CatalogComponent, CatalogStats, TemplateSlot } from "@/actions/ass
 // ─── Tier Definitions ────────────────────────────────────────────────
 
 const TIERS = [
-  { id: "all", label: "All", icon: Package },
-  { id: "universal", label: "Universal", icon: Layers },
-  { id: "electromechanical", label: "Electro", icon: Zap },
-  { id: "domain", label: "Domain", icon: Package },
+  { id: "all", label: "All", icon: Package, tip: "All component tiers" },
+  { id: "universal", label: "Universal", icon: Layers, tip: "Standard parts usable across all assemblies" },
+  { id: "electromechanical", label: "Electro", icon: Zap, tip: "Electrical and mechanical components" },
+  { id: "domain", label: "Domain", icon: Package, tip: "Specialized parts for specific industries" },
 ] as const
 
 // ─── Props ───────────────────────────────────────────────────────────
@@ -49,6 +55,8 @@ interface ComponentCatalogProps {
   activeSlot?: TemplateSlot | null
   /** Called when user selects a component */
   onSelectComponent: (component: CatalogComponent) => void
+  /** Called to deselect the active slot (dismiss filter) */
+  onClearActiveSlot?: () => void
   /** Optional className */
   className?: string
 }
@@ -67,6 +75,7 @@ export function ComponentCatalog({
   stats,
   activeSlot,
   onSelectComponent,
+  onClearActiveSlot,
   className,
 }: ComponentCatalogProps): React.ReactNode {
   const [search, setSearch] = useState("")
@@ -100,6 +109,38 @@ export function ComponentCatalog({
         activeSlot.compatibleTiers.includes(component.tier)
 
       return categoryMatch && tierMatch
+    },
+    [activeSlot],
+  )
+
+  // Build a human-readable reason for incompatibility
+  const getIncompatibleReason = useCallback(
+    (component: CatalogComponent): string | undefined => {
+      if (!activeSlot) return undefined
+
+      const categoryMatch =
+        activeSlot.compatibleCategories.length === 0 ||
+        activeSlot.compatibleCategories.some((cat) =>
+          component.category.toLowerCase().includes(cat.toLowerCase()),
+        )
+
+      const tierMatch =
+        activeSlot.compatibleTiers.length === 0 ||
+        activeSlot.compatibleTiers.includes(component.tier)
+
+      if (categoryMatch && tierMatch) return undefined
+
+      const reasons: string[] = []
+      if (!categoryMatch) {
+        reasons.push(`Needs: ${activeSlot.compatibleCategories.join(", ")}`)
+      }
+      if (!tierMatch) {
+        const tierLabels = activeSlot.compatibleTiers.map((t) =>
+          t === "universal" ? "T1" : t === "electromechanical" ? "T2" : "T3",
+        )
+        reasons.push(`Requires tier: ${tierLabels.join(", ")}`)
+      }
+      return reasons.join(" · ")
     },
     [activeSlot],
   )
@@ -176,33 +217,41 @@ export function ComponentCatalog({
         </div>
 
         {/* Tier tabs */}
-        <div className="flex gap-1">
-          {TIERS.map((tier) => {
-            const count =
-              tier.id === "all"
-                ? stats.total
-                : (stats.byTier[tier.id] ?? 0)
-            const TierIcon = tier.icon
-            return (
-              <button
-                key={tier.id}
-                type="button"
-                onClick={() => setActiveTier(tier.id)}
-                className={cn(
-                  "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
-                  activeTier === tier.id
-                    ? "bg-international-orange text-white"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80",
-                )}
-                aria-pressed={activeTier === tier.id}
-              >
-                <TierIcon className="h-3 w-3" />
-                {tier.label}
-                <span className="opacity-70">({count})</span>
-              </button>
-            )
-          })}
-        </div>
+        <TooltipProvider delayDuration={300}>
+          <div className="flex gap-1">
+            {TIERS.map((tier) => {
+              const count =
+                tier.id === "all"
+                  ? stats.total
+                  : (stats.byTier[tier.id] ?? 0)
+              const TierIcon = tier.icon
+              return (
+                <Tooltip key={tier.id}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTier(tier.id)}
+                      className={cn(
+                        "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
+                        activeTier === tier.id
+                          ? "bg-international-orange text-white"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80",
+                      )}
+                      aria-pressed={activeTier === tier.id}
+                    >
+                      <TierIcon className="h-3 w-3" />
+                      {tier.label}
+                      <span className="opacity-70">({count})</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    {tier.tip}
+                  </TooltipContent>
+                </Tooltip>
+              )
+            })}
+          </div>
+        </TooltipProvider>
 
         {/* Category chips */}
         {categories.length > 0 && (
@@ -232,12 +281,31 @@ export function ComponentCatalog({
         {/* Active slot indicator */}
         {activeSlot && (
           <div className="rounded-md bg-international-orange-light/30 border border-international-orange/20 px-3 py-1.5">
-            <p className="text-[11px] font-medium text-international-orange">
-              Filtering for: {activeSlot.label}
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              {activeSlot.compatibleCategories.join(", ") || "Any category"}
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-international-orange">
+                  Showing compatible with "{activeSlot.label}" slot
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {activeSlot.compatibleCategories.length > 0
+                    ? `Categories: ${activeSlot.compatibleCategories.join(", ")}`
+                    : "Any category"}
+                  {activeSlot.compatibleTiers.length > 0
+                    ? ` · Tiers: ${activeSlot.compatibleTiers.map((t) => t === "universal" ? "T1" : t === "electromechanical" ? "T2" : "T3").join(", ")}`
+                    : ""}
+                </p>
+              </div>
+              {onClearActiveSlot && (
+                <button
+                  type="button"
+                  onClick={onClearActiveSlot}
+                  className="shrink-0 text-international-orange/70 hover:text-international-orange p-0.5"
+                  aria-label="Clear slot filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -271,6 +339,11 @@ export function ComponentCatalog({
                 key={component.id}
                 component={component}
                 isCompatible={isCompatible(component)}
+                incompatibleReason={
+                  isCompatible(component) === false
+                    ? getIncompatibleReason(component)
+                    : undefined
+                }
                 onSelect={onSelectComponent}
               />
             ))

@@ -57,6 +57,12 @@ function getGroupColor(group: string): { fill: string; stroke: string; text: str
 
 // ─── Props ───────────────────────────────────────────────────────────
 
+/** Screen-space position for popover placement */
+export interface SlotClickPosition {
+  x: number
+  y: number
+}
+
 interface SchematicViewProps {
   /** Slot definitions from the template */
   slots: TemplateSlot[]
@@ -64,8 +70,8 @@ interface SchematicViewProps {
   placedComponents: PlacedComponent[]
   /** Currently active/selected slot ID */
   activeSlotId: string | null
-  /** Called when a slot is clicked */
-  onSlotClick: (slotId: string) => void
+  /** Called when a slot is clicked, with optional screen position for popover */
+  onSlotClick: (slotId: string, position?: SlotClickPosition) => void
   /** Custom SVG from template (optional; not used in React Flow version) */
   customSvg?: string | null
   /** Optional className */
@@ -120,6 +126,39 @@ function buildNodesAndEdges(
     })
   }
 
+  // Group label annotation nodes — non-interactive labels at group centroids
+  for (const [groupName, groupSlots] of grouped) {
+    const positions = groupSlots.map(
+      (s) => layout.get(s.id) ?? { x: s.position.x, y: s.position.y },
+    )
+    const centroidX = positions.reduce((sum, p) => sum + p.x, 0) / positions.length
+    const minY = Math.min(...positions.map((p) => p.y))
+    const color = getGroupColor(groupName)
+
+    nodes.push({
+      id: `group-label-${groupName}`,
+      type: "default",
+      position: { x: centroidX, y: minY - 40 },
+      data: { label: groupName.charAt(0).toUpperCase() + groupName.slice(1) },
+      draggable: false,
+      selectable: false,
+      connectable: false,
+      style: {
+        background: "transparent",
+        border: "none",
+        boxShadow: "none",
+        fontSize: "11px",
+        fontWeight: 600,
+        color: color.text,
+        opacity: 0.7,
+        padding: 0,
+        pointerEvents: "none" as const,
+        width: "auto",
+      },
+    })
+  }
+
+  // Edges — subtle dashed lines connecting same-group nodes
   const edges: Edge[] = []
   for (const [, groupSlots] of grouped) {
     if (groupSlots.length < 2) continue
@@ -130,8 +169,13 @@ function buildNodesAndEdges(
         source: groupSlots[i].id,
         target: groupSlots[i + 1].id,
         type: "smoothstep",
-        animated: true,
-        style: { stroke: color.stroke, strokeWidth: 1.5 },
+        animated: false,
+        style: {
+          stroke: color.stroke,
+          strokeWidth: 1,
+          strokeDasharray: "6 4",
+          opacity: 0.35,
+        },
       })
     }
   }
@@ -182,8 +226,16 @@ export function SchematicView({
   }, [slots, placedBySlot, activeSlotId, layout, setNodes, setEdges])
 
   const onNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      onSlotClick(node.id)
+    (event: React.MouseEvent, node: Node) => {
+      // Skip group label annotation nodes
+      if (node.id.startsWith("group-label-")) return
+
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+      const position: SlotClickPosition = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      }
+      onSlotClick(node.id, position)
     },
     [onSlotClick],
   )
@@ -193,6 +245,18 @@ export function SchematicView({
   ).length
   const totalCount = slots.length
   const completionPct = totalCount > 0 ? (filledCount / totalCount) * 100 : 0
+
+  // Unique groups present in slots for the legend
+  const activeGroups = useMemo(() => {
+    const seen = new Set<string>()
+    return slots
+      .map((s) => s.group.toLowerCase())
+      .filter((g) => {
+        if (seen.has(g)) return false
+        seen.add(g)
+        return true
+      })
+  }, [slots])
 
   if (slots.length === 0) {
     return (
@@ -236,6 +300,31 @@ export function SchematicView({
           {filledCount}/{totalCount}
         </span>
       </div>
+
+      {/* Group color legend */}
+      {activeGroups.length > 1 && (
+        <div className="absolute top-4 left-4 z-10 bg-background/90 rounded-lg border shadow-sm px-3 py-2">
+          <p className="text-[10px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
+            Groups
+          </p>
+          <div className="flex flex-col gap-1">
+            {activeGroups.map((group) => {
+              const color = getGroupColor(group)
+              return (
+                <div key={group} className="flex items-center gap-2">
+                  <div
+                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: color.stroke }}
+                  />
+                  <span className="text-[11px] text-foreground capitalize">
+                    {group}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <ReactFlow
         nodes={nodes}

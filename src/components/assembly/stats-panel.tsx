@@ -302,6 +302,7 @@ export function StatsPanel({
                 }
                 sublabel={weightClass.label}
                 sublabelColor={weightClass.color}
+                hint={stats.filledSlots > 0 ? "Specs not available for placed components" : undefined}
               />
 
               <StatRow
@@ -314,6 +315,7 @@ export function StatsPanel({
                 }
                 sublabel={costTier.label}
                 sublabelColor={costTier.color}
+                hint={stats.filledSlots > 0 ? "Pricing not listed for placed components" : undefined}
               />
 
               <StatRow
@@ -324,6 +326,7 @@ export function StatsPanel({
                     ? `${stats.totalPower.toFixed(1)} W`
                     : "—"
                 }
+                hint={stats.filledSlots > 0 ? "Power data not available" : undefined}
               />
 
               <StatRow
@@ -334,6 +337,7 @@ export function StatsPanel({
                     ? `${stats.maxLeadTime} days`
                     : "—"
                 }
+                hint={stats.filledSlots > 0 ? "Lead time not listed" : undefined}
               />
             </div>
 
@@ -371,16 +375,24 @@ export function StatsPanel({
                       : null
                     const cost =
                       (comp?.procurement?.typical_cost_gbp as number) ?? 0
+                    const slotLabel = slots.find((s) => s.id === pc.slotId)?.label
 
                     return (
                       <div
                         key={pc.id || pc.slotId}
-                        className="flex items-center justify-between text-xs py-1 border-b border-muted last:border-0"
+                        className="flex items-center justify-between text-xs py-1.5 border-b border-muted last:border-0"
                       >
-                        <span className="text-foreground truncate max-w-[140px]">
-                          {pc.componentName}
-                        </span>
-                        <span className="text-muted-foreground font-mono">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-foreground truncate max-w-[140px]">
+                            {pc.componentName}
+                          </p>
+                          {slotLabel && (
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {slotLabel}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-muted-foreground font-mono shrink-0 ml-2">
                           {cost > 0 ? `£${cost.toFixed(2)}` : "—"}
                         </span>
                       </div>
@@ -589,12 +601,15 @@ function StatRow({
   value,
   sublabel,
   sublabelColor,
+  hint,
 }: {
   icon: LucideIcon
   label: string
   value: string
   sublabel?: string
   sublabelColor?: string
+  /** Muted hint shown when value is "—" to explain missing data */
+  hint?: string
 }): React.ReactNode {
   return (
     <div className="flex items-center gap-3">
@@ -606,6 +621,11 @@ function StatRow({
         <p className="text-sm font-medium text-foreground font-mono">
           {value}
         </p>
+        {value === "—" && hint && (
+          <p className="text-[10px] text-muted-foreground/70 leading-tight">
+            {hint}
+          </p>
+        )}
       </div>
       {sublabel && sublabel !== "—" && (
         <span className={cn("text-[10px] font-medium", sublabelColor)}>

@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge"
 
 import { ComponentCatalog } from "./component-catalog"
 import { SchematicView } from "./schematic-view"
+import type { SlotClickPosition } from "./schematic-view"
 import { StatsPanel } from "./stats-panel"
 import { SlotPopover } from "./slot-popover"
 
@@ -101,6 +102,7 @@ export function AssemblyWorkbench({
   // Interaction state
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null)
   const [showSlotPopover, setShowSlotPopover] = useState(false)
+  const [popoverPosition, setPopoverPosition] = useState<SlotClickPosition | null>(null)
 
   // RFQ export state
   const [rfqId, setRfqId] = useState<string | null>(null)
@@ -234,8 +236,9 @@ export function AssemblyWorkbench({
 
   // ─── Handlers ────────────────────────────────────────────────────
 
-  const handleSlotClick = useCallback((slotId: string) => {
+  const handleSlotClick = useCallback((slotId: string, position?: SlotClickPosition) => {
     setActiveSlotId((prev) => (prev === slotId ? null : slotId))
+    setPopoverPosition(position ?? null)
     setShowSlotPopover(true)
   }, [])
 
@@ -318,6 +321,11 @@ export function AssemblyWorkbench({
   }, [])
 
   const handleClosePopover = useCallback(() => {
+    setShowSlotPopover(false)
+  }, [])
+
+  const handleClearActiveSlot = useCallback(() => {
+    setActiveSlotId(null)
     setShowSlotPopover(false)
   }, [])
 
@@ -481,6 +489,7 @@ export function AssemblyWorkbench({
             stats={stats}
             activeSlot={activeSlot}
             onSelectComponent={handleSelectComponent}
+            onClearActiveSlot={handleClearActiveSlot}
           />
         </div>
 
@@ -494,9 +503,19 @@ export function AssemblyWorkbench({
             customSvg={assembly.schematicSvg}
           />
 
-          {/* Slot popover overlay */}
+          {/* Slot popover overlay — positioned near the clicked node */}
           {showSlotPopover && activeSlot && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+            <div
+              className="absolute z-10"
+              style={
+                popoverPosition
+                  ? {
+                      left: `${Math.min(Math.max(popoverPosition.x - 144, 8), window.innerWidth - 320)}px`,
+                      top: `${Math.max(popoverPosition.y - 20, 8)}px`,
+                    }
+                  : { top: "16px", left: "50%", transform: "translateX(-50%)" }
+              }
+            >
               <SlotPopover
                 slot={activeSlot}
                 placedComponent={activeSlotPlaced}
@@ -508,36 +527,73 @@ export function AssemblyWorkbench({
             </div>
           )}
 
-          {/* Auto-fill prompt when no components placed */}
+          {/* Onboarding guide when no components placed */}
           {assembly.placedComponents.length === 0 && (
-            <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10">
-              <div className="bg-background/95 rounded-lg border shadow-md px-4 py-3 flex items-center gap-3">
-                <p className="text-sm text-muted-foreground">
-                  Auto-fill recommended components?
-                </p>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={isPending}
-                  onClick={() => {
-                    startTransition(async () => {
-                      toast.info("Auto-filling slots...")
-                      const result = await autoFillAssembly(assemblyId)
-                      if ("error" in result) {
-                        toast.error(result.error)
-                        return
-                      }
-                      setAssembly(result.assembly)
-                      toast.success(
-                        result.filled > 0
-                          ? `Auto-filled ${result.filled} of ${result.total} slots`
-                          : "No compatible components found for empty slots",
-                      )
-                    })
-                  }}
-                >
-                  Auto-Fill
-                </Button>
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 w-80">
+              <div className="bg-background/95 rounded-xl border shadow-lg px-5 py-4 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Get started with your build
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Fill each slot with a component, or auto-fill to get going fast.
+                  </p>
+                </div>
+
+                <div className="space-y-2.5">
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-international-orange text-white text-[10px] font-bold mt-0.5">
+                      1
+                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Click a slot</span> on the canvas to select it
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-international-orange text-white text-[10px] font-bold mt-0.5">
+                      2
+                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Browse components</span> in the sidebar — compatible parts are highlighted
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-international-orange text-white text-[10px] font-bold mt-0.5">
+                      3
+                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Click a component</span> to assign it to the selected slot
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 border-t">
+                  <p className="text-xs text-muted-foreground flex-1">
+                    Or skip ahead:
+                  </p>
+                  <Button
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => {
+                      startTransition(async () => {
+                        toast.info("Auto-filling slots...")
+                        const result = await autoFillAssembly(assemblyId)
+                        if ("error" in result) {
+                          toast.error(result.error)
+                          return
+                        }
+                        setAssembly(result.assembly)
+                        toast.success(
+                          result.filled > 0
+                            ? `Auto-filled ${result.filled} of ${result.total} slots`
+                            : "No compatible components found for empty slots",
+                        )
+                      })
+                    }}
+                  >
+                    Auto-Fill All Slots
+                  </Button>
+                </div>
               </div>
             </div>
           )}
