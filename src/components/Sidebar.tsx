@@ -49,6 +49,7 @@ import {
     AppWindow,
     Globe,
     Map,
+    Brain,
 } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
@@ -90,6 +91,7 @@ const todayNavItem = { name: "Today", href: "/today", icon: CalendarDays, toolti
 const meNavigation = [
     { name: "My Profile", href: "/my-profile", icon: UserCircle, tooltip: "Your profile, companies, and marketplace presence" },
     { name: "Updates", href: "/updates", icon: Bell, tooltip: "Notes, comments, and changes across tasks and objectives" },
+    { name: "Knowledge", href: "/knowledge", icon: Brain, tooltip: "Your organizational second brain — decisions, insights, and lessons" },
     { name: "Google Apps", href: "/google-apps", icon: AppWindow, tooltip: "Your Google Drive, Docs, Calendar, and Email" },
 ]
 

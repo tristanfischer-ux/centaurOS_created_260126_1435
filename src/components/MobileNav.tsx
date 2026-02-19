@@ -39,6 +39,7 @@ import {
     FileOutput,
     Globe,
     Map,
+    Brain,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -71,6 +72,7 @@ const mainNavigation = [
 
 // "More" dropdown — Me section (items not in main bar)
 const meMoreNavigation = [
+    { name: "Knowledge", href: "/knowledge", icon: Brain },
     { name: "Google Apps", href: "/google-apps", icon: AppWindow },
 ]
 
