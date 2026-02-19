@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Download,
   Box,
+  Send,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -95,7 +96,7 @@ export default function CadLabReviewPage(): React.ReactNode {
       {/* Pipeline Complete */}
       <Card className="border-status-success/30 bg-gradient-to-r from-status-success-light/20 to-background">
         <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-light">
                 <CheckCircle2 className="h-5 w-5 text-status-success" />
@@ -105,15 +106,24 @@ export default function CadLabReviewPage(): React.ReactNode {
                   Pipeline Complete
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Your engineering package for &quot;{subject}&quot; is ready. Copy the review package above to share with stakeholders,
-                  or go back to Build to download individual STEP + STL files.
+                  Your engineering package for &quot;{subject}&quot; is ready. Send an RFQ to suppliers from Procurement, copy the review package to share with stakeholders, or go back to Build to download STEP + STL files.
                 </p>
               </div>
             </div>
-            <Button variant="outline" onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
-              <Download className="h-4 w-4" />
-              Back to Downloads
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="default"
+                onClick={() => router.push("/the-forge/cad-lab/procurement")}
+                className="gap-1.5"
+              >
+                <Send className="h-4 w-4" />
+                Create Marketplace RFQ
+              </Button>
+              <Button variant="outline" onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
+                <Download className="h-4 w-4" />
+                Back to Downloads
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

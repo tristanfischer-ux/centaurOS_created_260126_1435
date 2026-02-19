@@ -5,9 +5,80 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 
+/** Known manufacturing/process terms to extract from specs for matching */
+const MANUFACTURING_TERMS = new Set([
+  'cnc', 'machining', 'milling', 'turning', 'lathe', 'injection', 'moulding', 'molding',
+  '3d print', 'additive', 'fdm', 'sla', 'sls', 'metal', 'plastic', 'assembly',
+  'fabrication', 'welding', 'sheet metal', 'stamping', 'casting', 'forging',
+  'finish', 'anodize', 'paint', 'coating', 'tolerance', 'manufacturing', 'prototype',
+])
+
+/**
+ * Extract skill-like tokens from RFQ specifications for supplier matching.
+ */
+function extractSkillsFromSpecifications(specifications: unknown): string[] {
+  const skills: Set<string> = new Set()
+  if (!specifications || typeof specifications !== 'object') return []
+
+  const spec = specifications as Record<string, unknown>
+
+  // From description: split on non-alpha and keep known terms or words >= 3 chars
+  const description = spec.description
+  if (typeof description === 'string') {
+    const words = description.toLowerCase().split(/\W+/).filter(Boolean)
+    for (const w of words) {
+      if (MANUFACTURING_TERMS.has(w) || (w.length >= 3 && w.length <= 30)) {
+        skills.add(w)
+      }
+    }
+  }
+
+  // From materials array
+  const materials = spec.materials
+  if (Array.isArray(materials)) {
+    materials.forEach((m) => {
+      if (typeof m === 'string' && m.trim()) skills.add(m.trim().toLowerCase())
+    })
+  }
+
+  // From custom_fields (Forge CAD Lab / Assembly Builder)
+  const customFields = spec.custom_fields as Record<string, unknown> | undefined
+  if (customFields && typeof customFields === 'object') {
+    const designBrief = customFields.design_brief as Record<string, unknown> | undefined
+    if (designBrief && typeof designBrief === 'object') {
+      const targetProcess = designBrief.targetProcess
+      if (typeof targetProcess === 'string' && targetProcess.trim()) {
+        skills.add(targetProcess.trim().toLowerCase())
+      }
+      const targetMaterial = designBrief.targetMaterial
+      if (typeof targetMaterial === 'string' && targetMaterial.trim()) {
+        skills.add(targetMaterial.trim().toLowerCase())
+      }
+    }
+    const modules = customFields.modules as Array<Record<string, unknown>> | undefined
+    if (Array.isArray(modules)) {
+      for (const mod of modules) {
+        if (mod && typeof mod === 'object') {
+          const process = mod.process
+          if (typeof process === 'string' && process.trim()) skills.add(process.trim().toLowerCase())
+          const material = mod.material
+          if (typeof material === 'string' && material.trim()) skills.add(material.trim().toLowerCase())
+          const finish = mod.finish
+          if (typeof finish === 'string' && finish.trim()) skills.add(finish.trim().toLowerCase())
+        }
+      }
+    }
+  }
+
+  return Array.from(skills)
+}
+
 export interface SupplierMatch {
   providerId: string
   providerName: string
+  userId?: string
+  headline?: string | null
+  timezone?: string | null
   matchScore: number
   matchReasons: string[]
   tier: 'pending' | 'standard' | 'verified' | 'premium'
@@ -138,6 +209,8 @@ export async function matchSuppliersToRFQ(
         tier,
         day_rate,
         currency,
+        headline,
+        timezone,
         is_active,
         current_order_count,
         max_concurrent_orders,
@@ -176,12 +249,14 @@ export async function matchSuppliersToRFQ(
         const categories = [...new Set(providerListings.map(l => l.category).filter(Boolean))] as string[]
         const skills = [...new Set(providerListings.flatMap(l => l.tags || []))]
 
+        const skillsRequired = extractSkillsFromSpecifications(rfq.specifications)
+
         const matchResult = calculateMatchScore(
           {
             category: rfq.category,
+            skillsRequired: skillsRequired.length > 0 ? skillsRequired : undefined,
             budgetRange: { min: rfq.budget_min, max: rfq.budget_max },
             urgency: rfq.urgency as 'urgent' | 'standard',
-            // Could extract skills from specifications JSON
           },
           {
             categories,
@@ -196,10 +271,14 @@ export async function matchSuppliersToRFQ(
         )
 
         const profile = Array.isArray(provider.profiles) ? provider.profiles[0] : provider.profiles
-        
+        const row = provider as { headline?: string | null; timezone?: string | null }
+
         return {
           providerId: provider.id,
           providerName: profile?.full_name || 'Unknown',
+          userId: provider.user_id,
+          headline: row.headline ?? null,
+          timezone: row.timezone ?? null,
           matchScore: matchResult.score,
           matchReasons: matchResult.reasons,
           tier: provider.tier as SupplierMatch['tier'],

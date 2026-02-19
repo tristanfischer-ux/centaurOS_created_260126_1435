@@ -11,8 +11,8 @@ import {
   closeRFQ as closeRFQService,
   getRFQs,
   getAvailableRFQsForSupplier,
-  matchSuppliers,
 } from "@/lib/rfq/service"
+import { matchSuppliersToRFQ } from "@/lib/rfq/matching"
 import {
   broadcastRFQ,
   acceptRFQ as acceptRFQRace,
@@ -371,7 +371,7 @@ export async function getRFQRaceStatus(rfqId: string): Promise<{
 }
 
 /**
- * Get matched suppliers for an RFQ
+ * Get matched suppliers for an RFQ (uses same smart matching as broadcast).
  */
 export async function getMatchedSuppliers(rfqId: string): Promise<{
   data: SupplierMatch[]
@@ -382,7 +382,20 @@ export async function getMatchedSuppliers(rfqId: string): Promise<{
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: "Not authenticated" }
 
-  return matchSuppliers(supabase, rfqId)
+  const { matches, error } = await matchSuppliersToRFQ(supabase, rfqId)
+  if (error) return { data: [], error }
+
+  const data: SupplierMatch[] = matches.map((m) => ({
+    provider_id: m.providerId,
+    user_id: m.userId ?? "",
+    full_name: m.providerName,
+    headline: m.headline ?? null,
+    tier: m.tier as SupplierMatch["tier"],
+    timezone: m.timezone ?? null,
+    match_score: m.matchScore,
+    match_reasons: m.matchReasons,
+  }))
+  return { data, error: null }
 }
 
 // =============================================

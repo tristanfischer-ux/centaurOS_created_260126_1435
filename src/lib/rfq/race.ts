@@ -40,31 +40,37 @@ export async function broadcastRFQ(
 
     // Use smart matching to find best suppliers for this RFQ
     const { matches, error: matchError } = await matchSuppliersToRFQ(supabase, rfqId)
-    
-    if (matchError) {
-      console.error('Error matching suppliers:', matchError)
-      // Fall back to broadcast to all active providers
-      const { data: providers, error: providersError } = await supabase
+
+    let providers: Array<{ id: string; user_id: string; timezone: string | null; tier: string | null }>
+
+    if (matchError || !matches.length) {
+      // Fall back to all active providers when matching fails or returns no matches
+      if (matchError) {
+        console.error('Error matching suppliers:', matchError)
+      }
+      const { data: fallbackProviders, error: providersError } = await supabase
         .from('provider_profiles')
         .select('id, user_id, timezone, tier')
         .eq('is_active', true)
         .not('tier', 'eq', 'suspended')
 
-      if (providersError || !providers || providers.length === 0) {
+      if (providersError || !fallbackProviders || fallbackProviders.length === 0) {
         return { success: false, broadcast_count: 0, error: 'Failed to fetch suppliers' }
       }
-    }
+      providers = fallbackProviders
+    } else {
+      // Get provider details for matched suppliers
+      const providerIds = matches.map((m) => m.providerId)
+      const { data: matchedProviders, error: providersError } = await supabase
+        .from('provider_profiles')
+        .select('id, user_id, timezone, tier')
+        .in('id', providerIds)
+        .eq('is_active', true)
 
-    // Get provider details for matched suppliers
-    const providerIds = matches.map(m => m.providerId)
-    const { data: providers, error: providersError } = await supabase
-      .from('provider_profiles')
-      .select('id, user_id, timezone, tier')
-      .in('id', providerIds)
-      .eq('is_active', true)
-
-    if (providersError || !providers || providers.length === 0) {
-      return { success: true, broadcast_count: 0, error: null }
+      if (providersError || !matchedProviders || matchedProviders.length === 0) {
+        return { success: true, broadcast_count: 0, error: null }
+      }
+      providers = matchedProviders
     }
 
     // Calculate broadcast schedule for each provider

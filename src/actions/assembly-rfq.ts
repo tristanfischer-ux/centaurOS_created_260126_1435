@@ -190,15 +190,25 @@ export async function createAssemblyRfqAction(
     "list above. Contact buyer to discuss tolerances, materials, and quantities.",
   ]
 
+  // Attach generated CAD files when available so suppliers can quote from geometry
+  const attachments: string[] = []
+  if (assembly.stepFileUrl?.trim() && /^https?:\/\//i.test(assembly.stepFileUrl)) {
+    attachments.push(assembly.stepFileUrl.trim())
+  }
+  if (assembly.stlFileUrl?.trim() && /^https?:\/\//i.test(assembly.stlFileUrl)) {
+    attachments.push(assembly.stlFileUrl.trim())
+  }
+
   // ── Create RFQ ──────────────────────────────────────────────────────
   const rfqResult = await createNewRFQ({
     title: `${assembly.name} — Manufacturing RFQ`,
     rfq_type: "custom",
-    category: "Custom Manufacturing",
+    category: "Products",
     specifications: {
       description: descriptionLines.join("\n"),
       quantity: 1,
       unit: "assembly",
+      ...(attachments.length > 0 ? { attachments } : {}),
       custom_fields: {
         source: "the-forge-assembly-builder",
         assembly_id: assemblyId,

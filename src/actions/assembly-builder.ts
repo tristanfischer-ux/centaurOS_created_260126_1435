@@ -92,6 +92,10 @@ export interface UserAssembly {
   placedComponents: PlacedComponent[]
   /** Marketplace RFQ created from this assembly (if any) */
   rfqId: string | null
+  /** Generated STEP file URL for manufacturing (if any) */
+  stepFileUrl: string | null
+  /** Generated STL file URL for manufacturing (if any) */
+  stlFileUrl: string | null
   createdAt: string
   updatedAt: string
 }
@@ -448,6 +452,8 @@ export async function getAssembly(
 
   const params = assembly.assembly_params as Record<string, unknown> | null
 
+  const row = assembly as { step_file_url?: string | null; stl_file_url?: string | null; rfq_id?: string | null }
+
   return {
     id: assembly.id,
     name: assembly.name,
@@ -466,7 +472,9 @@ export async function getAssembly(
       customParams: p.custom_params as Record<string, unknown> | null,
       quantity: p.quantity ?? 1,
     })),
-    rfqId: (assembly as { rfq_id?: string | null }).rfq_id ?? null,
+    rfqId: row.rfq_id ?? null,
+    stepFileUrl: row.step_file_url ?? null,
+    stlFileUrl: row.stl_file_url ?? null,
     createdAt: assembly.created_at ?? "",
     updatedAt: assembly.updated_at ?? "",
   }
