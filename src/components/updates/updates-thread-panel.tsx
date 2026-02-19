@@ -160,9 +160,7 @@ export function UpdatesThreadPanel({
   const isConversation = source.type === 'conversation'
   const linkHref = isTask
     ? `/new-tasks?taskId=${source.id}`
-    : isConversation
-      ? `/updates`
-      : `/new-objectives`
+    : `/new-objectives`
 
   // Choose icon and color based on source type
   const sourceIcon = isTask
@@ -204,13 +202,15 @@ export function UpdatesThreadPanel({
             </div>
           </div>
 
-          <Link
-            href={linkHref}
-            className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-            title={`Open in ${isTask ? 'Tasks' : isConversation ? 'Inbox' : 'Objectives'}`}
-          >
-            <ExternalLink className="h-4 w-4" />
-          </Link>
+          {!isConversation && (
+            <Link
+              href={linkHref}
+              className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+              title={`Open in ${isTask ? 'Tasks' : 'Objectives'}`}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Link>
+          )}
         </div>
 
         {/* Metadata chips */}

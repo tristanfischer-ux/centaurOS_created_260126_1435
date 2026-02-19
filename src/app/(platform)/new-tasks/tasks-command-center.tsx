@@ -60,7 +60,7 @@ export function TasksCommandCenter({
   initialTaskId,
 }: TasksCommandCenterProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('focus')
-  const [quickFilter, setQuickFilter] = useState<string | null>('my-tasks')
+  const [quickFilter, setQuickFilter] = useState<string | null>(initialTaskId ? null : 'my-tasks')
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(initialTaskId || null)
