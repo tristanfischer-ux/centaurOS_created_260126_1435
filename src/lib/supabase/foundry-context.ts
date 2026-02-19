@@ -86,15 +86,7 @@ export function clearFoundryCache(userId?: string) {
   }
 }
 
-/**
- * Get all foundries for the current user.
- *
- * @description Calls the get_user_foundries RPC which returns each foundry
- * the user belongs to, including name, role, member count, and logo URL.
- *
- * @returns Array of foundry info objects sorted by primary first, then join date
- */
-export async function getUserFoundries(): Promise<Array<{
+export interface FoundryInfo {
   foundryId: string
   foundryName: string
   role: string
@@ -103,21 +95,42 @@ export async function getUserFoundries(): Promise<Array<{
   memberCount: number
   joinedAt: string
   logoUrl: string | null
-}>> {
+}
+
+export interface GetUserFoundriesResult {
+  foundries: FoundryInfo[]
+  error: string | null
+}
+
+/**
+ * Get all foundries for the current user.
+ *
+ * @description Calls the get_user_foundries RPC which returns each foundry
+ * the user belongs to, including name, role, member count, and logo URL.
+ * Returns a result object that distinguishes between "no foundries" and
+ * "RPC failed" so the UI can show appropriate error states.
+ *
+ * @returns Object with foundries array and optional error message
+ */
+export async function getUserFoundries(): Promise<GetUserFoundriesResult> {
   const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
+  if (!user) return { foundries: [], error: null }
 
   const { data, error } = await supabase
     .rpc('get_user_foundries', { p_user_id: user.id })
 
-  if (error || !data) {
+  if (error) {
     console.error('[FoundryContext] Failed to get user foundries:', error)
-    return []
+    return { foundries: [], error: error.message }
   }
 
-  return data.map((f: {
+  if (!data) {
+    return { foundries: [], error: null }
+  }
+
+  const foundries = data.map((f: {
     foundry_id: string
     foundry_name: string
     role: string
@@ -136,4 +149,6 @@ export async function getUserFoundries(): Promise<Array<{
     joinedAt: f.joined_at,
     logoUrl: f.logo_url || null,
   }))
+
+  return { foundries, error: null }
 }

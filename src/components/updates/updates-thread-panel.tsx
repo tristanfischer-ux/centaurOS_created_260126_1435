@@ -357,7 +357,7 @@ function ThreadMessage({ item, isOwnMessage }: { item: ThreadItem; isOwnMessage:
           </span>
         </div>
         <div className={cn(
-          'rounded-lg px-3 py-2 text-sm leading-relaxed',
+          'rounded-lg px-3 py-2 text-sm leading-relaxed break-words',
           isOwnMessage
             ? 'bg-international-orange/10 text-foreground'
             : 'bg-muted text-foreground'

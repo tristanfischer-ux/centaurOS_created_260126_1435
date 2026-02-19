@@ -43,7 +43,7 @@ export default async function PlatformLayout({
     }
 
     // Fetch profile and foundry memberships in parallel
-    const [profileResult, userFoundries] = await Promise.all([
+    const [profileResult, foundriesResult] = await Promise.all([
         supabase
             .from("profiles")
             .select("foundry_id, active_foundry_id, full_name, role, account_type, onboarding_data")
@@ -51,6 +51,7 @@ export default async function PlatformLayout({
             .single(),
         getUserFoundries(),
     ]);
+    const userFoundries = foundriesResult.foundries;
 
     let { data: profile, error: profileError } = profileResult;
 

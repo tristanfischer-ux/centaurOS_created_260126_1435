@@ -53,7 +53,7 @@ export default async function MyProfilePage() {
 
   // Fetch profile data, foundries, telegram link, and enrichment data in parallel
   const admin = getAdminClient()
-  const [data, foundries, telegramResult, completionHistoryResult] = await Promise.all([
+  const [data, foundriesResult, telegramResult, completionHistoryResult] = await Promise.all([
     getProfileHubData(),
     getUserFoundries(),
     admin
@@ -119,7 +119,8 @@ export default async function MyProfilePage() {
   return (
     <ProfileHubView
       data={data}
-      foundries={foundries}
+      foundries={foundriesResult.foundries}
+      foundriesError={foundriesResult.error}
       telegramLink={telegramLink}
       botUsername={botUsername}
       enrichment={enrichment}

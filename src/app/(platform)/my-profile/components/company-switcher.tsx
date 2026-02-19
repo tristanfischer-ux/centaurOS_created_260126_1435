@@ -7,6 +7,8 @@ import {
   Check,
   ChevronRight,
   Plus,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -25,6 +27,8 @@ interface FoundryInfo {
 
 interface CompanySwitcherProps {
   foundries: FoundryInfo[]
+  /** Error message if foundries could not be loaded, null if no error */
+  error: string | null
   switchingTo: string | null
   isPending: boolean
   onCompanyClick: (foundryId: string) => void
@@ -57,6 +61,7 @@ function getRoleBadgeClasses(role: string): string {
  */
 export function CompanySwitcher({
   foundries,
+  error,
   switchingTo,
   isPending,
   onCompanyClick,
@@ -65,7 +70,29 @@ export function CompanySwitcher({
     <section>
       <h2 className={cn(typography.label, 'mb-4')}>Your Companies</h2>
 
-      {foundries.length === 0 ? (
+      {error ? (
+        <Card className="rounded-xl border border-status-warning-light shadow-sm">
+          <CardContent className="py-10 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-status-warning-light flex items-center justify-center mb-4">
+              <AlertTriangle className="h-6 w-6 text-status-warning" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Couldn&apos;t load your companies
+            </h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
+              Something went wrong loading your company data. Try refreshing
+              the page. If the problem persists, contact support.
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => window.location.reload()}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </CardContent>
+        </Card>
+      ) : foundries.length === 0 ? (
         <Card className="rounded-xl border border-dashed shadow-sm">
           <CardContent className="py-12 text-center">
             <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">

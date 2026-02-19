@@ -15,7 +15,7 @@ export default async function WorkspacePickerPage() {
     redirect('/login')
   }
 
-  const foundries = await getUserFoundries()
+  const { foundries } = await getUserFoundries()
 
   // If user only has one foundry, go straight there
   if (foundries.length === 1) {

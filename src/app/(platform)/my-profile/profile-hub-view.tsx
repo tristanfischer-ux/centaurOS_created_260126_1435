@@ -41,6 +41,8 @@ export interface ProfileEnrichment {
 interface ProfileHubViewProps {
   data: ProfileHubData
   foundries: FoundryInfo[]
+  /** Error message if foundries RPC failed, null if successful */
+  foundriesError?: string | null
   /** Existing Telegram link data, or null if not linked */
   telegramLink: {
     id: string
@@ -65,7 +67,7 @@ interface ProfileHubViewProps {
  * @example
  * <ProfileHubView data={profileHubData} foundries={foundries} telegramLink={null} botUsername="ForgeOSBot" />
  */
-export function ProfileHubView({ data, foundries, telegramLink, botUsername, enrichment }: ProfileHubViewProps) {
+export function ProfileHubView({ data, foundries, foundriesError, telegramLink, botUsername, enrichment }: ProfileHubViewProps) {
   const { profile, providerProfile, listing, strength, isProvider, foundryName, stats } = data
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
@@ -141,6 +143,7 @@ export function ProfileHubView({ data, foundries, telegramLink, botUsername, enr
       {/* Company Switcher */}
       <CompanySwitcher
         foundries={foundries}
+        error={foundriesError ?? null}
         switchingTo={switchingTo}
         isPending={isPending}
         onCompanyClick={handleCompanyClick}
