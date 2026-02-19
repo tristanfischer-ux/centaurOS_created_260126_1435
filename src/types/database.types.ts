@@ -1,4 +1,3 @@
-Initialising login role...
 export type Json =
   | string
   | number
@@ -3307,6 +3306,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          rfq_id: string | null
           status: string | null
           step_file_url: string | null
           stl_file_url: string | null
@@ -3321,6 +3321,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          rfq_id?: string | null
           status?: string | null
           step_file_url?: string | null
           stl_file_url?: string | null
@@ -3335,13 +3336,22 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          rfq_id?: string | null
           status?: string | null
           step_file_url?: string | null
           stl_file_url?: string | null
           thumbnail_url?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cad_assemblies_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfqs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cad_grammar_versions: {
         Row: {
@@ -6364,19 +6374,25 @@ export type Database = {
           depth: number | null
           description: string | null
           display_order: number | null
+          foundry_id: string | null
+          icon: string
           id: string
           key_questions: Json | null
           learning_resources: Json | null
           learning_time_estimate: string | null
           marketplace_categories: string[] | null
           name: string
+          note_count: number
           parent_id: string | null
           prerequisite_domain_ids: string[] | null
           primer: Json | null
           related_domain_ids: string[] | null
+          slug: string | null
+          sort_order: number
           supplier_categories: string[] | null
           template_id: string | null
           typical_roles: string[] | null
+          updated_at: string | null
         }
         Insert: {
           ai_summary?: string | null
@@ -6386,19 +6402,25 @@ export type Database = {
           depth?: number | null
           description?: string | null
           display_order?: number | null
+          foundry_id?: string | null
+          icon?: string
           id?: string
           key_questions?: Json | null
           learning_resources?: Json | null
           learning_time_estimate?: string | null
           marketplace_categories?: string[] | null
           name: string
+          note_count?: number
           parent_id?: string | null
           prerequisite_domain_ids?: string[] | null
           primer?: Json | null
           related_domain_ids?: string[] | null
+          slug?: string | null
+          sort_order?: number
           supplier_categories?: string[] | null
           template_id?: string | null
           typical_roles?: string[] | null
+          updated_at?: string | null
         }
         Update: {
           ai_summary?: string | null
@@ -6408,21 +6430,34 @@ export type Database = {
           depth?: number | null
           description?: string | null
           display_order?: number | null
+          foundry_id?: string | null
+          icon?: string
           id?: string
           key_questions?: Json | null
           learning_resources?: Json | null
           learning_time_estimate?: string | null
           marketplace_categories?: string[] | null
           name?: string
+          note_count?: number
           parent_id?: string | null
           prerequisite_domain_ids?: string[] | null
           primer?: Json | null
           related_domain_ids?: string[] | null
+          slug?: string | null
+          sort_order?: number
           supplier_categories?: string[] | null
           template_id?: string | null
           typical_roles?: string[] | null
+          updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "knowledge_domains_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "knowledge_domains_parent_id_fkey"
             columns: ["parent_id"]
@@ -6435,6 +6470,165 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "blueprint_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_links: {
+        Row: {
+          created_at: string
+          description: string
+          discovered_by: string
+          foundry_id: string
+          id: string
+          relationship: string
+          source_note_id: string
+          target_note_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          discovered_by?: string
+          foundry_id: string
+          id?: string
+          relationship?: string
+          source_note_id: string
+          target_note_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          discovered_by?: string
+          foundry_id?: string
+          id?: string
+          relationship?: string
+          source_note_id?: string
+          target_note_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_links_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_links_source_note_id_fkey"
+            columns: ["source_note_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_links_target_note_id_fkey"
+            columns: ["target_note_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_notes: {
+        Row: {
+          confidence: number
+          content: string
+          created_at: string
+          description: string
+          domain_id: string | null
+          extraction_metadata: Json
+          foundry_id: string
+          id: string
+          is_archived: boolean
+          is_pinned: boolean
+          is_verified: boolean
+          link_count: number
+          note_type: string
+          source_message_id: string | null
+          source_specialist: string | null
+          source_thread_id: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+          view_count: number
+        }
+        Insert: {
+          confidence?: number
+          content: string
+          created_at?: string
+          description?: string
+          domain_id?: string | null
+          extraction_metadata?: Json
+          foundry_id: string
+          id?: string
+          is_archived?: boolean
+          is_pinned?: boolean
+          is_verified?: boolean
+          link_count?: number
+          note_type?: string
+          source_message_id?: string | null
+          source_specialist?: string | null
+          source_thread_id?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          view_count?: number
+        }
+        Update: {
+          confidence?: number
+          content?: string
+          created_at?: string
+          description?: string
+          domain_id?: string | null
+          extraction_metadata?: Json
+          foundry_id?: string
+          id?: string
+          is_archived?: boolean
+          is_pinned?: boolean
+          is_verified?: boolean
+          link_count?: number
+          note_type?: string
+          source_message_id?: string | null
+          source_specialist?: string | null
+          source_thread_id?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_notes_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_domains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_notes_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_notes_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "knowledge_notes_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -16470,5 +16664,3 @@ export const Constants = {
     },
   },
 } as const
-A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.7)
-We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

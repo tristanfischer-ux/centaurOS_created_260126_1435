@@ -90,6 +90,8 @@ export interface UserAssembly {
   slots: TemplateSlot[]
   schematicSvg: string | null
   placedComponents: PlacedComponent[]
+  /** Marketplace RFQ created from this assembly (if any) */
+  rfqId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -104,6 +106,16 @@ export interface PlacedComponent {
   componentName: string
   customParams: Record<string, unknown> | null
   quantity: number
+}
+
+/** Summary of an assembly for listing (e.g. Recent Projects grid) */
+export interface AssemblySummary {
+  id: string
+  name: string
+  updatedAt: string
+  createdAt: string
+  thumbnailUrl: string | null
+  status: string
 }
 
 // ─── getComponentCatalog ─────────────────────────────────────────────
@@ -454,8 +466,50 @@ export async function getAssembly(
       customParams: p.custom_params as Record<string, unknown> | null,
       quantity: p.quantity ?? 1,
     })),
+    rfqId: (assembly as { rfq_id?: string | null }).rfq_id ?? null,
     createdAt: assembly.created_at ?? "",
     updatedAt: assembly.updated_at ?? "",
+  }
+}
+
+// ─── listRecentAssemblies ───────────────────────────────────────────
+
+/**
+ * Lists recent assemblies for the current user (for Forge landing page).
+ *
+ * @description Returns assembly summaries sorted by updated_at desc.
+ * RLS restricts to creator_id = auth.uid().
+ *
+ * @param limit - Max number to return (default 20)
+ * @returns Array of assembly summaries or error
+ *
+ * @security RLS: users only see their own assemblies
+ */
+export async function listRecentAssemblies(
+  limit = 20,
+): Promise<{ assemblies: AssemblySummary[] } | { error: string }> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("cad_assemblies")
+    .select("id, name, updated_at, created_at, thumbnail_url, status")
+    .order("updated_at", { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error("[AssemblyBuilder] Failed to list assemblies:", error.message)
+    return { error: "Failed to load assemblies" }
+  }
+
+  return {
+    assemblies: (data ?? []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      updatedAt: row.updated_at ?? "",
+      createdAt: row.created_at ?? "",
+      thumbnailUrl: row.thumbnail_url ?? null,
+      status: row.status ?? "draft",
+    })),
   }
 }
 

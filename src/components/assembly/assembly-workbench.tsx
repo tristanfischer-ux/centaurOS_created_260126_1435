@@ -22,6 +22,8 @@ import {
   PoundSterling,
   ShieldCheck,
   Link2,
+  SendHorizonal,
+  ExternalLink,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -42,6 +44,7 @@ import {
   getAssemblyEnrichment,
   autoFillAssembly,
 } from "@/actions/assembly-builder"
+import { createAssemblyRfqAction } from "@/actions/assembly-rfq"
 
 import type {
   UserAssembly,
@@ -99,6 +102,10 @@ export function AssemblyWorkbench({
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null)
   const [showSlotPopover, setShowSlotPopover] = useState(false)
 
+  // RFQ export state
+  const [rfqId, setRfqId] = useState<string | null>(null)
+  const [isCreatingRfq, startRfqTransition] = useTransition()
+
   // ─── Load Data ───────────────────────────────────────────────────
 
   useEffect(() => {
@@ -116,6 +123,7 @@ export function AssemblyWorkbench({
         }
 
         setAssembly(assemblyResult)
+        setRfqId(assemblyResult.rfqId ?? null)
         setComponents(catalogResult.components)
         setStats(catalogResult.stats)
       } catch (err) {
@@ -188,6 +196,41 @@ export function AssemblyWorkbench({
     if (!activeSlotPlaced?.geometryTypeSlug) return null
     return componentLookup.get(activeSlotPlaced.geometryTypeSlug) ?? null
   }, [activeSlotPlaced, componentLookup])
+
+  // ─── Assembly Readiness (for RFQ gate) ───────────────────────────
+
+  // Mirrors the "Build Ready" logic from stats-panel.tsx:
+  // All required slots must be filled (warnings not checked here — soft gate).
+  const isAssemblyReady = useMemo((): boolean => {
+    if (!assembly) return false
+    const requiredSlots = assembly.slots.filter((s) => s.required)
+    if (requiredSlots.length === 0) return assembly.placedComponents.length > 0
+    const filledSlotIds = new Set(assembly.placedComponents.map((pc) => pc.slotId))
+    return requiredSlots.every((s) => filledSlotIds.has(s.id))
+  }, [assembly])
+
+  // ─── RFQ Handler ─────────────────────────────────────────────────
+
+  /**
+   * Creates a marketplace RFQ from the current assembly BOM.
+   * Only available when all required slots are filled.
+   *
+   * @security createAssemblyRfqAction verifies authentication via RLS
+   */
+  const handleExportToRfq = useCallback((): void => {
+    if (!isAssemblyReady) return
+    startRfqTransition(async () => {
+      const result = await createAssemblyRfqAction(assemblyId)
+      if ("error" in result) {
+        toast.error("Failed to create RFQ", { description: result.error })
+        return
+      }
+      setRfqId(result.rfqId)
+      toast.success("RFQ created", {
+        description: "Your assembly has been sent to the marketplace.",
+      })
+    })
+  }, [assemblyId, isAssemblyReady, startRfqTransition])
 
   // ─── Handlers ────────────────────────────────────────────────────
 
@@ -385,6 +428,47 @@ export function AssemblyWorkbench({
             <Rocket className="h-3.5 w-3.5 mr-1.5" />
             Generate CAD
           </Button>
+
+          {/* RFQ export — enabled only when all required slots are filled */}
+          <div className="flex flex-col items-end gap-0">
+            <div className="flex items-center gap-2">
+              {rfqId ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.open(`/rfq/${rfqId}`, "_blank", "noopener,noreferrer")}
+                >
+                  View RFQ
+                  <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!isAssemblyReady || isCreatingRfq || isPending}
+                  title={!isAssemblyReady ? "Fill all required slots to create an RFQ" : undefined}
+                  onClick={handleExportToRfq}
+                >
+                  {isCreatingRfq ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Creating…
+                    </>
+                  ) : (
+                    <>
+                      <SendHorizonal className="h-3.5 w-3.5 mr-1.5" />
+                      Create Marketplace RFQ
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+            {!isAssemblyReady && !rfqId && (
+              <p className="text-[11px] text-status-warning -mt-1">
+                Fill all required slots to create an RFQ
+              </p>
+            )}
+          </div>
         </div>
       </div>
 

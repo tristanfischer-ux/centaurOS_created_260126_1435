@@ -4,10 +4,10 @@
  * Mashup Lab — Combine 2+ STEP files into a hybrid product.
  *
  * @description Wizard: (1) Select sources, (2) Describe mashup concept,
- * (3) Generate (plan + code + Modal), (4) Preview and export.
+ * (3) Generate (plan + code + Modal), (4) Preview, download, and send to RFQ.
  */
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import {
   Loader2,
   Sparkles,
@@ -16,14 +16,20 @@ import {
   Box,
   FileText,
   CheckCircle2,
+  SendHorizonal,
+  ExternalLink,
+  AlertCircle,
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { MashupSourceSelector } from "../components/mashup-source-selector"
 import { STLViewer } from "@/components/cad/stl-viewer"
 import { generateMashup } from "@/actions/cad-lab"
+import { createMashupRfqAction } from "@/actions/cad-lab-rfq"
 import type { MashupSourceInput, MashupResult } from "@/lib/cad-lab-types"
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
@@ -37,6 +43,11 @@ export default function MashupPage(): React.ReactElement {
   const [result, setResult] = useState<MashupResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // RFQ state
+  const [rfqId, setRfqId] = useState<string | null>(null)
+  const [rfqError, setRfqError] = useState<string | null>(null)
+  const [isCreatingRfq, startRfqTransition] = useTransition()
+
   const canProceedFromSources = sources.length >= 2
   const canGenerate = canProceedFromSources && concept.trim().length > 0
 
@@ -45,6 +56,8 @@ export default function MashupPage(): React.ReactElement {
     setError(null)
     setStep("generating")
     setResult(null)
+    setRfqId(null)
+    setRfqError(null)
 
     try {
       const res = await generateMashup(sources, concept.trim())
@@ -67,6 +80,48 @@ export default function MashupPage(): React.ReactElement {
     setConcept("")
     setResult(null)
     setError(null)
+    setRfqId(null)
+    setRfqError(null)
+  }
+
+  /**
+   * Creates a marketplace RFQ from the generated mashup artifacts.
+   * STEP URL is required; STL is optional but included if present.
+   */
+  const handleSendToRfq = (): void => {
+    if (!result?.step_url) return
+    setRfqError(null)
+
+    startRfqTransition(async () => {
+      const res = await createMashupRfqAction({
+        concept: concept.trim(),
+        sources: sources.map((s) => ({
+          name: s.name ?? "unnamed",
+          description: s.description,
+        })),
+        stepUrl: result.step_url!,
+        stlUrl: result.stl_url ?? null,
+        strategy: typeof result.mashup_plan === "object" && result.mashup_plan !== null
+          ? (result.mashup_plan as { strategy?: string }).strategy
+          : undefined,
+      })
+
+      if ("error" in res) {
+        setRfqError(res.error)
+        toast.error("Failed to create RFQ", { description: res.error })
+        return
+      }
+
+      setRfqId(res.rfqId)
+      toast.success("RFQ created", {
+        description: "Your mashup design has been sent to the marketplace.",
+      })
+    })
+  }
+
+  const handleViewRfq = (): void => {
+    if (!rfqId) return
+    window.open(`/rfq/${rfqId}`, "_blank", "noopener,noreferrer")
   }
 
   return (
@@ -78,7 +133,7 @@ export default function MashupPage(): React.ReactElement {
             <h1 className={typography.h1}>Mashup Lab</h1>
           </div>
           <p className={typography.pageSubtitle}>
-            Combine two or more STEP files into a hybrid product — e.g. a radio in a toaster, or an RC car that’s also a drone.
+            Combine two or more STEP files into a hybrid product — e.g. a radio in a toaster, or an RC car that&apos;s also a drone.
           </p>
         </div>
       </header>
@@ -131,9 +186,10 @@ export default function MashupPage(): React.ReactElement {
               />
             </div>
             {error && (
-              <p className="text-sm text-destructive" role="alert">
-                {error}
-              </p>
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
             <div className="flex justify-between">
               <Button variant="secondary" onClick={() => setStep("sources")}>
@@ -169,11 +225,14 @@ export default function MashupPage(): React.ReactElement {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* 3D preview */}
             {result.stl_b64 && (
               <div className="rounded-lg overflow-hidden border border-border">
                 <STLViewer stlData={result.stl_b64} className="min-h-[400px]" />
               </div>
             )}
+
+            {/* Download buttons */}
             <div className="flex flex-wrap gap-2">
               {result.step_url && (
                 <Button variant="outline" asChild>
@@ -192,15 +251,53 @@ export default function MashupPage(): React.ReactElement {
                 </Button>
               )}
             </div>
+
+            {/* Generation time */}
             {result.elapsedMs != null && (
               <p className="text-sm text-muted-foreground">
                 Generated in {(result.elapsedMs / 1000).toFixed(1)}s
               </p>
             )}
-            <div className="flex justify-between pt-4 border-t border-border">
+
+            {/* RFQ error */}
+            {rfqError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{rfqError}</AlertDescription>
+              </Alert>
+            )}
+
+            {/* Footer actions */}
+            <div className="flex items-center justify-between pt-4 border-t border-border">
               <Button variant="secondary" onClick={handleReset}>
                 Start over
               </Button>
+
+              <div className="flex items-center gap-2">
+                {rfqId ? (
+                  <Button onClick={handleViewRfq} variant="outline">
+                    View RFQ
+                    <ExternalLink className="h-4 w-4 ml-2" />
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSendToRfq}
+                    disabled={!result.step_url || isCreatingRfq}
+                  >
+                    {isCreatingRfq ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating RFQ…
+                      </>
+                    ) : (
+                      <>
+                        <SendHorizonal className="h-4 w-4 mr-2" />
+                        Create Marketplace RFQ
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

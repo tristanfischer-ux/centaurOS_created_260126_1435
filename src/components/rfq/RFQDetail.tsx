@@ -38,6 +38,8 @@ import {
   Send,
   Users,
   FileCheck,
+  Download,
+  FileBox,
 } from 'lucide-react'
 import Link from 'next/link'
 import {
@@ -313,6 +315,38 @@ export function RFQDetail({
               </div>
             </div>
           )}
+
+          {/* Attachments — STEP/STL and other files for suppliers to download */}
+          {Array.isArray(rfq.specifications?.attachments) &&
+            rfq.specifications.attachments.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Attachments</h3>
+                <ul className="space-y-2">
+                  {rfq.specifications.attachments.map((url, index) => {
+                    const href = typeof url === 'string' ? url : ''
+                    if (!href) return null
+                    const lower = href.toLowerCase()
+                    const isStep = lower.endsWith('.step') || lower.includes('.step?')
+                    const isStl = lower.endsWith('.stl') || lower.includes('.stl?')
+                    const label = isStep ? 'STEP' : isStl ? 'STL' : `File ${index + 1}`
+                    return (
+                      <li key={index}>
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-sm font-medium text-electric-blue hover:text-electric-blue-hover hover:underline"
+                        >
+                          <FileBox className="h-4 w-4 shrink-0" />
+                          <span>{label}</span>
+                          <Download className="h-3.5 w-3.5 shrink-0" />
+                        </a>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
 
           {/* Buyer info */}
           {rfq.buyer && (

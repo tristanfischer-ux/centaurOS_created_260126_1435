@@ -56,8 +56,6 @@
     "src/actions/universal-subsystems.ts|TS2322|Type is not assignable to type.",
     "src/actions/universal-subsystems.ts|TS2352|Conversion of type '__TYPE__' to type 'SubsystemObjectiveTask[]'__TYPE__'unknown' first.",
     "src/actions/universal-subsystems.ts|TS2352|Conversion of type '__TYPE__' to type 'SubsystemQuestion[]'__TYPE__'unknown' first.",
-    "src/actions/web-fetch.ts|TS18049|'article.textContent' is possibly 'null' or 'undefined'.",
-    "src/actions/web-fetch.ts|TS2345|Argument of type is not assignable to parameter of type.",
     "src/actions/whiteboards.ts|TS2769|No overload matches this call.",
     "src/app/(platform)/agents/artifacts/artifacts-view.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/agents/components/workflow-results-dialog.tsx|TS2322|Type is not assignable to type.",
