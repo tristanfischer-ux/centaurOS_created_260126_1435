@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { InspirationPageNew } from './inspiration-page-new'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getBlueprints, getBlueprintTemplates } from '@/actions/blueprints'
+import { getBlueprintTemplates } from '@/actions/blueprints'
 import { getObjectivePacks, getSavedPackIds } from '@/actions/packs'
 import { getFoundryContext } from '@/actions/foundry-context'
 import { getUniversalSubsystems } from '@/actions/universal-subsystems'
@@ -32,7 +32,6 @@ async function InspirationData() {
     savedPacksResult,
     foundryContext,
     membersResult,
-    blueprintsResult,
     universalSubsystems,
     questionsResult,
   ] = await Promise.all([
@@ -47,7 +46,6 @@ async function InspirationData() {
       .neq('role', 'AI_Agent')
       .order('full_name')
       : Promise.resolve({ data: null }),
-    getBlueprints(),
     getUniversalSubsystems(),
     getAdvisoryQuestions({ limit: 10 }),
   ])
@@ -64,10 +62,6 @@ async function InspirationData() {
   if ('error' in membersResult && membersResult.error) {
     console.error('[Inspiration] Failed to fetch members:', membersResult.error)
   }
-  if (blueprintsResult.error) {
-    console.error('[Inspiration] Failed to fetch blueprints:', blueprintsResult.error)
-  }
-
   const members = (membersResult.data || []).map(m => ({
     id: m.id,
     full_name: m.full_name || 'Unknown',
@@ -102,7 +96,6 @@ async function InspirationData() {
       initialSavedPackIds={Array.from(savedPacksResult.savedIds || [])}
       foundryContext={foundryContext}
       members={members}
-      blueprints={blueprintsResult.data || []}
       universalSubsystems={universalSubsystems}
       questions={transformedQuestions}
     />

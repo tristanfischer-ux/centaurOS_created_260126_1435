@@ -13,7 +13,6 @@ import {
   Clock,
   Wrench,
   DollarSign,
-  Map,
   Target,
   Cpu,
   Users,
@@ -40,7 +39,7 @@ import {
 import { typography } from '@/lib/design-system'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
-import type { Blueprint, BlueprintTemplate, UniversalSubsystem, SubsystemObjectivePack } from '@/types/blueprints'
+import type { BlueprintTemplate, UniversalSubsystem, SubsystemObjectivePack } from '@/types/blueprints'
 import type { ObjectivePack } from '@/actions/packs'
 import type { FoundryContext } from '@/actions/foundry-context'
 import { CategoryTabs, type TabId } from './components/category-tabs'
@@ -107,7 +106,6 @@ interface InspirationPageNewProps {
   initialSavedPackIds?: string[]
   foundryContext?: FoundryContext
   members?: TeamMember[]
-  blueprints?: Blueprint[]
   universalSubsystems?: UniversalSubsystem[]
   questions?: Question[]
 }
@@ -118,7 +116,6 @@ export function InspirationPageNew({
   initialSavedPackIds = [],
   foundryContext,
   members = [],
-  blueprints = [],
   universalSubsystems = [],
   questions = [],
 }: InspirationPageNewProps) {
@@ -417,37 +414,6 @@ export function InspirationPageNew({
           Discover what to do next. Turn ideas into objectives and tasks for your team.
         </p>
       </div>
-
-      {/* ================================================================== */}
-      {/* Product Maps summary card                                          */}
-      {/* ================================================================== */}
-      <Card className="bg-gradient-to-r from-orange-50 to-blue-50 border-orange-100 hover:shadow-md transition-shadow">
-        <CardContent className="py-5">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
-              <Map className="h-5 w-5 text-international-orange" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm">Product Maps</h3>
-              <p className="text-xs text-muted-foreground">
-                {blueprints.length > 0
-                  ? `${blueprints.length} active map${blueprints.length > 1 ? 's' : ''} \u00B7 ${Math.round(blueprints.reduce((sum, b) => sum + b.coverage_score, 0) / blueprints.length)}% average coverage`
-                  : 'Visualise every domain, skill, and component your product needs. Find gaps and turn them into action.'}
-              </p>
-            </div>
-            <Button
-              asChild
-              size="sm"
-              className="shrink-0 bg-international-orange hover:bg-international-orange/90"
-            >
-              <Link href="/blueprints">
-                {blueprints.length > 0 ? 'View Product Maps' : 'Create Your First Map'}
-                <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* ================================================================== */}
       {/* Category tabs (reorganised: For You, By Need, By Industry, Popular, Saved) */}

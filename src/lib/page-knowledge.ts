@@ -614,33 +614,6 @@ const PAGE_KNOWLEDGE: PageKnowledge[] = [
       "Pitch prep: Create pitch -> Define narrative -> Build deck -> AI rehearsal -> Refine -> Present",
     ],
   },
-  {
-    route: "/blueprints",
-    title: "Product Maps",
-    purpose: "Visual knowledge domain maps for tracking every domain, skill, and component a product needs. Find coverage gaps and turn them into objectives.",
-    features: [
-      {
-        name: "Browse Blueprints",
-        description: "Explore the library of pre-built frameworks and templates.",
-        howToAccess: "Scroll through the blueprint grid or use category filters.",
-        whenToUse: "When starting a new initiative and want proven frameworks to follow.",
-      },
-      {
-        name: "Apply Blueprint",
-        description: "Apply a blueprint to create pre-configured objectives, tasks, and structures.",
-        howToAccess: "Click 'Apply' or 'Use This Blueprint' on any blueprint card.",
-        whenToUse: "When you've found a framework that fits your situation.",
-      },
-    ],
-    gettingStarted: [
-      "Browse available blueprints to find one matching your current challenge",
-      "Preview what a blueprint creates before applying",
-      "Apply and customize to fit your specific needs",
-    ],
-    workflows: [
-      "Blueprint usage: Browse library -> Preview -> Apply -> Customize -> Execute",
-    ],
-  },
 ]
 
 // ─── Lookup Functions ───────────────────────────────────────────────────────

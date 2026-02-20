@@ -246,7 +246,7 @@ export const inspirationCommand: SlashCommand = {
   usage: '/inspiration',
   icon: Lightbulb,
   category: 'navigation',
-  aliases: ['ideas', 'blueprints', 'productmap'],
+  aliases: ['ideas'],
   execute: async (): Promise<CommandResult> => {
     return navigateResult('/inspiration')
   }

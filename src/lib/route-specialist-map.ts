@@ -48,7 +48,6 @@ const ROUTE_SPECIALIST_MAP: Array<{
   { pattern: "/strategic-planner", specialistId: "strategist" },
   { pattern: "/team", specialistId: "hiring-team" },
   { pattern: "/marketplace", specialistId: "sales-lead" },
-  { pattern: "/blueprints", specialistId: "product-lead" },
   { pattern: "/pitch-prep", specialistId: "fundraising-advisor" },
   { pattern: "/guild", specialistId: "hiring-team" },
   { pattern: "/retainers", specialistId: "legal-counsel" },

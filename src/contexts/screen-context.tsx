@@ -317,14 +317,6 @@ const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
     title: "Tasks",
     summary: "The user is viewing the task list — work items, statuses, and assignments.",
   },
-  "/blueprints": {
-    title: "Product Maps",
-    summary: "The user is browsing product maps — visual knowledge domain maps for tracking what their product needs.",
-  },
-  "/blueprints/explore": {
-    title: "Explore Blueprints",
-    summary: "The user is exploring the blueprint library — discovering frameworks for strategy, operations, and growth.",
-  },
   "/org-blueprint": {
     title: "Organizational Blueprint",
     summary: "The user is viewing the org blueprint — organizational structure, roles, and coverage analysis.",
