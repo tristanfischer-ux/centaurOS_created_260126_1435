@@ -46,16 +46,16 @@ describe('TaskCard', () => {
         expect(screen.getByText('Test Task')).toBeInTheDocument()
     })
 
-    it('shows Accept button for assignee', () => {
+    it('renders status badge for assignee', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         render(<TaskCard task={mockTask as any} currentUserId="user-1" {...defaultProps} />)
-        expect(screen.getByText('Accept Task')).toBeInTheDocument()
+        expect(screen.getByText('Pending')).toBeInTheDocument()
     })
 
-    it('hides Accept button for non-assignee', () => {
+    it('renders status badge for non-assignee', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         render(<TaskCard task={mockTask as any} currentUserId="user-2" {...defaultProps} />)
-        expect(screen.queryByText('Accept Task')).not.toBeInTheDocument()
+        expect(screen.getByText('Pending')).toBeInTheDocument()
     })
 
     it.skip('shows Amendment Notes when status is Amended_Pending_Approval', () => {

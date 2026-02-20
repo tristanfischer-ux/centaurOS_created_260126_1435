@@ -331,23 +331,29 @@ describe('agent objective action security regressions', () => {
 
 describe('server action OpenAI hardening regressions', () => {
   it('does not use dummy OpenAI key fallbacks in server actions and telegram AI processor', async () => {
-    const actionFiles = [
+    const openaiActionFiles = [
       'src/actions/strategic-planner.ts',
       'src/actions/smart-goals.ts',
       'src/actions/generate-advisory-answer.ts',
       'src/actions/assess-coverage.ts',
-      'src/actions/analyze.ts',
       'src/app/actions/analyze-business-plan.ts',
       'src/lib/telegram/ai-processor.ts',
     ]
 
-    for (const filePath of actionFiles) {
+    for (const filePath of openaiActionFiles) {
       const source = await readFile(path.join(process.cwd(), filePath), 'utf-8')
       expect(source).toContain('function getOpenAIClient()')
       expect(source).not.toContain('dummy-key-for-build')
       expect(source).not.toContain('sk-placeholder-for-build-only')
       expect(source).not.toMatch(/apiKey:\s*process\.env\.OPENAI_API_KEY\s*\|\|/)
     }
+
+    // analyze.ts uses Anthropic (Claude Opus 4.6) — verify it fails closed too
+    const analyzeSource = await readFile(path.join(process.cwd(), 'src/actions/analyze.ts'), 'utf-8')
+    expect(analyzeSource).toContain('ANTHROPIC_API_KEY')
+    expect(analyzeSource).toContain('AI analysis service is not configured')
+    expect(analyzeSource).not.toContain('dummy-key-for-build')
+    expect(analyzeSource).not.toContain('sk-placeholder')
   })
 
   it('fails closed for both assessCoverage and assessSingleFunction OpenAI usage', async () => {
