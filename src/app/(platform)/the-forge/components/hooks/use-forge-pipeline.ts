@@ -154,78 +154,50 @@ export function useForgePipeline({
   }, [scanId, setSpecDirect])
 
   const handleRunFullPipeline = useCallback(async (): Promise<void> => {
-    const stages = INITIAL_PIPELINE_STAGES.map((s) => ({ ...s }))
-    setPipelineProgress({ isRunning: true, stages })
+    setPipelineProgress({ isRunning: true, stages: INITIAL_PIPELINE_STAGES.map((s) => ({ ...s })) })
 
+    // Functional updater avoids stale closure over a mutable local array
     const updateStage = (id: PipelineStageId, update: Partial<PipelineStageStatus>): void => {
-      const idx = stages.findIndex((s) => s.id === id)
-      if (idx >= 0) stages[idx] = { ...stages[idx], ...update }
-      setPipelineProgress({ isRunning: true, stages: [...stages] })
+      setPipelineProgress((prev) => ({
+        ...prev,
+        stages: prev.stages.map((s) => (s.id === id ? { ...s, ...update } : s)),
+      }))
     }
 
+    type StageRunner = { id: PipelineStageId; label: string; run: () => Promise<{ spec: XRaySpec } | { error: string }> }
+    const stageRunners: StageRunner[] = [
+      { id: "mass_dfm", label: "Mass & DFM", run: () => analyzeModulesAction(scanId) },
+      { id: "structural", label: "Structural FEA", run: () => runStructuralAnalysisAction(scanId) },
+      { id: "thermal", label: "Thermal Analysis", run: () => runThermalAnalysisAction(scanId) },
+      { id: "topology", label: "Topology Optimization", run: () => runTopologyOptimizationAction(scanId) },
+    ]
+
+    let hasError = false
+
     try {
-      // Stage 1: Mass properties + DFM
-      updateStage("mass_dfm", { status: "running" })
-      toast.info("Pipeline: Running mass properties & DFM...")
-      try {
-        const r = await analyzeModulesAction(scanId)
-        if ("error" in r) {
-          updateStage("mass_dfm", { status: "error", error: r.error })
-        } else {
-          setSpecDirect(r.spec)
-          updateStage("mass_dfm", { status: "complete" })
-          if ("persistError" in r) toast.warning("Mass/DFM: Results computed but failed to save.")
+      // Stages 1-4: sequential analysis passes
+      for (const stage of stageRunners) {
+        updateStage(stage.id, { status: "running" })
+        toast.info(`Pipeline: Running ${stage.label}...`)
+        try {
+          const r = await stage.run()
+          if ("error" in r) {
+            updateStage(stage.id, { status: "error", error: r.error })
+            hasError = true
+          } else {
+            setSpecDirect(r.spec)
+            updateStage(stage.id, { status: "complete" })
+            if ("persistError" in r) toast.warning(`${stage.label}: Results computed but failed to save.`)
+          }
+        } catch (err) {
+          updateStage(stage.id, { status: "error", error: err instanceof Error ? err.message : "Unknown" })
+          hasError = true
         }
-      } catch (err) {
-        updateStage("mass_dfm", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
-      }
-
-      // Stage 2: Structural FEA
-      updateStage("structural", { status: "running" })
-      toast.info("Pipeline: Running structural FEA...")
-      try {
-        const r = await runStructuralAnalysisAction(scanId)
-        if ("error" in r) {
-          updateStage("structural", { status: "error", error: r.error })
-        } else {
-          setSpecDirect(r.spec)
-          updateStage("structural", { status: "complete" })
-          if ("persistError" in r) toast.warning("Structural FEA: Results computed but failed to save.")
+        // Abort pipeline on first error — downstream stages depend on prior results
+        if (hasError) {
+          toast.error(`Pipeline stopped: ${stage.label} failed. Fix the issue and re-run.`)
+          return
         }
-      } catch (err) {
-        updateStage("structural", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
-      }
-
-      // Stage 3: Thermal analysis
-      updateStage("thermal", { status: "running" })
-      toast.info("Pipeline: Running thermal analysis...")
-      try {
-        const r = await runThermalAnalysisAction(scanId)
-        if ("error" in r) {
-          updateStage("thermal", { status: "error", error: r.error })
-        } else {
-          setSpecDirect(r.spec)
-          updateStage("thermal", { status: "complete" })
-          if ("persistError" in r) toast.warning("Thermal: Results computed but failed to save.")
-        }
-      } catch (err) {
-        updateStage("thermal", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
-      }
-
-      // Stage 4: Topology optimization
-      updateStage("topology", { status: "running" })
-      toast.info("Pipeline: Running topology optimization...")
-      try {
-        const r = await runTopologyOptimizationAction(scanId)
-        if ("error" in r) {
-          updateStage("topology", { status: "error", error: r.error })
-        } else {
-          setSpecDirect(r.spec)
-          updateStage("topology", { status: "complete" })
-          if ("persistError" in r) toast.warning("Topology: Results computed but failed to save.")
-        }
-      } catch (err) {
-        updateStage("topology", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
       }
 
       // Stage 5: Convergence evaluation
@@ -256,11 +228,7 @@ export function useForgePipeline({
         updateStage("convergence", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
       }
     } finally {
-      setPipelineProgress((prev) => ({
-        ...prev,
-        isRunning: false,
-        stages: [...stages],
-      }))
+      setPipelineProgress((prev) => ({ ...prev, isRunning: false }))
     }
   }, [scanId, setSpecDirect])
 
