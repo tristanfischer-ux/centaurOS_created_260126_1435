@@ -133,7 +133,7 @@ export function BlueprintDetailView({
           href="/blueprints" 
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
-          Blueprints
+          Product Maps
         </Link>
         <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
         <span className="text-foreground font-medium truncate max-w-[200px]">

@@ -1,5 +1,12 @@
 'use client'
 
+/**
+ * @file CompletionTrendSection.tsx
+ *
+ * @description Completion trend section with Recharts bar chart visualization,
+ * summary stats, and consistent section header with icon.
+ */
+
 import {
   BarChart,
   Bar,
@@ -10,12 +17,17 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
+import { BarChart3 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
+import { ReportSectionHeader } from '@/components/reports/report-visuals'
 
-import type { CompletionTrendSectionData } from '@/lib/reports/report-document-types'
+import type { CompletionTrendSectionData, ReportTemplateId } from '@/lib/reports/report-document-types'
 
-type CompletionTrendSectionProps = CompletionTrendSectionData
+interface CompletionTrendSectionProps extends CompletionTrendSectionData {
+  templateId?: ReportTemplateId
+  sectionNumber?: number
+}
 
 const INTERNATIONAL_ORANGE = 'hsl(14, 100%, 50%)'
 const ELECTRIC_BLUE = 'hsl(217, 91%, 60%)'
@@ -29,23 +41,48 @@ function formatXAxisDate(dateStr: string): string {
 export function CompletionTrendSection({
   dataPoints,
   periodLabel,
-}: CompletionTrendSectionProps) {
+  templateId,
+  sectionNumber,
+}: CompletionTrendSectionProps): React.JSX.Element {
   const chartData = dataPoints.map((dp) => ({
     ...dp,
     label: formatXAxisDate(dp.date),
   }))
 
+  const totalCompleted = dataPoints.reduce((sum, dp) => sum + dp.completed, 0)
+  const totalCreated = dataPoints.reduce((sum, dp) => sum + dp.created, 0)
+  const netProgress = totalCompleted - totalCreated
+
   return (
     <section className="space-y-8">
-      <div className="flex items-center gap-3">
-        <div className="h-6 w-1 rounded-full bg-international-orange" />
-        <h2 className="text-2xl font-display font-bold text-foreground">
-          Completion Trend
-        </h2>
+      <ReportSectionHeader
+        title="Completion Trend"
+        icon={BarChart3}
+        templateId={templateId}
+        sectionNumber={sectionNumber}
+      />
+
+      {/* Summary stat pills */}
+      <div className="flex flex-wrap gap-3">
+        <div className="rounded-xl bg-international-orange/5 border border-international-orange/10 px-4 py-2.5 text-center">
+          <p className="text-2xl font-display font-bold text-foreground">{totalCompleted}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Completed</p>
+        </div>
+        <div className="rounded-xl bg-electric-blue/5 border border-electric-blue/10 px-4 py-2.5 text-center">
+          <p className="text-2xl font-display font-bold text-foreground">{totalCreated}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Created</p>
+        </div>
+        <div className="rounded-xl bg-muted/50 px-4 py-2.5 text-center">
+          <p className={`text-2xl font-display font-bold ${netProgress >= 0 ? 'text-status-success' : 'text-destructive'}`}>
+            {netProgress >= 0 ? '+' : ''}{netProgress}
+          </p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Net Progress</p>
+        </div>
       </div>
 
       <p className="text-sm text-muted-foreground">{periodLabel}</p>
 
+      {/* Chart */}
       <Card>
         <CardContent className="p-6 pt-6">
           <div className="h-72">

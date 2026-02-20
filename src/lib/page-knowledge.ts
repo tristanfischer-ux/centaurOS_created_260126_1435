@@ -616,8 +616,8 @@ const PAGE_KNOWLEDGE: PageKnowledge[] = [
   },
   {
     route: "/blueprints",
-    title: "Blueprints",
-    purpose: "Pre-built strategic and operational frameworks — templates for common business processes and organizational patterns.",
+    title: "Product Maps",
+    purpose: "Visual knowledge domain maps for tracking every domain, skill, and component a product needs. Find coverage gaps and turn them into objectives.",
     features: [
       {
         name: "Browse Blueprints",

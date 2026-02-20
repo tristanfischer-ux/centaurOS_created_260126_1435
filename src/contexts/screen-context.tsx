@@ -318,8 +318,8 @@ const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
     summary: "The user is viewing the task list — work items, statuses, and assignments.",
   },
   "/blueprints": {
-    title: "Blueprints",
-    summary: "The user is browsing blueprints — pre-built strategic frameworks and templates.",
+    title: "Product Maps",
+    summary: "The user is browsing product maps — visual knowledge domain maps for tracking what their product needs.",
   },
   "/blueprints/explore": {
     title: "Explore Blueprints",

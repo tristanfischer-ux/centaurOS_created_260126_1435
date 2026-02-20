@@ -140,7 +140,7 @@ export function TechTreeBrowser({ templatesWithTrees, foundryId }: TechTreeBrows
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
             <Link href="/blueprints" className="hover:text-foreground transition-colors flex items-center gap-1">
               <ArrowLeft className="h-4 w-4" />
-              Blueprints
+              Product Maps
             </Link>
           </div>
           <div className={typography.pageHeader}>

@@ -114,7 +114,7 @@ const planNavigation = [
 // ─────────────────────────────────────────────────────────────────────────────
 const workshopNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame, tooltip: "Turn product ideas into manufacturing-ready engineering packages" },
-    { name: "Blueprints", href: "/blueprints", icon: Map, tooltip: "Product maps, objective packs, and technical domain planning" },
+    { name: "Product Maps", href: "/blueprints", icon: Map, tooltip: "Your product knowledge maps and technology trees" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Retainers", href: "/retainers", icon: Handshake, tooltip: "Ongoing agreements with freelancers and experts" },
     { name: "AI Team", href: "/agents", icon: UsersRound, tooltip: "13 AI specialists — strategy, engineering, finance, legal, hiring, and more" },

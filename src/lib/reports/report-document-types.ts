@@ -55,6 +55,7 @@ export interface KPIMetric {
   format: 'number' | 'percentage' | 'decimal'
   trend: 'up' | 'down' | 'stable'
   changePercent: number
+  sparklineData?: number[]
 }
 
 export interface KeyMetricsSectionData {
