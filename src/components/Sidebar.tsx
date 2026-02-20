@@ -47,11 +47,10 @@ import {
     CalendarDays,
     AppWindow,
     Globe,
-    Map,
     Brain,
     Handshake,
     MessageCircle,
-    Banknote,
+
 } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
@@ -105,7 +104,7 @@ const planNavigation = [
     { name: "Strategy", href: "/strategy", icon: Waypoints, tooltip: "Your strategic direction — pillars, progress, and health at a glance" },
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Milestones that move the strategy forward" },
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Day-to-day work that delivers on objectives" },
-    { name: "Funding", href: "/funding", icon: Banknote, tooltip: "Capital requirements, funding events, and financial milestones from your business plan" },
+
     { name: "Reports", href: "/reports", icon: FileOutput, tooltip: "Generate polished weekly updates and board packs from your live data" },
 ]
 
@@ -114,7 +113,6 @@ const planNavigation = [
 // ─────────────────────────────────────────────────────────────────────────────
 const workshopNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame, tooltip: "Turn product ideas into manufacturing-ready engineering packages" },
-    { name: "Product Maps", href: "/blueprints", icon: Map, tooltip: "Your product knowledge maps and technology trees" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Retainers", href: "/retainers", icon: Handshake, tooltip: "Ongoing agreements with freelancers and experts" },
     { name: "AI Team", href: "/agents", icon: UsersRound, tooltip: "13 AI specialists — strategy, engineering, finance, legal, hiring, and more" },

@@ -37,7 +37,6 @@ import {
     AppWindow,
     FileOutput,
     Globe,
-    Map,
     Brain,
     Handshake,
     MessageCircle,
@@ -87,7 +86,6 @@ const planMoreNavigation = [
 // "More" dropdown — Workshop section
 const workshopMoreNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame },
-    { name: "Product Maps", href: "/blueprints", icon: Map },
     { name: "Team", href: "/team", icon: Users },
     { name: "Retainers", href: "/retainers", icon: Handshake },
     { name: "AI Team", href: "/agents", icon: UsersRound },
