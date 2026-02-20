@@ -63,6 +63,10 @@ export function useForgePersist({ initialProject }: UseForgePersistOptions): Use
   const isMountedRef = useRef(true)
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingSpecRef = useRef<XRaySpec | null>(null)
+  // Version counter prevents stale persists: each edit increments the counter,
+  // and the persist only clears localEditInProgress if its version is current.
+  const editVersionRef = useRef(0)
+  const persistVersionRef = useRef(0)
 
   // Unmount cleanup
   useEffect(() => {
@@ -137,6 +141,7 @@ export function useForgePersist({ initialProject }: UseForgePersistOptions): Use
 
   // ── Debounced persist ──
   const persistSpec = useCallback(async (nextSpec: XRaySpec): Promise<void> => {
+    const version = ++persistVersionRef.current
     try {
       await updateScanSpecAction(scanId, nextSpec)
       if (isMountedRef.current) {
@@ -152,7 +157,11 @@ export function useForgePersist({ initialProject }: UseForgePersistOptions): Use
         toast.warning("Failed to save changes. Please refresh and retry.")
       }
     } finally {
-      if (isMountedRef.current) localEditInProgressRef.current = false
+      // Only clear the edit-in-progress flag if no newer edits arrived
+      // while this persist was in flight.
+      if (isMountedRef.current && version === persistVersionRef.current) {
+        localEditInProgressRef.current = false
+      }
     }
   }, [scanId])
 
@@ -174,6 +183,7 @@ export function useForgePersist({ initialProject }: UseForgePersistOptions): Use
 
   // setSpec: update state + auto-persist
   const setSpec = useCallback((next: XRaySpec) => {
+    editVersionRef.current++
     setSpecInternal(next)
     specRef.current = next
     localEditInProgressRef.current = true
