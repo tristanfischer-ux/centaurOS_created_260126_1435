@@ -7,7 +7,8 @@
  * caching results in local state.
  */
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
+import { toast } from "sonner"
 
 import { matchPeopleAction, matchSuppliersAction } from "@/actions/xray"
 
@@ -54,31 +55,64 @@ export function useForgeMatching({
   const [suppliersByModule, setSuppliersByModule] = useState<Record<string, SupplierMatch[]>>({})
   const [isSuppliersLoading, setIsSuppliersLoading] = useState(false)
 
+  // Request versioning: if a newer request fires before the old completes,
+  // the stale result is ignored.
+  const peopleVersionRef = useRef(0)
+  const supplierVersionRef = useRef(0)
+
   const loadPeople = useCallback((forceRefresh = false): void => {
     if (specRef.current.modules.length === 0) return
+    const version = ++peopleVersionRef.current
     setIsPeopleLoading(true)
     matchPeopleAction(scanId, specRef.current.modules, forceRefresh)
       .then((result) => {
-        if (!isMountedRef.current) return
-        if ("people" in result) setPeople(result.people)
-        else console.error("[Forge] People error:", result.error)
+        if (!isMountedRef.current || version !== peopleVersionRef.current) return
+        if ("people" in result) {
+          setPeople(result.people)
+        } else {
+          console.error("[Forge] People error:", result.error)
+          toast.error("Failed to find expert matches")
+        }
       })
-      .catch((err) => console.error("[Forge] People error:", err))
-      .finally(() => setIsPeopleLoading(false))
+      .catch((err) => {
+        console.error("[Forge] People error:", err)
+        if (isMountedRef.current && version === peopleVersionRef.current) {
+          toast.error("Failed to load expert matches")
+        }
+      })
+      .finally(() => {
+        if (isMountedRef.current && version === peopleVersionRef.current) {
+          setIsPeopleLoading(false)
+        }
+      })
   }, [scanId, specRef, isMountedRef])
 
   const loadSuppliers = useCallback((forceRefresh = false): void => {
     if (specRef.current.modules.length === 0) return
     const diagComplete = isGatingDiagComplete(specRef.current)
+    const version = ++supplierVersionRef.current
     setIsSuppliersLoading(true)
     matchSuppliersAction(scanId, specRef.current.modules, diagComplete, forceRefresh)
       .then((result) => {
-        if (!isMountedRef.current) return
-        if ("suppliersByModule" in result) setSuppliersByModule(result.suppliersByModule)
-        else console.error("[Forge] Supplier error:", result.error)
+        if (!isMountedRef.current || version !== supplierVersionRef.current) return
+        if ("suppliersByModule" in result) {
+          setSuppliersByModule(result.suppliersByModule)
+        } else {
+          console.error("[Forge] Supplier error:", result.error)
+          toast.error("Failed to find supplier matches")
+        }
       })
-      .catch((err) => console.error("[Forge] Supplier error:", err))
-      .finally(() => setIsSuppliersLoading(false))
+      .catch((err) => {
+        console.error("[Forge] Supplier error:", err)
+        if (isMountedRef.current && version === supplierVersionRef.current) {
+          toast.error("Failed to load supplier matches")
+        }
+      })
+      .finally(() => {
+        if (isMountedRef.current && version === supplierVersionRef.current) {
+          setIsSuppliersLoading(false)
+        }
+      })
   }, [scanId, specRef, isMountedRef])
 
   return {
