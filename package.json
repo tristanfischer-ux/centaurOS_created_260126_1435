@@ -123,7 +123,8 @@
     "mermaid@10.9.4": {
       "dompurify": "3.2.4"
     },
-    "dompurify": "3.2.4"
+    "dompurify": "3.2.4",
+    "minimatch": "10.2.1"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.2.0",
