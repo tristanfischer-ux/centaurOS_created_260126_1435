@@ -61,6 +61,7 @@ import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import { MeetingOutputs } from "./meeting-outputs"
 import { HuddleReport } from "./huddle-report"
+import { createArtifact } from "@/actions/agent-artifacts"
 import { parseProposedActions, stripProposedActionsBlock } from "./brief-specialist-dialog"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { Specialist } from "./specialists-data"
@@ -761,6 +762,7 @@ export function TeamMeetingDialog({
     const [userThoughts, setUserThoughts] = useState("")
     const [showThoughtsInput, setShowThoughtsInput] = useState(false)
     const [meetingOutputs, setMeetingOutputs] = useState<MeetingOutputData | null>(null)
+    const [isAutoSaved, setIsAutoSaved] = useState(false)
     const [isGeneratingOutputs, setIsGeneratingOutputs] = useState(false)
     const [showReportDialog, setShowReportDialog] = useState(false)
     const [speakingEntryIdx, setSpeakingEntryIdx] = useState<number | null>(null)
@@ -1342,6 +1344,76 @@ export function TeamMeetingDialog({
 
             const parsed = JSON.parse(jsonStr) as MeetingOutputData
             setMeetingOutputs(parsed)
+
+            // INTENT: Auto-save meeting to deliverables so the user never loses output.
+            // Previously, users had to manually click "Save Meeting" — if they closed
+            // the dialog first, the entire meeting output was lost.
+            try {
+                const attendeeNames = selectedSpecialists.map((s) => s.name)
+                const redundantItems = parsed.redundantItems ?? []
+                const notesMarkdown = [
+                    `# Team Meeting: ${topic}`,
+                    `**Attendees:** ${attendeeNames.join(", ")}`,
+                    `**Rounds:** ${currentRound}`,
+                    "",
+                    "## Summary",
+                    parsed.notes.summary,
+                    "",
+                    "## Key Decisions",
+                    ...parsed.notes.keyDecisions.map((d: string) => `- ${d}`),
+                    "",
+                    "## Action Items",
+                    ...parsed.notes.actionItems.map((a: string) => `- ${a}`),
+                    "",
+                    "## Open Questions",
+                    ...parsed.notes.openQuestions.map((q: string) => `- ${q}`),
+                    "",
+                    "## Next Steps",
+                    ...parsed.notes.nextSteps.map((s: string) => `- ${s}`),
+                    ...(redundantItems.length > 0
+                        ? [
+                              "",
+                              "## Items Retired",
+                              ...redundantItems.map(
+                                  (item: { title: string; reason: string; recommendation: string }) =>
+                                      `- **${item.title}** — ${item.reason} (${item.recommendation})`
+                              ),
+                          ]
+                        : []),
+                    "",
+                    "---",
+                    "",
+                    "## Full Transcript",
+                    "",
+                    "*The complete meeting discussion is included below for reference.*",
+                    "",
+                    fullTranscript,
+                ].join("\n")
+
+                const saveResult = await createArtifact({
+                    title: `Team Meeting: ${topic.slice(0, 80)}`,
+                    content: notesMarkdown,
+                    contentType: "document",
+                    metadata: {
+                        source: "team-meeting",
+                        topic,
+                        attendees: attendeeNames,
+                        roundCount: currentRound,
+                        notes: parsed.notes,
+                        objectiveCount: parsed.objectives.length,
+                        marketplaceCount: parsed.marketplaceSuggestions.length,
+                        redundantItemCount: redundantItems.length,
+                    },
+                })
+
+                if (!saveResult.error) {
+                    setIsAutoSaved(true)
+                } else {
+                    console.error("[TeamMeeting] Auto-save failed:", saveResult.error)
+                }
+            } catch (saveErr) {
+                console.error("[TeamMeeting] Auto-save error:", saveErr instanceof Error ? saveErr.message : "Unknown")
+            }
         } catch (err) {
             const message = err instanceof Error ? err.message : "Unknown error"
             console.error("[TeamMeeting] Wrap-up failed:", message)
@@ -2104,6 +2176,7 @@ export function TeamMeetingDialog({
                                     .join("\n\n---\n\n")}
                                 roundCount={currentRound}
                                 onShareReport={() => setShowReportDialog(true)}
+                                initialSaved={isAutoSaved}
                             />
                         ) : error ? (
                             <div className="space-y-4 py-8">

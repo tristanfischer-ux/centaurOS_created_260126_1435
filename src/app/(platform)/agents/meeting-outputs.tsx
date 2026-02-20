@@ -49,7 +49,8 @@ import {
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Markdown } from "@/components/ui/markdown"
-import { createObjective, getStrategicObjectives, archiveObjectiveByTitle } from "@/actions/objectives"
+import { Input } from "@/components/ui/input"
+import { createObjective, getStrategicObjectives, createStrategicObjective, archiveObjectiveByTitle } from "@/actions/objectives"
 import { createArtifact } from "@/actions/agent-artifacts"
 import type { MeetingOutputData } from "./team-meeting-dialog"
 
@@ -69,6 +70,8 @@ interface MeetingOutputsProps {
     roundCount: number
     /** Called when user wants to share the report via email */
     onShareReport?: () => void
+    /** When true, the meeting was auto-saved to deliverables on wrap-up */
+    initialSaved?: boolean
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -80,16 +83,27 @@ export function MeetingOutputs({
     transcript,
     roundCount,
     onShareReport,
+    initialSaved = false,
 }: MeetingOutputsProps) {
     const [createdObjectives, setCreatedObjectives] = useState<Set<number>>(new Set())
     const [creatingIdx, setCreatingIdx] = useState<number | null>(null)
     const [isSaving, setIsSaving] = useState(false)
-    const [isSaved, setIsSaved] = useState(false)
+    const [isSaved, setIsSaved] = useState(initialSaved)
     const [archivedItems, setArchivedItems] = useState<Set<number>>(new Set())
     const [archivingIdx, setArchivingIdx] = useState<number | null>(null)
 
     const [strategicSelections, setStrategicSelections] = useState<Record<number, string>>({})
     const [strategicObjectives, setStrategicObjectives] = useState<StrategicObjectiveOption[]>([])
+    const [creatingStrategicForIdx, setCreatingStrategicForIdx] = useState<number | null>(null)
+    const [newStrategicTitle, setNewStrategicTitle] = useState("")
+    const [isCreatingStrategic, setIsCreatingStrategic] = useState(false)
+
+    // GOTCHA: initialSaved transitions from false to true AFTER this component mounts
+    // (the parent does setMeetingOutputs then async auto-save). useState only reads
+    // the initial value on mount, so we sync via useEffect.
+    useEffect(() => {
+        if (initialSaved) setIsSaved(true)
+    }, [initialSaved])
 
     const redundantItems = useMemo(() => outputs.redundantItems ?? [], [outputs.redundantItems])
     const hasCleanupItems = redundantItems.length > 0
@@ -110,6 +124,11 @@ export function MeetingOutputs({
     }, [])
 
     const handleStrategicSelect = useCallback((objIdx: number, value: string) => {
+        if (value === "create_new") {
+            setCreatingStrategicForIdx(objIdx)
+            setNewStrategicTitle("")
+            return
+        }
         setStrategicSelections((prev) => {
             const next = { ...prev }
             if (value === "none") {
@@ -120,6 +139,41 @@ export function MeetingOutputs({
             return next
         })
     }, [])
+
+    // INTENT: Let users create a strategic objective inline from the meeting outputs
+    // without leaving the dialog. This removes friction when no existing objective fits.
+    const handleCreateStrategicObjective = useCallback(
+        async (objIdx: number) => {
+            const title = newStrategicTitle.trim()
+            if (!title) return
+
+            setIsCreatingStrategic(true)
+            try {
+                const result = await createStrategicObjective(title)
+                if ("error" in result && result.error) {
+                    toast.error("Failed to create strategic objective", {
+                        description: result.error,
+                    })
+                    return
+                }
+                if (result.data) {
+                    setStrategicObjectives((prev) => [...prev, result.data!])
+                    setStrategicSelections((prev) => ({ ...prev, [objIdx]: result.data!.id }))
+                    toast.success("Strategic objective created", {
+                        description: `"${result.data.title}" created and linked`,
+                    })
+                }
+            } catch (err) {
+                const message = err instanceof Error ? err.message : "Unknown error"
+                toast.error("Failed to create strategic objective", { description: message })
+            } finally {
+                setIsCreatingStrategic(false)
+                setCreatingStrategicForIdx(null)
+                setNewStrategicTitle("")
+            }
+        },
+        [newStrategicTitle]
+    )
 
     // ─── Create Objective ─────────────────────────────────────────────────
     const handleCreateObjective = useCallback(
@@ -449,27 +503,80 @@ export function MeetingOutputs({
                                             </Button>
                                         </div>
 
-                                        {strategicObjectives.length > 0 && !isCreated && (
+                                        {!isCreated && (
                                             <div className="flex items-center gap-2">
                                                 <Flag className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                                                <Select
-                                                    value={selectedStrategicId || "none"}
-                                                    onValueChange={(value) => handleStrategicSelect(objIdx, value)}
-                                                >
-                                                    <SelectTrigger className="h-8 text-xs flex-1">
-                                                        <SelectValue placeholder="Add to strategic objective..." />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="none">
-                                                            <span className="text-muted-foreground">No strategic objective</span>
-                                                        </SelectItem>
-                                                        {strategicObjectives.map((so) => (
-                                                            <SelectItem key={so.id} value={so.id}>
-                                                                {so.title}
+                                                {creatingStrategicForIdx === objIdx ? (
+                                                    <div className="flex items-center gap-1.5 flex-1">
+                                                        <Input
+                                                            value={newStrategicTitle}
+                                                            onChange={(e) => setNewStrategicTitle(e.target.value)}
+                                                            placeholder="e.g. Secure Series A Funding"
+                                                            className="h-8 text-xs flex-1"
+                                                            autoFocus
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === "Enter" && newStrategicTitle.trim()) {
+                                                                    handleCreateStrategicObjective(objIdx)
+                                                                }
+                                                                if (e.key === "Escape") {
+                                                                    setCreatingStrategicForIdx(null)
+                                                                    setNewStrategicTitle("")
+                                                                }
+                                                            }}
+                                                            disabled={isCreatingStrategic}
+                                                        />
+                                                        <Button
+                                                            size="sm"
+                                                            variant="default"
+                                                            onClick={() => handleCreateStrategicObjective(objIdx)}
+                                                            disabled={isCreatingStrategic || !newStrategicTitle.trim()}
+                                                            className="h-8 px-3 bg-international-orange hover:bg-international-orange-hover text-white"
+                                                        >
+                                                            {isCreatingStrategic ? (
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                            ) : (
+                                                                "Create"
+                                                            )}
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => {
+                                                                setCreatingStrategicForIdx(null)
+                                                                setNewStrategicTitle("")
+                                                            }}
+                                                            disabled={isCreatingStrategic}
+                                                            className="h-8 px-2 text-muted-foreground"
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <Select
+                                                        value={selectedStrategicId || "none"}
+                                                        onValueChange={(value) => handleStrategicSelect(objIdx, value)}
+                                                    >
+                                                        <SelectTrigger className="h-8 text-xs flex-1">
+                                                            <SelectValue placeholder="Add to strategic objective..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="none">
+                                                                <span className="text-muted-foreground">No strategic objective</span>
                                                             </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
+                                                            {strategicObjectives.map((so) => (
+                                                                <SelectItem key={so.id} value={so.id}>
+                                                                    {so.title}
+                                                                </SelectItem>
+                                                            ))}
+                                                            <SelectItem value="create_new">
+                                                                <span className="flex items-center gap-1.5 text-international-orange font-medium">
+                                                                    <Plus className="h-3 w-3" />
+                                                                    Create new strategic objective
+                                                                </span>
+                                                            </SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                )}
                                             </div>
                                         )}
 

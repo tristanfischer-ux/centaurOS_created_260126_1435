@@ -446,8 +446,8 @@ export function ProposedActionsCard({
         () => new Set(proposals.map((_, i) => i))
     )
 
-    // Collapsible groups (strategic goals) — start collapsed
-    const [expandedGoals, setExpandedGoals] = useState<Set<string>>(() => new Set())
+    // Collapsible groups (strategic goals) — start expanded so all tasks are visible
+    const [collapsedGoals, setCollapsedGoals] = useState<Set<string>>(() => new Set())
 
     // Progress indicator during execution
     const [progress, setProgress] = useState<{ completed: number; total: number; current: string } | null>(null)
@@ -465,7 +465,7 @@ export function ProposedActionsCard({
     }, [])
 
     const toggleGoal = useCallback((goalTitle: string) => {
-        setExpandedGoals((prev) => {
+        setCollapsedGoals((prev) => {
             const next = new Set(prev)
             if (next.has(goalTitle)) {
                 next.delete(goalTitle)
@@ -1081,7 +1081,7 @@ export function ProposedActionsCard({
                     ) : (
                         <div className="space-y-1">
                             {hierarchyGroups.map((group) => {
-                                const isExpanded = expandedGoals.has(group.title)
+                                const isExpanded = !collapsedGoals.has(group.title)
                                 const groupDoneCount = group.allIndices.filter((i) => executed[i]?.success).length
                                 const groupTotal = group.allIndices.length
                                 const groupAllDone = groupTotal > 0 && group.allIndices.every((i) => executed[i] !== undefined)

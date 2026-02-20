@@ -74,7 +74,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         releasedAt: new Date('2026-02-20'),
         category: 'strategic',
         section: 'plan',
-        status: 'beta',
+        status: 'stable',
         isVisibleInNav: true,
         changelog: 'Added Business Plan Intelligence — upload your business plan and receive detailed AI analysis covering strengths, risks, hiring recommendations, and funding readiness. Powered by Claude Opus 4.6 with deep strategic reasoning.'
     },
