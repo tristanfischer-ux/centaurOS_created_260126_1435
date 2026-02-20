@@ -1,7 +1,6 @@
 'use client'
 
 import {
-  Sparkles,
   Target,
   CircuitBoard,
   TrendingUp,
@@ -17,7 +16,7 @@ import { cn } from '@/lib/utils'
 // Tabs organised around user needs rather than content source.
 // ---------------------------------------------------------------------------
 
-export type TabId = 'for-you' | 'by-need' | 'by-industry' | 'popular' | 'saved' | 'techniques' | 'projects' | 'learn'
+export type TabId = 'by-need' | 'by-industry' | 'popular' | 'saved' | 'techniques' | 'projects' | 'learn'
 
 interface Tab {
   id: TabId
@@ -63,14 +62,6 @@ export function CategoryTabs({
   showTechniques = false,
 }: CategoryTabsProps) {
   const tabs: Tab[] = [
-    {
-      id: 'for-you',
-      label: 'For You',
-      icon: Sparkles,
-      iconColor: 'text-international-orange',
-      activeClasses:
-        'bg-international-orange/10 text-international-orange border-international-orange',
-    },
     {
       id: 'by-need',
       label: 'By Need',

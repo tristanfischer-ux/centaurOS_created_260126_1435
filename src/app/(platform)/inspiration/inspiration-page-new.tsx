@@ -5,11 +5,8 @@ import {
   Lightbulb,
   Search,
   X,
-  Sparkles,
-  Store,
   ArrowRight,
   Heart,
-  AlertCircle,
   TrendingUp,
   Hammer,
   BookOpen,
@@ -74,176 +71,6 @@ import {
 } from '@/components/ui/dialog'
 
 // ---------------------------------------------------------------------------
-// Context-aware recommendation engine
-// Uses foundry context (industry, stage, gaps) to personalise results and
-// generate a "why" tag for each recommended pack.
-// ---------------------------------------------------------------------------
-
-interface ScoredPack {
-  pack: ObjectivePack
-  score: number
-  whyTag: string
-}
-
-function getContextAwareRecommendations(
-  allPacks: ObjectivePack[],
-  savedIds: Set<string>,
-  ctx: FoundryContext | null,
-): ScoredPack[] {
-  const candidates = allPacks.filter(p => !savedIds.has(p.id))
-
-  const scored: ScoredPack[] = candidates.map(pack => {
-    let score = 0
-    const reasons: string[] = []
-    const cat = pack.category?.toLowerCase() || ''
-
-    // 1. Gap match: highest priority -- pack addresses a known gap
-    if (ctx?.gapCategories && ctx.gapCategories.length > 0) {
-      const gapMatch = ctx.gapCategories.some(gc =>
-        cat.includes(gc.toLowerCase().replace(/[& ]/g, ''))
-      )
-      if (gapMatch) {
-        score += 10
-        const matchedGap = ctx.gapCategories.find(gc =>
-          cat.includes(gc.toLowerCase().replace(/[& ]/g, ''))
-        )
-        reasons.push(`Addresses your ${matchedGap} gap`)
-      }
-    }
-
-    // 2. Industry match: pack targets user's industry
-    if (ctx?.industry && pack.product_category) {
-      const industrySlug = ctx.industry.toLowerCase().replace(/\s+/g, '-')
-      if (pack.product_category.toLowerCase().includes(industrySlug)) {
-        score += 8
-        reasons.push(`Matches your industry (${ctx.industry})`)
-      }
-    }
-
-    // 3. Stage-appropriate: easy packs for early stage, harder for later
-    const isEarlyStage = ctx?.stage && ['Idea', 'Pre-seed', 'Seed'].includes(ctx.stage)
-    if (pack.difficulty === 'Easy') {
-      score += isEarlyStage ? 5 : 3
-      if (isEarlyStage && reasons.length === 0) reasons.push(`Great starting point for ${ctx?.stage} stage`)
-    }
-    if (pack.difficulty === 'Medium') score += 1
-
-    // 4. Value density: more tasks = more value
-    score += Math.min((pack.items?.length || 0) / 3, 2)
-
-    // 5. Quick wins: shorter durations
-    if (pack.estimated_duration?.includes('1-2')) {
-      score += 1
-      if (reasons.length === 0) reasons.push('Quick win -- under 2 weeks')
-    }
-
-    // Fallback reason
-    if (reasons.length === 0) {
-      if (pack.difficulty === 'Easy') reasons.push('Easy to get started')
-      else reasons.push('Curated for you')
-    }
-
-    return { pack, score, whyTag: reasons[0] }
-  })
-
-  scored.sort((a, b) => b.score - a.score)
-
-  // Category diversity -- at most 2 packs from the same category
-  const result: ScoredPack[] = []
-  const counts: Record<string, number> = {}
-
-  for (const item of scored) {
-    const cat = item.pack.category || 'other'
-    if ((counts[cat] || 0) >= 2) continue
-    counts[cat] = (counts[cat] || 0) + 1
-    result.push(item)
-    if (result.length >= 8) break
-  }
-
-  return result
-}
-
-// ---------------------------------------------------------------------------
-// Stage-aware welcome banner
-// ---------------------------------------------------------------------------
-
-function StageWelcomeBanner({
-  stage,
-  industry,
-  gapCategories,
-}: {
-  stage: string | null
-  industry: string | null
-  gapCategories: string[]
-}) {
-  const hasContext = stage || industry || gapCategories.length > 0
-
-  if (!hasContext) {
-    return (
-      <Card className="bg-gradient-to-r from-international-orange/5 to-electric-blue/5 border-international-orange/20">
-        <CardContent className="py-4">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-international-orange/10 flex items-center justify-center shrink-0 mt-0.5">
-              <Lightbulb className="h-5 w-5 text-international-orange" />
-            </div>
-            <div>
-              <h2 className="font-semibold text-sm mb-0.5">Welcome to Inspiration</h2>
-              <p className="text-xs text-muted-foreground">
-                Discover objective packs to guide your next steps. Set your company stage and
-                industry in{' '}
-                <Link href="/settings" className="text-electric-blue hover:underline">
-                  Settings
-                </Link>{' '}
-                for personalised recommendations.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  // Build contextual subtitle parts
-  const parts: string[] = []
-  if (stage) parts.push(`${stage} stage`)
-  if (industry) parts.push(industry)
-
-  return (
-    <Card className="bg-gradient-to-r from-international-orange/5 to-electric-blue/5 border-international-orange/20">
-      <CardContent className="py-4">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-international-orange/10 flex items-center justify-center shrink-0 mt-0.5">
-            <Sparkles className="h-5 w-5 text-international-orange" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-sm mb-0.5">
-              Personalised for {parts.length > 0 ? parts.join(' \u00B7 ') : 'you'}
-            </h2>
-            {gapCategories.length > 0 ? (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <AlertCircle className="h-3 w-3 text-status-warning shrink-0" />
-                <span>
-                  We noticed gaps in{' '}
-                  <strong className="text-foreground">
-                    {gapCategories.slice(0, 3).join(', ')}
-                    {gapCategories.length > 3 ? ` +${gapCategories.length - 3} more` : ''}
-                  </strong>
-                  {' '}&mdash; we&apos;ve highlighted packs that can help.
-                </span>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Recommendations tailored to where you are right now.
-              </p>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // "By Need" tab: packs grouped by business function category
 // ---------------------------------------------------------------------------
 
@@ -296,7 +123,7 @@ export function InspirationPageNew({
   questions = [],
 }: InspirationPageNewProps) {
   // Tab state
-  const [activeTab, setActiveTab] = useState<TabId>('for-you')
+  const [activeTab, setActiveTab] = useState<TabId>('by-need')
 
   // Saved packs
   const [savedPackIds, setSavedPackIds] = useState<Set<string>>(
@@ -476,19 +303,12 @@ export function InspirationPageNew({
   )
 
   const ctx = foundryContext || null
-  const hasContext = !!(ctx?.stage || ctx?.industry || (ctx?.gapCategories && ctx.gapCategories.length > 0))
 
   // Only show manufacturing-specific Techniques tab when industry is relevant
   const MANUFACTURING_INDUSTRIES = ['manufacturing', 'industrial', 'engineering', 'automotive', 'aerospace', 'hardware']
   const isManufacturingIndustry = ctx?.industry
     ? MANUFACTURING_INDUSTRIES.some(mi => ctx.industry!.toLowerCase().includes(mi))
     : false
-
-  // Context-aware recommendations with "why" tags
-  const recommendedPacks = useMemo(
-    () => getContextAwareRecommendations(packs, savedPackIds, ctx),
-    [packs, savedPackIds, ctx],
-  )
 
   const savedPacks = useMemo(
     () => packs.filter(p => savedPackIds.has(p.id)),
@@ -599,15 +419,6 @@ export function InspirationPageNew({
       </div>
 
       {/* ================================================================== */}
-      {/* Stage-aware welcome banner                                         */}
-      {/* ================================================================== */}
-      <StageWelcomeBanner
-        stage={ctx?.stage || null}
-        industry={ctx?.industry || null}
-        gapCategories={ctx?.gapCategories || []}
-      />
-
-      {/* ================================================================== */}
       {/* Product Maps summary card                                          */}
       {/* ================================================================== */}
       <Card className="bg-gradient-to-r from-orange-50 to-blue-50 border-orange-100 hover:shadow-md transition-shadow">
@@ -654,100 +465,6 @@ export function InspirationPageNew({
         gapCount={ctx?.gapCategories.length}
         showTechniques={isManufacturingIndustry}
       />
-
-      {/* ================================================================== */}
-      {/* FOR YOU tab -- context-aware recommendations                       */}
-      {/* ================================================================== */}
-      {activeTab === 'for-you' && (
-        <div className="space-y-8">
-          {/* Recommended -- only show when we have company context */}
-          {hasContext ? (
-            <section>
-              <div className="flex items-center gap-2 mb-1">
-                <Sparkles className="h-5 w-5 text-international-orange" />
-                <h2 className="text-lg font-semibold">Recommended for You</h2>
-              </div>
-              <p className="text-sm text-muted-foreground mb-5">
-                {ctx?.gapCategories && ctx.gapCategories.length > 0
-                  ? 'Packs selected based on your industry, company stage, and coverage gaps.'
-                  : `Packs tailored to ${[ctx?.stage && `${ctx.stage} stage`, ctx?.industry].filter(Boolean).join(', ')}.`}
-              </p>
-
-              {recommendedPacks.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {recommendedPacks.map(({ pack, whyTag }) => (
-                    <PackCard
-                      key={pack.id}
-                      pack={pack}
-                      isSaved={savedPackIds.has(pack.id)}
-                      onSaveToggle={handleSaveToggle}
-                      whyTag={whyTag}
-                      members={members}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <Card className="border-dashed">
-                  <CardContent className="py-8 text-center">
-                    <Sparkles className="h-8 w-8 text-muted-foreground mx-auto mb-3 opacity-50" />
-                    <p className="text-muted-foreground text-sm">
-                      Browse the other tabs to discover packs and get personalised recommendations.
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </section>
-          ) : (
-            <section>
-              <Card className="border-dashed">
-                <CardContent className="py-8 text-center">
-                  <Sparkles className="h-8 w-8 text-muted-foreground mx-auto mb-3 opacity-50" />
-                  <h3 className="font-semibold text-sm mb-1">
-                    Tell us about your company first
-                  </h3>
-                  <p className="text-muted-foreground text-sm mb-4 max-w-md mx-auto">
-                    Set your company stage and industry in Settings so we can recommend packs that actually match where you are.
-                  </p>
-                  <Button asChild variant="outline" size="sm">
-                    <Link href="/settings">
-                      Go to Settings
-                      <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            </section>
-          )}
-
-          {/* Marketplace CTA */}
-          <Card className="bg-gradient-to-r from-international-orange/5 to-background border-international-orange/20">
-            <CardContent className="py-5">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-international-orange/10 flex items-center justify-center shrink-0">
-                  <Store className="h-5 w-5 text-international-orange" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm">Need expert help executing?</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Browse advisors, consultants, and suppliers in the marketplace.
-                  </p>
-                </div>
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 border-international-orange/30 text-international-orange hover:bg-international-orange/5"
-                >
-                  <Link href="/marketplace">
-                    Browse Marketplace
-                    <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* ================================================================== */}
       {/* BY NEED tab -- packs grouped by business function                  */}
