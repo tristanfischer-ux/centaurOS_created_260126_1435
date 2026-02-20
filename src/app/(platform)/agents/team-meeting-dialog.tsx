@@ -101,11 +101,34 @@ export interface MeetingOutputData {
         subcategory: string
         searchQuery: string
     }>
+    /** Items Cal identifies as redundant, superseded, or no longer necessary */
+    redundantItems?: Array<{
+        type: "objective" | "task"
+        title: string
+        reason: string
+        recommendation: "archive" | "delete" | "merge"
+    }>
+    /** Shareable report for emailing to team members */
+    report?: {
+        subject: string
+        summary: string
+        decisions: string[]
+        newActions: string[]
+        removedItems: string[]
+    }
+}
+
+/** Pre-configured meeting setup from huddle cards */
+export interface MeetingPreset {
+    participantIds: string[]
+    topic: string
 }
 
 interface TeamMeetingDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
+    /** When provided, auto-selects participants and pre-fills topic */
+    preset?: MeetingPreset
 }
 
 // ─── Meeting Topic Suggestions ────────────────────────────────────────────────
@@ -720,6 +743,7 @@ function MeetingOutputsLoading({
 export function TeamMeetingDialog({
     open,
     onOpenChange,
+    preset,
 }: TeamMeetingDialogProps) {
     // ─── State ────────────────────────────────────────────────────────────
     const [phase, setPhase] = useState<MeetingPhase>("setup")
