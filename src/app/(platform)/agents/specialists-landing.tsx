@@ -456,7 +456,7 @@ export function SpecialistsLanding({
                                         Plan a Team Project
                                     </h3>
                                     <p className="text-sm text-muted-foreground mt-0.5">
-                                        For complex, multi-step work &mdash; brief multiple specialists in sequence
+                                        For complex, multi-step work &mdash; chain multiple specialists together
                                         and build a complete project from start to finish.
                                     </p>
                                 </div>
