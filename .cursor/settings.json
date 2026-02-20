@@ -1,0 +1,28 @@
+{
+  "plugins": {
+    "deploy-on-aws": {
+      "enabled": true
+    },
+    "parallel": {
+      "enabled": true
+    },
+    "superpowers": {
+      "enabled": true
+    },
+    "create-plugin": {
+      "enabled": true
+    },
+    "continual-learning": {
+      "enabled": true
+    },
+    "cursor-team-kit": {
+      "enabled": true
+    },
+    "browserstack": {
+      "enabled": true
+    },
+    "supabase": {
+      "enabled": true
+    }
+  }
+}

@@ -1,10 +1,17 @@
 "use client"
 
 /**
- * Mashup Lab — Combine 2+ STEP files into a hybrid product.
+ * Mashup Lab -- Combine 2+ STEP files into a hybrid product.
  *
- * @description Wizard: (1) Select sources, (2) Describe mashup concept,
- * (3) Generate (plan + code + Modal), (4) Preview, download, and send to RFQ.
+ * @description Two-phase wizard:
+ *   (1) Select sources, (2) Describe mashup concept,
+ *   (3) Generate -- Phase A: plan (shows strategy + steps ~10-15s),
+ *                  Phase B: execute (code gen + Modal + upload ~1-2min),
+ *   (4) Preview, download, and send to RFQ.
+ *
+ * INTENT: Splitting generation into plan + execute lets the UI reveal
+ * what the AI is building partway through, turning dead wait time into
+ * an engaging "here's the plan" moment.
  */
 
 import { useState, useTransition } from "react"
@@ -28,10 +35,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { MashupSourceSelector } from "../components/mashup-source-selector"
 import { MashupConceptSearch } from "../components/mashup-concept-search"
+import { MashupGenerationProgress } from "../components/mashup-generation-progress"
 import { STLViewer } from "@/components/cad/stl-viewer"
-import { generateMashup } from "@/actions/cad-lab"
+import { planMashup, executeMashupPlan } from "@/actions/cad-lab"
 import { createMashupRfqAction } from "@/actions/cad-lab-rfq"
-import type { MashupSourceInput, MashupResult } from "@/lib/cad-lab-types"
+import type { MashupSourceInput, MashupPlan, MashupResult } from "@/lib/cad-lab-types"
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
 
@@ -43,8 +51,11 @@ export default function MashupPage(): React.ReactElement {
   const [concept, setConcept] = useState("")
   const [result, setResult] = useState<MashupResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
 
-  // RFQ state
+  const [mashupPlan, setMashupPlan] = useState<MashupPlan | null>(null)
+  const [isExecuting, setIsExecuting] = useState(false)
+
   const [rfqId, setRfqId] = useState<string | null>(null)
   const [rfqError, setRfqError] = useState<string | null>(null)
   const [isCreatingRfq, startRfqTransition] = useTransition()
@@ -52,16 +63,40 @@ export default function MashupPage(): React.ReactElement {
   const canProceedFromSources = sources.length >= 2
   const canGenerate = canProceedFromSources && concept.trim().length > 0
 
+  /**
+   * INTENT: Two-phase generation so the user sees the mashup plan ~10-15s in
+   * while the heavier code-gen + Modal execution runs in Phase 2.
+   */
   const handleGenerate = async (): Promise<void> => {
-    if (!canGenerate) return
+    if (!canGenerate || isGenerating) return
+    setIsGenerating(true)
     setError(null)
     setStep("generating")
     setResult(null)
+    setMashupPlan(null)
+    setIsExecuting(false)
     setRfqId(null)
     setRfqError(null)
 
     try {
-      const res = await generateMashup(sources, concept.trim())
+      const planResult = await planMashup(sources, concept.trim())
+
+      if (!planResult.success || !planResult.plan || !planResult.resolvedSources) {
+        setError(planResult.error ?? "Planning failed")
+        setStep("concept")
+        setIsGenerating(false)
+        return
+      }
+
+      setMashupPlan(planResult.plan)
+      setIsExecuting(true)
+
+      const res = await executeMashupPlan(
+        planResult.resolvedSources,
+        planResult.plan,
+        concept.trim(),
+      )
+
       setResult(res)
       if (res.success) {
         setStep("result")
@@ -72,6 +107,9 @@ export default function MashupPage(): React.ReactElement {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error")
       setStep("concept")
+    } finally {
+      setIsGenerating(false)
+      setIsExecuting(false)
     }
   }
 
@@ -81,14 +119,12 @@ export default function MashupPage(): React.ReactElement {
     setConcept("")
     setResult(null)
     setError(null)
+    setMashupPlan(null)
+    setIsExecuting(false)
     setRfqId(null)
     setRfqError(null)
   }
 
-  /**
-   * Creates a marketplace RFQ from the generated mashup artifacts.
-   * STEP URL is required; STL is optional but included if present.
-   */
   const handleSendToRfq = (): void => {
     if (!result?.step_url) return
     setRfqError(null)
@@ -134,14 +170,13 @@ export default function MashupPage(): React.ReactElement {
             <h1 className={typography.h1}>Mashup Lab</h1>
           </div>
           <p className={typography.pageSubtitle}>
-            Combine two or more STEP files into a hybrid product — e.g. a radio in a toaster, or an RC car that&apos;s also a drone.
+            Combine two or more STEP files into a hybrid product &mdash; e.g. a radio in a toaster, or an RC car that&apos;s also a drone.
           </p>
         </div>
       </header>
 
       {step === "sources" && (
         <div className="space-y-6">
-          {/* AI concept search */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -160,7 +195,6 @@ export default function MashupPage(): React.ReactElement {
             </CardContent>
           </Card>
 
-          {/* Manual browse divider */}
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t border-border" />
@@ -170,7 +204,6 @@ export default function MashupPage(): React.ReactElement {
             </div>
           </div>
 
-          {/* Manual source selector */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -237,7 +270,7 @@ export default function MashupPage(): React.ReactElement {
                 <Button variant="secondary" onClick={() => setStep("sources")}>
                   Back
                 </Button>
-                <Button onClick={handleGenerate} disabled={!canGenerate}>
+                <Button onClick={handleGenerate} disabled={!canGenerate || isGenerating}>
                   <Sparkles className="h-4 w-4 mr-2" />
                   Generate mashup
                 </Button>
@@ -248,15 +281,13 @@ export default function MashupPage(): React.ReactElement {
       )}
 
       {step === "generating" && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Loader2 className="h-12 w-12 animate-spin text-muted-foreground mb-4" />
-            <p className="text-lg font-medium text-foreground">Generating mashup…</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Planning, writing CadQuery, and running on Modal. This may take 1–3 minutes.
-            </p>
-          </CardContent>
-        </Card>
+        <MashupGenerationProgress
+          isActive={true}
+          concept={concept}
+          sources={sources}
+          plan={mashupPlan}
+          isExecuting={isExecuting}
+        />
       )}
 
       {step === "result" && result?.success && (
@@ -268,14 +299,12 @@ export default function MashupPage(): React.ReactElement {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* 3D preview */}
             {result.stl_b64 && (
               <div className="rounded-lg overflow-hidden border border-border">
                 <STLViewer stlData={result.stl_b64} className="min-h-[400px]" />
               </div>
             )}
 
-            {/* Download buttons */}
             <div className="flex flex-wrap gap-2">
               {result.step_url && (
                 <Button variant="outline" asChild>
@@ -295,14 +324,12 @@ export default function MashupPage(): React.ReactElement {
               )}
             </div>
 
-            {/* Generation time */}
             {result.elapsedMs != null && (
               <p className="text-sm text-muted-foreground">
                 Generated in {(result.elapsedMs / 1000).toFixed(1)}s
               </p>
             )}
 
-            {/* RFQ error */}
             {rfqError && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -310,7 +337,6 @@ export default function MashupPage(): React.ReactElement {
               </Alert>
             )}
 
-            {/* Footer actions */}
             <div className="flex items-center justify-between pt-4 border-t border-border">
               <Button variant="secondary" onClick={handleReset}>
                 Start over
@@ -330,7 +356,7 @@ export default function MashupPage(): React.ReactElement {
                     {isCreatingRfq ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Creating RFQ…
+                        Creating RFQ&hellip;
                       </>
                     ) : (
                       <>
@@ -345,7 +371,6 @@ export default function MashupPage(): React.ReactElement {
           </CardContent>
         </Card>
       )}
-
     </div>
   )
 }

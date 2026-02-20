@@ -13,7 +13,7 @@
  * combinations in seconds.
  */
 
-import { useState, useTransition } from "react"
+import { useState, useEffect, useTransition } from "react"
 import Image from "next/image"
 import { Sparkles, ArrowRight, FileBox, Shapes, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -32,6 +32,51 @@ const EXAMPLE_PROMPTS = [
   "Prosthetic hand with embedded pressure sensors",
   "Modular satellite with deployable solar wings",
 ] as const
+
+// ─── Thinking log messages (cycle during search) ────────────────────
+
+const THINKING_MESSAGES = [
+  "Scanning 200+ STEP templates across the library…",
+  (q: string) => `Matching parts to "${q}"…`,
+  "Evaluating which components can physically combine…",
+  "Curating the best mashup recipes…",
+] as const
+
+function resolveMessage(msg: (typeof THINKING_MESSAGES)[number], query: string): string {
+  return typeof msg === "function" ? msg(query) : msg
+}
+
+/** Animated cycling status line shown above skeletons during AI search. */
+function ThinkingLog({ query }: { query: string }): React.ReactElement {
+  const [index, setIndex] = useState(0)
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false)
+      setTimeout(() => {
+        setIndex((prev) => (prev + 1) % THINKING_MESSAGES.length)
+        setVisible(true)
+      }, 200)
+    }, 2500)
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <div className="flex items-center gap-2.5 py-2">
+      <span className="relative flex h-2 w-2 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-international-orange opacity-75" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-international-orange" />
+      </span>
+      <p
+        className="text-sm text-muted-foreground transition-opacity duration-200"
+        style={{ opacity: visible ? 1 : 0 }}
+      >
+        {resolveMessage(THINKING_MESSAGES[index], query)}
+      </p>
+    </div>
+  )
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────
 
@@ -225,8 +270,13 @@ export function MashupConceptSearch({
         )}
       </div>
 
-      {/* Loading */}
-      {isPending && <SuggestionSkeleton />}
+      {/* Loading — thinking log above skeleton cards */}
+      {isPending && (
+        <>
+          <ThinkingLog query={query} />
+          <SuggestionSkeleton />
+        </>
+      )}
 
       {/* Error */}
       {searchError && !isPending && (

@@ -294,7 +294,7 @@ export function BlueprintsView({
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {categoryPacks.map((pack) => (
-                      <PackCard key={pack.id} pack={pack} />
+                      <PackCard key={pack.id} pack={pack} members={members} />
                     ))}
                   </div>
                 </section>
@@ -1276,7 +1276,7 @@ function PackCategoryIcon({ category }: { category: string }) {
 }
 
 // Pack card for "Objective Packs" section
-function PackCard({ pack }: { pack: ObjectivePack }) {
+function PackCard({ pack, members }: { pack: ObjectivePack; members: TeamMember[] }) {
   const difficultyColors: Record<string, string> = {
     'beginner': 'bg-green-100 text-green-700',
     'intermediate': 'bg-blue-100 text-blue-700',

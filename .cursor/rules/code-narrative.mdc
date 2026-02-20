@@ -1,0 +1,143 @@
+---
+description: In-code narrative annotations for agent and human readability -- explaining intent, decisions, failed approaches, cross-file flows, and gotchas
+alwaysApply: true
+---
+
+# Code Narrative Annotations
+
+Code must be understandable by the **next agent or human** who reads it -- not just the one who wrote it. This rule defines structured annotation patterns that capture reasoning, intent, and history directly in the source code.
+
+**This rule extends** `documentation-standards.mdc` (which covers JSDoc signatures and security prefixes). That rule handles the *interface*; this rule handles the *narrative* -- the story of why the code exists and how it got here.
+
+## Annotation Prefixes
+
+Use these grep-able prefixes so annotations are searchable across the codebase.
+
+### INTENT -- Why does this code exist?
+
+Place at the top of non-trivial functions, modules, or code sections. Explain the **business/product reason**, not a restatement of the function name.
+
+```ts
+// INTENT: When a user accepts a foundry invite, we need to create their
+// membership record AND set their active foundry in one transaction.
+// If either fails, the user sees "invite accepted" but can't access
+// the foundry -- which was the #1 support ticket source before this fix.
+export async function acceptInvite(inviteId: string): Promise<void> {
+```
+
+**Good INTENT:** Explains the real-world problem this code solves.
+**Bad INTENT:** `// INTENT: This function accepts an invite` (just restates the name).
+
+### DECISION -- Why this approach over alternatives?
+
+Use when choosing between two or more valid approaches, especially when the chosen path looks unusual or suboptimal at first glance.
+
+```ts
+// DECISION: Using a database function instead of application-level logic
+// because RLS policies make it impossible to read-then-write atomically
+// from the client. The DB function runs with SECURITY DEFINER to bypass
+// RLS for this specific cross-table operation.
+const { data, error } = await supabase.rpc('accept_foundry_invite', { ... })
+```
+
+### TRIED -- What was attempted and abandoned?
+
+Prevents the next agent from wasting time on the same dead end. Include **what** was tried and **why** it failed.
+
+```ts
+// TRIED: Supabase realtime subscriptions for live task updates.
+// Abandoned because: (1) subscription count per connection is limited to 100,
+// (2) presence channel caused memory leaks on long-lived pages.
+// Current approach: polling every 30s with stale-while-revalidate.
+```
+
+### FLOW -- How does this connect across files?
+
+For multi-file flows (form -> server action -> DB -> webhook), leave breadcrumb comments at entry and exit points so the reader can trace the chain.
+
+```ts
+// FLOW: User clicks "Accept Invite" button
+// -> This component calls acceptInvite() server action
+// -> See: src/actions/invites.ts#acceptInvite
+// -> Which calls the accept_foundry_invite DB function
+// -> See: supabase/migrations/20260215_invite_functions.sql
+```
+
+### GOTCHA -- What looks wrong but is correct?
+
+For non-obvious constraints, intentional edge cases, or code that a future reader might "fix" and break.
+
+```ts
+// GOTCHA: This query intentionally omits the foundry_id filter.
+// The get_user_foundries() DB function handles isolation internally
+// via SECURITY DEFINER + explicit foundry checks. Adding a client-side
+// filter here would double-filter and break the "all foundries" view.
+const { data } = await supabase.rpc('get_user_foundries')
+```
+
+## When to Annotate (Decision Tree)
+
+| Situation | Annotation | Required? |
+|---|---|---|
+| Non-trivial function with business logic | `// INTENT:` | Yes |
+| Chose between 2+ valid approaches | `// DECISION:` | Yes |
+| Tried something that failed or was abandoned | `// TRIED:` | Yes |
+| Multi-file flow (3+ files in the chain) | `// FLOW:` at entry/exit points | Yes |
+| Code that looks wrong but is intentionally correct | `// GOTCHA:` | Yes |
+| Simple utility, obvious one-liner, or pure boilerplate | None needed | No |
+
+**Rule of thumb:** If deleting a piece of code and rewriting it would require context that isn't in the code itself, that context belongs in an annotation.
+
+## Annotation Length
+
+Keep annotations concise -- **2-4 lines** is the sweet spot. If you need more than 6 lines, the annotation is probably trying to cover too much; split it or move detailed analysis to a doc comment.
+
+```ts
+// INTENT: Debounce search input to avoid hammering the API on every keystroke.
+// 300ms delay matches the perceived "finished typing" threshold from UX research.
+```
+
+Not:
+
+```ts
+// INTENT: This function implements a debounce mechanism for the search input
+// field. Debouncing is a technique where we delay the execution of a function
+// until after a certain period of inactivity. In this case, we use a 300ms
+// delay. The reason for 300ms specifically is that UX research has shown that
+// users typically pause for about 300ms between typing bursts, and this
+// threshold provides a good balance between responsiveness and avoiding
+// unnecessary API calls. We considered 200ms but it was too aggressive...
+```
+
+## Anti-Patterns
+
+These are NOT what this rule is asking for:
+
+| Anti-Pattern | Why It's Wrong |
+|---|---|
+| `// increment the counter` | Restates the code (narration, not narrative) |
+| `// INTENT: This function fetches a user` | Restates the function name |
+| A comment on every line | Noise drowns out signal |
+| Multi-paragraph essays in comments | Move to doc comments or design docs |
+| Duplicating JSDoc content | Signatures stay in JSDoc per `documentation-standards.mdc` |
+
+## Relationship to Other Documentation Rules
+
+| Rule | What It Covers | This Rule Adds |
+|---|---|---|
+| `documentation-standards.mdc` | JSDoc signatures, `@param`, `@returns`, security prefixes | Narrative context: INTENT, DECISION, TRIED, FLOW, GOTCHA |
+| `code-hygiene.mdc` | "Comment the WHY, not the WHAT" | Concrete patterns and prefixes for doing exactly that |
+| `change-documentation.mdc` | Session logs in `~/.memory/daily/` | Annotations that live *in the code*, not in external logs |
+| `work-quality.mdc` | "Find root causes, no temp fixes" | TRIED annotations to document root-cause investigation history |
+
+## Quick Checklist
+
+Before finishing any non-trivial code change:
+
+- [ ] Functions with business logic have an `// INTENT:` block
+- [ ] Non-obvious architectural choices have a `// DECISION:` comment
+- [ ] Dead ends encountered during implementation are recorded with `// TRIED:`
+- [ ] Multi-file flows have `// FLOW:` breadcrumbs at entry and exit points
+- [ ] Intentionally surprising code has a `// GOTCHA:` warning
+- [ ] No annotations restate what the code already says
+- [ ] Annotations are 2-4 lines, not essays

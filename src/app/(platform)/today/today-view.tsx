@@ -33,6 +33,7 @@ import {
     ClipboardCheck,
     Calendar,
     Lightbulb,
+    MessageCircle,
     Waypoints,
 } from "lucide-react"
 
@@ -44,6 +45,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { getMorningBriefing, type MorningBriefing } from "@/actions/nudges"
 import { getMyDailyPulse, type DailyPulseResult } from "@/actions/reports"
 import { getStrategyHealthSummary, type StrategyHealthItem } from "@/actions/canvas"
+import { getUnreadCount } from "@/actions/messaging"
 import { typography } from "@/lib/design-system"
 import { StreakBadge } from "@/components/celebrations/StreakBadge"
 import { useCelebration } from "@/hooks/useCelebration"
@@ -95,6 +97,7 @@ export function TodayView(): React.ReactElement {
     const [briefing, setBriefing] = useState<MorningBriefing | null>(null)
     const [pulse, setPulse] = useState<FormattedReport | null>(null)
     const [strategyHealth, setStrategyHealth] = useState<StrategyHealthItem[]>([])
+    const [unreadCount, setUnreadCount] = useState(0)
     const [isLoading, setIsLoading] = useState(true)
     const [briefingError, setBriefingError] = useState(false)
     const [pulseError, setPulseError] = useState(false)
@@ -108,10 +111,11 @@ export function TodayView(): React.ReactElement {
         setBriefingError(false)
         setPulseError(false)
 
-        const [briefingResult, pulseResult, strategyResult] = await Promise.all([
+        const [briefingResult, pulseResult, strategyResult, unreadResult] = await Promise.all([
             getMorningBriefing().catch(() => ({ data: null, error: "Failed" })),
             getMyDailyPulse().catch(() => ({ success: false, data: undefined, error: "Failed" }) as DailyPulseResult),
             getStrategyHealthSummary().catch(() => ({ error: "Failed" }) as { error: string }),
+            getUnreadCount().catch(() => ({ count: 0 })),
         ])
 
         if (briefingResult.data) {
@@ -129,6 +133,8 @@ export function TodayView(): React.ReactElement {
         if ('data' in strategyResult && strategyResult.data) {
             setStrategyHealth(strategyResult.data)
         }
+
+        setUnreadCount(unreadResult?.count ?? 0)
 
         setIsLoading(false)
     }, [])
@@ -321,9 +327,9 @@ export function TodayView(): React.ReactElement {
                         )}
 
                         {/* Smart Nudges */}
-                        {briefing && briefing.nudges.length > 0 && (
+                        {(briefing?.nudges?.length ?? 0) > 0 || unreadCount > 0 ? (
                             <div className="space-y-1.5">
-                                {briefing.nudges.map((nudge, i) => (
+                                {briefing?.nudges.map((nudge, i) => (
                                     <div
                                         key={i}
                                         className="flex items-center gap-2 text-xs"
@@ -349,8 +355,24 @@ export function TodayView(): React.ReactElement {
                                         )}
                                     </div>
                                 ))}
+
+                                {unreadCount > 0 && (
+                                    <div className="flex items-center gap-2 text-xs">
+                                        <div className="w-1 h-4 rounded-full shrink-0 bg-status-info" />
+                                        <span className="text-muted-foreground flex-1">
+                                            You have {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}
+                                        </span>
+                                        <Link
+                                            href="/updates"
+                                            className="text-international-orange hover:underline shrink-0 flex items-center gap-0.5"
+                                        >
+                                            View messages
+                                            <ArrowRight className="h-3 w-3" />
+                                        </Link>
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        ) : null}
 
                         {/* Intelligence Signal — shows how long the system has been learning */}
                         {briefing && briefing.intelligenceDaysOfData > 7 && (
@@ -405,6 +427,42 @@ export function TodayView(): React.ReactElement {
                     overdueCount={briefing?.overdueCount ?? 0}
                 />
             </motion.div>
+
+            {/* Unread Messages Section */}
+            {unreadCount > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.12, ease: EASE_CURVE }}
+                >
+                    <SectionHeader icon={MessageCircle} label="Unread Messages" color="text-status-info" />
+                    <Card className="rounded-xl border">
+                        <CardContent className="pt-4 pb-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-status-info-light">
+                                        <MessageCircle className="h-4 w-4 text-status-info" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-foreground">
+                                            {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Conversations waiting for your response
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button variant="outline" size="sm" asChild className="gap-1.5">
+                                    <Link href="/updates">
+                                        View messages
+                                        <ArrowRight className="h-3.5 w-3.5" />
+                                    </Link>
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </motion.div>
+            )}
 
             {/* Blockers Section */}
             {pulseData && Array.isArray(pulseData.blockers) && pulseData.blockers.length > 0 && (

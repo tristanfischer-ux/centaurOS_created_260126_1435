@@ -607,7 +607,7 @@ const KEYWORD_MAP: [string[], string][] = [
 /**
  * Selects the best fact pool based on keyword matching in the subject string.
  */
-function selectFactPool(subject: string): string[] {
+export function selectFactPool(subject: string): string[] {
   const lower = subject.toLowerCase()
   let bestMatch = "default"
   let bestScore = 0
@@ -648,7 +648,10 @@ export function CadLabProgress({ lines, isActive, operationType, subject = "" }:
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const factPool = useMemo(() => selectFactPool(subject), [subject])
-  const explainers = OPERATION_EXPLAINERS[operationType] ?? OPERATION_EXPLAINERS.generate
+  const explainers = useMemo(
+    () => OPERATION_EXPLAINERS[operationType] ?? OPERATION_EXPLAINERS.generate,
+    [operationType]
+  )
 
   // Rotate engineering facts every 8 seconds
   useEffect(() => {

@@ -260,23 +260,34 @@ export function StrategyDashboard({
   return (
     <div className="space-y-8">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          {/* Cascade breadcrumb */}
-          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-            <Link href="/plan" className="hover:text-foreground transition-colors">Plan</Link>
-            <ChevronRight className="h-3 w-3" />
-            <span className="text-foreground font-medium">Strategy</span>
-          </nav>
-          <div className={typography.pageHeader}>
-            <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Strategy</h1>
+      <div className="space-y-4 pb-4 border-b border-slate-100">
+        {/* Row 1: Title + primary CTA */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+              <Link href="/plan" className="hover:text-foreground transition-colors">Plan</Link>
+              <ChevronRight className="h-3 w-3" />
+              <span className="text-foreground font-medium">Strategy</span>
+            </nav>
+            <div className={typography.pageHeader}>
+              <div className={typography.pageHeaderAccent} />
+              <h1 className={typography.h1}>Strategy</h1>
+            </div>
+            <p className={typography.pageSubtitle}>
+              Where you're going and how you'll get there
+            </p>
           </div>
-          <p className={typography.pageSubtitle}>
-            Where you're going and how you'll get there
-          </p>
+          <Button
+            onClick={() => setIsCreateGoalOpen(true)}
+            className="bg-international-orange hover:bg-international-orange-hover shrink-0"
+          >
+            <Plus className="h-4 w-4 mr-1.5" />
+            New Goal
+          </Button>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Row 2: Toolbar — view tabs + secondary actions */}
+        <div className="flex flex-wrap items-center gap-2">
           <AskSpecialistButton
             context={{
               type: 'strategy',
@@ -325,13 +336,6 @@ export function StrategyDashboard({
           >
             <FileText className="h-4 w-4 mr-1.5" />
             Import Transcript
-          </Button>
-          <Button
-            onClick={() => setIsCreateGoalOpen(true)}
-            className="bg-international-orange hover:bg-international-orange-hover"
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Goal
           </Button>
         </div>
       </div>

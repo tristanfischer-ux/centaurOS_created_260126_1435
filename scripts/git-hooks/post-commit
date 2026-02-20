@@ -1,0 +1,28 @@
+#!/bin/sh
+# Append minimal entry to daily memory log on every commit.
+# Tagged [AUTO-COMMIT] so agent-written entries can be distinguished.
+# Install: ./scripts/install-memory-hook.sh
+
+MEMORY_DIR="${HOME}/.memory"
+DAILY_DIR="${MEMORY_DIR}/daily"
+DATE=$(date +%Y-%m-%d)
+TIME=$(date +%H:%M)
+LOG_FILE="${DAILY_DIR}/${DATE}.md"
+
+# Only run if memory directory exists (user has memory system)
+[ -d "$DAILY_DIR" ] || exit 0
+
+# Ensure log file exists with header
+if [ ! -f "$LOG_FILE" ]; then
+  mkdir -p "$DAILY_DIR"
+  printf "# Daily Log: %s\n\n## Entries\n\n" "$DATE" > "$LOG_FILE"
+fi
+
+# Last commit: short hash and subject
+HASH=$(git rev-parse --short HEAD)
+SUBJECT=$(git log -1 --format="%s" | sed 's/|/\\|/g')
+
+# Append one-line entry
+printf "### %s - [AUTO-COMMIT] %s\n**Commit:** %s\n**Message:** %s\n\n" "$TIME" "$HASH" "$HASH" "$SUBJECT" >> "$LOG_FILE"
+
+exit 0

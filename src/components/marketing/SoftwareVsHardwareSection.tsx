@@ -1,8 +1,7 @@
 "use client"
 
-import Image from "next/image"
+import { ArrowRight, Clock, Banknote, TrendingDown, Zap, Check } from "lucide-react"
 import Link from "next/link"
-import { ArrowRight, Laptop, Factory, Check, X, Zap } from "lucide-react"
 import { motion } from "framer-motion"
 import {
   AnimatedSection,
@@ -13,97 +12,69 @@ import {
 } from "@/components/marketing/animations"
 
 /**
- * Side-by-side items comparing starting a software vs hardware company.
+ * The core pain stats from traditional hardware development.
  *
- * @description Each item contrasts how trivially easy the software path is
- * versus the painful hardware path, making the gap viscerally clear.
+ * INTENT: These numbers make the problem viscerally concrete. Pulled from
+ * the founder's voice notes and industry benchmarks.
  */
-const COMPARISON_ITEMS = [
+const PAIN_STATS = [
   {
-    category: "Getting Started",
-    software: "Open a laptop. Deploy to the cloud. You're live.",
-    hardware: "Lease a workshop. Source tooling. Wait 6 months.",
+    icon: Clock,
+    stat: "12–18 months",
+    label: "To first prototype",
+    detail: "Leases, equipment, hiring — all before a single part is made",
   },
   {
-    category: "Your First Team",
-    software: "Hire freelancers on Upwork. Start this afternoon.",
-    hardware: "Recruit 4-6 full-time engineers. Burn 3 months hiring.",
+    icon: Banknote,
+    stat: "£50–100k",
+    label: "Monthly burn rate",
+    detail: "Salaries for staff you hired in advance, waiting for work",
   },
   {
-    category: "Infrastructure Cost",
-    software: "£0 to £50/month for hosting and tools.",
-    hardware: "£50k-£100k/month in salaries before a single prototype.",
-  },
-  {
-    category: "Time to First Product",
-    software: "Ship an MVP in a weekend. Iterate daily.",
-    hardware: "12-18 months to first prototype. Iterate quarterly.",
-  },
-  {
-    category: "Scaling Up",
-    software: "Add a server. Copy-paste infrastructure.",
-    hardware: "New tooling, new factory relationships, new capital.",
-  },
-  {
-    category: "Raising Capital",
-    software: "Bootstrap with revenue. Raise when you choose.",
-    hardware: "Raise £2M+ before you can build anything. Give away 30-40% equity.",
+    icon: TrendingDown,
+    stat: "30–40%",
+    label: "Equity given away",
+    detail: "Raising millions just to fund infrastructure, not innovation",
   },
 ] as const
 
 /**
  * The Fractional Forge bridge — how we close the gap.
  *
- * @description Maps each hardware pain point to its Fractional Forge equivalent,
- * showing how hardware development can feel as lightweight as software.
+ * INTENT: Maps each pain point to its Cloud Factory equivalent, showing
+ * that hardware development can be as lightweight as software.
  */
-/**
- * Hard stats from the traditional hardware development model.
- *
- * @description Pulled from industry benchmarks — these numbers make the
- * pain viscerally concrete before the comparison table drives it home.
- */
-const PAIN_STATS = [
-  { stat: "12–18 months", label: "To first prototype" },
-  { stat: "£50–100k", label: "Monthly burn rate" },
-  { stat: "30–40%", label: "Equity given away" },
-] as const
-
 const BRIDGE_ITEMS = [
   {
-    pain: "Full-time engineering team",
-    solution: "Fractional experts on demand",
+    pain: "Lease a factory, buy equipment",
+    solution: "Use cloud factories with spare capacity",
   },
   {
-    pain: "6-figure monthly burn",
-    solution: "Pay only for what you use",
+    pain: "Hire full-time teams in advance",
+    solution: "Fractional experts on demand",
   },
   {
     pain: "18-month timelines",
     solution: "12-week sprints",
   },
   {
-    pain: "Equity dilution to fund hiring",
-    solution: "Keep 100% of your company",
-  },
-  {
-    pain: "Finding manufacturers yourself",
-    solution: "78+ manufacturing techniques, one platform",
-  },
-  {
-    pain: "Building everything from scratch",
-    solution: "Plug into a ready-made network",
+    pain: "Raise millions before building",
+    solution: "Start for £0. Keep 100% equity.",
   },
 ] as const
 
 /**
- * SoftwareVsHardwareSection — The dramatic comparison that sets up the problem.
+ * SoftwareVsHardwareSection — Reframed as "The Mismatch."
  *
- * @description Makes the visitor viscerally feel the gap between starting a
- * software company (trivially easy) and a hardware company (painfully hard).
- * Then reveals Fractional Forge as the bridge that closes that gap.
+ * INTENT: The founder's core insight is that CAD designs move at software
+ * speed while physical infrastructure moves at physical speed. This creates
+ * a constant mismatch where ideas outrun execution. By the time your factory
+ * is ready, your designs have moved on — forcing you to either ship an
+ * outdated product or delay further.
  *
- * @component
+ * DECISION: Tightened from a 6-row comparison table to a focused 3-point
+ * narrative with the AWS analogy. The old version was thorough but too long
+ * for a first-time visitor to absorb.
  */
 export function SoftwareVsHardwareSection() {
   return (
@@ -112,138 +83,72 @@ export function SoftwareVsHardwareSection() {
       className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        {/* Section Header */}
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-20">
+        {/* Section Header — The Mismatch */}
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            The Gap
+            The Problem
           </span>
           <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Starting a Software Company Is
-            <br className="hidden sm:block" />{" "}
-            <span className="text-international-orange">Absurdly Easy.</span>
+            Your Designs Move at{" "}
+            <span className="text-status-success">Software Speed.</span>
             <br />
-            Starting a Hardware Company{" "}
-            <span className="text-destructive">Isn&apos;t.</span>
+            Your Factory Moves at{" "}
+            <span className="text-destructive">Physical Speed.</span>
           </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Anyone can spin up a SaaS from a coffee shop. Building a physical
-            product still requires factories, engineers, and mountains of capital.
-            Until now.
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-3xl mx-auto leading-relaxed">
+            CAD designs iterate in hours. But leasing premises, buying equipment,
+            and hiring engineers takes months. By the time your physical infrastructure
+            catches up, your ideas have moved on — forcing you to ship an outdated
+            product or delay again. This mismatch between thinking speed and building
+            speed is why hardware companies burn through cash, time, and equity before
+            they ever ship.
           </p>
         </AnimatedSection>
 
-        {/* Pain Stats — the hard numbers */}
-        <StaggerContainer className="grid grid-cols-3 gap-3 sm:gap-6 mb-10 sm:mb-12 md:mb-16">
-          {PAIN_STATS.map((item) => (
-            <AnimatedCard
-              key={item.label}
-              className="text-center p-4 sm:p-6 rounded-xl border bg-card"
-            >
-              <p className="text-lg sm:text-2xl md:text-3xl font-black text-destructive mb-1">
-                {item.stat}
-              </p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground font-mono uppercase tracking-wider">
-                {item.label}
-              </p>
-            </AnimatedCard>
-          ))}
+        {/* Pain Stats */}
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 mb-10 sm:mb-12 md:mb-16">
+          {PAIN_STATS.map((item) => {
+            const Icon = item.icon
+            return (
+              <AnimatedCard
+                key={item.label}
+                className="text-center p-4 sm:p-6 rounded-xl border bg-card"
+              >
+                <div className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-destructive/10 mb-3">
+                  <Icon className="h-5 w-5 text-destructive" />
+                </div>
+                <p className="text-lg sm:text-2xl md:text-3xl font-black text-destructive mb-1">
+                  {item.stat}
+                </p>
+                <p className="text-xs sm:text-sm font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                  {item.label}
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {item.detail}
+                </p>
+              </AnimatedCard>
+            )
+          })}
         </StaggerContainer>
 
-        {/* Side-by-Side Comparison */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-10 sm:mb-12 md:mb-20">
-          {/* Software Column */}
-          <AnimatedSection>
-            <div className="border bg-card rounded-xl overflow-hidden">
-              <div className="bg-status-success-light px-5 sm:px-6 py-4 flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-status-success/10 flex items-center justify-center">
-                  <Laptop className="h-5 w-5 text-status-success" />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-black text-foreground">
-                    Starting a Software Company
-                  </h3>
-                  <p className="text-xs font-mono uppercase tracking-widest text-status-success">
-                    Easy Mode
-                  </p>
-                </div>
-              </div>
-              <div className="p-5 sm:p-6 space-y-4">
-                {COMPARISON_ITEMS.map((item) => (
-                  <div key={item.category} className="flex items-start gap-3">
-                    <div className="mt-0.5 flex-shrink-0">
-                      <Check className="h-4 w-4 text-status-success" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
-                        {item.category}
-                      </p>
-                      <p className="text-sm text-foreground leading-relaxed">
-                        {item.software}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </AnimatedSection>
-
-          {/* Hardware Column */}
-          <AnimatedSection delay={0.15}>
-            <div className="border bg-card rounded-xl overflow-hidden">
-              <div className="bg-status-error-light px-5 sm:px-6 py-4 flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center">
-                  <Factory className="h-5 w-5 text-destructive" />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-black text-foreground">
-                    Starting a Hardware Company
-                  </h3>
-                  <p className="text-xs font-mono uppercase tracking-widest text-destructive">
-                    Hard Mode
-                  </p>
-                </div>
-              </div>
-              <div className="p-5 sm:p-6 space-y-4">
-                {COMPARISON_ITEMS.map((item) => (
-                  <div key={item.category} className="flex items-start gap-3">
-                    <div className="mt-0.5 flex-shrink-0">
-                      <X className="h-4 w-4 text-destructive" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
-                        {item.category}
-                      </p>
-                      <p className="text-sm text-foreground leading-relaxed">
-                        {item.hardware}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </AnimatedSection>
-        </div>
-
-        {/* The Bridge — Fractional Forge */}
+        {/* The Bridge — Fractional Forge Way */}
         <AnimatedSection>
           <div className="relative border-2 border-international-orange rounded-xl overflow-hidden bg-card">
-            {/* Header */}
             <div className="bg-international-orange/5 px-5 sm:px-8 py-5 sm:py-6 text-center border-b border-international-orange/20">
-              <div className="inline-flex items-center gap-2 mb-3">
+              <div className="inline-flex items-center gap-2 mb-2">
                 <Zap className="h-5 w-5 text-international-orange" />
                 <span className="text-xs font-mono font-bold uppercase tracking-widest text-international-orange">
                   The Fractional Forge Way
                 </span>
               </div>
               <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-foreground leading-tight">
-                What If Hardware Was{" "}
-                <span className="text-international-orange">This Easy Too?</span>
+                Move as Fast as{" "}
+                <span className="text-international-orange">Your Ideas.</span>
               </h3>
             </div>
 
-            {/* Bridge Items */}
             <div className="p-5 sm:p-8">
-              <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 mb-6 sm:mb-8">
                 {BRIDGE_ITEMS.map((item) => (
                   <AnimatedCard
                     key={item.pain}
@@ -260,37 +165,22 @@ export function SoftwareVsHardwareSection() {
                 ))}
               </StaggerContainer>
 
-              {/* CTA */}
-              <div className="mt-6 sm:mt-8 text-center">
+              <div className="text-center">
                 <motion.div
                   whileHover={buttonHover}
                   whileTap={buttonTap}
                   className="inline-block"
                 >
                   <Link
-                    href="/join"
+                    href="#ecosystem"
                     className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
                   >
-                    Build Hardware at Software Speed
+                    See How It Works
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </motion.div>
               </div>
             </div>
-          </div>
-        </AnimatedSection>
-
-        {/* Image */}
-        <AnimatedSection className="mt-10 sm:mt-12 md:mt-16" delay={0.2}>
-          <div className="relative w-full aspect-[3/2] sm:aspect-[2.5/1] rounded-xl overflow-hidden border shadow-lg">
-            <Image
-              src="/images/marketing/software-vs-hardware.png"
-              alt="The gap between starting a software company and a hardware company — and how Fractional Forge bridges it"
-              fill
-              className="object-cover"
-              sizes="(max-width: 640px) 100vw, 1200px"
-              loading="lazy"
-            />
           </div>
         </AnimatedSection>
       </div>

@@ -292,3 +292,20 @@ export interface MashupResult {
   tokensIn?: number
   tokensOut?: number
 }
+
+/** Result of the planMashup phase (plan only, no execution) */
+export interface MashupPlanResult {
+  success: boolean
+  error?: string
+  plan?: MashupPlan
+  /** Resolved source STEPs (base64) for passing to executeMashupPlan */
+  resolvedSources?: Array<{ name: string; step_b64: string }>
+  /** Source info used in planning (for display) */
+  sourceInfos?: Array<{ name: string; description?: string }>
+  tokensIn?: number
+  tokensOut?: number
+  elapsedMs?: number
+}
+
+/** Result of the executeMashupPlan phase (code gen + Modal + upload) */
+export type MashupExecuteResult = MashupResult
