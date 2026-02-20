@@ -20,6 +20,10 @@ jest.mock("@/components/smart/quick-capture-dialog", () => ({
   QuickCaptureDialog: () => null,
 }))
 
+jest.mock("@/lib/features/registry", () => ({
+  isRouteAlpha: jest.fn(() => false),
+}))
+
 jest.mock("@/components/ui/dropdown-menu", () => {
   type MockDropdownProps = {
     children?: React.ReactNode
@@ -64,7 +68,7 @@ describe("MobileNav dropdown routing", () => {
 
     fireEvent.click(await screen.findByRole("menuitem", { name: /^The Forge$/i }))
 
-    expect(pushMock).toHaveBeenCalledWith("/the-forge/studio")
+    expect(pushMock).toHaveBeenCalledWith("/the-forge")
   })
 
   it("routes Settings from More menu via router push", async () => {
