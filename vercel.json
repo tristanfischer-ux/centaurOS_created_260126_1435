@@ -5,6 +5,7 @@
     {"path": "/api/cron/weekly-synthesis", "schedule": "0 8 * * 1"},
     {"path": "/api/cron/specialist-briefings", "schedule": "0 6 * * *"},
     {"path": "/api/cron/specialist-briefings", "schedule": "0 12 * * *"},
-    {"path": "/api/cron/specialist-briefings", "schedule": "0 17 * * *"}
+    {"path": "/api/cron/specialist-briefings", "schedule": "0 17 * * *"},
+    {"path": "/api/cron/reports", "schedule": "0 8 * * *"}
   ]
 }

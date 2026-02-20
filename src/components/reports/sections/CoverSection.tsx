@@ -1,14 +1,19 @@
 'use client'
 
-import type { CoverSectionData } from '@/lib/reports/report-document-types'
+/* eslint-disable @next/next/no-img-element */
 
-type CoverSectionProps = CoverSectionData
+import type { CoverSectionData, ReportBranding } from '@/lib/reports/report-document-types'
+
+interface CoverSectionProps extends CoverSectionData {
+  branding?: ReportBranding
+}
 
 export function CoverSection({
   companyName,
   reportTitle,
   subtitle,
   generatedAt,
+  branding,
 }: CoverSectionProps) {
   const formattedDate = new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
@@ -21,12 +26,23 @@ export function CoverSection({
 
   return (
     <section className="flex flex-col items-center justify-center py-16 text-center">
+      {branding?.logoUrl && (
+        <img
+          src={branding.logoUrl}
+          alt={`${companyName} logo`}
+          className="mb-6 h-16 w-auto object-contain"
+        />
+      )}
+
       <h1 className="text-3xl font-display font-bold text-foreground">
         {companyName}
       </h1>
 
       <div className="mt-6 flex justify-center">
-        <div className="h-1 w-16 rounded-full bg-international-orange" />
+        <div
+          className="h-1 w-16 rounded-full bg-international-orange"
+          style={branding?.primaryColor ? { backgroundColor: branding.primaryColor } : undefined}
+        />
       </div>
 
       <h2 className="mt-6 text-xl text-muted-foreground">{reportTitle}</h2>

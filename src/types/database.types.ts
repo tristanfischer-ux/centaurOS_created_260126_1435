@@ -5599,6 +5599,8 @@ export type Database = {
           name: string
           owner_id: string | null
           purpose_data: Json | null
+          report_accent_color: string | null
+          report_primary_color: string | null
           sector: string | null
           slug: string | null
           stage: string | null
@@ -5613,6 +5615,8 @@ export type Database = {
           name: string
           owner_id?: string | null
           purpose_data?: Json | null
+          report_accent_color?: string | null
+          report_primary_color?: string | null
           sector?: string | null
           slug?: string | null
           stage?: string | null
@@ -5627,6 +5631,8 @@ export type Database = {
           name?: string
           owner_id?: string | null
           purpose_data?: Json | null
+          report_accent_color?: string | null
+          report_primary_color?: string | null
           sector?: string | null
           slug?: string | null
           stage?: string | null
@@ -11067,7 +11073,16 @@ export type Database = {
           include_summary: boolean | null
           include_team_activity: boolean | null
           include_trends: boolean | null
+          last_scheduled_at: string | null
           profile_id: string
+          schedule_day_of_month: number | null
+          schedule_day_of_week: number | null
+          schedule_detail_level: string | null
+          schedule_enabled: boolean
+          schedule_frequency: string | null
+          schedule_recipients: string[] | null
+          schedule_template: string | null
+          schedule_tone: string | null
           slack_enabled: boolean | null
           slack_webhook_url: string | null
           telegram_enabled: boolean | null
@@ -11084,7 +11099,16 @@ export type Database = {
           include_summary?: boolean | null
           include_team_activity?: boolean | null
           include_trends?: boolean | null
+          last_scheduled_at?: string | null
           profile_id: string
+          schedule_day_of_month?: number | null
+          schedule_day_of_week?: number | null
+          schedule_detail_level?: string | null
+          schedule_enabled?: boolean
+          schedule_frequency?: string | null
+          schedule_recipients?: string[] | null
+          schedule_template?: string | null
+          schedule_tone?: string | null
           slack_enabled?: boolean | null
           slack_webhook_url?: string | null
           telegram_enabled?: boolean | null
@@ -11101,7 +11125,16 @@ export type Database = {
           include_summary?: boolean | null
           include_team_activity?: boolean | null
           include_trends?: boolean | null
+          last_scheduled_at?: string | null
           profile_id?: string
+          schedule_day_of_month?: number | null
+          schedule_day_of_week?: number | null
+          schedule_detail_level?: string | null
+          schedule_enabled?: boolean
+          schedule_frequency?: string | null
+          schedule_recipients?: string[] | null
+          schedule_template?: string | null
+          schedule_tone?: string | null
           slack_enabled?: boolean | null
           slack_webhook_url?: string | null
           telegram_enabled?: boolean | null

@@ -27,7 +27,7 @@ import {
   WeekAheadSection,
 } from '@/components/reports/sections'
 
-import type { ReportDocument as ReportDocumentType, SectionData } from '@/lib/reports/report-document-types'
+import type { ReportDocument as ReportDocumentType, SectionData, ReportBranding } from '@/lib/reports/report-document-types'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const SECTION_RENDERERS: Record<string, React.ComponentType<any>> = {
@@ -47,10 +47,11 @@ interface ReportDocumentProps {
   forPrint?: boolean
 }
 
-function renderSection(section: SectionData, _forPrint: boolean): React.ReactNode {
+function renderSection(section: SectionData, _forPrint: boolean, branding?: ReportBranding): React.ReactNode {
   const Renderer = SECTION_RENDERERS[section.type]
   if (!Renderer) return null
-  return <Renderer {...section.data} />
+  const extraProps = section.type === 'cover' ? { branding } : {}
+  return <Renderer {...section.data} {...extraProps} />
 }
 
 export function ReportDocument({ document, forPrint = false }: ReportDocumentProps): React.JSX.Element {
@@ -76,7 +77,7 @@ export function ReportDocument({ document, forPrint = false }: ReportDocumentPro
                 forPrint && isMajorSection && 'print-page-break'
               )}
             >
-              {renderSection(section, forPrint)}
+              {renderSection(section, forPrint, document.branding)}
             </div>
           )
         })}

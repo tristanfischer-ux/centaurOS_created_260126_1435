@@ -152,6 +152,12 @@ export type SectionData =
 // Report Document
 // ========================
 
+export interface ReportBranding {
+  logoUrl?: string | null
+  primaryColor?: string | null
+  accentColor?: string | null
+}
+
 export interface ReportDocument {
   id: string
   templateId: string
@@ -161,6 +167,7 @@ export interface ReportDocument {
   foundryId: string
   foundryName: string
   sections: SectionData[]
+  branding?: ReportBranding
 }
 
 // ========================

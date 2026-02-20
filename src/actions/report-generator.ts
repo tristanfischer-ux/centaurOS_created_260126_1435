@@ -69,7 +69,7 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
 
     const { data: foundry } = await supabase
       .from('foundries')
-      .select('name')
+      .select('name, logo_url, report_primary_color, report_accent_color')
       .eq('id', foundryId)
       .single()
 
@@ -187,6 +187,11 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
       foundryId,
       foundryName,
       sections: orderedSections,
+      branding: {
+        logoUrl: foundry?.logo_url ?? null,
+        primaryColor: foundry?.report_primary_color ?? null,
+        accentColor: foundry?.report_accent_color ?? null,
+      },
     }
 
     return { success: true, document }

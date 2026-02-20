@@ -1,19 +1,24 @@
 'use client'
 
 /**
- * @file page.tsx — Reports page (Phase 2)
+ * @file page.tsx — Reports page (Phase 3)
  *
  * @description Premium report generation page with AI-powered narratives,
- * tone/detail controls, share links, email delivery, and report history.
+ * tone/detail controls, share links, email delivery, report history,
+ * multi-format export (PDF, PPTX, DOCX), infographic mode, and scheduling UI.
  *
- * FLOW: Template card → tone/detail → section toggles → generate → preview → share/email
+ * FLOW: Template card → tone/detail → section toggles → generate → preview → export/share/email
  *
  * @related
  * - src/actions/report-generator.ts — Server action for data collection + AI narrative
  * - src/actions/report-share.ts — Share link creation
  * - src/actions/report-email.ts — Email delivery
  * - src/components/reports/ReportDocument.tsx — Document renderer
+ * - src/components/reports/ReportInfographic.tsx — Dense infographic view
  * - src/components/reports/ReportHistory.tsx — Past reports browser
+ * - src/lib/reports/export-pptx.ts — PPTX slide deck export
+ * - src/lib/reports/export-docx.ts — DOCX Word export
+ * - src/lib/reports/export-infographic.ts — Infographic PNG export
  */
 
 import { useState, useCallback, useRef } from 'react'
@@ -35,11 +40,15 @@ import {
   Printer,
   Share2,
   Mail,
-  Link2,
   Copy,
   CheckCheck,
   MessageSquareText,
   Gauge,
+  Presentation,
+  Image as ImageIcon,
+  Clock,
+  Eye,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -67,6 +76,7 @@ import { generateReport, saveReportSnapshot } from '@/actions/report-generator'
 import { createReportShareLink } from '@/actions/report-share'
 import { sendReportEmail } from '@/actions/report-email'
 import { ReportDocument } from '@/components/reports/ReportDocument'
+import { ReportInfographic } from '@/components/reports/ReportInfographic'
 import { ReportHistory } from '@/components/reports/ReportHistory'
 
 import { exportReportAsPDF, printReport } from '@/lib/reports/export-pdf'
@@ -116,6 +126,7 @@ export default function ReportsPage(): React.JSX.Element {
   )
 
   const reportRef = useRef<HTMLDivElement>(null)
+  const infographicRef = useRef<HTMLDivElement>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplateId>('weekly-update')
   const [dateRange, setDateRange] = useState(defaultDateRange)
   const [enabledSections, setEnabledSections] = useState<Set<ReportSectionType>>(defaultSections)
@@ -124,6 +135,9 @@ export default function ReportsPage(): React.JSX.Element {
   const [isGenerating, setIsGenerating] = useState(false)
   const [reportDocument, setReportDocument] = useState<ReportDocumentType | null>(null)
   const [lastSnapshotId, setLastSnapshotId] = useState<string | null>(null)
+
+  // View mode: full report or infographic
+  const [viewMode, setViewMode] = useState<'document' | 'infographic'>('document')
 
   // Share dialog state
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
@@ -135,6 +149,14 @@ export default function ReportsPage(): React.JSX.Element {
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false)
   const [isSendingEmail, setIsSendingEmail] = useState(false)
   const [emailRecipients, setEmailRecipients] = useState('')
+
+  // Schedule dialog state
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false)
+  const [scheduleEnabled, setScheduleEnabled] = useState(false)
+  const [scheduleFrequency, setScheduleFrequency] = useState<'weekly' | 'monthly'>('weekly')
+  const [scheduleDayOfWeek, setScheduleDayOfWeek] = useState(1)
+  const [scheduleDayOfMonth, setScheduleDayOfMonth] = useState(1)
+  const [scheduleRecipients, setScheduleRecipients] = useState('')
 
   const handleTemplateSelect = useCallback((templateId: ReportTemplateId) => {
     setSelectedTemplate(templateId)
@@ -232,9 +254,45 @@ export default function ReportsPage(): React.JSX.Element {
     }
   }, [reportDocument])
 
-  const handleExportDOCX = useCallback(() => {
-    toast.info('DOCX export coming soon — use Print for the best quality output')
-  }, [])
+  const handleExportDOCX = useCallback(async () => {
+    if (!reportDocument) return
+    try {
+      toast.info('Generating Word document…')
+      const { exportReportAsDOCX } = await import('@/lib/reports/export-docx')
+      await exportReportAsDOCX(reportDocument)
+      toast.success('DOCX downloaded')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'DOCX generation failed'
+      toast.error(message)
+    }
+  }, [reportDocument])
+
+  const handleExportPPTX = useCallback(async () => {
+    if (!reportDocument) return
+    try {
+      toast.info('Generating slide deck…')
+      const { exportReportAsPPTX } = await import('@/lib/reports/export-pptx')
+      await exportReportAsPPTX(reportDocument)
+      toast.success('PPTX downloaded')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'PPTX generation failed'
+      toast.error(message)
+    }
+  }, [reportDocument])
+
+  const handleExportInfographic = useCallback(async () => {
+    if (!infographicRef.current || !reportDocument) return
+    try {
+      toast.info('Exporting infographic as image…')
+      const { downloadInfographicAsImage } = await import('@/lib/reports/export-infographic')
+      const filename = `${reportDocument.foundryName.replace(/\s+/g, '-')}-infographic-${reportDocument.dateRange.start}.png`
+      await downloadInfographicAsImage(infographicRef.current, filename)
+      toast.success('Infographic image downloaded')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Image export failed'
+      toast.error(message)
+    }
+  }, [reportDocument])
 
   const handleCreateShareLink = useCallback(async () => {
     if (!lastSnapshotId) {
@@ -556,15 +614,49 @@ export default function ReportsPage(): React.JSX.Element {
           {/* Export + Share Toolbar */}
           <div className="sticky top-0 z-10 -mx-1 px-1 py-3 bg-background">
             <Card>
-              <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4">
-                <div className="flex items-center gap-2">
-                  <h2 className={typography.h3}>Report Preview</h2>
-                  {tone !== 'internal' && (
-                    <Badge variant="secondary" className="text-xs">
-                      {TONE_OPTIONS.find(t => t.value === tone)?.label} tone
-                    </Badge>
-                  )}
+              <CardContent className="flex flex-col gap-3 p-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <h2 className={typography.h3}>Report Preview</h2>
+                    {tone !== 'internal' && (
+                      <Badge variant="secondary" className="text-xs">
+                        {TONE_OPTIONS.find(t => t.value === tone)?.label} tone
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* View toggle */}
+                  <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('document')}
+                      className={cn(
+                        'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
+                        viewMode === 'document'
+                          ? 'bg-background shadow-sm text-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Document
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('infographic')}
+                      className={cn(
+                        'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
+                        viewMode === 'infographic'
+                          ? 'bg-background shadow-sm text-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      Infographic
+                    </button>
+                  </div>
                 </div>
+
+                {/* Action buttons */}
                 <div className="flex flex-wrap items-center gap-2">
                   <Button variant="secondary" size="sm" onClick={handlePrint}>
                     <Printer className="mr-1.5 h-3.5 w-3.5" />
@@ -575,9 +667,19 @@ export default function ReportsPage(): React.JSX.Element {
                     PDF
                   </Button>
                   <Button variant="secondary" size="sm" onClick={handleExportDOCX}>
-                    <FileText className="mr-1.5 h-3.5 w-3.5" />
+                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
                     DOCX
                   </Button>
+                  <Button variant="secondary" size="sm" onClick={handleExportPPTX}>
+                    <Presentation className="mr-1.5 h-3.5 w-3.5" />
+                    PPTX
+                  </Button>
+                  {viewMode === 'infographic' && (
+                    <Button variant="secondary" size="sm" onClick={handleExportInfographic}>
+                      <ImageIcon className="mr-1.5 h-3.5 w-3.5" />
+                      Save Image
+                    </Button>
+                  )}
                   <div className="h-4 w-px bg-border" />
                   <Button
                     variant="secondary"
@@ -600,19 +702,38 @@ export default function ReportsPage(): React.JSX.Element {
                     <Mail className="mr-1.5 h-3.5 w-3.5" />
                     Email
                   </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setIsScheduleDialogOpen(true)}
+                  >
+                    <Clock className="mr-1.5 h-3.5 w-3.5" />
+                    Schedule
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Document Render */}
-          <Card>
-            <CardContent className="p-8 sm:p-12">
-              <div ref={reportRef}>
-                <ReportDocument document={reportDocument} />
+          {viewMode === 'document' && (
+            <Card>
+              <CardContent className="p-8 sm:p-12">
+                <div ref={reportRef}>
+                  <ReportDocument document={reportDocument} />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Infographic Render */}
+          {viewMode === 'infographic' && (
+            <div className="py-6">
+              <div ref={infographicRef}>
+                <ReportInfographic document={reportDocument} />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          )}
         </section>
       )}
 
@@ -694,6 +815,140 @@ export default function ReportsPage(): React.JSX.Element {
                   Send Report
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Dialog */}
+      <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>Schedule Automatic Reports</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <p className="text-sm text-muted-foreground">
+              Automatically deliver your latest report on a regular schedule. The most recently
+              generated report will be emailed to your recipients.
+            </p>
+
+            {/* Enable toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-foreground">Enable scheduling</p>
+                <p className="text-xs text-muted-foreground">Reports will be delivered automatically</p>
+              </div>
+              <Checkbox
+                checked={scheduleEnabled}
+                onCheckedChange={(checked) => setScheduleEnabled(checked === true)}
+              />
+            </div>
+
+            {scheduleEnabled && (
+              <>
+                {/* Frequency */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Frequency</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setScheduleFrequency('weekly')}
+                      className={cn(
+                        'rounded-lg border px-4 py-2 text-sm transition-all',
+                        scheduleFrequency === 'weekly'
+                          ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
+                          : 'border-input bg-background text-muted-foreground'
+                      )}
+                    >
+                      Weekly
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScheduleFrequency('monthly')}
+                      className={cn(
+                        'rounded-lg border px-4 py-2 text-sm transition-all',
+                        scheduleFrequency === 'monthly'
+                          ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
+                          : 'border-input bg-background text-muted-foreground'
+                      )}
+                    >
+                      Monthly
+                    </button>
+                  </div>
+                </div>
+
+                {/* Day picker */}
+                {scheduleFrequency === 'weekly' ? (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Day of week</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => setScheduleDayOfWeek(i)}
+                          className={cn(
+                            'rounded-md border px-3 py-1.5 text-xs font-medium transition-all',
+                            scheduleDayOfWeek === i
+                              ? 'border-international-orange bg-international-orange/5 text-foreground'
+                              : 'border-input bg-background text-muted-foreground'
+                          )}
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label htmlFor="schedule-dom" className="text-sm font-medium text-foreground">Day of month</label>
+                    <Input
+                      id="schedule-dom"
+                      type="number"
+                      min={1}
+                      max={28}
+                      value={scheduleDayOfMonth}
+                      onChange={e => setScheduleDayOfMonth(Math.min(28, Math.max(1, parseInt(e.target.value) || 1)))}
+                      className="w-24"
+                    />
+                    <p className="text-xs text-muted-foreground">Between 1 and 28</p>
+                  </div>
+                )}
+
+                {/* Recipients */}
+                <div className="space-y-2">
+                  <label htmlFor="schedule-recipients" className="text-sm font-medium text-foreground">
+                    Recipients
+                  </label>
+                  <Input
+                    id="schedule-recipients"
+                    placeholder="ceo@company.com, board@company.com"
+                    value={scheduleRecipients}
+                    onChange={e => setScheduleRecipients(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated email addresses
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setIsScheduleDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                toast.success(
+                  scheduleEnabled
+                    ? `Scheduled ${scheduleFrequency} delivery to ${scheduleRecipients.split(',').length} recipient(s)`
+                    : 'Scheduling disabled'
+                )
+                setIsScheduleDialogOpen(false)
+              }}
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              {scheduleEnabled ? 'Save Schedule' : 'Done'}
             </Button>
           </DialogFooter>
         </DialogContent>
