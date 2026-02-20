@@ -3297,6 +3297,58 @@ export type Database = {
         }
         Relationships: []
       }
+      business_plan_analyses: {
+        Row: {
+          analysis_json: Json
+          analyzed_at: string
+          created_at: string
+          created_by: string | null
+          file_name: string | null
+          foundry_id: string
+          id: string
+        }
+        Insert: {
+          analysis_json?: Json
+          analyzed_at?: string
+          created_at?: string
+          created_by?: string | null
+          file_name?: string | null
+          foundry_id: string
+          id?: string
+        }
+        Update: {
+          analysis_json?: Json
+          analyzed_at?: string
+          created_at?: string
+          created_by?: string | null
+          file_name?: string | null
+          foundry_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_plan_analyses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "business_plan_analyses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_plan_analyses_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cad_assemblies: {
         Row: {
           assembly_params: Json | null
@@ -6116,6 +6168,66 @@ export type Database = {
           },
         ]
       }
+      funding_requirements: {
+        Row: {
+          amount_usd: number | null
+          analysis_id: string | null
+          created_at: string
+          foundry_id: string
+          funding_type: string | null
+          id: string
+          linked_objective_ids: string[] | null
+          needed_by_date: string | null
+          reason: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount_usd?: number | null
+          analysis_id?: string | null
+          created_at?: string
+          foundry_id: string
+          funding_type?: string | null
+          id?: string
+          linked_objective_ids?: string[] | null
+          needed_by_date?: string | null
+          reason?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amount_usd?: number | null
+          analysis_id?: string | null
+          created_at?: string
+          foundry_id?: string
+          funding_type?: string | null
+          id?: string
+          linked_objective_ids?: string[] | null
+          needed_by_date?: string | null
+          reason?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funding_requirements_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "business_plan_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funding_requirements_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_oauth_tokens: {
         Row: {
           access_token: string
@@ -6235,6 +6347,73 @@ export type Database = {
             columns: ["foundry_id"]
             isOneToOne: false
             referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hiring_requirements: {
+        Row: {
+          ai_suggested_date: string | null
+          analysis_id: string | null
+          created_at: string
+          foundry_id: string
+          id: string
+          linked_objective_id: string | null
+          reason: string | null
+          role_title: string
+          role_type: string
+          status: string
+          updated_at: string
+          user_override_date: string | null
+        }
+        Insert: {
+          ai_suggested_date?: string | null
+          analysis_id?: string | null
+          created_at?: string
+          foundry_id: string
+          id?: string
+          linked_objective_id?: string | null
+          reason?: string | null
+          role_title: string
+          role_type: string
+          status?: string
+          updated_at?: string
+          user_override_date?: string | null
+        }
+        Update: {
+          ai_suggested_date?: string | null
+          analysis_id?: string | null
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          linked_objective_id?: string | null
+          reason?: string | null
+          role_title?: string
+          role_type?: string
+          status?: string
+          updated_at?: string
+          user_override_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hiring_requirements_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "business_plan_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hiring_requirements_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hiring_requirements_linked_objective_id_fkey"
+            columns: ["linked_objective_id"]
+            isOneToOne: false
+            referencedRelation: "objectives"
             referencedColumns: ["id"]
           },
         ]

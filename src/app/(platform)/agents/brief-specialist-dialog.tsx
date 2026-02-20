@@ -2037,19 +2037,26 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 <p className="text-[10px] font-medium text-muted-foreground mb-1.5">Continue with...</p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {suggestedSpecialists.map((s) => (
-                                        <button
-                                            key={s.id}
-                                            onClick={() => handleSwitchSpecialist(s.id)}
-                                            className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-background border border-muted hover:border-international-orange/50 transition-colors text-xs group"
-                                        >
-                                            {s.avatarImage && (
-                                                <div className="relative h-4 w-4 rounded-full overflow-hidden flex-shrink-0">
-                                                    <Image src={s.avatarImage} alt={s.name} fill className="object-cover" sizes="16px" />
-                                                </div>
-                                            )}
-                                            <span className="font-medium text-foreground">{s.name}</span>
-                                            <ArrowRight className="h-2.5 w-2.5 text-muted-foreground group-hover:text-international-orange transition-colors" />
-                                        </button>
+                                        <Tooltip key={s.id}>
+                                            <TooltipTrigger asChild>
+                                                <button
+                                                    onClick={() => handleSwitchSpecialist(s.id)}
+                                                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-background border border-muted hover:border-international-orange/50 transition-colors text-xs group"
+                                                >
+                                                    {s.avatarImage && (
+                                                        <div className="relative h-4 w-4 rounded-full overflow-hidden flex-shrink-0">
+                                                            <Image src={s.avatarImage} alt={s.name} fill className="object-cover" sizes="16px" />
+                                                        </div>
+                                                    )}
+                                                    <span className="font-medium text-foreground">{s.name}</span>
+                                                    <ArrowRight className="h-2.5 w-2.5 text-muted-foreground group-hover:text-international-orange transition-colors" />
+                                                </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top" className="max-w-[220px]">
+                                                <p className="font-medium">{s.name} — {s.title}</p>
+                                                <p className="text-muted-foreground mt-0.5">{s.tagline}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
                                     ))}
                                 </div>
                             </div>
@@ -2879,25 +2886,32 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 </p>
                                 <div className="flex gap-2">
                                     {suggestedSpecialists.map((s) => (
-                                        <button
-                                            key={s.id}
-                                            onClick={() => handleSwitchSpecialist(s.id)}
-                                            className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-background border border-muted hover:border-international-orange/50 transition-colors text-sm group"
-                                        >
-                                            {s.avatarImage && (
-                                                <div className="relative h-5 w-5 rounded-full overflow-hidden flex-shrink-0">
-                                                    <Image
-                                                        src={s.avatarImage}
-                                                        alt={s.name}
-                                                        fill
-                                                        className="object-cover"
-                                                        sizes="20px"
-                                                    />
-                                                </div>
-                                            )}
-                                            <span className="font-medium text-foreground">{s.name}</span>
-                                            <ArrowRight className="h-3 w-3 text-muted-foreground group-hover:text-international-orange transition-colors" />
-                                        </button>
+                                        <Tooltip key={s.id}>
+                                            <TooltipTrigger asChild>
+                                                <button
+                                                    onClick={() => handleSwitchSpecialist(s.id)}
+                                                    className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-background border border-muted hover:border-international-orange/50 transition-colors text-sm group"
+                                                >
+                                                    {s.avatarImage && (
+                                                        <div className="relative h-5 w-5 rounded-full overflow-hidden flex-shrink-0">
+                                                            <Image
+                                                                src={s.avatarImage}
+                                                                alt={s.name}
+                                                                fill
+                                                                className="object-cover"
+                                                                sizes="20px"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    <span className="font-medium text-foreground">{s.name}</span>
+                                                    <ArrowRight className="h-3 w-3 text-muted-foreground group-hover:text-international-orange transition-colors" />
+                                                </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top" className="max-w-[240px]">
+                                                <p className="font-medium">{s.name} — {s.title}</p>
+                                                <p className="text-muted-foreground mt-0.5">{s.tagline}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
                                     ))}
                                 </div>
                             </div>

@@ -32,6 +32,9 @@ import {
 import { CreateStrategicGoalDialog } from '@/components/strategy/create-strategic-goal-dialog'
 import { TranscriptImportDialog } from '@/components/strategy/transcript-import-dialog'
 import { ExportStrategyDialog } from '@/components/strategy/export-strategy-dialog'
+import { BusinessPlanUpload } from '@/components/strategy/business-plan-upload'
+import { MergeReviewDialog } from '@/components/strategy/merge-review-dialog'
+import type { MergeReviewState } from '@/lib/business-plan-types'
 import { AutoGenerateMilestonesDialog } from '@/components/strategy/auto-generate-milestones-dialog'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import { StrategyHealthReview } from '@/components/specialists/strategy-health-review'
@@ -139,6 +142,10 @@ export function StrategyDashboard({
     }
     return new Set()
   })
+
+  // ── Business Plan merge review ──
+  const [mergeState, setMergeState] = useState<MergeReviewState | null>(null)
+  const [showMergeDialog, setShowMergeDialog] = useState(false)
 
   // ── Node details dialog ──
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -339,6 +346,34 @@ export function StrategyDashboard({
           </Button>
         </div>
       </div>
+
+      {/* ── Business Plan Upload Zone ── */}
+      {isFounder && (
+        <div>
+          <h2 className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+            Business Plan
+          </h2>
+          <BusinessPlanUpload
+            lastAnalyzedAt={null}
+            onMergeReady={(state) => {
+              setMergeState(state)
+              setShowMergeDialog(true)
+            }}
+          />
+        </div>
+      )}
+
+      {mergeState && (
+        <MergeReviewDialog
+          open={showMergeDialog}
+          mergeState={mergeState}
+          onClose={() => setShowMergeDialog(false)}
+          onApplied={() => {
+            setShowMergeDialog(false)
+            router.refresh()
+          }}
+        />
+      )}
 
       {/* ── Dashboard View ── */}
       {viewMode === 'dashboard' && (
