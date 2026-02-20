@@ -1,6 +1,6 @@
 "use client"
 
-import { CheckCircle2, ArrowRight, Clock, AlertCircle } from "lucide-react"
+import { CheckCircle2, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface StatusItem {
@@ -11,11 +11,6 @@ interface StatusItem {
 
 const STATUS_ITEMS: StatusItem[] = [
     {
-        label: "Pending",
-        color: "bg-muted-foreground",
-        icon: Clock,
-    },
-    {
         label: "In Progress",
         color: "bg-status-info",
         icon: ArrowRight,
@@ -24,11 +19,6 @@ const STATUS_ITEMS: StatusItem[] = [
         label: "Completed",
         color: "bg-status-success",
         icon: CheckCircle2,
-    },
-    {
-        label: "Rejected",
-        color: "bg-status-error",
-        icon: AlertCircle,
     },
 ]
 

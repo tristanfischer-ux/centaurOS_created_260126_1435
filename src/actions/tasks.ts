@@ -274,7 +274,7 @@ export async function createTask(formData: FormData) {
                   assignee_id: primaryAssigneeId, // Primary assignee
                   start_date: startDate || null,
                   end_date: deadline || null,
-                  status: 'Pending',
+                  status: 'Accepted',
                   risk_level: riskLevel,
                   client_visible: false, // Always hidden initially
                   is_private: isPrivate,
@@ -601,9 +601,8 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
         const { error } = await supabase.from('tasks')
             .update({
                 assignee_id: newAssigneeId,
+                status: 'Accepted',
                 forwarding_history: newHistory as unknown as Database['public']['Tables']['tasks']['Update']['forwarding_history']
-                // Status remains Pending or whatever it was? Usually Forwarding resets to Pending for the new person to Accept? 
-                // "The recipient can send the task to a third user... The task remains Pending but the assignee updates." (User Prompt)
             })
             .eq('id', taskId)
             .eq('foundry_id', foundryId)
@@ -916,27 +915,12 @@ export async function completeTask(taskId: string) {
 
         if (fetchError || !task) return { error: 'Task not found' }
 
-        let nextStatus: TaskStatus = 'Completed'
-        let clientVisible = true
+        const nextStatus: TaskStatus = 'Completed'
 
-        // Founders and Executives can directly complete tasks regardless of risk level
-        const canBypassApproval = userProfile?.role === 'Founder' || userProfile?.role === 'Executive'
-
-        if (!canBypassApproval) {
-            if (task.risk_level === 'Medium') {
-                nextStatus = 'Pending_Peer_Review'
-                clientVisible = false
-            } else if (task.risk_level === 'High') {
-                nextStatus = 'Pending_Executive_Approval'
-                clientVisible = false
-            }
-        }
-
-        const updates: Partial<Database['public']['Tables']['tasks']['Update']> = { status: nextStatus }
-        // Only set end_date if actually fully completed
-        if (nextStatus === 'Completed') {
-            updates.end_date = new Date().toISOString()
-            updates.client_visible = true // Explicitly set visible
+        const updates: Partial<Database['public']['Tables']['tasks']['Update']> = {
+            status: nextStatus,
+            end_date: new Date().toISOString(),
+            client_visible: true,
         }
 
         const { error } = await supabase.from('tasks')

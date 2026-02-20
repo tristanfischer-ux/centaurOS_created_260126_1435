@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { getStatusBadgeClass } from '@/lib/status-colors'
-import { acceptTask, completeTask, getTaskComments, addTaskComment } from '@/actions/tasks'
+import { completeTask, getTaskComments, addTaskComment } from '@/actions/tasks'
 import { toast } from 'sonner'
 import { useCelebration } from '@/hooks/useCelebration'
 import { formatDistanceToNow } from 'date-fns'
@@ -44,7 +44,6 @@ interface TaskComment {
 
 /** Status options a user can move a task to */
 const STATUS_OPTIONS = [
-  { value: 'Pending', label: 'Pending' },
   { value: 'Accepted', label: 'In Progress' },
   { value: 'Completed', label: 'Completed' },
 ] as const
@@ -149,33 +148,23 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
 
   /**
    * @description Handle inline status change from the detail panel.
-   * Uses acceptTask / completeTask server actions to properly transition status.
+   * Uses completeTask server action to properly transition status.
    */
   const handleStatusChange = (newStatus: string): void => {
     if (newStatus === task.status) return
 
     startTransition(async () => {
-      let result: { error?: string; success?: boolean }
-
-      if (newStatus === 'Accepted') {
-        result = await acceptTask(task.id)
-      } else if (newStatus === 'Completed') {
-        result = await completeTask(task.id)
-      } else {
-        // For other transitions, we'd need additional actions
-        // For now, acceptTask handles Pending -> Accepted and completeTask handles -> Completed
-        toast.error('This status transition is not yet supported from here')
+      if (newStatus !== 'Completed') {
+        toast.error('This status transition is not supported from here')
         return
       }
+
+      const result = await completeTask(task.id)
 
       if (result.error) {
         toast.error(result.error)
       } else {
-        if (newStatus === 'Completed') {
-          celebrateTaskComplete(task.title)
-        } else {
-          toast.success(`Task moved to ${newStatus === 'Accepted' ? 'In Progress' : newStatus}`)
-        }
+        celebrateTaskComplete(task.title)
         router.refresh()
       }
     })
@@ -281,7 +270,7 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                 <Select
                   value={task.status}
                   onValueChange={handleStatusChange}
-                  disabled={isPending || task.status === 'Completed' || task.status === 'Rejected'}
+                  disabled={isPending || task.status === 'Completed'}
                 >
                   <SelectTrigger className="h-8 text-sm w-full max-w-[180px]">
                     <SelectValue />

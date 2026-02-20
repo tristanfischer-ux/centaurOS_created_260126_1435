@@ -4,26 +4,16 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { CardFooter } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { ForwardTaskDialog } from "@/components/tasks/forward-task-dialog"
 import { ClientNudgeButton } from "@/components/smart-airlock/ClientNudgeButton"
 import {
   Check,
-  X,
   Pencil,
   Copy,
   HistoryIcon,
   MessageSquare,
   Maximize2,
   Bot,
-  ShieldCheck,
   Trash2,
   Loader2,
 } from "lucide-react"
@@ -70,8 +60,6 @@ interface TaskActionButtonsProps {
   userRole?: string
   isLoading: boolean
   aiRunning: boolean
-  rejectOpen: boolean
-  setRejectOpen: (open: boolean) => void
   editOpen: boolean
   setEditOpen: (open: boolean) => void
   forwardOpen: boolean
@@ -82,15 +70,10 @@ interface TaskActionButtonsProps {
   setShowThread: (show: boolean) => void
   fullViewOpen: boolean
   setFullViewOpen: (open: boolean) => void
-  rubberStampOpen: boolean
-  setRubberStampOpen: (open: boolean) => void
-  handleAccept: () => void
-  handleReject: (formData: FormData) => void
   handleComplete: () => void
   handleDuplicate: () => void
   handleRunAI: () => void
   handleForward: (formData: FormData) => void
-  handleApprove: () => void
   handleDelete?: () => Promise<void>
   isDeleting?: boolean
   sortedMembers: Member[]
@@ -111,8 +94,6 @@ export function TaskActionButtons({
   userRole,
   isLoading,
   aiRunning,
-  rejectOpen,
-  setRejectOpen,
   editOpen,
   setEditOpen,
   forwardOpen,
@@ -123,15 +104,10 @@ export function TaskActionButtons({
   setShowThread,
   fullViewOpen,
   setFullViewOpen,
-  rubberStampOpen,
-  setRubberStampOpen,
-  handleAccept,
-  handleReject,
   handleComplete,
   handleDuplicate,
   handleRunAI,
   handleForward,
-  handleApprove,
   handleDelete,
   isDeleting,
   sortedMembers,
@@ -142,15 +118,9 @@ export function TaskActionButtons({
   handleForwardFileUpload,
   handleRemoveAttachment,
 }: TaskActionButtonsProps) {
-  const showAcceptReject = task.status === "Pending" && isAssignee
   const showMarkComplete =
     task.status === "Accepted" && (isAssignee || userRole === "Executive" || isCreator)
-  const showCertify = task.status === "Pending_Executive_Approval" && isExecutive
-  // APPROVAL: Show approve button for peer review (any user) and executive approval (executives only)
-  const showApprovePeerReview = task.status === "Pending_Peer_Review"
-  const showApproveExecutive = task.status === "Pending_Executive_Approval" && isExecutive
-  const showApprove = showApprovePeerReview || showApproveExecutive
-  const hasPrimaryActions = showAcceptReject || showMarkComplete || showCertify || showApprove
+  const hasPrimaryActions = showMarkComplete
 
   return (
     <CardFooter className="bg-muted p-4 flex flex-col gap-4 mt-auto">
@@ -158,49 +128,6 @@ export function TaskActionButtons({
       {hasPrimaryActions && (
         <>
           <div className="flex gap-4 w-full">
-            {showAcceptReject && (
-              <>
-                <Button
-                  onClick={handleAccept}
-                  variant="success"
-                  disabled={isLoading}
-                  className="flex-1 shadow-sm font-medium"
-                  title="Accept this task assignment and start working"
-                >
-                  <Check className="h-4 w-4" /> Accept Task
-                </Button>
-
-                <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="secondary"
-                      disabled={isLoading}
-                      className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive/50 shadow-sm font-medium"
-                      title="Decline this task assignment"
-                    >
-                      <X className="h-4 w-4" /> Reject Task
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="bg-background shadow-xl text-foreground">
-                    <DialogHeader>
-                      <DialogTitle>Reject Task</DialogTitle>
-                    </DialogHeader>
-                    <form action={handleReject} className="space-y-4">
-                      <Textarea
-                        name="reason"
-                        placeholder="Reason for rejection..."
-                        required
-                        className="bg-muted"
-                      />
-                      <Button type="submit" variant="destructive" className="w-full">
-                        Confirm Rejection
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              </>
-            )}
-
             {showMarkComplete && (
               <Button
                 onClick={handleComplete}
@@ -208,36 +135,6 @@ export function TaskActionButtons({
                 className="w-full bg-foreground hover:bg-foreground/90 text-background shadow-sm font-medium"
               >
                 <Check className="h-4 w-4" /> Mark Complete
-              </Button>
-            )}
-
-            {showCertify && (
-              <Button
-                onClick={() => setRubberStampOpen(true)}
-                variant="success"
-                disabled={isLoading}
-                className="w-full shadow-sm font-medium"
-              >
-                <ShieldCheck className="h-4 w-4" /> Certify Release
-              </Button>
-            )}
-
-            {showApprove && (
-              <Button
-                onClick={handleApprove}
-                variant="success"
-                disabled={isLoading}
-                className="w-full shadow-sm font-medium"
-                title={
-                  task.status === "Pending_Peer_Review"
-                    ? "Approve this peer-reviewed task"
-                    : "Approve and release this high-risk task"
-                }
-              >
-                <Check className="h-4 w-4" />{" "}
-                {task.status === "Pending_Peer_Review"
-                  ? "Approve Peer Review"
-                  : "Approve & Release"}
               </Button>
             )}
           </div>

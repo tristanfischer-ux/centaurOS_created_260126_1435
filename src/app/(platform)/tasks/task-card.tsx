@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { UserAvatar, UserAvatarStack, getRoleColors } from "@/components/ui/user-avatar"
 import { Markdown } from "@/components/ui/markdown"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, Bot, ChevronDown, ChevronUp, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, CheckCircle2, XCircle, Clock, MessageSquare, Trash2, Lock } from "lucide-react"
+import { Calendar as CalendarIcon, Check, Bot, ChevronDown, ChevronUp, Eye, EyeOff, Paperclip, Plus, CheckCircle2, Clock, MessageSquare, Trash2, Lock } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
@@ -30,7 +30,6 @@ import { InlineHistory } from "@/components/tasks/inline-history"
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
 import { FullTaskView } from "@/components/tasks/full-task-view"
 import { TaskActionButtons } from "@/components/tasks/task-action-buttons"
-import { RubberStampModal } from "@/components/smart-airlock/RubberStampModal"
 import { Checkbox } from "@/components/ui/checkbox"
 import { getStatusColor } from "@/lib/status-colors"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -100,8 +99,6 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
         setIsLoading,
         aiRunning,
         setAiRunning,
-        rejectOpen,
-        setRejectOpen,
         forwardOpen,
         setForwardOpen,
         showThread,
@@ -110,8 +107,6 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
         setEditOpen,
         showHistory,
         setShowHistory,
-        rubberStampOpen,
-        setRubberStampOpen,
         fullViewOpen,
         setFullViewOpen,
         assigneePopoverOpen,
@@ -147,15 +142,12 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
 
     // Use custom hook for action handlers
     const {
-        handleAccept,
-        handleReject,
         handleForward,
         handleComplete,
         handleDuplicate,
         handleRunAI,
         handleDateUpdate,
         handleAssigneeToggle,
-        handleApprove,
     } = useTaskActions({
         taskId: task.id,
         taskStartDate: task.start_date,
@@ -164,7 +156,6 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
         members,
         setIsLoading,
         setAiRunning,
-        setRejectOpen,
         setForwardOpen,
         setOptimisticAssignees,
     })
@@ -198,16 +189,16 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     const getRiskBadge = (level: string | null) => {
         const riskInfo = {
             High: {
-                badge: <Badge variant="destructive" className="gap-1 shadow-sm font-mono tracking-tighter cursor-help"><ShieldAlert className="w-3 h-3" /> HIGH RISK</Badge>,
-                tooltip: "Financial or legal impact. Requires executive approval before release to client."
+                badge: <Badge variant="destructive" className="gap-1 shadow-sm font-mono tracking-tighter cursor-help">HIGH RISK</Badge>,
+                tooltip: "Financial or legal impact. Handle with extra care."
             },
             Medium: {
-                badge: <Badge variant="warning" className="gap-1 shadow-sm font-mono tracking-tighter cursor-help"><ShieldCheck className="w-3 h-3" /> MEDIUM RISK</Badge>,
-                tooltip: "Requires peer review before completion. Important but manageable impact."
+                badge: <Badge variant="warning" className="gap-1 shadow-sm font-mono tracking-tighter cursor-help">MEDIUM RISK</Badge>,
+                tooltip: "Important but manageable impact."
             },
             Low: {
-                badge: <Badge variant="secondary" className="gap-1 text-muted-foreground bg-muted border font-mono tracking-tighter cursor-help"><ShieldCheck className="w-3 h-3" /> LOW RISK</Badge>,
-                tooltip: "Routine task. Can be completed without additional approvals."
+                badge: <Badge variant="secondary" className="gap-1 text-muted-foreground bg-muted border font-mono tracking-tighter cursor-help">LOW RISK</Badge>,
+                tooltip: "Routine task with minimal risk."
             }
         }
         
@@ -542,32 +533,6 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                             
                             {/* Quick Actions - always visible */}
                             <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                {isAssignee && task.status === 'Pending' && (
-                                    <>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={handleAccept}
-                                            disabled={isLoading}
-                                            className="h-7 px-2 text-status-success hover:bg-status-success-light"
-                                            title="Accept this task assignment and start working"
-                                        >
-                                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                                            Accept Task
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => setRejectOpen(true)}
-                                            disabled={isLoading}
-                                            className="h-7 px-2 text-destructive hover:bg-status-error-light"
-                                            title="Decline this task assignment"
-                                        >
-                                            <XCircle className="h-3.5 w-3.5 mr-1" />
-                                            Reject Task
-                                        </Button>
-                                    </>
-                                )}
                                 {isAssignee && task.status === 'Accepted' && (
                                     <Button
                                         size="sm"
@@ -579,32 +544,6 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                     >
                                         <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                                         Mark Complete
-                                    </Button>
-                                )}
-                                {task.status === 'Pending_Peer_Review' && (
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={handleApprove}
-                                        disabled={isLoading}
-                                        className="h-7 px-2 text-status-success hover:bg-status-success-light"
-                                        title="Approve this peer-reviewed task"
-                                    >
-                                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                                        Approve
-                                    </Button>
-                                )}
-                                {isExecutive && (task.status === 'Pending_Executive_Approval' || task.status === 'Amended_Pending_Approval') && (
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={handleApprove}
-                                        disabled={isLoading}
-                                        className="h-7 px-2 text-international-orange hover:bg-orange-50"
-                                        title="Approve and release this high-risk task"
-                                    >
-                                        <ShieldCheck className="h-3.5 w-3.5 mr-1" />
-                                        Approve & Release
                                     </Button>
                                 )}
                                 {(isCreator || isExecutive) && (
@@ -707,17 +646,6 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <p className="mt-1 opacity-90">{task.amendment_notes}</p>
                             </div>
                         )}
-
-                        {/* Executive Airlock Warning */}
-                        {task.status === 'Pending_Executive_Approval' && (
-                            <div className="mt-4 bg-status-info-light border border-status-info p-3 rounded-md text-sm text-status-info-dark flex items-start gap-2">
-                                <ShieldAlert className="w-5 h-5 shrink-0" />
-                                <div>
-                                    <strong className="block uppercase text-xs tracking-wide mb-1">Airlock Active</strong>
-                                    Task completed but held for Executive Certification.
-                                </div>
-                            </div>
-                        )}
                     </CardContent>
 
                     <Separator className="bg-muted" />
@@ -736,8 +664,6 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                         userRole={userRole}
                         isLoading={isLoading}
                         aiRunning={aiRunning}
-                        rejectOpen={rejectOpen}
-                        setRejectOpen={setRejectOpen}
                         editOpen={editOpen}
                         setEditOpen={setEditOpen}
                         forwardOpen={forwardOpen}
@@ -748,15 +674,10 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                         setShowThread={setShowThread}
                         fullViewOpen={fullViewOpen}
                         setFullViewOpen={setFullViewOpen}
-                        rubberStampOpen={rubberStampOpen}
-                        setRubberStampOpen={setRubberStampOpen}
-                        handleAccept={handleAccept}
-                        handleReject={handleReject}
                         handleComplete={handleComplete}
                         handleDuplicate={handleDuplicate}
                         handleRunAI={handleRunAI}
                         handleForward={handleForward}
-                        handleApprove={handleApprove}
                         handleDelete={handleDelete}
                         isDeleting={isDeleting}
                         sortedMembers={sortedMembers}
@@ -786,11 +707,6 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                         onOpenChange={setEditOpen}
                         task={task}
                         members={members}
-                    />
-                    <RubberStampModal
-                        isOpen={rubberStampOpen}
-                        onClose={() => setRubberStampOpen(false)}
-                        taskId={task.id}
                     />
                     <FullTaskView
                         open={fullViewOpen}

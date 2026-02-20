@@ -1,14 +1,11 @@
 import { useCallback } from "react"
 import {
-  acceptTask,
-  rejectTask,
   forwardTask,
   completeTask,
   duplicateTask,
   triggerAIWorker,
   updateTaskDates,
   updateTaskAssignees,
-  approveTask,
 } from "@/actions/tasks"
 import { toast } from "sonner"
 
@@ -34,7 +31,6 @@ interface UseTaskActionsProps {
   members: Member[]
   setIsLoading: (loading: boolean) => void
   setAiRunning: (running: boolean) => void
-  setRejectOpen: (open: boolean) => void
   setForwardOpen: (open: boolean) => void
   setOptimisticAssignees: (assignees: TaskAssignee[]) => void
 }
@@ -47,31 +43,9 @@ export function useTaskActions({
   members,
   setIsLoading,
   setAiRunning,
-  setRejectOpen,
   setForwardOpen,
   setOptimisticAssignees,
 }: UseTaskActionsProps) {
-  const handleAccept = useCallback(async () => {
-    setIsLoading(true)
-    const res = await acceptTask(taskId)
-    setIsLoading(false)
-    if (res.error) toast.error(res.error)
-    else toast.success("Task accepted")
-  }, [taskId, setIsLoading])
-
-  const handleReject = useCallback(
-    async (formData: FormData) => {
-      setIsLoading(true)
-      const reason = formData.get("reason") as string
-      const res = await rejectTask(taskId, reason)
-      setIsLoading(false)
-      setRejectOpen(false)
-      if (res.error) toast.error(res.error)
-      else toast.success("Task rejected")
-    },
-    [taskId, setIsLoading, setRejectOpen]
-  )
-
   const handleForward = useCallback(
     async (formData: FormData) => {
       setIsLoading(true)
@@ -91,13 +65,7 @@ export function useTaskActions({
     const res = await completeTask(taskId)
     setIsLoading(false)
     if (res.error) toast.error(res.error)
-    else {
-      if (res.newStatus === "Completed") {
-        toast.success("Task completed")
-      } else {
-        toast.info(`Task moved to ${res.newStatus?.replace(/_/g, " ")}`)
-      }
-    }
+    else toast.success("Task completed")
   }, [taskId, setIsLoading])
 
   const handleDuplicate = useCallback(async () => {
@@ -177,23 +145,12 @@ export function useTaskActions({
     [taskId, currentAssignees, members, setOptimisticAssignees]
   )
 
-  const handleApprove = useCallback(async () => {
-    setIsLoading(true)
-    const res = await approveTask(taskId)
-    setIsLoading(false)
-    if (res.error) toast.error(res.error)
-    else toast.success("Task approved and released")
-  }, [taskId, setIsLoading])
-
   return {
-    handleAccept,
-    handleReject,
     handleForward,
     handleComplete,
     handleDuplicate,
     handleRunAI,
     handleDateUpdate,
     handleAssigneeToggle,
-    handleApprove,
   }
 }
