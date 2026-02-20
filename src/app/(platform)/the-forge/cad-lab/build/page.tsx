@@ -50,6 +50,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { STLViewer } from "@/components/cad/stl-viewer"
 import { CadLabWhileYouWait } from "@/components/cad/cad-lab-while-you-wait"
 import { EmptyState } from "@/components/ui/empty-state"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import type { CadLabResult, CadLabModule } from "@/lib/cad-lab-types"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
@@ -91,6 +101,7 @@ export default function CadLabBuildPage(): React.ReactNode {
   const [viewingModuleId, setViewingModuleId] = useState<string | null>(null)
   const [showCode, setShowCode] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
+  const [isConfirmRemapOpen, setIsConfirmRemapOpen] = useState(false)
 
   // Register screen context so specialists can see what the user is working on
   useRegisterScreenContext(
@@ -249,7 +260,7 @@ export default function CadLabBuildPage(): React.ReactNode {
           </p>
           <div className="flex items-center gap-2">
             <Button
-              onClick={handleDecompose}
+              onClick={modules.length > 0 ? () => setIsConfirmRemapOpen(true) : handleDecompose}
               disabled={isAnyLoading || isDecomposing || !hasResearch}
               variant={modules.length > 0 ? "secondary" : "outline"}
             >
@@ -468,7 +479,7 @@ export default function CadLabBuildPage(): React.ReactNode {
 
           {/* Batch failure summary — shown after batch with errors */}
           {!isBatchRunning && Object.keys(batchProgress).length > 0 && Object.values(batchProgress).some((s) => s === "error") && (
-            <div className="border border-destructive/30 rounded-lg bg-status-error-light/20 p-4 space-y-2">
+            <div className="border border-destructive/30 rounded-lg bg-status-error-light/20 p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-destructive" />
                 <p className="text-sm font-semibold text-destructive">
@@ -476,9 +487,18 @@ export default function CadLabBuildPage(): React.ReactNode {
                 </p>
               </div>
               <p className="text-xs text-muted-foreground">
-                This can happen due to temporary service issues, complex geometry that times out, or high demand. 
-                Use the &quot;Retry&quot; button on individual failed modules above, or click &quot;Generate All Modules&quot; again to retry all failed modules.
+                This can happen due to temporary service issues, complex geometry that times out, or high demand.
               </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                onClick={handleGenerateAllModules}
+                disabled={isAnyLoading}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Retry All Failed
+              </Button>
             </div>
           )}
 
@@ -708,6 +728,24 @@ export default function CadLabBuildPage(): React.ReactNode {
           onClose={() => { setFullscreenView(null); setViewingModuleId(null) }}
         />
       )}
+
+      <AlertDialog open={isConfirmRemapOpen} onOpenChange={setIsConfirmRemapOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Re-map modules?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will discard your current {modules.length} module{modules.length !== 1 ? "s" : ""} and any generated CAD files.
+              You&apos;ll need to regenerate everything from scratch.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setIsConfirmRemapOpen(false); handleDecompose() }}>
+              Re-map Modules
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -35,6 +35,8 @@ import {
     extractDecisionSummary,
     recordDecision,
 } from "@/lib/agents/decision-journal"
+import { estimateAICost } from "@/lib/ai/usage-tracking"
+import { countTokens } from "@/lib/agent-memory"
 import { recordInteraction } from "@/lib/agents/founder-preferences"
 import { addSpan, finishRollout } from "@/lib/agent-spans"
 import type { SupabaseClient } from "@supabase/supabase-js"
@@ -142,19 +144,19 @@ export function createPostResponseCallback(
         // Usage logging (requires foundry for billing)
         if (foundryId) {
             try {
-                const estimatedInputTokens = Math.ceil((finalPrompt.length + systemPromptWithContext.length) / 4)
-                const estimatedOutputTokens = Math.ceil(fullOutput.length / 4)
-                const totalTokens = estimatedInputTokens + estimatedOutputTokens
+                const inputTokens = countTokens(finalPrompt) + countTokens(systemPromptWithContext)
+                const outputTokens = countTokens(fullOutput)
+                const totalTokens = inputTokens + outputTokens
 
                 await supabase.from("ai_usage_log").insert({
                     user_id: userId,
                     foundry_id: foundryId,
                     feature: `specialist-${modality}`,
                     model: `${providerId}/${modelId}`,
-                    prompt_tokens: estimatedInputTokens,
-                    completion_tokens: estimatedOutputTokens,
+                    prompt_tokens: inputTokens,
+                    completion_tokens: outputTokens,
                     total_tokens: totalTokens,
-                    estimated_cost_usd: 0,
+                    estimated_cost_usd: estimateAICost(modelId, inputTokens, outputTokens),
                     key_source: keySource,
                     metadata: { modality, providerId, modelId },
                 })
@@ -165,16 +167,16 @@ export function createPostResponseCallback(
 
         // Rollout tracing
         if (rolloutId) {
-            const estimatedInputTokens = Math.ceil((finalPrompt.length + systemPromptWithContext.length) / 4)
-            const estimatedOutputTokens = Math.ceil(fullOutput.length / 4)
+            const spanInputTokens = countTokens(finalPrompt) + countTokens(systemPromptWithContext)
+            const spanOutputTokens = countTokens(fullOutput)
             const promptSnapshot = `${systemPromptWithContext}\n\n---\n\n${finalPrompt}`
             addSpan({
                 rolloutId,
                 kind: "llm_call",
                 promptSnapshot,
                 responseSnapshot: fullOutput,
-                promptTokens: estimatedInputTokens,
-                completionTokens: estimatedOutputTokens,
+                promptTokens: spanInputTokens,
+                completionTokens: spanOutputTokens,
                 metadata: { modality, providerId, modelId },
             }).catch(() => {})
             finishRollout(rolloutId, "finished").catch(() => {})

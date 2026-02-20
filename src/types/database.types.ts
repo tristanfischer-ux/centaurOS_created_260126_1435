@@ -14905,6 +14905,7 @@ export type Database = {
       cleanup_expired_telegram_sessions: { Args: never; Returns: undefined }
       cleanup_old_activity_events: { Args: never; Returns: number }
       cleanup_old_intelligence_reports: { Args: never; Returns: undefined }
+      cleanup_old_memory_messages: { Args: never; Returns: undefined }
       cleanup_old_outreach_logs: { Args: never; Returns: undefined }
       clone_blueprint_from_template: {
         Args: {

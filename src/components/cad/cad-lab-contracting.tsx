@@ -373,7 +373,9 @@ export function CadLabContracting({
   const canCreateRfq =
     rfqReadiness.quoteReadyModuleCount > 0
   const createRfqBlockedReason = !canCreateRfq
-    ? "At least one module must be quote-ready (generated + STEP/STL/manifest) before RFQ creation."
+    ? rfqReadiness.gaps.length > 0
+      ? `RFQ blocked: ${rfqReadiness.gaps.join("; ")}`
+      : "At least one module must be quote-ready (generated + STEP/STL/manifest) before RFQ creation."
     : null
 
   useEffect(() => {

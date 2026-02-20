@@ -16,6 +16,13 @@ import {
   Clock,
   Wrench,
   DollarSign,
+  Map,
+  Target,
+  Cpu,
+  Users,
+  MessageSquare,
+  HelpCircle,
+  ChevronDown,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -28,10 +35,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { typography } from '@/lib/design-system'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
-import type { BlueprintTemplate } from '@/types/blueprints'
+import type { Blueprint, BlueprintTemplate, UniversalSubsystem, SubsystemObjectivePack } from '@/types/blueprints'
 import type { ObjectivePack } from '@/actions/packs'
 import type { FoundryContext } from '@/actions/foundry-context'
 import { CategoryTabs, type TabId } from './components/category-tabs'
@@ -42,8 +54,17 @@ import { TechniquesExplorer } from '@/components/techniques'
 import { ALL_TECHNIQUES } from '@/lib/manufacturing-techniques'
 import { getProjectTemplates, type ProjectTemplateListItem } from '@/actions/project-templates'
 import { getTutorials, type TutorialListItem } from '@/actions/tutorials'
+import { getSubsystemObjectivePack } from '@/actions/universal-subsystems'
+import { createAdvisoryQuestion } from '@/actions/advisory'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
+import { UniversalSubsystemsGrid } from '@/components/blueprints/universal-subsystems-grid'
+import { SubsystemDetailDialog } from '@/components/blueprints/subsystem-detail-dialog'
+import { CreateSubsystemObjectiveDialog } from '@/components/blueprints/create-subsystem-objective-dialog'
+import { QuestionCard, Question } from '@/components/advisory/question-card'
+import { AskModal } from '@/components/advisory/ask-modal'
+import { StatusLegend } from '@/components/advisory/status-legend'
+import { toast } from 'sonner'
 import {
   Dialog,
   DialogContent,
@@ -259,6 +280,9 @@ interface InspirationPageNewProps {
   initialSavedPackIds?: string[]
   foundryContext?: FoundryContext
   members?: TeamMember[]
+  blueprints?: Blueprint[]
+  universalSubsystems?: UniversalSubsystem[]
+  questions?: Question[]
 }
 
 export function InspirationPageNew({
@@ -267,6 +291,9 @@ export function InspirationPageNew({
   initialSavedPackIds = [],
   foundryContext,
   members = [],
+  blueprints = [],
+  universalSubsystems = [],
+  questions = [],
 }: InspirationPageNewProps) {
   // Tab state
   const [activeTab, setActiveTab] = useState<TabId>('for-you')
@@ -275,6 +302,78 @@ export function InspirationPageNew({
   const [savedPackIds, setSavedPackIds] = useState<Set<string>>(
     new Set(initialSavedPackIds),
   )
+
+  // Universal Subsystems state
+  const [selectedSubsystem, setSelectedSubsystem] = useState<UniversalSubsystem | null>(null)
+  const [selectedSubsystemPack, setSelectedSubsystemPack] = useState<SubsystemObjectivePack | null>(null)
+  const [isSubsystemDialogOpen, setIsSubsystemDialogOpen] = useState(false)
+  const [isCreateObjectiveOpen, setIsCreateObjectiveOpen] = useState(false)
+
+  // Advisory Q&A state
+  const [isQAOpen, setIsQAOpen] = useState(false)
+  const [qaSearchQuery, setQaSearchQuery] = useState('')
+
+  useEffect(() => {
+    async function fetchPack() {
+      if (selectedSubsystem) {
+        const pack = await getSubsystemObjectivePack(selectedSubsystem.id)
+        setSelectedSubsystemPack(pack)
+      } else {
+        setSelectedSubsystemPack(null)
+      }
+    }
+    fetchPack()
+  }, [selectedSubsystem])
+
+  const handleSubsystemClick = useCallback((subsystem: UniversalSubsystem) => {
+    setSelectedSubsystem(subsystem)
+    setIsSubsystemDialogOpen(true)
+  }, [])
+
+  const handleCreateObjective = useCallback((subsystem: UniversalSubsystem, pack: SubsystemObjectivePack) => {
+    setSelectedSubsystem(subsystem)
+    setSelectedSubsystemPack(pack)
+    setIsSubsystemDialogOpen(false)
+    setIsCreateObjectiveOpen(true)
+  }, [])
+
+  const filteredQuestions = useMemo(() => {
+    if (!qaSearchQuery.trim()) return questions
+    const query = qaSearchQuery.toLowerCase()
+    return questions.filter(q =>
+      q.title.toLowerCase().includes(query) ||
+      q.body.toLowerCase().includes(query) ||
+      q.category.toLowerCase().includes(query)
+    )
+  }, [questions, qaSearchQuery])
+
+  const handleAskQuestion = async (data: {
+    title: string
+    body: string
+    category: string
+    visibility: 'public' | 'foundry'
+    getAiAnswer: boolean
+  }) => {
+    const result = await createAdvisoryQuestion({
+      title: data.title,
+      body: data.body,
+      category: data.category,
+      visibility: data.visibility === 'public' ? 'network' : 'foundry',
+      getAiAnswer: data.getAiAnswer,
+    })
+
+    if (result.error) {
+      toast.error(result.error)
+      return { error: result.error }
+    }
+
+    toast.success(
+      data.getAiAnswer
+        ? 'Question submitted! AI is generating an answer...'
+        : 'Question submitted successfully'
+    )
+    return { questionId: result.data?.id }
+  }
 
   // "By Need" selected category
   const [selectedNeed, setSelectedNeed] = useState<string | null>(null)

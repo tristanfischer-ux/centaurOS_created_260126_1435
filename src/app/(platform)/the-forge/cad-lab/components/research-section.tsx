@@ -15,6 +15,8 @@ import {
   ChevronRight,
   Globe,
   ExternalLink,
+  RotateCcw,
+  AlertTriangle,
 } from "lucide-react"
 
 import { useMemo } from "react"
@@ -36,6 +38,7 @@ interface ResearchSectionProps {
   showSources: boolean
   setShowSources: (value: boolean) => void
   handleReset: () => void
+  onRetryResearch?: () => void
 }
 
 /**

@@ -50,6 +50,7 @@ import {
     DropdownMenuTrigger,
     DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
+import { isRouteAlpha } from "@/lib/features/registry"
 import { signOut } from "@/actions/auth"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 
@@ -85,7 +86,7 @@ const planMoreNavigation = [
 
 // "More" dropdown — Workshop section
 const workshopMoreNavigation = [
-    { name: "The Forge", href: "/the-forge/studio", icon: Flame },
+    { name: "The Forge", href: "/the-forge", icon: Flame },
     { name: "Blueprints", href: "/blueprints", icon: Map },
     { name: "Team", href: "/team", icon: Users },
     { name: "Retainers", href: "/retainers", icon: Handshake },
@@ -126,6 +127,7 @@ export function MobileNav() {
      */
     const renderDropdownItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }> }) => {
         const isActive = isRouteActive(pathname, item.href)
+        const isAlpha = isRouteAlpha(item.href)
         return (
             <DropdownMenuItem
                 key={item.name}
@@ -142,6 +144,11 @@ export function MobileNav() {
                     <item.icon className="h-4 w-4" />
                     {item.name}
                 </span>
+                {isAlpha && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
+                        Alpha
+                    </span>
+                )}
             </DropdownMenuItem>
         )
     }

@@ -66,6 +66,7 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { typography } from '@/lib/design-system'
+import { BetaBadge } from '@/components/ui/beta-badge'
 import {
   REPORT_TEMPLATES,
   SECTION_META,
@@ -378,6 +379,7 @@ export default function ReportsPage(): React.JSX.Element {
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
             <h1 className={typography.h1}>Reports</h1>
+            <BetaBadge />
           </div>
           <p className={typography.pageSubtitle}>
             Generate polished reports from your live data — ready to share with your team, board, or investors.

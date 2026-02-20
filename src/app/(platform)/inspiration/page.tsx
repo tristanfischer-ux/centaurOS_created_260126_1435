@@ -1,9 +1,11 @@
 import { Suspense } from 'react'
 import { InspirationPageNew } from './inspiration-page-new'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getBlueprintTemplates } from '@/actions/blueprints'
+import { getBlueprints, getBlueprintTemplates } from '@/actions/blueprints'
 import { getObjectivePacks, getSavedPackIds } from '@/actions/packs'
 import { getFoundryContext } from '@/actions/foundry-context'
+import { getUniversalSubsystems } from '@/actions/universal-subsystems'
+import { getAdvisoryQuestions } from '@/actions/advisory'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata = {
@@ -16,21 +18,28 @@ async function InspirationData() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch user profile for foundry info
   const { data: profile } = user ? await supabase
     .from('profiles')
-    .select('foundry_id')
+    .select('role, foundry_id')
     .eq('id', user.id)
     .single() : { data: null }
 
   const foundryId = profile?.foundry_id
 
-  const [templatesResult, packsResult, savedPacksResult, foundryContext, membersResult] = await Promise.all([
+  const [
+    templatesResult,
+    packsResult,
+    savedPacksResult,
+    foundryContext,
+    membersResult,
+    blueprintsResult,
+    universalSubsystems,
+    questionsResult,
+  ] = await Promise.all([
     getBlueprintTemplates(),
     getObjectivePacks(),
     getSavedPackIds(),
     getFoundryContext(),
-    // Fetch team members for task assignment in UsePackDialog
     foundryId ? supabase
       .from('profiles')
       .select('id, full_name, role, email, avatar_url')
@@ -38,9 +47,11 @@ async function InspirationData() {
       .neq('role', 'AI_Agent')
       .order('full_name')
       : Promise.resolve({ data: null }),
+    getBlueprints(),
+    getUniversalSubsystems(),
+    getAdvisoryQuestions({ limit: 10 }),
   ])
 
-  // Log any errors from parallel fetches so failures aren't silently swallowed
   if (templatesResult.error) {
     console.error('[Inspiration] Failed to fetch templates:', templatesResult.error)
   }
@@ -53,14 +64,35 @@ async function InspirationData() {
   if ('error' in membersResult && membersResult.error) {
     console.error('[Inspiration] Failed to fetch members:', membersResult.error)
   }
+  if (blueprintsResult.error) {
+    console.error('[Inspiration] Failed to fetch blueprints:', blueprintsResult.error)
+  }
 
-  // Transform members for use in dialogs
   const members = (membersResult.data || []).map(m => ({
     id: m.id,
     full_name: m.full_name || 'Unknown',
     role: m.role,
     email: m.email || '',
     avatar_url: m.avatar_url,
+  }))
+
+  const transformedQuestions = (questionsResult.data || []).map(q => ({
+    id: q.id,
+    title: q.title,
+    body: q.body,
+    category: q.category || 'General',
+    visibility: q.visibility === 'network' ? 'public' as const : 'foundry' as const,
+    created_at: q.created_at,
+    asker: {
+      id: q.author?.id || q.asked_by || '',
+      full_name: q.author?.full_name || 'Unknown User',
+      avatar_url: undefined,
+    },
+    ai_answer: undefined,
+    verification_status: (q.status === 'verified' ? 'verified' : q.status === 'answered' ? 'endorsed' : 'unverified') as 'unverified' | 'endorsed' | 'verified',
+    upvotes: 0,
+    answers_count: q.answer_count || 0,
+    views: q.view_count,
   }))
 
   return (
@@ -70,6 +102,9 @@ async function InspirationData() {
       initialSavedPackIds={Array.from(savedPacksResult.savedIds || [])}
       foundryContext={foundryContext}
       members={members}
+      blueprints={blueprintsResult.data || []}
+      universalSubsystems={universalSubsystems}
+      questions={transformedQuestions}
     />
   )
 }

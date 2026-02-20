@@ -266,7 +266,7 @@ export function useSpecialistChat({
                     break
 
                 case "deep_chunk":
-                    setDeepResponse(event.text ?? "")
+                    setDeepResponse((prev) => prev + (event.text ?? ""))
                     break
 
                 case "deep_done":

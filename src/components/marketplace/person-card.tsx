@@ -107,7 +107,10 @@ export const PersonCard = memo(function PersonCard({
     const gradient = getAvatarGradient('People' as MarketplaceCategory, listing.title)
     const role = attrs.role as string | undefined
     const location = attrs.location as string | undefined
-    const rate = (attrs.rate || attrs.day_rate) as string | undefined
+    const rawRate = (attrs.rate || attrs.day_rate) as string | undefined
+    const ratePeriodMatch = rawRate?.match(/\/(day|month|hr|hour|week|year)$/i)
+    const rate = rawRate && ratePeriodMatch ? rawRate.slice(0, ratePeriodMatch.index) : rawRate
+    const ratePeriod = ratePeriodMatch ? ratePeriodMatch[1].toLowerCase() : 'day'
     const yearsExp = attrs.years_experience as number | undefined
     const skills: string[] = (attrs.skills || attrs.expertise || []).slice(0, 4)
     const previousCompanies: string[] = (attrs.previous_companies || []).slice(0, 3)
@@ -316,9 +319,9 @@ export const PersonCard = memo(function PersonCard({
                         {rate ? (
                             <span>
                                 <span className="text-lg font-bold text-foreground">
-                                    {rate.startsWith('£') ? rate : `£${rate}`}
+                                    {rate.startsWith('£') || rate.startsWith('$') || rate.startsWith('€') ? rate : `£${rate}`}
                                 </span>
-                                <span className="text-xs text-muted-foreground ml-0.5">/day</span>
+                                <span className="text-xs text-muted-foreground ml-0.5">/{ratePeriod}</span>
                             </span>
                         ) : (
                             <span className="text-sm text-muted-foreground">Request pricing</span>

@@ -14,6 +14,16 @@ import { Search, ArrowRight, Loader2, RotateCcw, Box, Sparkles } from "lucide-re
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-dialog"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import { ReferenceModelViewer } from "./reference-model-viewer"
@@ -77,6 +87,7 @@ export function HeroSection({
 }: HeroSectionProps): React.ReactNode {
   const subjectTrimmed = subject.trim().length > 0
   const [isSpecialistOpen, setIsSpecialistOpen] = useState(false)
+  const [isConfirmReResearchOpen, setIsConfirmReResearchOpen] = useState(false)
   const fang = useMemo(() => getSpecialistById("vp-manufacturing"), [])
 
   const specialistContext = subject.trim()
@@ -117,7 +128,7 @@ export function HeroSection({
           </div>
           <Button
             id="research-btn"
-            onClick={onResearch}
+            onClick={hasResearch ? () => setIsConfirmReResearchOpen(true) : onResearch}
             disabled={isAnyLoading || !subjectTrimmed}
             size="lg"
             variant={hasResearch ? "secondary" : "default"}
@@ -227,6 +238,24 @@ export function HeroSection({
           contextLabel="Design Brief"
         />
       )}
+
+      <AlertDialog open={isConfirmReResearchOpen} onOpenChange={setIsConfirmReResearchOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Re-run research?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will replace your current research results and any modules built from them.
+              Generated CAD files will also be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setIsConfirmReResearchOpen(false); onResearch() }}>
+              Re-Research
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

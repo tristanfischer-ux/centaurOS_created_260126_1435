@@ -82,8 +82,8 @@ function StudioShell(): React.ReactNode {
         <div className="flex items-center gap-3">
           <div className="h-8 w-1 rounded-full bg-international-orange" />
           <h1 className="text-2xl font-bold text-foreground">Product Studio</h1>
-          <span className="text-xs font-mono bg-muted text-muted-foreground px-2 py-1 rounded">
-            BETA
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
+            Alpha
           </span>
         </div>
         <p className="text-sm text-muted-foreground mt-2">

@@ -53,24 +53,132 @@ export const NEW_FEATURE_THRESHOLD_DAYS = 14
  * Features are sorted by release date (newest first) in the changelog
  */
 export const FEATURE_REGISTRY: Feature[] = [
-    // === February 2026 Features ===
+    // === February 2026 Features (Week of Feb 17-20) ===
+    {
+        id: 'reports',
+        name: 'Reports',
+        description: 'Generate board packs, investor updates, and branded reports with AI narratives and one-click export',
+        route: '/reports',
+        releasedAt: new Date('2026-02-20'),
+        category: 'analytics',
+        section: 'plan',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Added Reports — generate professional board packs, investor updates, and custom reports. Features AI-written narratives, infographic view mode, PPTX and DOCX export, scheduled generation, shareable links, and email delivery.'
+    },
+    {
+        id: 'business-plan-intelligence',
+        name: 'Business Plan Intelligence',
+        description: 'Upload your business plan and get AI analysis with hiring insights and funding readiness',
+        route: '/strategy',
+        releasedAt: new Date('2026-02-20'),
+        category: 'strategic',
+        section: 'plan',
+        status: 'beta',
+        isVisibleInNav: true,
+        changelog: 'Added Business Plan Intelligence — upload your business plan and receive detailed AI analysis covering strengths, risks, hiring recommendations, and funding readiness. Powered by Claude Opus 4.6 with deep strategic reasoning.'
+    },
+    {
+        id: 'marketplace-ai-search',
+        name: 'Marketplace AI Search',
+        description: 'Find the right suppliers and services using natural language — AI interprets what you need',
+        route: '/marketplace',
+        releasedAt: new Date('2026-02-19'),
+        category: 'marketplace',
+        section: 'marketplace',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Upgraded Marketplace search with AI-powered interpretation. Describe what you need in plain language and the system understands intent, applies smart filters, and falls back to semantic matching. Server-side search with pagination for fast results at any scale.'
+    },
+    {
+        id: 'comms',
+        name: 'Comms',
+        description: 'Unified communications hub combining your activity feed with direct conversations',
+        route: '/updates',
+        releasedAt: new Date('2026-02-19'),
+        category: 'communication',
+        section: 'me',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Updates is now Comms — a unified communications hub that merges your activity feed with direct conversations. One place for notes, comments, changes, and messages across all your work.'
+    },
+    {
+        id: 'task-discussions',
+        name: 'Task Discussion Threads',
+        description: 'Threaded conversations directly inside each task for focused collaboration',
+        route: '/new-tasks',
+        releasedAt: new Date('2026-02-19'),
+        category: 'core',
+        section: 'plan',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Added discussion threads to task details. Start a conversation, tag teammates, and keep all decisions and context attached to the task itself.'
+    },
+    {
+        id: 'google-apps',
+        name: 'Google Apps',
+        description: 'Access Google Drive, Docs, and Calendar from inside ForgeOS',
+        route: '/google-apps',
+        releasedAt: new Date('2026-02-17'),
+        category: 'integration',
+        section: 'me',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Added Google Apps integration — browse Google Drive files, open Google Docs, and view your Google Calendar without leaving ForgeOS. Available in the Me section of the sidebar.'
+    },
+    {
+        id: 'expert-directory',
+        name: 'Expert Directory',
+        description: 'Public directory of vetted experts — searchable, shareable, and SEO-indexed',
+        route: '/experts',
+        releasedAt: new Date('2026-02-17'),
+        category: 'marketplace',
+        status: 'stable',
+        isVisibleInNav: false,
+        changelog: 'Launched the public Expert Directory at /experts — browse profiles of vetted professionals with detailed bios and specialisations. Each expert has a shareable profile page, and the directory is SEO-indexed for discoverability.'
+    },
+    {
+        id: 'knowledge-vault',
+        name: 'Knowledge Vault',
+        description: 'Upload documents and let AI extract insights that feed into your specialists and strategy',
+        route: '/knowledge',
+        releasedAt: new Date('2026-02-16'),
+        category: 'core',
+        section: 'me',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Added Knowledge Vault — upload business documents (pitch decks, reports, research) and AI automatically extracts key insights. Your knowledge feeds directly into specialist conversations and strategic analysis, making your AI team smarter with every document.'
+    },
+    {
+        id: 'specialist-intelligence-upgrade',
+        name: 'Specialist AI Upgrade',
+        description: 'Your AI specialists now have personality, memory, voice conversations, and emotional intelligence',
+        route: '/agents',
+        releasedAt: new Date('2026-02-15'),
+        category: 'core',
+        section: 'workshop',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Major upgrade to AI Specialists — each specialist now has a distinct personality, persistent memory across conversations, bidirectional voice chat, emotional intelligence, and cross-specialist awareness. They remember what you discussed last time and build on it.'
+    },
+    // === February 2026 Features (Week of Feb 7-11) ===
     {
         id: 'the-forge',
         name: 'The Forge',
-        description: 'Scan an idea into a buildable engineering dossier with 3D CAD models',
+        description: 'Transform an idea into a complete engineering dossier with architecture diagrams, module breakdowns, and risk analysis',
         route: '/the-forge',
         releasedAt: new Date('2026-02-11'),
         category: 'core',
         section: 'workshop',
         status: 'stable',
         isVisibleInNav: true,
-        changelog: 'The Forge (formerly Product X-Ray) — AI-powered product decomposition that transforms an idea into a complete engineering dossier with architecture diagrams, module breakdowns, risk analysis, and 3D CAD models.'
+        changelog: 'The Forge — AI-powered product decomposition that transforms an idea into a complete engineering dossier with architecture diagrams, module breakdowns, risk analysis, component libraries, and assembly builders.'
     },
     {
         id: 'canvas',
         name: 'Strategy',
         description: 'Strategy flow visualization, timeline, and visual map of strategic goals',
-        route: '/canvas',
+        route: '/strategy',
         releasedAt: new Date('2026-02-09'),
         category: 'strategic',
         section: 'plan',
@@ -414,6 +522,14 @@ export function getNewFeatures(): Feature[] {
 export function isRouteBeta(route: string): boolean {
     const feature = FEATURE_REGISTRY.find(f => f.route === route)
     return feature?.status === 'beta'
+}
+
+/**
+ * Check if a route's feature is in alpha status
+ */
+export function isRouteAlpha(route: string): boolean {
+    const feature = FEATURE_REGISTRY.find(f => f.route === route)
+    return feature?.status === 'alpha'
 }
 
 /**

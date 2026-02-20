@@ -60,9 +60,14 @@ function getCTALabel(category: string): string {
     }
 }
 
-/** Extract display price from attributes */
-function getDisplayPrice(attrs: Record<string, unknown>): string | null {
-    return (attrs.rate || attrs.cost || attrs.price || attrs.day_rate || null) as string | null
+/** Extract display price from attributes, stripping any embedded rate period (e.g. "/day") */
+function getDisplayPrice(attrs: Record<string, unknown>): { amount: string; period: string | null } | null {
+    const raw = (attrs.rate || attrs.cost || attrs.price || attrs.day_rate || null) as string | null
+    if (!raw) return null
+    const periodMatch = raw.match(/\/(day|month|hr|hour|week|year)$/i)
+    const amount = periodMatch ? raw.slice(0, periodMatch.index) : raw
+    const period = periodMatch ? periodMatch[1].toLowerCase() : null
+    return { amount, period }
 }
 
 /** Extract rating data */
@@ -286,9 +291,13 @@ export const MarketCardV2 = memo(function MarketCardV2({
                     <div>
                         {price ? (
                             <span>
-                                <span className="text-lg font-bold text-foreground">£{price}</span>
-                                {listing.category === 'People' && (
-                                    <span className="text-xs text-muted-foreground ml-0.5">/ day</span>
+                                <span className="text-lg font-bold text-foreground">
+                                    {price.amount.startsWith('£') || price.amount.startsWith('$') || price.amount.startsWith('€')
+                                        ? price.amount
+                                        : `£${price.amount}`}
+                                </span>
+                                {price.period && (
+                                    <span className="text-xs text-muted-foreground ml-0.5">/{price.period}</span>
                                 )}
                             </span>
                         ) : (

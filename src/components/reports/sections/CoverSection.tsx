@@ -2,59 +2,199 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import type { CoverSectionData, ReportBranding } from '@/lib/reports/report-document-types'
+/**
+ * @file CoverSection.tsx
+ *
+ * @description Template-specific cover page for reports. Board Pack gets a
+ * formal, executive-grade cover with confidentiality notice. Weekly Update
+ * gets a casual, branded header with quick highlights. Custom gets a clean
+ * minimal cover.
+ */
+
+import { Briefcase, CalendarDays, Sliders, Lock } from 'lucide-react'
+
+import { cn } from '@/lib/utils'
+
+import type { CoverSectionData, ReportBranding, ReportTemplateId } from '@/lib/reports/report-document-types'
 
 interface CoverSectionProps extends CoverSectionData {
   branding?: ReportBranding
+  templateId?: ReportTemplateId
 }
 
-export function CoverSection({
+function formatCoverDate(dateStr: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(new Date(dateStr))
+}
+
+function BoardPackCover({
   companyName,
   reportTitle,
   subtitle,
   generatedAt,
   branding,
-}: CoverSectionProps) {
-  const formattedDate = new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(generatedAt))
-
+}: CoverSectionProps): React.JSX.Element {
   return (
-    <section className="flex flex-col items-center justify-center py-16 text-center">
-      {branding?.logoUrl && (
-        <img
-          src={branding.logoUrl}
-          alt={`${companyName} logo`}
-          className="mb-6 h-16 w-auto object-contain"
-        />
-      )}
+    <section className="relative py-20">
+      {/* Top accent band */}
+      <div
+        className="absolute top-0 left-0 right-0 h-2 rounded-full bg-international-orange"
+        style={branding?.primaryColor ? { backgroundColor: branding.primaryColor } : undefined}
+      />
 
-      <h1 className="text-3xl font-display font-bold text-foreground">
-        {companyName}
-      </h1>
+      <div className="flex flex-col items-center text-center space-y-8">
+        {branding?.logoUrl && (
+          <img
+            src={branding.logoUrl}
+            alt={`${companyName} logo`}
+            className="h-14 w-auto object-contain"
+          />
+        )}
 
-      <div className="mt-6 flex justify-center">
+        <div className="space-y-1">
+          <p className="text-xs font-mono uppercase tracking-[0.25em] text-muted-foreground">
+            {companyName}
+          </p>
+        </div>
+
+        <div className="space-y-4 max-w-2xl">
+          <div className="flex justify-center">
+            <div className="flex items-center gap-2 rounded-full bg-muted/60 px-4 py-1.5">
+              <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground">Board Pack</span>
+            </div>
+          </div>
+
+          <h1 className="text-4xl font-display font-bold text-foreground leading-tight">
+            {reportTitle}
+          </h1>
+
+          <p className="text-lg text-muted-foreground leading-relaxed">
+            {subtitle}
+          </p>
+        </div>
+
+        <div className="w-24 h-px bg-border" />
+
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Prepared for the Board of Directors
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {formatCoverDate(generatedAt)}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1.5 rounded-lg border border-muted bg-muted/30 px-4 py-2">
+          <Lock className="h-3 w-3 text-muted-foreground" />
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Confidential
+          </span>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function WeeklyUpdateCover({
+  companyName,
+  reportTitle,
+  subtitle,
+  generatedAt,
+  branding,
+}: CoverSectionProps): React.JSX.Element {
+  return (
+    <section className="relative">
+      {/* Colored header band */}
+      <div
+        className="rounded-xl bg-international-orange px-8 py-8 text-white"
+        style={branding?.primaryColor ? { backgroundColor: branding.primaryColor } : undefined}
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <CalendarDays className="h-4 w-4 opacity-80" />
+          <span className="text-xs font-medium uppercase tracking-wider opacity-80">
+            Weekly Update
+          </span>
+        </div>
+
+        <p className="text-xs font-mono uppercase tracking-[0.2em] opacity-70 mb-2">
+          {companyName}
+        </p>
+
+        <h1 className="text-3xl font-display font-bold leading-tight">
+          {reportTitle}
+        </h1>
+
+        {subtitle && (
+          <p className="mt-3 text-base opacity-90 leading-relaxed max-w-2xl">
+            {subtitle}
+          </p>
+        )}
+
+        <div className="mt-6 flex items-center gap-4 text-xs opacity-70">
+          <span>{formatCoverDate(generatedAt)}</span>
+          <span>·</span>
+          <span>Generated by ForgeOS</span>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function CustomCover({
+  companyName,
+  reportTitle,
+  subtitle,
+  generatedAt,
+  branding,
+}: CoverSectionProps): React.JSX.Element {
+  return (
+    <section className="py-12">
+      <div className="flex flex-col items-center text-center space-y-6">
+        {branding?.logoUrl && (
+          <img
+            src={branding.logoUrl}
+            alt={`${companyName} logo`}
+            className="h-12 w-auto object-contain"
+          />
+        )}
+
+        <div className="flex items-center gap-2 rounded-full bg-muted/60 px-3 py-1">
+          <Sliders className="h-3 w-3 text-muted-foreground" />
+          <span className="text-xs font-medium text-muted-foreground">Custom Report</span>
+        </div>
+
+        <h1 className="text-3xl font-display font-bold text-foreground">
+          {companyName}
+        </h1>
+
         <div
           className="h-1 w-16 rounded-full bg-international-orange"
           style={branding?.primaryColor ? { backgroundColor: branding.primaryColor } : undefined}
         />
+
+        <h2 className="text-xl text-muted-foreground">{reportTitle}</h2>
+        <p className="text-base text-muted-foreground">{subtitle}</p>
+
+        <p className="text-xs text-muted-foreground">
+          {formatCoverDate(generatedAt)} · Generated by ForgeOS
+        </p>
       </div>
-
-      <h2 className="mt-6 text-xl text-muted-foreground">{reportTitle}</h2>
-
-      <p className="mt-3 text-base text-muted-foreground">{subtitle}</p>
-
-      <p className="mt-12 text-xs text-muted-foreground">
-        Generated {formattedDate}
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Generated by ForgeOS
-      </p>
     </section>
   )
+}
+
+export function CoverSection(props: CoverSectionProps): React.JSX.Element {
+  switch (props.templateId) {
+    case 'board-pack':
+      return <BoardPackCover {...props} />
+    case 'weekly-update':
+      return <WeeklyUpdateCover {...props} />
+    default:
+      return <CustomCover {...props} />
+  }
 }

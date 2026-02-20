@@ -124,9 +124,20 @@ export async function createCadLabRfqAction(
     (module) => module.hasStep && module.hasStl && module.hasManifest,
   ).length
   if (quoteReadyModuleCount === 0) {
+    const blockerSummary = moduleReadiness
+      .filter(m => !m.hasStep || !m.hasStl || !m.hasManifest)
+      .slice(0, 3)
+      .map(m => {
+        const missing = [
+          !m.hasStep && "STEP",
+          !m.hasStl && "STL",
+          !m.hasManifest && "manifest",
+        ].filter(Boolean)
+        return `${m.moduleName}: missing ${missing.join(", ")}`
+      })
+      .join("; ")
     return {
-      error:
-        "RFQ package is incomplete. At least one module must include STEP, STL, and drawing manifest artifacts.",
+      error: `RFQ package is incomplete — ${blockerSummary}. Generate CAD with drawing packages before creating an RFQ.`,
     }
   }
 

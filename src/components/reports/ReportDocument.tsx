@@ -27,7 +27,12 @@ import {
   WeekAheadSection,
 } from '@/components/reports/sections'
 
-import type { ReportDocument as ReportDocumentType, SectionData, ReportBranding } from '@/lib/reports/report-document-types'
+import type {
+  ReportDocument as ReportDocumentType,
+  SectionData,
+  ReportBranding,
+  ReportTemplateId,
+} from '@/lib/reports/report-document-types'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const SECTION_RENDERERS: Record<string, React.ComponentType<any>> = {
@@ -42,20 +47,43 @@ const SECTION_RENDERERS: Record<string, React.ComponentType<any>> = {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+// INTENT: Non-cover sections get numbered headings for the Board Pack template.
+// The section number is based on position among non-cover sections.
+const SECTION_ORDER = [
+  'executive-summary',
+  'key-metrics',
+  'completion-trend',
+  'objectives-progress',
+  'team-activity',
+  'blockers-risks',
+  'week-ahead',
+]
+
 interface ReportDocumentProps {
   document: ReportDocumentType
   forPrint?: boolean
 }
 
-function renderSection(section: SectionData, _forPrint: boolean, branding?: ReportBranding): React.ReactNode {
+function renderSection(
+  section: SectionData,
+  _forPrint: boolean,
+  branding: ReportBranding | undefined,
+  templateId: ReportTemplateId,
+  sectionNumber: number,
+): React.ReactNode {
   const Renderer = SECTION_RENDERERS[section.type]
   if (!Renderer) return null
+
+  const sharedProps = { templateId, sectionNumber }
   const extraProps = section.type === 'cover' ? { branding } : {}
-  return <Renderer {...section.data} {...extraProps} />
+  return <Renderer {...section.data} {...extraProps} {...sharedProps} />
 }
 
 export function ReportDocument({ document, forPrint = false }: ReportDocumentProps): React.JSX.Element {
   const formattedTimestamp = format(new Date(document.generatedAt), 'd MMM yyyy, h:mm a')
+  const templateId = (document.templateId || 'weekly-update') as ReportTemplateId
+
+  let sectionCounter = 0
 
   return (
     <div
@@ -69,6 +97,9 @@ export function ReportDocument({ document, forPrint = false }: ReportDocumentPro
           const isCover = section.type === 'cover'
           const isMajorSection = !isCover && index > 0
 
+          if (!isCover) sectionCounter++
+          const sectionNumber = isCover ? 0 : sectionCounter
+
           return (
             <div
               key={`${section.type}-${index}`}
@@ -77,7 +108,7 @@ export function ReportDocument({ document, forPrint = false }: ReportDocumentPro
                 forPrint && isMajorSection && 'print-page-break'
               )}
             >
-              {renderSection(section, forPrint, document.branding)}
+              {renderSection(section, forPrint, document.branding, templateId, sectionNumber)}
             </div>
           )
         })}

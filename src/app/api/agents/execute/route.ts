@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/security/rate-limit"
+import { checkAILimit } from "@/lib/ai/limit-check"
+import { estimateAICost } from "@/lib/ai/usage-tracking"
+import { countTokens } from "@/lib/agent-memory"
 import { getTextProvider, getImageProvider, getAudioProvider, getVideoProvider } from "@/lib/ai-providers/registry"
 import { decryptApiKey } from "@/lib/ai-providers/key-vault"
 import type { AIProviderId, OutputModality } from "@/lib/ai-providers/types"
@@ -285,6 +288,27 @@ export async function POST(request: Request) {
     // 4. Build rich company context using the AI Context Builder
     const foundryId = await resolveFoundryId(supabase, user.id)
 
+    // SECURITY: Enforce subscription tier limits (monthly AI task cap).
+    // The per-hour rate limit above prevents burst abuse; this prevents
+    // sustained overuse beyond what the subscription tier allows.
+    if (foundryId) {
+        const limitCheck = await checkAILimit(foundryId)
+        if (!limitCheck.allowed) {
+            return NextResponse.json(
+                {
+                    error: limitCheck.message,
+                    code: "SUBSCRIPTION_LIMIT",
+                    usage: {
+                        current: limitCheck.currentUsage,
+                        limit: limitCheck.limit,
+                        remaining: 0,
+                    },
+                },
+                { status: 429 }
+            )
+        }
+    }
+
     // 4a. Validate threadId belongs to user's foundry (IDOR prevention)
     if (threadId && foundryId) {
         const { data: thread } = await supabase
@@ -313,14 +337,15 @@ export async function POST(request: Request) {
               })
             : null
 
-    // 4b. Fast-path detection for short conversational follow-ups.
-    // When a user sends a quick message like "hi", "thanks", or "what about X?"
-    // in an existing conversation, skip the ~15 DB queries for company context,
-    // preferences, intelligence, knowledge vault, etc. The conversation history
-    // and specialist personality are sufficient for a snappy reply.
+    // 4b. Fast-path detection for conversational follow-ups.
+    // When a user sends a follow-up message in an existing conversation, skip the
+    // ~15 DB queries for company context, preferences, intelligence, knowledge vault,
+    // etc. The conversation history and specialist personality are sufficient for a
+    // responsive reply. Triggers when: short-ish input (<200 chars), existing thread,
+    // text mode, no cross-specialist context injection.
     const isConversationalFastPath = !!(
         input.length > 0 &&
-        input.length < 100 &&
+        input.length < 200 &&
         threadId &&
         specialistId &&
         modality === "text" &&
@@ -660,18 +685,18 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
     const logUsageAfterCompletion = async (outputLength: number): Promise<void> => {
         if (!foundryId) return
         try {
-            const estimatedInputTokens = Math.ceil((finalPrompt.length + systemPromptWithContext.length) / 4)
-            const estimatedOutputTokens = Math.ceil(outputLength / 4)
-            const totalTokens = estimatedInputTokens + estimatedOutputTokens
+            const inputTokens = countTokens(finalPrompt) + countTokens(systemPromptWithContext)
+            const outputTokens = Math.ceil(outputLength / 4) // Non-text outputs (URLs, base64) use rough estimate
+            const totalTokens = inputTokens + outputTokens
             await supabase.from("ai_usage_log").insert({
                 user_id: user.id,
                 foundry_id: foundryId,
                 feature: `specialist-${modality}`,
                 model: `${providerId}/${modelId}`,
-                prompt_tokens: estimatedInputTokens,
-                completion_tokens: estimatedOutputTokens,
+                prompt_tokens: inputTokens,
+                completion_tokens: outputTokens,
                 total_tokens: totalTokens,
-                estimated_cost_usd: 0,
+                estimated_cost_usd: estimateAICost(modelId, inputTokens, outputTokens),
                 key_source: keySource,
                 metadata: { modality, providerId, modelId },
             })
@@ -698,6 +723,25 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
         keySource,
         rolloutId,
     })
+
+    // GOTCHA: Validate total prompt size before sending to the LLM. The system
+    // prompt assembles 9+ layers (personality, context, memory, etc.) with no
+    // individual cap. If the total exceeds a safe threshold, truncate the least
+    // critical layer (company context) to avoid hitting model context limits.
+    const MAX_SYSTEM_PROMPT_CHARS = 120_000
+    if (systemPromptWithContext.length > MAX_SYSTEM_PROMPT_CHARS) {
+        const overage = systemPromptWithContext.length - MAX_SYSTEM_PROMPT_CHARS
+        console.warn("[agents/execute] System prompt exceeds safe limit, truncating company context:", {
+            totalChars: systemPromptWithContext.length,
+            limit: MAX_SYSTEM_PROMPT_CHARS,
+            overage,
+            specialistId,
+        })
+        if (companyContext && companyContext.length > overage) {
+            const truncatedCompanyContext = companyContext.slice(0, companyContext.length - overage)
+            systemPromptWithContext = systemPromptWithContext.replace(companyContext, truncatedCompanyContext)
+        }
+    }
 
     // Build the fallback chain for text modalities.
     // If the client sent modelTier, use that chain. Otherwise fall back to single-provider (no failover).
@@ -1055,13 +1099,18 @@ async function handleSpeculativeStreaming(
             const tryFinalize = (): void => {
                 if (!fastDone || !deepDone) return
                 clearInterval(heartbeatInterval)
-                const combinedOutput = complexity === "simple"
+                // INTENT: Save only the substantive answer to memory. When the
+                // question was "simple", the fast model IS the answer. When
+                // "complex", the deep model has the real analysis — the fast
+                // model's brief acknowledgment ("Great question, let me think...")
+                // wastes tokens and reads unnaturally in future conversation history.
+                const outputForMemory = complexity === "simple"
                     ? fastFullOutput
-                    : (fastFullOutput + "\n\n" + deepFullOutput).trim()
+                    : (deepFullOutput || fastFullOutput).trim()
                 controller.enqueue(encoder.encode("data: [DONE]\n\n"))
                 controller.close()
-                if (onComplete && combinedOutput) {
-                    onComplete(combinedOutput).catch(() => {})
+                if (onComplete && outputForMemory) {
+                    onComplete(outputForMemory).catch(() => {})
                 }
             }
 

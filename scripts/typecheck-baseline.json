@@ -88,7 +88,7 @@
     "src/app/(platform)/the-forge/components/engineering-review-package.tsx|TS2367|This comparison appears to be unintentional because compared types have no overlap.",
     "src/app/(platform)/the-forge/components/engineering-summary.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/the-forge/components/forge-project-card.tsx|TS2322|Type is not assignable to type.",
-    "src/app/(platform)/the-forge/components/forge-sub-nav.tsx|TS2322|Type is not assignable to type.",
+
     "src/app/(platform)/the-forge/components/quick-insights.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/the-forge/components/scan-hero.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/the-forge/components/team-map.tsx|TS2739|Type '__TYPE__' is missing the following properties from type 'MarketplaceListing': is_demo, created_by_provider_id",

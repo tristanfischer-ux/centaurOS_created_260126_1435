@@ -144,6 +144,9 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
             <span className="text-xs font-mono bg-muted text-muted-foreground px-2 py-1 rounded">
               PIPELINE
             </span>
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
+              Alpha
+            </span>
             {sector && (
               <span className="flex items-center gap-1.5 text-xs font-medium bg-international-orange-light text-international-orange px-2.5 py-1 rounded">
                 <Factory className="h-3 w-3" />

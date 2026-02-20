@@ -370,6 +370,9 @@ function PageHeader(): React.ReactNode {
         <div className={typography.pageHeader}>
           <div className={typography.pageHeaderAccent} />
           <h1 className={typography.h1}>The Forge</h1>
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
+            Alpha
+          </span>
         </div>
         <p className={cn(typography.pageSubtitle, "mt-1")}>
           Turn product ideas into manufacturing-ready engineering packages

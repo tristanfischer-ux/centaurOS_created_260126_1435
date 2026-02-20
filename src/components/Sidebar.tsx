@@ -64,6 +64,7 @@ import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 import { SectionHeader } from "@/components/sidebar/SectionHeader"
 import { useSectionNewBadges } from "@/hooks/useSectionNewBadge"
+import { isRouteAlpha, isRouteBeta } from "@/lib/features/registry"
 import { signOut } from "@/actions/auth"
 import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
@@ -112,7 +113,7 @@ const planNavigation = [
 // Section 3: "Workshop" — Where the work happens
 // ─────────────────────────────────────────────────────────────────────────────
 const workshopNavigation = [
-    { name: "The Forge", href: "/the-forge/studio", icon: Flame, tooltip: "Turn product ideas into manufacturing-ready engineering packages" },
+    { name: "The Forge", href: "/the-forge", icon: Flame, tooltip: "Turn product ideas into manufacturing-ready engineering packages" },
     { name: "Blueprints", href: "/blueprints", icon: Map, tooltip: "Product maps, objective packs, and technical domain planning" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Retainers", href: "/retainers", icon: Handshake, tooltip: "Ongoing agreements with freelancers and experts" },
@@ -175,7 +176,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     // with staleTimes (30s dynamic cache), this means the RSC payload is already
     // in the client cache before the user clicks.
     React.useEffect(() => {
-        const topRoutes = ['/today', '/new-tasks', '/new-objectives', '/team', '/the-forge/studio', '/strategy']
+        const topRoutes = ['/today', '/new-tasks', '/new-objectives', '/team', '/the-forge', '/strategy']
         topRoutes.forEach(route => router.prefetch(route))
     }, [router])
 
@@ -199,6 +200,8 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
      */
     const renderNavItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }>; tooltip?: string; indent?: boolean }) => {
         const isActive = isRouteActive(pathname, item.href)
+        const isAlpha = isRouteAlpha(item.href)
+        const isBeta = isRouteBeta(item.href)
 
         const navLink = (
             <Link
@@ -222,6 +225,16 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                     />
                     {item.name}
                 </span>
+                {isAlpha && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
+                        Alpha
+                    </span>
+                )}
+                {isBeta && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
+                        Beta
+                    </span>
+                )}
             </Link>
         )
 

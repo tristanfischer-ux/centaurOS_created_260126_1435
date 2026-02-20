@@ -141,9 +141,17 @@ export function ProcurementEnrichment({
 
       if (componentNames.length > 0) {
         try {
-          const firstQuery = componentNames[0]
-          const live = await getLiveSupplierPricing(firstQuery)
-          setLiveSupplierResults(live)
+          const allResults = await Promise.all(
+            componentNames.map(name => getLiveSupplierPricing(name).catch(() => []))
+          )
+          const seen = new Set<string>()
+          const deduped = allResults.flat().filter(r => {
+            const key = `${r.supplierId}:${r.partNumber}`
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+          })
+          setLiveSupplierResults(deduped)
         } catch {
           setLiveSupplierResults([])
         }
