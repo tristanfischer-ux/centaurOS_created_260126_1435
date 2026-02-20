@@ -2,23 +2,36 @@
 
 import { useEffect } from "react"
 
-// INTENT: Register the cleanup service worker that clears stale caches from
-// a previous caching SW. The sw.js file is a self-unregistering stub — once
-// it activates and purges caches, it removes itself. This prevents chunk
-// mismatch errors (e.g. "Can't find variable: members") caused by old SWs
-// serving JS from previous deployments alongside new deployment HTML.
-export function PWARegister() {
+// INTENT: Clean up stale service workers left by a previous caching SW deployment.
+// DECISION: We unregister + clear caches directly from the page instead of
+// registering a self-unregistering sw.js. The old approach caused an
+// InvalidStateError race condition: sw.js would unregister itself, then on
+// the next page load PWARegister would try to re-register it while the
+// browser was still tearing down the old registration.
+// See: Sentry JAVASCRIPT-NEXTJS-B (Feb 2026)
+export function PWARegister(): null {
     useEffect(() => {
-        if ("serviceWorker" in navigator) {
-            navigator.serviceWorker
-                .register("/sw.js", { updateViaCache: "none" })
-                .then((reg) => {
-                    reg.update()
-                })
-                .catch(() => {
-                    // Silent — sw.js is a cleanup stub, failures are not actionable
-                })
-        }
+        if (!("serviceWorker" in navigator)) return
+
+        navigator.serviceWorker
+            .getRegistrations()
+            .then((registrations) => {
+                for (const registration of registrations) {
+                    registration.unregister()
+                }
+            })
+            .catch(() => {
+                // Non-actionable — user's browser may not support getRegistrations
+            })
+
+        caches
+            .keys()
+            .then((names) =>
+                Promise.all(names.map((name) => caches.delete(name)))
+            )
+            .catch(() => {
+                // Non-actionable — caches API may not be available
+            })
     }, [])
 
     return null
