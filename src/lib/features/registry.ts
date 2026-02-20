@@ -62,7 +62,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         releasedAt: new Date('2026-02-20'),
         category: 'analytics',
         section: 'plan',
-        status: 'stable',
+        status: 'beta',
         isVisibleInNav: true,
         changelog: 'Added Reports — generate professional board packs, investor updates, and custom reports. Features AI-written narratives, infographic view mode, PPTX and DOCX export, scheduled generation, shareable links, and email delivery.'
     },
