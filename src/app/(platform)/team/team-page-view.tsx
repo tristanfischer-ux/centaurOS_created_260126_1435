@@ -15,7 +15,8 @@ import { useState, useCallback, useTransition, useMemo, useEffect } from 'react'
 import {
     Plus, Search, LayoutGrid, List, Users,
     BarChart3, ShieldCheck, Zap, MoreHorizontal, Loader2,
-    AlertTriangle, Check, Store, Orbit, Settings, CalendarDays
+    AlertTriangle, Check, Store, Orbit, Settings, CalendarDays,
+    Handshake, Briefcase,
 } from 'lucide-react'
 import { ViewToggle } from '@/components/ui/view-toggle'
 import Link from 'next/link'
@@ -77,6 +78,8 @@ const TeamAnalytics = dynamic(
 
 import { useTeamData } from './hooks/use-team-data'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
+import { RetainerCard } from '@/components/retainers'
+import type { RetainerWithDetails, RetainerStats } from '@/types/retainers'
 import type { TeamViewMode, BusinessFunction } from './types'
 
 // ─── Types ───────────────────────────────────────
@@ -198,6 +201,12 @@ interface TeamPageViewProps {
     foundryId?: string
     /** Hiring requirements from business plan analysis */
     hiringRequirements?: import('@/lib/business-plan-types').SavedHiringRequirement[]
+    /** Retainers with stats, fetched server-side */
+    retainersWithStats?: { retainer: RetainerWithDetails; stats: RetainerStats | null }[]
+    /** Count of retainers where user is buyer */
+    buyerRetainerCount?: number
+    /** Count of retainers where user is seller/provider */
+    sellerRetainerCount?: number
 }
 
 type ActiveTab = 'members' | 'workload' | 'teams' | 'hiring'
@@ -226,6 +235,9 @@ export function TeamPageView({
     ],
     foundryId,
     hiringRequirements = [],
+    retainersWithStats = [],
+    buyerRetainerCount = 0,
+    sellerRetainerCount = 0,
 }: TeamPageViewProps) {
     // View state — orbit is the default landing view
     const [viewMode, setViewMode] = useState<TeamViewMode>('orbit')
@@ -1287,6 +1299,55 @@ export function TeamPageView({
                     <HiringTimeline requirements={hiringRequirements} />
                 </div>
             )}
+
+            {/* ── Retainers Section ─────────────────────────────── */}
+            <section className="space-y-4 pt-4 border-t border-muted">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-1 h-6 rounded-full bg-electric-blue" />
+                        <Handshake className="h-5 w-5 text-electric-blue" />
+                        <h2 className="text-lg font-display font-semibold text-foreground">Retainers</h2>
+                        {retainersWithStats.length > 0 && (
+                            <Badge variant="secondary" className="text-xs font-normal">{retainersWithStats.length}</Badge>
+                        )}
+                    </div>
+                    <Button size="sm" variant="outline" asChild>
+                        <Link href="/marketplace?category=People">
+                            <Plus className="h-4 w-4" />
+                            New Retainer
+                        </Link>
+                    </Button>
+                </div>
+
+                {retainersWithStats.length === 0 ? (
+                    <EmptyState
+                        icon={<Handshake className="h-10 w-10" />}
+                        title="No retainer agreements yet"
+                        description="Set up retainers with freelancers and experts from the Marketplace to manage ongoing engagements."
+                        action={
+                            <Button asChild className="bg-international-orange hover:bg-international-orange/90 text-white">
+                                <Link href="/marketplace?category=People">
+                                    <Briefcase className="h-4 w-4 mr-2" />
+                                    Browse People
+                                </Link>
+                            </Button>
+                        }
+                        className="py-12 bg-muted/20 rounded-xl border border-muted"
+                    />
+                ) : (
+                    <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                        {retainersWithStats.map(({ retainer, stats }) => (
+                            <RetainerCard
+                                key={retainer.id}
+                                retainer={retainer}
+                                stats={stats}
+                                role={retainer.buyer_id === currentUserId ? 'buyer' : 'seller'}
+                                compact
+                            />
+                        ))}
+                    </div>
+                )}
+            </section>
 
             {/* ── Modals & Dialogs ──────────────────────────────── */}
 

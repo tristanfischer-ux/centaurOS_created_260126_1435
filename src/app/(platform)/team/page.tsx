@@ -7,6 +7,7 @@ import { RefreshButton } from '@/components/RefreshButton'
 import { AlertCircle } from 'lucide-react'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
 import { getHiringRequirements } from '@/actions/business-plan'
+import { getMyRetainers, getRetainerStatistics } from '@/actions/retainers'
 import type { BusinessFunction, FunctionId } from './types'
 
 /**
@@ -404,6 +405,19 @@ export default async function TeamPage() {
     const hiringResult = await getHiringRequirements()
     const hiringRequirements = hiringResult.data || []
 
+    // INTENT: Retainers are shown below the team section so founders can see
+    // their ongoing agreements alongside their team at a glance.
+    const { data: buyerRetainers } = await getMyRetainers('buyer')
+    const { data: sellerRetainers } = await getMyRetainers('seller')
+    const allRetainers = [...(buyerRetainers || []), ...(sellerRetainers || [])]
+
+    const retainersWithStats = await Promise.all(
+        allRetainers.map(async (retainer) => {
+            const { data: stats } = await getRetainerStatistics(retainer.id)
+            return { retainer, stats }
+        })
+    )
+
     return (
         <TeamPageView
             founders={founders}
@@ -425,6 +439,9 @@ export default async function TeamPage() {
             orbitFunctions={orbitFunctions}
             foundryId={foundry_id}
             hiringRequirements={hiringRequirements}
+            retainersWithStats={retainersWithStats}
+            buyerRetainerCount={buyerRetainers?.length ?? 0}
+            sellerRetainerCount={sellerRetainers?.length ?? 0}
         />
     )
 }
