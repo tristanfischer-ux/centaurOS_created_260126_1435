@@ -365,6 +365,39 @@ Urgency guide:
 `,
 }
 
+// ─── Huddle Topic Mapping ────────────────────────────────────────────
+
+/**
+ * Maps huddle IDs to the specialist IDs whose sweep insights feed that huddle.
+ *
+ * INTENT: When a user views the AI Team page, each huddle card shows the most
+ * relevant discussion topic. This mapping lets us filter insights by huddle
+ * without coupling sweep-prompts to the UI layer.
+ */
+const HUDDLE_SPECIALIST_MAP: Record<string, SpecialistId[]> = {
+  strategy: ['strategist', 'growth-marketer', 'sales-lead'],
+  technology: ['cto', 'vp-engineering', 'vp-manufacturing', 'vp-supply-chain', 'product-lead'],
+  'legal-finance': ['legal-counsel', 'finance-lead', 'hiring-team'],
+  'finance-deep-dive': ['finance-lead', 'fundraising-advisor'],
+}
+
+/**
+ * Gets the specialist IDs whose insights feed a given huddle.
+ *
+ * @param huddleId - The huddle identifier (e.g., "strategy", "technology")
+ * @returns Array of specialist IDs, or empty array if huddle not found
+ */
+export function getHuddleSpecialistIds(huddleId: string): SpecialistId[] {
+  return HUDDLE_SPECIALIST_MAP[huddleId] ?? []
+}
+
+/**
+ * Gets all defined huddle IDs.
+ */
+export function getHuddleIds(): string[] {
+  return Object.keys(HUDDLE_SPECIALIST_MAP)
+}
+
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**

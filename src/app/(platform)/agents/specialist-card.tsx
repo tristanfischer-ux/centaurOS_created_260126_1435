@@ -130,7 +130,7 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
             <Card
                 role="button"
                 tabIndex={0}
-                aria-label={`Brief ${specialist.name}, ${specialist.title}`}
+                aria-label={`Start a conversation with ${specialist.name}, ${specialist.title}`}
                 className={cn(
                     "border-l-4 rounded-xl shadow-sm bg-card",
                     "transition-all duration-200 hover:shadow-lg hover:-translate-y-1",
@@ -242,7 +242,7 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
                     {/* CTA Row */}
                     <div className="flex items-center justify-between pt-4 border-t border-muted">
                         <span className="text-xs text-muted-foreground">
-                            {capabilityCount} {capabilityCount === 1 ? "brief" : "briefs"} ready
+                            {capabilityCount} {capabilityCount === 1 ? "topic" : "topics"} to explore
                         </span>
                         <Button
                             size="sm"
@@ -252,7 +252,7 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
                                 onBrief(specialist.id)
                             }}
                         >
-                            Brief
+                            Start a conversation
                             <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                         </Button>
                     </div>

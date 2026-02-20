@@ -60,6 +60,7 @@ import { compileInterSpecialistDynamics } from "@/lib/agents/relationship-matrix
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
 import { MeetingOutputs } from "./meeting-outputs"
+import { HuddleReport } from "./huddle-report"
 import { parseProposedActions, stripProposedActionsBlock } from "./brief-specialist-dialog"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { Specialist } from "./specialists-data"
@@ -761,6 +762,7 @@ export function TeamMeetingDialog({
     const [showThoughtsInput, setShowThoughtsInput] = useState(false)
     const [meetingOutputs, setMeetingOutputs] = useState<MeetingOutputData | null>(null)
     const [isGeneratingOutputs, setIsGeneratingOutputs] = useState(false)
+    const [showReportDialog, setShowReportDialog] = useState(false)
     const [speakingEntryIdx, setSpeakingEntryIdx] = useState<number | null>(null)
     const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set())
     const [wantsToSpeak, setWantsToSpeak] = useState<Set<string>>(new Set())
@@ -825,6 +827,15 @@ export function TeamMeetingDialog({
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open])
+
+    // INTENT: When a huddle card opens the dialog with a preset, auto-select
+    // the participants and pre-fill the topic so the user can jump straight in.
+    useEffect(() => {
+        if (open && preset && phase === "setup") {
+            setSelectedIds(new Set(preset.participantIds))
+            setTopic(preset.topic)
+        }
+    }, [open, preset, phase])
 
     // Auto-scroll during streaming
     useEffect(() => {
@@ -1369,6 +1380,7 @@ export function TeamMeetingDialog({
     // ─── Render ───────────────────────────────────────────────────────────
 
     return (
+        <>
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent size="xl" className="max-h-[90vh] flex flex-col">
                 <DialogHeader>
@@ -2091,6 +2103,7 @@ export function TeamMeetingDialog({
                                     .map((e) => `**${e.specialistName}** (Round ${e.round}):\n${e.content}`)
                                     .join("\n\n---\n\n")}
                                 roundCount={currentRound}
+                                onShareReport={() => setShowReportDialog(true)}
                             />
                         ) : error ? (
                             <div className="space-y-4 py-8">
@@ -2206,5 +2219,16 @@ export function TeamMeetingDialog({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        {meetingOutputs?.report && (
+            <HuddleReport
+                open={showReportDialog}
+                onOpenChange={setShowReportDialog}
+                report={meetingOutputs.report}
+                topic={topic}
+                attendees={selectedSpecialists.map((s) => s.name)}
+            />
+        )}
+        </>
     )
 }
