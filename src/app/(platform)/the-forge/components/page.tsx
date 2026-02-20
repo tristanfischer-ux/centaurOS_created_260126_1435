@@ -9,6 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { typography, spacing } from '@/lib/design-system'
 import { cn } from '@/lib/utils'
 import { ComponentCard } from '@/components/forge/component-card'
@@ -20,7 +27,7 @@ import {
   type ComponentFilters,
 } from '@/actions/component-library'
 
-type SortOption = ComponentFilters['sortBy']
+type SortOption = NonNullable<ComponentFilters['sortBy']>
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'name', label: 'Name A–Z' },
@@ -171,18 +178,21 @@ export default function ComponentLibraryPage() {
               className="pl-9"
             />
           </div>
-          <select
+          <Select
             value={sortBy ?? 'name'}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="h-10 rounded-md border bg-background px-3 text-sm text-foreground"
-            aria-label="Sort by"
+            onValueChange={(value) => setSortBy(value as SortOption)}
           >
-            {SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-[180px]" aria-label="Sort by">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <span className="text-xs text-muted-foreground whitespace-nowrap">
             {total} component{total !== 1 ? 's' : ''}
           </span>
