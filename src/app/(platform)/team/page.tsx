@@ -6,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { RefreshButton } from '@/components/RefreshButton'
 import { AlertCircle } from 'lucide-react'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
+import { getHiringRequirements } from '@/actions/business-plan'
 import type { BusinessFunction, FunctionId } from './types'
 
 /**
@@ -400,6 +401,9 @@ export default async function TeamPage() {
         }
     }
 
+    const hiringResult = await getHiringRequirements()
+    const hiringRequirements = hiringResult.data || []
+
     return (
         <TeamPageView
             founders={founders}
@@ -420,6 +424,7 @@ export default async function TeamPage() {
             functionCategoryMap={functionCategoryMap}
             orbitFunctions={orbitFunctions}
             foundryId={foundry_id}
+            hiringRequirements={hiringRequirements}
         />
     )
 }

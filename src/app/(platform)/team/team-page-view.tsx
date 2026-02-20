@@ -15,7 +15,7 @@ import { useState, useCallback, useTransition, useMemo, useEffect } from 'react'
 import {
     Plus, Search, LayoutGrid, List, Users,
     BarChart3, ShieldCheck, Zap, MoreHorizontal, Loader2,
-    AlertTriangle, Check, Store, Orbit, Settings
+    AlertTriangle, Check, Store, Orbit, Settings, CalendarDays
 } from 'lucide-react'
 import { ViewToggle } from '@/components/ui/view-toggle'
 import Link from 'next/link'
@@ -51,6 +51,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database.types'
 
 // View components
+import { HiringTimeline } from './hiring-timeline'
 import { OrbitalView } from './components/orbital-view'
 import { WorkloadBoard } from './workload-board'
 import { TeamDetailCard } from './team-detail-card'
@@ -195,9 +196,11 @@ interface TeamPageViewProps {
     orbitFunctions?: BusinessFunction[]
     /** Foundry ID for editing functions */
     foundryId?: string
+    /** Hiring requirements from business plan analysis */
+    hiringRequirements?: import('@/lib/business-plan-types').SavedHiringRequirement[]
 }
 
-type ActiveTab = 'members' | 'workload' | 'teams'
+type ActiveTab = 'members' | 'workload' | 'teams' | 'hiring'
 
 // ─── Main Component ───────────────────────────────
 
@@ -222,6 +225,7 @@ export function TeamPageView({
         { id: 'product', label: 'Product', short: 'PROD' },
     ],
     foundryId,
+    hiringRequirements = [],
 }: TeamPageViewProps) {
     // View state — orbit is the default landing view
     const [viewMode, setViewMode] = useState<TeamViewMode>('orbit')
@@ -921,6 +925,27 @@ export function TeamPageView({
                         <ShieldCheck className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
                         Teams
                     </button>
+                    <button
+                        role="tab"
+                        aria-selected={activeTab === 'hiring'}
+                        aria-controls="team-hiring-panel"
+                        id="team-hiring-tab"
+                        onClick={() => { setActiveTab('hiring'); setSearchQuery('') }}
+                        className={cn(
+                            'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200',
+                            activeTab === 'hiring'
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                        )}
+                    >
+                        <CalendarDays className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
+                        Hiring Plan
+                        {hiringRequirements.length > 0 && (
+                            <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                                {hiringRequirements.length}
+                            </Badge>
+                        )}
+                    </button>
                 </div>
 
                 {/* Right: controls (same position in all modes) */}
@@ -1253,6 +1278,13 @@ export function TeamPageView({
                             </Link>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Hiring Plan Tab */}
+            {activeTab === 'hiring' && (
+                <div id="team-hiring-panel" role="tabpanel" aria-labelledby="team-hiring-tab">
+                    <HiringTimeline requirements={hiringRequirements} />
                 </div>
             )}
 

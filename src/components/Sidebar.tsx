@@ -51,6 +51,7 @@ import {
     Brain,
     Handshake,
     MessageCircle,
+    Banknote,
 } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
@@ -103,6 +104,7 @@ const planNavigation = [
     { name: "Strategy", href: "/strategy", icon: Waypoints, tooltip: "Your strategic direction — pillars, progress, and health at a glance" },
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Milestones that move the strategy forward" },
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Day-to-day work that delivers on objectives" },
+    { name: "Funding", href: "/funding", icon: Banknote, tooltip: "Capital requirements, funding events, and financial milestones from your business plan" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────

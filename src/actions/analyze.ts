@@ -1,18 +1,14 @@
 "use server"
 
-import OpenAI from 'openai'
 import { withAuth } from '@/lib/server-action-utils'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import type { BusinessPlanAnalysis } from '@/lib/business-plan-types'
 
-let openaiClient: OpenAI | null = null
-
-function getOpenAIClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return null
-  if (!openaiClient) openaiClient = new OpenAI({ apiKey })
-  return openaiClient
-}
+// DECISION: Using Claude Opus 4.6 instead of GPT-4o for business plan analysis.
+// Claude excels at strategic reasoning, structured output, and understanding
+// nuanced business context — exactly what's needed for deriving objectives,
+// hiring timelines, and funding requirements from a business plan.
+const MODEL_ID = 'claude-opus-4-6'
 
 // INTENT: Single comprehensive prompt that extracts all five output streams
 // in one AI call. This avoids multiple round-trips and keeps the analysis
@@ -62,8 +58,8 @@ Return ONLY a raw JSON object with this exact structure (no markdown, no code fe
 }`
 
 /**
- * @description Analyzes a business plan document and extracts strategic objectives,
- * hiring requirements, capacity needs, and funding milestones.
+ * @description Analyzes a business plan document using Claude Opus 4.6 and extracts
+ * strategic objectives, hiring requirements, capacity needs, and funding milestones.
  * @param formData - FormData containing either a 'file' (PDF/DOCX/TXT) or 'text' field
  * @returns The full analysis or an error message
  * @security Rate-limited per user to prevent AI cost abuse
@@ -72,8 +68,8 @@ export async function analyzeBusinessPlan(
   formData: FormData
 ): Promise<{ analysis?: BusinessPlanAnalysis; error?: string }> {
   return withAuth(async ({ user }) => {
-    const openai = getOpenAIClient()
-    if (!openai) return { error: 'AI analysis service is not configured' }
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) return { error: 'AI analysis service is not configured' }
 
     // SECURITY: Rate limit AI calls to prevent cost abuse
     const rateLimitError = await checkRateLimit('aiAnalysis', `ai:${user.id}`)
@@ -107,22 +103,25 @@ export async function analyzeBusinessPlan(
 
       const truncatedText = text.slice(0, 100000)
 
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        response_format: { type: 'json_object' },
+      const Anthropic = (await import('@anthropic-ai/sdk')).default
+      const client = new Anthropic({ apiKey })
+
+      const message = await client.messages.create({
+        model: MODEL_ID,
+        max_tokens: 8192,
+        system: SYSTEM_PROMPT,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: `Analyze the following business plan:\n\n${truncatedText}` },
         ],
       })
 
-      if (!completion.choices?.length) return { error: 'AI returned no response choices' }
-
-      const content = completion.choices[0].message.content
-      if (!content) return { error: 'AI returned no content' }
+      const textBlock = message.content.find(block => block.type === 'text')
+      if (!textBlock || textBlock.type !== 'text') {
+        return { error: 'AI returned no text content' }
+      }
 
       try {
-        const analysis = JSON.parse(content) as BusinessPlanAnalysis
+        const analysis = JSON.parse(textBlock.text) as BusinessPlanAnalysis
         return { analysis }
       } catch (parseError) {
         console.error('[analyze] Failed to parse AI JSON response:', parseError)
