@@ -13,7 +13,7 @@ test.describe('Marketplace Comparison', () => {
 
   test('@critical: can select and compare marketplace listings', async ({ page }) => {
     // Wait for marketplace to load
-    await expect(page.locator('text=Browse')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Browse' })).toBeVisible()
 
     // Find and click on compare buttons for at least 2 items
     const compareButtons = page.locator('[title*="comparison"], [aria-label*="comparison"]')
