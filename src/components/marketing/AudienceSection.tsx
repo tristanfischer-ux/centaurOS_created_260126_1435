@@ -7,6 +7,7 @@ import {
   GraduationCap,
   Factory,
   Briefcase,
+  Lightbulb,
   ArrowRight,
 } from "lucide-react"
 import { motion } from "framer-motion"
@@ -27,6 +28,7 @@ import {
  * This section puts all audiences on equal footing with tailored value props.
  */
 const AUDIENCES = [
+  // ── Top row: the three hands-on roles ──
   {
     id: "founders",
     icon: Rocket,
@@ -38,6 +40,29 @@ const AUDIENCES = [
     href: "/join?role=founder",
     highlight: true,
   },
+  {
+    id: "executives",
+    icon: Briefcase,
+    title: "Fractional Executives",
+    hook: "Monetize decades of expertise.",
+    description:
+      "Whether you're looking for a change from corporate life or want to have a more interesting career than any single company could offer — deploy your skills across multiple ventures and mentor the next generation.",
+    cta: "Join as Expert",
+    href: "/join?role=executive",
+    highlight: false,
+  },
+  {
+    id: "apprentices",
+    icon: Lightbulb,
+    title: "Apprentices",
+    hook: "Learn by doing. Build real products.",
+    description:
+      "Skip the unpaid internship loop. Work alongside experienced executives on live hardware projects, build a portfolio that matters, and get paid while you learn the skills that actually get you hired.",
+    cta: "Start Apprenticeship",
+    href: "/join?role=apprentice",
+    highlight: false,
+  },
+  // ── Bottom row: the ecosystem enablers ──
   {
     id: "vcs",
     icon: TrendingUp,
@@ -68,17 +93,6 @@ const AUDIENCES = [
     description:
       "List your available capacity on the marketplace. Put your in-house experts on the platform as fractional executives. Every company they advise is a potential manufacturing order for your factory.",
     cta: "List Your Factory",
-    href: "/join?role=executive",
-    highlight: false,
-  },
-  {
-    id: "executives",
-    icon: Briefcase,
-    title: "Fractional Executives",
-    hook: "Monetize decades of expertise.",
-    description:
-      "Whether you're looking for a change from corporate life or want to have a more interesting career than any single company could offer — deploy your skills across multiple ventures and mentor the next generation.",
-    cta: "Join as Expert",
     href: "/join?role=executive",
     highlight: false,
   },
