@@ -608,6 +608,37 @@ export function InspirationPageNew({
       />
 
       {/* ================================================================== */}
+      {/* Product Maps summary card                                          */}
+      {/* ================================================================== */}
+      <Card className="bg-gradient-to-r from-orange-50 to-blue-50 border-orange-100 hover:shadow-md transition-shadow">
+        <CardContent className="py-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
+              <Map className="h-5 w-5 text-international-orange" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-sm">Product Maps</h3>
+              <p className="text-xs text-muted-foreground">
+                {blueprints.length > 0
+                  ? `${blueprints.length} active map${blueprints.length > 1 ? 's' : ''} \u00B7 ${Math.round(blueprints.reduce((sum, b) => sum + b.coverage_score, 0) / blueprints.length)}% average coverage`
+                  : 'Visualise every domain, skill, and component your product needs. Find gaps and turn them into action.'}
+              </p>
+            </div>
+            <Button
+              asChild
+              size="sm"
+              className="shrink-0 bg-international-orange hover:bg-international-orange/90"
+            >
+              <Link href="/blueprints">
+                {blueprints.length > 0 ? 'View Product Maps' : 'Create Your First Map'}
+                <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ================================================================== */}
       {/* Category tabs (reorganised: For You, By Need, By Industry, Popular, Saved) */}
       {/* ================================================================== */}
       <CategoryTabs
@@ -1285,6 +1316,169 @@ export function InspirationPageNew({
           )}
         </>
       )}
+
+      {/* ================================================================== */}
+      {/* Universal Subsystems section                                       */}
+      {/* ================================================================== */}
+      {universalSubsystems.length > 0 && (
+        <section className="space-y-4 pt-4 border-t border-muted">
+          <Card className="bg-gradient-to-r from-orange-50 to-background border-orange-100">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-orange-100 rounded-xl shrink-0">
+                  <Cpu className="h-6 w-6 text-international-orange" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-foreground mb-1">Universal Subsystems</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Technical domains that apply to any hardware or software product. Get detailed guidance,
+                    key questions to answer, and create objectives with pre-built tasks.
+                  </p>
+                  <div className="flex flex-wrap gap-3 text-xs">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Target className="h-3.5 w-3.5 text-international-orange" />
+                      <span>Create objectives with 5-6 pre-built tasks</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Users className="h-3.5 w-3.5 text-electric-blue" />
+                      <span>Auto-includes marketplace discovery tasks</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Lightbulb className="h-3.5 w-3.5 text-status-success" />
+                      <span>Detailed primers &amp; key questions</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <UniversalSubsystemsGrid
+            subsystems={universalSubsystems}
+            onSubsystemClick={handleSubsystemClick}
+          />
+        </section>
+      )}
+
+      {/* ================================================================== */}
+      {/* Advisory Q&A section                                               */}
+      {/* ================================================================== */}
+      {questions.length > 0 && (
+        <section className="space-y-4 pt-4 border-t border-muted">
+          <Collapsible open={isQAOpen} onOpenChange={setIsQAOpen}>
+            <div className="flex items-center justify-between">
+              <CollapsibleTrigger asChild>
+                <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                  <div className="h-10 w-10 rounded-lg bg-violet-100 flex items-center justify-center">
+                    <MessageSquare className="h-5 w-5 text-violet-600" />
+                  </div>
+                  <div className="text-left">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                      Advisory Q&A
+                      <Badge variant="secondary" className="text-xs">
+                        {questions.length} {questions.length === 1 ? 'question' : 'questions'}
+                      </Badge>
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Get AI-powered insights verified by human experts
+                    </p>
+                  </div>
+                  <ChevronDown className={cn(
+                    "h-5 w-5 text-muted-foreground transition-transform ml-2",
+                    isQAOpen && "rotate-180"
+                  )} />
+                </button>
+              </CollapsibleTrigger>
+              <AskModal onSubmit={handleAskQuestion} />
+            </div>
+
+            <CollapsibleContent className="mt-6 space-y-4">
+              <StatusLegend className="pb-4" />
+
+              {questions.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="search"
+                      placeholder="Search questions..."
+                      value={qaSearchQuery}
+                      onChange={(e) => setQaSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {filteredQuestions.length} {filteredQuestions.length === 1 ? 'question' : 'questions'}
+                    {qaSearchQuery && ' found'}
+                  </p>
+                </div>
+              )}
+
+              {filteredQuestions.length === 0 ? (
+                <Card className="border-2 border-dashed">
+                  <CardContent className="py-12">
+                    <EmptyState
+                      icon={<HelpCircle className="h-12 w-12" />}
+                      title={qaSearchQuery ? "No questions match your search" : "No questions yet"}
+                      description={
+                        qaSearchQuery
+                          ? "Try adjusting your search terms."
+                          : "Ask your first question to get AI-powered insights verified by experts."
+                      }
+                      action={
+                        qaSearchQuery ? (
+                          <Button variant="link" onClick={() => setQaSearchQuery('')} className="text-electric-blue">
+                            Clear Search
+                          </Button>
+                        ) : (
+                          <AskModal
+                            onSubmit={handleAskQuestion}
+                            trigger={
+                              <Button className="gap-2">
+                                <MessageSquare className="h-4 w-4" />
+                                Ask a Question
+                              </Button>
+                            }
+                          />
+                        )
+                      }
+                    />
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredQuestions.slice(0, 6).map((question) => (
+                    <QuestionCard key={question.id} question={question} />
+                  ))}
+                </div>
+              )}
+
+              {filteredQuestions.length > 6 && (
+                <div className="text-center pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing 6 of {filteredQuestions.length} questions. Use search to find specific topics.
+                  </p>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </section>
+      )}
+
+      {/* Subsystem dialogs */}
+      <SubsystemDetailDialog
+        subsystem={selectedSubsystem}
+        objectivePack={selectedSubsystemPack}
+        open={isSubsystemDialogOpen}
+        onOpenChange={setIsSubsystemDialogOpen}
+        onCreateObjective={handleCreateObjective}
+      />
+      <CreateSubsystemObjectiveDialog
+        subsystem={selectedSubsystem}
+        objectivePack={selectedSubsystemPack}
+        open={isCreateObjectiveOpen}
+        onOpenChange={setIsCreateObjectiveOpen}
+      />
     </div>
   )
 }

@@ -54,6 +54,7 @@ export function ResearchSection({
   showSources,
   setShowSources,
   handleReset,
+  onRetryResearch,
 }: ResearchSectionProps): React.ReactNode {
   if (!hasResearch && !researchResult?.error) return null
 
@@ -61,13 +62,31 @@ export function ResearchSection({
 
   return (
     <>
-      {/* ── Error display ── */}
+      {/* ── Error display with retry ── */}
       {researchResult && !researchResult.success && researchResult.error && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="p-3 bg-status-error-light rounded text-sm text-destructive font-mono">
-              {researchResult.error}
+        <Card className="border-destructive/30">
+          <CardContent className="pt-6 space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-destructive">Research failed</p>
+                <p className="text-xs text-muted-foreground font-mono">
+                  {researchResult.error}
+                </p>
+              </div>
             </div>
+            {onRetryResearch && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={onRetryResearch}
+                disabled={isAnyLoading}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Retry Research
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

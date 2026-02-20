@@ -1,26 +1,38 @@
 'use client'
 
-import { CalendarDays } from 'lucide-react'
+/**
+ * @file WeekAheadSection.tsx
+ *
+ * @description Visual week-ahead section with a calendar strip overview and
+ * rich task cards grouped by day, replacing the plain list layout.
+ */
 
+import { CalendarDays, Circle, CheckCircle2 } from 'lucide-react'
+
+import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { ReportSectionHeader } from '@/components/reports/report-visuals'
 
-import type { WeekAheadSectionData, UpcomingTask } from '@/lib/reports/report-document-types'
+import type { WeekAheadSectionData, UpcomingTask, ReportTemplateId } from '@/lib/reports/report-document-types'
 
-type WeekAheadSectionProps = WeekAheadSectionData
+interface WeekAheadSectionProps extends WeekAheadSectionData {
+  templateId?: ReportTemplateId
+  sectionNumber?: number
+}
+
+function formatDayOfWeek(dateStr: string): string {
+  return new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(new Date(dateStr))
+}
+
+function formatDayNumber(dateStr: string): string {
+  return new Intl.DateTimeFormat('en-US', { day: 'numeric' }).format(new Date(dateStr))
+}
 
 function formatGroupDate(dateStr: string): string {
   return new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
-  }).format(new Date(dateStr))
-}
-
-function formatTaskDate(dateStr: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
   }).format(new Date(dateStr))
 }
 
@@ -35,74 +47,121 @@ function groupByDate(tasks: UpcomingTask[]): Map<string, UpcomingTask[]> {
   return groups
 }
 
+function CalendarStrip({ dateGroups }: { dateGroups: Map<string, UpcomingTask[]> }): React.JSX.Element {
+  const sortedDates = [...dateGroups.keys()].sort()
+  const maxTasks = Math.max(...[...dateGroups.values()].map(t => t.length), 1)
+
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1">
+      {sortedDates.map((dateKey) => {
+        const tasks = dateGroups.get(dateKey)!
+        const intensity = tasks.length / maxTasks
+
+        return (
+          <div
+            key={dateKey}
+            className="flex flex-col items-center gap-1 min-w-[4rem] rounded-xl bg-muted/40 px-3 py-2.5 text-center"
+          >
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              {formatDayOfWeek(dateKey)}
+            </span>
+            <span className="text-lg font-display font-bold text-foreground">
+              {formatDayNumber(dateKey)}
+            </span>
+            <div
+              className={cn(
+                'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                intensity > 0.6
+                  ? 'bg-international-orange/15 text-international-orange'
+                  : 'bg-muted text-muted-foreground'
+              )}
+            >
+              {tasks.length} task{tasks.length !== 1 && 's'}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function WeekAheadSection({
   tasks,
   totalDueNextWeek,
-}: WeekAheadSectionProps) {
+  templateId,
+  sectionNumber,
+}: WeekAheadSectionProps): React.JSX.Element {
   const dateGroups = groupByDate(tasks)
   const sortedDates = [...dateGroups.keys()].sort()
 
   return (
     <section className="space-y-8">
-      <div className="flex items-center gap-3">
-        <div className="h-6 w-1 rounded-full bg-international-orange" />
-        <h2 className="text-2xl font-display font-bold text-foreground">
-          Week Ahead
-        </h2>
+      <ReportSectionHeader
+        title="Week Ahead"
+        icon={CalendarDays}
+        templateId={templateId}
+        sectionNumber={sectionNumber}
+      />
+
+      {/* Summary callout */}
+      <div className="flex items-center gap-3 rounded-xl bg-muted/30 px-5 py-3">
+        <CalendarDays className="h-5 w-5 text-international-orange shrink-0" />
+        <p className="text-sm text-foreground">
+          <span className="font-semibold">{totalDueNextWeek} task{totalDueNextWeek !== 1 ? 's' : ''}</span>
+          {' '}due across{' '}
+          <span className="font-semibold">{sortedDates.length} day{sortedDates.length !== 1 ? 's' : ''}</span>
+          {' '}in the next week
+        </p>
       </div>
 
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <CalendarDays className="h-4 w-4" />
-        <span>
-          {totalDueNextWeek} task{totalDueNextWeek !== 1 ? 's' : ''} due in the
-          next 7 days
-        </span>
-      </div>
+      {/* Calendar strip overview */}
+      {sortedDates.length > 0 && <CalendarStrip dateGroups={dateGroups} />}
 
+      {/* Empty state */}
       {sortedDates.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-muted/30 py-12 text-center">
-          <CalendarDays className="h-8 w-8 text-muted-foreground" />
-          <p className="mt-3 text-sm font-medium text-foreground">
-            No upcoming tasks
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/30 py-14 text-center">
+          <CheckCircle2 className="h-10 w-10 text-status-success" />
+          <p className="mt-4 text-sm font-medium text-foreground">
+            The week ahead is clear
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            The week ahead is clear
+            No tasks due in the next 7 days
           </p>
         </div>
       )}
 
+      {/* Task cards grouped by day */}
       <div className="space-y-6">
         {sortedDates.map((dateKey) => {
           const dayTasks = dateGroups.get(dateKey)!
           return (
             <div key={dateKey} className="space-y-2">
-              <h3 className="text-sm font-medium text-foreground">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-international-orange" />
                 {formatGroupDate(dateKey)}
+                <span className="text-xs font-normal text-muted-foreground">
+                  ({dayTasks.length})
+                </span>
               </h3>
-              <div className="space-y-1">
+              <div className="space-y-1.5 pl-4 border-l-2 border-muted">
                 {dayTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center justify-between gap-4 rounded-lg border bg-card p-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {task.title}
-                      </p>
-                      <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                        {task.assigneeName && <span>{task.assigneeName}</span>}
-                        {task.assigneeName && task.objectiveTitle && (
-                          <span>·</span>
-                        )}
-                        {task.objectiveTitle && (
-                          <span className="truncate">{task.objectiveTitle}</span>
-                        )}
+                  <Card key={task.id} className="border-none bg-muted/20 shadow-none">
+                    <CardContent className="flex items-center gap-3 p-3">
+                      <Circle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {task.title}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                          {task.assigneeName && <span>{task.assigneeName}</span>}
+                          {task.assigneeName && task.objectiveTitle && <span>·</span>}
+                          {task.objectiveTitle && (
+                            <span className="truncate">{task.objectiveTitle}</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {formatTaskDate(task.dueDate)}
-                    </span>
-                  </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             </div>

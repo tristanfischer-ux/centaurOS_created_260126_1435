@@ -44,6 +44,7 @@ import {
   loadCadLabBatchStatus,
 } from "@/actions/cad-lab-projects"
 
+import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 import type {
   CadLabResearchResult,
@@ -792,10 +793,17 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setMilestone("batch")
         addProgressLine(`All ${pending.length} modules generated successfully.`)
         sendNotification("The Forge — All Modules Generated", `${pending.length} modules for "${subject}" are ready. View results now.`)
+        toast.success(`All ${pending.length} modules generated successfully`)
       } else {
+        const successCount = completedCount - (modules.length - pending.length)
         addProgressLine(
-          `Batch finished — ${completedCount - (modules.length - pending.length)}/${pending.length} modules generated, ${errorCount} failed.`,
+          `Batch finished — ${successCount}/${pending.length} modules generated, ${errorCount} failed.`,
         )
+        toast.warning(`${successCount} of ${pending.length} modules generated — ${errorCount} failed`, {
+          description: "Use Retry All Failed to try again.",
+          duration: 8000,
+        })
+        sendNotification("The Forge — Batch Finished", `${errorCount} module(s) failed for "${subject}". Check results.`)
       }
     }
   }, [modules, isBatchRunning, activeProjectId, addProgressLine, sendNotification, subject])

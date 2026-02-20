@@ -1,11 +1,25 @@
 'use client'
 
+/**
+ * @file ObjectivesProgressSection.tsx
+ *
+ * @description Rich objectives progress section with visual progress bars,
+ * health badges, and summary stats — enhanced with icons and consistent
+ * section header treatment.
+ */
+
+import { Target } from 'lucide-react'
+
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { ReportSectionHeader, HealthDot } from '@/components/reports/report-visuals'
 
-import type { ObjectivesProgressSectionData, ObjectiveRow } from '@/lib/reports/report-document-types'
+import type { ObjectivesProgressSectionData, ObjectiveRow, ReportTemplateId } from '@/lib/reports/report-document-types'
 
-type ObjectivesProgressSectionProps = ObjectivesProgressSectionData
+interface ObjectivesProgressSectionProps extends ObjectivesProgressSectionData {
+  templateId?: ReportTemplateId
+  sectionNumber?: number
+}
 
 const HEALTH_BADGE_VARIANT: Record<ObjectiveRow['health'], 'success' | 'warning' | 'destructive' | 'secondary'> = {
   'on-track': 'success',
@@ -42,30 +56,44 @@ export function ObjectivesProgressSection({
   objectives,
   totalActive,
   totalCompleted,
-}: ObjectivesProgressSectionProps) {
+  templateId,
+  sectionNumber,
+}: ObjectivesProgressSectionProps): React.JSX.Element {
   return (
     <section className="space-y-8">
-      <div className="flex items-center gap-3">
-        <div className="h-6 w-1 rounded-full bg-international-orange" />
-        <h2 className="text-2xl font-display font-bold text-foreground">
-          Objectives Progress
-        </h2>
+      <ReportSectionHeader
+        title="Objectives Progress"
+        icon={Target}
+        templateId={templateId}
+        sectionNumber={sectionNumber}
+      />
+
+      {/* Summary stat pills */}
+      <div className="flex flex-wrap gap-3">
+        <div className="rounded-xl bg-muted/50 px-4 py-2.5 text-center">
+          <p className="text-2xl font-display font-bold text-foreground">{totalActive}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Active</p>
+        </div>
+        <div className="rounded-xl bg-status-success-light px-4 py-2.5 text-center">
+          <p className="text-2xl font-display font-bold text-status-success-dark">{totalCompleted}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Completed</p>
+        </div>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        {totalActive} active · {totalCompleted} completed
-      </p>
-
+      {/* Objective cards */}
       <div className="space-y-3">
         {objectives.map((objective) => (
           <div
             key={objective.id}
-            className="rounded-lg border bg-card p-4 space-y-3"
+            className="rounded-xl border bg-card p-4 space-y-3"
           >
             <div className="flex items-center justify-between gap-4">
-              <h3 className="min-w-0 truncate font-medium text-foreground">
-                {objective.title}
-              </h3>
+              <div className="flex items-center gap-2 min-w-0">
+                <HealthDot health={objective.health} />
+                <h3 className="min-w-0 truncate font-medium text-foreground">
+                  {objective.title}
+                </h3>
+              </div>
               <Badge variant={HEALTH_BADGE_VARIANT[objective.health]} size="sm" className="shrink-0">
                 {HEALTH_LABEL[objective.health]}
               </Badge>
@@ -80,7 +108,8 @@ export function ObjectivesProgressSection({
 
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                {objective.progress}% · {objective.tasksRemaining} task{objective.tasksRemaining !== 1 ? 's' : ''} remaining
+                <span className="font-medium text-foreground">{objective.progress}%</span>
+                {' '}· {objective.tasksRemaining} task{objective.tasksRemaining !== 1 ? 's' : ''} remaining
               </span>
               {objective.endDate && (
                 <span>Due {formatEndDate(objective.endDate)}</span>

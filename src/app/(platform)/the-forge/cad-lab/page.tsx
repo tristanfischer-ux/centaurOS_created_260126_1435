@@ -193,6 +193,7 @@ export default function CadLabResearchPage(): React.ReactNode {
         showSources={showSources}
         setShowSources={setShowSources}
         handleReset={handleReset}
+        onRetryResearch={handleResearch}
       />
 
       {/* ── Process flow: how modules integrate ── */}
