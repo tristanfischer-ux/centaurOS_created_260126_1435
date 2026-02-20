@@ -1,0 +1,174 @@
+'use server'
+
+/**
+ * @file strategic-briefing.ts
+ *
+ * @description Server action that generates a strategic briefing slide deck
+ * using the Gemini API. Collects optional company data from Supabase and
+ * combines it with user-provided source context to produce a full presentation.
+ *
+ * FLOW: User provides source text → action enriches with company data →
+ * Gemini generates slide structure → returns StrategicBriefing
+ *
+ * @related
+ * - src/lib/reports/ai-slide-generator.ts — Core generation logic
+ * - src/lib/reports/slide-deck-types.ts — Type definitions
+ * - src/app/(platform)/reports/page.tsx — UI that calls this action
+ */
+
+import { createClient } from '@/lib/supabase/server'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { generateStrategicBriefing } from '@/lib/reports/ai-slide-generator'
+
+import type {
+  GenerateBriefingRequest,
+  GenerateBriefingResponse,
+} from '@/lib/reports/slide-deck-types'
+
+// ─── Public Types ────────────────────────────────────────────────
+
+interface GenerateBriefingActionRequest {
+  sourceContext: string
+  tone: 'internal' | 'board' | 'investor'
+  includeCompanyData?: boolean
+}
+
+// ─── Main Action ─────────────────────────────────────────────────
+
+/**
+ * Generate a strategic briefing slide deck.
+ *
+ * @description Authenticates the user, optionally enriches source context
+ * with company data from Supabase, then calls the Gemini-powered slide
+ * generator to produce a full presentation.
+ *
+ * @param request - Source context, tone, and whether to include company data
+ * @returns The generated StrategicBriefing or an error
+ */
+export async function generateBriefingAction(
+  request: GenerateBriefingActionRequest,
+): Promise<GenerateBriefingResponse> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false, error: 'Not authenticated' }
+    }
+
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) {
+      return { success: false, error: 'No foundry context' }
+    }
+
+    // Fetch company name
+    const { data: foundry } = await supabase
+      .from('foundries')
+      .select('name')
+      .eq('id', foundryId)
+      .single()
+
+    const companyName = foundry?.name ?? 'My Company'
+
+    // Optionally enrich with company data
+    let enrichedContext = request.sourceContext
+
+    if (request.includeCompanyData) {
+      const companyData = await gatherCompanyContext(supabase, foundryId)
+      if (companyData) {
+        enrichedContext = `${request.sourceContext}\n\n## Company Data (from ForgeOS)\n\n${companyData}`
+      }
+    }
+
+    const generationRequest: GenerateBriefingRequest = {
+      sourceContext: enrichedContext,
+      tone: request.tone,
+      companyName,
+      includeCompanyData: request.includeCompanyData,
+    }
+
+    const result = await generateStrategicBriefing(generationRequest)
+
+    // Set foundry ID on the result
+    if (result.success && result.briefing) {
+      result.briefing.foundryId = foundryId
+    }
+
+    return result
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[StrategicBriefing] Action failed:', { message })
+    return {
+      success: false,
+      error: sanitizeErrorMessage(message),
+    }
+  }
+}
+
+// ─── Company Data Enrichment ─────────────────────────────────────
+
+// INTENT: Pull key company data points from Supabase so Gemini can
+// reference real metrics, objectives, and team information in the
+// presentation. This bridges ForgeOS data with the narrative generator.
+async function gatherCompanyContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  foundryId: string,
+): Promise<string | null> {
+  try {
+    const sections: string[] = []
+
+    // Active objectives
+    const { data: objectives } = await supabase
+      .from('objectives')
+      .select('title, progress, status')
+      .eq('foundry_id', foundryId)
+      .is('deleted_at', null)
+      .in('status', ['In Progress', 'Not Started'])
+      .limit(10)
+
+    if (objectives && objectives.length > 0) {
+      const objLines = objectives.map(
+        o => `- ${o.title} (${Math.round(o.progress ?? 0)}% complete, ${o.status})`
+      )
+      sections.push(`### Active Objectives\n${objLines.join('\n')}`)
+    }
+
+    // Team members
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('full_name, role')
+      .eq('active_foundry_id', foundryId)
+      .limit(20)
+
+    if (profiles && profiles.length > 0) {
+      const memberLines = profiles
+        .filter(p => p.full_name)
+        .map(p => `- ${p.full_name} (${p.role ?? 'Member'})`)
+      if (memberLines.length > 0) {
+        sections.push(`### Team\n${memberLines.join('\n')}`)
+      }
+    }
+
+    // Recent task completion count
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const { count: tasksCompleted } = await supabase
+      .from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId)
+      .eq('status', 'Completed')
+      .gte('updated_at', thirtyDaysAgo.toISOString())
+
+    if (tasksCompleted !== null && tasksCompleted > 0) {
+      sections.push(`### Recent Activity\n- ${tasksCompleted} tasks completed in the last 30 days`)
+    }
+
+    return sections.length > 0 ? sections.join('\n\n') : null
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown'
+    console.warn('[StrategicBriefing] Failed to gather company context:', { message })
+    return null
+  }
+}

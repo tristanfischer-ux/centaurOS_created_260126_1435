@@ -2,7 +2,7 @@
  * @file image-generator.ts — Gemini image generation for X-Ray blueprints
  *
  * @description Two-tier image generation strategy:
- * - Module images: gemini-2.5-flash-image (fast, parallel, 1K)
+ * - Module images: gemini-3-flash-preview (fast, parallel, 1K)
  * - System diagram: gemini-3-pro-image-preview (professional, 2K, with module image references)
  *
  * Uses direct Gemini REST API calls with full imageConfig support.
@@ -23,8 +23,8 @@ import type { StructuralBrief, SystemStructuralBrief } from "./structural-brief"
 // ─── Constants ───────────────────────────────────────────────────────
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-const MODULE_MODEL = "gemini-2.5-flash-image" // Nano Banana — fast module blueprints
-const SYSTEM_MODEL = "gemini-3-pro-image-preview" // Nano Banana Pro — professional system P&ID diagrams
+const MODULE_MODEL = "gemini-3-flash-preview" // Gemini 3 Flash — fast module blueprints
+const SYSTEM_MODEL = "gemini-3-pro-image-preview" // Gemini 3 Pro Image — professional system P&ID diagrams
 const STORAGE_BUCKET = "xray-images"
 
 // ─── Types ───────────────────────────────────────────────────────────

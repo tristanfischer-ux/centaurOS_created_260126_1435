@@ -22,7 +22,7 @@ import type { AIProviderId } from "@/lib/ai-providers/types"
 // already configured as a fallback in the provider registry. gpt-4o-mini is
 // the backup if Gemini is unavailable.
 export const FAST_MODEL_CHAIN: Array<{ providerId: AIProviderId; modelId: string }> = [
-    { providerId: "google", modelId: "gemini-2.0-flash" },
+    { providerId: "google", modelId: "gemini-3-flash-preview" },
     { providerId: "openai", modelId: "gpt-4o-mini" },
 ]
 

@@ -226,7 +226,7 @@ async function callOpus(
 
   console.info("[StructuralBrief] All Anthropic models refused — falling back to Gemini")
 
-  const geminiModel = "gemini-2.5-pro"
+  const geminiModel = "gemini-3.1-pro-preview"
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`
 
   const response = await fetch(url, {

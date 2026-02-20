@@ -511,7 +511,7 @@ function generateWorkflowMarkdown(
 async function callGeminiText(prompt: string, input: string): Promise<string> {
     const { GoogleGenerativeAI } = await import('@google/generative-ai')
     const genAI = new GoogleGenerativeAI(googleApiKey!)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
 
     const finalPrompt = prompt.replace(/\{\{input\}\}/g, input)
     const fullPrompt = `${SYSTEM_PROMPT}\n\n${finalPrompt}`

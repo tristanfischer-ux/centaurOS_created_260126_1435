@@ -19,7 +19,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 // progress-report.ts and nudges.ts.
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
-const MODEL_ID = 'gemini-2.0-flash'
+const MODEL_ID = 'gemini-3-flash-preview'
 const API_TIMEOUT_MS = 10_000
 
 // ─── Public Types ─────────────────────────────────────────────────

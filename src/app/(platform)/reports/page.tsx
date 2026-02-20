@@ -74,10 +74,12 @@ import {
   getDateRangeFromPreset,
 } from '@/lib/reports/templates'
 import { generateReport, saveReportSnapshot } from '@/actions/report-generator'
+import { generateBriefingAction } from '@/actions/strategic-briefing'
 import { createReportShareLink } from '@/actions/report-share'
 import { sendReportEmail } from '@/actions/report-email'
 import { ReportDocument } from '@/components/reports/ReportDocument'
 import { ReportInfographic } from '@/components/reports/ReportInfographic'
+import { SlideDeckRenderer } from '@/components/reports/SlideDeckRenderer'
 import { ReportHistory } from '@/components/reports/ReportHistory'
 
 import { exportReportAsPDF, printReport } from '@/lib/reports/export-pdf'
@@ -89,6 +91,7 @@ import type {
   ReportTone,
   ReportDetailLevel,
 } from '@/lib/reports/report-document-types'
+import type { StrategicBriefing } from '@/lib/reports/slide-deck-types'
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   FileText,
@@ -102,6 +105,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 }
 
 const TEMPLATE_ICONS: Record<ReportTemplateId, React.ComponentType<{ className?: string }>> = {
+  'strategic-briefing': Presentation,
   'weekly-update': CalendarDays,
   'board-pack': Briefcase,
   'custom': Sliders,
@@ -140,6 +144,13 @@ export default function ReportsPage(): React.JSX.Element {
   // View mode: full report or infographic
   const [viewMode, setViewMode] = useState<'document' | 'infographic'>('document')
 
+  // Strategic briefing state
+  const [briefingContext, setBriefingContext] = useState('')
+  const [includeCompanyData, setIncludeCompanyData] = useState(true)
+  const [briefingResult, setBriefingResult] = useState<StrategicBriefing | null>(null)
+
+  const isStrategicBriefing = selectedTemplate === 'strategic-briefing'
+
   // Share dialog state
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
   const [isCreatingShareLink, setIsCreatingShareLink] = useState(false)
@@ -173,8 +184,11 @@ export default function ReportsPage(): React.JSX.Element {
     } else if (templateId === 'weekly-update') {
       setTone('internal')
       setDetailLevel('standard')
+    } else if (templateId === 'strategic-briefing') {
+      setTone('investor')
     }
     setReportDocument(null)
+    setBriefingResult(null)
     setShareUrl(null)
     setLastSnapshotId(null)
   }, [])
@@ -231,6 +245,50 @@ export default function ReportsPage(): React.JSX.Element {
       setIsGenerating(false)
     }
   }, [enabledSections, selectedTemplate, dateRange, tone, detailLevel])
+
+  const handleGenerateBriefing = useCallback(async () => {
+    if (!briefingContext.trim()) {
+      toast.error('Provide source material for the briefing')
+      return
+    }
+
+    setIsGenerating(true)
+    setBriefingResult(null)
+
+    try {
+      const result = await generateBriefingAction({
+        sourceContext: briefingContext,
+        tone,
+        includeCompanyData,
+      })
+
+      if (!result.success || !result.briefing) {
+        toast.error(result.error ?? 'Failed to generate briefing')
+        return
+      }
+
+      setBriefingResult(result.briefing)
+      toast.success(`Briefing generated — ${result.briefing.slides.length} slides`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unexpected error'
+      toast.error(`Briefing generation failed: ${message}`)
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [briefingContext, tone, includeCompanyData])
+
+  const handleExportBriefingPPTX = useCallback(async () => {
+    if (!briefingResult) return
+    try {
+      toast.info('Generating slide deck…')
+      const { exportSlideDeckAsPPTX } = await import('@/lib/reports/export-slide-deck-pptx')
+      await exportSlideDeckAsPPTX(briefingResult)
+      toast.success('PPTX downloaded')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'PPTX generation failed'
+      toast.error(message)
+    }
+  }, [briefingResult])
 
   const handleExportPDF = useCallback(async () => {
     if (!reportRef.current || !reportDocument) return
@@ -393,7 +451,7 @@ export default function ReportsPage(): React.JSX.Element {
       {/* Template Selector */}
       <section className="space-y-4">
         <h2 className={typography.h3}>Choose a Template</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {REPORT_TEMPLATES.map(template => {
             const isSelected = selectedTemplate === template.id
             const TemplateIcon = TEMPLATE_ICONS[template.id]
@@ -439,176 +497,261 @@ export default function ReportsPage(): React.JSX.Element {
         </div>
       </section>
 
-      {/* Tone & Detail Controls */}
-      <section className="space-y-4">
-        <h2 className={typography.h3}>Narrative Style</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Tone Selector */}
-          <Card>
-            <CardContent className="p-6 space-y-3">
-              <div className="flex items-center gap-2">
-                <MessageSquareText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Tone</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {TONE_OPTIONS.map(option => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setTone(option.value)}
-                    className={cn(
-                      'rounded-lg border px-3 py-2 text-sm transition-all',
-                      tone === option.value
-                        ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
-                        : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
-                    )}
-                  >
-                    <span className="block">{option.label}</span>
-                    <span className="block text-xs opacity-70">{option.description}</span>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Detail Level Selector */}
-          <Card>
-            <CardContent className="p-6 space-y-3">
-              <div className="flex items-center gap-2">
-                <Gauge className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Detail Level</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {DETAIL_OPTIONS.map(option => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setDetailLevel(option.value)}
-                    className={cn(
-                      'rounded-lg border px-3 py-2 text-sm transition-all',
-                      detailLevel === option.value
-                        ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
-                        : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
-                    )}
-                  >
-                    <span className="block">{option.label}</span>
-                    <span className="block text-xs opacity-70">{option.description}</span>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Date Range */}
-      <section className="space-y-4">
-        <h2 className={typography.h3}>Date Range</h2>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <div className="w-full sm:flex-1">
-                <label htmlFor="date-start" className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  Start
-                </label>
-                <Input
-                  id="date-start"
-                  type="date"
-                  value={dateRange.start}
-                  onChange={e => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+      {/* ──── Strategic Briefing: Source Context ──── */}
+      {isStrategicBriefing && (
+        <>
+          <section className="space-y-4">
+            <h2 className={typography.h3}>Source Material</h2>
+            <Card>
+              <CardContent className="p-6 space-y-4">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Paste your strategy notes, investor updates, research findings, or any
+                  source material. The system will synthesize it into a polished
+                  presentation deck with 12-18 slides.
+                </p>
+                <textarea
+                  className="w-full min-h-[200px] rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 focus:border-international-orange resize-y"
+                  placeholder="Paste your source material here — strategy documents, progress updates, meeting notes, investor memos, research findings…"
+                  value={briefingContext}
+                  onChange={e => setBriefingContext(e.target.value)}
                 />
-              </div>
-              <span className="hidden sm:block text-sm text-muted-foreground pt-5">to</span>
-              <div className="w-full sm:flex-1">
-                <label htmlFor="date-end" className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  End
-                </label>
-                <Input
-                  id="date-end"
-                  type="date"
-                  value={dateRange.end}
-                  onChange={e => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Section Toggles */}
-      <section className="space-y-4">
-        <h2 className={typography.h3}>Sections</h2>
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-1">
-              {allSectionTypes.map(sectionType => {
-                const meta = SECTION_META[sectionType]
-                const isCover = sectionType === 'cover'
-                const isEnabled = enabledSections.has(sectionType)
-                const SectionIcon = ICON_MAP[meta.icon]
-
-                return (
-                  <label
-                    key={sectionType}
-                    className={cn(
-                      'flex items-center gap-4 rounded-lg px-3 py-3 transition-colors',
-                      !isCover && 'cursor-pointer hover:bg-muted/50',
-                      isCover && 'opacity-80'
-                    )}
-                  >
-                    <Checkbox
-                      checked={isEnabled}
-                      disabled={isCover}
-                      onCheckedChange={(checked) => {
-                        if (!isCover) handleSectionToggle(sectionType, checked === true)
-                      }}
-                    />
-
-                    {SectionIcon && (
-                      <SectionIcon className={cn(
-                        'h-4 w-4 shrink-0',
-                        isEnabled ? 'text-foreground' : 'text-muted-foreground'
-                      )} />
-                    )}
-
-                    <div className="min-w-0 flex-1">
-                      <span className={cn(
-                        'block text-sm font-medium',
-                        isEnabled ? 'text-foreground' : 'text-muted-foreground'
-                      )}>
-                        {meta.label}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {meta.description}
-                      </span>
-                    </div>
-
-                    {isCover && (
-                      <span className="text-xs text-muted-foreground">Always included</span>
-                    )}
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id="include-company-data"
+                    checked={includeCompanyData}
+                    onCheckedChange={(checked) => setIncludeCompanyData(checked === true)}
+                  />
+                  <label htmlFor="include-company-data" className="text-sm text-foreground cursor-pointer">
+                    Enrich with company data (objectives, team, recent activity)
                   </label>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
 
-      {/* Generate Button */}
-      <Button
-        className="w-full bg-international-orange hover:bg-international-orange-hover text-background font-semibold h-12 text-base"
-        disabled={isGenerating || enabledSections.size === 0}
-        onClick={handleGenerate}
-      >
-        {isGenerating ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Generating report with narrative…
-          </>
-        ) : (
-          'Generate Report'
-        )}
-      </Button>
+          {/* Tone selector for briefing */}
+          <section className="space-y-4">
+            <h2 className={typography.h3}>Presentation Tone</h2>
+            <Card>
+              <CardContent className="p-6 space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {TONE_OPTIONS.map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setTone(option.value)}
+                      className={cn(
+                        'rounded-lg border px-3 py-2 text-sm transition-all',
+                        tone === option.value
+                          ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
+                          : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                      )}
+                    >
+                      <span className="block">{option.label}</span>
+                      <span className="block text-xs opacity-70">{option.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+
+          {/* Generate Briefing Button */}
+          <Button
+            className="w-full bg-international-orange hover:bg-international-orange-hover text-background font-semibold h-12 text-base"
+            disabled={isGenerating || !briefingContext.trim()}
+            onClick={handleGenerateBriefing}
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating presentation deck…
+              </>
+            ) : (
+              <>
+                <Presentation className="mr-2 h-4 w-4" />
+                Generate Strategic Briefing
+              </>
+            )}
+          </Button>
+        </>
+      )}
+
+      {/* ──── Operational Reports: Tone, Date Range, Sections ──── */}
+      {!isStrategicBriefing && (
+        <>
+          {/* Tone & Detail Controls */}
+          <section className="space-y-4">
+            <h2 className={typography.h3}>Narrative Style</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Tone Selector */}
+              <Card>
+                <CardContent className="p-6 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <MessageSquareText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Tone</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {TONE_OPTIONS.map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setTone(option.value)}
+                        className={cn(
+                          'rounded-lg border px-3 py-2 text-sm transition-all',
+                          tone === option.value
+                            ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
+                            : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                        )}
+                      >
+                        <span className="block">{option.label}</span>
+                        <span className="block text-xs opacity-70">{option.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Detail Level Selector */}
+              <Card>
+                <CardContent className="p-6 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Gauge className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Detail Level</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {DETAIL_OPTIONS.map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setDetailLevel(option.value)}
+                        className={cn(
+                          'rounded-lg border px-3 py-2 text-sm transition-all',
+                          detailLevel === option.value
+                            ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
+                            : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                        )}
+                      >
+                        <span className="block">{option.label}</span>
+                        <span className="block text-xs opacity-70">{option.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
+          {/* Date Range */}
+          <section className="space-y-4">
+            <h2 className={typography.h3}>Date Range</h2>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <div className="w-full sm:flex-1">
+                    <label htmlFor="date-start" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                      Start
+                    </label>
+                    <Input
+                      id="date-start"
+                      type="date"
+                      value={dateRange.start}
+                      onChange={e => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                    />
+                  </div>
+                  <span className="hidden sm:block text-sm text-muted-foreground pt-5">to</span>
+                  <div className="w-full sm:flex-1">
+                    <label htmlFor="date-end" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                      End
+                    </label>
+                    <Input
+                      id="date-end"
+                      type="date"
+                      value={dateRange.end}
+                      onChange={e => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+
+          {/* Section Toggles */}
+          <section className="space-y-4">
+            <h2 className={typography.h3}>Sections</h2>
+            <Card>
+              <CardContent className="p-6">
+                <div className="space-y-1">
+                  {allSectionTypes.map(sectionType => {
+                    const meta = SECTION_META[sectionType]
+                    const isCover = sectionType === 'cover'
+                    const isEnabled = enabledSections.has(sectionType)
+                    const SectionIcon = ICON_MAP[meta.icon]
+
+                    return (
+                      <label
+                        key={sectionType}
+                        className={cn(
+                          'flex items-center gap-4 rounded-lg px-3 py-3 transition-colors',
+                          !isCover && 'cursor-pointer hover:bg-muted/50',
+                          isCover && 'opacity-80'
+                        )}
+                      >
+                        <Checkbox
+                          checked={isEnabled}
+                          disabled={isCover}
+                          onCheckedChange={(checked) => {
+                            if (!isCover) handleSectionToggle(sectionType, checked === true)
+                          }}
+                        />
+
+                        {SectionIcon && (
+                          <SectionIcon className={cn(
+                            'h-4 w-4 shrink-0',
+                            isEnabled ? 'text-foreground' : 'text-muted-foreground'
+                          )} />
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <span className={cn(
+                            'block text-sm font-medium',
+                            isEnabled ? 'text-foreground' : 'text-muted-foreground'
+                          )}>
+                            {meta.label}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {meta.description}
+                          </span>
+                        </div>
+
+                        {isCover && (
+                          <span className="text-xs text-muted-foreground">Always included</span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+
+          {/* Generate Button */}
+          <Button
+            className="w-full bg-international-orange hover:bg-international-orange-hover text-background font-semibold h-12 text-base"
+            disabled={isGenerating || enabledSections.size === 0}
+            onClick={handleGenerate}
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating report with narrative…
+              </>
+            ) : (
+              'Generate Report'
+            )}
+          </Button>
+        </>
+      )}
 
       {/* Report Preview */}
       {reportDocument && (
@@ -736,6 +879,48 @@ export default function ReportsPage(): React.JSX.Element {
               </div>
             </div>
           )}
+        </section>
+      )}
+
+      {/* Strategic Briefing Preview */}
+      {briefingResult && isStrategicBriefing && (
+        <section className="space-y-4">
+          {/* Briefing Toolbar */}
+          <div className="sticky top-0 z-10 -mx-1 px-1 py-3 bg-background">
+            <Card>
+              <CardContent className="flex flex-col gap-3 p-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <h2 className={typography.h3}>Presentation Preview</h2>
+                    <Badge variant="secondary" className="text-xs">
+                      {briefingResult.slides.length} slides
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {TONE_OPTIONS.find(t => t.value === tone)?.label} tone
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="secondary" size="sm" onClick={handleExportBriefingPPTX}>
+                    <Presentation className="mr-1.5 h-3.5 w-3.5" />
+                    PPTX
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handlePrint}
+                  >
+                    <Printer className="mr-1.5 h-3.5 w-3.5" />
+                    Print
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Slide Deck Viewer */}
+          <SlideDeckRenderer briefing={briefingResult} />
         </section>
       )}
 

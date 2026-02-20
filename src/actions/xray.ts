@@ -2451,7 +2451,7 @@ I need comprehensive product intelligence for an engineering team. Search for:
 
 Be thorough and precise. Include specific numbers, model names, and manufacturer details where available. If you find conflicting information from different sources, include both.`
 
-      const searchUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`
+      const searchUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`
 
       const searchResponse = await fetch(searchUrl, {
         method: "POST",

@@ -175,7 +175,7 @@ export interface ReportDocument {
 // Template Types
 // ========================
 
-export type ReportTemplateId = 'weekly-update' | 'board-pack' | 'custom'
+export type ReportTemplateId = 'weekly-update' | 'board-pack' | 'custom' | 'strategic-briefing'
 
 export interface ReportTemplate {
   id: ReportTemplateId

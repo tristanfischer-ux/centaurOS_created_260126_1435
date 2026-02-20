@@ -1,0 +1,8 @@
+export { TitleSlide } from './TitleSlide'
+export { HeroInsightSlide } from './HeroInsightSlide'
+export { ArgumentSlide } from './ArgumentSlide'
+export { ComparisonSlide } from './ComparisonSlide'
+export { DataCalloutSlide } from './DataCalloutSlide'
+export { EvidenceSlide } from './EvidenceSlide'
+export { SummarySlide } from './SummarySlide'
+export { SectionDividerSlide } from './SectionDividerSlide'

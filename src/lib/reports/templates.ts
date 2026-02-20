@@ -59,6 +59,16 @@ export const SECTION_META: Record<ReportSectionType, { label: string; descriptio
 
 export const REPORT_TEMPLATES: ReportTemplate[] = [
   {
+    id: 'strategic-briefing',
+    name: 'Strategic Briefing',
+    description: 'A polished presentation deck generated from your source material — strategy, progress, vision. Presentation-ready slides.',
+    icon: 'Presentation',
+    defaultDateRange: 'this-month',
+    defaultSections: [
+      { type: 'cover', enabled: true, order: 0 },
+    ],
+  },
+  {
     id: 'weekly-update',
     name: 'Weekly Update',
     description: 'A concise summary of the week — what was accomplished, what\'s at risk, and what\'s ahead. Perfect for team-wide sharing.',

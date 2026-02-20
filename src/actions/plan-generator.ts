@@ -160,7 +160,7 @@ Rules:
 
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3-flash-preview',
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 3000,
