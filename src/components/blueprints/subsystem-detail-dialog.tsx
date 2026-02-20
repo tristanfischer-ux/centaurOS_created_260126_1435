@@ -23,7 +23,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Accordion,
   AccordionContent,
@@ -105,9 +104,8 @@ export function SubsystemDetailDialog({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="lg" className="max-h-[90vh] flex flex-col p-0">
-        <ScrollArea className="max-h-[85vh]">
-          <div className="p-6">
+      <DialogContent size="lg" className="max-h-[90vh] p-0 overflow-hidden">
+        <div className="overflow-y-auto max-h-[85vh] p-6">
             <DialogHeader className="mb-6">
               <div className="flex items-start gap-4">
                 <div
@@ -537,8 +535,7 @@ export function SubsystemDetailDialog({
                 </Link>
               </Button>
             </div>
-          </div>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   )
