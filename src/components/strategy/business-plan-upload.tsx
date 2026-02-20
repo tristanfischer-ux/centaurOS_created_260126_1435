@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { analyzeBusinessPlan } from '@/actions/analyze'
 import { saveBusinessPlanAnalysis, buildSmartMerge } from '@/actions/business-plan'
+import { toast } from 'sonner'
+import {
+  MAX_FILE_SIZE_BYTES,
+  ALLOWED_EXTENSIONS,
+} from '@/lib/business-plan-types'
 import type { MergeReviewState } from '@/lib/business-plan-types'
 
 interface BusinessPlanUploadProps {
@@ -13,19 +18,34 @@ interface BusinessPlanUploadProps {
   onMergeReady: (mergeState: MergeReviewState) => void
 }
 
-type UploadState = 'idle' | 'uploading' | 'analyzing' | 'done' | 'error'
+type UploadState = 'idle' | 'reading' | 'analyzing' | 'saving' | 'done' | 'error'
 
 const STEP_LABELS = {
   idle: '',
-  uploading: 'Reading document...',
-  analyzing: 'Analyzing your business plan...',
+  reading: 'Reading your document...',
+  analyzing: 'Claude is analyzing your business plan...',
+  saving: 'Saving results and preparing review...',
   done: 'Analysis complete',
   error: 'Analysis failed',
 } satisfies Record<UploadState, string>
 
+// INTENT: Validate file before sending to server to give instant feedback.
+// The accept attribute only works on the file picker, not drag-and-drop.
+function validateFile(file: File): string | null {
+  const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+  if (!ALLOWED_EXTENSIONS.includes(ext as typeof ALLOWED_EXTENSIONS[number])) {
+    return `Unsupported file type "${ext}". Please use PDF, DOCX, or TXT.`
+  }
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
+    return `File is too large (${sizeMB} MB). Maximum size is 20 MB.`
+  }
+  return null
+}
+
 /**
  * @description Drag-and-drop zone for business plan upload. Handles the full
- * flow: file → AI analysis → save to DB → smart merge → open review dialog.
+ * flow: file → validate → AI analysis → save to DB → smart merge → review dialog.
  */
 export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPlanUploadProps) {
   const [state, setState] = useState<UploadState>('idle')
@@ -33,11 +53,18 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // FLOW: File selected → analyze → save → smart merge → callback
+  // FLOW: File selected → validate → analyze → save → smart merge → callback
   const handleFile = useCallback(async (file: File) => {
-    setState('uploading')
+    const validationError = validateFile(file)
+    if (validationError) {
+      setState('error')
+      setErrorMessage(validationError)
+      return
+    }
+
     setErrorMessage(null)
 
+    setState('reading')
     const formData = new FormData()
     formData.append('file', file)
 
@@ -46,10 +73,11 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
 
     if (result.error || !result.analysis) {
       setState('error')
-      setErrorMessage(result.error ?? 'Unknown error')
+      setErrorMessage(result.error ?? 'Unknown error during analysis')
       return
     }
 
+    setState('saving')
     const { analysisId, error: saveError } = await saveBusinessPlanAnalysis(
       result.analysis,
       file.name
@@ -85,14 +113,20 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
     if (file) handleFile(file)
   }
 
-  const isLoading = state === 'uploading' || state === 'analyzing'
+  const handleReAnalyze = (e: React.MouseEvent): void => {
+    e.stopPropagation()
+    setState('idle')
+    fileInputRef.current?.click()
+  }
+
+  const isLoading = state === 'reading' || state === 'analyzing' || state === 'saving'
 
   return (
     <div
       onDrop={handleDrop}
       onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
       onDragLeave={() => setIsDragging(false)}
-      onClick={() => !isLoading && fileInputRef.current?.click()}
+      onClick={() => !isLoading && state !== 'done' && fileInputRef.current?.click()}
       className={cn(
         'relative flex flex-col items-center gap-3 rounded-xl border-2 border-dashed p-6 transition-all duration-200 cursor-pointer',
         isDragging
@@ -105,7 +139,7 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
         ref={fileInputRef}
         type="file"
         className="hidden"
-        accept=".pdf,.txt,.doc,.docx"
+        accept=".pdf,.txt,.docx"
         onChange={handleInputChange}
       />
 
@@ -113,7 +147,7 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
         <>
           <Loader2 className="h-8 w-8 text-accent animate-spin" />
           <p className="text-sm font-medium text-foreground">{STEP_LABELS[state]}</p>
-          <p className="text-xs text-muted-foreground">This usually takes 15-30 seconds</p>
+          <p className="text-xs text-muted-foreground">This usually takes 30-60 seconds</p>
         </>
       ) : state === 'done' ? (
         <>
@@ -123,7 +157,7 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
             variant="ghost"
             size="sm"
             className="text-muted-foreground gap-1.5"
-            onClick={(e) => { e.stopPropagation(); setState('idle') }}
+            onClick={handleReAnalyze}
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Re-analyse with updated plan

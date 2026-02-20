@@ -90,12 +90,20 @@ export async function buildSmartMerge(
     const existing = existingObjectives || []
 
     // DECISION: Using word-overlap (Jaccard coefficient) for similarity.
-    // This avoids an OpenAI embedding call per objective which would be slow
+    // This avoids an AI embedding call per objective which would be slow
     // and expensive. For objective titles (typically 5-10 words), word
     // overlap is surprisingly effective.
+    // GOTCHA: We filter stopwords (the, and, for, etc.) not by length,
+    // because short domain terms like "AI", "ML", "VR", "IoT" are critical.
+    const STOPWORDS = new Set([
+      'the', 'and', 'for', 'with', 'from', 'that', 'this', 'into', 'our',
+      'your', 'will', 'can', 'are', 'was', 'has', 'have', 'been', 'not',
+    ])
     function jaccardSimilarity(a: string, b: string): number {
-      const setA = new Set(a.toLowerCase().split(/\s+/).filter(w => w.length > 3))
-      const setB = new Set(b.toLowerCase().split(/\s+/).filter(w => w.length > 3))
+      const tokenize = (s: string): Set<string> =>
+        new Set(s.toLowerCase().split(/\s+/).filter(w => w.length > 0 && !STOPWORDS.has(w)))
+      const setA = tokenize(a)
+      const setB = tokenize(b)
       const intersection = new Set([...setA].filter(x => setB.has(x)))
       const union = new Set([...setA, ...setB])
       if (union.size === 0) return 0
@@ -147,7 +155,9 @@ export async function buildSmartMerge(
  * @param mergeState - The final merge state after user review
  * @returns An error string if something failed, empty object on success
  */
-export async function applyMergeReview(mergeState: MergeReviewState): Promise<{ error?: string }> {
+export async function applyMergeReview(
+  mergeState: MergeReviewState
+): Promise<{ error?: string; warnings?: string[] }> {
   return withAuth(async ({ user }) => {
     const supabase = await createClient()
 
@@ -160,13 +170,14 @@ export async function applyMergeReview(mergeState: MergeReviewState): Promise<{ 
     if (!profile?.foundry_id) return { error: 'No foundry found' }
     const foundryId = profile.foundry_id
 
+    const warnings: string[] = []
     const objectiveIdMap: Record<string, string> = {}
 
     for (const suggestion of mergeState.objectiveSuggestions) {
       if (suggestion.disposition === 'skip') continue
 
       if (suggestion.disposition === 'adopt') {
-        const { data: newObj } = await supabase
+        const { data: newObj, error: objError } = await supabase
           .from('objectives')
           .insert({
             foundry_id: foundryId,
@@ -180,6 +191,15 @@ export async function applyMergeReview(mergeState: MergeReviewState): Promise<{ 
           })
           .select('id')
           .single()
+
+        if (objError) {
+          console.error('[business-plan] Failed to create objective:', {
+            title: suggestion.aiObjective.title,
+            error: objError.message,
+          })
+          warnings.push(`Failed to create objective "${suggestion.aiObjective.title}"`)
+          continue
+        }
 
         if (newObj) {
           objectiveIdMap[suggestion.aiObjective.title] = newObj.id
@@ -218,6 +238,7 @@ export async function applyMergeReview(mergeState: MergeReviewState): Promise<{ 
           error: error.message,
           count: hiringInserts.length,
         })
+        warnings.push(`Failed to save ${hiringInserts.length} hiring requirement(s)`)
       }
     }
 
@@ -242,10 +263,11 @@ export async function applyMergeReview(mergeState: MergeReviewState): Promise<{ 
           error: error.message,
           count: fundingInserts.length,
         })
+        warnings.push(`Failed to save ${fundingInserts.length} funding requirement(s)`)
       }
     }
 
-    return {}
+    return { warnings: warnings.length > 0 ? warnings : undefined }
   })
 }
 
@@ -401,6 +423,72 @@ export async function updateFundingRequirementStatus(
       console.error('[business-plan] Failed to update funding status:', {
         error: error.message,
         fundingRequirementId: id,
+      })
+      return { error: error.message }
+    }
+
+    return {}
+  })
+}
+
+/**
+ * @description Returns the timestamp of the most recent business plan analysis
+ * for the user's foundry, or null if none exists.
+ */
+export async function getLastAnalyzedAt(): Promise<{ date: string | null; error?: string }> {
+  return withAuth(async ({ user }) => {
+    const supabase = await createClient()
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('foundry_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.foundry_id) return { date: null }
+
+    const { data } = await supabase
+      .from('business_plan_analyses')
+      .select('analyzed_at')
+      .eq('foundry_id', profile.foundry_id)
+      .order('analyzed_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    return { date: data?.analyzed_at ?? null }
+  })
+}
+
+/**
+ * @description Updates a hiring requirement's status (planned → recruiting → hired).
+ * @param id - The hiring requirement ID
+ * @param status - The new status value
+ */
+export async function updateHiringRequirementStatus(
+  id: string,
+  status: 'planned' | 'recruiting' | 'hired' | 'cancelled'
+): Promise<{ error?: string }> {
+  return withAuth(async ({ user }) => {
+    const supabase = await createClient()
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('foundry_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.foundry_id) return { error: 'No foundry found' }
+
+    const { error } = await supabase
+      .from('hiring_requirements')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('foundry_id', profile.foundry_id)
+
+    if (error) {
+      console.error('[business-plan] Failed to update hiring status:', {
+        error: error.message,
+        hiringRequirementId: id,
       })
       return { error: error.message }
     }

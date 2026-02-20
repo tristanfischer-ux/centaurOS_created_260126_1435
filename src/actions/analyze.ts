@@ -2,6 +2,11 @@
 
 import { withAuth } from '@/lib/server-action-utils'
 import { checkRateLimit } from '@/lib/security/rate-limit'
+import {
+  businessPlanAnalysisSchema,
+  MAX_FILE_SIZE_BYTES,
+  ALLOWED_FILE_TYPES,
+} from '@/lib/business-plan-types'
 import type { BusinessPlanAnalysis } from '@/lib/business-plan-types'
 
 // DECISION: Using Claude Opus 4.6 instead of GPT-4o for business plan analysis.
@@ -84,12 +89,27 @@ export async function analyzeBusinessPlan(
       let text = ''
 
       if (file) {
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          return { error: 'File too large. Maximum size is 20 MB.' }
+        }
+
+        if (!ALLOWED_FILE_TYPES.includes(file.type as typeof ALLOWED_FILE_TYPES[number])) {
+          return { error: 'Unsupported file type. Please upload a PDF, DOCX, or TXT file.' }
+        }
+
         if (file.type === 'application/pdf') {
           const buffer = Buffer.from(await file.arrayBuffer())
           // eslint-disable-next-line @typescript-eslint/no-require-imports
           const pdfParse = require('pdf-parse')
           const data = await pdfParse(buffer)
           text = data.text
+        } else if (
+          file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ) {
+          const buffer = Buffer.from(await file.arrayBuffer())
+          const mammoth = await import('mammoth')
+          const result = await mammoth.extractRawText({ buffer })
+          text = result.value
         } else {
           text = await file.text()
         }
@@ -101,6 +121,8 @@ export async function analyzeBusinessPlan(
         return { error: 'Could not extract enough text from the file.' }
       }
 
+      // GOTCHA: Claude's context window is large (200k tokens) but we cap
+      // at ~100k chars to keep costs reasonable and avoid timeouts.
       const truncatedText = text.slice(0, 100000)
 
       const Anthropic = (await import('@anthropic-ai/sdk')).default
@@ -121,11 +143,16 @@ export async function analyzeBusinessPlan(
       }
 
       try {
-        const analysis = JSON.parse(textBlock.text) as BusinessPlanAnalysis
-        return { analysis }
+        const raw = JSON.parse(textBlock.text)
+        const parsed = businessPlanAnalysisSchema.safeParse(raw)
+        if (!parsed.success) {
+          console.error('[analyze] AI response failed validation:', parsed.error.issues)
+          return { error: 'AI response was malformed. Please try again.' }
+        }
+        return { analysis: parsed.data }
       } catch (parseError) {
         console.error('[analyze] Failed to parse AI JSON response:', parseError)
-        return { error: 'Failed to parse AI response' }
+        return { error: 'Failed to parse AI response. Please try again.' }
       }
     } catch (error) {
       console.error('[analyze] Business plan analysis failed:', {

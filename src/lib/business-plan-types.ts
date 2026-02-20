@@ -5,59 +5,77 @@
  * and funding requirements.
  */
 
+import { z } from 'zod'
+
 // ─── AI Analysis Output ──────────────────────────────────────────────────────
 
 // INTENT: The AI produces five parallel output streams from the business plan.
-// Each stream seeds a different part of the platform.
+// Each stream seeds a different part of the platform. Zod schemas validate
+// the AI response at runtime to catch malformed output before it hits the DB.
 
-export interface AnalyzedObjective {
-  title: string
-  description: string
-  phase?: string
-  suggestedStartDate?: string
-  suggestedEndDate?: string
-  tasks: AnalyzedTask[]
-}
+const analyzedTaskSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().default(''),
+  role: z.enum(['Executive', 'Apprentice', 'AI_Agent']).default('Apprentice'),
+  estimatedDays: z.number().optional(),
+})
 
-export interface AnalyzedTask {
-  title: string
-  description: string
-  role: 'Executive' | 'Apprentice' | 'AI_Agent'
-  estimatedDays?: number
-}
+const analyzedObjectiveSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().default(''),
+  phase: z.string().optional(),
+  suggestedStartDate: z.string().optional(),
+  suggestedEndDate: z.string().optional(),
+  tasks: z.array(analyzedTaskSchema).default([]),
+})
 
-export interface HiringRequirement {
-  roleTitle: string
-  roleType: 'full_time' | 'fractional' | 'apprentice'
-  reason: string
-  linkedObjectiveTitle: string
-  suggestedDate: string
-  phase?: string
-}
+const hiringRequirementSchema = z.object({
+  roleTitle: z.string().min(1),
+  roleType: z.enum(['full_time', 'fractional', 'apprentice']),
+  reason: z.string().default(''),
+  linkedObjectiveTitle: z.string().default(''),
+  suggestedDate: z.string().default(''),
+  phase: z.string().optional(),
+})
 
-export interface CapacityRequirement {
-  description: string
-  linkedObjectiveTitle: string
-  requiredByDate?: string
-  notes?: string
-}
+const capacityRequirementSchema = z.object({
+  description: z.string().min(1),
+  linkedObjectiveTitle: z.string().default(''),
+  requiredByDate: z.string().optional(),
+  notes: z.string().optional(),
+})
 
-export interface FundingRequirement {
-  title: string
-  amountUsd?: number
-  reason: string
-  neededByDate?: string
-  fundingType?: 'bootstrapping' | 'angel' | 'vc' | 'grant' | 'revenue_based' | 'debt' | 'other'
-  linkedObjectiveTitles: string[]
-}
+const fundingRequirementSchema = z.object({
+  title: z.string().min(1),
+  amountUsd: z.number().optional(),
+  reason: z.string().default(''),
+  neededByDate: z.string().optional(),
+  fundingType: z.enum(['bootstrapping', 'angel', 'vc', 'grant', 'revenue_based', 'debt', 'other']).optional(),
+  linkedObjectiveTitles: z.array(z.string()).default([]),
+})
 
-export interface BusinessPlanAnalysis {
-  objectives: AnalyzedObjective[]
-  hiringRequirements: HiringRequirement[]
-  capacityRequirements: CapacityRequirement[]
-  fundingRequirements: FundingRequirement[]
-  executiveSummary: string
-}
+export const businessPlanAnalysisSchema = z.object({
+  objectives: z.array(analyzedObjectiveSchema).default([]),
+  hiringRequirements: z.array(hiringRequirementSchema).default([]),
+  capacityRequirements: z.array(capacityRequirementSchema).default([]),
+  fundingRequirements: z.array(fundingRequirementSchema).default([]),
+  executiveSummary: z.string().default(''),
+})
+
+export type AnalyzedTask = z.infer<typeof analyzedTaskSchema>
+export type AnalyzedObjective = z.infer<typeof analyzedObjectiveSchema>
+export type HiringRequirement = z.infer<typeof hiringRequirementSchema>
+export type CapacityRequirement = z.infer<typeof capacityRequirementSchema>
+export type FundingRequirement = z.infer<typeof fundingRequirementSchema>
+export type BusinessPlanAnalysis = z.infer<typeof businessPlanAnalysisSchema>
+
+export const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024 // 20 MB
+export const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'text/plain',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+] as const
+export const ALLOWED_EXTENSIONS = ['.pdf', '.txt', '.docx'] as const
 
 // ─── Smart Merge ─────────────────────────────────────────────────────────────
 
@@ -65,7 +83,7 @@ export interface BusinessPlanAnalysis {
 // has in ForgeOS. Each suggestion gets a disposition: adopt, merge, or skip.
 // This prevents blowing away existing work.
 
-export type MergeDisposition = 'adopt' | 'merge' | 'skip' | 'pending'
+export type MergeDisposition = 'adopt' | 'merge' | 'skip'
 
 export interface ObjectiveMergeSuggestion {
   id: string

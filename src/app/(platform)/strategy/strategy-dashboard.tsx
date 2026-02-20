@@ -82,6 +82,7 @@ interface StrategyDashboardProps {
   initialBundles: GoalBundle[]
   strategicObjectives: StrategicObjective[]
   regularObjectives: RegularObjective[]
+  lastAnalyzedAt?: string | null
 }
 
 // ============================================================================
@@ -111,6 +112,7 @@ export function StrategyDashboard({
   initialBundles,
   strategicObjectives,
   regularObjectives,
+  lastAnalyzedAt,
 }: StrategyDashboardProps) {
   const router = useRouter()
 
@@ -354,7 +356,7 @@ export function StrategyDashboard({
             Business Plan
           </h2>
           <BusinessPlanUpload
-            lastAnalyzedAt={null}
+            lastAnalyzedAt={lastAnalyzedAt}
             onMergeReady={(state) => {
               setMergeState(state)
               setShowMergeDialog(true)

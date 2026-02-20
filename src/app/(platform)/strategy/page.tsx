@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getStrategicGoals, getGoalBundle } from '@/actions/canvas'
+import { getLastAnalyzedAt } from '@/actions/business-plan'
 import { StrategyDashboard } from './strategy-dashboard'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
 import { StrategyError } from './strategy-error'
@@ -255,6 +256,8 @@ export default async function StrategyPage() {
   // Unlinked objectives count
   const unlinkedCount = regularObjectives.filter((o) => !o.parent_objective_id).length
 
+  const { date: lastAnalyzedAt } = await getLastAnalyzedAt()
+
   return (
     <StrategyDashboard
       pillars={pillars}
@@ -271,6 +274,7 @@ export default async function StrategyPage() {
         created_at: '',
       }))}
       regularObjectives={regularObjectives}
+      lastAnalyzedAt={lastAnalyzedAt}
     />
   )
 }

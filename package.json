@@ -82,6 +82,7 @@
     "html2pdf.js": "^0.14.0",
     "jsdom": "^28.1.0",
     "lucide-react": "^0.563.0",
+    "mammoth": "^1.11.0",
     "mobile-drag-drop": "^3.0.0-rc.0",
     "next": "^16.1.6",
     "next-themes": "^0.4.6",

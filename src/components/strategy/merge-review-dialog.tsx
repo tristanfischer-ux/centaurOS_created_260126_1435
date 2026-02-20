@@ -48,9 +48,16 @@ export function MergeReviewDialog({ open, mergeState, onClose, onApplied }: Merg
       return
     }
 
-    toast.success('Strategy updated', {
-      description: `${adopted} new objective${adopted !== 1 ? 's' : ''} created, ${merged} merged with existing.`,
-    })
+    if (result.warnings && result.warnings.length > 0) {
+      toast.warning('Strategy updated with warnings', {
+        description: result.warnings.join('. '),
+        duration: 8000,
+      })
+    } else {
+      toast.success('Strategy updated', {
+        description: `${adopted} new objective${adopted !== 1 ? 's' : ''} created, ${merged} merged with existing.`,
+      })
+    }
     onApplied()
   }
 
