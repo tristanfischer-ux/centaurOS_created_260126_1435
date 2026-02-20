@@ -386,7 +386,7 @@ export function WorkflowToolbar({
                     <TooltipContent>
                         {isChainRunning
                             ? "Stop chain execution"
-                            : "Run all briefs in order (with human review at each step)"}
+                            : "Run all steps in order (with human review at each step)"}
                     </TooltipContent>
                 </Tooltip>
 
@@ -496,7 +496,7 @@ export function WorkflowToolbar({
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                        Copy all briefs as a chained text
+                        Copy all steps as a chained text
                     </TooltipContent>
                 </Tooltip>
 

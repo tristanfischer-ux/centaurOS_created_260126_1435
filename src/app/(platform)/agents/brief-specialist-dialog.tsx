@@ -41,7 +41,6 @@ function stripComplexityTags(text: string): string {
 }
 import { toast } from "sonner"
 import { Markdown } from "@/components/ui/markdown"
-import { getPromptsByCategory } from "./lib/prompt-library"
 import { getOrCreateSpecialistThread, getRecentSpecialistOutputs, getSpecialistThreadHistory } from "@/actions/agent-memory"
 import type { SpecialistHistoryMessage } from "@/actions/agent-memory"
 import { createArtifact, exportArtifactToGoogleDocs } from "@/actions/agent-artifacts"
@@ -56,7 +55,6 @@ import type { SlideDeckContent } from "@/lib/ai-providers/types"
 import { SpecialistChatAvatar } from "@/components/specialists/specialist-presentation"
 import { InlinePresentationCard } from "@/components/specialists/inline-presentation-card"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
-import type { PromptTemplate } from "./lib/agent-types"
 import type { Specialist } from "./specialists-data"
 
 // ─── Presentation Intent Detection ───────────────────────────────────────────
@@ -367,7 +365,6 @@ export function BriefSpecialistDialog({
 }: BriefSpecialistDialogProps) {
     const isPanel = renderMode === "panel"
     // ─── State ────────────────────────────────────────────────────────────
-    const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(null)
     const [briefText, setBriefText] = useState("")
     const [isExecuting, setIsExecuting] = useState(false)
     const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -487,7 +484,6 @@ export function BriefSpecialistDialog({
         }
 
         // Reset transient state
-        setSelectedPrompt(null)
         setBriefText("")
         setStreamingResponse("")
         setError(null)
@@ -915,14 +911,11 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
         // Add user message to chat
         const userMessage: ChatMessage = {
             role: "user",
-            content: selectedPrompt
-                ? `[${selectedPrompt.title}] ${userInput}`
-                : userInput,
+            content: userInput,
             timestamp: new Date(),
         }
         setMessages((prev) => [...prev, userMessage])
         setBriefText("")
-        setSelectedPrompt(null)
         const attachmentsToSend = [...pendingAttachments]
         setPendingAttachments([])
         setIsExecuting(true)
@@ -993,11 +986,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
         // because setMessages for the current user message hasn't flushed yet.
         const isFollowUp = messages.some(m => !m.historical && m.role === "assistant")
 
-        const promptTemplate = selectedPrompt?.defaultPrompt
-            ?? (isFollowUp
-                ? `{{input}}\n\n{{company_context}}`
-                : `You are ${specialist.name}, the ${specialist.title} specialist for this company. ${specialist.workingStyle}\n\n{{input}}\n\n{{company_context}}\n\nProvide a thorough, actionable response that demonstrates deep expertise. Use markdown formatting with headers, tables, and bullet points for clarity.`
-            )
+        const promptTemplate = isFollowUp
+            ? `{{input}}\n\n{{company_context}}`
+            : `You are ${specialist.name}, the ${specialist.title} specialist for this company. ${specialist.workingStyle}\n\n{{input}}\n\n{{company_context}}\n\nProvide a thorough, actionable response that demonstrates deep expertise. Use markdown formatting with headers, tables, and bullet points for clarity.`
 
         // Determine if we should stream TTS (declared before try so catch can stop it)
         const isTtsStreaming = tts.voiceEnabled && !!specialist.voice
@@ -1344,7 +1335,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             setIsExecuting(false)
             setIsUrgentMessage(false)
         }
-    }, [briefText, selectedPrompt, specialist, threadId, crossSpecialistContext, handoffContext, messages, pendingAttachments, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext, formatBrowseContext])
+    }, [briefText, specialist, threadId, crossSpecialistContext, handoffContext, messages, pendingAttachments, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext, formatBrowseContext])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
@@ -2360,7 +2351,6 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                     toast.success(`Topic saved. Ready for the next one.`, { duration: 3000 })
                                                     setNewTopicPreviousSummary(topicSummary)
                                                     setMessages((prev) => prev.filter((m) => m.historical))
-                                                    setSelectedPrompt(null)
                                                     setBriefText("")
                                                     setError(null)
                                                     setDynamicSuggestion(null)
@@ -3054,7 +3044,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         <div className="flex-shrink-0 space-y-2">
                             {!hasNonHistoricalMessages && !isGeneratingGreeting && !hasHistoricalMessages && (
                                 <Label htmlFor="brief-text" className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-                                    {selectedPrompt?.inputLabel ?? "Describe what you need"}
+                                    Describe what you need
                                 </Label>
                             )}
                             <div className="relative">
@@ -3074,9 +3064,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 ? (speechRecognition.interimTranscript || "Listening... speak now")
                                                 : hasNonHistoricalMessages
                                                 ? `Follow up with ${specialist.name}...`
-                                                : selectedPrompt
-                                                    ? `Paste or type your ${selectedPrompt.inputLabel.toLowerCase()} here...`
-                                                    : `What do you need from ${specialist.name} (${specialist.title})?`
+                                                : `What do you need from ${specialist.name} (${specialist.title})?`
                                     }
                                     className={cn(
                                         "resize-none pr-[120px]",
@@ -3239,7 +3227,6 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         }
                                         // Start a new topic (clear non-historical messages but keep thread)
                                         setMessages((prev) => prev.filter((m) => m.historical))
-                                        setSelectedPrompt(null)
                                         setBriefText("")
                                         setError(null)
                                         setDynamicSuggestion(null)

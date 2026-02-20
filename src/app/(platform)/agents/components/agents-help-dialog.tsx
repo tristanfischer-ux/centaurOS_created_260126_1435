@@ -49,8 +49,8 @@ export function AgentsHelpDialog({ open, onOpenChange }: AgentsHelpDialogProps) 
                             <Step
                                 number={1}
                                 icon={<GripVertical className="w-4 h-4" />}
-                                title="Drag briefs onto the canvas"
-                                description="Browse the Brief Library on the left. Drag any brief onto the canvas to add it to your project. You can also drop files directly."
+                                title="Drag templates onto the canvas"
+                                description="Browse the Template Library on the left. Drag any template onto the canvas to add it to your project. You can also drop files directly."
                             />
                             <Step
                                 number={2}

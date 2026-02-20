@@ -493,7 +493,7 @@ export function WorkflowResultsDialog({
                                     No steps in this project yet.
                                 </p>
                                 <p className="text-xs text-muted-foreground/70 mt-1">
-                                    Add briefs to the canvas, run the chain, then view results here.
+                                    Add templates to the canvas, run the chain, then view results here.
                                 </p>
                             </div>
                         ) : !hasAnyOutput ? (

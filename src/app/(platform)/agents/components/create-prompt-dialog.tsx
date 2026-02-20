@@ -198,7 +198,7 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
                         <Textarea
                             value={promptText}
                             onChange={(e) => setPromptText(e.target.value)}
-                            placeholder={"Write your brief here...\n\nUse {{input}} to reference data from the previous step."}
+                            placeholder={"Write your template here...\n\nUse {{input}} to reference data from the previous step."}
                             className="min-h-[160px] font-mono text-xs leading-relaxed resize-y"
                         />
                         <p className="text-[10px] text-muted-foreground mt-1">

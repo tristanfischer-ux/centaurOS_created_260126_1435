@@ -128,7 +128,7 @@ export function WorkflowTemplatesDialog({
                     </DialogTitle>
                     <DialogDescription className="text-sm text-muted-foreground">
                         Start with a pre-built project. Each template is a
-                        daisy-chain of briefs designed to work together.
+                        daisy-chain of steps designed to work together.
                     </DialogDescription>
                 </DialogHeader>
 

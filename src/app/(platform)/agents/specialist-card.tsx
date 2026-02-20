@@ -81,9 +81,7 @@ const BADGE_COLOR = "bg-international-orange-light text-international-orange"
 interface SpecialistCardProps {
     /** The specialist data to display */
     specialist: Specialist
-    /** Number of capabilities (prompts) available for this specialist */
-    capabilityCount: number
-    /** Called when "Brief" is clicked */
+    /** Called when the card is clicked to start a conversation */
     onBrief: (specialistId: string) => void
     /** Animation delay for staggered entrance */
     index?: number
@@ -112,13 +110,13 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 /**
- * SpecialistCard -- A single specialist in the 3x3 roster grid.
+ * SpecialistCard -- A single specialist displayed as a clickable card.
  *
- * @description Displays a specialist as a team member card with avatar image,
- * human name, functional title, tagline, working style, capability count,
- * highlights, and a "Brief" CTA. Recommended specialists get a "Start here" badge.
+ * @description Displays a specialist with avatar, name, title, tagline,
+ * working style, highlight badges, example questions, and a conversation CTA.
+ * Recommended specialists get a "Start here" badge.
  */
-export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0, activity }: SpecialistCardProps) {
+export function SpecialistCard({ specialist, onBrief, index = 0, activity }: SpecialistCardProps) {
     const Icon = ICON_MAP[specialist.icon] ?? Compass
 
     return (
@@ -240,10 +238,7 @@ export function SpecialistCard({ specialist, capabilityCount, onBrief, index = 0
                     <div className="flex-1" />
 
                     {/* CTA Row */}
-                    <div className="flex items-center justify-between pt-4 border-t border-muted">
-                        <span className="text-xs text-muted-foreground">
-                            {capabilityCount} {capabilityCount === 1 ? "topic" : "topics"} to explore
-                        </span>
+                    <div className="flex items-center justify-end pt-4 border-t border-muted">
                         <Button
                             size="sm"
                             className="bg-international-orange hover:bg-international-orange-hover text-white gap-1.5 group-hover:gap-2.5 transition-all"
