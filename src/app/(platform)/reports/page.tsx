@@ -132,6 +132,7 @@ export default function ReportsPage(): React.JSX.Element {
 
   const reportRef = useRef<HTMLDivElement>(null)
   const infographicRef = useRef<HTMLDivElement>(null)
+  const briefingRef = useRef<HTMLDivElement>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplateId>('weekly-update')
   const [dateRange, setDateRange] = useState(defaultDateRange)
   const [enabledSections, setEnabledSections] = useState<Set<ReportSectionType>>(defaultSections)
@@ -269,6 +270,15 @@ export default function ReportsPage(): React.JSX.Element {
 
       setBriefingResult(result.briefing)
       toast.success(`Briefing generated — ${result.briefing.slides.length} slides`)
+
+      // GOTCHA: React needs a full render cycle to mount the SlideDeckRenderer
+      // before we can scroll to it. requestAnimationFrame + setTimeout ensures
+      // the DOM node exists when scrollIntoView is called.
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          briefingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 100)
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unexpected error'
       toast.error(`Briefing generation failed: ${message}`)
@@ -884,7 +894,7 @@ export default function ReportsPage(): React.JSX.Element {
 
       {/* Strategic Briefing Preview */}
       {briefingResult && isStrategicBriefing && (
-        <section className="space-y-4">
+        <section ref={briefingRef} className="space-y-4">
           {/* Briefing Toolbar */}
           <div className="sticky top-0 z-10 -mx-1 px-1 py-3 bg-background">
             <Card>

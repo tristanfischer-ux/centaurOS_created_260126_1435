@@ -54,15 +54,18 @@ export async function generateBriefingAction(
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
+      console.info('[StrategicBriefing] No authenticated user')
       return { success: false, error: 'Not authenticated' }
     }
 
+    console.info('[StrategicBriefing] Starting generation for user:', user.id)
+
     const foundryId = await getFoundryIdCached()
     if (!foundryId) {
+      console.info('[StrategicBriefing] No foundry context')
       return { success: false, error: 'No foundry context' }
     }
 
-    // Fetch company name
     const { data: foundry } = await supabase
       .from('foundries')
       .select('name')
@@ -70,16 +73,21 @@ export async function generateBriefingAction(
       .single()
 
     const companyName = foundry?.name ?? 'My Company'
+    console.info('[StrategicBriefing] Company:', companyName, '| Tone:', request.tone)
 
-    // Optionally enrich with company data
     let enrichedContext = request.sourceContext
 
     if (request.includeCompanyData) {
+      console.info('[StrategicBriefing] Gathering company context...')
       const companyData = await gatherCompanyContext(supabase, foundryId)
       if (companyData) {
         enrichedContext = `${request.sourceContext}\n\n## Company Data (from ForgeOS)\n\n${companyData}`
+        console.info('[StrategicBriefing] Company context added:', companyData.length, 'chars')
       }
     }
+
+    console.info('[StrategicBriefing] Calling Gemini (source length:', enrichedContext.length, 'chars)')
+    const genStart = Date.now()
 
     const generationRequest: GenerateBriefingRequest = {
       sourceContext: enrichedContext,
@@ -89,8 +97,8 @@ export async function generateBriefingAction(
     }
 
     const result = await generateStrategicBriefing(generationRequest)
+    console.info('[StrategicBriefing] Gemini returned in', Date.now() - genStart, 'ms | success:', result.success, '| slides:', result.briefing?.slides?.length ?? 0)
 
-    // Set foundry ID on the result
     if (result.success && result.briefing) {
       result.briefing.foundryId = foundryId
     }

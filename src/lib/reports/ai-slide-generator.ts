@@ -28,7 +28,9 @@ import type {
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
 const MODEL_ID = 'gemini-3-flash-preview'
-const API_TIMEOUT_MS = 30_000
+// DECISION: 60s timeout (not 30s) because structured JSON generation with
+// 12-18 slides takes significantly longer than a short narrative summary.
+const API_TIMEOUT_MS = 60_000
 
 // ─── Tone Instructions ───────────────────────────────────────────
 
@@ -84,6 +86,8 @@ export async function generateStrategicBriefing(
 
   try {
     const prompt = buildPrompt(request)
+    console.info('[SlideGenerator] Prompt length:', prompt.length, 'chars')
+    const genStart = Date.now()
 
     const model = genAI.getGenerativeModel({
       model: MODEL_ID,
@@ -101,7 +105,9 @@ export async function generateStrategicBriefing(
       timeout(API_TIMEOUT_MS),
     ])
 
+    console.info('[SlideGenerator] Gemini responded in', Date.now() - genStart, 'ms')
     const text = result.response.text()
+    console.info('[SlideGenerator] Response length:', text.length, 'chars')
     const slides = parseSlideResponse(text)
 
     if (!slides || slides.length === 0) {
@@ -164,12 +170,12 @@ function buildPrompt(request: GenerateBriefingRequest): string {
     '',
     '## Output Format',
     '',
-    'Return a JSON object with this exact structure:',
-    '{',
-    '  "title": "Presentation title",',
-    '  "subtitle": "Brief subtitle",',
-    '  "slides": [ ...array of slide objects following the types above... ]',
-    '}',
+    'CRITICAL: Return a single JSON object (not an array). Every slide object MUST include the "slideType" field.',
+    '',
+    'Return this exact structure:',
+    '{"title":"Presentation Title","subtitle":"Brief subtitle","slides":[{"slideType":"title","headline":"...","subtitle":"...","companyName":"...","date":"..."},{"slideType":"hero-insight","headline":"...","body":"...","accent":"Key Insight"},{"slideType":"summary","headline":"Key Takeaways","takeaways":["...","..."],"closingLine":"..."}]}',
+    '',
+    'Each slide MUST have a "slideType" field set to one of: title, hero-insight, section-divider, argument, comparison, data-callout, evidence, summary.',
     '',
     `## Company Name: ${request.companyName}`,
     '',
@@ -191,18 +197,25 @@ function parseSlideResponse(raw: string): SlideContent[] | null {
     .trim()
 
   try {
-    const parsed = JSON.parse(cleaned) as {
-      title?: string
-      subtitle?: string
-      slides?: SlideContent[]
+    const parsed: unknown = JSON.parse(cleaned)
+
+    // GOTCHA: Gemini sometimes wraps the response in an array [{ ... }]
+    // instead of returning a plain object { ... }.
+    let obj: { title?: string; subtitle?: string; slides?: unknown[] }
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      obj = parsed[0] as typeof obj
+    } else {
+      obj = parsed as typeof obj
     }
 
-    if (!Array.isArray(parsed.slides)) {
-      console.warn('[SlideGenerator] Response missing slides array')
+    if (!Array.isArray(obj?.slides)) {
+      console.warn('[SlideGenerator] Response missing slides array:', Object.keys(obj ?? {}))
       return null
     }
 
-    return parsed.slides.filter(isValidSlide)
+    const validSlides = obj.slides.filter(isValidSlide)
+    console.info('[SlideGenerator] Parsed', validSlides.length, 'valid slides from', obj.slides.length, 'total')
+    return validSlides
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown'
     console.error('[SlideGenerator] JSON parse failed:', { message, rawLength: raw.length })
