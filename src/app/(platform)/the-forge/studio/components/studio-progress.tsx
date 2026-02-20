@@ -1,11 +1,11 @@
 "use client"
 
 /**
- * @file studio-progress.tsx — Lightweight vertical progress indicator.
+ * @file studio-progress.tsx — Compact horizontal progress bar.
  *
- * INTENT: Replaces the 5-stage horizontal stepper with a minimal sidebar
- * that shows where the user is in the flow. Clicking a stage scrolls to
- * that section smoothly.
+ * INTENT: Full-width horizontal stepper that sits above content so the
+ * main area gets 100% of the available width. Clicking a completed or
+ * current stage scrolls to that section smoothly.
  */
 
 import {
@@ -42,10 +42,7 @@ export function StudioProgress({ currentStage }: StudioProgressProps): React.Rea
   }
 
   return (
-    <div className="space-y-1">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-        Progress
-      </p>
+    <nav aria-label="Studio progress" className="hidden sm:flex items-center w-full">
       {STAGES.map((stage, idx) => {
         const Icon = stage.icon
         const stageIndex = STAGE_ORDER.indexOf(stage.id)
@@ -54,42 +51,58 @@ export function StudioProgress({ currentStage }: StudioProgressProps): React.Rea
         const isFuture = stageIndex > currentIndex
 
         return (
-          <div key={stage.id}>
+          <div key={stage.id} className="flex items-center flex-1 last:flex-none">
             <button
               onClick={() => handleClick(stage.id)}
               disabled={isFuture}
               className={cn(
-                "flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-left transition-all",
-                isCurrent && "bg-international-orange-light/20 text-international-orange font-medium",
-                isCompleted && "text-status-success hover:bg-muted/50",
-                isFuture && "text-muted-foreground/40 cursor-not-allowed",
-                !isCurrent && !isFuture && !isCompleted && "text-muted-foreground hover:bg-muted/50",
+                "flex flex-col items-center gap-1.5 transition-all",
+                isFuture && "cursor-not-allowed opacity-40",
+                !isFuture && "hover:opacity-80",
               )}
             >
               <div
                 className={cn(
-                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors",
-                  isCurrent && "bg-international-orange text-white",
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors",
+                  isCurrent && "bg-international-orange text-white shadow-sm",
                   isCompleted && "bg-status-success-light text-status-success",
-                  isFuture && "bg-muted text-muted-foreground/40",
+                  isFuture && "bg-muted text-muted-foreground",
                   !isCurrent && !isFuture && !isCompleted && "bg-muted text-muted-foreground",
                 )}
               >
                 {isCompleted ? (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <CheckCircle2 className="h-4 w-4" />
                 ) : (
-                  <Icon className="h-3.5 w-3.5" />
+                  <Icon className="h-4 w-4" />
                 )}
               </div>
-              <span className="text-sm">{stage.label}</span>
+              <span
+                className={cn(
+                  "text-xs whitespace-nowrap",
+                  isCurrent && "text-international-orange font-semibold",
+                  isCompleted && "text-status-success font-medium",
+                  isFuture && "text-muted-foreground",
+                  !isCurrent && !isFuture && !isCompleted && "text-muted-foreground",
+                )}
+              >
+                {stage.label}
+              </span>
             </button>
+
             {/* Connector line between stages */}
             {idx < STAGES.length - 1 && (
-              <div className="ml-[22px] h-3 w-0.5 rounded-full bg-muted" />
+              <div
+                className={cn(
+                  "flex-1 h-0.5 mx-2 rounded-full transition-colors",
+                  stageIndex < currentIndex
+                    ? "bg-status-success"
+                    : "bg-muted",
+                )}
+              />
             )}
           </div>
         )
       })}
-    </div>
+    </nav>
   )
 }

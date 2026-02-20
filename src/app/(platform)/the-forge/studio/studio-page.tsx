@@ -4,8 +4,9 @@
  * @file studio-page.tsx — The main Product Studio client component.
  *
  * INTENT: Single vertical scroll page that progressively reveals sections
- * as the user advances through the pipeline. Replaces the 5-page CAD Lab
- * with one cohesive flow: Brief -> Research -> Design -> Specs -> Quote.
+ * as the user advances through the pipeline. A compact horizontal progress
+ * bar sits above the content so sections get the full available width.
+ * Flow: Brief -> Research -> Design -> Specs -> Quote.
  */
 
 import { useMemo } from "react"
@@ -32,43 +33,36 @@ export function StudioPage(): React.ReactNode {
   }, [hasResearch, modules.length, generatedModuleCount])
 
   return (
-    <div className="flex gap-8">
-      {/* Sticky vertical progress indicator */}
-      <div className="hidden lg:block w-48 flex-shrink-0">
-        <div className="sticky top-24">
-          <StudioProgress currentStage={currentStage} />
-        </div>
+    <div className="space-y-8">
+      {/* Sticky horizontal progress bar */}
+      <div className="sticky top-20 z-10 bg-background/95 backdrop-blur-sm pb-4 -mx-2 px-2">
+        <StudioProgress currentStage={currentStage} />
       </div>
 
-      {/* Main content — sections progressively reveal */}
-      <div className="flex-1 min-w-0 space-y-10">
-        {/* 1. Brief — always visible */}
+      {/* Main content — sections progressively reveal (full width) */}
+      <div className="space-y-10">
         <section id="studio-brief">
           <BriefSection />
         </section>
 
-        {/* 2. Research — visible after research completes */}
         {hasResearch && (
           <section id="studio-research">
             <ResearchSection />
           </section>
         )}
 
-        {/* 3. Design — visible after modules exist */}
         {modules.length > 0 && (
           <section id="studio-design">
             <DesignSection />
           </section>
         )}
 
-        {/* 4. Specs — visible after at least one module is generated */}
         {generatedModuleCount > 0 && (
           <section id="studio-specs">
             <SpecsSection />
           </section>
         )}
 
-        {/* 5. Quote — visible after all modules generated */}
         {generatedModuleCount > 0 && generatedModuleCount === modules.length && (
           <section id="studio-quote">
             <QuoteSection />
