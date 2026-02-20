@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { DollarSign, TrendingUp, Calendar, ExternalLink, Target } from 'lucide-react'
+import { PoundSterling, TrendingUp, Calendar, ExternalLink, Target } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { format, parseISO } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { formatCurrency } from '@/lib/format'
 import type { SavedFundingRequirement } from '@/lib/business-plan-types'
 
 interface FundingPageViewProps {
@@ -110,7 +111,7 @@ export function FundingPageView({ requirements }: FundingPageViewProps) {
                 <div>
                   <p className="text-sm text-muted-foreground">Total Required</p>
                   <p className="text-2xl font-bold text-foreground">
-                    ${totalRequired.toLocaleString()}
+                    {formatCurrency(totalRequired)}
                   </p>
                 </div>
               </CardContent>
@@ -123,7 +124,7 @@ export function FundingPageView({ requirements }: FundingPageViewProps) {
                 <div>
                   <p className="text-sm text-muted-foreground">Secured</p>
                   <p className="text-2xl font-bold text-foreground">
-                    ${secured.toLocaleString()}
+                    {formatCurrency(secured)}
                   </p>
                 </div>
               </CardContent>
@@ -131,12 +132,12 @@ export function FundingPageView({ requirements }: FundingPageViewProps) {
             <Card>
               <CardContent className="p-6 flex items-center gap-4">
                 <div className="h-10 w-10 rounded-full bg-status-warning-light flex items-center justify-center">
-                  <DollarSign className="h-5 w-5 text-status-warning" />
+                  <PoundSterling className="h-5 w-5 text-status-warning" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Still Needed</p>
                   <p className="text-2xl font-bold text-foreground">
-                    ${(totalRequired - secured).toLocaleString()}
+                    {formatCurrency(totalRequired - secured)}
                   </p>
                 </div>
               </CardContent>
@@ -168,7 +169,7 @@ export function FundingPageView({ requirements }: FundingPageViewProps) {
 
                         {req.amount_usd != null && (
                           <p className="text-lg font-bold text-foreground mt-1">
-                            ${req.amount_usd.toLocaleString()}
+                            {formatCurrency(req.amount_usd)}
                           </p>
                         )}
 
