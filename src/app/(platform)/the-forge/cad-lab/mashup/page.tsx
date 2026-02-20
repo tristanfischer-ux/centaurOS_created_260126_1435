@@ -217,6 +217,16 @@ export default function MashupPage(): React.ReactElement {
                 onSelectedChange={setSources}
                 maxSources={5}
               />
+              {sources.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  Select at least 2 STEP files to combine into a mashup.
+                </p>
+              )}
+              {sources.length === 1 && (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  Select at least 1 more file &mdash; mashups combine 2 or more sources.
+                </p>
+              )}
               <div className="flex justify-end">
                 <Button
                   onClick={() => setStep("concept")}
