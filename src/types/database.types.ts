@@ -12071,6 +12071,54 @@ export type Database = {
           },
         ]
       }
+      shared_reports: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          foundry_id: string
+          id: string
+          report_snapshot_id: string
+          share_token: string
+          view_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          foundry_id: string
+          id?: string
+          report_snapshot_id: string
+          share_token: string
+          view_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          foundry_id?: string
+          id?: string
+          report_snapshot_id?: string
+          share_token?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_reports_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shared_reports_report_snapshot_id_fkey"
+            columns: ["report_snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "report_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       signup_intents: {
         Row: {
           created_at: string

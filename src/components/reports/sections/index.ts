@@ -1,0 +1,8 @@
+export { CoverSection } from './CoverSection'
+export { ExecutiveSummarySection } from './ExecutiveSummarySection'
+export { KeyMetricsSection } from './KeyMetricsSection'
+export { ObjectivesProgressSection } from './ObjectivesProgressSection'
+export { TeamActivitySection } from './TeamActivitySection'
+export { BlockersRisksSection } from './BlockersRisksSection'
+export { CompletionTrendSection } from './CompletionTrendSection'
+export { WeekAheadSection } from './WeekAheadSection'
