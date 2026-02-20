@@ -158,7 +158,12 @@ export default function MashupPage(): React.ReactElement {
 
   const handleViewRfq = (): void => {
     if (!rfqId) return
-    window.open(`/rfq/${rfqId}`, "_blank", "noopener,noreferrer")
+    const url = `/rfq/${rfqId}`
+    const win = window.open(url, "_blank", "noopener,noreferrer")
+    if (!win) {
+      toast.info("Popup was blocked — opening in this tab instead")
+      window.location.href = url
+    }
   }
 
   return (
