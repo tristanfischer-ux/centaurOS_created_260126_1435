@@ -186,7 +186,7 @@ export function BlueprintsView({
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-sm">Looking for ideas?</h3>
               <p className="text-xs text-muted-foreground">
-                Browse objective packs, universal subsystems, and expert recommendations in Inspiration.
+                Discover ideas, guidance, and expert recommendations to help build your product.
               </p>
             </div>
             <Button
