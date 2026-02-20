@@ -142,16 +142,30 @@ export async function analyzeBusinessPlan(
         return { error: 'AI returned no text content' }
       }
 
+      // GOTCHA: Claude often wraps JSON in markdown code fences despite
+      // being told not to. Strip them before parsing.
+      let jsonText = textBlock.text.trim()
+      const fenceMatch = jsonText.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/)
+      if (fenceMatch) {
+        jsonText = fenceMatch[1].trim()
+      }
+
       try {
-        const raw = JSON.parse(textBlock.text)
+        const raw = JSON.parse(jsonText)
         const parsed = businessPlanAnalysisSchema.safeParse(raw)
         if (!parsed.success) {
-          console.error('[analyze] AI response failed validation:', parsed.error.issues)
+          console.error('[analyze] AI response failed Zod validation:', {
+            issues: parsed.error.issues.slice(0, 5),
+            rawKeys: Object.keys(raw),
+          })
           return { error: 'AI response was malformed. Please try again.' }
         }
         return { analysis: parsed.data }
       } catch (parseError) {
-        console.error('[analyze] Failed to parse AI JSON response:', parseError)
+        console.error('[analyze] Failed to parse AI JSON response:', {
+          error: parseError instanceof Error ? parseError.message : 'Unknown',
+          responsePreview: jsonText.slice(0, 300),
+        })
         return { error: 'Failed to parse AI response. Please try again.' }
       }
     } catch (error) {
