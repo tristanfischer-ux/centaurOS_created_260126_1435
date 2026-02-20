@@ -75,6 +75,16 @@ const NOTIFICATION_SPECIALIST_MAP: Record<string, SpecialistId> = {
     // Engineering notifications
     'deployment_failed': 'vp-engineering',
     'velocity_change': 'vp-engineering',
+
+    // CTO notifications
+    'architecture_decision': 'cto',
+    'tech_debt_flagged': 'cto',
+    'security_alert': 'cto',
+
+    // Fundraising notifications
+    'funding_milestone': 'fundraising-advisor',
+    'investor_meeting': 'fundraising-advisor',
+    'pitch_update': 'fundraising-advisor',
 }
 
 /**
@@ -145,6 +155,12 @@ function buildVoicedMessage(
         'supplier_delay': `${name}: Supplier delay on "${title}".${detailSuffix} I'm checking backup options.`,
         'contract_expiring': `${name}: Contract expiring — "${title}".${detailSuffix} Let's review before it lapses.`,
         'team_capacity_high': `${name}: Team capacity is high — ${title}.${detailSuffix} We should discuss priorities or hiring.`,
+        'architecture_decision': `${name}: Architecture decision needed — "${title}".${detailSuffix} What's the simplest solution that works?`,
+        'tech_debt_flagged': `${name}: Tech debt alert — "${title}".${detailSuffix} This is slowing us down. Let's decide: fix now or accept it.`,
+        'security_alert': `${name}: Security issue — ${title}.${detailSuffix} This needs attention before we ship anything else.`,
+        'funding_milestone': `${name}: Funding milestone — "${title}".${detailSuffix} Let's make sure the narrative is sharp.`,
+        'investor_meeting': `${name}: Investor meeting coming up — "${title}".${detailSuffix} Let's prep the story and the numbers.`,
+        'pitch_update': `${name}: Pitch materials need updating — "${title}".${detailSuffix} The story has evolved since the last version.`,
     }
 
     return templates[type] ?? `${name}: ${title}${detailSuffix}`
@@ -157,9 +173,9 @@ function buildVoicedMessage(
  * @returns Priority level: urgent, high, normal, or low
  */
 function getPriority(type: string): 'urgent' | 'high' | 'normal' | 'low' {
-    const urgentTypes = ['runway_warning', 'production_issue', 'deployment_failed']
-    const highTypes = ['task_overdue', 'objective_at_risk', 'budget_exceeded', 'supplier_delay', 'contract_expiring']
-    const lowTypes = ['task_completed', 'objective_completed', 'feature_shipped']
+    const urgentTypes = ['runway_warning', 'production_issue', 'deployment_failed', 'security_alert']
+    const highTypes = ['task_overdue', 'objective_at_risk', 'budget_exceeded', 'supplier_delay', 'contract_expiring', 'tech_debt_flagged', 'investor_meeting']
+    const lowTypes = ['task_completed', 'objective_completed', 'feature_shipped', 'pitch_update']
 
     if (urgentTypes.includes(type)) return 'urgent'
     if (highTypes.includes(type)) return 'high'
@@ -200,6 +216,10 @@ export function attributeInsight(
         specialistId = 'sales-lead'
     } else if (lowerContent.includes('legal') || lowerContent.includes('contract') || lowerContent.includes('compliance')) {
         specialistId = 'legal-counsel'
+    } else if (lowerContent.includes('architecture') || lowerContent.includes('tech debt') || lowerContent.includes('security') || lowerContent.includes('infrastructure')) {
+        specialistId = 'cto'
+    } else if (lowerContent.includes('fundrais') || lowerContent.includes('investor') || lowerContent.includes('pitch') || lowerContent.includes('raise')) {
+        specialistId = 'fundraising-advisor'
     }
 
     const specialist = getSpecialistById(specialistId)
