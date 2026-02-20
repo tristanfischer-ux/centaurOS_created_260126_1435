@@ -2,7 +2,8 @@
 
 import { createObjective } from "@/actions/objectives"
 import { getObjectivePacks, ObjectivePack } from "@/actions/packs"
-import { analyzeBusinessPlan, AnalyzedObjective } from "@/actions/analyze"
+import { analyzeBusinessPlan } from "@/actions/analyze"
+import type { AnalyzedObjective, AnalyzedTask } from "@/lib/business-plan-types"
 import { smartifyGoal } from "@/actions/smart-goals"
 import { generateStrategicPlan, applyStrategicPlan } from "@/actions/strategic-planner"
 import { toast } from "sonner"
@@ -302,13 +303,12 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
         if (result.error) {
             toast.error(result.error)
             setAnalysisFile(null)
-        } else if (result.objectives && result.objectives.length > 0) {
-            setAnalyzedObjectives(result.objectives)
-            setSelectedAnalysisIndex(0) // Default to first
-            // Pre-fill manual fields from first result
-            setTitle(result.objectives[0].title)
-            setDescription(result.objectives[0].description)
-            toast.success(`Analysis complete: Found ${result.objectives.length} objectives`)
+        } else if (result.analysis?.objectives && result.analysis.objectives.length > 0) {
+            setAnalyzedObjectives(result.analysis.objectives)
+            setSelectedAnalysisIndex(0)
+            setTitle(result.analysis.objectives[0].title)
+            setDescription(result.analysis.objectives[0].description)
+            toast.success(`Analysis complete: Found ${result.analysis.objectives.length} objectives`)
         } else {
             toast.warning("No objectives found in document")
         }
@@ -326,7 +326,7 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                 const formData = new FormData()
                 formData.append('title', obj.title)
                 formData.append('description', obj.description)
-                obj.tasks.forEach(task => {
+                obj.tasks.forEach((task: AnalyzedTask) => {
                     formData.append('aiTasks', JSON.stringify(task))
                 })
 
