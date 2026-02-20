@@ -60,7 +60,6 @@
     "src/app/(platform)/agents/artifacts/artifacts-view.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/agents/components/workflow-results-dialog.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/blueprints/[id]/blueprint-detail-view.tsx|TS2322|Type is not assignable to type.",
-    "src/app/(platform)/blueprints/blueprints-view.tsx|TS2304|Cannot find name 'members'.",
     "src/app/(platform)/blueprints/blueprints-view.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/blueprints/explore/tech-tree-browser.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/canvas/whiteboard/whiteboard-editor.tsx|TS2769|No overload matches this call.",
@@ -88,7 +87,6 @@
     "src/app/(platform)/the-forge/components/engineering-review-package.tsx|TS2367|This comparison appears to be unintentional because compared types have no overlap.",
     "src/app/(platform)/the-forge/components/engineering-summary.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/the-forge/components/forge-project-card.tsx|TS2322|Type is not assignable to type.",
-
     "src/app/(platform)/the-forge/components/quick-insights.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/the-forge/components/scan-hero.tsx|TS2322|Type is not assignable to type.",
     "src/app/(platform)/the-forge/components/team-map.tsx|TS2739|Type '__TYPE__' is missing the following properties from type 'MarketplaceListing': is_demo, created_by_provider_id",
