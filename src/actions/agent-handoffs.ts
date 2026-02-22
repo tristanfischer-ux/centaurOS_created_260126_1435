@@ -17,7 +17,6 @@
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import {
   requestDelegation,
-  sendAgentMessage,
 } from '@/lib/agents/collaboration-hub'
 import { logAgentAction } from '@/lib/agents/permission-guard'
 

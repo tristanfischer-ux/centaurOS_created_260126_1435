@@ -291,22 +291,26 @@ export async function POST(request: Request) {
     // SECURITY: Enforce subscription tier limits (monthly AI task cap).
     // The per-hour rate limit above prevents burst abuse; this prevents
     // sustained overuse beyond what the subscription tier allows.
-    if (foundryId) {
-        const limitCheck = await checkAILimit(foundryId)
-        if (!limitCheck.allowed) {
-            return NextResponse.json(
-                {
-                    error: limitCheck.message,
-                    code: "SUBSCRIPTION_LIMIT",
-                    usage: {
-                        current: limitCheck.currentUsage,
-                        limit: limitCheck.limit,
-                        remaining: 0,
-                    },
+    if (!foundryId) {
+        return NextResponse.json(
+            { error: "No active foundry. Please complete onboarding first.", code: "NO_FOUNDRY" },
+            { status: 403 }
+        )
+    }
+    const limitCheck = await checkAILimit(foundryId)
+    if (!limitCheck.allowed) {
+        return NextResponse.json(
+            {
+                error: limitCheck.message,
+                code: "SUBSCRIPTION_LIMIT",
+                usage: {
+                    current: limitCheck.currentUsage,
+                    limit: limitCheck.limit,
+                    remaining: 0,
                 },
-                { status: 429 }
-            )
-        }
+            },
+            { status: 429 }
+        )
     }
 
     // 4a. Validate threadId belongs to user's foundry (IDOR prevention)
@@ -392,6 +396,20 @@ export async function POST(request: Request) {
 
     // 4b. Enrich input with attachment context (for prompt only; memory stores original input)
     const MAX_ATTACHMENT_CONTEXT_CHARS = 25_000
+    // SECURITY: Only allow fetching from our own Supabase storage to prevent SSRF
+    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+    const isAllowedAttachmentUrl = (url: string): boolean => {
+        try {
+            const parsed = new URL(url)
+            const supabaseParsed = SUPABASE_URL ? new URL(SUPABASE_URL) : null
+            // Allow only our Supabase storage domain
+            if (supabaseParsed && parsed.hostname === supabaseParsed.hostname) return true
+            // Block everything else (internal IPs, metadata endpoints, etc.)
+            return false
+        } catch {
+            return false
+        }
+    }
     let inputForPrompt = input
     if (attachments && attachments.length > 0) {
         const parts: string[] = []
@@ -402,6 +420,11 @@ export async function POST(request: Request) {
             const url = a.url
             if (!url) {
                 parts.push(`[User attached file: ${name}]`)
+                continue
+            }
+            if (!isAllowedAttachmentUrl(url)) {
+                console.warn("[agents/execute] Blocked non-Supabase attachment URL:", url)
+                parts.push(`[User attached file: ${name} — URL not allowed]`)
                 continue
             }
             try {
