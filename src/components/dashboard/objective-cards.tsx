@@ -75,7 +75,7 @@ export function ObjectiveCards({ objectives }: ObjectiveCardsProps) {
               </Link>
               <span className="text-muted-foreground hidden sm:inline">&middot;</span>
               <Link
-                href="/inspiration"
+                href="/playbooks"
                 className="inline-flex items-center justify-center gap-1 text-sm text-status-info hover:text-status-info-dark font-medium"
               >
                 <Lightbulb className="w-3.5 h-3.5" />
@@ -244,7 +244,7 @@ function getObjectiveNudge(
   if (progress < 15) {
     return {
       label: 'Find a ready-made plan to get started',
-      href: '/inspiration',
+      href: '/playbooks',
       icon: Lightbulb,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50/50 border-blue-100',

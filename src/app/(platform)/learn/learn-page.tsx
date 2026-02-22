@@ -1,0 +1,425 @@
+'use client'
+
+// INTENT: The Learn page is the knowledge-oriented half of what was previously
+// the Inspiration page. Everything here is reference/educational content.
+// Action content (packs, projects, subsystems) lives on /playbooks.
+
+import { useState, useMemo, useCallback } from 'react'
+import {
+  BookOpen,
+  Factory,
+  MessageSquare,
+  HelpCircle,
+  Search,
+  Clock,
+  ChevronRight,
+  X,
+} from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { typography } from '@/lib/design-system'
+import { cn } from '@/lib/utils'
+import Link from 'next/link'
+import { TechniquesExplorer } from '@/components/techniques'
+import { ALL_TECHNIQUES } from '@/lib/manufacturing-techniques'
+import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
+import { QuestionCard } from '@/components/advisory/question-card'
+import type { Question } from '@/components/advisory/question-card'
+import { AskModal } from '@/components/advisory/ask-modal'
+import { StatusLegend } from '@/components/advisory/status-legend'
+import { createAdvisoryQuestion } from '@/actions/advisory'
+import { toast } from 'sonner'
+import type { TutorialListItem } from '@/actions/tutorials'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+
+// ---------------------------------------------------------------------------
+// Tab definitions
+// ---------------------------------------------------------------------------
+
+type LearnTabId = 'techniques' | 'tutorials' | 'qa'
+
+interface Tab {
+  id: LearnTabId
+  label: string
+  icon: React.ElementType
+  count?: number
+  activeClasses: string
+  iconColor: string
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
+interface LearnPageProps {
+  tutorials?: TutorialListItem[]
+  questions?: Question[]
+}
+
+export function LearnPage({
+  tutorials = [],
+  questions = [],
+}: LearnPageProps) {
+  const [activeTab, setActiveTab] = useState<LearnTabId>('techniques')
+
+  // Q&A state
+  const [qaSearchQuery, setQaSearchQuery] = useState('')
+
+  const [selectedTutorial, setSelectedTutorial] = useState<TutorialListItem | null>(null)
+
+  const filteredQuestions = useMemo(() => {
+    if (!qaSearchQuery.trim()) return questions
+    const query = qaSearchQuery.toLowerCase()
+    return questions.filter(q =>
+      q.title.toLowerCase().includes(query) ||
+      q.body.toLowerCase().includes(query) ||
+      q.category.toLowerCase().includes(query)
+    )
+  }, [questions, qaSearchQuery])
+
+  const handleAskQuestion = useCallback(async (data: {
+    title: string
+    body: string
+    category: string
+    visibility: 'public' | 'foundry'
+    getAiAnswer: boolean
+  }): Promise<{ error?: string; questionId?: string }> => {
+    const result = await createAdvisoryQuestion({
+      title: data.title,
+      body: data.body,
+      category: data.category,
+      visibility: data.visibility === 'public' ? 'network' : 'foundry',
+      getAiAnswer: data.getAiAnswer,
+    })
+
+    if (result.error) {
+      toast.error(result.error)
+      return { error: result.error }
+    }
+
+    toast.success(
+      data.getAiAnswer
+        ? 'Question submitted! AI is generating an answer...'
+        : 'Question submitted successfully'
+    )
+    return { questionId: result.data?.id }
+  }, [])
+
+  // ---------------------------------------------------------------------------
+  // Tab config
+  // ---------------------------------------------------------------------------
+
+  const tabs: Tab[] = useMemo(() => [
+    {
+      id: 'techniques',
+      label: 'Techniques',
+      icon: Factory,
+      count: ALL_TECHNIQUES.length,
+      iconColor: 'text-international-orange',
+      activeClasses: 'bg-international-orange/10 text-international-orange border-international-orange',
+    },
+    {
+      id: 'tutorials',
+      label: 'Tutorials & Guides',
+      icon: BookOpen,
+      count: tutorials.length,
+      iconColor: 'text-electric-blue',
+      activeClasses: 'bg-electric-blue/10 text-electric-blue border-electric-blue',
+    },
+    {
+      id: 'qa',
+      label: 'Q&A',
+      icon: MessageSquare,
+      count: questions.length,
+      iconColor: 'text-chart-5',
+      activeClasses: 'bg-chart-5/10 text-chart-5 border-chart-5',
+    },
+  ], [tutorials.length, questions.length])
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  return (
+    <div className="space-y-6">
+      {/* Page header */}
+      <div className="pb-4 border-b border-muted">
+        <div className={typography.pageHeader}>
+          <div className={typography.pageHeaderAccent} />
+          <h1 className={typography.h1}>
+            <BookOpen className="h-7 w-7 mr-3 inline-block text-electric-blue" />
+            Learn
+          </h1>
+        </div>
+        <p className={cn(typography.pageSubtitle, 'mt-1')}>
+          Build knowledge with techniques, tutorials, and expert Q&amp;A.
+        </p>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex flex-wrap gap-2" role="tablist">
+        {tabs.map((tab) => {
+          const Icon = tab.icon
+          const isActive = activeTab === tab.id
+
+          return (
+            <button
+              key={tab.id}
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium',
+                'border transition-all duration-200 select-none',
+                isActive
+                  ? cn(tab.activeClasses, 'shadow-sm')
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+            >
+              <Icon className={cn('h-4 w-4', !isActive && tab.iconColor)} />
+              {tab.label}
+              {tab.count !== undefined && tab.count > 0 && (
+                <span
+                  className={cn(
+                    'text-xs tabular-nums px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center',
+                    isActive ? 'bg-white/60' : 'bg-muted',
+                  )}
+                >
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ================================================================== */}
+      {/* TECHNIQUES tab                                                     */}
+      {/* ================================================================== */}
+      {activeTab === 'techniques' && <TechniquesExplorer />}
+
+      {/* ================================================================== */}
+      {/* TUTORIALS tab                                                      */}
+      {/* ================================================================== */}
+      {activeTab === 'tutorials' && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Step-by-step tutorials, safety guides, and best practices for hardware engineering.
+          </p>
+
+          {tutorials.length === 0 ? (
+            <EmptyState
+              title="Tutorials are being prepared"
+              description="Check back soon as new tutorials are added."
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
+              {tutorials.map((tutorial) => (
+                <Card
+                  key={tutorial.id}
+                  className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 hover:border-electric-blue/30"
+                  onClick={() => setSelectedTutorial(tutorial)}
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug">
+                        {tutorial.title}
+                      </h3>
+                      {tutorial.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {tutorial.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {tutorial.difficulty && (
+                        <Badge
+                          variant={
+                            tutorial.difficulty === 'beginner' ? 'success' :
+                            tutorial.difficulty === 'intermediate' ? 'warning' :
+                            'destructive'
+                          }
+                          className="text-[10px]"
+                        >
+                          {tutorial.difficulty}
+                        </Badge>
+                      )}
+                      {tutorial.topic && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {tutorial.topic}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1 border-t border-muted">
+                      {tutorial.estimated_read_minutes != null && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {tutorial.estimated_read_minutes} min read
+                        </span>
+                      )}
+                    </div>
+
+                    {tutorial.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {tutorial.tags.slice(0, 3).map((tag, i) => (
+                          <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                            {tag}
+                          </span>
+                        ))}
+                        {tutorial.tags.length > 3 && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                            +{tutorial.tags.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Tutorial Detail Dialog */}
+          <Dialog open={!!selectedTutorial} onOpenChange={(open) => !open && setSelectedTutorial(null)}>
+            <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-electric-blue" />
+                  {selectedTutorial?.title}
+                </DialogTitle>
+              </DialogHeader>
+              {selectedTutorial && (
+                <div className="flex-1 overflow-y-auto space-y-6 pb-4">
+                  {selectedTutorial.description && (
+                    <p className="text-sm text-muted-foreground">{selectedTutorial.description}</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTutorial.difficulty && (
+                      <Badge variant={
+                        selectedTutorial.difficulty === 'beginner' ? 'success' :
+                        selectedTutorial.difficulty === 'intermediate' ? 'warning' :
+                        'destructive'
+                      }>
+                        {selectedTutorial.difficulty}
+                      </Badge>
+                    )}
+                    {selectedTutorial.topic && (
+                      <Badge variant="secondary">{selectedTutorial.topic}</Badge>
+                    )}
+                    {selectedTutorial.estimated_read_minutes != null && (
+                      <Badge variant="secondary">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {selectedTutorial.estimated_read_minutes} min read
+                      </Badge>
+                    )}
+                  </div>
+
+                  {selectedTutorial.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedTutorial.tags.map((tag, i) => (
+                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSelectedTutorial(null)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+
+      {/* ================================================================== */}
+      {/* Q&A tab                                                            */}
+      {/* ================================================================== */}
+      {activeTab === 'qa' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Get AI-powered insights verified by human experts.
+            </p>
+            <AskModal onSubmit={handleAskQuestion} />
+          </div>
+
+          <StatusLegend className="pb-2" />
+
+          {questions.length > 0 && (
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search questions..."
+                  value={qaSearchQuery}
+                  onChange={(e) => setQaSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {filteredQuestions.length} {filteredQuestions.length === 1 ? 'question' : 'questions'}
+                {qaSearchQuery && ' found'}
+              </p>
+            </div>
+          )}
+
+          {filteredQuestions.length === 0 ? (
+            <Card className="border-2 border-dashed">
+              <CardContent className="py-12">
+                <EmptyState
+                  icon={<HelpCircle className="h-12 w-12" />}
+                  title={qaSearchQuery ? "No questions match your search" : "No questions yet"}
+                  description={
+                    qaSearchQuery
+                      ? "Try adjusting your search terms."
+                      : "Ask your first question to get AI-powered insights verified by experts."
+                  }
+                  action={
+                    qaSearchQuery ? (
+                      <Button variant="link" onClick={() => setQaSearchQuery('')} className="text-electric-blue">
+                        Clear Search
+                      </Button>
+                    ) : (
+                      <AskModal
+                        onSubmit={handleAskQuestion}
+                        trigger={
+                          <Button className="gap-2">
+                            <MessageSquare className="h-4 w-4" />
+                            Ask a Question
+                          </Button>
+                        }
+                      />
+                    )
+                  }
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredQuestions.map((question) => (
+                <QuestionCard key={question.id} question={question} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}

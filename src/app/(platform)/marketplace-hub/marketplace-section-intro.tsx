@@ -52,9 +52,9 @@ const CATEGORIES = [
         accentHover: "group-hover:bg-blue-100",
     },
     {
-        title: "Get Inspired",
-        description: "Discover techniques, trends, and ideas for your next project or product.",
-        href: "/inspiration",
+        title: "Browse Playbooks",
+        description: "Find pre-built plans, project templates, and subsystems for your next initiative.",
+        href: "/playbooks",
         icon: Lightbulb,
         accent: "bg-orange-50",
         accentText: "text-international-orange",

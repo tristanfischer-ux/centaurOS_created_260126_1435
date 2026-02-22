@@ -170,7 +170,7 @@ export function RFQTechniqueSelector({
               ))}
             </div>
             <a
-              href={`/inspiration?tab=techniques`}
+              href={`/learn?tab=techniques`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-xs text-electric-blue hover:underline"

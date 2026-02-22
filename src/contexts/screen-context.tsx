@@ -197,9 +197,13 @@ const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
     title: "Advisory",
     summary: "The user is viewing advisory — expert guidance and reviews.",
   },
-  "/inspiration": {
-    title: "Inspiration Hub",
-    summary: "The user is in the inspiration hub — templates and packs.",
+  "/playbooks": {
+    title: "Playbooks",
+    summary: "The user is browsing playbooks — pre-built objective packs, projects, and subsystems.",
+  },
+  "/learn": {
+    title: "Learn",
+    summary: "The user is in the learn hub — techniques, tutorials, and Q&A.",
   },
   "/the-forge/new": {
     title: "The Forge — New Design",

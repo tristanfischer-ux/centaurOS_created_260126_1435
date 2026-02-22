@@ -30,7 +30,7 @@ const PERSON_ROUTES = [
   '/recruits',
   '/guild',
   '/apprenticeship',
-  '/inspiration',
+  '/playbooks',
   '/settings',
 ]
 

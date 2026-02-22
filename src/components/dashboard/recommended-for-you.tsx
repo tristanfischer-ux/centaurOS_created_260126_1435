@@ -154,11 +154,11 @@ function generateRecommendations({
       id: 'no-objectives',
       title: 'Set your first objective',
       description: 'Browse proven objective packs to get your team focused and moving in the right direction.',
-      href: '/inspiration',
+      href: '/playbooks',
       icon: Lightbulb,
       accentColor: 'text-blue-600',
       bgColor: 'bg-blue-50',
-      ctaLabel: 'Browse ideas',
+      ctaLabel: 'Browse playbooks',
     })
   }
 
@@ -220,11 +220,11 @@ function generateRecommendations({
       id: 'more-objectives',
       title: 'Discover what to tackle next',
       description: 'Objective packs from experienced founders and operators. Ready to use, easy to customise.',
-      href: '/inspiration',
+      href: '/playbooks',
       icon: Target,
       accentColor: 'text-purple-600',
       bgColor: 'bg-purple-50',
-      ctaLabel: 'Get inspired',
+      ctaLabel: 'Browse playbooks',
     })
   }
 

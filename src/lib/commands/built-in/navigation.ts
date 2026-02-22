@@ -67,9 +67,11 @@ export const gotoCommand: SlashCommand = {
       'updates': '/updates',
       'timeline': '/timeline',
       'tl': '/timeline',
-      'inspiration': '/inspiration',
-      'ideas': '/inspiration',
-      'blueprints': '/inspiration',
+      'playbooks': '/playbooks',
+      'inspiration': '/playbooks',
+      'ideas': '/playbooks',
+      'blueprints': '/playbooks',
+      'learn': '/learn',
       'forge': '/the-forge',
       'xray': '/the-forge',
       'x-ray': '/the-forge',
@@ -240,15 +242,15 @@ export const timelineCommand: SlashCommand = {
   }
 }
 
-export const inspirationCommand: SlashCommand = {
-  name: 'inspiration',
-  description: 'Go to Inspiration - get ideas on what to do next',
-  usage: '/inspiration',
+export const playbooksCommand: SlashCommand = {
+  name: 'playbooks',
+  description: 'Go to Playbooks - find pre-built plans and objective packs',
+  usage: '/playbooks',
   icon: Lightbulb,
   category: 'navigation',
-  aliases: ['ideas'],
+  aliases: ['inspiration', 'ideas'],
   execute: async (): Promise<CommandResult> => {
-    return navigateResult('/inspiration')
+    return navigateResult('/playbooks')
   }
 }
 
@@ -277,6 +279,6 @@ export const navigationCommands: SlashCommand[] = [
   homeCommand,
   updatesCommand,
   timelineCommand,
-  inspirationCommand,
+  playbooksCommand,
   forgeCommand,
 ]

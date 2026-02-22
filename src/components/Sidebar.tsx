@@ -125,7 +125,8 @@ const marketplacePeopleNavigation = [
 ]
 
 const marketplaceSuppliesNavigation = [
-    { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
+    { name: "Playbooks", href: "/playbooks", icon: Lightbulb, tooltip: "Find pre-built plans and turn them into objectives and tasks" },
+    { name: "Learn", href: "/learn", icon: BookOpen, tooltip: "Techniques, tutorials, and expert Q&A" },
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
     { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
 ]

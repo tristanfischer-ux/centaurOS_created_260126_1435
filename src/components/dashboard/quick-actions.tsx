@@ -64,9 +64,9 @@ export function QuickActions({ foundryId }: QuickActionsProps) {
       bgColor: 'bg-emerald-50',
     },
     {
-      label: 'Inspiration',
+      label: 'Playbooks',
       icon: Lightbulb,
-      href: '/inspiration',
+      href: '/playbooks',
       color: 'from-amber-500 to-amber-600',
       bgColor: 'bg-amber-50',
     },

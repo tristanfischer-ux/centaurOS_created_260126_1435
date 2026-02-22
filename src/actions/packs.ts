@@ -263,7 +263,7 @@ export async function savePack(packId: string): Promise<{
             return { success: false, error: 'Failed to save pack' }
         }
 
-        revalidatePath('/inspiration')
+        revalidatePath('/playbooks')
         return { success: true, error: null }
     } catch (err) {
         console.error('[savePack] Exception:', err)
@@ -303,7 +303,7 @@ export async function unsavePack(packId: string): Promise<{
             return { success: false, error: 'Failed to unsave pack' }
         }
 
-        revalidatePath('/inspiration')
+        revalidatePath('/playbooks')
         return { success: true, error: null }
     } catch (err) {
         console.error('[unsavePack] Exception:', err)

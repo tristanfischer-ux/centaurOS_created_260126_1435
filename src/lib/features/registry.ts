@@ -170,7 +170,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         releasedAt: new Date('2026-02-11'),
         category: 'core',
         section: 'workshop',
-        status: 'stable',
+        status: 'beta',
         isVisibleInNav: true,
         changelog: 'The Forge — AI-powered product decomposition that transforms an idea into a complete engineering dossier with architecture diagrams, module breakdowns, risk analysis, component libraries, and assembly builders.'
     },
@@ -201,7 +201,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         id: 'manufacturing-techniques',
         name: 'Manufacturing Techniques Explorer',
         description: 'Browse 78+ manufacturing techniques with detailed specs, pros/cons, and direct links to find suppliers or start an RFQ',
-        route: '/inspiration',
+        route: '/playbooks',
         releasedAt: new Date('2026-02-07'),
         category: 'core',
         status: 'stable',

@@ -296,9 +296,9 @@ export const SECTIONS: Section[] = [
             },
             // ── Supplies ──
             {
-                name: "Inspiration",
-                description: "Get ideas on what to do next and discover opportunities",
-                route: "/inspiration",
+                name: "Playbooks",
+                description: "Find pre-built plans and turn them into objectives and tasks",
+                route: "/playbooks",
                 icon: Lightbulb,
                 addedAt: new Date("2026-02-07"),
             },

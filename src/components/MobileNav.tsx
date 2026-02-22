@@ -98,7 +98,8 @@ const marketplaceMoreNavigation = [
     { name: "Recruits", href: "/recruits", icon: UserSearch },
     { name: "Guild", href: "/guild", icon: GraduationCap },
     { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen },
-    { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
+    { name: "Playbooks", href: "/playbooks", icon: Lightbulb },
+    { name: "Learn", href: "/learn", icon: BookOpen },
     { name: "Marketplace", href: "/marketplace", icon: Store },
     { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag },
 ]

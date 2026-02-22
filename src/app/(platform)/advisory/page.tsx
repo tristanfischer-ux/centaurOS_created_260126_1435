@@ -1,11 +1,8 @@
 import { redirect } from "next/navigation"
 
 /**
- * Advisory page redirect.
- *
- * @description Redirects to the inspiration page.
- * This redirect ensures old bookmarks and links continue to work.
+ * @description Advisory page redirect — Q&A now lives on the Learn page.
  */
-export default function AdvisoryPage() {
-    redirect("/inspiration")
+export default function AdvisoryPage(): never {
+  redirect("/learn?tab=qa")
 }
