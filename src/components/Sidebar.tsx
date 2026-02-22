@@ -49,9 +49,7 @@ import {
     Globe,
     Brain,
     MessageCircle,
-    Banknote,
 } from "lucide-react"
-import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
 import { FocusModeToggle } from "@/components/FocusModeToggle"
@@ -103,7 +101,6 @@ const planNavigation = [
     { name: "Strategy", href: "/strategy", icon: Waypoints, tooltip: "Your strategic direction — pillars, progress, and health at a glance" },
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Milestones that move the strategy forward" },
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Day-to-day work that delivers on objectives" },
-    { name: "Funding", href: "/funding", icon: Banknote, tooltip: "Capital requirements, funding events, and financial milestones from your business plan" },
     { name: "Reports", href: "/reports", icon: FileOutput, tooltip: "Generate polished weekly updates and board packs from your live data" },
 ]
 
@@ -277,7 +274,6 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                             </TooltipContent>
                         </Tooltip>
                         <FocusModeToggle compact />
-                        <NotificationCenter />
                     </div>
                 </div>
             </div>
