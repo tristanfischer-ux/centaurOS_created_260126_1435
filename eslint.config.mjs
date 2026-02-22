@@ -57,6 +57,8 @@ const eslintConfig = defineConfig([
     "test-results/**",
     // Archived scripts and one-off utilities
     "_archive/**",
+    // Vendored third-party data files
+    "data/**",
   ]),
   // Downgrade non-critical rules to warnings for CI to pass
   {

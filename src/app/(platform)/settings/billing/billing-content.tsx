@@ -11,6 +11,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -64,11 +65,9 @@ export function BillingContent({
   const [isLoading, setIsLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const searchParams = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search)
-    : null
-  const isSuccess = searchParams?.get('success') === 'true'
-  const isCanceled = searchParams?.get('canceled') === 'true'
+  const searchParams = useSearchParams()
+  const isSuccess = searchParams.get('success') === 'true'
+  const isCanceled = searchParams.get('canceled') === 'true'
 
   const aiLimit = currentPlan.limits.maxAiTasksPerMonth
   const aiUsagePercent = Math.min(100, Math.round((aiUsage.totalAiTasks / aiLimit) * 100))

@@ -7,7 +7,7 @@ import { IntegrationSetupGuide } from '@/components/settings/integration-setup-g
 import { CompanyDataExport } from '@/components/settings/company-data-export'
 import { TeamManagementCard } from '@/components/settings/team-management-card'
 import { getGoogleConnectionStatus } from '@/actions/google-workspace'
-import type { CompanyProfile } from '@/types/foundry'
+import type { CompanyProfile, Sector } from '@/types/foundry'
 import { ShieldAlert } from 'lucide-react'
 
 interface CompanySettingsPageProps {
@@ -66,13 +66,21 @@ export default async function CompanySettingsPage({ searchParams }: CompanySetti
         )
     }
 
-    // Fetch company profile data
+    // Fetch company profile data and sector
     let companyProfile: CompanyProfile | null = null
+    let sector: Sector | null = null
     if (profile?.foundry_id) {
         const { data: foundryData } = await supabase.rpc('ensure_foundry_exists', {
             p_foundry_id: profile.foundry_id,
         })
         companyProfile = (foundryData as { company_profile?: CompanyProfile | null })?.company_profile ?? null
+
+        const { data: foundryRow } = await supabase
+            .from('foundries')
+            .select('sector')
+            .eq('id', profile.foundry_id)
+            .single()
+        sector = (foundryRow?.sector as Sector) ?? null
     }
 
     // Fetch team member count
@@ -97,6 +105,7 @@ export default async function CompanySettingsPage({ searchParams }: CompanySetti
         <div className="space-y-6">
             <CompanyProfileCard
                 companyProfile={companyProfile}
+                sector={sector}
                 foundryId={profile?.foundry_id || ''}
                 userId={user.id}
                 isFounder={isFounder}

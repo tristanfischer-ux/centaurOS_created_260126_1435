@@ -1648,6 +1648,20 @@ export async function executeMashupPlan(
       })
       .join("\n")
 
+    // Pre-flight: generated code must assign final geometry to "result"
+    if (!/\bresult\s*=/.test(mashupCode)) {
+      return {
+        success: false,
+        error:
+          "Generated mashup code does not assign the final model to 'result'. The CadQuery script must end with result = <Workplane>. Please try again.",
+        mashup_plan: plan,
+        mashup_code: mashupCode,
+        tokensIn,
+        tokensOut,
+        elapsedMs: Date.now() - startTime,
+      }
+    }
+
     const modalResult = await executeMashupOnModal(resolvedSources, mashupCode, materialDensity)
 
     if (modalResult.error && !modalResult.step) {

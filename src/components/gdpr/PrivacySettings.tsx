@@ -16,6 +16,13 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { DataRequestForm } from "./DataRequestForm"
 import { DataRequestList } from "./DataRequestStatus"
 import {
@@ -133,17 +140,11 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Intro + refresh */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Shield className="h-6 w-6" />
-            Privacy Settings
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage company data and exercise your privacy rights
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Manage your data and exercise your privacy rights under UK GDPR.
+        </p>
         <Button
           variant="secondary"
           size="sm"
@@ -160,7 +161,7 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
         <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setShowForm(true)}>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-blue-100 text-electric-blue">
+              <div className="p-2 rounded-lg bg-status-info-light text-status-info">
                 <Eye className="h-5 w-5" />
               </div>
               <CardTitle className="text-base">Access Company Data</CardTitle>
@@ -198,7 +199,7 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
         <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setShowForm(true)}>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-orange-100 text-international-orange">
+              <div className="p-2 rounded-lg bg-international-orange-light text-international-orange">
                 <Trash2 className="h-5 w-5" />
               </div>
               <CardTitle className="text-base">Delete Company Account</CardTitle>
@@ -215,24 +216,23 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
         </Card>
       </div>
 
-      {/* Request Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-muted z-50 flex items-center justify-center p-4">
-          <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      {/* Data Request Dialog */}
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent size="lg" className="max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-international-orange" />
+              Submit a Data Request
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[75vh]">
             <DataRequestForm
               pendingTypes={pendingTypes}
               onRequestCreated={handleRequestCreated}
             />
-            <Button
-              variant="ghost"
-              className="absolute top-4 right-4"
-              onClick={() => setShowForm(false)}
-            >
-              Close
-            </Button>
-          </div>
-        </div>
-      )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {/* Active Requests */}
       {activeRequests.length > 0 && (

@@ -395,7 +395,7 @@ export function UpdatesLayout({
 
   // ── SMALL SCREEN (Mobile) ──────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4">
+    <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4 pb-20 sm:pb-0">
       {showThread && (activeView === 'activity' ? selectedSource : selectedConversationId) ? (
         <div className="flex flex-col h-full">
           <div className="flex items-center gap-2 p-3 border-b border-muted">

@@ -2,6 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
 import { ObjectivesBoard } from './objectives-board'
+import { getBlueprintTemplates } from '@/actions/blueprints'
+import { getObjectivePacks, getSavedPackIds } from '@/actions/packs'
+import { getFoundryContext } from '@/actions/foundry-context'
+import { getUniversalSubsystems } from '@/actions/universal-subsystems'
 
 export const dynamic = 'force-dynamic'
 

@@ -77,11 +77,11 @@ export function AIProviders() {
     const providers = Object.values(PROVIDER_REGISTRY)
 
     return (
-        <Card className="bg-background border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-violet-50/60 to-transparent border-b border-slate-100">
+        <Card className="bg-background border-muted shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+            <CardHeader className="border-b">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-violet-100 rounded-lg">
-                        <KeyRound className="h-5 w-5 text-violet-600" />
+                    <div className="p-2 bg-international-orange-light rounded-lg">
+                        <KeyRound className="h-5 w-5 text-international-orange" />
                     </div>
                     <div>
                         <CardTitle>AI Providers</CardTitle>
@@ -109,7 +109,7 @@ export function AIProviders() {
                                     key={provider.id}
                                     className={cn(
                                         "p-4 rounded-lg border transition-all duration-200",
-                                        storedKey ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 hover:border-slate-300 hover:shadow-sm",
+                                        storedKey ? "border-status-success/30 bg-status-success-light/30" : "border-muted hover:border-muted-foreground/20 hover:shadow-sm",
                                         isEditing && "ring-2 ring-international-orange/30 border-international-orange/50"
                                     )}
                                 >
@@ -127,7 +127,7 @@ export function AIProviders() {
                                             <div className="flex items-center gap-2">
                                                 <span className="font-medium text-foreground">{provider.name}</span>
                                                 {storedKey && (
-                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700">
+                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-status-success-light text-status-success-dark">
                                                         <Check className="h-3 w-3" /> Connected
                                                     </span>
                                                 )}

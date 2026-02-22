@@ -1,28 +1,12 @@
-'use client'
-
-import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Download, Loader2, Database } from 'lucide-react'
-import { toast } from 'sonner'
+import { Database, Clock } from 'lucide-react'
 
+/**
+ * INTENT: Placeholder for company data export. Previously faked a success toast
+ * with setTimeout which was deceptive. Now shows an honest "coming soon" state
+ * until the export action is actually implemented.
+ */
 export function CompanyDataExport() {
-    const [isExporting, setIsExporting] = useState(false)
-
-    async function handleExport() {
-        setIsExporting(true)
-        try {
-            // TODO(TECH-DEBT): Implement company-wide data export action
-            await new Promise(resolve => setTimeout(resolve, 2000)) // Placeholder
-            toast.success('Company data export initiated. You will receive a download link via email.')
-        } catch (error) {
-            console.error('[CompanyDataExport] Export error:', error)
-            toast.error('Failed to export company data. Please try again.')
-        } finally {
-            setIsExporting(false)
-        }
-    }
-
     return (
         <Card className="bg-background border-muted shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
             <CardHeader>
@@ -34,41 +18,18 @@ export function CompanyDataExport() {
                     Export all company data including tasks, objectives, team members, and configuration.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                    <p className="text-sm font-medium">Export includes:</p>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• All tasks, objectives, and their history</li>
-                        <li>• Team member profiles and roles</li>
-                        <li>• Company profile and settings</li>
-                        <li>• Activity logs and audit trail</li>
-                    </ul>
-                </div>
-
-                <div className="p-3 bg-status-warning-light rounded-lg border border-status-warning/20">
-                    <p className="text-xs text-status-warning-dark">
-                        <strong>Note:</strong> The export will be prepared as a ZIP file and sent to your email within 24 hours.
-                        This export includes all company data and should be handled securely.
+            <CardContent>
+                <div className="flex flex-col items-center justify-center py-6 text-center rounded-lg bg-muted/30">
+                    <Clock className="h-8 w-8 text-muted-foreground mb-3" />
+                    <p className="text-sm font-medium text-foreground">Coming soon</p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                        Full company data export is being built. In the meantime, contact{' '}
+                        <a href="mailto:support@forgeos.ai" className="text-international-orange hover:underline">
+                            support@forgeos.ai
+                        </a>{' '}
+                        to request your data.
                     </p>
                 </div>
-
-                <Button
-                    onClick={handleExport}
-                    disabled={isExporting}
-                    className="w-full"
-                >
-                    {isExporting ? (
-                        <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Preparing export...
-                        </>
-                    ) : (
-                        <>
-                            <Download className="h-4 w-4 mr-2" />
-                            Request Company Data Export
-                        </>
-                    )}
-                </Button>
             </CardContent>
         </Card>
     )

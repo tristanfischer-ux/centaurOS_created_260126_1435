@@ -96,7 +96,7 @@ export function MessageInputHelp({ className }: { className?: string }) {
                 Type <kbd className="px-1.5 py-0.5 bg-background rounded font-mono text-[10px]">/</kbd>
                 <span className="mx-1">for quick actions</span>
               </p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] mt-1.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[11px] mt-1.5">
                 <div><code className="text-purple-400">/task</code> - Create new task</div>
                 <div><code className="text-purple-400">/search</code> - Search messages</div>
                 <div><code className="text-purple-400">/help</code> - Show all commands</div>
@@ -122,10 +122,10 @@ export function MessageInputHelp({ className }: { className?: string }) {
             </div>
           </div>
 
-          {/* Keyboard Shortcuts */}
-          <div className="space-y-1.5 pt-2 border-t border-border">
+          {/* Keyboard Shortcuts - hidden on mobile (touch devices) */}
+          <div className="hidden sm:block space-y-1.5 pt-2 border-t border-border">
             <div className="flex items-center gap-2 font-semibold text-foreground">
-              <Keyboard className="w-3.5 h-3.5 text-slate-500" />
+              <Keyboard className="w-3.5 h-3.5 text-muted-foreground" />
               <span>Keyboard Shortcuts</span>
             </div>
             <div className="ml-5 text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">

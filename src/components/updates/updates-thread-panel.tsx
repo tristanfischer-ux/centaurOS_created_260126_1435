@@ -318,7 +318,8 @@ export function UpdatesThreadPanel({
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-1 pl-1">
-          Press Cmd+Enter to send
+          <span className="sm:hidden">Tap Send to reply</span>
+          <span className="hidden sm:inline">Press Cmd+Enter to send</span>
         </p>
       </div>
     </div>

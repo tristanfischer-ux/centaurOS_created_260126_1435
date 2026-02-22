@@ -4,40 +4,53 @@ import { Skeleton } from "@/components/ui/skeleton"
 export default function SettingsLoading() {
     return (
         <div className="space-y-6">
-            {/* Header Skeleton */}
-            <Skeleton className="h-9 w-32" />
+            {/* Intro line */}
+            <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-72" />
+                <Skeleton className="h-8 w-24" />
+            </div>
 
-            {/* Profile Configuration Card */}
+            {/* Quick action cards */}
+            <div className="grid gap-4 md:grid-cols-3">
+                {[1, 2, 3].map((i) => (
+                    <Card key={i}>
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2">
+                                <Skeleton className="h-9 w-9 rounded-lg" />
+                                <Skeleton className="h-5 w-36" />
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <Skeleton className="h-4 w-full" />
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
+            {/* Data overview card */}
             <Card>
                 <CardHeader>
-                    <Skeleton className="h-6 w-44" />
+                    <Skeleton className="h-6 w-40" />
                     <Skeleton className="h-4 w-64 mt-2" />
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        {[
-                            { label: "Full Name", width: "w-48" },
-                            { label: "Email", width: "w-56" },
-                            { label: "Role", width: "w-24" },
-                            { label: "Company ID", width: "w-64" },
-                        ].map((field, i) => (
-                            <div key={i} className="space-y-2">
-                                <Skeleton className="h-4 w-20" />
-                                <Skeleton className={`h-10 ${field.width}`} />
-                            </div>
-                        ))}
-                    </div>
+                <CardContent className="space-y-3">
+                    <Skeleton className="h-10 w-40" />
+                    <Skeleton className="h-px w-full" />
+                    <Skeleton className="h-10 w-48" />
                 </CardContent>
             </Card>
 
-            {/* Sign Out Card */}
-            <Card className="border-destructive/20 bg-destructive/5">
+            {/* Privacy rights card */}
+            <Card>
                 <CardHeader>
-                    <Skeleton className="h-6 w-24" />
-                    <Skeleton className="h-4 w-80 mt-2" />
+                    <Skeleton className="h-6 w-36" />
                 </CardHeader>
                 <CardContent>
-                    <Skeleton className="h-12 w-full" />
+                    <div className="grid gap-3 md:grid-cols-2">
+                        {[1, 2, 3, 4].map((i) => (
+                            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                        ))}
+                    </div>
                 </CardContent>
             </Card>
         </div>

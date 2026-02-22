@@ -81,11 +81,11 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
     
     if (loading) {
         return (
-            <Card className="bg-background border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-blue-50/60 to-transparent border-b border-slate-100">
+            <Card className="bg-background border-muted shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="border-b">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                            <BarChart3 className="h-5 w-5 text-blue-600" />
+                        <div className="p-2 bg-electric-blue-light rounded-lg">
+                            <BarChart3 className="h-5 w-5 text-electric-blue" />
                         </div>
                         <CardTitle>Daily Pulse</CardTitle>
                     </div>
@@ -102,11 +102,11 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
     }
     
     return (
-        <Card className="bg-background border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-blue-50/60 to-transparent border-b border-slate-100">
+        <Card className="bg-background border-muted shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+            <CardHeader className="border-b">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                        <BarChart3 className="h-5 w-5 text-blue-600" />
+                    <div className="p-2 bg-electric-blue-light rounded-lg">
+                        <BarChart3 className="h-5 w-5 text-electric-blue" />
                     </div>
                     <div>
                         <CardTitle>Daily Pulse</CardTitle>
@@ -121,7 +121,7 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
                 <div className="space-y-3">
                     <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Delivery Channels</Label>
                     
-                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors">
                         <div className="space-y-0.5">
                             <Label htmlFor="telegram-reports" className="font-normal">Telegram</Label>
                             <p className="text-xs text-muted-foreground">
@@ -153,7 +153,7 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
                     </div>
                 </div>
                 
-                <div className="border-t border-slate-100" />
+                <div className="border-t border-muted" />
                 
                 {/* Timing */}
                 <div className="space-y-2">
@@ -178,13 +178,13 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
                     </p>
                 </div>
                 
-                <div className="border-t border-slate-100" />
+                <div className="border-t border-muted" />
                 
                 {/* Content Preferences */}
                 <div className="space-y-3">
                     <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Include in Report</Label>
                     
-                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors">
                         <div className="space-y-0.5">
                             <Label htmlFor="include-summary" className="font-normal">Summary</Label>
                             <p className="text-xs text-muted-foreground">
@@ -198,7 +198,7 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
                         />
                     </div>
                     
-                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors">
                         <div className="space-y-0.5">
                             <Label htmlFor="include-trends" className="font-normal">Trends</Label>
                             <p className="text-xs text-muted-foreground">
@@ -212,7 +212,7 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
                         />
                     </div>
                     
-                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors">
                         <div className="space-y-0.5">
                             <Label htmlFor="include-insights" className="font-normal">Insights</Label>
                             <p className="text-xs text-muted-foreground">
@@ -226,7 +226,7 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
                         />
                     </div>
                     
-                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors">
                         <div className="space-y-0.5">
                             <Label htmlFor="include-team" className="font-normal">Team Activity</Label>
                             <p className="text-xs text-muted-foreground">

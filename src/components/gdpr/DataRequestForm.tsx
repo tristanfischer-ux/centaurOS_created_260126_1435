@@ -236,8 +236,8 @@ export function DataRequestForm({
                   <div
                     className={`p-2 rounded-lg ${
                       reqType.variant === "warning"
-                        ? "bg-orange-100 text-international-orange"
-                        : "bg-blue-100 text-electric-blue"
+                        ? "bg-international-orange-light text-international-orange"
+                        : "bg-status-info-light text-status-info"
                     }`}
                   >
                     <Icon className="h-5 w-5" />
@@ -265,10 +265,10 @@ export function DataRequestForm({
         {/* Reason Input (for deletion) */}
         {selectedType === "deletion" && (
           <div className="space-y-2">
-            <Alert variant="destructive" className="bg-orange-50 border-international-orange/50">
-              <AlertTriangle className="h-4 w-4 text-international-orange" />
-              <AlertTitle className="text-international-orange">Important: Account Deletion</AlertTitle>
-              <AlertDescription className="text-international-orange/80">
+            <Alert variant="destructive" className="bg-status-warning-light border-status-warning/50">
+              <AlertTriangle className="h-4 w-4 text-status-warning-dark" />
+              <AlertTitle className="text-status-warning-dark">Important: Account Deletion</AlertTitle>
+              <AlertDescription className="text-status-warning-dark/80">
                 <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
                   <li>
                     This action cannot be undone once processed
