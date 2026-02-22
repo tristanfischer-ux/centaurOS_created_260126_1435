@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { analyzeBusinessPlan } from '@/actions/analyze'
 import { saveBusinessPlanAnalysis, buildSmartMerge } from '@/actions/business-plan'
+import { extractKnowledgeFromUpload } from '@/actions/knowledge'
 import { toast } from 'sonner'
 import {
   MAX_FILE_SIZE_BYTES,
@@ -96,6 +97,19 @@ export function BusinessPlanUpload({ lastAnalyzedAt, onMergeReady }: BusinessPla
       setErrorMessage(mergeError ?? 'Failed to build merge review')
       return
     }
+
+    // FLOW: Fire-and-forget knowledge extraction from the document.
+    // The same file is re-parsed server-side — negligible cost vs the LLM calls.
+    // Extracted notes appear in the Knowledge Vault for all specialists.
+    const extractionForm = new FormData()
+    extractionForm.append('file', file)
+    extractKnowledgeFromUpload(extractionForm)
+      .then(({ data }) => {
+        if (data && data.saved > 0) {
+          toast.success(`${data.saved} knowledge note${data.saved === 1 ? '' : 's'} extracted from your document`)
+        }
+      })
+      .catch(() => { /* best-effort — don't disrupt the main flow */ })
 
     setState('done')
     onMergeReady(mergeState)

@@ -35,6 +35,8 @@ export {
 
 // Extraction pipeline
 export { extractKnowledge } from './extractor'
+export { extractKnowledgeFromDocument } from './document-extractor'
+export type { DocumentExtractionInput, DocumentExtractionResult } from './document-extractor'
 
 // Connection discovery
 export { discoverConnections } from './connector'

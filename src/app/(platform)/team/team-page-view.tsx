@@ -817,7 +817,8 @@ export function TeamPageView({
                     </div>
                 ) : (
                     <div className="border border-muted rounded-xl overflow-hidden">
-                        <table className="w-full text-sm text-left">
+                        <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left min-w-[480px]">
                             <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-muted">
                                 <tr>
                                     <th className="px-4 py-2.5 pl-6 text-xs font-medium uppercase tracking-wider">Profile</th>
@@ -870,6 +871,7 @@ export function TeamPageView({
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 )}
             </section>
@@ -881,131 +883,149 @@ export function TeamPageView({
     return (
         <div className={cn(isOrbitActive ? 'space-y-2' : 'space-y-6')}>
             {/* ── Header (consistent across all view modes) ──────── */}
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 shrink-0">
-                    <div className={typography.pageHeaderAccent} />
-                    <h1 className="text-xl font-display font-bold text-foreground">Team</h1>
+            <div className="space-y-2">
+                {/* Row 1: Title + Controls */}
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 shrink-0">
+                        <div className={typography.pageHeaderAccent} />
+                        <h1 className="text-xl font-display font-bold text-foreground">Team</h1>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                        <div className="hidden md:flex items-center gap-2">
+                            <ViewToggle
+                                options={[
+                                    { value: 'orbit', label: 'Orbit', icon: Orbit, ariaLabel: 'Orbit view' },
+                                    { value: 'cards', icon: LayoutGrid, ariaLabel: 'Cards view' },
+                                    { value: 'list', icon: List, ariaLabel: 'List view' },
+                                ]}
+                                value={viewMode}
+                                onValueChange={(v) => setViewMode(v as 'orbit' | 'cards' | 'list')}
+                            />
+                            {foundryId && (
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setShowEditFunctions(true)}
+                                >
+                                    <Settings className="h-4 w-4" />
+                                    Functions
+                                </Button>
+                            )}
+                            <AskSpecialistButton
+                                context={{
+                                    type: 'general',
+                                    title: 'Team & Hiring',
+                                    description: `Team overview: ${totalPeople} members (${founders.length} founders, ${executives.length} executives, ${apprentices.length} apprentices), ${totalTeams} teams, ${avgCapacity}% avg capacity remaining.`,
+                                    metadata: {
+                                        notes: insights?.overloadedMembers?.length
+                                            ? `${insights.overloadedMembers.length} overloaded members. ${insights.overdueTaskCount || 0} overdue tasks.`
+                                            : undefined,
+                                    },
+                                }}
+                                specialistId="hiring-team"
+                                specialistName="Harper"
+                                variant="chip"
+                                label="Ask Harper"
+                            />
+                            <RefreshButton />
+                        </div>
+                        <InviteMemberDialog />
+                        <Link href="/team/new">
+                            <Button size="sm" className="bg-international-orange hover:bg-international-orange/90 text-white shadow-sm">
+                                <Plus className="h-4 w-4" />
+                                <span className="hidden sm:inline">New Team</span>
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
 
-                {/* Center: tabs */}
-                <div role="tablist" aria-label="Team views" className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-muted">
-                    <button
-                        role="tab"
-                        aria-selected={activeTab === 'members'}
-                        aria-controls="team-members-panel"
-                        id="team-members-tab"
-                        onClick={() => { setActiveTab('members'); setSearchQuery('') }}
-                        className={cn(
-                            'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200',
-                            activeTab === 'members'
-                                ? 'bg-background text-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground'
-                        )}
-                    >
-                        <Users className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
-                        Members
-                    </button>
-                    <button
-                        role="tab"
-                        aria-selected={activeTab === 'workload'}
-                        aria-controls="team-workload-panel"
-                        id="team-workload-tab"
-                        onClick={() => { setActiveTab('workload'); setSearchQuery('') }}
-                        className={cn(
-                            'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200',
-                            activeTab === 'workload'
-                                ? 'bg-background text-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground'
-                        )}
-                    >
-                        <BarChart3 className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
-                        Workload
-                    </button>
-                    <button
-                        role="tab"
-                        aria-selected={activeTab === 'teams'}
-                        aria-controls="team-teams-panel"
-                        id="team-teams-tab"
-                        onClick={() => { setActiveTab('teams'); setSearchQuery('') }}
-                        className={cn(
-                            'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200',
-                            activeTab === 'teams'
-                                ? 'bg-background text-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground'
-                        )}
-                    >
-                        <ShieldCheck className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
-                        Teams
-                    </button>
-                    <button
-                        role="tab"
-                        aria-selected={activeTab === 'hiring'}
-                        aria-controls="team-hiring-panel"
-                        id="team-hiring-tab"
-                        onClick={() => { setActiveTab('hiring'); setSearchQuery('') }}
-                        className={cn(
-                            'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200',
-                            activeTab === 'hiring'
-                                ? 'bg-background text-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground'
-                        )}
-                    >
-                        <CalendarDays className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
-                        Hiring Plan
-                        {hiringRequirements.length > 0 && (
-                            <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
-                                {hiringRequirements.length}
-                            </Badge>
-                        )}
-                    </button>
-                </div>
-
-                {/* Right: controls (same position in all modes) */}
-                <div className="flex items-center gap-2 shrink-0">
-                    {/* 3-way view toggle — always visible so header doesn't shift */}
-                    <ViewToggle
-                        options={[
-                            { value: 'orbit', label: 'Orbit', icon: Orbit, ariaLabel: 'Orbit view' },
-                            { value: 'cards', icon: LayoutGrid, ariaLabel: 'Cards view' },
-                            { value: 'list', icon: List, ariaLabel: 'List view' },
-                        ]}
-                        value={viewMode}
-                        onValueChange={(v) => setViewMode(v as 'orbit' | 'cards' | 'list')}
-                    />
-                    {foundryId && (
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => setShowEditFunctions(true)}
+                {/* Row 2: Tabs + mobile view toggle */}
+                <div className="flex items-center gap-2">
+                    <div role="tablist" aria-label="Team views" className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-muted overflow-x-auto scrollbar-none">
+                        <button
+                            role="tab"
+                            aria-selected={activeTab === 'members'}
+                            aria-controls="team-members-panel"
+                            id="team-members-tab"
+                            onClick={() => { setActiveTab('members'); setSearchQuery('') }}
+                            className={cn(
+                                'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap shrink-0',
+                                activeTab === 'members'
+                                    ? 'bg-background text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            )}
                         >
-                            <Settings className="h-4 w-4" />
-                            Functions
-                        </Button>
-                    )}
-                    <AskSpecialistButton
-                        context={{
-                            type: 'general',
-                            title: 'Team & Hiring',
-                            description: `Team overview: ${totalPeople} members (${founders.length} founders, ${executives.length} executives, ${apprentices.length} apprentices), ${totalTeams} teams, ${avgCapacity}% avg capacity remaining.`,
-                            metadata: {
-                                notes: insights?.overloadedMembers?.length
-                                    ? `${insights.overloadedMembers.length} overloaded members. ${insights.overdueTaskCount || 0} overdue tasks.`
-                                    : undefined,
-                            },
-                        }}
-                        specialistId="hiring-team"
-                        specialistName="Harper"
-                        variant="chip"
-                        label="Ask Harper"
-                    />
-                    <RefreshButton />
-                    <InviteMemberDialog />
-                    <Link href="/team/new">
-                        <Button size="sm" className="bg-international-orange hover:bg-international-orange/90 text-white shadow-sm">
-                            <Plus className="h-4 w-4" />
-                            New Team
-                        </Button>
-                    </Link>
+                            <Users className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
+                            Members
+                        </button>
+                        <button
+                            role="tab"
+                            aria-selected={activeTab === 'workload'}
+                            aria-controls="team-workload-panel"
+                            id="team-workload-tab"
+                            onClick={() => { setActiveTab('workload'); setSearchQuery('') }}
+                            className={cn(
+                                'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap shrink-0',
+                                activeTab === 'workload'
+                                    ? 'bg-background text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            )}
+                        >
+                            <BarChart3 className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
+                            Workload
+                        </button>
+                        <button
+                            role="tab"
+                            aria-selected={activeTab === 'teams'}
+                            aria-controls="team-teams-panel"
+                            id="team-teams-tab"
+                            onClick={() => { setActiveTab('teams'); setSearchQuery('') }}
+                            className={cn(
+                                'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap shrink-0',
+                                activeTab === 'teams'
+                                    ? 'bg-background text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            )}
+                        >
+                            <ShieldCheck className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
+                            Teams
+                        </button>
+                        <button
+                            role="tab"
+                            aria-selected={activeTab === 'hiring'}
+                            aria-controls="team-hiring-panel"
+                            id="team-hiring-tab"
+                            onClick={() => { setActiveTab('hiring'); setSearchQuery('') }}
+                            className={cn(
+                                'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap shrink-0',
+                                activeTab === 'hiring'
+                                    ? 'bg-background text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            )}
+                        >
+                            <CalendarDays className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
+                            Hiring<span className="hidden sm:inline"> Plan</span>
+                            {hiringRequirements.length > 0 && (
+                                <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                                    {hiringRequirements.length}
+                                </Badge>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Mobile-only view toggle */}
+                    <div className="flex md:hidden shrink-0">
+                        <ViewToggle
+                            options={[
+                                { value: 'orbit', label: 'Orbit', icon: Orbit, ariaLabel: 'Orbit view' },
+                                { value: 'cards', icon: LayoutGrid, ariaLabel: 'Cards view' },
+                                { value: 'list', icon: List, ariaLabel: 'List view' },
+                            ]}
+                            value={viewMode}
+                            onValueChange={(v) => setViewMode(v as 'orbit' | 'cards' | 'list')}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -1077,7 +1097,7 @@ export function TeamPageView({
             {/* Members Tab — Orbit View (hero layout) */}
             {isOrbitActive && (
                 <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
-                    <div className="h-[calc(100vh-7rem)] overflow-hidden flex">
+                    <div className="h-[calc(100vh-12rem)] md:h-[calc(100vh-7rem)] overflow-hidden flex">
                         <OrbitalView
                             teamData={teamData}
                             functions={orbitFunctions}

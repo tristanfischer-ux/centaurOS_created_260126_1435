@@ -349,7 +349,7 @@ function LinkCanvas({ strategicObjectives, regularObjectives, visibleStrategies,
   )
 
   return (
-    <div className="h-[calc(100vh-260px)] min-h-[500px] bg-muted/20 rounded-lg border border-slate-100">
+    <div className="h-[calc(100vh-340px)] sm:h-[calc(100vh-260px)] min-h-[400px] bg-muted/20 rounded-lg border border-slate-100">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -487,7 +487,7 @@ export function StrategyLinkView({ strategicObjectives, regularObjectives, toolb
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 mb-3 text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-3 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-2 rounded-sm bg-international-orange" />
           Strategy
@@ -500,7 +500,7 @@ export function StrategyLinkView({ strategicObjectives, regularObjectives, toolb
           <span className="w-6 h-0.5 bg-international-orange" />
           Linked
         </span>
-        <span className="ml-auto text-[10px]">
+        <span className="hidden sm:inline ml-auto text-[10px]">
           Drag from an objective to a strategy to link &bull; Select edge + Delete/Backspace to unlink &bull; Re-drag to move between strategies
         </span>
       </div>

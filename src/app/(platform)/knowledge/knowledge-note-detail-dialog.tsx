@@ -209,7 +209,7 @@ export function KnowledgeNoteDetailDialog({
                   <h4 className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                     Provenance
                   </h4>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     {note.source_specialist && (
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Sparkles className="h-3.5 w-3.5" />
@@ -308,8 +308,8 @@ export function KnowledgeNoteDetailDialog({
             </ScrollArea>
 
             {/* Actions Footer */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-slate-100">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <Button
                   variant="ghost"
                   size="sm"

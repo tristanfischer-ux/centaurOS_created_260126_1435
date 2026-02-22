@@ -294,14 +294,15 @@ function MeetingDetailDialog({
                         <FileText className="h-5 w-5 text-electric-blue" />
                         {meeting.topic || meeting.title}
                     </DialogTitle>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-1">
                         <span className="flex items-center gap-1">
                             <Calendar className="h-3.5 w-3.5" />
-                            {format(new Date(meeting.createdAt), "MMMM d, yyyy 'at' h:mm a")}
+                            {format(new Date(meeting.createdAt), "MMM d, yyyy 'at' h:mm a")}
                         </span>
-                        <span className="flex items-center gap-1">
-                            <Users className="h-3.5 w-3.5" />
-                            {meeting.attendees.join(", ")}
+                        <span className="flex items-center gap-1 truncate max-w-[200px]">
+                            <Users className="h-3.5 w-3.5 flex-shrink-0" />
+                            {meeting.attendees.slice(0, 3).join(", ")}
+                            {meeting.attendees.length > 3 ? ` +${meeting.attendees.length - 3} more` : ""}
                         </span>
                         <span className="flex items-center gap-1">
                             <MessageSquare className="h-3.5 w-3.5" />

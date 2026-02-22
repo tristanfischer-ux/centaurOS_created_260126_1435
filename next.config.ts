@@ -32,11 +32,13 @@ const nextConfig: NextConfig = {
 
   // Tree-shake heavy barrel-export packages for smaller bundles
   experimental: {
+    // SECURITY: framer-motion removed — optimizePackageImports breaks its
+    // constructor exports in production builds, causing "Object is not a
+    // constructor (evaluating 'new A.A')" crashes.
     optimizePackageImports: [
       "lucide-react",
       "date-fns",
       "recharts",
-      "framer-motion",
       "react-day-picker",
     ],
     // INTENT: Keep previously-visited pages in the client router cache so
@@ -118,6 +120,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
+              "worker-src 'self' blob:",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.stripe.com https://api.openai.com https://*.sentry.io https://*.ingest.sentry.io",
               // SECURITY: Allow iframes from any origin for the in-app browser (/browse).
               // The iframe uses sandbox="allow-scripts allow-same-origin allow-forms allow-popups"

@@ -62,8 +62,9 @@ function getCTALabel(category: string): string {
 
 /** Extract display price from attributes, stripping any embedded rate period (e.g. "/day") */
 function getDisplayPrice(attrs: Record<string, unknown>): { amount: string; period: string | null } | null {
-    const raw = (attrs.rate || attrs.cost || attrs.price || attrs.day_rate || null) as string | null
-    if (!raw) return null
+    const rawValue = attrs.rate || attrs.cost || attrs.price || attrs.day_rate || null
+    if (!rawValue) return null
+    const raw = String(rawValue)
     const periodMatch = raw.match(/\/(day|month|hr|hour|week|year)$/i)
     const amount = periodMatch ? raw.slice(0, periodMatch.index) : raw
     const period = periodMatch ? periodMatch[1].toLowerCase() : null

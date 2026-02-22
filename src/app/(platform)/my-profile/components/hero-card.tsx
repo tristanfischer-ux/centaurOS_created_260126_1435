@@ -107,10 +107,10 @@ export function HeroCard({
   return (
     <Card className="overflow-hidden">
       {/* Gradient header band */}
-      <div className="h-24 bg-gradient-to-r from-orange-50 via-orange-100/40 to-background" />
+      <div className="h-16 sm:h-24 bg-gradient-to-r from-orange-50 via-orange-100/40 to-background" />
 
-      <CardContent className="-mt-14 relative pb-6">
-        <div className="flex flex-col sm:flex-row items-start gap-5">
+      <CardContent className="-mt-10 sm:-mt-14 relative pb-6">
+        <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
           {/* Avatar with upload overlay */}
           <div className="relative flex-shrink-0">
             <button
@@ -125,7 +125,7 @@ export function HeroCard({
                 role={role}
                 avatarUrl={avatarUrl}
                 size="2xl"
-                className="border-4 border-background shadow-lg"
+                className="h-20 w-20 sm:h-28 sm:w-28 border-4 border-background shadow-lg"
               />
               {/* Hover overlay */}
               <div className="absolute inset-0 rounded-full bg-foreground/0 group-hover:bg-foreground/40 transition-colors flex items-center justify-center">
@@ -148,10 +148,10 @@ export function HeroCard({
           </div>
 
           {/* Info */}
-          <div className="flex-1 min-w-0 pt-2 sm:pt-8">
+          <div className="flex-1 min-w-0 pt-1 sm:pt-8">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="text-2xl font-display font-semibold text-foreground tracking-tight truncate">
+                <h2 className="text-xl sm:text-2xl font-display font-semibold text-foreground tracking-tight truncate">
                   {name || 'Your Name'}
                 </h2>
                 {headline && (
@@ -162,16 +162,17 @@ export function HeroCard({
               {/* Action buttons */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 {onEditClick && (
-                  <Button variant="outline" size="sm" onClick={onEditClick}>
+                  <Button variant="outline" size="sm" onClick={onEditClick} className="min-h-[44px]">
                     <Pencil className="h-4 w-4 mr-2" />
                     Edit
                   </Button>
                 )}
                 {isProvider && profileSlug && (
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline" size="sm" asChild className="min-h-[44px]">
                     <a href={`/profile/${profileSlug}`} target="_blank" rel="noopener noreferrer">
                       <Eye className="h-4 w-4 mr-2" />
-                      Public Profile
+                      <span className="hidden sm:inline">Public Profile</span>
+                      <span className="sm:hidden">Public</span>
                     </a>
                   </Button>
                 )}

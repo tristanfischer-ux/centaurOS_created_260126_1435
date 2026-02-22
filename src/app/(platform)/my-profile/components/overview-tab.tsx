@@ -342,16 +342,16 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="pt-5 pb-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Icon className="h-4 w-4 text-international-orange" />
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+      <CardContent className="pt-5 pb-4 px-4 sm:px-6">
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
+          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-international-orange flex-shrink-0" />
+          <span className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">
             {label}
           </span>
         </div>
-        <p className="text-2xl font-bold text-foreground">{value}</p>
+        <p className="text-xl sm:text-2xl font-bold text-foreground">{value}</p>
         {detail && (
-          <p className="text-xs text-muted-foreground mt-0.5">{detail}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">{detail}</p>
         )}
       </CardContent>
     </Card>

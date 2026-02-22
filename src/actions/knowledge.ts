@@ -32,8 +32,10 @@ import {
   getVaultStats,
   ensureDefaultDomains,
   extractKnowledge,
+  extractKnowledgeFromDocument,
   discoverConnections,
 } from '@/lib/knowledge-vault'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 import type {
   KnowledgeQueryParams,
   KnowledgeQueryResult,
@@ -44,6 +46,7 @@ import type {
   KnowledgeLinkRelationship,
   VaultStats,
   ExtractionResult,
+  DocumentExtractionResult,
 } from '@/lib/knowledge-vault'
 
 // ─── Auth Helper ─────────────────────────────────────────────────────
@@ -446,4 +449,139 @@ export async function triggerKnowledgeExtraction(
     })
     return { data: null, error: 'Extraction failed' }
   }
+}
+
+// ─── Document Knowledge Extraction ──────────────────────────────────
+
+const MAX_DOCUMENT_SIZE_BYTES = 20 * 1024 * 1024 // 20MB
+const ALLOWED_DOCUMENT_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+] as const
+
+/**
+ * Extracts knowledge notes from an uploaded document file.
+ *
+ * @description Parses the file (PDF, DOCX, or TXT), extracts text, then runs
+ * the document extraction pipeline to create knowledge notes in the vault.
+ * All specialists can then reference this knowledge via full-text search.
+ *
+ * @param formData - FormData containing 'file' (the document)
+ * @returns Extraction results (saved/skipped counts) or error
+ *
+ * @security Requires authenticated user with foundry membership.
+ * Rate-limited to prevent AI cost abuse.
+ */
+export async function extractKnowledgeFromUpload(
+  formData: FormData
+): Promise<{ data: DocumentExtractionResult | null; error: string | null }> {
+  const auth = await requireAuth()
+  if (!auth) return { data: null, error: 'Unauthorized' }
+
+  // SECURITY: Rate limit to prevent AI cost abuse (same bucket as AI analysis)
+  const rateLimitError = await checkRateLimit('aiAnalysis', `doc-extract:${auth.userId}`)
+  if (rateLimitError) return { data: null, error: rateLimitError }
+
+  const file = formData.get('file') as File | null
+  if (!file) return { data: null, error: 'No file provided' }
+
+  if (file.size > MAX_DOCUMENT_SIZE_BYTES) {
+    return { data: null, error: 'File too large. Maximum size is 20 MB.' }
+  }
+
+  if (!ALLOWED_DOCUMENT_TYPES.includes(file.type as typeof ALLOWED_DOCUMENT_TYPES[number])) {
+    return { data: null, error: 'Unsupported file type. Please upload a PDF, DOCX, or TXT file.' }
+  }
+
+  try {
+    const text = await parseDocumentText(file)
+
+    if (!text || text.length < 100) {
+      return { data: null, error: 'Could not extract enough text from the file.' }
+    }
+
+    const result = await extractKnowledgeFromDocument({
+      text,
+      documentName: file.name,
+      foundryId: auth.foundryId,
+    })
+
+    return { data: result, error: null }
+  } catch (err) {
+    console.error('[knowledge] Document extraction failed:', {
+      fileName: file.name,
+      fileSize: file.size,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    })
+    return { data: null, error: 'Failed to extract knowledge from document. Please try again.' }
+  }
+}
+
+/**
+ * Extracts knowledge from pre-parsed text (used by business plan upload flow).
+ *
+ * @description When the business plan analysis already has parsed text,
+ * this avoids re-parsing the file. Fire-and-forget from the caller.
+ *
+ * @param text - Pre-parsed plaintext from the document
+ * @param documentName - Original filename for provenance
+ * @returns Extraction results or error
+ *
+ * @security Requires authenticated user with foundry membership
+ */
+export async function extractKnowledgeFromText(
+  text: string,
+  documentName: string
+): Promise<{ data: DocumentExtractionResult | null; error: string | null }> {
+  const auth = await requireAuth()
+  if (!auth) return { data: null, error: 'Unauthorized' }
+
+  if (!text || text.length < 100) {
+    return { data: null, error: 'Text too short for extraction' }
+  }
+
+  try {
+    const result = await extractKnowledgeFromDocument({
+      text,
+      documentName,
+      foundryId: auth.foundryId,
+    })
+
+    return { data: result, error: null }
+  } catch (err) {
+    console.error('[knowledge] Text extraction failed:', {
+      documentName,
+      textLength: text.length,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    })
+    return { data: null, error: 'Extraction failed' }
+  }
+}
+
+// ─── File Parsing Helper ────────────────────────────────────────────
+
+/**
+ * Extracts plaintext from a document file (PDF, DOCX, or TXT).
+ *
+ * GOTCHA: pdf-parse and mammoth are dynamically imported to keep them
+ * out of the client bundle and avoid issues with SSR.
+ */
+async function parseDocumentText(file: File): Promise<string> {
+  if (file.type === 'application/pdf') {
+    const buffer = Buffer.from(await file.arrayBuffer())
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require('pdf-parse')
+    const data = await pdfParse(buffer)
+    return data.text
+  }
+
+  if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const mammoth = await import('mammoth')
+    const result = await mammoth.extractRawText({ buffer })
+    return result.value
+  }
+
+  return await file.text()
 }

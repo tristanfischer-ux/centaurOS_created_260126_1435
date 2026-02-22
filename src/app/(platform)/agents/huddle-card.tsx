@@ -195,7 +195,7 @@ export function HuddleCard({ huddle, topics, onJoinHuddle, index = 0 }: HuddleCa
                     <div className="flex items-center gap-2">
                         <Button
                             onClick={handleJoin}
-                            className="flex-1 bg-international-orange hover:bg-international-orange-hover text-white"
+                            className="flex-1 bg-international-orange hover:bg-international-orange-hover text-white h-10 sm:h-8"
                             size="sm"
                         >
                             <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
@@ -206,7 +206,7 @@ export function HuddleCard({ huddle, topics, onJoinHuddle, index = 0 }: HuddleCa
                         {alternateTopics.length > 0 && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="secondary" size="sm" className="px-2">
+                                    <Button variant="secondary" size="sm" className="px-2 h-10 sm:h-8">
                                         <ChevronDown className="h-3.5 w-3.5" />
                                         <span className="sr-only">Other topics</span>
                                     </Button>

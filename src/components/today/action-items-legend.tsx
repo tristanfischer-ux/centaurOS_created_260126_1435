@@ -29,7 +29,7 @@ const ACTION_ITEMS: ActionItem[] = [
 
 export function ActionItemsLegend({ className }: { className?: string }) {
     return (
-        <div className={cn("flex items-center gap-6 text-sm", className)}>
+        <div className={cn("flex items-center gap-3 sm:gap-6 text-sm flex-wrap", className)}>
             <span className="text-muted-foreground font-medium">Action Items:</span>
             {ACTION_ITEMS.map((item) => {
                 const Icon = item.icon

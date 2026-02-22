@@ -201,7 +201,7 @@ export function SpecialistsLanding({
                     <h2 className="text-2xl sm:text-3xl lg:text-4xl font-display font-bold text-foreground tracking-tight leading-tight">
                         Your leadership team, ready to huddle.
                     </h2>
-                    <p className="text-lg text-muted-foreground leading-relaxed">
+                    <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
                         Talk to your key leaders one-on-one, or jump into a team huddle where
                         they&apos;ve already identified what needs discussing.
                     </p>
@@ -241,7 +241,7 @@ export function SpecialistsLanding({
                         Your Key Leaders
                     </h3>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     {keyLeaders.map((leader) => {
                         if (!leader) return null
                         const activity = specialistActivities[leader.id]
@@ -267,10 +267,10 @@ export function SpecialistsLanding({
                                     )}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-semibold text-foreground group-hover:text-international-orange transition-colors">
+                                    <p className="text-sm font-semibold text-foreground group-hover:text-international-orange transition-colors truncate">
                                         {leader.name}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-xs text-muted-foreground truncate">
                                         {leader.title}
                                     </p>
                                     {activity?.lastMessageAt && (
@@ -279,7 +279,7 @@ export function SpecialistsLanding({
                                         </p>
                                     )}
                                 </div>
-                                <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                <ArrowRight className="h-4 w-4 text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                             </button>
                         )
                     })}

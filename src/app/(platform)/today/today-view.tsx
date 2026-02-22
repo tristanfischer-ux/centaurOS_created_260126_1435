@@ -376,8 +376,8 @@ export function TodayView(): React.ReactElement {
 
                         {/* Intelligence Signal — shows how long the system has been learning */}
                         {briefing && briefing.intelligenceDaysOfData > 7 && (
-                            <div className="flex items-center gap-2 mt-4 pt-3 border-t text-xs text-muted-foreground">
-                                <Lightbulb className="h-3.5 w-3.5 shrink-0 text-status-warning" />
+                            <div className="flex items-start gap-2 mt-4 pt-3 border-t text-xs text-muted-foreground">
+                                <Lightbulb className="h-3.5 w-3.5 shrink-0 text-status-warning mt-0.5" />
                                 <span className="flex-1">
                                     Based on {briefing.intelligenceDaysOfData} days of activity
                                     {briefing.bestProductivityDay && (
@@ -438,9 +438,9 @@ export function TodayView(): React.ReactElement {
                     <SectionHeader icon={MessageCircle} label="Unread Messages" color="text-status-info" />
                     <Card className="rounded-xl border">
                         <CardContent className="pt-4 pb-4">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                 <div className="flex items-center gap-3">
-                                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-status-info-light">
+                                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-status-info-light shrink-0">
                                         <MessageCircle className="h-4 w-4 text-status-info" />
                                     </div>
                                     <div>
@@ -452,7 +452,7 @@ export function TodayView(): React.ReactElement {
                                         </p>
                                     </div>
                                 </div>
-                                <Button variant="outline" size="sm" asChild className="gap-1.5">
+                                <Button variant="outline" size="sm" asChild className="gap-1.5 self-start sm:self-auto shrink-0">
                                     <Link href="/updates">
                                         View messages
                                         <ArrowRight className="h-3.5 w-3.5" />
@@ -823,13 +823,15 @@ function FocusTasksSection({ briefing, overdueCount }: FocusTasksSectionProps): 
             <div>
                 <SectionHeader icon={ListChecks} label="Focus Today" color="text-international-orange" />
                 <Card className="rounded-xl border shadow-sm">
-                    <CardContent className="py-6 flex items-center gap-3">
-                        <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <p className="text-sm text-muted-foreground">
-                            No tasks scheduled for today, but you have {overdueCount} overdue{" "}
-                            {overdueCount === 1 ? "item" : "items"}.
-                        </p>
-                        <Button variant="outline" size="sm" asChild className="shrink-0 ml-auto">
+                    <CardContent className="py-6 flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex items-center gap-3">
+                            <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <p className="text-sm text-muted-foreground">
+                                No tasks scheduled for today, but you have {overdueCount} overdue{" "}
+                                {overdueCount === 1 ? "item" : "items"}.
+                            </p>
+                        </div>
+                        <Button variant="outline" size="sm" asChild className="shrink-0 sm:ml-auto self-start sm:self-auto">
                             <Link href="/new-tasks" className="gap-1.5">
                                 View tasks
                                 <ArrowRight className="h-3 w-3" />
@@ -1119,7 +1121,7 @@ function StrategySpotlightSection({ items }: StrategySpotlightSectionProps): Rea
                                 </div>
                                 {/* Progress */}
                                 <div className="flex items-center gap-2 shrink-0">
-                                    <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                                    <div className="hidden sm:block w-16 h-1.5 rounded-full bg-muted overflow-hidden">
                                         <div
                                             className={cn("h-full rounded-full transition-all", healthColor)}
                                             style={{ width: `${item.progress}%` }}

@@ -90,7 +90,7 @@ export function OrbitalView({
   )
 
   return (
-    <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
       {/* Pan + Zoom Canvas with Orbit SVG */}
       <PanZoomCanvas onBackgroundClick={handleDeselect}>
         <OrbitSVG
@@ -107,8 +107,8 @@ export function OrbitalView({
         />
       </PanZoomCanvas>
 
-      {/* Side Panel (340px) */}
-      <div className="w-[340px] border-l border-border overflow-y-auto bg-muted/30">
+      {/* Side Panel — full-width bottom sheet on mobile, 340px sidebar on desktop */}
+      <div className="w-full md:w-[340px] max-h-[40vh] md:max-h-none border-t md:border-t-0 md:border-l border-border overflow-y-auto bg-muted/30">
         <OrbitSidePanel
           selected={selected}
           functions={functions}

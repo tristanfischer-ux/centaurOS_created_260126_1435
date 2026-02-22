@@ -271,7 +271,7 @@ export function StrategyDashboard({
       {/* Page Header */}
       <div className="space-y-4 pb-4 border-b border-slate-100">
         {/* Row 1: Title + primary CTA */}
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="min-w-0 flex-1">
             <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
               <Link href="/plan" className="hover:text-foreground transition-colors">Plan</Link>
@@ -288,7 +288,7 @@ export function StrategyDashboard({
           </div>
           <Button
             onClick={() => setIsCreateGoalOpen(true)}
-            className="bg-international-orange hover:bg-international-orange-hover shrink-0"
+            className="bg-international-orange hover:bg-international-orange-hover shrink-0 w-full sm:w-auto"
           >
             <Plus className="h-4 w-4 mr-1.5" />
             New Goal
@@ -296,56 +296,81 @@ export function StrategyDashboard({
         </div>
 
         {/* Row 2: Toolbar — view tabs + secondary actions */}
-        <div className="flex flex-wrap items-center gap-2">
-          <AskSpecialistButton
-            context={{
-              type: 'strategy',
-              title: 'Overall Strategy',
-              description: purposeData?.purpose ?? 'Company strategic direction',
-              metadata: {
-                purposeSummary: purposeData?.purpose,
-                objectives: pillars.map((p) => ({
-                  title: p.title,
-                  health: p.health,
-                  progress: p.progress,
-                })),
-                notes: `${pillars.length} strategic pillars. ${stats.totalProgress}% average progress. ${stats.atRisk} at risk, ${stats.offTrack} off track.`,
-              },
-            }}
-            specialistId="strategist"
-            specialistName="Sage"
-            label="Discuss Strategy"
-          />
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-            <TabsList className="h-9">
-              <TabsTrigger value="dashboard" className="text-xs gap-1.5 px-3">
-                <LayoutDashboard className="h-3.5 w-3.5" />
-                Dashboard
-              </TabsTrigger>
-              <TabsTrigger value="river" className="text-xs gap-1.5 px-3">
-                <Waypoints className="h-3.5 w-3.5" />
-                River
-              </TabsTrigger>
-              <TabsTrigger value="link" className="text-xs gap-1.5 px-3">
-                <Link2 className="h-3.5 w-3.5" />
-                Link
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Button
-            variant="outline"
-            onClick={() => setIsExportOpen(true)}
-          >
-            <Copy className="h-4 w-4 mr-1.5" />
-            Copy for Email
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setIsTranscriptImportOpen(true)}
-          >
-            <FileText className="h-4 w-4 mr-1.5" />
-            Import Transcript
-          </Button>
+        <div className="space-y-2 sm:space-y-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <AskSpecialistButton
+              context={{
+                type: 'strategy',
+                title: 'Overall Strategy',
+                description: purposeData?.purpose ?? 'Company strategic direction',
+                metadata: {
+                  purposeSummary: purposeData?.purpose,
+                  objectives: pillars.map((p) => ({
+                    title: p.title,
+                    health: p.health,
+                    progress: p.progress,
+                  })),
+                  notes: `${pillars.length} strategic pillars. ${stats.totalProgress}% average progress. ${stats.atRisk} at risk, ${stats.offTrack} off track.`,
+                },
+              }}
+              specialistId="strategist"
+              specialistName="Sage"
+              label="Discuss Strategy"
+            />
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+              <TabsList className="h-9">
+                <TabsTrigger value="dashboard" className="text-xs gap-1.5 px-3">
+                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  <span className="hidden xs:inline">Dashboard</span>
+                </TabsTrigger>
+                <TabsTrigger value="river" className="text-xs gap-1.5 px-3">
+                  <Waypoints className="h-3.5 w-3.5" />
+                  <span className="hidden xs:inline">River</span>
+                </TabsTrigger>
+                <TabsTrigger value="link" className="text-xs gap-1.5 px-3">
+                  <Link2 className="h-3.5 w-3.5" />
+                  <span className="hidden xs:inline">Link</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="hidden sm:contents">
+              <Button
+                variant="outline"
+                onClick={() => setIsExportOpen(true)}
+              >
+                <Copy className="h-4 w-4 mr-1.5" />
+                Copy for Email
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsTranscriptImportOpen(true)}
+              >
+                <FileText className="h-4 w-4 mr-1.5" />
+                Import Transcript
+              </Button>
+            </div>
+          </div>
+          {/* Secondary actions: shown below tabs on mobile */}
+          <div className="flex items-center gap-2 sm:hidden">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => setIsExportOpen(true)}
+            >
+              <Copy className="h-4 w-4 mr-1.5" />
+              Copy for Email
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => setIsTranscriptImportOpen(true)}
+            >
+              <FileText className="h-4 w-4 mr-1.5" />
+              Import
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -481,9 +506,9 @@ export function StrategyDashboard({
           {unlinkedObjectiveCount > 0 && (
             <Card className="rounded-xl border-dashed border-2 border-status-warning/30 bg-status-warning/5">
               <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="rounded-full bg-status-warning/10 p-2">
+                    <div className="rounded-full bg-status-warning/10 p-2 shrink-0">
                       <AlertTriangle className="h-5 w-5 text-status-warning" />
                     </div>
                     <div>
@@ -495,7 +520,7 @@ export function StrategyDashboard({
                       </p>
                     </div>
                   </div>
-                  <Link href="/new-objectives">
+                  <Link href="/new-objectives" className="self-end sm:self-auto shrink-0">
                     <Button variant="outline" size="sm">
                       Review
                       <ArrowRight className="h-3.5 w-3.5 ml-1.5" />

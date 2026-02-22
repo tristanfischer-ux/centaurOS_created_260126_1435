@@ -402,7 +402,7 @@ export function ObjectivesBoard({
             Your objectives, grouped by strategy
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <AskSpecialistButton
             context={{
               type: 'objective',
@@ -450,8 +450,8 @@ export function ObjectivesBoard({
       />
 
       {/* Toolbar: View tabs + Strategy Filter + Search */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
             <TabsList className="h-9">
               <TabsTrigger value="board" className="text-xs gap-1.5 px-3">
@@ -493,7 +493,7 @@ export function ObjectivesBoard({
                 placeholder="Search objectives..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 w-48 text-sm"
+                className="h-8 w-full sm:w-48 text-sm"
               />
               <Button
                 variant="ghost"
@@ -514,7 +514,7 @@ export function ObjectivesBoard({
             >
               <Search className="h-3.5 w-3.5 mr-1.5" />
               Search
-              <kbd className="ml-2 text-[10px] bg-muted px-1 py-0.5 rounded">/</kbd>
+              <kbd className="ml-2 text-[10px] bg-muted px-1 py-0.5 rounded hidden sm:inline">/</kbd>
             </Button>
           )}
         </div>

@@ -37,11 +37,11 @@ export function ProfileStrengthGauge({ score, sections }: ProfileStrengthGaugePr
   return (
     <Card>
       <CardContent className="pt-5 pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             {/* Circular gauge */}
-            <div className="relative h-16 w-16 flex-shrink-0">
-              <svg className="h-16 w-16 -rotate-90" viewBox="0 0 64 64">
+            <div className="relative h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0">
+              <svg className="h-12 w-12 sm:h-16 sm:w-16 -rotate-90" viewBox="0 0 64 64">
                 {/* Background circle */}
                 <circle
                   cx="32"
@@ -66,7 +66,7 @@ export function ProfileStrengthGauge({ score, sections }: ProfileStrengthGaugePr
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className={cn(
-                  'text-sm font-bold',
+                  'text-xs sm:text-sm font-bold',
                   score >= 80 ? 'text-status-success' :
                   score >= 50 ? 'text-status-warning' :
                   'text-destructive'
@@ -77,7 +77,7 @@ export function ProfileStrengthGauge({ score, sections }: ProfileStrengthGaugePr
             </div>
 
             {/* Label */}
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground">
                 Profile Strength
               </p>
@@ -85,7 +85,7 @@ export function ProfileStrengthGauge({ score, sections }: ProfileStrengthGaugePr
                 {completedCount} of {sections.length} sections complete
               </p>
               {score < 80 && incompleteSections.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
                   Next: {incompleteSections[0].name}
                 </p>
               )}

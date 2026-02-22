@@ -16,7 +16,7 @@
  * - Types: src/types/canvas.ts
  */
 
-import { useState, useMemo, useRef, useCallback, type FC } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect, type FC } from 'react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -206,7 +206,21 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
   const [hovObj, setHovObj] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState(0)
+  const [isMobile, setIsMobile] = useState(false)
+  const [mobileHintDismissed, setMobileHintDismissed] = useState(false)
   const dragRef = useRef<{ x: number; startPan: number } | null>(null)
+
+  // INTENT: On mobile, the 1200px-wide SVG scales down to ~3x smaller than intended,
+  // making labels unreadable. Auto-set zoom to 2x so users start at a usable scale
+  // and can pan to see the full timeline.
+  useEffect(() => {
+    const mobile = window.innerWidth < 640
+    setIsMobile(mobile)
+    if (mobile) {
+      setZoom(2)
+      setPan(0)
+    }
+  }, [])
 
   // ── Drag-to-reschedule state ──
   // Use both state (for re-renders) and ref (for event handlers to avoid stale closures)
@@ -521,8 +535,10 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
     >
       {/* Floating controls (top-right corner of the river) */}
       <div style={{
-        position: 'absolute', top: 10, right: 28, zIndex: 10,
-        display: 'flex', alignItems: 'center', gap: 6,
+        position: 'absolute', top: 8, right: 12, zIndex: 10,
+        display: 'flex', flexWrap: 'wrap' as const, alignItems: 'center', gap: 4,
+        justifyContent: 'flex-end',
+        maxWidth: 'calc(100% - 24px)',
       }}>
         {/* Expand / Collapse All toggle */}
         {(onExpandAll || onCollapseAll) && (
@@ -533,24 +549,25 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
               height: 26, borderRadius: 7, border: '1px solid #E2E8F0',
               background: 'white', cursor: 'pointer', fontSize: 10, fontWeight: 700,
               color: '#64748B', display: 'flex', alignItems: 'center', gap: 4,
-              fontFamily: FONT, padding: '0 10px',
+              fontFamily: FONT, padding: '0 8px',
               boxShadow: '0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04)',
+              whiteSpace: 'nowrap' as const,
             }}
           >
             <span style={{ fontSize: 12 }}>{allExpanded ? '▾' : '▸'}</span>
-            {allExpanded ? 'Collapse All' : 'Expand All'}
+            {allExpanded ? 'Collapse' : 'Expand'}
           </button>
         )}
 
         {/* Zoom controls */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 3,
-          background: 'white', borderRadius: 8, padding: '3px 5px',
+          display: 'flex', alignItems: 'center', gap: 2,
+          background: 'white', borderRadius: 8, padding: '3px 4px',
           boxShadow: '0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04)',
         }}>
           <ZoomBtn onClick={() => setPan((p) => Math.max(p - 80, -200))}>◀</ZoomBtn>
           <ZoomBtn onClick={() => setZoom((z) => { const n = Math.max(z - 0.25, 0.5); if (n <= 1) setPan(0); return n })}>−</ZoomBtn>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B', minWidth: 32, textAlign: 'center' as const }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B', minWidth: 28, textAlign: 'center' as const }}>
             {Math.round(zoom * 100)}%
           </span>
           <ZoomBtn onClick={() => setZoom((z) => Math.min(z + 0.25, 4))}>+</ZoomBtn>
@@ -563,8 +580,35 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
         </div>
       </div>
 
+      {/* Mobile hint: nudge users to use zoom/pan controls */}
+      {isMobile && !mobileHintDismissed && (
+        <div
+          style={{
+            position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 10, background: '#1E293B', color: 'white', borderRadius: 10,
+            padding: '8px 16px', fontSize: 12, fontFamily: FONT, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 8,
+            boxShadow: '0 4px 12px rgba(0,0,0,.15)',
+            whiteSpace: 'nowrap' as const,
+          }}
+        >
+          <span>Pinch or use controls to zoom &amp; pan</span>
+          <button
+            onClick={() => setMobileHintDismissed(true)}
+            style={{
+              background: 'transparent', border: 'none', color: '#94A3B8',
+              cursor: 'pointer', fontSize: 14, fontWeight: 700, padding: '0 2px',
+              lineHeight: 1,
+            }}
+            aria-label="Dismiss hint"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* SVG Canvas */}
-      <div style={{ padding: '0 20px 40px', cursor: dragState?.isDragging ? 'grabbing' : (zoom > 1 ? 'grab' : 'default') }} onMouseDown={onMD}>
+      <div style={{ padding: '0 12px 40px', cursor: dragState?.isDragging ? 'grabbing' : (zoom > 1 ? 'grab' : 'default') }} onMouseDown={onMD}>
         <svg
           ref={svgRef}
           viewBox={`${pan} 0 ${vbW} ${totalH}`}

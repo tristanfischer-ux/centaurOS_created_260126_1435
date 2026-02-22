@@ -121,12 +121,12 @@ export function WeeklyBrief(): React.ReactElement | null {
                   <span className="h-2 w-2 rounded-full bg-international-orange" />
                 )}
               </CardTitle>
-              <div className="flex items-center gap-2 mt-0.5">
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 <Calendar className="h-3 w-3 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">
                   {dateRange}
                 </span>
-                <span className="text-xs text-muted-foreground">·</span>
+                <span className="text-xs text-muted-foreground hidden sm:inline">·</span>
                 <span className="text-xs text-muted-foreground">
                   {insightsAnalyzed} insights from {specialistsContributing} specialists
                 </span>
@@ -134,7 +134,7 @@ export function WeeklyBrief(): React.ReactElement | null {
             </div>
           </div>
 
-          <Badge variant="brand" className="flex-shrink-0">
+          <Badge variant="brand" className="flex-shrink-0 hidden sm:flex">
             <BookOpen className="h-3 w-3 mr-1" />
             Executive Brief
           </Badge>

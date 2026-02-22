@@ -57,6 +57,7 @@ import { fetchKnowledgeNotes, fetchKnowledgeDomains, fetchVaultStats, toggleNote
 import { KnowledgeNoteCard } from './knowledge-note-card'
 import { KnowledgeNoteDetailDialog } from './knowledge-note-detail-dialog'
 import { CreateKnowledgeNoteDialog } from './create-knowledge-note-dialog'
+import { DocumentUploadZone } from './document-upload-zone'
 import type {
   KnowledgeNoteSummary,
   KnowledgeDomain,
@@ -266,23 +267,28 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <DocumentUploadZone
+            compact
+            onExtractionComplete={() => { loadNotes(); loadInitialData() }}
+          />
           <Button
             variant="default"
             onClick={() => setIsCreateDialogOpen(true)}
+            aria-label="Add Knowledge"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Knowledge
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Knowledge</span>
           </Button>
         </div>
       </div>
 
       {/* ── Empty State ──────────────────────────────────────────── */}
       {isVaultEmpty ? (
-        <div className="py-12">
+        <div className="space-y-8 py-8">
           <EmptyState
             title="Your knowledge vault is empty"
-            description="Knowledge accumulates automatically as you consult your specialists. You can also add notes manually to capture decisions, insights, and lessons."
+            description="Knowledge accumulates automatically as you consult your specialists. You can also upload documents or add notes manually."
             action={
               <Button variant="default" onClick={() => setIsCreateDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -290,6 +296,11 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
               </Button>
             }
           />
+          <div className="max-w-lg mx-auto">
+            <DocumentUploadZone
+              onExtractionComplete={() => { loadNotes(); loadInitialData() }}
+            />
+          </div>
         </div>
       ) : (
         <>
@@ -349,7 +360,7 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
               {/* Domain filter */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2 min-w-[140px]">
+                  <Button variant="outline" className="gap-2 w-full sm:w-auto sm:min-w-[140px]">
                     <Filter className="h-4 w-4" />
                     {selectedDomain
                       ? domains.find((d) => d.id === selectedDomain)?.name ?? 'Domain'
@@ -386,7 +397,7 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
               {/* Sort */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
+                  <Button variant="outline" className="gap-2 w-full sm:w-auto">
                     <ArrowUpDown className="h-4 w-4" />
                     {SORT_OPTIONS.find((s) => s.value === sortBy)?.label}
                   </Button>
@@ -410,15 +421,15 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
             {/* Tabs + Type filters */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as typeof activeTab); setPage(1) }}>
-                <TabsList>
+                <TabsList className="w-full sm:w-auto">
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="pinned">
-                    <Pin className="h-3.5 w-3.5 mr-1.5" />
-                    Pinned
+                    <Pin className="h-3.5 w-3.5 sm:mr-1.5" />
+                    <span className="hidden sm:inline">Pinned</span>
                   </TabsTrigger>
                   <TabsTrigger value="unverified">
-                    <Eye className="h-3.5 w-3.5 mr-1.5" />
-                    Needs Review
+                    <Eye className="h-3.5 w-3.5 sm:mr-1.5" />
+                    <span className="hidden sm:inline">Needs Review</span>
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -429,7 +440,7 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
                     key={type}
                     onClick={() => toggleTypeFilter(type)}
                     className={cn(
-                      'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
+                      'inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-full text-xs font-medium transition-colors',
                       selectedTypes.includes(type)
                         ? 'bg-international-orange text-white'
                         : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
@@ -584,10 +595,10 @@ function KnowledgeVaultSkeleton() {
   return (
     <div className="space-y-8">
       {/* Header skeleton */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
         <div className="space-y-2">
           <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-4 w-72" />
+          <Skeleton className="h-4 w-64 sm:w-72" />
         </div>
         <Skeleton className="h-10 w-36" />
       </div>
@@ -600,10 +611,10 @@ function KnowledgeVaultSkeleton() {
       </div>
 
       {/* Filter skeleton */}
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <Skeleton className="h-10 flex-1" />
-        <Skeleton className="h-10 w-36" />
-        <Skeleton className="h-10 w-36" />
+        <Skeleton className="h-10 w-full sm:w-36" />
+        <Skeleton className="h-10 w-full sm:w-36" />
       </div>
 
       {/* Notes skeleton */}

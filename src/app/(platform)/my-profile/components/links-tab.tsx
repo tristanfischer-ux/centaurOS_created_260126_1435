@@ -132,23 +132,23 @@ function LinkRow({
   displayText: string
 }) {
   return (
-    <div className="flex items-center justify-between py-2">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-muted rounded-md">
+    <div className="flex items-center justify-between gap-2 py-2">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="p-2 bg-muted rounded-md flex-shrink-0">
           <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             {label}
           </p>
-          <p className="text-sm text-foreground">{displayText}</p>
+          <p className="text-sm text-foreground truncate">{displayText}</p>
         </div>
       </div>
       <a
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+        className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0"
         aria-label={`Open ${label}`}
       >
         <ExternalLink className="h-4 w-4" />

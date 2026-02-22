@@ -88,8 +88,8 @@ export function ObjectiveCard({ objective, strategicObjectives = [], isSelected,
         !isDragOverlay && !isDragging && !isSelected && 'hover:border-foreground/10',
       )}
     >
-      {/* Action buttons - visible on hover (hidden during drag) */}
-      {!isDragOverlay && <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+      {/* Action buttons — always visible on mobile, hover-revealed on desktop */}
+      {!isDragOverlay && <div className="absolute top-2 right-2 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-10">
         {onEdit && (
           <Button
             variant="ghost"

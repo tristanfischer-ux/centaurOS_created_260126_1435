@@ -151,13 +151,16 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
 
       {/* Tabbed Content */}
       <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsList className="w-full flex-wrap">
+          <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
           {showMarketplaceTab && (
-            <TabsTrigger value="marketplace">Marketplace</TabsTrigger>
+            <TabsTrigger value="marketplace" className="flex-1">Marketplace</TabsTrigger>
           )}
-          <TabsTrigger value="links">Links & Social</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
+          <TabsTrigger value="links" className="flex-1">
+            <span className="sm:hidden">Links</span>
+            <span className="hidden sm:inline">Links &amp; Social</span>
+          </TabsTrigger>
+          <TabsTrigger value="preferences" className="flex-1">Preferences</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
