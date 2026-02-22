@@ -56,86 +56,9 @@ export interface SpecialistWorkflow {
 
 export const SPECIALIST_WORKFLOWS: SpecialistWorkflow[] = [
     // ── Strategy (Sage) ──────────────────────────────────────────
-    {
-        id: "draft-strategic-plan",
-        name: "Draft Strategic Plan",
-        description: "Produces a full strategic plan document based on your conversation",
-        specialistId: "strategist",
-        triggers: [
-            "draft the plan",
-            "write the strategy",
-            "draft strategic plan",
-            "create a strategy document",
-        ],
-        promptTemplate: `Based on our conversation, produce a complete strategic plan document. Structure it as:
-
-## Executive Summary
-One paragraph capturing the core strategy.
-
-## Strategic Priorities (Top 3)
-For each priority:
-- What: Clear description
-- Why: Strategic rationale
-- How: Key initiatives
-- Success metric: How we'll know it's working
-- Timeline: When we expect results
-
-## Key Assumptions
-What must be true for this strategy to work.
-
-## Risks & Mitigations
-Top 3 risks and how to address them.
-
-## Next Steps (This Week)
-3-5 concrete actions that start immediately.
-
-Context from our conversation:
-{{context}}
-
-Write this as a polished, ready-to-share document. Be specific and actionable.`,
-        outputFormat: "document",
-        autoSave: true,
-        icon: "FileText",
-    },
-    {
-        id: "competitive-analysis",
-        name: "Competitive Analysis",
-        description: "Produces a structured competitive landscape analysis",
-        specialistId: "strategist",
-        triggers: [
-            "analyze competitors",
-            "competitive analysis",
-            "competitive landscape",
-            "map the competition",
-            "deep dive on competitors",
-            "who are our competitors",
-            "market competition",
-        ],
-        promptTemplate: `Based on our conversation, produce a competitive analysis document.
-
-## Market Overview
-Brief description of the market and key dynamics.
-
-## Competitor Matrix
-| Competitor | Positioning | Strengths | Weaknesses | Threat Level |
-|---|---|---|---|---|
-(Fill in based on what we discussed)
-
-## Our Differentiation
-What makes us different and why it matters.
-
-## Competitive Risks
-Where we're vulnerable and what to do about it.
-
-## Strategic Recommendations
-3 specific moves to strengthen our competitive position.
-
-Context from our conversation:
-{{context}}`,
-        outputFormat: "document",
-        autoSave: true,
-        icon: "Target",
-    },
+    // NOTE: More specific workflows MUST come before generic ones.
+    // detectWorkflowTrigger() returns the first match, so "full strategic analysis"
+    // must precede "competitive analysis" to prevent shadowing.
     {
         id: "full-strategic-analysis",
         name: "Full Strategic Analysis",
@@ -144,6 +67,7 @@ Context from our conversation:
         triggers: [
             "run strategic analysis",
             "full market analysis",
+            "full strategic analysis",
             "analyze my market",
             "McKinsey analysis",
             "strategic deep dive",
@@ -199,7 +123,85 @@ Context from our conversation and company:
         autoSave: true,
         icon: "Telescope",
     },
+    {
+        id: "draft-strategic-plan",
+        name: "Draft Strategic Plan",
+        description: "Produces a full strategic plan document based on your conversation",
+        specialistId: "strategist",
+        triggers: [
+            "draft the plan",
+            "write the strategy",
+            "draft strategic plan",
+            "create a strategy document",
+        ],
+        promptTemplate: `Based on our conversation, produce a complete strategic plan document. Structure it as:
 
+## Executive Summary
+One paragraph capturing the core strategy.
+
+## Strategic Priorities (Top 3)
+For each priority:
+- What: Clear description
+- Why: Strategic rationale
+- How: Key initiatives
+- Success metric: How we'll know it's working
+- Timeline: When we expect results
+
+## Key Assumptions
+What must be true for this strategy to work.
+
+## Risks & Mitigations
+Top 3 risks and how to address them.
+
+## Next Steps (This Week)
+3-5 concrete actions that start immediately.
+
+Context from our conversation:
+{{context}}
+
+Write this as a polished, ready-to-share document. Be specific and actionable.`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "FileText",
+    },
+    {
+        id: "competitive-analysis",
+        name: "Competitive Analysis",
+        description: "Produces a structured competitive landscape analysis",
+        specialistId: "strategist",
+        triggers: [
+            "analyze competitors",
+            "competitive analysis",
+            "competitive landscape",
+            "map the competition",
+            "deep dive on competitors",
+            "who are our competitors",
+        ],
+        promptTemplate: `Based on our conversation, produce a competitive analysis document.
+
+## Market Overview
+Brief description of the market and key dynamics.
+
+## Competitor Matrix
+| Competitor | Positioning | Strengths | Weaknesses | Threat Level |
+|---|---|---|---|---|
+(Fill in based on what we discussed)
+
+## Our Differentiation
+What makes us different and why it matters.
+
+## Competitive Risks
+Where we're vulnerable and what to do about it.
+
+## Strategic Recommendations
+3 specific moves to strengthen our competitive position.
+
+Context from our conversation:
+{{context}}`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "Target",
+    },
     // ── Finance (Finn) ───────────────────────────────────────────
     {
         id: "financial-model",

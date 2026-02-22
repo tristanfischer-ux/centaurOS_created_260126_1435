@@ -44,6 +44,9 @@ import { Markdown } from "@/components/ui/markdown"
 import { getOrCreateSpecialistThread, getRecentSpecialistOutputs, getSpecialistThreadHistory } from "@/actions/agent-memory"
 import type { SpecialistHistoryMessage } from "@/actions/agent-memory"
 import { createArtifact, exportArtifactToGoogleDocs } from "@/actions/agent-artifacts"
+import type { ArtifactContentType } from "@/actions/agent-artifacts"
+import { detectWorkflowTrigger } from "@/lib/agents/specialist-workflows"
+import type { SpecialistId } from "./specialists-data"
 import { persistSpecialistHandoff } from "@/actions/agent-handoffs"
 import { exportAsPDF } from "@/lib/export-utils"
 import { getSpecialistById, SPECIALISTS } from "./specialists-data"
@@ -1303,22 +1306,41 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 tts.finishStreaming(displayResponse)
             }
 
-            // Auto-save to deliverables (fire and forget)
+            // Auto-save to deliverables with smart content type detection
+            const matchedWorkflow = detectWorkflowTrigger(userMessage.content, specialist.id as SpecialistId)
+            const artifactTitle = matchedWorkflow
+                ? `${matchedWorkflow.name} — ${new Date().toLocaleDateString()}`
+                : `${specialist.name}: ${userMessage.content.slice(0, 80)}`
+            // Infer content type from workflow output format or specialist domain
+            let contentType: ArtifactContentType = "document"
+            if (matchedWorkflow) {
+                if (matchedWorkflow.outputFormat === "analysis") contentType = "report"
+                else if (matchedWorkflow.outputFormat === "email") contentType = "email"
+                else if (matchedWorkflow.outputFormat === "table") contentType = "report"
+            } else if (parsedDeck) {
+                contentType = "presentation"
+            }
             createArtifact({
-                title: `${specialist.name}: ${userMessage.content.slice(0, 80)}`,
+                workflowId: matchedWorkflow?.id ?? null,
+                title: artifactTitle,
                 content: displayResponse,
-                contentType: "document",
+                contentType,
                 metadata: {
                     specialistId: specialist.id,
                     specialistName: specialist.name,
-                    source: "specialist-brief",
+                    source: matchedWorkflow ? "specialist-workflow" : "specialist-brief",
+                    workflowName: matchedWorkflow?.name,
                     userPrompt: userMessage.content,
                 },
             }).then((result) => {
                 if (result.data) {
-                    toast.success("Saved to Deliverables", {
-                        description: "You can find this output in your Deliverables.",
-                        duration: 3000,
+                    toast.success(matchedWorkflow ? `${matchedWorkflow.name} saved` : "Saved to Deliverables", {
+                        description: "View it in your Deliverables.",
+                        action: {
+                            label: "Open",
+                            onClick: () => { window.location.href = "/agents/artifacts" },
+                        },
+                        duration: 4000,
                     })
                 }
             }).catch((err) => {
@@ -1336,6 +1358,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             executeAbortRef.current = null
             setIsExecuting(false)
             setIsUrgentMessage(false)
+            setIsSpeculativeMode(false)
         }
     }, [briefText, specialist, threadId, crossSpecialistContext, handoffContext, messages, pendingAttachments, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext, formatBrowseContext])
 
@@ -1589,7 +1612,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     key={s.id}
                                     onClick={() => {
                                         if (!isActive) {
-                                            onSwitchSpecialist?.(s.id)
+                                            handleSwitchSpecialist(s.id)
                                         }
                                         setIsSwitcherOpen(false)
                                     }}
