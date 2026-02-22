@@ -59,6 +59,7 @@ import { SPECIALISTS, getSpecialistById, getSpecialistDisplayName } from "./spec
 import { compileInterSpecialistDynamics } from "@/lib/agents/relationship-matrix"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useTts } from "@/hooks/use-tts"
+import { AiDisclaimer } from "@/components/ui/ai-disclaimer"
 import { MeetingOutputs } from "./meeting-outputs"
 import { HuddleReport } from "./huddle-report"
 import { createArtifact } from "@/actions/agent-artifacts"
@@ -2193,6 +2194,11 @@ export function TeamMeetingDialog({
                         ) : null}
                     </div>
                 )}
+
+                {/* AI disclaimer */}
+                <div className="px-6 pb-1">
+                    <AiDisclaimer />
+                </div>
 
                 {/* ── Footer ───────────────────────────────────────────────── */}
                 <DialogFooter>

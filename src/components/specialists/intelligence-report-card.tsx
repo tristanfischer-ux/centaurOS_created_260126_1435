@@ -36,6 +36,7 @@ import {
 import { cn } from '@/lib/utils'
 
 import { getSpecialistById } from '@/app/(platform)/agents/specialists-data'
+import { AiDisclaimer } from '@/components/ui/ai-disclaimer'
 import { markReportRead } from '@/actions/intelligence'
 
 import type { IntelligenceReportView } from '@/actions/intelligence'
@@ -206,6 +207,9 @@ export function IntelligenceReportCard({
                                 </ul>
                             </div>
                         )}
+
+                        {/* AI disclaimer */}
+                        <AiDisclaimer specialistId={report.specialistId} className="mt-1" />
                     </div>
                 )}
 

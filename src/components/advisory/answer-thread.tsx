@@ -4,6 +4,7 @@ import { useState, useMemo } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
+    AlertTriangle,
     Bot, 
     ThumbsUp, 
     ThumbsDown, 
@@ -231,6 +232,14 @@ export function AnswerThread({
                 <div className="prose prose-sm max-w-none text-foreground">
                     <p className="whitespace-pre-wrap leading-relaxed">{answer.content}</p>
                 </div>
+
+                {/* AI accuracy disclaimer */}
+                {answer.is_ai_generated && (
+                    <p className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <AlertTriangle className="h-2.5 w-2.5" />
+                        AI-generated answers may contain errors. Verify before acting on this information.
+                    </p>
+                )}
 
                 {/* Verification Note */}
                 {answer.verification_note && answer.verified_by && (

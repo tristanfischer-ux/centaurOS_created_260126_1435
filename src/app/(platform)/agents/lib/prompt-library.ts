@@ -6737,7 +6737,7 @@ For each section below, provide:
 - DPO or privacy contact details
 - Supervisory authority (for GDPR)
 
-**Important:** This is a comprehensive starting point, NOT final legal documentation. Have it reviewed by a privacy lawyer licensed in your operating jurisdictions. Flag which sections need jurisdiction-specific customization.
+**Important:** This is AI-generated educational guidance, not legal advice. AI can make mistakes or miss jurisdiction-specific nuances. This is a comprehensive starting point, NOT final legal documentation. Always have it reviewed by a privacy lawyer licensed in your operating jurisdictions before publishing. Flag which sections need jurisdiction-specific customization.
 
 **Before finalizing, verify:** (1) Is every data type mapped to a legal basis? (2) Are retention periods specific (not "as long as necessary")? (3) Would a regular user understand their rights after reading the plain-language summaries?`,
         inputLabel: "Data practices & product details",
@@ -6826,7 +6826,7 @@ Draft terms of service with a dual-layer format: for each section, provide (a) a
 
 **15. Contact Information**
 
-**Important:** This is a comprehensive starting point, NOT final legal documentation. Have it reviewed by a lawyer licensed in your operating jurisdictions before publishing. Flag all jurisdiction-dependent provisions.
+**Important:** This is AI-generated educational guidance, not legal advice. AI can make mistakes or miss jurisdiction-specific nuances. This is a comprehensive starting point, NOT final legal documentation. Always have it reviewed by a lawyer licensed in your operating jurisdictions before publishing. Flag all jurisdiction-dependent provisions.
 
 **Before finalizing, verify:** (1) Would a user who reads only the "What this means" summaries understand their key obligations? (2) Are liability caps reasonable for your company stage? (3) Is the dispute resolution mechanism appropriate for your user base?`,
         inputLabel: "Product details & business model",
@@ -6865,7 +6865,7 @@ Create a compliance checklist:
 **Priority Actions** — What to address first
 **Ongoing Compliance** — Regular activities to maintain compliance
 
-**Important:** Regulatory requirements vary by jurisdiction and change frequently. This checklist is a starting point — verify all requirements with a qualified compliance professional for your specific jurisdiction and industry. Flag any requirements that are jurisdiction-dependent.
+**Important:** This is AI-generated educational guidance, not legal advice. AI can make mistakes or miss jurisdiction-specific nuances. Regulatory requirements vary by jurisdiction and change frequently. This checklist is a starting point — always verify all requirements with a qualified compliance professional for your specific jurisdiction and industry. Flag any requirements that are jurisdiction-dependent.
 
 **Before finalizing, verify:** (1) Are priorities based on actual risk exposure, not just checkbox completeness? (2) Does every action item have a clear owner and deadline? (3) Would this survive a real audit, not just look good on paper?`,
         inputLabel: "Regulation & business context",
@@ -6992,7 +6992,7 @@ First, assess: Is this regulation already in effect or upcoming? Does it apply t
 | Scenario | Probability | Financial Impact | Reputational Impact | Operational Impact |
 - Enforcement action / Customer complaint / Data breach / Competitor reporting
 
-**Important:** Regulatory interpretations vary by jurisdiction and enforcement approach. This assessment provides a strategic framework — verify specific obligations, deadlines, and interpretations with qualified legal counsel in your jurisdiction before implementing changes.
+**Important:** This is AI-generated educational guidance, not legal advice. AI can make mistakes or miss jurisdiction-specific nuances. Regulatory interpretations vary by jurisdiction and enforcement approach. This assessment provides a strategic framework — always verify specific obligations, deadlines, and interpretations with qualified legal counsel in your jurisdiction before implementing changes.
 
 **Before finalizing, verify:** (1) Is the applicability assessment honest — are you actually in scope? (2) Are cost estimates realistic, not just low-balled to look manageable? (3) Does the roadmap account for resource constraints?`,
         inputLabel: "Regulation details & business context",
@@ -7087,7 +7087,7 @@ Categories to audit:
 - International trademark filings in key markets
 - Annual IP audit process
 
-**Important:** IP law is jurisdiction-specific and changes frequently. This strategy provides a framework for prioritization — work with a qualified IP attorney for formal filings, freedom-to-operate opinions, and enforcement decisions.
+**Important:** This is AI-generated educational guidance, not legal advice. AI can make mistakes or miss jurisdiction-specific nuances. IP law is jurisdiction-specific and changes frequently. This strategy provides a framework for prioritization — always work with a qualified IP attorney for formal filings, freedom-to-operate opinions, and enforcement decisions.
 
 **Before finalizing, verify:** (1) Is the patent recommendation honest about whether it's worth the cost? (2) Are trade secret measures practical for the team's size and culture? (3) Is the budget realistic for the company's stage?`,
         inputLabel: "Product, technology & brand details",

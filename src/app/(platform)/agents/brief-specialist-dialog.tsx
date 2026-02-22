@@ -53,6 +53,7 @@ import { useBrowseContext } from "@/contexts/browse-context"
 import { parseSlideDeckFromText } from "@/lib/ai-providers/slide-parser"
 import type { SlideDeckContent } from "@/lib/ai-providers/types"
 import { SpecialistChatAvatar } from "@/components/specialists/specialist-presentation"
+import { AiDisclaimer } from "@/components/ui/ai-disclaimer"
 import { InlinePresentationCard } from "@/components/specialists/inline-presentation-card"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { Specialist } from "./specialists-data"
@@ -2181,6 +2182,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
 
                         </div>
 
+                        {/* AI disclaimer (persistent, above input) */}
+                        <div className="flex-shrink-0 px-4 pt-2">
+                            <AiDisclaimer specialistId={specialist.id} />
+                        </div>
+
                         {/* Text Input (pinned to bottom) */}
                         <div
                             className={cn(
@@ -3038,6 +3044,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             </div>
                         )}
 
+                        </div>
+
+                        {/* AI disclaimer (persistent, above input — dialog mode) */}
+                        <div className="flex-shrink-0 px-1 pt-2">
+                            <AiDisclaimer specialistId={specialist.id} />
                         </div>
 
                         {/* Text Input (always visible at bottom) */}

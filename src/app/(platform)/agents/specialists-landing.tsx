@@ -24,7 +24,7 @@ import { useState, useMemo, useEffect, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { motion } from "framer-motion"
-import { ArrowRight, Layers, Users, ChevronDown, ChevronRight, Sparkles, X } from "lucide-react"
+import { ArrowRight, Layers, Users, ChevronDown, ChevronRight, Sparkles, X, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -204,6 +204,27 @@ export function SpecialistsLanding({
                     <p className="text-lg text-muted-foreground leading-relaxed">
                         Talk to your key leaders one-on-one, or jump into a team huddle where
                         they&apos;ve already identified what needs discussing.
+                    </p>
+                </div>
+            </motion.div>
+
+            {/* ── Human-First Philosophy Banner ─────────────────────────── */}
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
+                className="flex items-start gap-3 rounded-lg bg-status-info-light/50 border border-status-info/20 px-4 py-3"
+            >
+                <Shield className="h-4 w-4 text-status-info mt-0.5 shrink-0" />
+                <div className="space-y-0.5">
+                    <p className="text-sm font-medium text-foreground">
+                        You&apos;re in charge
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                        Your AI Specialists are fast, knowledgeable, and tireless&nbsp;&mdash;&nbsp;but
+                        like any team member, they can make mistakes or miss nuances. You&apos;re the
+                        decision-maker. Always verify critical information, especially legal and
+                        financial guidance.
                     </p>
                 </div>
             </motion.div>

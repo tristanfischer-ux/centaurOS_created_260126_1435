@@ -21,7 +21,7 @@ import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { UserAvatar } from '@/components/ui/user-avatar'
-import { MessageCircle, X, Lightbulb, AlertTriangle, TrendingUp } from 'lucide-react'
+import { MessageCircle, X, Lightbulb, AlertTriangle, TrendingUp, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getSpecialistById } from '@/app/(platform)/agents/specialists-data'
 import type { AgentInsight } from '@/actions/agent-insights'
@@ -149,6 +149,14 @@ export function SpecialistInsightCard({
                         )}
                     >
                         {insight.body}
+                    </p>
+
+                    {/* AI-generated indicator */}
+                    <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        {insight.specialist_id === 'legal-counsel'
+                            ? 'AI-generated \u2014 not legal advice. Verify before acting.'
+                            : 'AI-generated \u2014 verify before acting.'}
                     </p>
 
                     {/* Actions */}
