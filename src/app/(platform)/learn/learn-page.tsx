@@ -1,8 +1,9 @@
 'use client'
 
-// INTENT: The Learn page is the knowledge-oriented half of what was previously
-// the Inspiration page. Everything here is reference/educational content.
-// Action content (packs, projects, subsystems) lives on /playbooks.
+// INTENT: The Inspiration page (formerly Learn, formerly half of Inspiration)
+// contains educational/reference content: manufacturing techniques, tutorials,
+// and Q&A. Action content (packs, projects, subsystems) now lives on the
+// Objectives page as "Other ideas for you to be getting on with".
 
 import { useState, useMemo, useCallback } from 'react'
 import {
@@ -153,15 +154,21 @@ export function LearnPage({
     <div className="space-y-6">
       {/* Page header */}
       <div className="pb-4 border-b border-muted">
+        {/* Cascade breadcrumb */}
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+          <a href="/workshop" className="hover:text-foreground transition-colors">Workshop</a>
+          <ChevronRight className="h-3 w-3" />
+          <span className="text-foreground font-medium">Inspiration</span>
+        </nav>
         <div className={typography.pageHeader}>
           <div className={typography.pageHeaderAccent} />
           <h1 className={typography.h1}>
             <BookOpen className="h-7 w-7 mr-3 inline-block text-electric-blue" />
-            Learn
+            Inspiration
           </h1>
         </div>
         <p className={cn(typography.pageSubtitle, 'mt-1')}>
-          Build knowledge with techniques, tutorials, and expert Q&amp;A.
+          Techniques, tutorials, and expert guidance to level up your craft.
         </p>
       </div>
 

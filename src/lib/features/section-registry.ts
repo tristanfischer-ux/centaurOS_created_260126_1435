@@ -26,7 +26,6 @@ import {
     UserSearch,
     GraduationCap,
     BookOpen,
-    Lightbulb,
     Store,
     ShoppingBag,
 } from "lucide-react"
@@ -245,6 +244,13 @@ export const SECTIONS: Section[] = [
                 icon: UsersRound,
                 addedAt: new Date("2026-02-01"),
             },
+            {
+                name: "Inspiration",
+                description: "Techniques, tutorials, and expert guidance to level up your craft",
+                route: "/learn",
+                icon: BookOpen,
+                addedAt: new Date("2026-02-22"),
+            },
         ],
     },
     {
@@ -295,13 +301,6 @@ export const SECTIONS: Section[] = [
                 addedAt: new Date("2026-01-15"),
             },
             // ── Supplies ──
-            {
-                name: "Playbooks",
-                description: "Find pre-built plans and turn them into objectives and tasks",
-                route: "/playbooks",
-                icon: Lightbulb,
-                addedAt: new Date("2026-02-07"),
-            },
             {
                 name: "Marketplace",
                 description: "Find experts, suppliers, products, and services",

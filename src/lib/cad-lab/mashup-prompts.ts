@@ -79,10 +79,31 @@ ENVIRONMENT:
 - A variable SOURCE_DIR is already set (path to a directory containing the source STEP files).
 - Source filenames are: ${namesList}. Each file is at SOURCE_DIR + "/" + name + ".step"
 - Load a source with: cq.importers.importStep(SOURCE_DIR + "/<name>.step") which returns a cq.Workplane.
-- You may translate/rotate with .translate((x,y,z)) and .rotate(axis, angle_deg). For Workplane, get the shape with .val() if you need to pass to cq.Workplane("XY").newObject([shape]).
-- Combine with .union() or .cut() as needed. The final variable MUST be named "result" and be a cq.Workplane.
+- You may translate/rotate with .translate((x,y,z)) and .rotate(axisStart, axisEnd, angleDegrees). For Workplane, get the shape with .val() if you need to pass to cq.Workplane("XY").newObject([shape]).
+- The final variable MUST be named "result" and be a cq.Workplane.
 - Do NOT use open(), os, or file paths other than SOURCE_DIR. Do NOT export or print.
-- Output ONLY Python code inside a \`\`\`python code fence. No explanations.`
+- Output ONLY Python code inside a \`\`\`python code fence. No explanations.
+
+COMBINING STRATEGIES (prefer in this order):
+1. ASSEMBLY (safest — always works, no boolean failures): Use cq.Assembly(), add each part with .add(part, loc=cq.Location(cq.Vector(x,y,z))), then call .toCompound() and wrap: result = cq.Workplane("XY").newObject([assembly.toCompound()])
+2. TRANSLATE-ONLY (good for positioning without merging): load each source, call .translate((x,y,z)) to position, then union shapes: result = partA.union(partB)
+3. BOOLEAN (risky on complex STEP geometry — only use if explicitly needed): Wrap .union()/.cut() in try/except and fall back to Assembly if they fail.
+
+MANDATORY PATTERN — your code MUST end with:
+\`\`\`
+result = <your final cq.Workplane here>
+\`\`\`
+
+EXAMPLE (assembly approach):
+\`\`\`python
+import cadquery as cq
+a = cq.importers.importStep(SOURCE_DIR + "/partA.step")
+b = cq.importers.importStep(SOURCE_DIR + "/partB.step")
+assy = cq.Assembly()
+assy.add(a, loc=cq.Location(cq.Vector(0, 0, 0)))
+assy.add(b, loc=cq.Location(cq.Vector(50, 0, 0)))
+result = cq.Workplane("XY").newObject([assy.toCompound()])
+\`\`\``
 }
 
 /**
@@ -99,9 +120,11 @@ SOURCE NAMES (use these exact names for filenames): ${sourceNames.join(", ")}
 Implement the plan in CadQuery:
 1. Import each source with cq.importers.importStep(SOURCE_DIR + "/<name>.step")
 2. Apply the positions and rotations from the plan
-3. Apply any cuts or unions
-4. If adapter_geometry is specified, create that geometry with cq.Workplane primitives and combine
-5. Assign the final combined model to "result" (a cq.Workplane)
+3. Prefer cq.Assembly() for combining parts — it never fails on complex geometry. Only use .union()/.cut() if the plan explicitly requires boolean merging AND wrap it in try/except with an Assembly fallback.
+4. If adapter_geometry is specified, create that geometry with cq.Workplane primitives and add it to the assembly
+5. The LAST line of the script MUST be: result = <your final cq.Workplane>
+
+CRITICAL: The variable "result" must be assigned. The script will fail if "result" is missing.
 
 Output only the Python code.`
 }

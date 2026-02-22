@@ -65,9 +65,19 @@ export interface Member {
   full_name: string
   role: string | null
   email: string
+  avatar_url?: string | null
 }
 
 export interface Team {
   id: string
   name: string
+}
+
+/** Data needed to render the "Other ideas" playbooks section below objectives */
+export interface PlaybooksData {
+  templates: import('@/types/blueprints').BlueprintTemplate[]
+  packs: import('@/actions/packs').ObjectivePack[]
+  initialSavedPackIds: string[]
+  foundryContext: import('@/actions/foundry-context').FoundryContext | null
+  universalSubsystems: import('@/types/blueprints').UniversalSubsystem[]
 }

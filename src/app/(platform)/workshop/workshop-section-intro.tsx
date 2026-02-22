@@ -18,6 +18,7 @@ import {
     FileText,
     Cpu,
     Wrench,
+    BookOpen,
 } from "lucide-react"
 
 import { SectionIntroPage } from "@/components/sidebar/SectionIntroPage"
@@ -147,7 +148,7 @@ export function WorkshopSectionIntro(): React.ReactElement {
             </div>
 
             {/* Team Quick View */}
-            <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-4">
+            <div className="px-4 sm:px-6 lg:px-8 pt-6">
                 <Link href="/team" className="block group">
                     <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all border">
                         <CardContent className="pt-5 pb-4 flex items-center gap-4">
@@ -163,6 +164,28 @@ export function WorkshopSectionIntro(): React.ReactElement {
                                 </p>
                             </div>
                             <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-international-orange transition-colors shrink-0" />
+                        </CardContent>
+                    </Card>
+                </Link>
+            </div>
+
+            {/* Inspiration — techniques, tutorials, guidance */}
+            <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-4">
+                <Link href="/learn" className="block group">
+                    <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all border">
+                        <CardContent className="pt-5 pb-4 flex items-center gap-4">
+                            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-electric-blue/10 shrink-0 group-hover:bg-electric-blue/20 transition-colors">
+                                <BookOpen className="h-5 w-5 text-electric-blue" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-foreground group-hover:text-electric-blue transition-colors">
+                                    Inspiration
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Techniques, tutorials, and expert guidance to level up your craft
+                                </p>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-electric-blue transition-colors shrink-0" />
                         </CardContent>
                     </Card>
                 </Link>

@@ -109,10 +109,25 @@ export default async function NewObjectivesPage() {
     task_assignees: Array<{ profile: TaskAssignee | null }> | null;
   }>
 
-  // Fetch members for dialog/assignee display
-  const [{ data: membersData }, { data: teamsData }] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, role, email').eq('foundry_id', profile.foundry_id),
+  // INTENT: Fetch members, teams, AND playbooks data in parallel. The playbooks
+  // section appears below objectives as "Other ideas for you to be getting on with",
+  // mirroring the Team page pattern (your stuff + marketplace).
+  const [
+    { data: membersData },
+    { data: teamsData },
+    templatesResult,
+    packsResult,
+    savedPacksResult,
+    foundryContext,
+    universalSubsystems,
+  ] = await Promise.all([
+    supabase.from('profiles').select('id, full_name, role, email, avatar_url').eq('foundry_id', profile.foundry_id),
     supabase.from('teams').select('id, name').eq('foundry_id', profile.foundry_id),
+    getBlueprintTemplates(),
+    getObjectivePacks(),
+    getSavedPackIds(),
+    getFoundryContext(),
+    getUniversalSubsystems(),
   ])
 
   const members = (membersData || []).map(p => ({
@@ -120,8 +135,18 @@ export default async function NewObjectivesPage() {
     full_name: p.full_name || 'Unknown',
     role: p.role,
     email: p.email || '',
+    avatar_url: p.avatar_url,
   }))
   const teams = teamsData || []
+
+  // Playbooks data for the "Ideas" section
+  const playbooksData = {
+    templates: templatesResult.data || [],
+    packs: packsResult.packs || [],
+    initialSavedPackIds: Array.from(savedPacksResult.savedIds || []),
+    foundryContext,
+    universalSubsystems,
+  }
 
   // Build strategy lookup: parent_objective_id -> { id, title }
   const strategyLookup = new Map<string, { id: string; title: string }>()
@@ -190,6 +215,7 @@ export default async function NewObjectivesPage() {
       teams={teams}
       currentUserId={user.id}
       currentUserRole={profile.role}
+      playbooksData={playbooksData}
     />
   )
 }

@@ -23,7 +23,6 @@ import {
     Settings,
     Target,
     MoreHorizontal,
-    Lightbulb,
     UsersRound,
     UserSearch,
     LogOut,
@@ -91,6 +90,7 @@ const workshopMoreNavigation = [
     { name: "AI Team", href: "/agents", icon: UsersRound },
     { name: "AI Outputs", href: "/agents/artifacts", icon: FileOutput },
     { name: "Browse", href: "/browse", icon: Globe },
+    { name: "Inspiration", href: "/learn", icon: BookOpen },
 ]
 
 // "More" dropdown — Marketplace section
@@ -98,8 +98,6 @@ const marketplaceMoreNavigation = [
     { name: "Recruits", href: "/recruits", icon: UserSearch },
     { name: "Guild", href: "/guild", icon: GraduationCap },
     { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen },
-    { name: "Playbooks", href: "/playbooks", icon: Lightbulb },
-    { name: "Learn", href: "/learn", icon: BookOpen },
     { name: "Marketplace", href: "/marketplace", icon: Store },
     { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag },
 ]

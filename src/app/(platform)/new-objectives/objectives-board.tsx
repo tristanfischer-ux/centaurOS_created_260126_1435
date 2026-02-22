@@ -60,8 +60,9 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import type { Database } from '@/types/database.types'
-import type { ObjectiveWithTasks, ObjectiveTask, Member, Team, StrategicObjective } from './types'
+import type { ObjectiveWithTasks, ObjectiveTask, Member, Team, StrategicObjective, PlaybooksData } from './types'
 import type { TaskWithData } from '../new-tasks/types'
+import { PlaybooksSection } from './playbooks-section'
 
 const LARGE_BREAKPOINT = 1280
 const MEDIUM_BREAKPOINT = 768
@@ -109,6 +110,8 @@ interface ObjectivesBoardProps {
   teams: Team[]
   currentUserId: string
   currentUserRole: string | null
+  /** Data for the "Other ideas" playbooks section below objectives */
+  playbooksData?: PlaybooksData
 }
 
 type ViewMode = 'board' | 'tree' | 'timeline'
@@ -121,6 +124,7 @@ export function ObjectivesBoard({
   teams,
   currentUserId,
   currentUserRole,
+  playbooksData,
 }: ObjectivesBoardProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('board')
   const [healthFilter, setHealthFilter] = useState<string | null>(null)
@@ -598,6 +602,11 @@ export function ObjectivesBoard({
             onEdit={setObjectiveToEdit}
           />
         </div>
+      )}
+
+      {/* "Other ideas for you to be getting on with" — playbooks section */}
+      {playbooksData && (
+        <PlaybooksSection playbooksData={playbooksData} members={members} />
       )}
     </div>
   )

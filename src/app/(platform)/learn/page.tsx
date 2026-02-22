@@ -5,7 +5,7 @@ import { getAdvisoryQuestions } from '@/actions/advisory'
 import { getTutorials, type TutorialListItem } from '@/actions/tutorials'
 
 export const metadata = {
-  title: 'Learn | ForgeOS',
+  title: 'Inspiration | ForgeOS',
   description:
     'Build knowledge with manufacturing techniques, tutorials, and expert Q&A.',
 }

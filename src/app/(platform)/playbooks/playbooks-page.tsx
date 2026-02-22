@@ -109,6 +109,8 @@ interface PlaybooksPageProps {
   foundryContext?: FoundryContext
   members?: TeamMember[]
   universalSubsystems?: UniversalSubsystem[]
+  /** When true, hides the standalone page header (used when embedded below objectives) */
+  embedded?: boolean
 }
 
 export function PlaybooksPage({
@@ -118,6 +120,7 @@ export function PlaybooksPage({
   foundryContext,
   members = [],
   universalSubsystems = [],
+  embedded = false,
 }: PlaybooksPageProps) {
   const [activeTab, setActiveTab] = useState<PlaybookTabId>('by-need')
 
@@ -383,19 +386,21 @@ export function PlaybooksPage({
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div className="pb-4 border-b border-muted">
-        <div className={typography.pageHeader}>
-          <div className={typography.pageHeaderAccent} />
-          <h1 className={typography.h1}>
-            <Lightbulb className="h-7 w-7 mr-3 inline-block text-international-orange" />
-            Playbooks
-          </h1>
+      {/* Page header — hidden when embedded below objectives */}
+      {!embedded && (
+        <div className="pb-4 border-b border-muted">
+          <div className={typography.pageHeader}>
+            <div className={typography.pageHeaderAccent} />
+            <h1 className={typography.h1}>
+              <Lightbulb className="h-7 w-7 mr-3 inline-block text-international-orange" />
+              Playbooks
+            </h1>
+          </div>
+          <p className={cn(typography.pageSubtitle, 'mt-1')}>
+            Find pre-built plans and turn them into objectives and tasks for your team.
+          </p>
         </div>
-        <p className={cn(typography.pageSubtitle, 'mt-1')}>
-          Find pre-built plans and turn them into objectives and tasks for your team.
-        </p>
-      </div>
+      )}
 
       {/* Tab bar with visual grouping */}
       <div className="flex flex-wrap items-center gap-2" role="tablist">
