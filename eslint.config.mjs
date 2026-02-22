@@ -47,6 +47,7 @@ const eslintConfig = defineConfig([
     "test-three-pages.js",
     "test-two-features.js",
     "test-cad-lab-improvements.ts",
+    "test-mobile-*.ts",
     "src/actions/__tests__/activity.test.ts",
     // Auto-generated Supabase types
     "src/types/database.types.ts",
