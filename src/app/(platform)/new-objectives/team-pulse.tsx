@@ -198,7 +198,7 @@ ${standup.entries.map((e) =>
 
       {/* Standup Dialog */}
       <Dialog open={standupDialog} onOpenChange={setStandupDialog}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh]">
+        <DialogContent size="sm" className="max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-international-orange" />

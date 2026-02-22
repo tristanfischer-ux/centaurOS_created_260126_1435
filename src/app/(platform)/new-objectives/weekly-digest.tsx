@@ -345,21 +345,21 @@ export function WeeklyDigestPanel({ className }: WeeklyDigestPanelProps): React.
           ) : null}
 
           {digest && (
-            <DialogFooter>
-              <Button variant="secondary" onClick={() => setIsOpen(false)}>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button variant="secondary" onClick={() => setIsOpen(false)} className="w-full sm:w-auto">
                 Close
               </Button>
               <Button
                 variant="outline"
                 onClick={handleCopyMarkdown}
-                className="gap-1.5"
+                className="gap-1.5 w-full sm:w-auto hidden sm:inline-flex"
               >
                 <FileText className="h-4 w-4" />
                 Copy Markdown
               </Button>
               <Button
                 onClick={handleCopyReport}
-                className="gap-1.5"
+                className="gap-1.5 w-full sm:w-auto"
               >
                 <Copy className="h-4 w-4" />
                 Share Report

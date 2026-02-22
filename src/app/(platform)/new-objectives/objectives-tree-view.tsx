@@ -78,7 +78,7 @@ function TreeItem({
   return (
     <div className="group relative">
       {/* Action buttons - visible on hover */}
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-10">
         {onEdit && (
           <Button
             variant="ghost"
@@ -117,7 +117,7 @@ function TreeItem({
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           isSelected && 'bg-international-orange/5 ring-1 ring-international-orange/20',
         )}
-        style={{ paddingLeft: `${depth * 24 + 12}px` }}
+        style={{ paddingLeft: `${depth * 16 + 12}px` }}
       >
         {/* Expand/collapse */}
         {hasChildren ? (
@@ -150,7 +150,7 @@ function TreeItem({
 
         {/* Task count */}
         <span className="text-xs text-muted-foreground tabular-nums flex items-center gap-1 flex-shrink-0">
-          <ListChecks className="h-3 w-3" />
+          <ListChecks className="h-3 w-3 hidden sm:block" />
           {objective.completedTasks}/{objective.totalTasks}
         </span>
 
@@ -163,10 +163,12 @@ function TreeItem({
         )}
 
         {/* Progress ring */}
-        <ProgressRing progress={objective.progress} size={32} strokeWidth={3} variant={variant} showLabel={false} />
+        <div className="hidden sm:block flex-shrink-0">
+          <ProgressRing progress={objective.progress} size={32} strokeWidth={3} variant={variant} showLabel={false} />
+        </div>
 
         {/* Progress text */}
-        <span className="text-xs font-medium tabular-nums text-foreground w-8 text-right flex-shrink-0">
+        <span className="text-xs font-medium tabular-nums text-foreground w-8 text-right flex-shrink-0 hidden sm:inline">
           {objective.progress}%
         </span>
       </button>
@@ -177,7 +179,7 @@ function TreeItem({
           {/* Vertical alignment line */}
           <div
             className="absolute top-0 bottom-0 w-px bg-border"
-            style={{ left: `${depth * 24 + 24}px` }}
+            style={{ left: `${depth * 16 + 24}px` }}
           />
           {node.children.map(child => (
             <TreeItem
@@ -402,13 +404,13 @@ export function ObjectivesTreeView({ objectives, strategicObjectives = [], selec
 /** Header row for the tree table */
 function TreeHeader() {
   return (
-    <div className="flex items-center gap-3 py-2 px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+    <div className="flex items-center gap-2 sm:gap-3 py-2 px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
       <div className="w-[18px]" />
       <div className="w-2.5" />
       <div className="flex-1">Objective</div>
-      <div className="w-16 text-center">Tasks</div>
-      <div className="w-8" />
-      <div className="w-8 text-right">Progress</div>
+      <div className="w-16 text-center hidden sm:block">Tasks</div>
+      <div className="w-8 hidden sm:block" />
+      <div className="w-8 text-right hidden sm:block">Progress</div>
     </div>
   )
 }
