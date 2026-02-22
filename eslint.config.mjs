@@ -5,9 +5,7 @@ import reactPlugin from "eslint-plugin-react";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
 
 const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  // Override default ignores of eslint-config-next.
+  // Global ignores must come first to take effect before any config applies files patterns.
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
@@ -59,7 +57,10 @@ const eslintConfig = defineConfig([
     "_archive/**",
     // Vendored third-party data files
     "data/**",
+    "data/",
   ]),
+  ...nextVitals,
+  ...nextTs,
   // Downgrade non-critical rules to warnings for CI to pass
   {
     plugins: {
