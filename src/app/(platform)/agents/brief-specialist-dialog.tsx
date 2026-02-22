@@ -44,6 +44,7 @@ import { Markdown } from "@/components/ui/markdown"
 import { getOrCreateSpecialistThread, getRecentSpecialistOutputs, getSpecialistThreadHistory } from "@/actions/agent-memory"
 import type { SpecialistHistoryMessage } from "@/actions/agent-memory"
 import { createArtifact, exportArtifactToGoogleDocs } from "@/actions/agent-artifacts"
+import { persistSpecialistHandoff } from "@/actions/agent-handoffs"
 import { exportAsPDF } from "@/lib/export-utils"
 import { getSpecialistById, SPECIALISTS } from "./specialists-data"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
@@ -1418,6 +1419,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
         // Build rich handoff context that feels like a real colleague briefing
         const targetSpec = getSpecialistById(id)
         let handoff: string | undefined
+        let conversationSummary: string | undefined
         if (messages.length > 0) {
             const userMessages = messages.filter((m) => m.role === "user" && !m.historical)
             const assistantMessages = messages.filter((m) => m.role === "assistant" && !m.historical)
@@ -1433,6 +1435,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
 
             if (firstUserMsg) {
                 parts.push(`\n**What the founder originally asked about:**\n"${firstUserMsg.content.slice(0, 400)}"`)
+                conversationSummary = firstUserMsg.content.slice(0, 300)
             }
 
             if (lastAssistant) {
@@ -1448,6 +1451,22 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             parts.push(`\n**Your job:** Pick up where ${specialist.name} left off. Don't repeat what was already covered — BUILD on it. Start substantively as if ${specialist.name} just briefed you in the hallway. The founder doesn't want to re-explain.`)
 
             handoff = parts.join("\n")
+        }
+
+        // Persist the handoff to the collaboration hub DB (fire-and-forget)
+        if (targetSpec) {
+            persistSpecialistHandoff({
+                fromSpecialistId: specialist.id,
+                fromSpecialistName: specialist.name,
+                toSpecialistId: id,
+                toSpecialistName: targetSpec.name,
+                conversationSummary,
+                handoffReason: dynamicSuggestion?.specialistId === id
+                    ? dynamicSuggestion.reason
+                    : undefined,
+            }).catch(() => {
+                // Silent — persistence is supplementary, never blocks handoff
+            })
         }
 
         // Abort any in-flight request from the current specialist before switching
@@ -1466,7 +1485,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             onOpenChange(false)
             setTimeout(() => onSwitchSpecialist?.(id, handoff), 200)
         }
-    }, [isPanel, onOpenChange, onSwitchSpecialist, messages, specialist])
+    }, [isPanel, onOpenChange, onSwitchSpecialist, messages, specialist, dynamicSuggestion])
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {

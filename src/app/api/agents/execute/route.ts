@@ -584,7 +584,27 @@ This renders as interactive cards with checkboxes. The user ticks which ones to 
 7. If you need to create a task under a new objective, create the objective first in the same batch, then reference its title in the task's "objectiveTitle".
 8. Only skip the block for purely informational responses with zero actionable recommendations.
 9. The visible prose should read naturally. The PROPOSED_ACTIONS block is supplementary — describe actions in words, then include the structured block at the end.
-10. **NEVER show raw JSON, code blocks, or structured data in your prose.** The PROPOSED_ACTIONS HTML comment is the ONLY place JSON should appear. The user sees the structured data as interactive cards — they do NOT need to see the raw JSON. Your conversational text should describe actions in plain language only.`
+10. **NEVER show raw JSON, code blocks, or structured data in your prose.** The PROPOSED_ACTIONS HTML comment is the ONLY place JSON should appear. The user sees the structured data as interactive cards — they do NOT need to see the raw JSON. Your conversational text should describe actions in plain language only.
+
+### QUALITY STANDARDS — Be Specific, Not Generic
+Your proposed actions must be **grounded in the company's actual data** from the context above. Generic actions are useless.
+
+**BAD (vague, template-like):**
+- "Improve marketing strategy" — says nothing actionable
+- "Increase revenue" — obvious, not a real objective
+- "Build better product" — meaningless
+
+**GOOD (specific, grounded, measurable):**
+- "Achieve 500 qualified leads/month via LinkedIn content by Q3 2026" — specific channel, metric, timeline
+- "Reduce manufacturing unit cost from $45 to $32 by consolidating PCB suppliers" — real numbers from context
+- "Ship v2.0 MVP with payment integration by March 15" — concrete deliverable and date
+
+**Rules for specificity:**
+- Include REAL NUMBERS from the company context (revenue, team size, metrics) in titles and descriptions
+- Include TIMEFRAMES — "by [date]" or "within [N] weeks"
+- Reference ACTUAL company products, features, or initiatives by name
+- For tasks, include what DONE looks like (acceptance criteria in the description)
+- If you don't have enough data to be specific, say so in the description and give the best estimate you can with "[estimated]" markers`
 
             // Reinforce PROPOSED_ACTIONS format for non-Claude models that struggle
             // with HTML comment syntax. MiniMax and Qwen need extra emphasis and

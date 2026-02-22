@@ -618,6 +618,347 @@ Context from our conversation:
         icon: "Factory",
     },
 
+    // ── CTO (Max) ────────────────────────────────────────────────
+    {
+        id: "tech-stack-assessment",
+        name: "Tech Stack Assessment",
+        description: "Produces a structured technology stack evaluation with build-vs-buy analysis",
+        specialistId: "cto",
+        triggers: [
+            "assess the stack",
+            "tech stack review",
+            "technology assessment",
+            "evaluate our stack",
+            "build or buy",
+        ],
+        promptTemplate: `Based on our conversation, produce a technology stack assessment.
+
+## Current Stack Overview
+Inventory of current technologies, frameworks, and infrastructure.
+
+## Architecture Assessment
+| Layer | Current Choice | Fit (1-5) | Risk | Notes |
+|---|---|---|---|---|
+| Frontend | | | | |
+| Backend | | | | |
+| Database | | | | |
+| Infrastructure | | | | |
+| CI/CD | | | | |
+| Monitoring | | | | |
+
+## Build vs. Buy Analysis
+For each major capability:
+| Capability | Build Cost | Buy Cost | Recommendation | Reasoning |
+|---|---|---|---|---|
+
+## Technical Debt Inventory
+| Item | Severity | Effort to Fix | Business Impact if Ignored |
+|---|---|---|---|
+
+## Scalability Assessment
+Where the current architecture breaks at 10x, 100x scale.
+
+## Recommended Architecture Changes
+Top 3 changes with effort estimates and migration paths.
+
+## 90-Day Technical Roadmap
+Week-by-week priorities for the engineering team.
+
+Context from our conversation:
+{{context}}
+
+Be specific about trade-offs. Every recommendation should include effort estimate and risk.`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "Server",
+    },
+    {
+        id: "system-design",
+        name: "System Design Document",
+        description: "Produces a system design document for a new feature or service",
+        specialistId: "cto",
+        triggers: [
+            "design the system",
+            "system design",
+            "architecture design",
+            "design doc",
+            "technical design",
+        ],
+        promptTemplate: `Based on our conversation, produce a system design document.
+
+## Problem Statement
+What we're building and why.
+
+## Requirements
+### Functional Requirements
+- [ ] Requirement with clear acceptance criteria
+
+### Non-Functional Requirements
+- Performance: [target metrics]
+- Scalability: [target scale]
+- Reliability: [target uptime]
+- Security: [key constraints]
+
+## Proposed Architecture
+High-level system components and how they interact.
+
+## Data Model
+Key entities, relationships, and storage choices.
+
+## API Design
+Key endpoints or interfaces with request/response shapes.
+
+## Trade-offs Considered
+| Option | Pros | Cons | Why Chosen/Rejected |
+|---|---|---|---|
+
+## Implementation Plan
+| Phase | Scope | Effort | Dependencies |
+|---|---|---|---|
+
+## Risks & Mitigations
+Top 3 technical risks and how to address them.
+
+## Open Questions
+What needs to be resolved before building.
+
+Context from our conversation:
+{{context}}
+
+Write this as a document an engineering team can execute against.`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "GitBranch",
+    },
+
+    // ── VP Engineering (Jian) ──────────────────────────────────────
+    {
+        id: "sprint-plan",
+        name: "Sprint Plan",
+        description: "Produces a structured sprint plan with priorities, assignments, and velocity targets",
+        specialistId: "vp-engineering",
+        triggers: [
+            "plan the sprint",
+            "sprint plan",
+            "sprint planning",
+            "plan this week",
+            "weekly plan",
+        ],
+        promptTemplate: `Based on our conversation, produce a sprint plan.
+
+## Sprint Goal
+One sentence: what does shipping this sprint unlock?
+
+## Sprint Backlog
+| Priority | Task | Estimate | Assignee | Dependencies | Done Definition |
+|---|---|---|---|---|---|
+| P0 | | | | | |
+| P0 | | | | | |
+| P1 | | | | | |
+| P1 | | | | | |
+| P2 | | | | | |
+
+## Capacity Planning
+| Team Member | Available Hours | Allocated | Buffer |
+|---|---|---|---|
+
+## Risks & Blockers
+| Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|
+
+## Definition of Done (Sprint)
+Checklist that must pass before sprint is considered complete.
+
+## Velocity Target
+Story points or tasks targeted vs. last sprint's actual.
+
+## Ceremonies Schedule
+- Standup: [time]
+- Mid-sprint check: [date]
+- Sprint review: [date]
+- Retro: [date]
+
+Context from our conversation:
+{{context}}
+
+Be realistic about capacity. It's better to under-promise and over-deliver.`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "Kanban",
+    },
+    {
+        id: "hiring-roadmap",
+        name: "Engineering Hiring Roadmap",
+        description: "Produces a structured engineering hiring plan with roles, timelines, and comp ranges",
+        specialistId: "vp-engineering",
+        triggers: [
+            "hiring roadmap",
+            "engineering hiring plan",
+            "who should we hire",
+            "build the team",
+            "hiring plan",
+        ],
+        promptTemplate: `Based on our conversation, produce an engineering hiring roadmap.
+
+## Current Team Assessment
+| Role | Current | Needed | Gap | Urgency |
+|---|---|---|---|---|
+
+## Hiring Priority Order
+For each role (in priority order):
+### Role: [Title]
+- **Why now:** Business impact if unfilled
+- **Seniority:** Junior / Mid / Senior / Staff
+- **Key skills:** Must-have and nice-to-have
+- **Comp range:** Based on market + stage
+- **Timeline:** When to start sourcing, target start date
+- **Interview focus:** What to test for
+
+## Team Structure (Target)
+How the team should look in 6 months.
+
+## Sourcing Strategy
+| Channel | Expected Volume | Quality | Cost |
+|---|---|---|---|
+| Referrals | | | |
+| LinkedIn | | | |
+| Job boards | | | |
+| Recruiters | | | |
+
+## Budget Impact
+Monthly burn increase per hire. Total cost to reach target team.
+
+## Onboarding Plan
+First 30/60/90 days for each role.
+
+Context from our conversation:
+{{context}}
+
+Be specific about comp ranges and timelines. Founders need real numbers.`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "Users",
+    },
+
+    // ── VP Supply Chain (Chase) ────────────────────────────────────
+    {
+        id: "supply-chain-map",
+        name: "Map Supply Chain",
+        description: "Produces a structured supply chain map with risk assessment and optimization opportunities",
+        specialistId: "vp-supply-chain",
+        triggers: [
+            "map the supply chain",
+            "supply chain analysis",
+            "supply chain map",
+            "logistics plan",
+            "procurement strategy",
+        ],
+        promptTemplate: `Based on our conversation, produce a supply chain analysis.
+
+## Supply Chain Overview
+End-to-end flow from raw materials to customer delivery.
+
+## Supplier Tier Map
+| Tier | Component | Supplier | Location | Lead Time | Alt Source? |
+|---|---|---|---|---|---|
+| Tier 1 | | | | | |
+| Tier 2 | | | | | |
+| Tier 3 | | | | | |
+
+## Cost Breakdown
+| Category | Current Cost | % of COGS | Optimization Target |
+|---|---|---|---|
+| Raw materials | | | |
+| Manufacturing | | | |
+| Logistics | | | |
+| Warehousing | | | |
+| Customs/duties | | | |
+
+## Risk Assessment
+| Risk | Probability | Impact | Mitigation | Cost of Mitigation |
+|---|---|---|---|---|
+| Single-source dependency | | | | |
+| Geopolitical exposure | | | | |
+| Lead time variability | | | | |
+| Quality inconsistency | | | | |
+
+## Inventory Strategy
+| SKU Category | Current Approach | Recommended | Days of Supply Target |
+|---|---|---|---|
+
+## Optimization Opportunities
+Top 3 cost reduction or resilience improvements with ROI estimates.
+
+## 90-Day Action Plan
+Concrete steps to improve the supply chain this quarter.
+
+Context from our conversation:
+{{context}}
+
+Ground everything in real lead times and costs where available. Flag assumptions.`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "Truck",
+    },
+    {
+        id: "sourcing-brief",
+        name: "Sourcing Brief",
+        description: "Produces a structured sourcing requirements document for finding new suppliers",
+        specialistId: "vp-supply-chain",
+        triggers: [
+            "find suppliers",
+            "sourcing brief",
+            "supplier search",
+            "source this",
+            "find a manufacturer",
+        ],
+        promptTemplate: `Based on our conversation, produce a sourcing requirements brief.
+
+## Component/Product Description
+What we need manufactured or sourced, with specifications.
+
+## Requirements
+### Technical Specifications
+| Parameter | Requirement | Tolerance |
+|---|---|---|
+
+### Volume Requirements
+| Timeline | Volume | Ramp Schedule |
+|---|---|---|
+
+### Quality Requirements
+- Certifications needed (ISO, CE, UL, etc.)
+- Inspection/testing requirements
+- Defect rate tolerance
+
+## Supplier Criteria
+| Criterion | Must-Have | Nice-to-Have | Weight |
+|---|---|---|---|
+| Location | | | |
+| MOQ | | | |
+| Lead time | | | |
+| Payment terms | | | |
+| Certifications | | | |
+| Tooling capability | | | |
+
+## Budget Parameters
+Target unit cost at volume, tooling budget, NRE budget.
+
+## Evaluation Scorecard
+How to rate and compare supplier responses.
+
+## RFQ Template
+Key questions to include in the request for quotation.
+
+Context from our conversation:
+{{context}}
+
+Make this ready to send to potential suppliers with minimal editing.`,
+        outputFormat: "document",
+        autoSave: true,
+        icon: "Search",
+    },
+
     // ── Fundraising (Fiona) ──────────────────────────────────────
     {
         id: "pitch-narrative",
