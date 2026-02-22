@@ -54,6 +54,8 @@ const eslintConfig = defineConfig([
     "playwright-report/**",
     "playwright-report */**",
     "test-results/**",
+    // Archived scripts and one-off utilities
+    "_archive/**",
   ]),
   // Downgrade non-critical rules to warnings for CI to pass
   {
