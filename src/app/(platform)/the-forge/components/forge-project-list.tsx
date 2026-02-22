@@ -2,7 +2,7 @@
  * @file forge-project-list.tsx — The Forge landing page
  *
  * @description Server component that renders the main launchpad for The Forge.
- * Presents three equal starting paths (AI Pipeline, Mashup Lab, Assembly Builder),
+ * Presents two starting paths (AI Pipeline, Mashup Lab),
  * a destination callout showing they all lead to RFQ, a reference tools section,
  * and a grid of recent CAD Lab projects. If the user has an in-progress project,
  * a "Continue where you left off" card appears at the top.
@@ -19,16 +19,12 @@ import { formatDistanceToNow } from "date-fns"
 import {
   ArrowRight,
   Sparkles,
-  Blocks,
   PlayCircle,
   Flame,
-  Package,
   FileBox,
   FileCheck2,
   Search,
   Box,
-  BarChart3,
-  ShoppingCart,
   ClipboardCheck,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
@@ -87,10 +83,8 @@ const STARTING_PATHS: StartingPath[] = [
     cta: "Start designing",
     outputs: ["3D CAD", "STEP files", "Engineering report", "DFM analysis", "RFQ package"],
     pipelineStages: [
-      { label: "Research", icon: Search },
+      { label: "Concept", icon: Search },
       { label: "Build", icon: Box },
-      { label: "Analysis", icon: BarChart3 },
-      { label: "Procurement", icon: ShoppingCart },
       { label: "Review", icon: ClipboardCheck },
     ],
   },
@@ -104,17 +98,6 @@ const STARTING_PATHS: StartingPath[] = [
     href: "/the-forge/cad-lab/mashup",
     cta: "Open Mashup Lab",
     outputs: ["Hybrid STEP", "STL preview", "RFQ package"],
-  },
-  {
-    icon: Blocks,
-    iconBg: "bg-status-success-light",
-    iconColor: "text-status-success",
-    accentBorder: "border-l-status-success",
-    headline: "Start from a template",
-    description: "Choose a pre-built layout and customize each part from the component library.",
-    href: "/the-forge/assembly-builder",
-    cta: "Browse templates",
-    outputs: ["Assembly BOM", "Cost estimate", "Compatibility check", "RFQ package"],
   },
 ]
 
@@ -260,7 +243,7 @@ function StartingPointsSection(): React.ReactNode {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {STARTING_PATHS.map((path) => (
           <StartingPathCard key={path.href} path={path} />
         ))}
@@ -277,14 +260,7 @@ function StartingPointsSection(): React.ReactNode {
             {" "}— a supplier-ready engineering package you can send as an RFQ.
           </p>
         </div>
-        <Link
-          href="/the-forge/components"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-international-orange hover:underline shrink-0"
-        >
-          <Package className="h-3.5 w-3.5" />
-          Browse Component Library
-          <ArrowRight className="h-3 w-3" />
-        </Link>
+        {/* Component Library link hidden — will be restored when Assembly Builder ships */}
       </div>
     </div>
   )

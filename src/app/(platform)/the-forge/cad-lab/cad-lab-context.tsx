@@ -44,6 +44,7 @@ import {
   loadCadLabBatchStatus,
 } from "@/actions/cad-lab-projects"
 
+import { generateCadLabSingleImageAction } from "@/actions/cad-lab-images"
 import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 import type {
@@ -136,6 +137,10 @@ export interface CadLabContextValue {
   generatedModuleCount: number
   riskCount: number
   diagCompletedCount: number
+
+  // Image generation (Gemini blueprint illustrations)
+  isGeneratingImages: boolean
+  handleGenerateModuleImages: (modules: CadLabModule[]) => Promise<void>
 
   // Integration (combined system assembly)
   integratedAssemblyStlUrl: string | null
@@ -255,6 +260,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const activeModuleCountRef = useRef(0)
   // Ref for batch reconnection polling interval (so cleanup always works)
   const batchPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // ── Image generation state (Gemini blueprint illustrations) ──
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false)
 
   // ── Progress storytelling ──
   const [progressLines, setProgressLines] = useState<string[]>([])
@@ -416,6 +424,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             }
           })
           .catch(() => { /* Non-critical */ })
+
+        // Auto-chain: trigger image generation immediately after decomposition
+        // Non-blocking — images fill in progressively while user sees module cards
+        handleGenerateModuleImages(res.modules)
+          .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
       }
     } catch (err) {
       timers.forEach(clearTimeout)
@@ -425,6 +438,63 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setIsDecomposing(false)
     }
   }, [editableReport, subject, modelId, activeProjectId, refreshProjects, addProgressLine])
+
+  // ── Generate Gemini blueprint images for modules (progressive fill) ──
+  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[]) => {
+    if (modulesToProcess.length === 0 || !activeProjectId) return
+    setIsGeneratingImages(true)
+
+    // Immediately set all modules to "generating" image status in local state
+    setModules((prev) =>
+      prev.map((m) => {
+        const isTarget = modulesToProcess.some((t) => t.id === m.id)
+        return isTarget ? { ...m, imageStatus: "generating" as const } : m
+      }),
+    )
+
+    toast.info(`Generating ${modulesToProcess.length} blueprint illustrations...`)
+
+    // Process concurrently (batch of 3) with progressive fill
+    const CONCURRENCY = 3
+    let completedCount = 0
+
+    const generateOne = async (mod: CadLabModule): Promise<void> => {
+      try {
+        const res = await generateCadLabSingleImageAction(activeProjectId, mod)
+        if ("module" in res) {
+          setModules((prev) =>
+            prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.module.imageUrl, imageStatus: res.module.imageStatus } : m)),
+          )
+          if (res.module.imageStatus === "complete") completedCount++
+        }
+      } catch {
+        setModules((prev) =>
+          prev.map((m) => (m.id === mod.id ? { ...m, imageStatus: "failed" as const } : m)),
+        )
+      }
+    }
+
+    // Run in batches of CONCURRENCY
+    for (let i = 0; i < modulesToProcess.length; i += CONCURRENCY) {
+      const batch = modulesToProcess.slice(i, i + CONCURRENCY)
+      await Promise.allSettled(batch.map(generateOne))
+    }
+
+    // Final persist
+    setModules((current) => {
+      if (activeProjectId) {
+        saveCadLabModules(activeProjectId, current)
+          .then(() => setLastSaved(new Date().toISOString()))
+          .catch(() => { /* Non-critical */ })
+      }
+      return current
+    })
+
+    if (completedCount > 0) {
+      toast.success(`Generated ${completedCount}/${modulesToProcess.length} blueprint illustrations`)
+    }
+    setIsGeneratingImages(false)
+  }, [activeProjectId])
 
   // ── Generate CAD for a specific module ──
   const handleModuleGenerate = useCallback(async (moduleId: string, step: "interface" | "generate") => {
@@ -1065,6 +1135,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     diagnosticAnswers, setDiagnosticAnswers, aiPrefilled,
     handleDecompose, handleModuleGenerate, handleGenerateSingleModule, handleGenerateAllModules,
     isBatchRunning, batchProgress,
+    isGeneratingImages, handleGenerateModuleImages,
     progressLines, milestone, setMilestone,
     isAnyLoading, generatedModuleCount, riskCount, diagCompletedCount,
     integratedAssemblyStlUrl, integratedAssemblyStepUrl, isIntegrating, integrationError, setIntegrationError, handleGenerateIntegration,

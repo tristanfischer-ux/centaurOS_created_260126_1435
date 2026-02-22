@@ -3,9 +3,9 @@
 /**
  * @file cad-lab-nav.tsx — Pipeline stepper navigation for The Forge stages.
  *
- * @description Five-stage pipeline stepper modeled on ForgeSubNav. Stages
- * unlock progressively: Research is always accessible, Build requires research
- * + modules, Analysis/Procurement/Review require at least one generated module.
+ * @description Three-stage pipeline stepper: Concept → Build → Review.
+ * Stages unlock progressively: Concept is always accessible, Build requires
+ * research + modules, Review requires at least one generated module.
  * Connector lines turn orange as stages complete. Locked stages show a
  * preview dialog explaining what they contain and how to unlock them.
  */
@@ -16,8 +16,6 @@ import { usePathname } from "next/navigation"
 import {
   Search,
   Box,
-  BarChart3,
-  ShoppingCart,
   ClipboardCheck,
   CheckCircle2,
   Lock,
@@ -51,12 +49,12 @@ interface StageDefinition {
 const STAGES: StageDefinition[] = [
   {
     id: "research",
-    label: "Research",
+    label: "Concept",
     icon: Search,
     href: "/the-forge/cad-lab",
-    description: "AI-powered research using engineering databases and datasheets.",
+    description: "Describe your product. Get research, module decomposition, and AI blueprint illustrations.",
     unlockHint: "Always available",
-    features: ["Dimensional specifications", "Material candidates", "Reference designs", "Source citations"],
+    features: ["Engineering research report", "Module decomposition", "AI blueprint illustrations", "Source citations"],
   },
   {
     id: "build",
@@ -64,26 +62,8 @@ const STAGES: StageDefinition[] = [
     icon: Box,
     href: "/the-forge/cad-lab/build",
     description: "Parametric CadQuery model generation for each sub-assembly.",
-    unlockHint: "Complete the Research stage first",
-    features: ["Module decomposition", "Parametric CAD code", "7 orthographic views", "STEP + STL exports"],
-  },
-  {
-    id: "analysis",
-    label: "Analysis",
-    icon: BarChart3,
-    href: "/the-forge/cad-lab/analysis",
-    description: "Engineering analysis dashboard with risk assessment.",
-    unlockHint: "Generate at least one module in the Build stage",
-    features: ["System mass & volume", "Manufacturing readiness grade", "Gantt timeline", "Risk register"],
-  },
-  {
-    id: "procurement",
-    label: "Procurement",
-    icon: ShoppingCart,
-    href: "/the-forge/cad-lab/procurement",
-    description: "Supply chain diagnostics and cost estimation.",
-    unlockHint: "Generate at least one module in the Build stage",
-    features: ["Manufacturing diagnostics", "Cost estimates", "Supply chain mapping", "Contracting tools"],
+    unlockHint: "Complete the Concept stage first",
+    features: ["Parametric CAD code", "7 orthographic views", "STEP + STL exports", "DFM analysis"],
   },
   {
     id: "review",
@@ -92,7 +72,7 @@ const STAGES: StageDefinition[] = [
     href: "/the-forge/cad-lab/review",
     description: "Supplier-ready engineering review package.",
     unlockHint: "Generate at least one module in the Build stage",
-    features: ["Review document", "Expert discipline matching", "Print & copy support", "Stakeholder summary"],
+    features: ["Review document", "Expert discipline matching", "Print & copy support", "RFQ package"],
   },
 ]
 
@@ -112,8 +92,6 @@ function getStageAccess(
   return {
     research: { enabled: true, completed: hasResearch },
     build: { enabled: hasResearch && moduleCount > 0, completed: generatedCount > 0 && generatedCount === moduleCount },
-    analysis: { enabled: generatedCount > 0, completed: false },
-    procurement: { enabled: generatedCount > 0, completed: false },
     review: { enabled: generatedCount > 0, completed: false },
   }
 }
@@ -121,8 +99,8 @@ function getStageAccess(
 /**
  * CadLabNav — Pipeline stepper with locked-stage preview dialogs.
  *
- * @description Shows 5 stages as connected circles with labels.
- * Disabled stages open a preview dialog explaining what they contain.
+ * @description Shows 3 stages (Concept → Build → Review) as connected circles
+ * with labels. Disabled stages open a preview dialog explaining what they contain.
  * Active stage glows orange. Completed stages show a check icon.
  */
 export function CadLabNav({ className }: { className?: string }): React.ReactNode {

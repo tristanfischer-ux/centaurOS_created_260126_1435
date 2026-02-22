@@ -197,6 +197,15 @@ export interface CadLabModule {
   code?: string
   /** Pipeline status */
   status: "pending" | "researched" | "interface_ready" | "generated"
+
+  // ── Image generation (Gemini blueprint illustrations) ──
+
+  /** URL of Gemini-generated engineering blueprint image */
+  imageUrl?: string
+  /** Image generation status */
+  imageStatus?: "pending" | "generating" | "complete" | "failed"
+  /** AI-crafted image prompt (set during decomposition or generated on-the-fly) */
+  moduleImagePrompt?: string
 }
 
 /** Result from module decomposition */
