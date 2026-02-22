@@ -33,6 +33,7 @@ export default async function MarketplacePage() {
     let listings: MarketplaceListing[] = []
     let totalCount = 0
     let hasMore = false
+    let categoryCounts: Record<string, number> = {}
     let recommendations: MarketplaceRecommendation[] = []
     let savedIds: string[] = []
     let savedListings: MarketplaceListing[] = []
@@ -52,6 +53,7 @@ export default async function MarketplacePage() {
         listings = searchResult.value.data
         totalCount = searchResult.value.totalCount
         hasMore = searchResult.value.hasMore
+        categoryCounts = searchResult.value.categoryCounts
     } else {
         console.error('[Marketplace] Failed to fetch listings:', searchResult.reason)
     }
@@ -109,6 +111,7 @@ export default async function MarketplacePage() {
                 initialListings={listings}
                 initialTotalCount={totalCount}
                 initialHasMore={hasMore}
+                initialCategoryCounts={categoryCounts}
                 recommendations={recommendations}
                 initialSavedIds={savedIds}
                 initialSavedListings={savedListings}

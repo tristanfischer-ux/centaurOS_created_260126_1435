@@ -215,6 +215,8 @@ export interface SearchMarketplaceListingsResult {
     data: MarketplaceListing[]
     totalCount: number
     hasMore: boolean
+    /** Per-category totals scoped to the same search/filter context (excludes pagination). */
+    categoryCounts: Record<string, number>
 }
 
 /**
@@ -290,7 +292,7 @@ export async function searchMarketplaceListings(
 
     if (error) {
         console.error('[Marketplace] searchMarketplaceListings error:', error)
-        return { data: [], totalCount: 0, hasMore: false }
+        return { data: [], totalCount: 0, hasMore: false, categoryCounts: {} }
     }
 
     let totalCount = count ?? 0
@@ -313,7 +315,6 @@ export async function searchMarketplaceListings(
             const semanticRows = (semanticData ?? []) as { id: string }[]
             const semanticIds = semanticRows.map((r) => r.id)
             if (semanticIds.length > 0) {
-                // Fetch full rows for semantic IDs with same category/subcategory filters
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 let semQuery = supabase.from('marketplace_listings').select('*').in('id', semanticIds)
                 if (params.categories?.length) {
@@ -329,7 +330,6 @@ export async function searchMarketplaceListings(
                 }
                 const { data: semanticListings } = await semQuery
                 const fullSemantic = (semanticListings ?? []) as MarketplaceListing[]
-                // Preserve similarity order: sort by position in semanticIds
                 const idToIndex = new Map(semanticIds.map((id, i) => [id, i]))
                 fullSemantic.sort((a, b) => (idToIndex.get(a.id) ?? 999) - (idToIndex.get(b.id) ?? 999))
                 const ftIds = new Set(listings.map((l) => l.id))
@@ -342,7 +342,29 @@ export async function searchMarketplaceListings(
         }
     }
 
-    return { data: listings, totalCount, hasMore }
+    // INTENT: Fetch per-category counts so the UI pills show real totals, not just
+    // the count from the loaded page. Uses the same text-search filter but grouped
+    // by category, scoped to the allowed categories.
+    const countCategories = params.categories ?? ['People', 'Products', 'Services']
+    const categoryCountPromises = countCategories.map(async (cat) => {
+        let cq = supabase.from('marketplace_listings').select('id', { count: 'exact', head: true })
+        if (queryTrimmed) {
+            cq = cq.textSearch('search_vector', queryTrimmed, { type: 'websearch', config: 'english' })
+        }
+        if (params.subcategories?.length) {
+            cq = cq.in('subcategory', params.subcategories)
+        } else if (params.subcategory) {
+            cq = cq.eq('subcategory', params.subcategory)
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        cq = cq.eq('category', cat as any)
+        const { count: c } = await cq
+        return [cat, c ?? 0] as const
+    })
+    const countEntries = await Promise.all(categoryCountPromises)
+    const categoryCounts: Record<string, number> = Object.fromEntries(countEntries)
+
+    return { data: listings, totalCount, hasMore, categoryCounts }
 }
 
 /**

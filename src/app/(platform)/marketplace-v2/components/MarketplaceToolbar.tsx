@@ -318,7 +318,7 @@ export function MarketplaceToolbar({
                     {totalCount != null && totalCount > 0 ? (
                         <>
                             Showing <span className="font-medium text-foreground">{resultCount}</span> of{' '}
-                            <span className="font-medium text-foreground">{totalCount}</span> suppliers
+                            <span className="font-medium text-foreground">{totalCount}</span> listings
                         </>
                     ) : (
                         <>

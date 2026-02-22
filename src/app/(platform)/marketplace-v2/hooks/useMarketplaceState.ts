@@ -56,6 +56,8 @@ interface UseMarketplaceStateProps {
     initialListings: MarketplaceListing[]
     initialTotalCount?: number
     initialHasMore?: boolean
+    /** Server-side per-category totals from the initial search. */
+    initialCategoryCounts?: Record<string, number>
     initialSavedIds?: string[]
     /**
      * Restrict which content categories are visible.
@@ -70,6 +72,7 @@ export function useMarketplaceState({
     initialListings,
     initialTotalCount = 0,
     initialHasMore = false,
+    initialCategoryCounts,
     initialSavedIds = [],
     allowedCategories,
 }: UseMarketplaceStateProps) {
@@ -120,6 +123,7 @@ export function useMarketplaceState({
     const [listings, setListings] = useState<MarketplaceListing[]>(initialListings)
     const [totalCount, setTotalCount] = useState(initialTotalCount)
     const [hasMore, setHasMore] = useState(initialHasMore)
+    const [serverCategoryCounts, setServerCategoryCounts] = useState<Record<string, number>>(initialCategoryCounts ?? {})
     const [currentPage, setCurrentPage] = useState(1)
     const [isLoading, setIsLoading] = useState(false)
     const [isLoadingMore, setIsLoadingMore] = useState(false)
@@ -137,8 +141,9 @@ export function useMarketplaceState({
         setListings(initialListings)
         setTotalCount(initialTotalCount ?? 0)
         setHasMore(initialHasMore ?? false)
+        if (initialCategoryCounts) setServerCategoryCounts(initialCategoryCounts)
         setCurrentPage(1)
-    }, [initialListings, initialTotalCount, initialHasMore])
+    }, [initialListings, initialTotalCount, initialHasMore, initialCategoryCounts])
 
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300)
@@ -217,6 +222,7 @@ export function useMarketplaceState({
                 }
                 setTotalCount(result.totalCount)
                 setHasMore(result.hasMore)
+                if (result.categoryCounts) setServerCategoryCounts(result.categoryCounts)
                 setCurrentPage(page)
             } catch (err) {
                 console.error('[Marketplace] searchMarketplaceListings failed:', err)
@@ -353,13 +359,12 @@ export function useMarketplaceState({
         return [...new Set(catListings.map(l => l.subcategory))].sort()
     }, [listings, activeCategory])
 
+    // INTENT: Use server-provided per-category totals so pills show real counts,
+    // not just the count from the loaded page. "All" is the sum of individual categories.
     const categoryCounts = useMemo(() => {
-        const counts: Record<string, number> = { All: listings.length }
-        for (const listing of listings) {
-            counts[listing.category] = (counts[listing.category] || 0) + 1
-        }
-        return counts
-    }, [listings])
+        const allTotal = Object.values(serverCategoryCounts).reduce((sum, n) => sum + n, 0)
+        return { All: allTotal, ...serverCategoryCounts }
+    }, [serverCategoryCounts])
 
     const clearTechniqueFilter = useCallback(() => {
         const params = new URLSearchParams(searchParams?.toString() || '')

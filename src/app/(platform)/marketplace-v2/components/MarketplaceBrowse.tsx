@@ -35,6 +35,8 @@ interface MarketplaceBrowseProps {
     initialTotalCount?: number
     /** Whether more pages exist (for infinite scroll). */
     initialHasMore?: boolean
+    /** Server-side per-category totals (e.g. { Products: 25, Services: 13 }). */
+    initialCategoryCounts?: Record<string, number>
     recommendations: MarketplaceRecommendation[]
     initialSavedIds: string[]
     initialSavedListings: MarketplaceListing[]
@@ -64,6 +66,7 @@ export function MarketplaceBrowse({
     initialListings,
     initialTotalCount = 0,
     initialHasMore = false,
+    initialCategoryCounts,
     recommendations: initialRecommendations,
     initialSavedIds,
     initialSavedListings,
@@ -76,6 +79,7 @@ export function MarketplaceBrowse({
         initialListings,
         initialTotalCount,
         initialHasMore,
+        initialCategoryCounts,
         initialSavedIds,
         allowedCategories,
     })
@@ -312,7 +316,7 @@ export function MarketplaceBrowse({
                                             size="sm"
                                             className="text-xs border-international-orange/30 text-international-orange hover:bg-international-orange/5"
                                         >
-                                            <Link href={`/inspiration?tab=techniques`}>
+                                            <Link href={`/learn?tab=techniques`}>
                                                 <ArrowRight className="h-3 w-3 mr-1 rotate-180" />
                                                 Back to Techniques
                                             </Link>
