@@ -22,6 +22,7 @@
 import {
   Crosshair,
   Package,
+  PackageCheck,
   Trash2,
   ArrowRight,
   Weight,
@@ -137,6 +138,14 @@ export function SlotPopover({
         {/* Assigned Component */}
         {isFilled && component ? (
           <div className="rounded-lg bg-muted/50 p-2.5 space-y-1.5">
+            {/* Catalog indicator */}
+            {placedComponent?.geometryTypeSlug && (
+              <div className="flex items-center gap-1 text-[10px] text-status-success font-medium">
+                <PackageCheck className="h-3 w-3" />
+                Catalog Part
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               <div
                 className="h-6 w-6 rounded-md flex items-center justify-center"
@@ -156,6 +165,13 @@ export function SlotPopover({
                 </p>
               </div>
             </div>
+
+            {/* Component description (first ~100 chars) */}
+            {component.description && (
+              <p className="text-[10px] text-muted-foreground leading-snug line-clamp-2">
+                {component.description}
+              </p>
+            )}
 
             {/* Component specs */}
             <div className="flex items-center gap-3 text-[10px] text-muted-foreground">

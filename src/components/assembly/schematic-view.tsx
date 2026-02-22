@@ -29,13 +29,16 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 
+import { Rocket, SendHorizonal, CheckCircle2, AlertCircle } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 import { AssemblySlotNode } from "./assembly-slot-node"
 import type { AssemblySlotNodeData } from "./assembly-slot-node"
 import { computeAssemblyLayout } from "./assembly-auto-layout"
 
-import type { TemplateSlot, PlacedComponent } from "@/actions/assembly-builder"
+import type { TemplateSlot, PlacedComponent, CatalogComponent } from "@/actions/assembly-builder"
 import type { Node, Edge } from "@xyflow/react"
 
 // ─── Group Colors ────────────────────────────────────────────────────
@@ -72,6 +75,16 @@ interface SchematicViewProps {
   activeSlotId: string | null
   /** Called when a slot is clicked, with optional screen position for popover */
   onSlotClick: (slotId: string, position?: SlotClickPosition) => void
+  /** Lookup map from slug -> full component data (for enriching node display) */
+  componentLookup?: Map<string, CatalogComponent>
+  /** Whether all required slots are filled (build is ready) */
+  isAssemblyReady?: boolean
+  /** Number of required slots still empty */
+  requiredSlotsRemaining?: number
+  /** Called when user clicks "Generate CAD" from the completion card */
+  onGenerateCad?: () => void
+  /** Called when user clicks "Create RFQ" from the completion card */
+  onCreateRfq?: () => void
   /** Custom SVG from template (optional; not used in React Flow version) */
   customSvg?: string | null
   /** Optional className */
@@ -91,6 +104,7 @@ function buildNodesAndEdges(
   placedBySlot: Map<string, PlacedComponent>,
   activeSlotId: string | null,
   layout: Map<string, { x: number; y: number }>,
+  componentLookup?: Map<string, CatalogComponent>,
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = []
   const grouped = new Map<string, TemplateSlot[]>()
@@ -105,6 +119,9 @@ function buildNodesAndEdges(
     const placed = placedBySlot.get(slot.id)
     const isFilled = !!placed
     const color = getGroupColor(slot.group)
+    const comp = placed?.geometryTypeSlug && componentLookup
+      ? componentLookup.get(placed.geometryTypeSlug)
+      : undefined
     const data: AssemblySlotNodeData = {
       slotId: slot.id,
       label: slot.label,
@@ -116,6 +133,9 @@ function buildNodesAndEdges(
       groupFill: color.fill,
       groupStroke: color.stroke,
       groupText: color.text,
+      category: comp?.category,
+      tier: comp?.tier,
+      isCatalogPart: !!placed?.geometryTypeSlug,
     }
     nodes.push({
       id: slot.id,
@@ -126,19 +146,54 @@ function buildNodesAndEdges(
     })
   }
 
-  // Group label annotation nodes — non-interactive labels at group centroids
+  // INTENT: Group region backgrounds give each cluster a tinted area so
+  // users can visually separate Propulsion from Electronics etc. at a glance.
+  // Labels are larger (13px, full opacity) so they read as section headers.
+  const NODE_W = 220
+  const NODE_H = 96
+  const REGION_PAD = 16
+
   for (const [groupName, groupSlots] of grouped) {
     const positions = groupSlots.map(
       (s) => layout.get(s.id) ?? { x: s.position.x, y: s.position.y },
     )
-    const centroidX = positions.reduce((sum, p) => sum + p.x, 0) / positions.length
+    const minX = Math.min(...positions.map((p) => p.x))
+    const maxX = Math.max(...positions.map((p) => p.x))
     const minY = Math.min(...positions.map((p) => p.y))
+    const maxY = Math.max(...positions.map((p) => p.y))
     const color = getGroupColor(groupName)
 
+    const regionW = (maxX - minX) + NODE_W + REGION_PAD * 2
+    const regionH = (maxY - minY) + NODE_H + REGION_PAD * 2 + 28
+
+    // Group region background — sits behind slot nodes
+    nodes.push({
+      id: `group-bg-${groupName}`,
+      type: "default",
+      position: { x: minX - REGION_PAD, y: minY - REGION_PAD - 28 },
+      data: { label: "" },
+      draggable: false,
+      selectable: false,
+      connectable: false,
+      zIndex: -1,
+      style: {
+        width: regionW,
+        height: regionH,
+        background: color.fill,
+        border: `1.5px solid ${color.stroke}30`,
+        borderRadius: "12px",
+        boxShadow: "none",
+        padding: 0,
+        pointerEvents: "none" as const,
+        opacity: 0.65,
+      },
+    })
+
+    // Group label — top-left of region
     nodes.push({
       id: `group-label-${groupName}`,
       type: "default",
-      position: { x: centroidX, y: minY - 40 },
+      position: { x: minX - REGION_PAD + 12, y: minY - REGION_PAD - 22 },
       data: { label: groupName.charAt(0).toUpperCase() + groupName.slice(1) },
       draggable: false,
       selectable: false,
@@ -147,10 +202,10 @@ function buildNodesAndEdges(
         background: "transparent",
         border: "none",
         boxShadow: "none",
-        fontSize: "11px",
-        fontWeight: 600,
+        fontSize: "13px",
+        fontWeight: 700,
+        letterSpacing: "0.01em",
         color: color.text,
-        opacity: 0.7,
         padding: 0,
         pointerEvents: "none" as const,
         width: "auto",
@@ -190,6 +245,11 @@ export function SchematicView({
   placedComponents,
   activeSlotId,
   onSlotClick,
+  componentLookup,
+  isAssemblyReady = false,
+  requiredSlotsRemaining = 0,
+  onGenerateCad,
+  onCreateRfq,
   className,
 }: SchematicViewProps): React.ReactNode {
   const placedBySlot = useMemo(() => {
@@ -203,8 +263,8 @@ export function SchematicView({
   const layout = useMemo(() => computeAssemblyLayout(slots), [slots])
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
-    () => buildNodesAndEdges(slots, placedBySlot, activeSlotId, layout),
-    [slots, placedBySlot, activeSlotId, layout],
+    () => buildNodesAndEdges(slots, placedBySlot, activeSlotId, layout, componentLookup),
+    [slots, placedBySlot, activeSlotId, layout, componentLookup],
   )
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
@@ -212,7 +272,7 @@ export function SchematicView({
 
   // Sync node data when slots/placed/activeSlotId change; preserve drag positions
   useEffect(() => {
-    const next = buildNodesAndEdges(slots, placedBySlot, activeSlotId, layout)
+    const next = buildNodesAndEdges(slots, placedBySlot, activeSlotId, layout, componentLookup)
     setNodes((current) =>
       next.nodes.map((nextNode) => {
         const existing = current.find((n) => n.id === nextNode.id)
@@ -223,7 +283,7 @@ export function SchematicView({
       }),
     )
     setEdges(next.edges)
-  }, [slots, placedBySlot, activeSlotId, layout, setNodes, setEdges])
+  }, [slots, placedBySlot, activeSlotId, layout, componentLookup, setNodes, setEdges])
 
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: Node) => {
@@ -351,11 +411,43 @@ export function SchematicView({
         />
       </ReactFlow>
 
-      {/* Hint */}
+      {/* Contextual guidance — changes based on build state */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
-        <p className="text-xs text-muted-foreground bg-background/90 rounded-full px-3 py-1.5 shadow-sm border">
-          Drag nodes to rearrange · Click a slot to assign a component
-        </p>
+        {isAssemblyReady ? (
+          <div className="bg-background/95 rounded-xl border shadow-lg px-5 py-3 flex items-center gap-4">
+            <div className="flex items-center gap-2 text-status-success">
+              <CheckCircle2 className="h-5 w-5" />
+              <span className="text-sm font-semibold">Build Ready</span>
+            </div>
+            <div className="h-6 w-px bg-muted" />
+            {onGenerateCad && (
+              <Button size="sm" onClick={onGenerateCad} className="gap-1.5">
+                <Rocket className="h-3.5 w-3.5" />
+                Generate CAD
+              </Button>
+            )}
+            {onCreateRfq && (
+              <Button size="sm" variant="outline" onClick={onCreateRfq} className="gap-1.5">
+                <SendHorizonal className="h-3.5 w-3.5" />
+                Create RFQ
+              </Button>
+            )}
+          </div>
+        ) : filledCount > 0 && requiredSlotsRemaining > 0 ? (
+          <div className="bg-background/95 rounded-full border shadow-sm px-4 py-2 flex items-center gap-2">
+            <AlertCircle className="h-3.5 w-3.5 text-international-orange" />
+            <p className="text-xs text-foreground font-medium">
+              {requiredSlotsRemaining} required slot{requiredSlotsRemaining !== 1 ? "s" : ""} remaining
+            </p>
+            <span className="text-xs text-muted-foreground">
+              — click an empty slot to assign
+            </span>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground bg-background/90 rounded-full px-3 py-1.5 shadow-sm border">
+            Drag nodes to rearrange · Click a slot to assign a component
+          </p>
+        )}
       </div>
     </div>
   )

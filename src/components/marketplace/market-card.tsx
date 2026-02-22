@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { cn, getInitials } from "@/lib/utils"
+import { safeParseAttributes, safeStringArray } from "@/lib/marketplace-utils"
 import { getCategoryBadgeClasses, getAvatarGradient, type MarketplaceCategory } from "@/lib/marketplace-colors"
 import { 
     ShieldCheck, MapPin, Clock, Briefcase,
@@ -98,7 +99,7 @@ export const MarketCard = memo(function MarketCard({
         }
     }, [listing.id, localSavedState, onSaveToggle])
 
-    const attrs = listing.attributes || {}
+    const attrs = safeParseAttributes(listing.attributes)
     const isPerson = listing.category === 'People'
     const isProduct = listing.category === 'Products'
     const isManufacturer = isProduct && listing.subcategory === 'Manufacturer'
@@ -113,7 +114,7 @@ export const MarketCard = memo(function MarketCard({
     const primaryMetric = attrs.rate || attrs.cost || attrs.price || null
     
     // Get all tags/skills
-    const allTags = attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications || []
+    const allTags = safeStringArray(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications)
     
     // Size indicator button
     const handleSizeToggle = useCallback((e: React.MouseEvent) => {
@@ -522,21 +523,25 @@ export const MarketCard = memo(function MarketCard({
                         )}
 
                         {/* Certifications */}
-                        {(attrs.certifications && Array.isArray(attrs.certifications) && attrs.certifications !== allTags) && (
-                            <div className="mb-4">
-                                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                                    <Award className="w-3 h-3" />
-                                    Certifications
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {(attrs.certifications as string[]).map((cert: string, i: number) => (
-                                        <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-status-success-light text-status-success-dark">
-                                            {cert}
-                                        </span>
-                                    ))}
+                        {(() => {
+                            const certs = safeStringArray(attrs.certifications)
+                            const certsDifferent = certs.length > 0 && JSON.stringify(certs) !== JSON.stringify(allTags)
+                            return certsDifferent ? (
+                                <div className="mb-4">
+                                    <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                                        <Award className="w-3 h-3" />
+                                        Certifications
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {certs.map((cert, i) => (
+                                            <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-status-success-light text-status-success-dark">
+                                                {cert}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            ) : null
+                        })()}
 
                         {/* Footer - Click to view prompt */}
                         <div className="flex items-center justify-between pt-4 border-t border-muted mt-auto">

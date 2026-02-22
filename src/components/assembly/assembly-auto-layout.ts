@@ -13,9 +13,9 @@ import type { TemplateSlot } from "@/actions/assembly-builder"
 // ─── Constants ───────────────────────────────────────────────────────
 
 /** Width of each slot node (must match AssemblySlotNode) */
-export const NODE_WIDTH = 200
+export const NODE_WIDTH = 220
 /** Height of each slot node */
-export const NODE_HEIGHT = 80
+export const NODE_HEIGHT = 96
 /** Vertical gap between slots within a group */
 export const SLOT_GAP_Y = 24
 /** Horizontal gap between groups */

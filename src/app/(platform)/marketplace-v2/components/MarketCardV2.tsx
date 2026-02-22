@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn, getInitials } from '@/lib/utils'
+import { safeParseAttributes, safeStringArray } from '@/lib/marketplace-utils'
 import {
     getCategoryBadgeClasses,
     getAvatarGradient,
@@ -114,7 +115,7 @@ export const MarketCardV2 = memo(function MarketCardV2({
     // Sync local state when parent prop changes (e.g. after save/unsave from another component)
     useEffect(() => { setLocalSaved(isSaved) }, [isSaved])
 
-    const attrs = listing.attributes || {}
+    const attrs = safeParseAttributes(listing.attributes)
     const isAI = listing.category === 'AI'
     const AIIcon = isAI ? getAIIcon(listing.subcategory) : null
     const initials = getInitials(listing.title)
@@ -123,7 +124,7 @@ export const MarketCardV2 = memo(function MarketCardV2({
     const rating = getRating(attrs)
     const responseTime = getResponseTime(attrs)
     const availability = getAvailability(attrs)
-    const tags: string[] = (attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications || []).slice(0, 3)
+    const tags = safeStringArray(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications).slice(0, 3)
     const location = attrs.location as string | undefined
     const headline = attrs.headline as string | undefined
     const hiredCount = attrs.total_bookings as number | undefined

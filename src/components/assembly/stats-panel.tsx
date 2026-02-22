@@ -239,9 +239,9 @@ export function StatsPanel({
       <ScrollArea className="flex-1">
         {/* ─── Stats Tab ─── */}
         {activeTab === "stats" && (
-          <div className="p-4 space-y-5">
-            {/* Build Status */}
-            <div className="space-y-2">
+          <div className="p-4 space-y-4">
+            {/* Build Status — highlighted card */}
+            <div className="rounded-lg bg-muted/40 border p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-foreground">
                   Build Status
@@ -258,7 +258,6 @@ export function StatsPanel({
                 )}
               </div>
 
-              {/* Completion bar */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Slots filled</span>
@@ -266,7 +265,7 @@ export function StatsPanel({
                     {stats.filledSlots} / {stats.totalSlots}
                   </span>
                 </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div className="h-2 rounded-full bg-background overflow-hidden">
                   <div
                     className={cn(
                       "h-full rounded-full transition-all duration-500 ease-out",
@@ -284,7 +283,10 @@ export function StatsPanel({
               </div>
             </div>
 
-            {/* Stat Bars */}
+            {/* Divider */}
+            <div className="border-b border-muted" />
+
+            {/* Assembly Stats */}
             <div className="space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Assembly Stats
@@ -343,63 +345,69 @@ export function StatsPanel({
 
             {/* Warnings */}
             {stats.warnings.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-destructive flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  Warnings ({stats.warnings.length})
-                </h3>
-                <div className="space-y-1.5">
-                  {stats.warnings.map((warning, i) => (
-                    <div
-                      key={i}
-                      className="rounded-md bg-status-error-light/50 border border-destructive/20 px-3 py-2"
-                    >
-                      <p className="text-[11px] text-destructive">{warning}</p>
-                    </div>
-                  ))}
+              <>
+                <div className="border-b border-muted" />
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-destructive flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Warnings ({stats.warnings.length})
+                  </h3>
+                  <div className="space-y-1.5">
+                    {stats.warnings.map((warning, i) => (
+                      <div
+                        key={i}
+                        className="rounded-md bg-status-error-light/50 border border-destructive/20 px-3 py-2"
+                      >
+                        <p className="text-[11px] text-destructive">{warning}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             {/* BOM Summary */}
             {placedComponents.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                  <Package className="h-3 w-3" />
-                  Bill of Materials
-                </h3>
-                <div className="space-y-1">
-                  {placedComponents.map((pc) => {
-                    const comp = pc.geometryTypeSlug
-                      ? componentLookup.get(pc.geometryTypeSlug)
-                      : null
-                    const cost =
-                      (comp?.procurement?.typical_cost_gbp as number) ?? 0
-                    const slotLabel = slots.find((s) => s.id === pc.slotId)?.label
+              <>
+                <div className="border-b border-muted" />
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                    <Package className="h-3 w-3" />
+                    Bill of Materials
+                  </h3>
+                  <div className="space-y-1">
+                    {placedComponents.map((pc) => {
+                      const comp = pc.geometryTypeSlug
+                        ? componentLookup.get(pc.geometryTypeSlug)
+                        : null
+                      const cost =
+                        (comp?.procurement?.typical_cost_gbp as number) ?? 0
+                      const slotLabel = slots.find((s) => s.id === pc.slotId)?.label
 
-                    return (
-                      <div
-                        key={pc.id || pc.slotId}
-                        className="flex items-center justify-between text-xs py-1.5 border-b border-muted last:border-0"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-foreground truncate max-w-[140px]">
-                            {pc.componentName}
-                          </p>
-                          {slotLabel && (
-                            <p className="text-[10px] text-muted-foreground truncate">
-                              {slotLabel}
+                      return (
+                        <div
+                          key={pc.id || pc.slotId}
+                          className="flex items-center justify-between text-xs py-1.5 border-b border-muted last:border-0"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-foreground truncate max-w-[140px]">
+                              {pc.componentName}
                             </p>
-                          )}
+                            {slotLabel && (
+                              <p className="text-[10px] text-muted-foreground truncate">
+                                {slotLabel}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-muted-foreground font-mono shrink-0 ml-2">
+                            {cost > 0 ? `£${cost.toFixed(2)}` : "—"}
+                          </span>
                         </div>
-                        <span className="text-muted-foreground font-mono shrink-0 ml-2">
-                          {cost > 0 ? `£${cost.toFixed(2)}` : "—"}
-                        </span>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
         )}

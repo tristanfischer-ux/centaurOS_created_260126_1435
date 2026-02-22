@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn, getInitials } from '@/lib/utils'
+import { safeParseAttributes, safeStringArray } from '@/lib/marketplace-utils'
 import { getAvatarGradient, type MarketplaceCategory } from '@/lib/marketplace-colors'
 import {
     ShieldCheck,
@@ -101,7 +102,7 @@ export const PersonCard = memo(function PersonCard({
 
     useEffect(() => { setLocalSaved(isSaved) }, [isSaved])
 
-    const attrs = listing.attributes || {}
+    const attrs = safeParseAttributes(listing.attributes)
     const trust = listing.trustData
     const initials = getInitials(listing.title)
     const gradient = getAvatarGradient('People' as MarketplaceCategory, listing.title)
@@ -113,8 +114,8 @@ export const PersonCard = memo(function PersonCard({
     const rate = rawRate && ratePeriodMatch ? rawRate.slice(0, ratePeriodMatch.index) : rawRate
     const ratePeriod = ratePeriodMatch ? ratePeriodMatch[1].toLowerCase() : 'day'
     const yearsExp = attrs.years_experience as number | undefined
-    const skills: string[] = (attrs.skills || attrs.expertise || []).slice(0, 4)
-    const previousCompanies: string[] = (attrs.previous_companies || []).slice(0, 3)
+    const skills = safeStringArray(attrs.skills || attrs.expertise).slice(0, 4)
+    const previousCompanies = safeStringArray(attrs.previous_companies).slice(0, 3)
     const availability = getAvailabilityStatus(attrs)
     const responseTime = getResponseTimeLabel(trust.responseTimeHours)
 

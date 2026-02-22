@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import type { MarketplaceListing, MarketplaceSortOption } from '@/actions/marketplace'
 import { searchMarketplaceListings } from '@/actions/marketplace'
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
+import { safeParseAttributes, safeStringArray } from '@/lib/marketplace-utils'
 import { getTechniqueById } from '@/lib/manufacturing-techniques'
 import type { ManufacturingTechnique } from '@/lib/manufacturing-techniques/types'
 
@@ -333,11 +334,9 @@ export function useMarketplaceState({
                 const title = l.title.toLowerCase()
                 const desc = l.description?.toLowerCase() || ''
                 const sub = l.subcategory?.toLowerCase() || ''
-                const attrs = l.attributes || {}
-                const tags: string[] = (attrs.tags || []).map((t: string) => t.toLowerCase())
-                const capabilities: string[] = (
-                    attrs.capabilities || attrs.techniques || []
-                ).map((c: string) => c.toLowerCase())
+                const attrs = safeParseAttributes(l.attributes)
+                const tags = safeStringArray(attrs.tags).map((t) => t.toLowerCase())
+                const capabilities = safeStringArray(attrs.capabilities || attrs.techniques).map((c) => c.toLowerCase())
                 return keywords.some(
                     kw =>
                         title.includes(kw) ||

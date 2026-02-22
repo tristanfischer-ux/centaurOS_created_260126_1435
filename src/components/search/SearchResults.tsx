@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { EmptyState } from "@/components/ui/empty-state"
 import { cn } from "@/lib/utils"
+import { safeParseAttributes, safeStringArray } from "@/lib/marketplace-utils"
 import {
   SearchResult,
   SortOption,
@@ -222,7 +223,7 @@ function ResultCard({
   canSelect = true,
   onClick,
 }: ResultCardProps) {
-  const attrs = result.attributes || {}
+  const attrs = safeParseAttributes(result.attributes)
 
   return (
     <Card
@@ -300,23 +301,26 @@ function ResultCard({
         </div>
 
         {/* Skills/tags */}
-        {(attrs.skills || attrs.expertise) && (
-          <div className="flex flex-wrap gap-1">
-            {(((attrs.skills || attrs.expertise) as string[]) || []).slice(0, 3).map((skill, i) => (
-              <span
-                key={i}
-                className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded"
-              >
-                {String(skill)}
-              </span>
-            ))}
-            {(((attrs.skills || attrs.expertise) as string[]) || []).length > 3 && (
-              <span className="px-2 py-0.5 text-xs text-muted-foreground">
-                +{(((attrs.skills || attrs.expertise) as string[]) || []).length - 3}
-              </span>
-            )}
-          </div>
-        )}
+        {(() => {
+          const skills = safeStringArray(attrs.skills || attrs.expertise)
+          return skills.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {skills.slice(0, 3).map((skill, i) => (
+                <span
+                  key={i}
+                  className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded"
+                >
+                  {skill}
+                </span>
+              ))}
+              {skills.length > 3 && (
+                <span className="px-2 py-0.5 text-xs text-muted-foreground">
+                  +{skills.length - 3}
+                </span>
+              )}
+            </div>
+          ) : null
+        })()}
 
         {/* Score indicator (optional - for debugging) */}
         {/* <div className="text-xs text-muted-foreground">
@@ -338,7 +342,7 @@ function ResultListItem({
   canSelect = true,
   onClick,
 }: ResultCardProps) {
-  const attrs = result.attributes || {}
+  const attrs = safeParseAttributes(result.attributes)
 
   return (
     <Card
@@ -425,9 +429,9 @@ function ResultListItem({
                 {String(attrs.location)}
               </div>
             )}
-            {(attrs.skills || attrs.expertise) && (
+            {safeStringArray(attrs.skills || attrs.expertise).length > 0 && (
               <div className="flex gap-1">
-                {(((attrs.skills || attrs.expertise) as string[]) || []).slice(0, 3).map((skill, i) => (
+                {safeStringArray(attrs.skills || attrs.expertise).slice(0, 3).map((skill, i) => (
                   <span key={i} className="px-2 py-0.5 bg-muted rounded">
                     {String(skill)}
                   </span>

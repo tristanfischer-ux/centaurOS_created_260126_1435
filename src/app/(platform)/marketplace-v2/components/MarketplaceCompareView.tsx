@@ -3,6 +3,7 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn, getInitials } from '@/lib/utils'
+import { safeParseAttributes, safeStringArray } from '@/lib/marketplace-utils'
 import {
     getCategoryBadgeClasses,
     getAvatarGradient,
@@ -76,7 +77,7 @@ function getComparisonRows(listings: MarketplaceListing[]): { key: string; label
 
 /** Extract a comparison value for a given key */
 function getComparisonValue(listing: MarketplaceListing, key: string): React.ReactNode {
-    const attrs = listing.attributes || {}
+    const attrs = safeParseAttributes(listing.attributes)
 
     switch (key) {
         case 'price': {
@@ -134,7 +135,7 @@ function getComparisonValue(listing: MarketplaceListing, key: string): React.Rea
             return '—'
         }
         case 'skills': {
-            const skills: string[] = (attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications || [])
+            const skills = safeStringArray(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications)
             if (skills.length === 0) return '—'
             return (
                 <div className="flex flex-wrap gap-1">
@@ -150,7 +151,7 @@ function getComparisonValue(listing: MarketplaceListing, key: string): React.Rea
             )
         }
         case 'specialties': {
-            const specs: string[] = (attrs.specialties || attrs.capabilities || [])
+            const specs = safeStringArray(attrs.specialties || attrs.capabilities)
             if (specs.length === 0) return '—'
             return (
                 <div className="flex flex-wrap gap-1">
@@ -179,7 +180,8 @@ function getBestIndex(listings: MarketplaceListing[], key: string): number | nul
             let bestIdx = -1
             let bestVal = -1
             listings.forEach((l, i) => {
-                const val = (l.attributes?.rating_average as number) || 0
+                const attrs = safeParseAttributes(l.attributes)
+                const val = (attrs.rating_average as number) || 0
                 if (val > bestVal) { bestVal = val; bestIdx = i }
             })
             return bestVal > 0 ? bestIdx : null
@@ -188,7 +190,7 @@ function getBestIndex(listings: MarketplaceListing[], key: string): number | nul
             let bestIdx = -1
             let bestVal = Infinity
             listings.forEach((l, i) => {
-                const attrs = l.attributes || {}
+                const attrs = safeParseAttributes(l.attributes)
                 const priceStr = (attrs.rate || attrs.cost || attrs.price || attrs.day_rate || '') as string
                 const match = String(priceStr).match(/[\d,]+/)
                 if (match) {
@@ -202,7 +204,8 @@ function getBestIndex(listings: MarketplaceListing[], key: string): number | nul
             let bestIdx = -1
             let bestVal = Infinity
             listings.forEach((l, i) => {
-                const val = (l.attributes?.response_time_hours as number) || Infinity
+                const attrs = safeParseAttributes(l.attributes)
+                const val = (attrs.response_time_hours as number) || Infinity
                 if (val < bestVal) { bestVal = val; bestIdx = i }
             })
             return bestVal < Infinity ? bestIdx : null
@@ -211,7 +214,8 @@ function getBestIndex(listings: MarketplaceListing[], key: string): number | nul
             let bestIdx = -1
             let bestVal = -1
             listings.forEach((l, i) => {
-                const val = (l.attributes?.total_bookings as number) || 0
+                const attrs = safeParseAttributes(l.attributes)
+                const val = (attrs.total_bookings as number) || 0
                 if (val > bestVal) { bestVal = val; bestIdx = i }
             })
             return bestVal > 0 ? bestIdx : null

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ViewToggle } from '@/components/ui/view-toggle'
 import { cn, getInitials } from '@/lib/utils'
+import { safeParseAttributes, safeStringArray } from '@/lib/marketplace-utils'
 import {
     getCategoryBadgeClasses,
     getAvatarGradient,
@@ -99,7 +100,7 @@ function ListRow({
     onViewDetail: (listing: MarketplaceListing) => void
     onToggleCompare: (id: string) => void
 }) {
-    const attrs = listing.attributes || {}
+    const attrs = safeParseAttributes(listing.attributes)
     const isAI = listing.category === 'AI'
     const AIIcon = isAI ? getAIIcon(listing.subcategory) : null
     const initials = getInitials(listing.title)
@@ -110,7 +111,7 @@ function ListRow({
     const location = attrs.location as string | undefined
     const headline = attrs.headline as string | undefined
     const hiredCount = attrs.total_bookings as number | undefined
-    const tags: string[] = (attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications || []).slice(0, 2)
+    const tags = safeStringArray(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications).slice(0, 2)
 
     const handleSave = async (e: React.MouseEvent) => {
         e.stopPropagation()

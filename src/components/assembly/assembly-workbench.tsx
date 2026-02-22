@@ -29,6 +29,7 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 import { ComponentCatalog } from "./component-catalog"
 import { SchematicView } from "./schematic-view"
@@ -201,14 +202,18 @@ export function AssemblyWorkbench({
 
   // ─── Assembly Readiness (for RFQ gate) ───────────────────────────
 
-  // Mirrors the "Build Ready" logic from stats-panel.tsx:
-  // All required slots must be filled (warnings not checked here — soft gate).
   const isAssemblyReady = useMemo((): boolean => {
     if (!assembly) return false
     const requiredSlots = assembly.slots.filter((s) => s.required)
     if (requiredSlots.length === 0) return assembly.placedComponents.length > 0
     const filledSlotIds = new Set(assembly.placedComponents.map((pc) => pc.slotId))
     return requiredSlots.every((s) => filledSlotIds.has(s.id))
+  }, [assembly])
+
+  const requiredSlotsRemaining = useMemo((): number => {
+    if (!assembly) return 0
+    const filledSlotIds = new Set(assembly.placedComponents.map((pc) => pc.slotId))
+    return assembly.slots.filter((s) => s.required && !filledSlotIds.has(s.id)).length
   }, [assembly])
 
   // ─── RFQ Handler ─────────────────────────────────────────────────
@@ -233,6 +238,22 @@ export function AssemblyWorkbench({
       })
     })
   }, [assemblyId, isAssemblyReady, startRfqTransition])
+
+  // ─── Generate CAD Handler ────────────────────────────────────────
+
+  const handleGenerateCad = useCallback((): void => {
+    if (!assembly || assembly.placedComponents.length === 0) return
+    startTransition(async () => {
+      toast.info("Creating Forge project...")
+      const result = await bridgeToCadLab(assemblyId)
+      if ("error" in result) {
+        toast.error(result.error)
+        return
+      }
+      toast.success("Forge project created! Redirecting...")
+      router.push("/the-forge/cad-lab")
+    })
+  }, [assembly, assemblyId, router, startTransition])
 
   // ─── Handlers ────────────────────────────────────────────────────
 
@@ -415,23 +436,17 @@ export function AssemblyWorkbench({
             <Save className="h-3.5 w-3.5 mr-1.5" />
             Saved
           </Button>
+          {/* INTENT: When build is ready, Generate CAD becomes the primary
+             action — larger button with accent styling to draw attention. */}
           <Button
-            size="sm"
+            size={isAssemblyReady ? "default" : "sm"}
+            className={cn(
+              isAssemblyReady && "bg-international-orange hover:bg-international-orange-hover text-white shadow-md",
+            )}
             disabled={
               assembly.placedComponents.length === 0 || isPending
             }
-            onClick={() => {
-              startTransition(async () => {
-                toast.info("Creating Forge project...")
-                const result = await bridgeToCadLab(assemblyId)
-                if ("error" in result) {
-                  toast.error(result.error)
-                  return
-                }
-                toast.success("Forge project created! Redirecting...")
-                router.push("/the-forge/cad-lab")
-              })
-            }}
+            onClick={handleGenerateCad}
           >
             <Rocket className="h-3.5 w-3.5 mr-1.5" />
             Generate CAD
@@ -483,7 +498,7 @@ export function AssemblyWorkbench({
       {/* Three-panel layout */}
       <div className="flex flex-1 min-h-0">
         {/* Left: Component Catalog */}
-        <div className="w-72 border-r shrink-0 overflow-hidden">
+        <div className="w-72 border-r-2 border-muted shrink-0 overflow-hidden bg-background">
           <ComponentCatalog
             components={components}
             stats={stats}
@@ -493,13 +508,18 @@ export function AssemblyWorkbench({
           />
         </div>
 
-        {/* Center: Schematic */}
-        <div className="flex-1 relative bg-muted/20 overflow-hidden">
+        {/* Center: Schematic — recessed canvas feel */}
+        <div className="flex-1 relative bg-muted/30 overflow-hidden shadow-inner">
           <SchematicView
             slots={assembly.slots}
             placedComponents={assembly.placedComponents}
             activeSlotId={activeSlotId}
             onSlotClick={handleSlotClick}
+            componentLookup={componentLookup}
+            isAssemblyReady={isAssemblyReady}
+            requiredSlotsRemaining={requiredSlotsRemaining}
+            onGenerateCad={handleGenerateCad}
+            onCreateRfq={!rfqId ? handleExportToRfq : undefined}
             customSvg={assembly.schematicSvg}
           />
 
@@ -600,7 +620,7 @@ export function AssemblyWorkbench({
         </div>
 
         {/* Right: Stats Panel */}
-        <div className="w-64 border-l shrink-0 overflow-hidden">
+        <div className="w-64 border-l-2 border-muted shrink-0 overflow-hidden bg-background">
           <StatsPanel
             slots={assembly.slots}
             placedComponents={assembly.placedComponents}

@@ -50,6 +50,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
+import { safeParseAttributes, safeStringArray } from '@/lib/marketplace-utils'
 import { getCategoryBadgeClasses, type MarketplaceCategory } from '@/lib/marketplace-colors'
 import { InviteToCompanyButton } from '@/components/marketplace/invite-to-company-button'
 import Link from 'next/link'
@@ -126,7 +127,7 @@ export function MarketplaceListingDialog({
         })
     }, [activeTab, listing.title, listing.category, reviews.length, reviewsLoading])
 
-    const attrs = listing.attributes || {}
+    const attrs = safeParseAttributes(listing.attributes)
     const category = listing.category
     const CategoryIcon = getCategoryIcon(category)
 
@@ -479,8 +480,7 @@ function KeyMetricsGrid({ category, attrs }: { category: string; attrs: Record<s
 
 // Skills/Expertise Preview
 function SkillsPreview({ category, attrs }: { category: string; attrs: Record<string, unknown> }) {
-    const rawSkills = attrs.skills || attrs.expertise || attrs.integrations || attrs.capabilities || []
-    const skills = Array.isArray(rawSkills) ? rawSkills as string[] : []
+    const skills = safeStringArray(attrs.skills || attrs.expertise || attrs.integrations || attrs.capabilities)
 
     if (skills.length === 0) return null
 
@@ -536,23 +536,26 @@ function PeopleDetails({ attrs }: { attrs: Record<string, unknown> }) {
                             <Building2 className="h-4 w-4 text-electric-blue" />
                             Previous Experience
                         </h3>
-                        {Array.isArray(attrs.previous_companies) ? (
-                            <div className="flex flex-wrap gap-2">
-                                {(attrs.previous_companies as string[]).map((company: string, i: number) => (
-                                    <Badge key={i} variant="secondary">
-                                        {company}
-                                    </Badge>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-sm text-muted-foreground">{String(attrs.previous_companies)}</p>
-                        )}
+                        {(() => {
+                            const companies = safeStringArray(attrs.previous_companies)
+                            return companies.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {companies.map((company, i) => (
+                                        <Badge key={i} variant="secondary">
+                                            {company}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">{String(attrs.previous_companies)}</p>
+                            )
+                        })()}
                     </CardContent>
                 </Card>
             )}
 
             {/* Full Skills/Expertise */}
-            {(attrs.skills || attrs.expertise) && Array.isArray(attrs.skills || attrs.expertise) && (
+            {safeStringArray(attrs.skills || attrs.expertise).length > 0 && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -560,7 +563,7 @@ function PeopleDetails({ attrs }: { attrs: Record<string, unknown> }) {
                             Skills & Expertise
                         </h3>
                         <div className="flex flex-wrap gap-2">
-                            {((attrs.skills || attrs.expertise) as string[]).map((skill: string, i: number) => (
+                            {safeStringArray(attrs.skills || attrs.expertise).map((skill, i) => (
                                 <Badge key={i} variant="secondary">
                                     {skill}
                                 </Badge>
@@ -571,7 +574,7 @@ function PeopleDetails({ attrs }: { attrs: Record<string, unknown> }) {
             )}
 
             {/* Certifications */}
-            {attrs.certifications && Array.isArray(attrs.certifications) && (
+            {attrs.certifications && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -579,7 +582,7 @@ function PeopleDetails({ attrs }: { attrs: Record<string, unknown> }) {
                             Certifications
                         </h3>
                         <div className="flex flex-wrap gap-2">
-                            {(attrs.certifications as string[]).map((cert: string, i: number) => (
+                            {safeStringArray(attrs.certifications).map((cert, i) => (
                                 <Badge key={i} variant="secondary" className="bg-status-success-light text-status-success-dark">
                                     {cert}
                                 </Badge>
@@ -594,10 +597,13 @@ function PeopleDetails({ attrs }: { attrs: Record<string, unknown> }) {
 
 // Products-specific details
 function ProductsDetails({ attrs }: { attrs: Record<string, unknown> }) {
+    const certs = safeStringArray(attrs.certifications)
+    const caps = safeStringArray(attrs.capabilities)
+
     return (
         <div className="space-y-4">
             {/* Certifications */}
-            {attrs.certifications && Array.isArray(attrs.certifications) && (
+            {certs.length > 0 && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -605,7 +611,7 @@ function ProductsDetails({ attrs }: { attrs: Record<string, unknown> }) {
                             Certifications
                         </h3>
                         <div className="flex flex-wrap gap-2">
-                            {(attrs.certifications as string[]).map((cert: string, i: number) => (
+                            {certs.map((cert, i) => (
                                 <Badge key={i} variant="secondary" className="bg-status-success-light text-status-success-dark">
                                     {cert}
                                 </Badge>
@@ -616,7 +622,7 @@ function ProductsDetails({ attrs }: { attrs: Record<string, unknown> }) {
             )}
 
             {/* Capabilities */}
-            {attrs.capabilities && Array.isArray(attrs.capabilities) && (
+            {caps.length > 0 && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -624,7 +630,7 @@ function ProductsDetails({ attrs }: { attrs: Record<string, unknown> }) {
                             Capabilities
                         </h3>
                         <div className="flex flex-wrap gap-2">
-                            {(attrs.capabilities as string[]).map((cap: string, i: number) => (
+                            {caps.map((cap, i) => (
                                 <Badge key={i} variant="secondary">
                                     {cap}
                                 </Badge>
@@ -639,6 +645,9 @@ function ProductsDetails({ attrs }: { attrs: Record<string, unknown> }) {
 
 // Services-specific details
 function ServicesDetails({ attrs }: { attrs: Record<string, unknown> }) {
+    const specs = safeStringArray(attrs.specialty)
+    const areas = safeStringArray(attrs.focus_areas)
+
     return (
         <div className="space-y-4">
             {/* Specialty */}
@@ -649,9 +658,9 @@ function ServicesDetails({ attrs }: { attrs: Record<string, unknown> }) {
                             <Target className="h-4 w-4 text-electric-blue" />
                             Specialty
                         </h3>
-                        {Array.isArray(attrs.specialty) ? (
+                        {specs.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
-                                {(attrs.specialty as string[]).map((spec: string, i: number) => (
+                                {specs.map((spec, i) => (
                                     <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
                                         {spec}
                                     </Badge>
@@ -672,9 +681,9 @@ function ServicesDetails({ attrs }: { attrs: Record<string, unknown> }) {
                             <Users className="h-4 w-4 text-electric-blue" />
                             Focus Areas
                         </h3>
-                        {Array.isArray(attrs.focus_areas) ? (
+                        {areas.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
-                                {(attrs.focus_areas as string[]).map((area: string, i: number) => (
+                                {areas.map((area, i) => (
                                     <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
                                         {area}
                                     </Badge>

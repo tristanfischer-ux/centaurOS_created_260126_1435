@@ -4,7 +4,8 @@
  * @file assembly-slot-node.tsx — Custom React Flow node for assembly slots.
  *
  * @description Renders a slot card with group color accent, filled/empty state,
- * required indicator, and connection handles. Used in the assembly schematic view.
+ * required indicator, category icon, tier badge, and connection handles.
+ * Used in the assembly schematic view.
  *
  * @component
  * @related schematic-view.tsx, assembly-auto-layout.ts
@@ -12,19 +13,58 @@
 
 import { memo } from "react"
 import { Handle, Position } from "@xyflow/react"
+import {
+  Cpu,
+  Zap,
+  Box,
+  CircleDot,
+  Wrench,
+  Shield,
+  Plus,
+  PackageCheck,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import type { NodeProps } from "@xyflow/react"
+import type { LucideIcon } from "lucide-react"
 
 // ─── Constants ───────────────────────────────────────────────────────
 
-const NODE_WIDTH = 200
-const NODE_HEIGHT = 80
+export const NODE_WIDTH = 220
+export const NODE_HEIGHT = 96
 
-/** Max characters before truncation */
 function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
   return text.slice(0, maxLength - 1) + "…"
+}
+
+// ─── Category Icons ──────────────────────────────────────────────────
+
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  motor: Zap,
+  fastener: Wrench,
+  bearing: CircleDot,
+  connector: Cpu,
+  structural: Shield,
+  electronics: Cpu,
+  sensor: CircleDot,
+  default: Box,
+}
+
+function getCategoryIcon(category: string): LucideIcon {
+  const lower = category.toLowerCase()
+  for (const [key, icon] of Object.entries(CATEGORY_ICONS)) {
+    if (lower.includes(key)) return icon
+  }
+  return CATEGORY_ICONS.default
+}
+
+// ─── Tier Labels ─────────────────────────────────────────────────────
+
+function getTierLabel(tier: string): string {
+  if (tier === "universal") return "T1"
+  if (tier === "electromechanical") return "T2"
+  return "T3"
 }
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -44,6 +84,12 @@ export interface AssemblySlotNodeData {
   groupStroke: string
   /** Group text color */
   groupText: string
+  /** Component category (for icon lookup) — populated when filled */
+  category?: string
+  /** Component tier — populated when filled */
+  tier?: string
+  /** Whether the placed component is from the catalog (has geometryTypeSlug) */
+  isCatalogPart?: boolean
   [key: string]: unknown
 }
 
@@ -53,6 +99,7 @@ function AssemblySlotNodeComponent({ data }: NodeProps): React.ReactNode {
   const nodeData = data as unknown as AssemblySlotNodeData
   const isFilled = nodeData.isFilled
   const isActive = nodeData.isActive === true
+  const Icon = nodeData.category ? getCategoryIcon(nodeData.category) : Box
 
   return (
     <div
@@ -60,13 +107,17 @@ function AssemblySlotNodeComponent({ data }: NodeProps): React.ReactNode {
         "relative rounded-lg border-2 shadow-sm transition-all duration-200",
         "hover:shadow-md cursor-pointer",
         isActive && "ring-2 ring-international-orange ring-offset-2 shadow-lg",
-        !isFilled && !isActive && "animate-pulse border-dashed",
+        !isFilled && !isActive && "border-dashed",
       )}
       style={{
         width: NODE_WIDTH,
         minHeight: NODE_HEIGHT,
         backgroundColor: isFilled ? nodeData.groupFill : "white",
-        borderColor: isActive ? "hsl(var(--international-orange))" : isFilled ? nodeData.groupStroke : "hsl(var(--muted-foreground) / 0.4)",
+        borderColor: isActive
+          ? "hsl(var(--international-orange))"
+          : isFilled
+            ? nodeData.groupStroke
+            : "hsl(var(--muted-foreground) / 0.3)",
         borderLeftWidth: "4px",
         borderLeftColor: nodeData.groupStroke,
       }}
@@ -81,41 +132,72 @@ function AssemblySlotNodeComponent({ data }: NodeProps): React.ReactNode {
       />
 
       <div className="p-2.5 h-full flex flex-col justify-center">
-        {/* Required indicator */}
-        {nodeData.required && !isFilled && (
-          <div className="absolute top-2 right-2">
-            <span
-              className="inline-block w-2 h-2 rounded-full bg-destructive"
-              title="Required slot"
-            />
-          </div>
-        )}
-
         {isFilled ? (
           <>
+            {/* Top row: category icon + tier badge */}
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <div
+                  className="flex h-5 w-5 items-center justify-center rounded"
+                  style={{ backgroundColor: `${nodeData.groupStroke}20` }}
+                >
+                  <Icon className="h-3 w-3" style={{ color: nodeData.groupStroke }} />
+                </div>
+                {nodeData.isCatalogPart && (
+                  <PackageCheck
+                    className="h-3 w-3"
+                    style={{ color: nodeData.groupStroke }}
+                    aria-label="Verified catalog part"
+                  />
+                )}
+              </div>
+              {nodeData.tier && (
+                <span
+                  className="text-[9px] font-bold rounded px-1.5 py-0.5 leading-none"
+                  style={{
+                    backgroundColor: `${nodeData.groupStroke}18`,
+                    color: nodeData.groupText,
+                  }}
+                >
+                  {getTierLabel(nodeData.tier)}
+                </span>
+              )}
+            </div>
+
+            {/* Component name */}
             <p
-              className="text-xs font-semibold leading-tight truncate pr-6"
+              className="text-xs font-semibold leading-tight truncate"
               style={{ color: nodeData.groupText }}
             >
-              {truncateText(nodeData.componentName ?? "", 22)}
+              {truncateText(nodeData.componentName ?? "", 26)}
             </p>
-            <p className="text-[10px] mt-0.5 opacity-80" style={{ color: nodeData.groupStroke }}>
+
+            {/* Slot label */}
+            <p
+              className="text-[10px] mt-0.5 truncate"
+              style={{ color: nodeData.groupStroke, opacity: 0.8 }}
+            >
               {nodeData.label}
             </p>
-            <span
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: nodeData.groupStroke }}
-            />
           </>
         ) : (
-          <>
-            <p className="text-xs font-medium text-muted-foreground truncate pr-6">
-              {truncateText(nodeData.label, 22)}
+          <div className="flex flex-col items-center justify-center gap-1 py-1">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/40">
+              <Plus className="h-3 w-3 text-muted-foreground/60" />
+            </div>
+            <p className="text-xs font-medium text-muted-foreground truncate max-w-[180px]">
+              {truncateText(nodeData.label, 24)}
             </p>
-            <p className="text-[10px] text-muted-foreground/80 mt-0.5">
-              Click to assign
+            <p className="text-[10px] text-muted-foreground/60">
+              {nodeData.required ? "Required" : "Click to assign"}
             </p>
-          </>
+            {nodeData.required && (
+              <span
+                className="absolute top-2 right-2 inline-block w-2 h-2 rounded-full bg-destructive"
+                title="Required slot"
+              />
+            )}
+          </div>
         )}
       </div>
 
@@ -129,4 +211,3 @@ function AssemblySlotNodeComponent({ data }: NodeProps): React.ReactNode {
 }
 
 export const AssemblySlotNode = memo(AssemblySlotNodeComponent)
-export { NODE_WIDTH, NODE_HEIGHT }

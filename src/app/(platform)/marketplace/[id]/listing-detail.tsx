@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { safeParseAttributes, safeStringArray } from "@/lib/marketplace-utils"
 import { getCategoryBadgeClasses, type MarketplaceCategory } from "@/lib/marketplace-colors"
 import {
     ShieldCheck,
@@ -59,7 +60,7 @@ interface MarketplaceListingDetailProps {
 }
 
 export function MarketplaceListingDetail({ listing, trustSignals, ratings }: MarketplaceListingDetailProps) {
-    const attrs = listing.attributes || {}
+    const attrs = safeParseAttributes(listing.attributes)
     const category = listing.category
     const [isContacting, setIsContacting] = useState(false)
 
@@ -254,17 +255,20 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
                         <Building2 className="h-5 w-5" />
                         Previous Experience
                     </h2>
-                    {Array.isArray(attrs.previous_companies) ? (
-                        <div className="flex flex-wrap gap-2">
-                            {attrs.previous_companies.map((company: string, i: number) => (
-                                <Badge key={i} variant="secondary">
-                                    {company}
-                                </Badge>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground">{attrs.previous_companies}</p>
-                    )}
+                    {(() => {
+                        const companies = safeStringArray(attrs.previous_companies)
+                        return companies.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                                {companies.map((company, i) => (
+                                    <Badge key={i} variant="secondary">
+                                        {company}
+                                    </Badge>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-muted-foreground">{String(attrs.previous_companies)}</p>
+                        )
+                    })()}
                 </section>
             )}
 
@@ -276,7 +280,7 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
                         Skills & Expertise
                     </h2>
                     <div className="flex flex-wrap gap-2">
-                        {(attrs.skills || attrs.expertise || []).map((skill: string, i: number) => (
+                        {safeStringArray(attrs.skills || attrs.expertise).map((skill, i) => (
                             <Badge key={i} variant="secondary" className="bg-secondary text-secondary-foreground">
                                 {skill}
                             </Badge>
@@ -299,17 +303,20 @@ function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
                         <Award className="h-5 w-5" />
                         Certifications
                     </h2>
-                    {Array.isArray(attrs.certifications) ? (
-                        <div className="flex flex-wrap gap-2">
-                            {attrs.certifications.map((cert: string, i: number) => (
-                                <Badge key={i} variant="secondary" className="bg-status-success-light text-status-success-dark">
-                                    {cert}
-                                </Badge>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground">{attrs.certifications}</p>
-                    )}
+                    {(() => {
+                        const certs = safeStringArray(attrs.certifications)
+                        return certs.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                                {certs.map((cert, i) => (
+                                    <Badge key={i} variant="secondary" className="bg-status-success-light text-status-success-dark">
+                                        {cert}
+                                    </Badge>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-muted-foreground">{String(attrs.certifications)}</p>
+                        )
+                    })()}
                 </section>
             )}
 
@@ -320,17 +327,20 @@ function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
                         <Wrench className="h-5 w-5" />
                         Capabilities
                     </h2>
-                    {Array.isArray(attrs.capabilities) ? (
-                        <div className="flex flex-wrap gap-2">
-                            {attrs.capabilities.map((cap: string, i: number) => (
-                                <Badge key={i} variant="secondary">
-                                    {cap}
-                                </Badge>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground">{attrs.capabilities}</p>
-                    )}
+                    {(() => {
+                        const caps = safeStringArray(attrs.capabilities)
+                        return caps.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                                {caps.map((cap, i) => (
+                                    <Badge key={i} variant="secondary">
+                                        {cap}
+                                    </Badge>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-muted-foreground">{String(attrs.capabilities)}</p>
+                        )
+                    })()}
                 </section>
             )}
         </div>
@@ -348,17 +358,20 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
                         <Target className="h-5 w-5" />
                         Specialty
                     </h2>
-                    {Array.isArray(attrs.specialty) ? (
-                        <div className="flex flex-wrap gap-2">
-                            {attrs.specialty.map((spec: string, i: number) => (
-                                <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
-                                    {spec}
-                                </Badge>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground">{attrs.specialty}</p>
-                    )}
+                    {(() => {
+                        const specs = safeStringArray(attrs.specialty)
+                        return specs.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                                {specs.map((spec, i) => (
+                                    <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
+                                        {spec}
+                                    </Badge>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-muted-foreground">{String(attrs.specialty)}</p>
+                        )
+                    })()}
                 </section>
             )}
 
@@ -369,17 +382,20 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
                         <Users className="h-5 w-5" />
                         Focus Areas
                     </h2>
-                    {Array.isArray(attrs.focus_areas) ? (
-                        <div className="flex flex-wrap gap-2">
-                            {attrs.focus_areas.map((area: string, i: number) => (
-                                <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
-                                    {area}
-                                </Badge>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground">{attrs.focus_areas}</p>
-                    )}
+                    {(() => {
+                        const areas = safeStringArray(attrs.focus_areas)
+                        return areas.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                                {areas.map((area, i) => (
+                                    <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
+                                        {area}
+                                    </Badge>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-muted-foreground">{String(attrs.focus_areas)}</p>
+                        )
+                    })()}
                 </section>
             )}
         </div>

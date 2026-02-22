@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { cn, getInitials } from '@/lib/utils'
+import { safeParseAttributes, safeStringArray } from '@/lib/marketplace-utils'
 import {
     getCategoryBadgeClasses,
     getAvatarGradient,
@@ -57,7 +58,7 @@ function getAIIcon(subcategory: string): React.ElementType {
 export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailDialogProps) {
     if (!listing) return null
 
-    const attrs = listing.attributes || {}
+    const attrs = safeParseAttributes(listing.attributes)
     const isAI = listing.category === 'AI'
     const AIIcon = isAI ? getAIIcon(listing.subcategory) : null
     const initials = getInitials(listing.title)
@@ -71,9 +72,9 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
     const location = attrs.location as string | undefined
     const experience = attrs.experience as string | undefined
     const headline = attrs.headline as string | undefined
-    const tags: string[] = attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications || []
+    const tags = safeStringArray(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications)
     const hiredCount = attrs.total_bookings as number | undefined
-    const specialties: string[] = attrs.specialties || attrs.capabilities || []
+    const specialties = safeStringArray(attrs.specialties || attrs.capabilities)
 
     return (
         <Dialog open={!!listing} onOpenChange={() => onClose()}>

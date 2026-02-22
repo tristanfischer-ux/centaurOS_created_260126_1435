@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn, getInitials } from '@/lib/utils'
+import { safeParseAttributes } from '@/lib/marketplace-utils'
 import {
     getCategoryBadgeClasses,
     getAvatarGradient,
@@ -200,7 +201,7 @@ export function MarketplaceSavedView({
             {/* List rows */}
             <div className="divide-y divide-border rounded-xl border bg-background overflow-hidden">
                 {listings.map((listing) => {
-                    const attrs = listing.attributes || {}
+                    const attrs = safeParseAttributes(listing.attributes)
                     const isAI = listing.category === 'AI'
                     const AIIcon = isAI ? getAIIcon(listing.subcategory) : null
                     const initials = getInitials(listing.title)

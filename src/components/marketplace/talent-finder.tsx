@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn, getInitials } from '@/lib/utils'
+import { safeParseAttributes } from '@/lib/marketplace-utils'
 import { getAvatarGradient, type MarketplaceCategory } from '@/lib/marketplace-colors'
 import {
     Search,
@@ -292,7 +293,7 @@ function TalentMatchCard({
     onViewDetail: (listing: MarketplaceListing) => void
 }) {
     const { listing, matchScore, matchReasons, highlightedSkills } = match
-    const attrs = listing.attributes || {}
+    const attrs = safeParseAttributes(listing.attributes)
     const initials = getInitials(listing.title)
     const gradient = getAvatarGradient('People' as MarketplaceCategory, listing.title)
     const location = attrs.location as string | undefined
