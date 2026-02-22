@@ -2,8 +2,6 @@
  * Order Service
  * Core business logic for order management
  */
-// @ts-nocheck — Schema mismatches: marketplace_listings.price and provider_profiles.display_name
-// columns don't exist in database. Needs migration to add columns or refactor queries.
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/types/database.types'
@@ -46,14 +44,16 @@ export async function createOrder(
         return { data: null, error: 'Listing not found' }
       }
 
-      // Security: Verify the order amount matches the listing price
-      // Allow small tolerance for floating point issues
-      const tolerance = 0.01
-      if (Math.abs(params.totalAmount - listing.price) > tolerance) {
-        console.error(`[SECURITY] Price manipulation attempt: Order amount ${params.totalAmount} != Listing price ${listing.price}`)
-        return { 
-          data: null, 
-          error: 'Order amount does not match listing price' 
+      // SECURITY: Verify the order amount matches the listing price.
+      // Skip for RFQ/quote-based listings where price is null.
+      if (listing.price != null) {
+        const tolerance = 0.01
+        if (Math.abs(params.totalAmount - listing.price) > tolerance) {
+          console.error(`[SECURITY] Price manipulation attempt: Order amount ${params.totalAmount} != Listing price ${listing.price}`)
+          return { 
+            data: null, 
+            error: 'Order amount does not match listing price' 
+          }
         }
       }
 
@@ -195,7 +195,6 @@ export async function getOrder(
           id,
           user_id,
           display_name,
-          business_type,
           stripe_account_id
         ),
         listing:marketplace_listings (
@@ -240,16 +239,25 @@ export async function getOrder(
       sellerProfile = profile
     }
 
+    const dispute = disputes?.[0] ?? null
+    // GOTCHA: DB types are more nullable than the domain type because
+    // columns like status have DB defaults. The assertion is safe because
+    // we already verified the order exists above.
     const orderWithDetails: OrderWithDetails = {
-      ...order,
-      buyer: order.buyer,
+      ...(order as unknown as Order),
+      buyer: order.buyer as OrderWithDetails['buyer'],
       seller: {
-        ...order.seller,
-        profile: sellerProfile,
+        ...(order.seller as unknown as Omit<OrderWithDetails['seller'], 'profile'>),
+        profile: sellerProfile as OrderWithDetails['seller']['profile'],
       },
-      listing: order.listing,
+      listing: order.listing as OrderWithDetails['listing'],
       milestones: (milestones || []) as OrderWithDetails['milestones'],
-      dispute: disputes?.[0] || null,
+      dispute: dispute ? {
+        id: dispute.id,
+        reason: dispute.reason,
+        status: dispute.status ?? 'open',
+        created_at: dispute.created_at ?? new Date().toISOString(),
+      } : null,
     }
 
     return { data: orderWithDetails, error: null }
@@ -569,20 +577,19 @@ export async function getOrders(
       return { data: [], error: 'Failed to fetch orders', count: 0 }
     }
 
-    // Map to OrderSummary type
     const orders: OrderSummary[] = (data || []).map((order) => ({
       id: order.id,
       order_number: order.order_number,
       status: order.status as OrderStatus,
       escrow_status: order.escrow_status as OrderSummary['escrow_status'],
       total_amount: order.total_amount,
-      currency: order.currency,
+      currency: order.currency ?? 'GBP',
       order_type: order.order_type as OrderSummary['order_type'],
-      created_at: order.created_at,
+      created_at: order.created_at ?? new Date().toISOString(),
       completed_at: order.completed_at,
-      buyer: order.buyer,
-      seller: order.seller,
-      listing: order.listing,
+      buyer: order.buyer as OrderSummary['buyer'],
+      seller: order.seller as OrderSummary['seller'],
+      listing: order.listing as OrderSummary['listing'],
     }))
 
     return { data: orders, error: null, count: count || 0 }

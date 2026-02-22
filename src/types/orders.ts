@@ -42,7 +42,6 @@ export interface OrderProviderProfile {
   id: string
   user_id: string
   display_name: string
-  business_type: string
   stripe_account_id: string | null
   profile?: OrderProfile
 }

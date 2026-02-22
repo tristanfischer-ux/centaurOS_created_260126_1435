@@ -123,11 +123,11 @@ export default function PreviewLandingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Preview Banner */}
+      {/* Preview Banner — this is now the archived version */}
       <div className="bg-muted border-b text-center py-2 px-4 text-xs text-muted-foreground font-mono tracking-wider">
-        Preview mode —{" "}
+        This is the archived preview —{" "}
         <Link href="/" className="text-international-orange hover:underline">
-          View current page &rarr;
+          View live page &rarr;
         </Link>
       </div>
 
@@ -149,7 +149,7 @@ export default function PreviewLandingPage() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <Link
-            href="/preview-landing"
+            href="/"
             className="text-base sm:text-lg md:text-xl font-bold tracking-tight"
           >
             FRACTIONAL FORGE

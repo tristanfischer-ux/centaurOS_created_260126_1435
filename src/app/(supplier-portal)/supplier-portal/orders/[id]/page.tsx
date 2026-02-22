@@ -91,16 +91,16 @@ async function OrderDetailContent({ orderId }: { orderId: string }) {
           <div className="flex items-center gap-3 mt-2">
             <Badge 
               variant="secondary"
-              className={cn(statusColors[order.status])}
+              className={cn(statusColors[order.status ?? 'pending'])}
             >
-              {order.status.replace('_', ' ')}
+              {(order.status ?? 'pending').replace('_', ' ')}
             </Badge>
             <span className="text-sm text-muted-foreground">
-              {new Date(order.created_at).toLocaleDateString('en-GB', {
+              {order.created_at ? new Date(order.created_at).toLocaleDateString('en-GB', {
                 day: 'numeric',
                 month: 'long',
                 year: 'numeric'
-              })}
+              }) : '-'}
             </span>
           </div>
         </div>
@@ -149,20 +149,12 @@ async function OrderDetailContent({ orderId }: { orderId: string }) {
                 <div>
                   <p className="text-sm text-muted-foreground">Created</p>
                   <p className="font-medium">
-                    {new Date(order.created_at).toLocaleString()}
+                    {order.created_at ? new Date(order.created_at).toLocaleString() : '-'}
                   </p>
                 </div>
               </div>
               
-              {order.notes && (
-                <>
-                  <Separator />
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">Buyer Notes</p>
-                    <p className="text-sm bg-muted p-3 rounded-lg">{order.notes}</p>
-                  </div>
-                </>
-              )}
+              {/* Notes would appear here if order had a notes field */}
             </CardContent>
           </Card>
 
@@ -183,7 +175,7 @@ async function OrderDetailContent({ orderId }: { orderId: string }) {
                   <div>
                     <p className="font-medium">Order Created</p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(order.created_at).toLocaleString()}
+                      {order.created_at ? new Date(order.created_at).toLocaleString() : '-'}
                     </p>
                   </div>
                 </div>
@@ -195,9 +187,6 @@ async function OrderDetailContent({ orderId }: { orderId: string }) {
                     </div>
                     <div>
                       <p className="font-medium">Order Accepted</p>
-                      <p className="text-sm text-muted-foreground">
-                        {order.updated_at ? new Date(order.updated_at).toLocaleString() : '-'}
-                      </p>
                     </div>
                   </div>
                 )}

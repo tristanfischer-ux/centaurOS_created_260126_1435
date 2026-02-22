@@ -1,130 +1,127 @@
-"use client";
+"use client"
 
-import Image from "next/image";
-import Link from "next/link";
-import { useState, useEffect } from "react";
+import Image from "next/image"
+import Link from "next/link"
+import { useState, useEffect } from "react"
 import {
   motion,
   useScroll,
   useTransform,
   AnimatePresence,
-} from "framer-motion";
+} from "framer-motion"
 import {
   fadeInScale,
   heroHeadline,
   heroTagline,
   buttonHover,
   buttonTap,
-  StaggerContainer,
-  AnimatedCard,
   AnimatedSection,
-} from "@/components/marketing/animations";
+  AnimatedCard,
+  StaggerContainer,
+} from "@/components/marketing/animations"
 import {
   ChevronDown,
   ArrowRight,
+  Clock,
+  Banknote,
+  TrendingDown,
+  Zap,
+  Check,
   Briefcase,
-  Lightbulb,
-  Hammer,
-} from "lucide-react";
+  Brain,
+  Factory,
+  Workflow,
+  Shield,
+  UserCheck,
+  DollarSign,
+  CheckCircle2,
+  Rocket,
+  GraduationCap,
+  LineChart,
+  Building2,
+  Beaker,
+} from "lucide-react"
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
-import { SoftwareVsHardwareSection } from "@/components/marketing/SoftwareVsHardwareSection";
-import { CloudFactorySection } from "@/components/marketing/CloudFactorySection";
-import { AudienceSection } from "@/components/marketing/AudienceSection";
-import { BuiltInBritainSection } from "@/components/marketing/BuiltInBritainSection";
+} from "@/components/ui/accordion"
 
 const APP_DOMAIN =
-  process.env.NEXT_PUBLIC_APP_DOMAIN || "https://fractionalforge.app";
+  process.env.NEXT_PUBLIC_APP_DOMAIN || "https://fractionalforge.app"
 
-/**
- * Custom hook to detect mobile viewport for performance optimizations.
- *
- * @description Used to disable heavy animations (parallax, hover effects)
- * on mobile devices where they cause jank.
- *
- * @returns Whether the viewport is mobile-sized (< 768px)
- */
 function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
-    const mql = window.matchMedia("(max-width: 767px)");
-    setIsMobile(mql.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
+    const mql = window.matchMedia("(max-width: 767px)")
+    setIsMobile(mql.matches)
+    const handler = (e: MediaQueryListEvent): void => setIsMobile(e.matches)
+    mql.addEventListener("change", handler)
+    return () => mql.removeEventListener("change", handler)
+  }, [])
 
-  return isMobile;
+  return isMobile
 }
 
 /**
- * Marketing landing page — restructured around the "Cloud Factory" narrative.
+ * Marketing landing page — unified narrative arc.
  *
- * INTENT: The page follows a conversion-optimized arc:
- * Hero (hook) → Problem (mismatch) → Solution (Cloud Factory ecosystem) →
- * Who It's For (audience cards) → How It Works (3 steps) →
- * Trust Strip → FAQ + Final CTA → Footer
- *
- * DECISION: Cut from 9 sections to 7 to tighten the narrative. Removed
- * standalone Guild, Pricing Preview, and detailed Roles sections. The core
- * "Cloud Factory" / "AWS for Atoms" metaphor is now the throughline.
+ * INTENT: Tells one story: Problem -> Solution (with photos and personality
+ * woven in) -> Who It's For (compact, equal) -> Trust -> FAQ -> CTA.
  */
 export default function MarketingPage() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [navScrolled, setNavScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [navScrolled, setNavScrolled] = useState(false)
 
   useEffect(() => {
-    const handleScroll = () => {
-      setNavScrolled(window.scrollY > 20);
-      if (mobileMenuOpen) setMobileMenuOpen(false);
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [mobileMenuOpen]);
+    const handleScroll = (): void => {
+      setNavScrolled(window.scrollY > 20)
+      if (mobileMenuOpen) setMobileMenuOpen(false)
+    }
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [mobileMenuOpen])
 
   useEffect(() => {
     if (mobileMenuOpen) {
-      document.body.style.overflow = "hidden";
+      document.body.style.overflow = "hidden"
     } else {
-      document.body.style.overflow = "";
+      document.body.style.overflow = ""
     }
     return () => {
-      document.body.style.overflow = "";
-    };
-  }, [mobileMenuOpen]);
+      document.body.style.overflow = ""
+    }
+  }, [mobileMenuOpen])
 
-  const [showFloatingCTA, setShowFloatingCTA] = useState(false);
+  const [showFloatingCTA, setShowFloatingCTA] = useState(false)
   useEffect(() => {
-    const handleFloatingCTA = () => {
-      setShowFloatingCTA(window.scrollY > window.innerHeight * 0.8);
-    };
-    window.addEventListener("scroll", handleFloatingCTA, { passive: true });
-    return () => window.removeEventListener("scroll", handleFloatingCTA);
-  }, []);
+    const handleFloatingCTA = (): void => {
+      setShowFloatingCTA(window.scrollY > window.innerHeight * 0.8)
+    }
+    window.addEventListener("scroll", handleFloatingCTA, { passive: true })
+    return () => window.removeEventListener("scroll", handleFloatingCTA)
+  }, [])
 
   useEffect(() => {
     const scrollToHash = (): void => {
-      const hash = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
-      if (!hash) return;
-      const el = document.getElementById(hash);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
-    const timeoutId = setTimeout(scrollToHash, 100);
-    window.addEventListener("hashchange", scrollToHash);
+      const hash =
+        typeof window !== "undefined" ? window.location.hash.slice(1) : ""
+      if (!hash) return
+      const el = document.getElementById(hash)
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+    const timeoutId = setTimeout(scrollToHash, 100)
+    window.addEventListener("hashchange", scrollToHash)
     return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener("hashchange", scrollToHash);
-    };
-  }, []);
+      clearTimeout(timeoutId)
+      window.removeEventListener("hashchange", scrollToHash)
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Skip Navigation - Accessibility */}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-accent focus:text-accent-foreground focus:rounded-md"
@@ -132,56 +129,37 @@ export default function MarketingPage() {
         Skip to main content
       </a>
 
-      {/* ── Sticky Navigation ── */}
+      {/* Sticky Navigation */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 pt-[env(safe-area-inset-top)] ${
+        className={`sticky top-0 left-0 right-0 z-40 transition-all duration-300 ${
           navScrolled
             ? "bg-background/95 backdrop-blur-sm shadow-sm border-b border-muted"
-            : "bg-transparent"
+            : "bg-background"
         }`}
         aria-label="Main navigation"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-          <Link href="/" className="text-base sm:text-lg md:text-xl font-bold tracking-tight">
+          <Link
+            href="/"
+            className="text-base sm:text-lg md:text-xl font-bold tracking-tight"
+          >
             FRACTIONAL FORGE
           </Link>
 
-          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <Link
-              href="/#the-gap"
-              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
-            >
+            <a href="#the-gap" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               The Problem
-            </Link>
-            <Link
-              href="/#ecosystem"
-              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
-            >
-              How We Solve It
-            </Link>
-            <Link
-              href="/#who-its-for"
-              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
-            >
+            </a>
+            <a href="#solution" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
+              The Solution
+            </a>
+            <a href="#for-you" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               Who It&apos;s For
-            </Link>
-            <Link
-              href="/#how-it-works"
-              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
-            >
-              Getting Started
-            </Link>
-            <Link
-              href="/#faq"
-              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
-            >
+            </a>
+            <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               FAQ
-            </Link>
-            <a
-              href={`${APP_DOMAIN}/login`}
-              className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
-            >
+            </a>
+            <a href={`${APP_DOMAIN}/login`} className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               Login
             </a>
             <motion.div whileHover={buttonHover} whileTap={buttonTap}>
@@ -194,7 +172,6 @@ export default function MarketingPage() {
             </motion.div>
           </div>
 
-          {/* Mobile Hamburger */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground"
@@ -213,7 +190,6 @@ export default function MarketingPage() {
           </button>
         </div>
 
-        {/* Mobile Menu */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <>
@@ -243,20 +219,19 @@ export default function MarketingPage() {
                     Join the Forge
                   </Link>
                   {[
-                    { href: "/#the-gap", label: "The Problem" },
-                    { href: "/#ecosystem", label: "How We Solve It" },
-                    { href: "/#who-its-for", label: "Who It's For" },
-                    { href: "/#how-it-works", label: "Getting Started" },
-                    { href: "/#faq", label: "FAQ" },
+                    { href: "#the-gap", label: "The Problem" },
+                    { href: "#solution", label: "The Solution" },
+                    { href: "#for-you", label: "Who It's For" },
+                    { href: "#faq", label: "FAQ" },
                   ].map((item) => (
-                    <Link
+                    <a
                       key={item.href}
                       href={item.href}
                       className="text-sm text-muted-foreground hover:text-foreground active:text-foreground uppercase tracking-wider py-3.5 min-h-[48px] flex items-center transition-colors border-b border-muted/50 last:border-b-0"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {item.label}
-                    </Link>
+                    </a>
                   ))}
                   <a
                     href={`${APP_DOMAIN}/login`}
@@ -272,19 +247,17 @@ export default function MarketingPage() {
         </AnimatePresence>
       </nav>
 
-      {/* ── Main Content ── */}
       <main id="main-content">
         <HeroSection />
-        <SoftwareVsHardwareSection />
-        <CloudFactorySection />
-        <AudienceSection />
-        <HowItWorksSection />
-        <BuiltInBritainSection />
+        <ProblemSection />
+        <SolutionSection />
+        <WhoItsForSection />
+        <TrustStrip />
         <FinalCTASection />
         <FAQSection />
       </main>
 
-      {/* ── Floating Mobile CTA ── */}
+      {/* Floating Mobile CTA */}
       <AnimatePresence>
         {showFloatingCTA && !mobileMenuOpen && (
           <motion.div
@@ -305,7 +278,6 @@ export default function MarketingPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Footer ── */}
       <footer className="py-10 sm:py-12 md:py-16 border-t border-muted bg-muted pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-12 md:pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-8">
@@ -313,486 +285,627 @@ export default function MarketingPage() {
               <p className="text-base sm:text-lg font-bold tracking-tight mb-2 sm:mb-3">
                 FRACTIONAL FORGE
               </p>
-              <p className="text-sm text-muted-foreground max-w-sm leading-relaxed mb-2">
-                The Cloud Factory platform. Access expert teams, AI-enabled
-                execution, and manufacturing capacity — without owning a factory.
-              </p>
-              <p className="text-xs font-mono uppercase tracking-widest text-international-orange">
-                Forged in Britain. Built for the World.
+              <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
+                Expert teams, AI-enabled execution, and manufacturing capacity — without owning a factory.
               </p>
             </div>
-
             <div>
-              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">
-                Platform
-              </p>
+              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">Platform</p>
               <div className="flex flex-col gap-1 sm:gap-2">
-                <Link
-                  href="/pricing"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
-                >
-                  Pricing
-                </Link>
-                <a
-                  href={`${APP_DOMAIN}/login`}
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
-                >
-                  Login
-                </a>
-                <Link
-                  href="/join"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
-                >
-                  Join the Forge
-                </Link>
+                <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Pricing</Link>
+                <a href={`${APP_DOMAIN}/login`} className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Login</a>
+                <Link href="/join" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Join the Forge</Link>
               </div>
             </div>
-
             <div>
-              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">
-                Join As
-              </p>
+              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 sm:mb-3">Join As</p>
               <div className="flex flex-col gap-1 sm:gap-2">
-                <Link
-                  href="/join?role=founder"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
-                >
-                  Founder
-                </Link>
-                <Link
-                  href="/join?role=executive"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
-                >
-                  Expert / Factory
-                </Link>
-                <Link
-                  href="/join?role=apprentice"
-                  className="text-sm text-muted-foreground hover:text-foreground active:text-foreground transition-colors min-h-[44px] flex items-center"
-                >
-                  Apprentice
-                </Link>
+                <Link href="/join?role=founder" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Founder</Link>
+                <Link href="/join?role=executive" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Expert / Factory</Link>
+                <Link href="/join?role=apprentice" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Apprentice</Link>
               </div>
             </div>
           </div>
-
           <div className="border-t border-muted pt-6 sm:pt-8 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
             <p className="text-xs sm:text-sm text-muted-foreground">
-              &copy; {new Date().getFullYear()} Fractional Forge Ltd. All rights
-              reserved.
+              &copy; {new Date().getFullYear()} Fractional Forge Ltd. All rights reserved.
             </p>
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <Link
-                href="/terms"
-                className="hover:text-foreground transition-colors min-h-[44px] flex items-center"
-              >
-                Terms
-              </Link>
-              <Link
-                href="/privacy"
-                className="hover:text-foreground transition-colors min-h-[44px] flex items-center"
-              >
-                Privacy
-              </Link>
-              <span className="font-mono tracking-wider">
-                Forged in Britain. Built for the World.
-              </span>
+              <Link href="/terms" className="hover:text-foreground transition-colors min-h-[44px] flex items-center">Terms</Link>
+              <Link href="/privacy" className="hover:text-foreground transition-colors min-h-[44px] flex items-center">Privacy</Link>
             </div>
           </div>
         </div>
       </footer>
     </div>
-  );
+  )
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * SECTION 1 — HERO
- * "Hardware at Software Speed" — the Cloud Factory hook.
- * ════════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════
+ * HERO
+ * ═══════════════════════════════════════════════════════════════════════ */
 
 function HeroSection() {
-  const isMobile = useIsMobile();
-  const { scrollY } = useScroll();
-  const parallaxY = useTransform(scrollY, [0, 500], [0, isMobile ? 0 : 150]);
-  const [memberCount, setMemberCount] = useState<number | null>(null);
+  const isMobile = useIsMobile()
+  const { scrollY } = useScroll()
+  const parallaxY = useTransform(scrollY, [0, 500], [0, isMobile ? 0 : 150])
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [memberCount, setMemberCount] = useState<number | null>(null)
+
+  const heroImages = [
+    { src: "/images/hero-robotic-steel.png", alt: "Robotic arm 3D printing steel structure" },
+    { src: "/images/hero-titanium-printing.png", alt: "Titanium 3D printing system" },
+    { src: "/images/hero-plastic-printing.png", alt: "Advanced polymer 3D printing farm" },
+    { src: "/images/hero-injection-moulding.png", alt: "Clean injection moulding manufacturing" },
+  ]
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % heroImages.length)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [heroImages.length])
 
   useEffect(() => {
     async function fetchStats(): Promise<void> {
       try {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 5000)
-
-        const res = await fetch("/api/marketing/stats", {
-          signal: controller.signal
-        })
+        const res = await fetch("/api/marketing/stats", { signal: controller.signal })
         clearTimeout(timeoutId)
-
         if (res.ok) {
-          const data = await res.json();
-          setMemberCount(data.foundingMembers ?? null);
+          const data = await res.json()
+          setMemberCount(data.foundingMembers ?? null)
         }
       } catch {
-        // Graceful fallback — counter shows "Be the first" when null
+        // Graceful fallback
       }
     }
-    fetchStats();
-  }, []);
+    fetchStats()
+  }, [])
 
   return (
-    <section className="relative min-h-[85vh] sm:min-h-[90vh] md:min-h-screen flex items-center justify-center overflow-hidden bg-background pt-20 sm:pt-16">
-      {/* Background image with parallax */}
-      <motion.div
-        style={{ y: parallaxY }}
-        className="absolute inset-0 will-change-transform"
-      >
-        <Image
-          src="/images/hero-cloud-factory.png"
-          alt="Digital CAD designs transforming into manufactured hardware parts — the Cloud Factory concept"
-          fill
-          className="object-cover object-center opacity-20"
-          priority
-          sizes="100vw"
-        />
+    <section className="relative min-h-[85vh] sm:min-h-[90vh] md:min-h-screen flex items-center justify-center overflow-hidden bg-background">
+      <motion.div style={{ y: parallaxY }} className="absolute inset-0 will-change-transform">
+        <AnimatePresence>
+          <motion.div
+            key={currentImageIndex}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.3 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1 }}
+            className="absolute inset-0"
+          >
+            <Image
+              src={heroImages[currentImageIndex].src}
+              alt={heroImages[currentImageIndex].alt}
+              fill
+              className="object-cover object-center"
+              priority
+              sizes="100vw"
+            />
+          </motion.div>
+        </AnimatePresence>
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background via-background/60 to-background/80" />
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-background/50 via-transparent to-background/50" />
       </motion.div>
 
-      {/* Content */}
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center">
-        {/* Early Access Badge */}
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeInScale}
-          className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full"
-        >
+        <motion.div initial="hidden" animate="visible" variants={fadeInScale} className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full">
           <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
           <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
             Early Access &mdash; Founding Members Only
           </span>
         </motion.div>
 
-        {/* Live founding member counter */}
-        {memberCount !== null ? (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="mb-6 md:mb-8"
-          >
+        {memberCount !== null && memberCount > 0 ? (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.5 }} className="mb-6 md:mb-8">
             <div className="inline-flex flex-col items-center gap-2">
-              {memberCount > 0 ? (
-                <>
-                  <p className="text-sm text-muted-foreground font-mono">
-                    <span className="text-2xl font-black text-international-orange">
-                      {memberCount}
-                    </span>{" "}
-                    of 100 founding spots claimed
-                  </p>
-                  <div className="w-36 sm:w-48 h-1.5 bg-muted rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min((memberCount / 100) * 100, 100)}%` }}
-                      transition={{ delay: 0.6, duration: 1.2, ease: "easeOut" }}
-                      className="h-full bg-international-orange rounded-full"
-                    />
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground font-mono">
-                  <span className="text-2xl font-black text-international-orange">
-                    Be the first
-                  </span>{" "}
-                  founding member
-                </p>
-              )}
+              <p className="text-sm text-muted-foreground font-mono">
+                <span className="text-2xl font-black text-international-orange">{memberCount}</span>{" "}
+                of 100 founding spots claimed
+              </p>
+              <div className="w-36 sm:w-48 h-1.5 bg-muted rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min((memberCount / 100) * 100, 100)}%` }}
+                  transition={{ delay: 0.6, duration: 1.2, ease: "easeOut" }}
+                  className="h-full bg-international-orange rounded-full"
+                />
+              </div>
             </div>
           </motion.div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="mb-6 md:mb-8"
-          >
-            <div className="inline-flex flex-col items-center gap-2">
-              <p className="text-sm text-muted-foreground font-mono">
-                <span className="text-2xl font-black text-international-orange">
-                  Be the first
-                </span>{" "}
-                to join
-              </p>
-            </div>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.5 }} className="mb-6 md:mb-8">
+            <p className="text-sm text-muted-foreground font-mono">
+              <span className="text-2xl font-black text-international-orange">Be the first</span>{" "}founding member
+            </p>
           </motion.div>
         )}
 
-        {/* Main Headline */}
-        <motion.h1
-          initial="hidden"
-          animate="visible"
-          variants={heroHeadline}
-          className="text-[2rem] sm:text-5xl md:text-6xl lg:text-7xl font-black leading-[1.08] mb-5 sm:mb-6 md:mb-8"
-        >
-          Hardware at{" "}
-          <motion.span
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }}
-            className="text-international-orange"
-          >
-            Software Speed.
+        <motion.h1 initial="hidden" animate="visible" variants={heroHeadline} className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
+          We build atoms at the{" "}
+          <motion.span initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }} className="text-international-orange">
+            speed of bits.
           </motion.span>
         </motion.h1>
 
-        {/* Subheadline */}
-        <motion.p
-          initial="hidden"
-          animate="visible"
-          variants={heroTagline}
-          className="text-foreground text-base sm:text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10"
-        >
-          Access fractional experts, AI-enabled execution, and on-demand
-          manufacturing capacity — all through one platform.
-          No factory required.
+        <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
+          Access fractional experts, AI-enabled execution, and on-demand manufacturing capacity — all through one platform. No factory required.
         </motion.p>
 
-        {/* CTA Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6, duration: 0.6 }}
-          className="flex flex-col items-center gap-4 w-full sm:w-auto"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-4 w-full sm:w-auto">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
             <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
-              <Link
-                href="/join"
-                className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto"
-              >
-                Join the Forge
-                <ArrowRight className="h-4 w-4" />
+              <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto">
+                Join the Forge <ArrowRight className="h-4 w-4" />
               </Link>
             </motion.div>
-            <a
-              href="#the-gap"
-              className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]"
-            >
-              See the Problem
-              <ChevronDown className="h-4 w-4" />
+            <a href="#the-gap" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]">
+              See the Problem <ChevronDown className="h-4 w-4" />
             </a>
           </div>
         </motion.div>
-
-        {/* Metrics strip */}
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1, duration: 0.6 }}
-          className="mt-8 sm:mt-10 md:mt-14 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 max-w-3xl mx-auto"
-        >
-          {[
-            { value: "78+", label: "Manufacturing Techniques" },
-            { value: "100", label: "Founding Member Spots" },
-            { value: "12 wk", label: "Idea to Prototype" },
-            { value: "£0", label: "Equity Given Up" },
-          ].map((metric) => (
-            <div key={metric.label} className="text-center">
-              <p className="text-lg sm:text-2xl font-black text-international-orange">
-                {metric.value}
-              </p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground font-mono uppercase tracking-wider">
-                {metric.label}
-              </p>
-            </div>
-          ))}
-        </motion.div>
-
-        {/* Version line */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2, duration: 0.6 }}
-          className="mt-4 sm:mt-6 text-xs text-muted-foreground font-mono tracking-wider"
-        >
-          The Cloud Factory Platform. Shipping weekly. Shaped by founding members.
-        </motion.p>
       </div>
 
-      {/* Scroll indicator */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 2, duration: 0.6 }}
-        className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1"
-      >
-        <span className="text-xs text-muted-foreground font-mono uppercase tracking-widest hidden sm:block">
-          Scroll
-        </span>
-        <motion.div
-          animate={{ y: [0, 6, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-        >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2, duration: 0.6 }} className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
+        <span className="text-xs text-muted-foreground font-mono uppercase tracking-widest hidden sm:block">Scroll</span>
+        <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </motion.div>
       </motion.div>
     </section>
-  );
+  )
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * SECTION 5 — HOW IT WORKS
- * Three streamlined steps from signup to shipping.
- * ════════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THE PROBLEM — Software vs Hardware mismatch
+ * ═══════════════════════════════════════════════════════════════════════ */
 
-function HowItWorksSection() {
-  interface HowItWorksStep {
-    number: string;
-    icon: typeof Briefcase;
-    title: string;
-    description: string;
-  }
+const PAIN_STATS = [
+  { icon: Clock, stat: "12–18 months", label: "To first prototype", detail: "Leases, equipment, hiring — all before a single part is made" },
+  { icon: Banknote, stat: "£50–100k", label: "Monthly burn rate", detail: "Salaries for staff you hired in advance, waiting for work" },
+  { icon: TrendingDown, stat: "30–40%", label: "Equity given away", detail: "Raising millions just to fund infrastructure, not innovation" },
+] as const
 
-  const STEPS: HowItWorksStep[] = [
-    {
-      number: "01",
-      icon: Lightbulb,
-      title: "Tell Us What You Need",
-      description:
-        "Describe your product, your expertise, or your capacity. Whether you're a founder with an idea, an expert with skills to deploy, or a factory with spare machines — start by telling us what you bring.",
-    },
-    {
-      number: "02",
-      icon: Briefcase,
-      title: "We Assemble Your Team",
-      description:
-        "ForgeOS matches you with the right fractional experts, AI-enabled apprentices, and manufacturing partners. Your team is assembled in days, not months.",
-    },
-    {
-      number: "03",
-      icon: Hammer,
-      title: "Build and Ship",
-      description:
-        "12-week sprints from idea to validated prototype. ForgeOS coordinates objectives, tasks, and RFQs across your entire team — so you move as fast as your ideas.",
-    },
-  ];
+const BRIDGE_ITEMS = [
+  { pain: "Lease a factory, buy equipment", solution: "Use cloud factories with spare capacity" },
+  { pain: "Hire full-time teams in advance", solution: "Fractional experts on demand" },
+  { pain: "18-month timelines", solution: "Start building from day one" },
+  { pain: "Raise millions before building", solution: "Start lean. Keep your equity." },
+] as const
 
+function ProblemSection() {
   return (
-    <section
-      id="how-it-works"
-      className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20"
-    >
+    <section id="the-gap" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-20">
-          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            Getting Started
-          </span>
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6">
-            Three Steps to Your First Build
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">The Problem</span>
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
+            Your Designs Move at <span className="text-status-success">Software Speed.</span>
+            <br />
+            Your Factory Moves at <span className="text-destructive">Physical Speed.</span>
           </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            From signup to shipping — here&apos;s the path.
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-3xl mx-auto leading-relaxed">
+            CAD designs iterate in hours. But leasing premises, buying equipment, and hiring engineers takes months. By the time your physical infrastructure catches up, your ideas have moved on — forcing you to ship an outdated product or delay again.
           </p>
         </AnimatedSection>
 
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
-          {STEPS.map((step) => {
-            const Icon = step.icon;
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 mb-10 sm:mb-12 md:mb-16">
+          {PAIN_STATS.map((item) => {
+            const Icon = item.icon
+            return (
+              <AnimatedCard key={item.label} className="text-center p-4 sm:p-6 rounded-xl border bg-card">
+                <div className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-destructive/10 mb-3">
+                  <Icon className="h-5 w-5 text-destructive" />
+                </div>
+                <p className="text-lg sm:text-2xl md:text-3xl font-black text-destructive mb-1">{item.stat}</p>
+                <p className="text-xs sm:text-sm font-mono uppercase tracking-wider text-muted-foreground mb-1">{item.label}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{item.detail}</p>
+              </AnimatedCard>
+            )
+          })}
+        </StaggerContainer>
+
+        <AnimatedSection>
+          <div className="relative border-2 border-international-orange rounded-xl overflow-hidden bg-card">
+            <div className="bg-international-orange/5 px-5 sm:px-8 py-5 sm:py-6 text-center border-b border-international-orange/20">
+              <div className="inline-flex items-center gap-2 mb-2">
+                <Zap className="h-5 w-5 text-international-orange" />
+                <span className="text-xs font-mono font-bold uppercase tracking-widest text-international-orange">The Fractional Forge Way</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-foreground leading-tight">
+                Move as Fast as <span className="text-international-orange">Your Ideas.</span>
+              </h3>
+            </div>
+            <div className="p-5 sm:p-8">
+              <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 mb-6 sm:mb-8">
+                {BRIDGE_ITEMS.map((item) => (
+                  <AnimatedCard key={item.pain} className="rounded-lg border bg-muted/30 p-4 flex flex-col">
+                    <p className="text-xs text-destructive line-through mb-2">{item.pain}</p>
+                    <p className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <Check className="h-4 w-4 text-status-success flex-shrink-0" />
+                      {item.solution}
+                    </p>
+                  </AnimatedCard>
+                ))}
+              </StaggerContainer>
+              <div className="text-center">
+                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
+                  <a href="#solution" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
+                    See How We Solve It <ArrowRight className="h-4 w-4" />
+                  </a>
+                </motion.div>
+              </div>
+            </div>
+          </div>
+        </AnimatedSection>
+      </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THE SOLUTION — Unified pillars with photos and founder voice
+ *
+ * DECISION: Each pillar has an image, a headline, and a founder-voice quote —
+ * telling the story once with personality rather than abstract cards.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+const SOLUTION_PILLARS = [
+  {
+    icon: Briefcase,
+    label: "Fractional Experts",
+    headline: "Senior Expertise, On Demand",
+    image: "/images/marketing/role-executive.png",
+    imageAlt: "Experienced engineering executive",
+    quote: "Don't burn seed capital on a standing army. Launch with a fractional team — seasoned engineers, marketers, and operators with decades of experience. No full-time hires, no six-figure salaries before your first prototype.",
+    highlights: [
+      "Experienced professionals across engineering disciplines",
+      "Flexible engagement — matched to your needs",
+      "Specialists in mechanical, electrical, manufacturing, and more",
+    ],
+  },
+  {
+    icon: Brain,
+    label: "AI-Enabled Execution",
+    headline: "AI Speed. Human Judgement.",
+    image: "/images/marketing/role-apprentice.png",
+    imageAlt: "Young engineers working with AI tools",
+    quote: "Ambitious apprentices — digital natives fresh from university — execute tasks using AI tools at remarkable speed. Senior experts review and verify every output. You aren't hiring juniors. You're deploying Founders-in-Training.",
+    highlights: [
+      "Senior directs. Junior executes with AI. Senior verifies.",
+      "Every output grounded in real-world experience",
+      "More output, lower cost than traditional hiring",
+    ],
+  },
+  {
+    icon: Factory,
+    label: "Cloud Manufacturing",
+    headline: "Factories Without the Factory",
+    image: "/images/marketing/factory-partner.png",
+    imageAlt: "Factory floor with manufacturing equipment",
+    quote: "Across the UK and Europe, factories have spare capacity waiting to be filled. We identify the right facilities, generate automated RFQ packs, and get your products built — without you leasing a single square metre.",
+    highlights: [
+      "Access a growing network of manufacturing partners",
+      "Automated RFQ generation from your designs",
+      "Real factories, real equipment, zero overhead",
+    ],
+  },
+] as const
+
+function SolutionSection() {
+  return (
+    <section id="solution" className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-20">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
+            The Cloud Factory Ecosystem
+          </span>
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
+            You Wouldn&apos;t Build Server Racks
+            <br className="hidden sm:block" />{" "}to Launch an App.{" "}
+            <br className="hidden sm:block" />
+            <span className="text-international-orange">So Why Build a Factory?</span>
+          </h2>
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            Modern software companies use AWS instead of buying servers.
+            Fractional Forge gives hardware companies the same model —
+            expert teams, AI-enabled execution, and manufacturing capacity, all on demand.
+          </p>
+        </AnimatedSection>
+
+        <StaggerContainer className="space-y-6 sm:space-y-8 md:space-y-12 mb-10 sm:mb-12 md:mb-16">
+          {SOLUTION_PILLARS.map((pillar, index) => {
+            const Icon = pillar.icon
+            const isEven = index % 2 === 1
             return (
               <AnimatedCard
-                key={step.number}
-                className="border bg-card rounded-xl p-5 sm:p-6 md:p-8 flex flex-col relative overflow-hidden"
+                key={pillar.label}
+                className="border bg-card rounded-xl overflow-hidden"
               >
-                <span className="text-5xl sm:text-6xl md:text-7xl font-black text-muted/50 absolute top-3 right-4 sm:top-4 sm:right-6 select-none pointer-events-none">
-                  {step.number}
-                </span>
-                <div className="mb-3 sm:mb-4 h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-electric-blue-light flex items-center justify-center">
-                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-electric-blue" />
+                <div className={`grid grid-cols-1 lg:grid-cols-2 ${isEven ? "lg:direction-rtl" : ""}`}>
+                  {/* Image */}
+                  <div className={`relative h-64 sm:h-72 lg:h-auto lg:min-h-[360px] ${isEven ? "lg:order-2" : ""}`}>
+                    <Image
+                      src={pillar.image}
+                      alt={pillar.imageAlt}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                    />
+                  </div>
+
+                  {/* Content */}
+                  <div className={`p-6 sm:p-8 md:p-10 flex flex-col justify-center ${isEven ? "lg:order-1" : ""}`}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-international-orange/10 flex items-center justify-center">
+                        <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-international-orange" />
+                      </div>
+                      <span className="text-xs font-mono font-bold uppercase tracking-widest text-international-orange">
+                        {pillar.label}
+                      </span>
+                    </div>
+
+                    <h3 className="text-xl sm:text-2xl md:text-3xl font-black mb-4 text-foreground leading-tight">
+                      {pillar.headline}
+                    </h3>
+
+                    <p className="text-muted-foreground text-sm sm:text-base leading-relaxed mb-6 italic">
+                      &ldquo;{pillar.quote}&rdquo;
+                    </p>
+
+                    <ul className="space-y-2.5">
+                      {pillar.highlights.map((highlight) => (
+                        <li key={highlight} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                          <div className="mt-1 h-1.5 w-1.5 rounded-full bg-international-orange flex-shrink-0" />
+                          {highlight}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-3">{step.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                  {step.description}
-                </p>
               </AnimatedCard>
-            );
+            )
+          })}
+        </StaggerContainer>
+
+        {/* ForgeOS coordinator strip */}
+        <AnimatedSection>
+          <div className="relative border-2 border-international-orange rounded-xl overflow-hidden bg-card">
+            <div className="bg-international-orange/5 px-5 sm:px-8 py-5 sm:py-6 text-center border-b border-international-orange/20">
+              <div className="inline-flex items-center gap-2 mb-2">
+                <Workflow className="h-5 w-5 text-international-orange" />
+                <span className="text-xs font-mono font-bold uppercase tracking-widest text-international-orange">
+                  Powered by ForgeOS
+                </span>
+              </div>
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-foreground leading-tight">
+                One Operating System. <span className="text-international-orange">Everything Coordinated.</span>
+              </h3>
+            </div>
+            <div className="p-5 sm:p-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 text-center">
+                {[
+                  { stat: "Objectives & Tasks", description: "Everyone knows what they're doing and where the blockages are" },
+                  { stat: "Guided Manufacturing", description: "Understand the systems required to make your product before you commit" },
+                  { stat: "Automated RFQs", description: "Full request-for-quote packs sent to factories that match your needs" },
+                ].map((item) => (
+                  <div key={item.stat} className="p-3 sm:p-4">
+                    <p className="text-sm sm:text-base font-bold text-foreground mb-1">{item.stat}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{item.description}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 sm:mt-8 text-center">
+                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
+                  <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
+                    Join the Forge <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </motion.div>
+              </div>
+            </div>
+          </div>
+        </AnimatedSection>
+      </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * WHO IT'S FOR — Compact grid, all audiences equal
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+const AUDIENCES = [
+  {
+    icon: Rocket,
+    role: "Founders",
+    value: "Launch without the overhead",
+    description: "Validate fast, risk less, and retain maximum equity. No standing army required.",
+    cta: "Start Building",
+    href: "/join?role=founder",
+  },
+  {
+    icon: Briefcase,
+    role: "Fractional Experts",
+    value: "Monetize your expertise",
+    description: "Join as a fractional executive to accelerate deep-tech startups. Then invest in them or launch your own.",
+    cta: "Join as Expert",
+    href: "/join?role=executive",
+  },
+  {
+    icon: GraduationCap,
+    role: "Apprentices",
+    value: "Become a Founder-in-Training",
+    description: "Pair with a seasoned executive, learn cutting-edge AI workflows, and multiply your output.",
+    cta: "Start Apprenticeship",
+    href: "/join?role=apprentice",
+  },
+  {
+    icon: LineChart,
+    role: "Venture Capital",
+    value: "More bets, same fund",
+    description: "Compressed validation cycles mean you can validate cheaper, kill failures faster, and place more winning bets.",
+    cta: "Partner With Us",
+    href: "/join",
+  },
+  {
+    icon: Building2,
+    role: "Factory Partners",
+    value: "Fill your spare capacity",
+    description: "List available capacity on the marketplace. Every company your experts advise is a potential manufacturing order.",
+    cta: "List Your Factory",
+    href: "/join?role=executive",
+  },
+  {
+    icon: Beaker,
+    role: "Universities",
+    value: "Commercialize research",
+    description: "Turn IP-rich research into venture-backed startups. Transform students into Apprentices with real-world experience.",
+    cta: "Partner",
+    href: "/join",
+  },
+] as const
+
+function WhoItsForSection() {
+  return (
+    <section id="for-you" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
+            Everyone Has a Role
+          </span>
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
+            Who It&apos;s <span className="text-international-orange">For.</span>
+          </h2>
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            Whether you&apos;re building a product, lending your expertise, or providing capacity — there&apos;s a place for you in the Forge.
+          </p>
+        </AnimatedSection>
+
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {AUDIENCES.map((audience) => {
+            const Icon = audience.icon
+            return (
+              <AnimatedCard key={audience.role} className="border bg-card rounded-xl p-5 sm:p-6 flex flex-col">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="h-10 w-10 rounded-lg bg-international-orange/10 flex items-center justify-center flex-shrink-0">
+                    <Icon className="h-5 w-5 text-international-orange" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-foreground uppercase tracking-wide">{audience.role}</h3>
+                    <p className="text-xs text-international-orange font-mono">{audience.value}</p>
+                  </div>
+                </div>
+
+                <p className="text-sm text-muted-foreground leading-relaxed mb-4 flex-1">
+                  {audience.description}
+                </p>
+
+                <Link
+                  href={audience.href}
+                  className="text-xs font-mono font-bold uppercase tracking-widest text-international-orange hover:text-international-orange-hover transition-colors inline-flex items-center gap-1.5"
+                >
+                  {audience.cta} <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </AnimatedCard>
+            )
           })}
         </StaggerContainer>
       </div>
     </section>
-  );
+  )
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * FINAL CTA — Move as Fast as Your Ideas
- * ════════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TRUST STRIP
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+const TRUST_SIGNALS = [
+  { icon: Shield, label: "Your IP, 100%" },
+  { icon: UserCheck, label: "Verified Experts" },
+  { icon: DollarSign, label: "No Equity Required" },
+  { icon: CheckCircle2, label: "Cancel Anytime" },
+] as const
+
+function TrustStrip() {
+  return (
+    <section className="py-8 sm:py-12 bg-background border-t border-muted">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
+        <AnimatedSection>
+          <div className="flex flex-wrap justify-center gap-x-4 sm:gap-x-8 gap-y-3 text-sm text-muted-foreground">
+            {TRUST_SIGNALS.map((signal) => {
+              const Icon = signal.icon
+              return (
+                <div key={signal.label} className="flex items-center gap-2">
+                  <Icon className="h-4 w-4 text-international-orange flex-shrink-0" />
+                  <span className="font-medium text-foreground text-xs sm:text-sm">{signal.label}</span>
+                </div>
+              )
+            })}
+          </div>
+        </AnimatedSection>
+      </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * FINAL CTA
+ * ═══════════════════════════════════════════════════════════════════════ */
 
 function FinalCTASection() {
   return (
-    <section className="py-12 sm:py-16 md:py-24 bg-background border-t border-muted">
+    <section className="py-12 sm:py-16 md:py-24 bg-muted/30 border-t border-muted">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
         <AnimatedSection>
           <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Move as Fast as{" "}
-            <span className="text-international-orange">Your Ideas.</span>
+            Move as Fast as <span className="text-international-orange">Your Ideas.</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-xl mx-auto leading-relaxed mb-6 sm:mb-8">
-            Stop burning cash on infrastructure you don&apos;t need.
-            Join the founders, experts, and factories building
-            hardware at software speed.
+            Stop burning cash on infrastructure you don&apos;t need. Join the founders, experts, and factories building hardware at software speed.
           </p>
-          <motion.div
-            whileHover={buttonHover}
-            whileTap={buttonTap}
-            className="inline-block"
-          >
-            <Link
-              href="/join"
-              className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-10 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
-            >
-              Join the Forge
-              <ArrowRight className="h-4 w-4" />
+          <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
+            <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-10 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
+              Join the Forge <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
         </AnimatedSection>
       </div>
     </section>
-  );
+  )
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * SECTION 7 — FAQ
- * Handles objections and builds confidence.
- * ════════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════
+ * FAQ
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+const FAQS = [
+  {
+    question: "What is a Cloud Factory?",
+    answer: "Think of it like AWS for manufacturing. Just as modern software companies use cloud compute instead of building their own server racks, Fractional Forge lets you build hardware products using existing factory capacity, expert teams, and AI-enabled execution — without owning any of it. You get the same results, at a fraction of the cost and time.",
+  },
+  {
+    question: "Who owns the IP I create on the platform?",
+    answer: "You do. 100%. Fractional Forge provides the team and infrastructure, but all intellectual property, designs, prototypes, and products belong entirely to you. This is baked into our contracts.",
+  },
+  {
+    question: "How does the fractional model actually work?",
+    answer: "Instead of hiring a full-time engineering team, you work with experienced executives and engineers on a fractional (part-time) basis. They direct AI-enabled apprentices who execute at speed, then verify the output based on decades of real-world experience. You only pay for the hours and outcomes you need.",
+  },
+  {
+    question: "How quickly can I go from idea to prototype?",
+    answer: "It depends on complexity, but the key advantage is eliminating the months of hiring, onboarding, and infrastructure setup that typically precede any actual engineering work. Because you're plugging into existing experts and factory capacity from day one, you can start building immediately instead of spending months assembling the team first.",
+  },
+  {
+    question: "How much does it cost?",
+    answer: "We're in early access and working directly with founding members to define pricing. No equity is required. Reach out and we'll walk you through what engagement looks like for your situation.",
+  },
+] as const
 
 function FAQSection() {
-  const FAQS = [
-    {
-      question: "What is a Cloud Factory?",
-      answer:
-        "Think of it like AWS for manufacturing. Just as modern software companies use cloud compute instead of building their own server racks, Fractional Forge lets you build hardware products using existing factory capacity, expert teams, and AI-enabled execution — without owning any of it. You get the same results, at a fraction of the cost and time.",
-    },
-    {
-      question: "Who owns the IP I create on the platform?",
-      answer:
-        "You do. 100%. Fractional Forge provides the team and infrastructure, but all intellectual property, designs, prototypes, and products belong entirely to you. This is baked into our contracts.",
-    },
-    {
-      question: "How does the fractional model actually work?",
-      answer:
-        "Instead of hiring a full-time engineering team, you work with experienced executives and engineers on a fractional (part-time) basis. They direct AI-enabled apprentices who execute at speed, then verify the output based on decades of real-world experience. You only pay for the hours and outcomes you need.",
-    },
-    {
-      question: "How quickly can I go from idea to prototype?",
-      answer:
-        "Our structured sprints target 12 weeks from kick-off to validated prototype. Some simpler projects ship faster. The key is eliminating the months of hiring, onboarding, and infrastructure setup that typically precede any actual engineering work.",
-    },
-    {
-      question: "How much does it cost?",
-      answer:
-        "The platform starts free for early exploration. Paid plans are structured around your usage — team size, manufacturing orders, and AI-assisted execution. There's a transparent platform fee on marketplace transactions. No hidden fees, no equity required, cancel anytime. Full pricing details are on our pricing page.",
-    },
-  ] as const;
-
   return (
-    <section id="faq" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
+    <section id="faq" className="py-12 sm:py-16 md:py-28 bg-background border-t border-muted scroll-mt-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
         <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
           <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
@@ -823,5 +936,5 @@ function FAQSection() {
         </AnimatedSection>
       </div>
     </section>
-  );
+  )
 }

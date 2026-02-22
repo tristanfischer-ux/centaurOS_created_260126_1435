@@ -7008,6 +7008,7 @@ export type Database = {
           category: Database["public"]["Enums"]["marketplace_category"]
           created_at: string | null
           created_by_provider_id: string | null
+          currency: string | null
           description: string | null
           embedding: string | null
           id: string
@@ -7015,6 +7016,7 @@ export type Database = {
           is_demo: boolean
           is_self_created: boolean | null
           is_verified: boolean | null
+          price: number | null
           search_vector: unknown
           subcategory: string
           title: string
@@ -7028,6 +7030,7 @@ export type Database = {
           category: Database["public"]["Enums"]["marketplace_category"]
           created_at?: string | null
           created_by_provider_id?: string | null
+          currency?: string | null
           description?: string | null
           embedding?: string | null
           id?: string
@@ -7035,6 +7038,7 @@ export type Database = {
           is_demo?: boolean
           is_self_created?: boolean | null
           is_verified?: boolean | null
+          price?: number | null
           search_vector?: unknown
           subcategory: string
           title: string
@@ -7048,6 +7052,7 @@ export type Database = {
           category?: Database["public"]["Enums"]["marketplace_category"]
           created_at?: string | null
           created_by_provider_id?: string | null
+          currency?: string | null
           description?: string | null
           embedding?: string | null
           id?: string
@@ -7055,6 +7060,7 @@ export type Database = {
           is_demo?: boolean
           is_self_created?: boolean | null
           is_verified?: boolean | null
+          price?: number | null
           search_vector?: unknown
           subcategory?: string
           title?: string
@@ -8582,6 +8588,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          business_function_id: string | null
           buyer_id: string
           completed_at: string | null
           converted_from_trial_id: string | null
@@ -8607,6 +8614,7 @@ export type Database = {
           vat_rate: number | null
         }
         Insert: {
+          business_function_id?: string | null
           buyer_id: string
           completed_at?: string | null
           converted_from_trial_id?: string | null
@@ -8632,6 +8640,7 @@ export type Database = {
           vat_rate?: number | null
         }
         Update: {
+          business_function_id?: string | null
           buyer_id?: string
           completed_at?: string | null
           converted_from_trial_id?: string | null
@@ -8657,6 +8666,13 @@ export type Database = {
           vat_rate?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_business_function_id_fkey"
+            columns: ["business_function_id"]
+            isOneToOne: false
+            referencedRelation: "business_functions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_buyer_id_fkey"
             columns: ["buyer_id"]
@@ -10602,6 +10618,7 @@ export type Database = {
           currency: string | null
           current_order_count: number | null
           day_rate: number | null
+          display_name: string | null
           featured_until: string | null
           forge_discount_percent: number | null
           headline: string | null
@@ -10650,6 +10667,7 @@ export type Database = {
           currency?: string | null
           current_order_count?: number | null
           day_rate?: number | null
+          display_name?: string | null
           featured_until?: string | null
           forge_discount_percent?: number | null
           headline?: string | null
@@ -10698,6 +10716,7 @@ export type Database = {
           currency?: string | null
           current_order_count?: number | null
           day_rate?: number | null
+          display_name?: string | null
           featured_until?: string | null
           forge_discount_percent?: number | null
           headline?: string | null
