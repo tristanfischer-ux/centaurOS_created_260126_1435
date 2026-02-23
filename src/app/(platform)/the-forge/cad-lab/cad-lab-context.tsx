@@ -4,8 +4,8 @@
  * @file cad-lab-context.tsx — Shared state for The Forge multi-page pipeline.
  *
  * @description Extracts all stateful logic from the original monolithic page.tsx
- * into a React Context so that Research, Build, Analysis, Procurement, and
- * Review sub-route pages can share a single source of truth.
+ * into a React Context so that Concept, Build, and Review sub-route pages
+ * can share a single source of truth.
  *
  * The provider is mounted in layout.tsx and wraps all child routes.
  */

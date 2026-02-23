@@ -1,115 +1,21 @@
 "use client"
 
 /**
- * @file analysis/page.tsx — The Forge: Analysis stage (Stage 3).
+ * @file analysis/page.tsx — Redirect stub.
  *
- * @description Engineering analysis dashboard with risk register, timeline,
- * and design quality metrics. Requires at least one generated module.
- *
- * Gate: redirects to /the-forge/cad-lab/build if no generated modules.
+ * The Analysis stage was consolidated into the 3-stage pipeline (Concept → Build → Review).
+ * Redirects to the Build stage for backward compatibility.
  */
 
-import { useMemo } from "react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import {
-  BarChart3,
-  ArrowLeft,
-  ArrowRight,
-  ShoppingCart,
-  Box,
-} from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { EmptyState } from "@/components/ui/empty-state"
-import { CadLabAnalysisDashboard } from "@/components/cad/cad-lab-analysis-dashboard"
-import { CadLabTimeline } from "@/components/cad/cad-lab-timeline"
-import { CadLabRiskRegister } from "@/components/cad/cad-lab-risk-register"
-import { useRegisterScreenContext } from "@/contexts/screen-context"
-
-import { useCadLab } from "../cad-lab-context"
-
-export default function CadLabAnalysisPage(): React.ReactNode {
+export default function CadLabAnalysisRedirect(): React.ReactNode {
   const router = useRouter()
-  const { modules, generatedModuleCount, subject, riskCount } = useCadLab()
-
-  useRegisterScreenContext(
-    useMemo(() => {
-      const parts: string[] = [`Viewing the Analysis stage for "${subject}".`]
-      parts.push(`${modules.length} modules, ${generatedModuleCount} generated.`)
-      parts.push(`${riskCount} risk items in the register.`)
-      return {
-        pageTitle: `The Forge — Analysis: ${subject}`,
-        summary: parts.join(" "),
-        entities: modules.slice(0, 15).map((m) => ({
-          type: "module",
-          title: m.name,
-          status: m.status === "generated" ? "CAD generated" : "pending",
-        })),
-      }
-    }, [subject, modules, generatedModuleCount, riskCount]),
-  )
-
-  // Show empty state instead of redirect
-  if (generatedModuleCount === 0) {
-    return (
-      <div className="py-12">
-        <EmptyState
-          title="No modules generated yet"
-          description="Generate at least one module in the Build stage to see engineering analysis — including risk register, timeline, and system-level metrics."
-          action={
-            <Button onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
-              <Box className="h-4 w-4" />
-              Go to Build
-            </Button>
-          }
-        />
-      </div>
-    )
-  }
-
+  useEffect(() => { router.replace("/the-forge/cad-lab/build") }, [router])
   return (
-    <div className="space-y-6">
-      {/* Stage header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <BarChart3 className="h-5 w-5 text-international-orange" />
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Engineering Analysis</h2>
-            <p className="text-xs text-muted-foreground">
-              {modules.length} modules, {riskCount} risk items
-            </p>
-          </div>
-        </div>
-        <Button variant="ghost" size="sm" onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5 text-xs">
-          <ArrowLeft className="h-3 w-3" /> Back to Build
-        </Button>
-      </div>
-
-      <CadLabAnalysisDashboard modules={modules} projectName={subject} />
-      <CadLabTimeline modules={modules} />
-      <CadLabRiskRegister modules={modules} />
-
-      {/* What's Next CTA */}
-      <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-foreground">
-                Next: Procurement &amp; Supply Chain
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Complete manufacturing diagnostics, get cost estimates, and identify suppliers for each module.
-              </p>
-            </div>
-            <Button onClick={() => router.push("/the-forge/cad-lab/procurement")} className="gap-1.5">
-              <ShoppingCart className="h-4 w-4" />
-              Continue to Procurement
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="py-12 text-center text-sm text-muted-foreground">
+      Redirecting to Build stage...
     </div>
   )
 }

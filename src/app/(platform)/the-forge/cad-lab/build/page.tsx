@@ -7,7 +7,7 @@
  * definition and CAD generation. Shows live batch progress grid and
  * per-module results with SVG previews, metrics, and DFM analysis.
  *
- * Gate: redirects to /the-forge/cad-lab if no research exists.
+ * Gate: redirects to /the-forge/cad-lab (Concept stage) if no research exists.
  */
 
 import { useState, useCallback, useEffect, useMemo } from "react"
@@ -32,8 +32,6 @@ import {
   Printer,
   Info,
   Play,
-  BarChart3,
-  ShoppingCart,
   ClipboardCheck,
   Layers,
   Clock,
@@ -146,12 +144,12 @@ export default function CadLabBuildPage(): React.ReactNode {
     return (
       <div className="py-12">
         <EmptyState
-          title="No research completed yet"
-          description="Run product research first to identify modules and sub-assemblies for your design."
+          title="Concept stage not completed"
+          description="Complete the Concept stage to identify modules and sub-assemblies for your design."
           action={
             <Button onClick={() => router.push("/the-forge/cad-lab")} className="gap-1.5">
               <Search className="h-4 w-4" />
-              Go to Research
+              Go to Concept
             </Button>
           }
         />
@@ -185,17 +183,11 @@ export default function CadLabBuildPage(): React.ReactNode {
               <div>
                 <h3 className="text-base font-semibold text-foreground">All {modules.length} Modules Generated</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Your product is manufacturing-ready. Explore the full analysis, procurement details, and review package.
+                  Your product is manufacturing-ready. Continue to the Review stage for supplier-ready documentation and expert matching.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => router.push("/the-forge/cad-lab/analysis")}>
-                  <BarChart3 className="h-3 w-3" /> View Analysis
-                </Button>
-                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => router.push("/the-forge/cad-lab/procurement")}>
-                  <ShoppingCart className="h-3 w-3" /> Procurement & Costs
-                </Button>
-                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => router.push("/the-forge/cad-lab/review")}>
+                <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push("/the-forge/cad-lab/review")}>
                   <ClipboardCheck className="h-3 w-3" /> Review Package
                 </Button>
               </div>
@@ -256,22 +248,29 @@ export default function CadLabBuildPage(): React.ReactNode {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Map your product into manufacturable sub-assemblies. Each module gets its own parametric CAD pipeline with dimension planning and DFM analysis.
+            Your sub-assemblies from the Concept stage are ready for CAD generation. Each module gets parametric code, dimension planning, and DFM analysis.
           </p>
           <div className="flex items-center gap-2">
-            <Button
-              onClick={modules.length > 0 ? () => setIsConfirmRemapOpen(true) : handleDecompose}
-              disabled={isAnyLoading || isDecomposing || !hasResearch}
-              variant={modules.length > 0 ? "secondary" : "outline"}
-            >
-              {isDecomposing ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Mapping sub-assemblies...</>
-              ) : modules.length > 0 ? (
-                <><RotateCcw className="h-4 w-4 mr-2" />Re-map Modules</>
-              ) : (
-                <><Box className="h-4 w-4 mr-2" />Map Sub-Assemblies</>
-              )}
-            </Button>
+            {modules.length > 0 ? (
+              <Button
+                onClick={() => setIsConfirmRemapOpen(true)}
+                disabled={isAnyLoading || isDecomposing}
+                variant="secondary"
+              >
+                {isDecomposing ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Mapping sub-assemblies...</>
+                ) : (
+                  <><RotateCcw className="h-4 w-4 mr-2" />Re-map Modules</>
+                )}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => router.push("/the-forge/cad-lab")}
+                variant="outline"
+              >
+                <Search className="h-4 w-4 mr-2" />Go to Concept
+              </Button>
+            )}
             {modules.length > 0 && modules.some((m) => m.status !== "generated") && (
               <Button onClick={handleGenerateAllModules} disabled={isAnyLoading} variant="default">
                 {isBatchRunning ? (
@@ -346,6 +345,12 @@ export default function CadLabBuildPage(): React.ReactNode {
                     <div className="flex items-center justify-between gap-4">
                       {/* Module info */}
                       <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {mod.imageUrl && mod.imageStatus === "complete" && (
+                          <div className="h-7 w-7 rounded overflow-hidden bg-muted flex-shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={mod.imageUrl} alt="" className="h-full w-full object-cover" />
+                          </div>
+                        )}
                         <div className={`flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold flex-shrink-0 ${
                           isDone ? "bg-status-success text-white" :
                           isActive ? "bg-international-orange text-white" :
@@ -522,6 +527,12 @@ export default function CadLabBuildPage(): React.ReactNode {
                     className="flex items-center justify-between w-full p-3 text-left hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {mod.imageUrl && mod.imageStatus === "complete" && (
+                        <div className="h-10 w-10 rounded overflow-hidden bg-muted flex-shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={mod.imageUrl} alt="" className="h-full w-full object-cover" />
+                        </div>
+                      )}
                       <div className={`h-2 w-2 rounded-full flex-shrink-0 ${
                         mod.status === "generated" ? "bg-status-success"
                         : mod.status === "interface_ready" ? "bg-status-info"

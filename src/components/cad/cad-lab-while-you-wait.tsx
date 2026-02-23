@@ -4,7 +4,7 @@
  * @file cad-lab-while-you-wait.tsx — Productive activities panel during batch generation.
  *
  * @description Turns dead wait time into preparation by suggesting context-aware
- * activities: reviewing failure modes, completing procurement diagnostics,
+ * activities: reviewing failure modes, reviewing module blueprints,
  * refining the research report, checking tasks, and preparing review checklists.
  *
  * Shown on the Build page while batch generation is running.
@@ -170,21 +170,13 @@ export function CadLabWhileYouWait({
       priority: riskCount > 0 ? 100 : 0,
       completed: riskCount === 0,
     },
-    // Complete diagnostics — high priority if incomplete
+    // Review module blueprints — useful context while waiting
     {
       icon: <ClipboardCheck className="h-4 w-4" />,
-      title: `Complete procurement diagnostics (${diagsRemaining} remaining)`,
-      description: "Fill in manufacturing, material, and supply chain questionnaires so the Procurement stage is ready the moment CAD completes.",
-      action: (
-        <Link href="/the-forge/cad-lab/procurement">
-          <Button variant="outline" size="sm" className="h-8 text-xs">
-            Go to Procurement
-            <ArrowRight className="h-3 w-3 ml-1" />
-          </Button>
-        </Link>
-      ),
-      priority: diagsRemaining > 0 ? 90 : 0,
-      completed: diagsRemaining === 0,
+      title: "Review module blueprints from Concept stage",
+      description: "Scroll through the blueprint illustrations generated during the Concept stage. Annotate any design concerns before CAD results arrive.",
+      priority: 70,
+      completed: false,
     },
     // Review research — always available
     {

@@ -53,10 +53,8 @@ export function CadLabProviderWrapper({ children }: { children: React.ReactNode 
 // ─── Stage label mapping for breadcrumbs ────────────────────────────
 
 const STAGE_LABELS: Record<string, string> = {
-  "": "Research",
+  "": "Concept",
   build: "Build",
-  analysis: "Analysis",
-  procurement: "Procurement",
   review: "Review",
   mashup: "Mashup Lab",
   templates: "Template Library",
@@ -67,7 +65,7 @@ const STAGE_LABELS: Record<string, string> = {
  */
 function getCurrentStageLabel(pathname: string): string {
   const segment = pathname.replace("/the-forge/cad-lab", "").replace(/^\//, "").split("/")[0]
-  return STAGE_LABELS[segment] ?? "Research"
+  return STAGE_LABELS[segment] ?? "Concept"
 }
 
 /** Mashup Lab and Template Library are standalone tools, not pipeline stages. */

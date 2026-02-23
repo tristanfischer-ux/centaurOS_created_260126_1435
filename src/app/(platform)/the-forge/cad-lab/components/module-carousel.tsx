@@ -184,6 +184,14 @@ export function ModuleCarousel({
               </div>
             </div>
 
+            {/* Blueprint image from Concept stage (shown before CAD is generated) */}
+            {focusedModule.imageUrl && focusedModule.imageStatus === "complete" && focusedModule.status !== "generated" && (
+              <div className="aspect-[3/2] w-full rounded-lg overflow-hidden bg-muted">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={focusedModule.imageUrl} alt={`Blueprint: ${focusedModule.name}`} className="w-full h-full object-cover" />
+              </div>
+            )}
+
             <p className="text-sm text-foreground">{focusedModule.description}</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">

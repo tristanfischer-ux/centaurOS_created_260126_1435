@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * @file review/page.tsx — The Forge: Review stage (Stage 5).
+ * @file review/page.tsx — The Forge: Review stage (Stage 3).
  *
  * @description Final review package with supplier-ready documentation and
  * expert discipline matching. Requires at least one generated module.
@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   Download,
   Box,
-  Send,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -106,19 +105,11 @@ export default function CadLabReviewPage(): React.ReactNode {
                   Pipeline Complete
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Your engineering package for &quot;{subject}&quot; is ready. Send an RFQ to suppliers from Procurement, copy the review package to share with stakeholders, or go back to Build to download STEP + STL files.
+                  Your engineering package for &quot;{subject}&quot; is ready. Copy the review package to share with stakeholders, or go back to Build to download STEP + STL files.
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="default"
-                onClick={() => router.push("/the-forge/cad-lab/procurement")}
-                className="gap-1.5"
-              >
-                <Send className="h-4 w-4" />
-                Create Marketplace RFQ
-              </Button>
               <Button variant="outline" onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
                 <Download className="h-4 w-4" />
                 Back to Downloads
