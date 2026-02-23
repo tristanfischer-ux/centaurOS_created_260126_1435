@@ -508,6 +508,17 @@ export async function POST(request: Request) {
         }
     }
 
+    // ─── Specialist Tool Resolution (early) ─────────────────────────
+    // Resolve tools early so they can be referenced in the system prompt.
+    // The actual tool-use loop happens later in handleToolAwareStreaming.
+    const isClaudeTierEarly = modelTier === "claude"
+    let specialistTools: ToolDefinition[] = []
+    if (specialistId && modality === "text") {
+        specialistTools = getToolsForSpecialist(specialistId, {
+            includeWebSearch: !isClaudeTierEarly,
+        })
+    }
+
     // Build system prompt: personality FIRST (identity leads), then context layers.
     // Structure: personality → temporal → emotional → company → memory → custom suffix
     // This ensures the specialist's identity is the dominant instruction, not a footnote.
@@ -702,6 +713,24 @@ When the founder triggers one of these (e.g., "draft the plan", "run the numbers
 - Label clearly: [FROM COMPANY DATA] vs [INDUSTRY BENCHMARK] vs [YOUR ESTIMATE]`
             }
 
+            // Tool-calling instructions: tell the specialist they have tools
+            if (specialistTools.length > 0) {
+                const toolList = specialistTools.map((t) => `- **${t.name}**: ${t.description}`).join("\n")
+                systemPromptWithContext += `\n\n## Your Data Tools
+
+You have access to these tools that you can call to query REAL company data during this conversation:
+
+${toolList}
+
+**CRITICAL INSTRUCTIONS for tool use:**
+- **Always use tools** when the founder asks about company data, metrics, progress, team, finances, or anything that requires real numbers. Do NOT guess or make up data.
+- Call tools BEFORE writing your analysis — ground your advice in actual data.
+- You can chain multiple tool calls in one turn (e.g., query objectives + query tasks + run calculation).
+- When you use run_calculation, show your work: explain the formula and what the numbers mean.
+- After getting tool results, synthesize them into clear, actionable insights — don't just dump raw data.
+- If a tool returns no data or an error, acknowledge it honestly and work with what you have.`
+            }
+
             // Multi-step execution plan capability
             const otherSpecialists = SPECIALISTS
                 .filter((s) => s.id !== specialistId)
@@ -886,21 +915,10 @@ ${otherSpecialists}
         ? FALLBACK_CHAINS[modelTier]
         : [{ providerId, modelId }]
 
-    // ─── Specialist Tool Resolution ──────────────────────────────────
-    // Look up domain-specific tools for this specialist. Tools give the
-    // specialist the ability to query real company data during the conversation.
-    const isClaudeTier = modelTier === "claude"
-    let specialistTools: ToolDefinition[] = []
-    if (specialistId && modality === "text") {
-        specialistTools = getToolsForSpecialist(specialistId, {
-            // Non-Claude providers use web_search as a tool; Claude uses native web search
-            includeWebSearch: !isClaudeTier,
-        })
-    }
-
     // ─── Web Search Detection ──────────────────────────────────────
     // Claude-tier: always enable web search as a native tool (specialists decide when to search)
     // Non-Claude: web_search is included in specialistTools above (replaces keyword heuristic)
+    const isClaudeTier = isClaudeTierEarly
     const needsSearch = specialistId && modality === "text" && shouldTriggerWebSearch(input)
     let enableWebSearchForStreaming = false
 
@@ -937,9 +955,25 @@ ${otherSpecialists}
                 specialist?.workingStyle ?? "",
             )
         }
-        // TODO: Route to tool-aware streaming when specialist has tools.
-        // handleToolAwareStreaming not yet implemented — fall through to text streaming.
-        // if (modality === "text" && specialistTools.length > 0 && foundryId && specialistId) { ... }
+        // DECISION: Route to tool-aware streaming when specialist has tools.
+        // This enables the multi-turn tool loop where the model can query data,
+        // run calculations, and search the web before responding.
+        if (modality === "text" && specialistTools.length > 0 && foundryId && specialistId) {
+            return await handleToolAwareStreaming({
+                chain: fallbackChain,
+                finalPrompt,
+                systemPrompt: systemPromptWithContext,
+                onComplete: memoryCallback,
+                enableThinking,
+                history: conversationHistory,
+                rolloutId,
+                enableWebSearch: enableWebSearchForStreaming,
+                groundingLayers: activeLayers,
+                tools: specialistTools,
+                foundryId,
+                specialistId,
+            })
+        }
         if (modality === "text") {
             return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId, enableWebSearchForStreaming, activeLayers)
         }
@@ -1361,8 +1395,7 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
 
                     let loopCount = 0
 
-                    // eslint-disable-next-line no-constant-condition
-                    while (true) {
+                    while (loopCount <= MAX_TOOL_LOOPS) {
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const response = await client.beta.messages.create(createParams as any) as any
 
