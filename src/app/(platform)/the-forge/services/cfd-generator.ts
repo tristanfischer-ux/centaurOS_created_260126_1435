@@ -145,9 +145,22 @@ export async function generateFlowConditions(
   try {
     const parsed = JSON.parse(content)
     // Sanity-check AI-inferred flow values
-    const velocity = Math.max(0, Math.min(parsed.velocity_m_s ?? 10.0, 500))
-    const density = Math.max(0.001, Math.min(parsed.density_kg_m3 ?? 1.225, 20_000))
-    const viscosity = Math.max(1e-8, Math.min(parsed.kinematic_viscosity_m2_s ?? 1.5e-5, 1))
+    // SECURITY: Cap at 100 m/s (Mach 0.3) — incompressible solver diverges at supersonic speeds
+    const rawVelocity = parsed.velocity_m_s ?? 10.0
+    const velocity = Math.max(0, Math.min(rawVelocity, 100))
+    if (velocity !== rawVelocity) {
+      console.warn(`[XRayCFD] Clamped velocity from ${rawVelocity} to ${velocity} m/s`)
+    }
+    const rawDensity = parsed.density_kg_m3 ?? 1.225
+    const density = Math.max(0.01, Math.min(rawDensity, 13_600))
+    if (density !== rawDensity) {
+      console.warn(`[XRayCFD] Clamped density from ${rawDensity} to ${density} kg/m³`)
+    }
+    const rawViscosity = parsed.kinematic_viscosity_m2_s ?? 1.5e-5
+    const viscosity = Math.max(1e-7, Math.min(rawViscosity, 0.1))
+    if (viscosity !== rawViscosity) {
+      console.warn(`[XRayCFD] Clamped viscosity from ${rawViscosity} to ${viscosity} m²/s`)
+    }
     // Normalize direction to unit vector (with Infinity/NaN guard)
     const rawDir: [number, number, number] = parsed.direction ?? [1, 0, 0]
     const dirValid = rawDir.every((v: number) => typeof v === 'number' && isFinite(v))
@@ -156,7 +169,11 @@ export async function generateFlowConditions(
       const mag = Math.sqrt(rawDir[0] ** 2 + rawDir[1] ** 2 + rawDir[2] ** 2)
       if (isFinite(mag) && mag > 0) {
         direction = [rawDir[0] / mag, rawDir[1] / mag, rawDir[2] / mag]
+      } else {
+        console.warn("[XRayCFD] Zero-length direction vector, defaulting to [1,0,0]")
       }
+    } else {
+      console.warn(`[XRayCFD] Invalid direction vector, defaulting to [1,0,0]`)
     }
     return {
       velocity_m_s: velocity,

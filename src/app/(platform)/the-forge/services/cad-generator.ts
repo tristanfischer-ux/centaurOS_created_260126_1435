@@ -41,8 +41,8 @@ const MAX_RETRY_ATTEMPTS = 3
 
 // ─── CAD Code Validation ─────────────────────────────────────────────
 
-/** Regex to detect dangerous Python imports that could escape the Modal sandbox */
-const DANGEROUS_IMPORT_RE = /(?:^|\s)(?:import|from)\s+(?:os|sys|subprocess|shutil)\b|__import__\s*\(\s*['"](?:os|sys|subprocess|shutil)['"]\)/m
+/** Regex to detect dangerous Python code that could escape the Modal sandbox */
+const DANGEROUS_CODE_RE = /(?:^|\s)(?:import|from)\s+(?:os|sys|subprocess|shutil|importlib)\b|__import__\s*\(|__builtins__|(?:exec|eval|compile)\s*\(|getattr\s*\([^)]*__/m
 
 /**
  * Validates CadQuery Python code before sending to Modal for execution.
@@ -60,7 +60,7 @@ function validateCadQueryCode(code: string): string | null {
   if (!code.includes("result") && !code.includes("show_object")) {
     return "No 'result' variable or 'show_object' call — Modal has nothing to export"
   }
-  const dangerousMatch = DANGEROUS_IMPORT_RE.exec(code)
+  const dangerousMatch = DANGEROUS_CODE_RE.exec(code)
   if (dangerousMatch) {
     return `Dangerous import detected: '${dangerousMatch[0].trim()}'`
   }

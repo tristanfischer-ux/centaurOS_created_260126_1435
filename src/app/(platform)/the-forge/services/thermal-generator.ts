@@ -135,12 +135,31 @@ async function inferThermalConfig(module: ModuleSpec): Promise<ThermalConfig> {
     }
     // Sanity-check AI-inferred values
     const heatSources = (parsed.heat_sources ?? [{ power_W: 1.0, description: "Default" }]) as HeatSourceConfig[]
-    for (const hs of heatSources) {
-      hs.power_W = Math.max(0, Math.min(hs.power_W, 10_000))
+    if (heatSources.length > 10) {
+      console.warn(`[XRayThermal] AI returned ${heatSources.length} heat sources, truncating to 10`)
+      heatSources.splice(10)
     }
-    const ambientTemp = Math.max(-60, Math.min(parsed.ambient_temp_C ?? 25.0, 500))
+    for (const hs of heatSources) {
+      const clamped = Math.max(0, Math.min(hs.power_W, 10_000))
+      if (clamped !== hs.power_W) {
+        console.warn(`[XRayThermal] Clamped heat source power from ${hs.power_W} to ${clamped} W`)
+      }
+      hs.power_W = clamped
+    }
+    const rawAmbient = parsed.ambient_temp_C ?? 25.0
+    const ambientTemp = Math.max(-40, Math.min(rawAmbient, 300))
+    if (ambientTemp !== rawAmbient) {
+      console.warn(`[XRayThermal] Clamped ambient temperature from ${rawAmbient} to ${ambientTemp} °C`)
+    }
     const normalizedKey = MATERIAL_ALIASES[parsed.material_key] ?? parsed.material_key
     const materialKey = ALLOWED_MATERIALS.includes(normalizedKey) ? normalizedKey : "pla"
+    if (materialKey !== normalizedKey) {
+      console.warn(`[XRayThermal] Unknown material '${parsed.material_key}', falling back to 'pla'`)
+    }
+    // SECURITY: Warn if high ambient temp used with polymer materials
+    if (ambientTemp > 200 && /^(pla|abs|petg|nylon|tpu)$/.test(materialKey)) {
+      console.warn(`[XRayThermal] High ambient temp ${ambientTemp}°C with polymer material '${materialKey}' — results may be meaningless`)
+    }
     return {
       heat_sources: heatSources,
       ambient_temp_C: ambientTemp,

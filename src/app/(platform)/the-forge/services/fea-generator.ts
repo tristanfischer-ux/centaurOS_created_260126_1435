@@ -189,21 +189,40 @@ What realistic loads and boundary conditions should be applied for structural an
       console.warn("[XRayFEA] AI returned non-array loadCases, using gravity fallback")
       parsed.loadCases = [{ type: "gravity", description: "Self-weight under gravity", rationale: "Fallback: loadCases was not an array" }]
     }
+    if (parsed.loadCases.length > 6) {
+      console.warn(`[XRayFEA] AI returned ${parsed.loadCases.length} loadCases, truncating to 6`)
+      parsed.loadCases = parsed.loadCases.slice(0, 6)
+    }
     // Sanity-check AI-inferred magnitudes to prevent physically implausible values
     for (const lc of parsed.loadCases) {
       if (typeof lc.magnitude_N === 'number' && isFinite(lc.magnitude_N)) {
-        lc.magnitude_N = Math.max(0, Math.min(lc.magnitude_N, 100_000))
+        const clamped = Math.max(0, Math.min(lc.magnitude_N, 100_000))
+        if (clamped !== lc.magnitude_N) {
+          console.warn(`[XRayFEA] Clamped force magnitude from ${lc.magnitude_N} to ${clamped} N`)
+        }
+        lc.magnitude_N = clamped
       } else if (lc.magnitude_N != null) {
+        console.warn(`[XRayFEA] Invalid force magnitude ${lc.magnitude_N}, clearing`)
         lc.magnitude_N = undefined
       }
       if (typeof lc.magnitude_MPa === 'number' && isFinite(lc.magnitude_MPa)) {
-        lc.magnitude_MPa = Math.max(0, Math.min(lc.magnitude_MPa, 1_000))
+        const clamped = Math.max(0, Math.min(lc.magnitude_MPa, 1_000))
+        if (clamped !== lc.magnitude_MPa) {
+          console.warn(`[XRayFEA] Clamped pressure magnitude from ${lc.magnitude_MPa} to ${clamped} MPa`)
+        }
+        lc.magnitude_MPa = clamped
       } else if (lc.magnitude_MPa != null) {
+        console.warn(`[XRayFEA] Invalid pressure magnitude ${lc.magnitude_MPa}, clearing`)
         lc.magnitude_MPa = undefined
       }
       if (typeof lc.magnitude_g === 'number' && isFinite(lc.magnitude_g)) {
-        lc.magnitude_g = Math.max(0, Math.min(lc.magnitude_g, 50))
+        const clamped = Math.max(0, Math.min(lc.magnitude_g, 50))
+        if (clamped !== lc.magnitude_g) {
+          console.warn(`[XRayFEA] Clamped acceleration magnitude from ${lc.magnitude_g} to ${clamped} g`)
+        }
+        lc.magnitude_g = clamped
       } else if (lc.magnitude_g != null) {
+        console.warn(`[XRayFEA] Invalid acceleration magnitude ${lc.magnitude_g}, clearing`)
         lc.magnitude_g = undefined
       }
       // Normalize direction vector
@@ -215,10 +234,12 @@ What realistic loads and boundary conditions should be applied for structural an
           if (isFinite(mag) && mag > 0) {
             lc.direction = [dx / mag, dy / mag, dz / mag]
           } else {
-            lc.direction = [0, 0, 1] // Zero-vector fallback
+            console.warn("[XRayFEA] Zero-length direction vector, defaulting to [0,0,1]")
+            lc.direction = [0, 0, 1]
           }
         } else {
-          lc.direction = [0, 0, 1] // Invalid values fallback
+          console.warn(`[XRayFEA] Invalid direction vector [${dx},${dy},${dz}], defaulting to [0,0,1]`)
+          lc.direction = [0, 0, 1]
         }
       }
     }
