@@ -11,7 +11,7 @@ import { config } from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
 
-config({ path: '.env.local' })
+config({ path: process.env.DOTENV_PATH || '.env.local' })
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -90,7 +90,7 @@ function buildMarketplaceText(row: { title: string; description?: string | null;
   return parts.join(' ')
 }
 
-function buildSupplierText(row: { name: string; description?: string | null; supplier_type?: string | null; domain_categories?: string[] | null; capabilities?: unknown; certifications?: string[] | null; headquarters_country?: string | null }): string {
+function buildSupplierText(row: { name: string; description?: string | null; supplier_type?: string | null; domain_categories?: string[] | null; capabilities?: unknown }): string {
   const parts = [row.name]
   if (row.description) parts.push(row.description)
   if (row.supplier_type) parts.push(row.supplier_type)
@@ -98,8 +98,6 @@ function buildSupplierText(row: { name: string; description?: string | null; sup
   if (row.capabilities && typeof row.capabilities === 'object') {
     parts.push(JSON.stringify(row.capabilities))
   }
-  if (row.certifications?.length) parts.push(row.certifications.join(' '))
-  if (row.headquarters_country) parts.push(row.headquarters_country)
   return parts.join(' ')
 }
 
@@ -175,7 +173,7 @@ async function main(): Promise<void> {
     console.log(`  Updated ${n}`)
   }
 
-  const { data: suppliers } = await supabase.from('suppliers').select('id, name, description, supplier_type, domain_categories, capabilities, certifications, headquarters_country').is('embedding', null)
+  const { data: suppliers } = await supabase.from('suppliers').select('id, name, description, supplier_type, domain_categories, capabilities').is('embedding', null)
   if (suppliers?.length) {
     console.log(`suppliers: ${suppliers.length} rows`)
     const n = await backfillTable('suppliers', 'id, name, description, supplier_type, domain_categories, capabilities', suppliers as { id: string; [k: string]: unknown }[], buildSupplierText)
