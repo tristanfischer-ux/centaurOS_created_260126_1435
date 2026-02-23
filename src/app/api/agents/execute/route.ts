@@ -821,22 +821,60 @@ ${otherSpecialists}
         rolloutId,
     })
 
-    // GOTCHA: Validate total prompt size before sending to the LLM. The system
-    // prompt assembles 9+ layers (personality, context, memory, etc.) with no
-    // individual cap. If the total exceeds a safe threshold, truncate the least
-    // critical layer (company context) to avoid hitting model context limits.
+    // ─── Prompt Size Observability & Smart Truncation ──────────────────────
+    // INTENT: Log every layer's size on every request (not just overflow) so we
+    // can see the real distribution in production. When over the 120k cap, trim
+    // layers in priority order (least critical first) instead of blindly slicing
+    // company context from the end.
     const MAX_SYSTEM_PROMPT_CHARS = 120_000
+    const layerSizes: Record<string, number> = {
+        contextLayers: contextLayers.length,
+        companyContext: companyContext.length,
+        memory: memoryBlock.length,
+        customSuffix: (customSystemPromptSuffix ?? "").length,
+        total: systemPromptWithContext.length,
+    }
+    console.info("[agents/execute] Prompt layer sizes:", {
+        ...layerSizes,
+        headroom: MAX_SYSTEM_PROMPT_CHARS - systemPromptWithContext.length,
+        specialistId,
+    })
+
     if (systemPromptWithContext.length > MAX_SYSTEM_PROMPT_CHARS) {
-        const overage = systemPromptWithContext.length - MAX_SYSTEM_PROMPT_CHARS
-        console.warn("[agents/execute] System prompt exceeds safe limit, truncating company context:", {
-            totalChars: systemPromptWithContext.length,
-            limit: MAX_SYSTEM_PROMPT_CHARS,
-            overage,
-            specialistId,
-        })
-        if (companyContext && companyContext.length > overage) {
-            const truncatedCompanyContext = companyContext.slice(0, companyContext.length - overage)
-            systemPromptWithContext = systemPromptWithContext.replace(companyContext, truncatedCompanyContext)
+        // Tier 1: Remove supplementary layers (least → most critical)
+        const trimmableLayers = [
+            { name: "customSuffix", value: customSystemPromptSuffix ?? "" },
+            { name: "memory", value: memoryBlock ? `\n\n## Agent Memory\n${memoryBlock}` : "" },
+            { name: "contextLayers", value: contextLayers },
+        ]
+
+        for (const layer of trimmableLayers) {
+            if (systemPromptWithContext.length <= MAX_SYSTEM_PROMPT_CHARS) break
+            if (!layer.value) continue
+
+            const before = systemPromptWithContext.length
+            systemPromptWithContext = systemPromptWithContext.replace(layer.value, "")
+            console.warn(`[agents/execute] Trimmed ${layer.name} (${before - systemPromptWithContext.length} chars) to fit under ${MAX_SYSTEM_PROMPT_CHARS} limit`, { specialistId })
+        }
+
+        // Tier 2: Section-aware company context trimming (preserve core identity)
+        // buildAIContext() produces sections joined by \n\n. Remove from the end
+        // (engineering history, activity, objectives) while keeping the first 4
+        // sections intact (company identity, profile, purpose/mission, founder).
+        if (systemPromptWithContext.length > MAX_SYSTEM_PROMPT_CHARS && companyContext) {
+            const overage = systemPromptWithContext.length - MAX_SYSTEM_PROMPT_CHARS
+            const sections = companyContext.split("\n\n")
+            const MIN_SECTIONS_TO_KEEP = 4
+            let trimmedChars = 0
+
+            while (sections.length > MIN_SECTIONS_TO_KEEP && trimmedChars < overage) {
+                const removed = sections.pop()!
+                trimmedChars += removed.length + 2 // +2 for the \n\n separator
+            }
+
+            const truncatedContext = sections.join("\n\n")
+            systemPromptWithContext = systemPromptWithContext.replace(companyContext, truncatedContext)
+            console.warn(`[agents/execute] Trimmed company context: removed ${trimmedChars} chars (${sections.length} sections kept)`, { specialistId })
         }
     }
 

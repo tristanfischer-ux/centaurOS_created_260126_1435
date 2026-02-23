@@ -1,9 +1,9 @@
 /**
  * @file image-generator.ts — Gemini image generation for X-Ray blueprints
  *
- * @description Two-tier image generation strategy:
- * - Module images: gemini-3-flash-preview (fast, parallel, 1K)
- * - System diagram: gemini-3-pro-image-preview (professional, 2K, with module image references)
+ * @description Image generation using Gemini 3.1 Pro for maximum quality:
+ * - Module images: gemini-3.1-pro-preview (highest quality module blueprints, 1K)
+ * - System diagram: gemini-3.1-pro-preview (highest quality system P&ID diagrams, 2K)
  *
  * Uses direct Gemini REST API calls with full imageConfig support.
  * No new SDK dependency -- uses fetch like existing code in registry.ts.
@@ -23,8 +23,8 @@ import type { StructuralBrief, SystemStructuralBrief } from "./structural-brief"
 // ─── Constants ───────────────────────────────────────────────────────
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-const MODULE_MODEL = "gemini-3-flash-preview" // Gemini 3 Flash — fast module blueprints
-const SYSTEM_MODEL = "gemini-3-pro-image-preview" // Gemini 3 Pro Image — professional system P&ID diagrams
+const MODULE_MODEL = "gemini-3.1-pro-preview" // Gemini 3.1 Pro — highest quality module blueprints
+const SYSTEM_MODEL = "gemini-3.1-pro-preview" // Gemini 3.1 Pro — highest quality system P&ID diagrams
 const STORAGE_BUCKET = "xray-images"
 
 // ─── Types ───────────────────────────────────────────────────────────

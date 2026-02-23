@@ -496,6 +496,10 @@ async function buildAIContextUncached(
     console.debug('[AIContextBuilder] Error building context:', err)
   }
 
+  if (sections.length > 0) {
+    console.debug('[AIContextBuilder] Section sizes:', sections.map((s, i) => `${i}:${s.length}`).join(', '), `total:${sections.reduce((sum, s) => sum + s.length, 0)}`)
+  }
+
   return sections.length > 0
     ? `\n--- Business Context ---\n${sections.join('\n\n')}\n--- End Business Context ---\n`
     : ''
