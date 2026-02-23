@@ -355,7 +355,7 @@ async function fetchMetricsData(
     kpiMetrics.push({
       label: 'Velocity',
       value: velocity,
-      previousValue: velocity,
+      previousValue: 100,
       format: 'percentage',
       trend: 'stable',
       changePercent: 0,
@@ -366,7 +366,7 @@ async function fetchMetricsData(
     {
       label: 'Blockers Reported',
       value: rollup.stats.blockers_reported,
-      previousValue: rollup.stats.blockers_reported,
+      previousValue: 0,
       format: 'number',
       trend: rollup.stats.blockers_reported > 3 ? 'down' : 'stable',
       changePercent: 0,
@@ -374,7 +374,7 @@ async function fetchMetricsData(
     {
       label: 'Overdue Tasks',
       value: overdueTasks,
-      previousValue: overdueTasks,
+      previousValue: 0,
       format: 'number',
       trend: overdueTasks > 0 ? 'down' : 'stable',
       changePercent: 0,
@@ -701,7 +701,7 @@ async function fetchWeekAheadData(
   nextWeek.setDate(today.getDate() + 7)
 
   // Run detail query (limited to 20) and count query (unlimited) in parallel
-  const [{ data: tasks, error }, { count: totalCount }] = await Promise.all([
+  const [{ data: tasks, error }, { count: totalCount, error: countError }] = await Promise.all([
     supabase
       .from('tasks')
       .select('id, title, end_date, risk_level, assignee_id, objective_id, profiles!tasks_assignee_id_fkey(full_name), objectives!tasks_objective_id_fkey(title)')
@@ -727,6 +727,10 @@ async function fetchWeekAheadData(
   if (error) {
     console.warn('[ReportGenerator] Week ahead fetch failed:', error.message)
     return { tasks: [], totalDueNextWeek: 0 }
+  }
+
+  if (countError) {
+    console.warn('[ReportGenerator] Week ahead count query failed:', countError.message)
   }
 
   const upcomingTasks: UpcomingTask[] = (tasks ?? []).map(t => {
