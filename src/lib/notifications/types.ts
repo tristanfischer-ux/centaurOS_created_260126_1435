@@ -69,6 +69,8 @@ export type EmailTemplate =
     | 'team_invitation'
     | 'waitlist_admin_notification'
     | 'waitlist_approved'
+    | 'financial_alert'
+    | 'finance_digest'
     | 'generic'
 
 export interface PushNotificationOptions {

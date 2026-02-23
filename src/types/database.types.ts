@@ -5231,6 +5231,53 @@ export type Database = {
           },
         ]
       }
+      finance_alert_preferences: {
+        Row: {
+          alert_types: Json
+          budget_threshold_pct: number
+          cash_low_threshold: number | null
+          created_at: string
+          digest_day: number
+          digest_frequency: string
+          foundry_id: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alert_types?: Json
+          budget_threshold_pct?: number
+          cash_low_threshold?: number | null
+          created_at?: string
+          digest_day?: number
+          digest_frequency?: string
+          foundry_id: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alert_types?: Json
+          budget_threshold_pct?: number
+          cash_low_threshold?: number | null
+          created_at?: string
+          digest_day?: number
+          digest_frequency?: string
+          foundry_id?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_alert_preferences_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forge_contracts: {
         Row: {
           created_at: string

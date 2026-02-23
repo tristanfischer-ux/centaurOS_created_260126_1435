@@ -31,6 +31,7 @@ import {
     PoundSterling,
     Map,
     FileText,
+    BellRing,
 } from "lucide-react"
 
 // ─── Section Definitions ────────────────────────────────────────────────────
@@ -245,6 +246,13 @@ export const SECTIONS: Section[] = [
                 description: "Track outstanding payments and aging buckets",
                 route: "/finance/invoices",
                 icon: FileText,
+                addedAt: new Date("2026-02-23"),
+            },
+            {
+                name: "Alerts",
+                description: "Configure financial alert thresholds and notification preferences",
+                route: "/finance/settings",
+                icon: BellRing,
                 addedAt: new Date("2026-02-23"),
             },
         ],

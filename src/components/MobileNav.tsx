@@ -43,6 +43,7 @@ import {
     PoundSterling,
     FileText,
     Map,
+    BellRing,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -92,6 +93,7 @@ const financeMoreNavigation = [
     { name: "Finance", href: "/finance", icon: PoundSterling },
     { name: "Money Map", href: "/finance/money-map", icon: Map },
     { name: "Invoices", href: "/finance/invoices", icon: FileText },
+    { name: "Alerts", href: "/finance/settings", icon: BellRing },
 ]
 
 // "More" dropdown — Workshop section

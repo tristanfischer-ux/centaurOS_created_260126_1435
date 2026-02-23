@@ -53,6 +53,7 @@ import {
     PoundSterling,
     FileText,
     Map,
+    BellRing,
 } from "lucide-react"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -116,6 +117,7 @@ const financeNavigation = [
     { name: "Overview", href: "/finance", icon: PoundSterling, tooltip: "Your unified financial dashboard — revenue, expenses, cash flow, and invoices" },
     { name: "Money Map", href: "/finance/money-map", icon: Map, tooltip: "Visualise revenue streams, costs, and profitability" },
     { name: "Invoices", href: "/finance/invoices", icon: FileText, tooltip: "Track outstanding payments and aging buckets" },
+    { name: "Alerts", href: "/finance/settings", icon: BellRing, tooltip: "Configure financial alert thresholds and digest preferences" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────

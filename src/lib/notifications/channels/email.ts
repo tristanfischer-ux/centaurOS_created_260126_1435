@@ -339,6 +339,41 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
         `
     }),
     
+    financial_alert: (data) => ({
+        subject: String(data.title || 'Financial Alert'),
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #ff4500; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+                    <h2 style="margin: 0; color: white; font-size: 18px;">${data.title || 'Financial Alert'}</h2>
+                </div>
+                <div style="background: #f8fafc; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e2e8f0; border-top: none;">
+                    <p style="color: #475569; font-size: 15px; margin: 0 0 16px 0;">${data.body || ''}</p>
+                    ${data.actionUrl ? `<a href="${data.actionUrl}" style="display: inline-block; background: #ff4500; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">View Details</a>` : ''}
+                </div>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #888; font-size: 12px;">You're receiving this because you enabled financial alerts on ForgeOS. <a href="${data.settingsUrl || '#'}" style="color: #888;">Manage preferences</a></p>
+            </div>
+        `
+    }),
+
+    finance_digest: (data) => ({
+        subject: String(data.title || 'Your Financial Digest'),
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #ff4500 0%, #10b981 100%); padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+                    <h1 style="margin: 0; color: white; font-size: 22px;">${data.title || 'Financial Digest'}</h1>
+                    <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">${data.period || ''}</p>
+                </div>
+                <div style="background: #f8fafc; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e2e8f0; border-top: none;">
+                    ${data.summaryHtml || '<p style="color: #475569;">No activity this period.</p>'}
+                    ${data.actionUrl ? `<div style="text-align: center; margin-top: 24px;"><a href="${data.actionUrl}" style="display: inline-block; background: #ff4500; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">View Finance Dashboard</a></div>` : ''}
+                </div>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #888; font-size: 12px;">You're receiving this digest based on your ForgeOS alert preferences. <a href="${data.settingsUrl || '#'}" style="color: #888;">Manage preferences</a></p>
+            </div>
+        `
+    }),
+
     generic: (data) => ({
         subject: String(data.subject || data.title || 'Notification from ForgeOS'),
         html: `
