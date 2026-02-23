@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: 'Your organizational knowledge vault — everything your team has learned',
 }
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 /**
  * Knowledge Vault page — the organizational second brain.

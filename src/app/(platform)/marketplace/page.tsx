@@ -8,7 +8,7 @@ import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrows
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 function MarketplaceLoading() {
     return (

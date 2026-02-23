@@ -6,8 +6,7 @@ import { BuyerDashboardView } from './buyer-dashboard-view'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 
-// Force dynamic since we're fetching user-specific data
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 export const metadata = {
     title: 'Buyer Dashboard | Marketplace',

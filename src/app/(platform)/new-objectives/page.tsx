@@ -7,7 +7,7 @@ import { getObjectivePacks, getSavedPackIds } from '@/actions/packs'
 import { getFoundryContext } from '@/actions/foundry-context'
 import { getUniversalSubsystems } from '@/actions/universal-subsystems'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 export default async function NewObjectivesPage() {
   const supabase = await createClient()

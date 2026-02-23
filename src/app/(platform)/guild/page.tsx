@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
 import { GuildPageContent } from './guild-page-content'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 /**
  * Guild page — community hub for apprentice management, events, and networking.

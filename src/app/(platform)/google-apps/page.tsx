@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     description: 'Access your Google Drive, Docs, Calendar, and Email',
 }
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 interface GoogleAppsPageProps {
     searchParams: Promise<{ error?: string; detail?: string }>

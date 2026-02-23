@@ -8,7 +8,7 @@ import { StrategyError } from './strategy-error'
 import type { StrategicGoal, GoalBundle } from '@/types/canvas'
 import type { FoundryPurposeData } from '@/types/foundry'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 /**
  * @description Strategy page — the top of the strategic cascade.

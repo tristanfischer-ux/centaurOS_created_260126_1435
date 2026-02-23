@@ -5,8 +5,7 @@ import { getBuyerOrders } from '@/actions/buyer'
 import { MarketplaceOrdersView } from './marketplace-orders-view'
 import { Skeleton } from '@/components/ui/skeleton'
 
-// Force dynamic since we're fetching user-specific data
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 export const metadata = {
     title: 'Marketplace Orders | ForgeOS',

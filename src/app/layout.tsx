@@ -64,6 +64,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="preload" href="/fonts/centaur-font-1.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/centaur-font-2.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+      </head>
       <body
         className={`${outfit.variable} ${playfair.variable} ${inter.variable} ${jetbrains.variable} antialiased font-sans`}
       >

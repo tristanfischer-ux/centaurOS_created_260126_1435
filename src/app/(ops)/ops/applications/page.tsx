@@ -1,7 +1,7 @@
 import { getPendingApplications } from "@/actions/admin"
 import { ApplicationsView } from "./applications-view"
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 export default async function ApplicationsPage() {
     // Fetch all applications server-side

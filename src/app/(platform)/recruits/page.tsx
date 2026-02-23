@@ -24,7 +24,7 @@ import { TalentFinderWrapper } from './talent-finder-wrapper'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { EnrichedPersonListing } from '@/actions/people-marketplace'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 /**
  * Loading skeleton for the Recruits page.

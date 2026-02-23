@@ -17,7 +17,7 @@ import { RetainerCard } from '@/components/retainers'
 import { getMyRetainers, getRetainerStatistics } from '@/actions/retainers'
 import { RetainerStatus } from '@/types/retainers'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 export const metadata: Metadata = {
   title: 'Retainers | ForgeOS',

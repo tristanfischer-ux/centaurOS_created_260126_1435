@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { EventDetailContent } from './event-detail-content'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 interface PageProps {
     params: Promise<{ id: string }>

@@ -3,7 +3,7 @@ import { getMyOrders } from "@/actions/orders"
 import { OrdersView } from "./orders-view"
 import { OrderCardSkeleton } from "@/components/orders"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 30
 
 export default async function OrdersPage() {
   // Fetch initial orders (all statuses, both roles)
