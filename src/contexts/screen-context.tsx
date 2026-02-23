@@ -157,6 +157,10 @@ const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
     title: "Outreach Hub",
     summary: "The user is viewing the outreach command center — cold email campaigns, prospect contacts, and generated email sequences.",
   },
+  "/outreach/[campaignId]": {
+    title: "Campaign Detail",
+    summary: "The user is managing a specific outreach campaign — viewing contacts, reviewing generated email sequences, and editing campaign settings.",
+  },
   "/updates": {
     title: "Activity Feed",
     summary: "The user is viewing the activity feed — recent changes across the organization.",

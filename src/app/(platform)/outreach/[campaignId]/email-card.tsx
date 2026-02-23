@@ -33,10 +33,14 @@ export function EmailCard({ email, onRefresh }: EmailCardProps) {
     const label = email.sequence_label || SEQUENCE_LABELS[email.sequence_position] || `Email ${email.sequence_position}`
 
     const copyToClipboard = async (text: string, field: string) => {
-        await navigator.clipboard.writeText(text)
-        setCopiedField(field)
-        setTimeout(() => setCopiedField(null), 2000)
-        toast.success('Copied to clipboard')
+        try {
+            await navigator.clipboard.writeText(text)
+            setCopiedField(field)
+            setTimeout(() => setCopiedField(null), 2000)
+            toast.success('Copied to clipboard')
+        } catch {
+            toast.error('Failed to copy to clipboard')
+        }
     }
 
     const handleSaveSubject = () => {
@@ -61,12 +65,14 @@ export function EmailCard({ email, onRefresh }: EmailCardProps) {
         setIsEditingBody(false)
     }
 
-    // Highlight personalization tokens
-    const highlightTokens = (text: string) => {
-        return text.replace(
-            /\{(\w+)\}/g,
-            '<span class="px-1 py-0.5 rounded bg-international-orange/10 text-international-orange text-xs font-mono">{$1}</span>'
-        )
+    // Safe React-based token highlighter (no dangerouslySetInnerHTML)
+    function HighlightedText({ text }: { text: string }) {
+        const parts = text.split(/(\{\w+\})/)
+        return <>{parts.map((part, i) =>
+            /^\{\w+\}$/.test(part)
+                ? <span key={i} className="px-1 py-0.5 rounded bg-international-orange/10 text-international-orange text-xs font-mono">{part}</span>
+                : part
+        )}</>
     }
 
     return (
@@ -191,6 +197,12 @@ export function EmailCard({ email, onRefresh }: EmailCardProps) {
                         <Textarea
                             value={editBody}
                             onChange={(e) => setEditBody(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
+                                    setEditBody(email.body)
+                                    setIsEditingBody(false)
+                                }
+                            }}
                             rows={6}
                             autoFocus
                         />
@@ -210,8 +222,9 @@ export function EmailCard({ email, onRefresh }: EmailCardProps) {
                     <div
                         className="text-sm text-foreground whitespace-pre-wrap cursor-pointer hover:bg-muted/30 rounded-md p-2 -m-2 transition-colors"
                         onClick={() => setIsEditingBody(true)}
-                        dangerouslySetInnerHTML={{ __html: highlightTokens(email.body) }}
-                    />
+                    >
+                        <HighlightedText text={email.body} />
+                    </div>
                 )}
             </div>
         </div>

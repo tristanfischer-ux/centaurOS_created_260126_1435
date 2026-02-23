@@ -5,6 +5,7 @@
  */
 
 import { useState, useTransition } from 'react'
+import { z } from 'zod'
 import {
     Dialog,
     DialogContent,
@@ -18,6 +19,18 @@ import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
 import { addContact } from '@/actions/outreach'
 import { toast } from 'sonner'
+
+const addContactSchema = z.object({
+    first_name: z.string().min(1, 'First name is required'),
+    last_name: z.string(),
+    email: z.string().email('Invalid email').or(z.literal('')),
+    company_name: z.string().min(1, 'Company name is required'),
+    job_title: z.string(),
+    linkedin_url: z.string().url('Invalid URL').or(z.literal('')),
+    company_domain: z.string(),
+    industry: z.string(),
+    company_size: z.string(),
+})
 
 interface AddContactDialogProps {
     open: boolean
@@ -45,12 +58,9 @@ export function AddContactDialog({ open, onOpenChange, campaignId, onAdded }: Ad
     }
 
     const handleSubmit = () => {
-        if (!form.first_name.trim()) {
-            toast.error('First name is required')
-            return
-        }
-        if (!form.company_name.trim()) {
-            toast.error('Company name is required')
+        const parsed = addContactSchema.safeParse(form)
+        if (!parsed.success) {
+            toast.error(parsed.error.issues[0].message)
             return
         }
 

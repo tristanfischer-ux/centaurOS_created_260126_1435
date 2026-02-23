@@ -45,11 +45,11 @@ export function EmailsTab({ campaign, contacts, emails, onRefresh }: EmailsTabPr
         }
 
         return Array.from(groups.entries())
+            .filter(([contactId]) => contactMap.has(contactId))
             .map(([contactId, contactEmails]) => ({
                 contact: contactMap.get(contactId)!,
                 emails: contactEmails.sort((a, b) => a.sequence_position - b.sequence_position),
             }))
-            .filter(g => g.contact)
     }, [contacts, emails])
 
     const toggleContact = (contactId: string) => {
@@ -74,8 +74,12 @@ export function EmailsTab({ campaign, contacts, emails, onRefresh }: EmailsTabPr
             `--- Email ${e.sequence_position}: ${e.sequence_label} ---\nSubject: ${e.subject}\n\n${e.body}`
         )).join('\n\n')
 
-        await navigator.clipboard.writeText(text)
-        toast.success(`Copied ${contactEmails.length} emails for ${contactName}`)
+        try {
+            await navigator.clipboard.writeText(text)
+            toast.success(`Copied ${contactEmails.length} emails for ${contactName}`)
+        } catch {
+            toast.error('Failed to copy to clipboard')
+        }
     }
 
     const handleBulkApprove = () => {

@@ -501,11 +501,16 @@ export async function generateSequenceForContact(
     }
 
     // Delete existing emails for this contact (regeneration)
-    await supabase
+    const { error: deleteError } = await supabase
         .from('outreach_emails')
         .delete()
         .eq('contact_id', contactId)
         .eq('foundry_id', foundry_id)
+
+    if (deleteError) {
+        console.error('[Outreach] Failed to delete old emails:', deleteError)
+        return { error: 'Failed to clear old emails before regeneration' }
+    }
 
     // Insert new emails
     const emailRows = parsedEmails.map(email => ({

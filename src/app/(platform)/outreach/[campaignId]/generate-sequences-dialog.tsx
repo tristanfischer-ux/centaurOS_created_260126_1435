@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Loader2, Wand2, CheckCircle2, XCircle } from 'lucide-react'
 import { generateSequencesForBatch } from '@/actions/outreach'
+import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import type { Campaign } from '@/types/outreach'
 import { toast } from 'sonner'
 
@@ -96,6 +97,21 @@ export function GenerateSequencesDialog({
                                     <span className="font-medium text-foreground">{contactIds.length * campaign.sequence_length}</span>
                                 </div>
                             </div>
+                            <AskSpecialistButton
+                                context={{
+                                    type: 'general',
+                                    title: campaign.name,
+                                    description: `Outreach campaign: ${campaign.icp_description || ''}`,
+                                    metadata: {
+                                        status: campaign.status,
+                                        notes: `Tone: ${campaign.tone}, ${contactIds.length} contacts selected, ${campaign.sequence_length} emails per contact`,
+                                    },
+                                }}
+                                specialistId="sales-lead"
+                                specialistName="Sal"
+                                variant="button"
+                                label="Review context with Sal first"
+                            />
                         </>
                     )}
 

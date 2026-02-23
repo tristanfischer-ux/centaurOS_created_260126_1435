@@ -7,7 +7,7 @@
  * Three tabs: Contacts (default), Emails, Settings.
  */
 
-import { useState, useCallback, useTransition } from 'react'
+import { useState, useCallback, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Users, Mail, Settings } from 'lucide-react'
@@ -28,6 +28,8 @@ import { SettingsTab } from './settings-tab'
 import { CAMPAIGN_STATUS_MAP } from '@/types/outreach'
 import type { Campaign, CampaignStatus, Contact, OutreachEmail } from '@/types/outreach'
 import { toast } from 'sonner'
+import { useRegisterScreenContext } from '@/contexts/screen-context'
+import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 
 interface CampaignDetailProps {
     campaign: Campaign
@@ -51,6 +53,17 @@ export function CampaignDetail({
     const [isEditingName, setIsEditingName] = useState(false)
     const [editName, setEditName] = useState(campaign.name)
     const [isPending, startTransition] = useTransition()
+    const [activeTab, setActiveTab] = useState('contacts')
+
+    useRegisterScreenContext(useMemo(() => ({
+        pageTitle: `Campaign: ${campaign.name}`,
+        summary: `Managing outreach campaign "${campaign.name}" with ${contacts.length} contacts and ${emails.length} emails. Status: ${campaign.status}. Tone: ${campaign.tone}.`,
+        entities: contacts.slice(0, 10).map(c => ({
+            type: 'contact' as const,
+            title: `${c.first_name} ${c.last_name}`,
+            status: c.status,
+        })),
+    }), [campaign, contacts, emails]))
 
     const refreshContacts = useCallback(async () => {
         const result = await getContacts(campaign.id)
@@ -151,12 +164,27 @@ export function CampaignDetail({
                         <span className="text-sm text-muted-foreground">
                             {emailCount} emails
                         </span>
+                        <AskSpecialistButton
+                            context={{
+                                type: 'general',
+                                title: campaign.name,
+                                description: `Outreach campaign: ${campaign.icp_description || ''}`,
+                                metadata: {
+                                    status: campaign.status,
+                                    notes: `Tone: ${campaign.tone}, Contacts: ${contacts.length}, Emails: ${emails.length}`,
+                                },
+                            }}
+                            specialistId="sales-lead"
+                            specialistName="Sal"
+                            variant="chip"
+                            label="Ask Sal"
+                        />
                     </div>
                 </div>
             </div>
 
             {/* Tabs */}
-            <Tabs defaultValue="contacts">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList>
                     <TabsTrigger value="contacts" className="gap-2">
                         <Users className="h-4 w-4" />
@@ -177,6 +205,7 @@ export function CampaignDetail({
                         campaign={campaign}
                         contacts={contacts}
                         onRefresh={refreshAll}
+                        onSwitchToEmails={() => setActiveTab('emails')}
                     />
                 </TabsContent>
 
