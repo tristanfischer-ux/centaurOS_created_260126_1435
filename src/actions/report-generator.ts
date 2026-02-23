@@ -447,13 +447,33 @@ async function fetchObjectivesData(
     return { objectives: [], totalActive: 0, totalCompleted: 0 }
   }
 
-  // Get task counts per objective
+  // Get task counts per objective, period-completed tasks, and completed objectives count
+  // in parallel for performance
   const objectiveIds = (objectives ?? []).map(o => o.id)
-  const { data: taskCounts } = await supabase
-    .from('tasks')
-    .select('objective_id, status')
-    .in('objective_id', objectiveIds.length > 0 ? objectiveIds : ['__none__'])
-    .is('deleted_at', null)
+  const safeObjectiveIds = objectiveIds.length > 0 ? objectiveIds : ['__none__']
+
+  const [{ data: taskCounts }, { data: periodCompletedTasks }, { count: completedCount }] = await Promise.all([
+    supabase
+      .from('tasks')
+      .select('objective_id, status')
+      .in('objective_id', safeObjectiveIds)
+      .is('deleted_at', null)
+      .limit(5000),
+    supabase
+      .from('tasks')
+      .select('objective_id')
+      .in('objective_id', safeObjectiveIds)
+      .eq('status', 'Completed')
+      .is('deleted_at', null)
+      .gte('updated_at', `${dateRange.start}T00:00:00`)
+      .lte('updated_at', `${dateRange.end}T23:59:59`),
+    supabase
+      .from('objectives')
+      .select('*', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId)
+      .eq('status', 'Completed')
+      .is('deleted_at', null),
+  ])
 
   const taskCountMap = new Map<string, { completed: number; total: number }>()
   for (const task of taskCounts ?? []) {
@@ -463,17 +483,6 @@ async function fetchObjectivesData(
     if (task.status === 'Completed') existing.completed++
     taskCountMap.set(task.objective_id, existing)
   }
-
-  // INTENT: Query tasks completed in-period per objective to compute approximate
-  // progress change (progressDelta) during this reporting period.
-  const { data: periodCompletedTasks } = await supabase
-    .from('tasks')
-    .select('objective_id')
-    .in('objective_id', objectiveIds.length > 0 ? objectiveIds : ['__none__'])
-    .eq('status', 'Completed')
-    .is('deleted_at', null)
-    .gte('updated_at', `${dateRange.start}T00:00:00`)
-    .lte('updated_at', `${dateRange.end}T23:59:59`)
 
   const periodCompletedByObjective = new Map<string, number>()
   for (const t of periodCompletedTasks ?? []) {
@@ -513,13 +522,6 @@ async function fetchObjectivesData(
       progressDelta: progressDelta > 0 ? progressDelta : undefined,
     }
   })
-
-  const { count: completedCount } = await supabase
-    .from('objectives')
-    .select('*', { count: 'exact', head: true })
-    .eq('foundry_id', foundryId)
-    .eq('status', 'Completed')
-    .is('deleted_at', null)
 
   return {
     objectives: rows,
@@ -573,17 +575,18 @@ async function fetchTeamActivityData(
   // INTENT: Compute standup participation rate. Count distinct users who
   // submitted standups in the period, divided by total active team members,
   // adjusted for working days.
-  const { count: standupCount } = await supabase
-    .from('standups')
-    .select('*', { count: 'exact', head: true })
-    .eq('foundry_id', foundryId)
-    .gte('standup_date', dateRange.start)
-    .lte('standup_date', dateRange.end)
-
-  const { count: teamMemberCount } = await supabase
-    .from('profiles')
-    .select('*', { count: 'exact', head: true })
-    .eq('foundry_id', foundryId)
+  const [{ count: standupCount }, { count: teamMemberCount }] = await Promise.all([
+    supabase
+      .from('standups')
+      .select('*', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId)
+      .gte('standup_date', dateRange.start)
+      .lte('standup_date', dateRange.end),
+    supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId),
+  ])
 
   const totalMembers = teamMemberCount ?? 1
   const startDate = new Date(dateRange.start)
