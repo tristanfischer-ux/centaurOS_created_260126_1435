@@ -133,6 +133,8 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
 
       {!hasRecent ? (
         <div className="space-y-8">
+          {/* eslint-disable-next-line react/jsx-no-undef -- defined below in same file */}
+          <SampleProjectPreview />
           <div className="rounded-xl bg-muted/30 py-12 px-8 flex flex-col items-center text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-international-orange-light mb-5">
               <PenTool className="h-7 w-7 text-international-orange" />
