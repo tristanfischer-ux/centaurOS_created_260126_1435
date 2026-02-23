@@ -23,11 +23,12 @@ const nextConfig: NextConfig = {
   // Disable X-Powered-By header for security
   poweredByHeader: false,
 
-  // Image optimization: serve modern formats with long cache TTL
+  // Image optimization: disabled globally.
+  // Next.js 16's optimizer silently fails on many of our PNGs (specialist
+  // avatars, hero images, marketing photos) — returning broken/empty images
+  // with no error. Until the root cause is resolved, serve originals directly.
   images: {
-    formats: ["image/avif", "image/webp"],
-    qualities: [75, 90],
-    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
+    unoptimized: true,
   },
 
   // Tree-shake heavy barrel-export packages for smaller bundles
