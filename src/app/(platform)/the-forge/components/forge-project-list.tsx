@@ -2,10 +2,10 @@
  * @file forge-project-list.tsx — The Forge landing page
  *
  * @description Server component that renders the main launchpad for The Forge.
- * Presents two starting paths (AI Pipeline, Mashup Lab),
- * a destination callout showing they all lead to RFQ, a reference tools section,
- * and a grid of recent CAD Lab projects. If the user has an in-progress project,
- * a "Continue where you left off" card appears at the top.
+ * Presents a single starting path (description-based AI pipeline),
+ * a destination callout, and a grid of recent CAD Lab projects.
+ * If the user has an in-progress project, a "Continue where you left off"
+ * card appears at the top.
  *
  * @related
  * - Page: src/app/(platform)/the-forge/page.tsx
@@ -21,7 +21,6 @@ import {
   Sparkles,
   PlayCircle,
   Flame,
-  FileBox,
   FileCheck2,
   Search,
   Box,
@@ -32,12 +31,10 @@ import type { LucideIcon } from "lucide-react"
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
 import { listCadLabProjects } from "@/actions/cad-lab-projects"
-import { listRecentAssemblies } from "@/actions/assembly-builder"
 import { RecentProjectsGrid } from "./recent-projects-grid"
 import { ForgeScreenContext } from "./forge-screen-context"
 
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
-import type { AssemblySummary } from "@/actions/assembly-builder"
 
 // ─── Stage Display Config ───────────────────────────────────────────
 
@@ -88,17 +85,6 @@ const STARTING_PATHS: StartingPath[] = [
       { label: "Review", icon: ClipboardCheck },
     ],
   },
-  {
-    icon: FileBox,
-    iconBg: "bg-electric-blue-light",
-    iconColor: "text-electric-blue",
-    accentBorder: "border-l-electric-blue",
-    headline: "Start from STEP files",
-    description: "Upload existing STEP files and combine them into one unified design.",
-    href: "/the-forge/cad-lab/mashup",
-    cta: "Open Mashup Lab",
-    outputs: ["Hybrid STEP", "STL preview", "RFQ package"],
-  },
 ]
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -107,23 +93,13 @@ const STARTING_PATHS: StartingPath[] = [
  * ForgeProjectList — Server component: The Forge landing page.
  *
  * @description Fetches CAD Lab projects from DB and renders the launchpad
- * with three starting-path cards, a destination callout, reference tools,
- * and a grid of recent projects.
+ * with a starting-path card, a destination callout, and a grid of recent projects.
  */
-type RecentItem =
-  | { type: "cad_lab"; item: CadLabProjectSummary }
-  | { type: "assembly"; item: AssemblySummary }
-
 export async function ForgeProjectList(): Promise<React.ReactNode> {
-  const [cadLabResult, assembliesResult] = await Promise.all([
-    listCadLabProjects(),
-    listRecentAssemblies(20),
-  ])
+  const cadLabResult = await listCadLabProjects()
 
-  const hasLoadError = "error" in cadLabResult || "error" in assembliesResult
+  const hasLoadError = "error" in cadLabResult
   const projects: CadLabProjectSummary[] = "projects" in cadLabResult ? cadLabResult.projects : []
-  const assemblies: AssemblySummary[] =
-    "assemblies" in assembliesResult ? assembliesResult.assemblies : []
 
   // Find the most recently updated in-progress project for "Continue" card
   // projects is pre-sorted by updated_at DESC from the server, but we sort
@@ -132,21 +108,12 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .find((p) => p.status !== "complete" && p.status !== "rfq_created")
 
-  // Merge and sort by updatedAt desc for Recent Projects grid
-  const recentItems: RecentItem[] = [
-    ...projects.map((item) => ({ type: "cad_lab" as const, item })),
-    ...assemblies.map((item) => ({ type: "assembly" as const, item })),
-  ]
-    .sort((a, b) => new Date(b.item.updatedAt).getTime() - new Date(a.item.updatedAt).getTime())
-    .slice(0, 18)
-
-  const hasRecent = recentItems.length > 0
+  const hasRecent = projects.length > 0
 
   return (
     <div className="space-y-10">
       <ForgeScreenContext
         projects={projects}
-        assemblies={assemblies}
         hasInProgressProject={!!inProgressProject}
       />
       <PageHeader />
@@ -171,7 +138,7 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
           </p>
         </div>
       ) : (
-        <RecentProjectsGrid items={recentItems} />
+        <RecentProjectsGrid projects={projects} />
       )}
     </div>
   )
@@ -225,25 +192,21 @@ function ContinueCard({ project }: { project: CadLabProjectSummary }): React.Rea
 // ─── Starting Points Section ──────────────────────────────────────────
 
 /**
- * StartingPointsSection — Three equal starting-path cards plus a destination callout.
- *
- * @description Replaces the old single-path hero. Each card explains a different
- * entry point and who it's for. A callout beneath all three makes it clear every
- * path ends as a supplier-ready RFQ.
+ * StartingPointsSection — Single starting-path card plus a destination callout.
  */
 function StartingPointsSection(): React.ReactNode {
   return (
     <div className="space-y-5">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-          How do you want to start?
+          Get started
         </p>
         <p className="text-sm text-muted-foreground">
-          Choose the path that matches where you are. All three end as a supplier-ready package.
+          Describe your product and we&apos;ll build a supplier-ready engineering package.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 max-w-lg gap-4">
         {STARTING_PATHS.map((path) => (
           <StartingPathCard key={path.href} path={path} />
         ))}
