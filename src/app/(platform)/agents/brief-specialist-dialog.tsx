@@ -30,6 +30,7 @@ import {
     FileIcon,
     ImageIcon,
     MoreVertical,
+    Scale,
 } from "lucide-react"
 import { validateFile, formatFileSize, isImageFile } from "@/lib/file-upload"
 import { cn } from "@/lib/utils"
@@ -41,8 +42,17 @@ function stripComplexityTags(text: string): string {
 }
 import { toast } from "sonner"
 import { Markdown } from "@/components/ui/markdown"
-import { getOrCreateSpecialistThread, getRecentSpecialistOutputs, getSpecialistThreadHistory } from "@/actions/agent-memory"
-import type { SpecialistHistoryMessage } from "@/actions/agent-memory"
+import { getOrCreateSpecialistThread, getRecentSpecialistOutputs, getSpecialistThreadHistory, getSpecialistRelationshipSummary } from "@/actions/agent-memory"
+import type { SpecialistHistoryMessage, RelationshipSummary } from "@/actions/agent-memory"
+import { RelationshipBar } from "@/components/specialists/relationship-bar"
+import { ContextLayerPill } from "@/components/specialists/context-layer-pill"
+import { ConversationStarterGrid } from "@/components/specialists/conversation-starter-grid"
+import { parseStarters } from "@/lib/utils/starter-parser"
+import type { StructuredStarter } from "@/lib/utils/starter-parser"
+import { DecisionTimeline } from "@/components/specialists/decision-timeline"
+import { HandoffCard } from "@/components/specialists/handoff-card"
+import { HandoffBreadcrumb } from "@/components/specialists/handoff-breadcrumb"
+import type { HandoffTrailEntry } from "@/components/specialists/handoff-breadcrumb"
 import { getProactiveOpener, markInsightRead, getSpecialistGreetingContext } from "@/actions/agent-insights"
 import { createArtifact, exportArtifactToGoogleDocs } from "@/actions/agent-artifacts"
 import type { ArtifactContentType } from "@/actions/agent-artifacts"
@@ -412,6 +422,8 @@ interface BriefSpecialistDialogProps {
     contextLabel?: string | null
     /** Render mode: "dialog" for centered modal (default), "panel" for sidebar layout */
     renderMode?: SpecialistRenderMode
+    /** Trail of specialist handoffs for breadcrumb display */
+    handoffTrail?: HandoffTrailEntry[]
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -435,6 +447,7 @@ export function BriefSpecialistDialog({
     referredBy,
     contextLabel,
     renderMode = "dialog",
+    handoffTrail = [],
 }: BriefSpecialistDialogProps) {
     const isPanel = renderMode === "panel"
     // ─── State ────────────────────────────────────────────────────────────
@@ -446,8 +459,9 @@ export function BriefSpecialistDialog({
     const [copied, setCopied] = useState(false)
     const [threadId, setThreadId] = useState<string | null>(null)
     const [contextGrounding, setContextGrounding] = useState<{
-        availableSections: string[]
-        missingContextHints: string[]
+        availableSections?: string[]
+        missingContextHints?: string[]
+        activeLayers?: string[]
     } | null>(null)
     const [webSources, setWebSources] = useState<Array<{ title: string; url: string; snippet: string }>>([])
     const [isLoadingThread, setIsLoadingThread] = useState(false)
@@ -460,6 +474,9 @@ export function BriefSpecialistDialog({
         reason: string
     } | null>(null)
 
+    const [relationshipSummary, setRelationshipSummary] = useState<RelationshipSummary | null>(null)
+    const [structuredStarters, setStructuredStarters] = useState<StructuredStarter[] | null>(null)
+    const [showDecisionTimeline, setShowDecisionTimeline] = useState(false)
     const [isGeneratingGreeting, setIsGeneratingGreeting] = useState(false)
     const [thinkingPhaseIndex, setThinkingPhaseIndex] = useState(0)
     const [isHandoffBriefingExpanded, setIsHandoffBriefingExpanded] = useState(true)
@@ -583,12 +600,13 @@ export function BriefSpecialistDialog({
             setIsLoadingThread(true)
             try {
                 // Fetch thread, cross-specialist context, history, proactive opener, AND greeting context in parallel
-                const [threadResult, crossResult, historyResult, proactiveResult, greetingCtx] = await Promise.all([
+                const [threadResult, crossResult, historyResult, proactiveResult, greetingCtx, relationshipResult] = await Promise.all([
                     getOrCreateSpecialistThread(specialist.id),
                     getRecentSpecialistOutputs(specialist.id, 5),
                     getSpecialistThreadHistory(specialist.id, 20),
                     getProactiveOpener(specialist.id).catch(() => null),
                     getSpecialistGreetingContext(specialist.id).catch(() => ({ insightTitles: [], overdueTasks: [] })),
+                    getSpecialistRelationshipSummary(specialist.id).catch(() => ({ data: null, error: null })),
                 ])
 
                 if (cancelled) return
@@ -640,6 +658,11 @@ export function BriefSpecialistDialog({
                 // Store greeting context for data-driven conversation starters
                 if (greetingCtx.insightTitles.length > 0 || greetingCtx.overdueTasks.length > 0) {
                     setGreetingContext(greetingCtx)
+                }
+
+                // Store relationship summary
+                if (relationshipResult.data) {
+                    setRelationshipSummary(relationshipResult.data)
                 }
             } catch (err) {
                 console.error("[BriefDialog] Init failed:", err)
@@ -977,13 +1000,11 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
                 // Extract dynamic conversation starters (STARTERS: block) if present
                 const startersMatch = cleaned.match(/STARTERS:\s*\n((?:\s*-\s*.+\n?)+)/i)
                 if (startersMatch) {
-                    const parsedStarters = startersMatch[1]
-                        .split("\n")
-                        .map((line) => line.replace(/^\s*-\s*/, "").trim())
-                        .filter((s) => s.length > 0)
-                        .slice(0, 3)
-                    if (parsedStarters.length > 0) {
-                        setDynamicStarters(parsedStarters)
+                    const parsed = parseStarters(startersMatch[1])
+                    if (parsed.length > 0) {
+                        setStructuredStarters(parsed)
+                        // Also set legacy starters for fallback rendering
+                        setDynamicStarters(parsed.map(s => s.prompt))
                     }
                     // Remove the STARTERS block from the visible greeting
                     cleaned = cleaned.replace(/STARTERS:\s*\n((?:\s*-\s*.+\n?)+)/i, "").trim()
@@ -1221,7 +1242,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         error?: string
                                         rawHint?: string
                                         errorCategory?: string
-                                        grounding?: { availableSections: string[]; missingContextHints: string[] }
+                                        grounding?: { availableSections?: string[]; missingContextHints?: string[]; activeLayers?: string[] }
                                         webSources?: Array<{ title: string; url: string; snippet: string }>
                                         stream?: "fast" | "deep"
                                         done?: boolean
@@ -2129,7 +2150,31 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         <History className="h-3.5 w-3.5" />
                     </Button>
                 )}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowDecisionTimeline(!showDecisionTimeline)}
+                    className={cn(
+                        "h-7 w-7 p-0",
+                        showDecisionTimeline && "text-international-orange"
+                    )}
+                    aria-label="Show decision timeline"
+                >
+                    <Scale className="h-3.5 w-3.5" />
+                </Button>
             </div>
+            {/* Row 3: Relationship bar (trust level, stats) */}
+            {relationshipSummary && relationshipSummary.level !== 'new' && (
+                <RelationshipBar summary={relationshipSummary} />
+            )}
+            {/* Handoff trail breadcrumb */}
+            {handoffTrail.length > 0 && (
+                <HandoffBreadcrumb
+                    trail={handoffTrail}
+                    currentName={specialist.name}
+                    onSwitchBack={(id) => handleSwitchSpecialist(id)}
+                />
+            )}
         </div>
     )
 
@@ -2194,6 +2239,28 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 ))}
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* Decision Timeline Panel */}
+                {showDecisionTimeline && !isLoadingThread && (
+                    <div className="border-b bg-muted/20 max-h-[40vh] overflow-y-auto">
+                        <div className="px-3 py-2 border-b bg-muted/50 sticky top-0 flex items-center justify-between">
+                            <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                                Decision Journal
+                            </p>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowDecisionTimeline(false)}
+                                className="h-6 w-6 p-0"
+                            >
+                                <X className="h-3 w-3" />
+                            </Button>
+                        </div>
+                        <div className="p-3">
+                            <DecisionTimeline specialistId={specialist.id} />
+                        </div>
                     </div>
                 )}
 
@@ -2403,6 +2470,13 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 </>
                             )}
 
+                        {/* Context layer indicator */}
+                        {lastAssistantMessage && !isExecuting && contextGrounding?.activeLayers && contextGrounding.activeLayers.length > 0 && (
+                            <div className="px-4 pb-1">
+                                <ContextLayerPill activeLayers={contextGrounding.activeLayers} />
+                            </div>
+                        )}
+
                         {/* Web sources from search */}
                         {webSources.length > 0 && (
                             <div className="px-4 pb-2">
@@ -2474,26 +2548,14 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             const suggested = getSpecialistById(dynamicSuggestion.specialistId)
                             if (!suggested) return null
                             return (
-                                <div className="mx-4 mb-3 p-2.5 rounded-lg bg-international-orange/5 border border-international-orange/20">
-                                    <p className="text-[10px] font-medium text-international-orange mb-1.5 flex items-center gap-1">
-                                        <Sparkles className="h-2.5 w-2.5" />
-                                        Recommended Next
-                                    </p>
-                                    <button
-                                        onClick={() => handleSwitchSpecialist(suggested.id)}
-                                        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md bg-background border border-international-orange/30 hover:border-international-orange/60 transition-colors text-xs group"
-                                    >
-                                        {suggested.avatarImage && (
-                                            <div className="relative h-5 w-5 rounded-full overflow-hidden flex-shrink-0">
-                                                <Image src={suggested.avatarImage} alt={suggested.name} fill unoptimized className="object-cover" sizes="20px" />
-                                            </div>
-                                        )}
-                                        <div className="flex-1 text-left min-w-0">
-                                            <span className="font-medium text-foreground">{suggested.name}</span>
-                                            <p className="text-[10px] text-muted-foreground truncate">{dynamicSuggestion.reason}</p>
-                                        </div>
-                                        <ArrowRight className="h-3 w-3 text-international-orange group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
-                                    </button>
+                                <div className="mx-4 mb-3">
+                                    <HandoffCard
+                                        suggested={suggested}
+                                        reason={dynamicSuggestion.reason}
+                                        messageCount={messages.length}
+                                        onContinue={() => handleSwitchSpecialist(suggested.id)}
+                                        onStay={() => {/* dismiss by not switching */}}
+                                    />
                                 </div>
                             )
                         })()}
@@ -2576,11 +2638,22 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         )}
                                     </div>
                                 </div>
-                                {(dynamicStarters || specialist.highlights.length > 0 || pageGuidanceStarter) && (
+                                {(structuredStarters || dynamicStarters || specialist.highlights.length > 0 || pageGuidanceStarter) && (
                                     <>
                                         <p className="text-[10px] font-medium text-muted-foreground">
-                                            {dynamicStarters ? "Ask me about..." : "Start with a topic"}
+                                            {structuredStarters || dynamicStarters ? "Ask me about..." : "Start with a topic"}
                                         </p>
+                                        {structuredStarters ? (
+                                            <ConversationStarterGrid
+                                                starters={structuredStarters}
+                                                onSelect={(prompt) => {
+                                                    setBriefText(prompt)
+                                                    setError(null)
+                                                    textareaRef.current?.focus()
+                                                }}
+                                                disabled={isExecuting}
+                                            />
+                                        ) : (
                                         <div className="flex flex-wrap gap-1.5">
                                             {/* Page guidance starter — always first when available */}
                                             {pageGuidanceStarter && !dynamicStarters && (
@@ -2630,6 +2703,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 </button>
                                             ))}
                                         </div>
+                                        )}
                                     </>
                                 )}
                             </div>
@@ -2987,6 +3061,16 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             )}
                         </div>
                     </div>
+                    {/* Handoff trail breadcrumb (dialog mode) */}
+                    {handoffTrail.length > 0 && (
+                        <div className="mt-2">
+                            <HandoffBreadcrumb
+                                trail={handoffTrail}
+                                currentName={specialist.name}
+                                onSwitchBack={(id) => handleSwitchSpecialist(id)}
+                            />
+                        </div>
+                    )}
                 </DialogHeader>
 
                 {/* Loading State */}
@@ -3371,33 +3455,14 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             const suggested = getSpecialistById(dynamicSuggestion.specialistId)
                             if (!suggested) return null
                             return (
-                                <div className="mb-4 p-3 rounded-lg bg-international-orange/5 border border-international-orange/20">
-                                    <p className="text-xs font-medium text-international-orange mb-2 flex items-center gap-1.5">
-                                        <Sparkles className="h-3 w-3" />
-                                        Recommended Next
-                                    </p>
-                                    <button
-                                        onClick={() => handleSwitchSpecialist(suggested.id)}
-                                        className="flex items-center gap-3 w-full px-3 py-2 rounded-md bg-background border border-international-orange/30 hover:border-international-orange/60 transition-colors text-sm group"
-                                    >
-                                        {suggested.avatarImage && (
-                                            <div className="relative h-6 w-6 rounded-full overflow-hidden flex-shrink-0">
-                                                <Image
-                                                    src={suggested.avatarImage}
-                                                    alt={suggested.name}
-                                                    fill
-                                                    unoptimized
-                                                    className="object-cover"
-                                                    sizes="24px"
-                                                />
-                                            </div>
-                                        )}
-                                        <div className="flex-1 text-left">
-                                            <span className="font-medium text-foreground">{suggested.name}</span>
-                                            <p className="text-xs text-muted-foreground">{dynamicSuggestion.reason}</p>
-                                        </div>
-                                        <ArrowRight className="h-4 w-4 text-international-orange group-hover:translate-x-0.5 transition-transform" />
-                                    </button>
+                                <div className="mb-4">
+                                    <HandoffCard
+                                        suggested={suggested}
+                                        reason={dynamicSuggestion.reason}
+                                        messageCount={messages.length}
+                                        onContinue={() => handleSwitchSpecialist(suggested.id)}
+                                        onStay={() => {/* dismiss by not switching */}}
+                                    />
                                 </div>
                             )
                         })()}

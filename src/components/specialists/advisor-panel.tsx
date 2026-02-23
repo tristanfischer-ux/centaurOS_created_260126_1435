@@ -33,6 +33,7 @@ export function AdvisorPanel(): React.ReactElement {
     handoffContext,
     referredBy,
     contextLabel,
+    handoffTrail,
     closePanel,
     switchSpecialist,
   } = useAdvisorPanel()
@@ -67,6 +68,7 @@ export function AdvisorPanel(): React.ReactElement {
           referredBy={referredBy}
           contextLabel={contextLabel}
           renderMode="panel"
+          handoffTrail={handoffTrail}
         />
       )}
     </div>

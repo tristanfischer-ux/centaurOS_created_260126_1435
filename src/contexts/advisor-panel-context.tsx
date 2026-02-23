@@ -38,6 +38,12 @@ interface OpenPanelOptions {
   contextLabel?: string | null
 }
 
+/** Entry in the handoff trail breadcrumb */
+export interface HandoffTrailEntry {
+  specialistId: string
+  name: string
+}
+
 interface AdvisorPanelState {
   /** Whether the panel is visible */
   isOpen: boolean
@@ -49,6 +55,8 @@ interface AdvisorPanelState {
   referredBy: string | null
   /** Badge label for what's being discussed */
   contextLabel: string | null
+  /** Trail of specialist handoffs for breadcrumb display */
+  handoffTrail: HandoffTrailEntry[]
 }
 
 interface AdvisorPanelContextValue extends AdvisorPanelState {
@@ -60,6 +68,8 @@ interface AdvisorPanelContextValue extends AdvisorPanelState {
   togglePanel: (specialistId?: string) => void
   /** Switch to a different specialist without closing */
   switchSpecialist: (specialistId: string, handoffCtx?: string) => void
+  /** Clear the handoff trail (when user opens specialist directly) */
+  clearTrail: () => void
 }
 
 // ─── Context ────────────────────────────────────────────────────────────────
@@ -81,6 +91,7 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     handoffContext: null,
     referredBy: null,
     contextLabel: null,
+    handoffTrail: [],
   }))
 
   const openPanel = useCallback((specialistId: string, options?: OpenPanelOptions) => {
@@ -96,6 +107,7 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
       handoffContext: options?.handoffContext ?? null,
       referredBy: options?.referredBy ?? null,
       contextLabel: options?.contextLabel ?? null,
+      handoffTrail: [], // Direct open = fresh start, clear trail
     }))
   }, [])
 
@@ -132,13 +144,25 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     const specialist = getSpecialistById(specialistId)
     if (!specialist) return
 
-    setState((prev) => ({
-      ...prev,
-      isOpen: true,
-      activeSpecialist: specialist,
-      handoffContext: handoffCtx ?? null,
-      referredBy: handoffCtx ? prev.activeSpecialist?.name ?? null : null,
-    }))
+    setState((prev) => {
+      // Append current specialist to handoff trail before switching
+      const updatedTrail = prev.activeSpecialist
+        ? [...prev.handoffTrail, { specialistId: prev.activeSpecialist.id, name: prev.activeSpecialist.name }]
+        : prev.handoffTrail
+
+      return {
+        ...prev,
+        isOpen: true,
+        activeSpecialist: specialist,
+        handoffContext: handoffCtx ?? null,
+        referredBy: handoffCtx ? prev.activeSpecialist?.name ?? null : null,
+        handoffTrail: updatedTrail,
+      }
+    })
+  }, [])
+
+  const clearTrail = useCallback(() => {
+    setState((prev) => ({ ...prev, handoffTrail: [] }))
   }, [])
 
   const value = useMemo<AdvisorPanelContextValue>(
@@ -148,8 +172,9 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
       closePanel,
       togglePanel,
       switchSpecialist,
+      clearTrail,
     }),
-    [state, openPanel, closePanel, togglePanel, switchSpecialist],
+    [state, openPanel, closePanel, togglePanel, switchSpecialist, clearTrail],
   )
 
   return (

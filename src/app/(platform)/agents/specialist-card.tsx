@@ -206,6 +206,23 @@ export function SpecialistCard({ specialist, onBrief, index = 0, activity }: Spe
                         </div>
                     )}
 
+                    {/* Mood indicator */}
+                    {activity?.mood && (
+                        <div className="flex items-center gap-1.5 mb-3 text-[11px] text-muted-foreground">
+                            <div className={cn(
+                                "h-2 w-2 rounded-full flex-shrink-0",
+                                activity.mood === 'energized' || activity.mood === 'proud' ? 'bg-success' :
+                                activity.mood === 'concerned' ? 'bg-warning' :
+                                activity.mood === 'thoughtful' ? 'bg-status-info' :
+                                'bg-muted-foreground',
+                            )} />
+                            <span className="capitalize">{activity.mood}</span>
+                            {activity.moodTrigger && (
+                                <span className="truncate text-[10px]">&mdash; {activity.moodTrigger}</span>
+                            )}
+                        </div>
+                    )}
+
                     {/* Highlights */}
                     <div className="flex flex-wrap gap-1.5 mb-4">
                         {specialist.highlights.slice(0, 4).map((h) => (

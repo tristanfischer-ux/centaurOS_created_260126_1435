@@ -21,7 +21,9 @@ import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { UserAvatar } from '@/components/ui/user-avatar'
-import { MessageCircle, X, Lightbulb, AlertTriangle, TrendingUp, Sparkles } from 'lucide-react'
+import { MessageCircle, X, Lightbulb, AlertTriangle, TrendingUp, Sparkles, Check, Scale } from 'lucide-react'
+import { updateDecisionOutcome } from '@/actions/decision-outcomes'
+import type { OutcomeStatus } from '@/lib/agents/decision-journal'
 import { cn } from '@/lib/utils'
 import { getSpecialistById } from '@/app/(platform)/agents/specialists-data'
 import type { AgentInsight } from '@/actions/agent-insights'
@@ -89,9 +91,11 @@ export function SpecialistInsightCard({
     compact = false,
 }: SpecialistInsightCardProps): React.ReactElement | null {
     const [isDismissed, setIsDismissed] = useState(false)
+    const [outcomeRecorded, setOutcomeRecorded] = useState(false)
     const specialist = getSpecialistById(insight.specialist_id)
     const config = URGENCY_CONFIG[insight.urgency]
     const Icon = config.icon
+    const domainData = insight.domain_data as Record<string, unknown> | null
 
     if (isDismissed) return null
 
@@ -102,6 +106,15 @@ export function SpecialistInsightCard({
 
     function handleDiscuss(): void {
         onDiscuss?.(insight.specialist_id, insight.body)
+    }
+
+    async function handleRecordOutcome(status: OutcomeStatus): Promise<void> {
+        const decisionId = domainData?.decision_id as string | undefined
+        if (!decisionId) return
+        const { error } = await updateDecisionOutcome(decisionId, status)
+        if (!error) {
+            setOutcomeRecorded(true)
+        }
     }
 
     return (
@@ -159,8 +172,44 @@ export function SpecialistInsightCard({
                             : 'AI-generated \u2014 verify before acting.'}
                     </p>
 
+                    {/* Decision outcome recording (for record_outcome action type) */}
+                    {!compact && domainData?.action_type === 'record_outcome' && !!domainData?.decision_id && !outcomeRecorded && (
+                        <div className="mt-2 flex items-center gap-1.5">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRecordOutcome('positive')}
+                                className="h-6 px-2 text-[10px] text-success hover:text-success hover:bg-success/10"
+                            >
+                                <Check className="h-2.5 w-2.5 mr-1" />
+                                Worked
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRecordOutcome('negative')}
+                                className="h-6 px-2 text-[10px] text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                                <X className="h-2.5 w-2.5 mr-1" />
+                                Didn&apos;t work
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRecordOutcome('mixed')}
+                                className="h-6 px-2 text-[10px] text-warning hover:text-warning hover:bg-warning/10"
+                            >
+                                <Scale className="h-2.5 w-2.5 mr-1" />
+                                Mixed
+                            </Button>
+                        </div>
+                    )}
+                    {outcomeRecorded && (
+                        <p className="mt-2 text-[10px] text-success font-medium">Outcome recorded</p>
+                    )}
+
                     {/* Actions */}
-                    {!compact && onDiscuss && (
+                    {!compact && onDiscuss && !domainData?.action_type && (
                         <div className="mt-3 flex items-center gap-2">
                             <Button
                                 variant="ghost"

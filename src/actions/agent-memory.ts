@@ -400,6 +400,8 @@ export interface SpecialistActivity {
     specialistId: string
     lastMessageAt: string | null
     lastTopic: string | null
+    mood: string | null
+    moodTrigger: string | null
 }
 
 /**
@@ -410,6 +412,109 @@ export interface SpecialistActivity {
  *
  * @security Requires authenticated user with foundry membership (RLS enforced)
  */
+/**
+ * Summary of the relationship between a founder and a specialist.
+ */
+export interface RelationshipSummary {
+    level: 'new' | 'building' | 'established' | 'deep'
+    conversationCount: number
+    decisionsCount: number
+    lastConversationDate: string | null
+    mood: string | null
+}
+
+/**
+ * Fetches a relationship summary for a specific specialist.
+ *
+ * @description Queries conversation count, decision count, last interaction date,
+ * and derives a trust level from conversation depth.
+ *
+ * @param specialistId - The specialist to get the relationship summary for
+ * @returns The relationship summary, or null on error
+ *
+ * @security Requires authenticated user with foundry membership (RLS enforced)
+ */
+export async function getSpecialistRelationshipSummary(
+    specialistId: string
+): Promise<{ data: RelationshipSummary | null; error: string | null }> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'Unauthorized' }
+
+        const foundryId = await getFoundryIdCached()
+        if (!foundryId) return { data: null, error: 'No active foundry' }
+
+        // Find the specialist thread
+        const { data: thread } = await supabase
+            .from('agent_memory_threads')
+            .select('id, metadata, last_interaction_at')
+            .eq('foundry_id', foundryId)
+            .eq('context_type', 'specialist')
+            .eq('context_id', specialistId)
+            .limit(1)
+            .maybeSingle()
+
+        if (!thread) {
+            return {
+                data: {
+                    level: 'new',
+                    conversationCount: 0,
+                    decisionsCount: 0,
+                    lastConversationDate: null,
+                    mood: null,
+                },
+                error: null,
+            }
+        }
+
+        // Count user messages (each = one conversation turn)
+        const { count: msgCount } = await supabase
+            .from('agent_memory_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('thread_id', thread.id)
+            .eq('role', 'user')
+
+        const conversationCount = msgCount ?? 0
+
+        // Count decisions made with this specialist
+        const { count: decisionCount } = await supabase
+            .from('specialist_decision_journal')
+            .select('*', { count: 'exact', head: true })
+            .eq('foundry_id', foundryId)
+            .eq('specialist_id', specialistId)
+
+        const decisionsCount = decisionCount ?? 0
+
+        // Derive trust level from conversation depth
+        let level: RelationshipSummary['level'] = 'new'
+        if (conversationCount >= 20 || decisionsCount >= 5) level = 'deep'
+        else if (conversationCount >= 10 || decisionsCount >= 3) level = 'established'
+        else if (conversationCount >= 3) level = 'building'
+
+        // Extract mood from thread metadata if available
+        const metadata = (thread.metadata ?? {}) as Record<string, unknown>
+        const mood = typeof metadata.mood === 'string' ? metadata.mood : null
+
+        return {
+            data: {
+                level,
+                conversationCount,
+                decisionsCount,
+                lastConversationDate: thread.last_interaction_at ?? null,
+                mood,
+            },
+            error: null,
+        }
+    } catch (err) {
+        console.error('[agent-memory] Failed to get relationship summary:', {
+            specialistId,
+            error: err instanceof Error ? err.message : 'Unknown error',
+        })
+        return { data: null, error: 'Internal error' }
+    }
+}
+
 export async function getSpecialistActivities(): Promise<{
     data: Record<string, SpecialistActivity> | null
     error: string | null
@@ -426,10 +531,10 @@ export async function getSpecialistActivities(): Promise<{
             return { data: null, error: 'No active foundry' }
         }
 
-        // Fetch all specialist threads
+        // Fetch all specialist threads (include metadata for mood)
         const { data: threads } = await supabase
             .from('agent_memory_threads')
-            .select('id, context_id')
+            .select('id, context_id, metadata')
             .eq('foundry_id', foundryId)
             .eq('context_type', 'specialist')
 
@@ -447,10 +552,12 @@ export async function getSpecialistActivities(): Promise<{
             .eq('role', 'user')
             .order('created_at', { ascending: false })
 
-        // Build map: threadId -> contextId (specialistId)
+        // Build maps: threadId -> contextId, threadId -> metadata
         const threadToSpecialist: Record<string, string> = {}
+        const threadMetadata: Record<string, Record<string, unknown>> = {}
         for (const t of threads) {
             threadToSpecialist[t.id] = t.context_id as string
+            threadMetadata[t.id] = (t.metadata ?? {}) as Record<string, unknown>
         }
 
         // Group by specialist, take most recent
@@ -463,10 +570,15 @@ export async function getSpecialistActivities(): Promise<{
             seen.add(specialistId)
 
             const content = msg.content as string
+            // Find the thread for this specialist to extract mood
+            const threadEntry = threads.find(t => threadToSpecialist[t.id] === specialistId)
+            const meta = threadEntry ? threadMetadata[threadEntry.id] : {}
             result[specialistId] = {
                 specialistId,
                 lastMessageAt: msg.created_at as string,
                 lastTopic: content.length > 60 ? content.slice(0, 60) + "..." : content,
+                mood: typeof meta.mood === 'string' ? meta.mood : null,
+                moodTrigger: typeof meta.mood_trigger === 'string' ? meta.mood_trigger : null,
             }
         }
 

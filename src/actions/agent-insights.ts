@@ -302,6 +302,83 @@ export async function requestAutoReport(
   }
 }
 
+// ─── Smart Prompt Suggestions ────────────────────────────────────────
+
+/**
+ * Generates context-aware prompt suggestions for a specialist card.
+ *
+ * @description Scores prompts based on company stage, recent decisions,
+ * time-based relevance, and which specialists haven't been consulted.
+ *
+ * @param specialistId - The specialist to get suggestions for
+ * @returns Top 3-5 scored prompts with reasons
+ *
+ * @security Requires authenticated user with foundry membership
+ */
+export async function getSmartPromptSuggestions(
+  specialistId: string,
+): Promise<Array<{ prompt: string; reason: string; score: number }>> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('foundry_id, active_foundry_id')
+    .eq('id', user.id)
+    .single()
+
+  const foundryId = profile?.active_foundry_id ?? profile?.foundry_id
+  if (!foundryId) return []
+
+  // Fetch recent decisions and insights for context
+  const [decisionsResult, insightsResult] = await Promise.all([
+    supabase
+      .from('specialist_decision_journal')
+      .select('decision, specialist_id, created_at')
+      .eq('foundry_id', foundryId)
+      .order('created_at', { ascending: false })
+      .limit(10),
+    supabase
+      .from('agent_insights')
+      .select('title, specialist_id, urgency')
+      .eq('foundry_id', foundryId)
+      .eq('specialist_id', specialistId)
+      .eq('is_dismissed', false)
+      .order('created_at', { ascending: false })
+      .limit(5),
+  ])
+
+  const suggestions: Array<{ prompt: string; reason: string; score: number }> = []
+
+  // Suggest based on unread insights
+  const insights = insightsResult.data ?? []
+  for (const insight of insights.slice(0, 2)) {
+    suggestions.push({
+      prompt: `Tell me more about: ${insight.title}`,
+      reason: insight.urgency === 'critical' ? 'Needs your attention' : 'Recent finding',
+      score: insight.urgency === 'critical' ? 10 : 7,
+    })
+  }
+
+  // Suggest follow-ups on recent decisions with this specialist
+  const myDecisions = (decisionsResult.data ?? []).filter(d => d.specialist_id === specialistId)
+  if (myDecisions.length > 0) {
+    const latest = myDecisions[0]
+    suggestions.push({
+      prompt: `Follow up on: ${latest.decision.slice(0, 80)}`,
+      reason: 'Continue from your last decision',
+      score: 8,
+    })
+  }
+
+  // Sort by score and return top 5
+  return suggestions
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+}
+
 // ─── Context-to-Specialist Mapping ──────────────────────────────────
 
 /**

@@ -758,7 +758,7 @@ ${otherSpecialists}
 
     // AUDIT: Heavy context layers extracted to prompt-builder.ts (2026-02-19, refactor step 6 of 8).
     // Each layer is independently failable — see prompt-builder.ts for the full assembly logic.
-    const contextLayers = await buildContextLayers({
+    const { contextBlocks: contextLayers, activeLayers } = await buildContextLayers({
         foundryId,
         specialistId,
         threadId,
@@ -924,7 +924,7 @@ ${otherSpecialists}
             )
         }
         if (modality === "text") {
-            return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId, enableWebSearchForStreaming)
+            return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId, enableWebSearchForStreaming, activeLayers)
         }
         if (modality === "slides") {
             return await handleTextStreaming(fallbackChain, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback, enableThinking, undefined, rolloutId)
@@ -996,6 +996,7 @@ async function handleTextStreaming(
     history?: ConversationMessage[],
     rolloutId?: string | null,
     enableWebSearch?: boolean,
+    groundingLayers?: string[],
 ): Promise<Response> {
     const conversationHistory = history?.map((msg) => ({
         role: msg.role as "system" | "user" | "assistant",
@@ -1007,6 +1008,15 @@ async function handleTextStreaming(
 
     const readable = new ReadableStream({
         async start(controller) {
+            // Emit grounding event with active context layers before LLM stream
+            if (groundingLayers && groundingLayers.length > 0) {
+                try {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ grounding: { activeLayers: groundingLayers } })}\n\n`))
+                } catch {
+                    // Stream not ready yet
+                }
+            }
+
             const heartbeatInterval = setInterval(() => {
                 try {
                     controller.enqueue(encoder.encode(": keepalive\n\n"))

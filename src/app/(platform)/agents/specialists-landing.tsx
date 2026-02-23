@@ -39,6 +39,7 @@ import type { SpecialistActivity } from "@/actions/agent-memory"
 import { getInsightFeed } from "@/actions/agent-insights"
 import type { AgentInsight } from "@/actions/agent-insights"
 import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
+import type { HandoffTrailEntry } from "@/contexts/advisor-panel-context"
 import type { SpecialistId } from "./specialists-data"
 
 function formatTimeAgo(dateStr: string): string {
@@ -114,6 +115,7 @@ export function SpecialistsLanding({
     } | null>(null)
     const [handoffContext, setHandoffContext] = useState<string | null>(null)
     const [referredByName, setReferredByName] = useState<string | null>(null)
+    const [handoffTrail, setHandoffTrail] = useState<HandoffTrailEntry[]>([])
     const [showOrgChart, setShowOrgChart] = useState(false)
     const [specialistActivities, setSpecialistActivities] = useState<Record<string, SpecialistActivity>>({})
     const [unreadInsights, setUnreadInsights] = useState<AgentInsight[]>([])
@@ -179,6 +181,7 @@ export function SpecialistsLanding({
         } else {
             setHandoffContext(null)
             setReferredByName(null)
+            setHandoffTrail([]) // Direct open = fresh start
             setBriefSpecialistId(specialistId)
         }
     }, [isDesktop, advisorPanel])
@@ -278,6 +281,20 @@ export function SpecialistsLanding({
                                         <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
                                             Last talked {formatTimeAgo(activity.lastMessageAt)}
                                         </p>
+                                    )}
+                                    {activity?.mood && (
+                                        <div className="flex items-center gap-1 mt-0.5">
+                                            <div className={cn(
+                                                "h-1.5 w-1.5 rounded-full flex-shrink-0",
+                                                activity.mood === 'energized' || activity.mood === 'proud' ? 'bg-success' :
+                                                activity.mood === 'concerned' ? 'bg-warning' :
+                                                activity.mood === 'thoughtful' ? 'bg-status-info' :
+                                                'bg-muted-foreground',
+                                            )} />
+                                            <span className="text-[10px] text-muted-foreground capitalize truncate">
+                                                {activity.mood}
+                                            </span>
+                                        </div>
                                     )}
                                 </div>
                                 <ArrowRight className="h-4 w-4 text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity flex-shrink-0" />
@@ -506,16 +523,21 @@ export function SpecialistsLanding({
                             setBriefSpecialistId(null)
                             setHandoffContext(null)
                             setReferredByName(null)
+                            setHandoffTrail([])
                         }
                     }}
                     onSwitchSpecialist={(id, context) => {
                         const fromName = selectedSpecialist.name
+                        const fromId = selectedSpecialist.id
+                        // Append current specialist to trail before switching
+                        setHandoffTrail(prev => [...prev, { specialistId: fromId, name: fromName }])
                         setHandoffContext(context ?? null)
                         setReferredByName(context ? fromName : null)
                         setBriefSpecialistId(id)
                     }}
                     handoffContext={handoffContext}
                     referredBy={referredByName}
+                    handoffTrail={handoffTrail}
                 />
             )}
 

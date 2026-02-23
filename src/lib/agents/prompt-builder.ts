@@ -81,11 +81,15 @@ export interface ContextLayerParams {
  * includes temporal and emotional awareness (zero DB queries).
  *
  * @param params - The context assembly parameters
- * @returns A string of context blocks, each separated by double newlines
+ * @returns Object with context blocks string and list of active layer names
  */
-export async function buildContextLayers(params: ContextLayerParams): Promise<string> {
+export async function buildContextLayers(params: ContextLayerParams): Promise<{
+    contextBlocks: string
+    activeLayers: string[]
+}> {
     const { foundryId, specialistId, threadId, input, finalPrompt, isConversationalFastPath } = params
     let contextBlocks = ""
+    const activeLayers: string[] = []
 
     if (!isConversationalFastPath) {
         // Founder preferences: learned communication style, trust level, pet peeves
@@ -103,6 +107,7 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<st
                 )
                 if (prefsBlock) {
                     contextBlocks += `\n\n${prefsBlock}`
+                    activeLayers.push('Founder Preferences')
                 }
             } catch (err) {
                 console.warn("[PromptBuilder] Could not load founder preferences:", err)
@@ -117,6 +122,7 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<st
                 const stateBlock = compileSpecialistStatePrompt(emotional, relationship, specialist?.name ?? specialistId)
                 if (stateBlock) {
                     contextBlocks += `\n\n${stateBlock}`
+                    activeLayers.push('Emotional State')
                 }
             } catch (err) {
                 console.warn("[PromptBuilder] Could not load specialist state:", err)
@@ -130,6 +136,7 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<st
                 const journalBlock = compileDecisionJournalPrompt(decisions)
                 if (journalBlock) {
                     contextBlocks += `\n\n${journalBlock}`
+                    activeLayers.push('Decision Journal')
                 }
                 const allDecisions = await getRecentDecisions(foundryId, undefined, 50)
                 const patterns = detectDecisionPatterns(allDecisions)
@@ -148,6 +155,7 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<st
                 const intelligenceBlock = compileIntelligencePrompt(reports, specialistId as SpecialistId)
                 if (intelligenceBlock) {
                     contextBlocks += `\n\n${intelligenceBlock}`
+                    activeLayers.push('External Intelligence')
                 }
             } catch (err) {
                 console.warn("[PromptBuilder] Failed to load intelligence context:", err)
@@ -165,6 +173,7 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<st
                 )
                 if (vaultContext) {
                     contextBlocks += `\n\n${vaultContext}`
+                    activeLayers.push('Knowledge Vault')
                 }
             } catch (err) {
                 console.warn("[PromptBuilder] Could not load Knowledge Vault context:", err)
@@ -178,6 +187,7 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<st
                 const taskBlock = await buildSpecialistTaskContext(foundryId, specialistId)
                 if (taskBlock) {
                     contextBlocks += `\n\n${taskBlock}`
+                    activeLayers.push('Task Ownership')
                 }
             } catch (err) {
                 console.warn("[PromptBuilder] Could not load task context:", err)
@@ -190,6 +200,7 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<st
                 const sinceBlock = await buildSinceLastTalkedContext(foundryId, specialistId, threadId)
                 if (sinceBlock) {
                     contextBlocks += `\n\n${sinceBlock}`
+                    activeLayers.push('Since Last Talked')
                 }
             } catch (err) {
                 console.warn("[PromptBuilder] Could not build 'since last talked' context:", err)
@@ -213,24 +224,28 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<st
         }
         const temporalBlock = compileTemporalPrompt(undefined, foundryCreatedAt)
         contextBlocks += `\n\n${temporalBlock}`
+        activeLayers.push('Temporal Awareness')
 
         // Emotional awareness: detect founder's emotional state from their message
         const emotionalBlock = compileEmotionalPrompt(input)
         if (emotionalBlock) {
             contextBlocks += `\n\n${emotionalBlock}`
+            activeLayers.push('Emotional Awareness')
         }
     } else {
         // Fast path: lightweight temporal + emotional only (no DB queries)
         const temporalBlock = compileTemporalPrompt()
         contextBlocks += `\n\n${temporalBlock}`
+        activeLayers.push('Temporal Awareness')
 
         const emotionalBlock = compileEmotionalPrompt(input)
         if (emotionalBlock) {
             contextBlocks += `\n\n${emotionalBlock}`
+            activeLayers.push('Emotional Awareness')
         }
     }
 
-    return contextBlocks
+    return { contextBlocks, activeLayers }
 }
 
 // ─── "Since We Last Talked" Context Bridge ─────────────────────────────

@@ -203,6 +203,73 @@ export function compileDecisionJournalPrompt(decisions: DecisionEntry[]): string
 }
 
 /**
+ * Generates follow-up reminders for decisions older than 30 days with pending outcomes.
+ *
+ * @description Scans the decision journal for stale pending decisions and creates
+ * reminder insights in agent_insights. Deduplicates by checking for existing
+ * follow-up insights referencing the same decision ID.
+ *
+ * @param foundryId - The foundry to scan
+ * @returns Number of follow-up insights created
+ */
+export async function generateDecisionFollowUps(foundryId: string): Promise<number> {
+    const admin = createAdminClient()
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+    const { data: pendingDecisions } = await admin
+        .from('specialist_decision_journal')
+        .select('id, specialist_id, decision, created_at')
+        .eq('foundry_id', foundryId)
+        .or('outcome_status.is.null,outcome_status.eq.pending')
+        .lt('created_at', thirtyDaysAgo)
+        .limit(20)
+
+    if (!pendingDecisions?.length) return 0
+
+    // Check for existing follow-ups
+    const decisionIds = pendingDecisions.map(d => d.id)
+    const { data: existing } = await admin
+        .from('agent_insights')
+        .select('domain_data')
+        .eq('foundry_id', foundryId)
+        .eq('insight_type', 'reminder')
+
+    const existingIds = new Set(
+        (existing ?? [])
+            .map(i => (i.domain_data as Record<string, unknown>)?.decision_id)
+            .filter(Boolean) as string[]
+    )
+
+    let created = 0
+    for (const d of pendingDecisions) {
+        if (existingIds.has(d.id)) continue
+
+        const daysAgo = Math.floor((Date.now() - new Date(d.created_at).getTime()) / 86400000)
+
+        await admin.from('agent_insights').insert({
+            foundry_id: foundryId,
+            specialist_id: d.specialist_id,
+            insight_type: 'reminder',
+            urgency: 'important',
+            title: `How did this decision work out? (${daysAgo}d ago)`,
+            body: `You decided "${d.decision.slice(0, 150)}" ${daysAgo} days ago. Recording the outcome helps improve future advice.`,
+            domain_data: {
+                decision_id: d.id,
+                action_type: 'record_outcome',
+                days_since_decision: daysAgo,
+            },
+            suggested_actions: [
+                { label: 'Record outcome', action_type: 'record_outcome', action_data: { decisionId: d.id } },
+            ],
+            expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        })
+        created++
+    }
+
+    return created
+}
+
+/**
  * Detects behavioral patterns from the decision journal.
  * E.g., "You tend to deprioritize marketing tasks" or "You favor speed over perfection."
  *

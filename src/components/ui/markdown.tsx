@@ -39,6 +39,91 @@ function isValidUrl(url: string | undefined): boolean {
  * @example
  * <Markdown content={report} className="text-sm" />
  */
+// ─── Confidence Marker Detection ───────────────────────────────────────
+
+interface ConfidenceMarker {
+  raw: string
+  label: string
+  containerClass: string
+  badgeClass: string
+}
+
+const CONFIDENCE_MARKERS: ConfidenceMarker[] = [
+  {
+    raw: '[FROM COMPANY DATA]',
+    label: 'Company Data',
+    containerClass: 'border-l-4 border-l-success bg-success/5',
+    badgeClass: 'text-success',
+  },
+  {
+    raw: '[INDUSTRY BENCHMARK]',
+    label: 'Industry Benchmark',
+    containerClass: 'border-l-4 border-l-info bg-info/5',
+    badgeClass: 'text-info',
+  },
+  {
+    raw: '[YOUR ESTIMATE]',
+    label: 'Estimate',
+    containerClass: 'border-l-4 border-l-warning bg-warning/5',
+    badgeClass: 'text-warning',
+  },
+  {
+    raw: '[DATA NEEDED:',
+    label: 'Data Needed',
+    containerClass: 'border-l-4 border-dashed border-l-destructive bg-destructive/5',
+    badgeClass: 'text-destructive',
+  },
+]
+
+function extractTextContent(children: React.ReactNode): string {
+  if (typeof children === 'string') return children
+  if (Array.isArray(children)) return children.map(extractTextContent).join('')
+  if (children && typeof children === 'object' && 'props' in children) {
+    return extractTextContent((children as React.ReactElement<{ children?: React.ReactNode }>).props.children)
+  }
+  return ''
+}
+
+function detectConfidenceMarker(text: string): ConfidenceMarker | null {
+  const trimmed = text.trimStart()
+  for (const marker of CONFIDENCE_MARKERS) {
+    if (trimmed.startsWith(marker.raw)) {
+      // For DATA NEEDED, extract the specific field name
+      if (marker.raw === '[DATA NEEDED:') {
+        const endBracket = trimmed.indexOf(']')
+        if (endBracket > 0) {
+          const field = trimmed.slice(marker.raw.length, endBracket).trim()
+          return {
+            ...marker,
+            raw: trimmed.slice(0, endBracket + 1),
+            label: `Data Needed: ${field}`,
+          }
+        }
+      }
+      return marker
+    }
+  }
+  return null
+}
+
+function stripMarkerFromChildren(children: React.ReactNode, markerRaw: string): React.ReactNode {
+  if (typeof children === 'string') {
+    return children.replace(markerRaw, '').trimStart()
+  }
+  if (Array.isArray(children)) {
+    let stripped = false
+    return children.map((child) => {
+      if (stripped) return child
+      if (typeof child === 'string' && child.includes(markerRaw)) {
+        stripped = true
+        return child.replace(markerRaw, '').trimStart()
+      }
+      return child
+    })
+  }
+  return children
+}
+
 function MarkdownInner({ content, className }: MarkdownProps) {
   if (!content) return null
 
@@ -47,9 +132,26 @@ function MarkdownInner({ content, className }: MarkdownProps) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-        p: ({ children }) => (
-          <p className="my-2.5 leading-relaxed text-inherit">{children}</p>
-        ),
+        p: ({ children }) => {
+          // Detect confidence markers and render styled sections
+          const text = extractTextContent(children)
+          const marker = detectConfidenceMarker(text)
+          if (marker) {
+            return (
+              <div className={cn('my-2.5 rounded-md pl-3 pr-2 py-2', marker.containerClass)}>
+                <span className={cn('inline-block text-[10px] font-semibold uppercase tracking-wider mb-1', marker.badgeClass)}>
+                  {marker.label}
+                </span>
+                <p className="leading-relaxed text-inherit text-sm">
+                  {stripMarkerFromChildren(children, marker.raw)}
+                </p>
+              </div>
+            )
+          }
+          return (
+            <p className="my-2.5 leading-relaxed text-inherit">{children}</p>
+          )
+        },
         h1: ({ children }) => (
           <h1 className="mt-6 mb-3 text-xl font-bold text-foreground first:mt-0">
             {children}
