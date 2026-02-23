@@ -25,6 +25,7 @@
 
 import type { XRaySpec, ModuleSpec, SystemAnalysis } from "./xray-schema"
 import type { ConvergenceEvaluation, ProposedChange } from "./convergence-controller"
+import { createObjectiveFromSubsystem } from "@/actions/objectives"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -236,12 +237,23 @@ function buildConvergenceDescription(
   return lines.join("\n")
 }
 
+// ─── Role Assignment ─────────────────────────────────────────────────
+
+/**
+ * Maps risk level to task role for assignment.
+ * High risk → Executive (needs senior review), else → Apprentice.
+ */
+function roleForRisk(risk: ReviewTaskDef["riskLevel"]): "Executive" | "Apprentice" {
+  return risk === "High" ? "Executive" : "Apprentice"
+}
+
+// ─── Export Functions ────────────────────────────────────────────────
+
 /**
  * Exports a single X-Ray module as an Objective with Tasks.
  *
- * @description This is called by the server action, not directly by clients.
- * Creates an objective titled "Build: {module.name}" with tasks for
- * unknowns, tests, and expert questions.
+ * @description Maps a module to a subsystem format and calls
+ * createObjectiveFromSubsystem to create a real objective + tasks.
  *
  * @param module - The module to convert
  * @param spec - The parent spec (for context)
@@ -300,11 +312,47 @@ export async function exportModuleToObjective(
     }
   }
 
-  // Return the definitions — actual DB creation is handled by the server action
+  // Map to createObjectiveFromSubsystem format
+  const tasks = taskDefs.map((td, i) => ({
+    order: i + 1,
+    title: td.title,
+    description: td.description,
+    role: roleForRisk(td.riskLevel) as "Executive" | "Apprentice" | "AI_Agent",
+  }))
+
+  const result = await createObjectiveFromSubsystem({
+    subsystemId: module.id,
+    subsystemName: module.name,
+    packId: `xray-module-${module.id}`,
+    packTitle: `Build: ${module.name}`,
+    packSummary: `Engineering tasks for X-Ray module "${module.name}" (${module.purpose})`,
+    packDescription: null,
+    selectedTaskIndices: tasks.map((_, i) => i),
+    tasks,
+  })
+
+  if ("error" in result) {
+    console.error("[XRayToObjectives] Failed to create objective for module:", {
+      moduleId: module.id,
+      error: result.error,
+    })
+    return {
+      objectiveId: "",
+      taskIds: [],
+      reviewGateIds: [],
+      moduleId: module.id,
+    }
+  }
+
+  console.info("[XRayToObjectives] Created objective for module:", {
+    moduleId: module.id,
+    objectiveId: result.objectiveId,
+  })
+
   return {
-    objectiveId: "", // Populated by server action
-    taskIds: [], // Populated by server action
-    reviewGateIds: [], // Populated by server action
+    objectiveId: result.objectiveId ?? "",
+    taskIds: [],
+    reviewGateIds: [],
     moduleId: module.id,
   }
 }

@@ -1,5 +1,9 @@
 {
   "errors": [
+    "src/actions/decision-outcomes.ts|TS2322|Type is not assignable to type.",
+    "src/components/specialists/specialist-insight-card.tsx|TS2322|Type is not assignable to type.",
+    "src/contexts/advisor-panel-context.tsx|TS2345|Argument of type is not assignable to parameter of type.",
+    "src/contexts/advisor-panel-context.tsx|TS2741|Property 'clearTrail' is missing in type '__TYPE__' but required in type 'AdvisorPanelContextValue'.",
     "e2e/apprentice-onboarding-e2e.spec.ts|TS2769|No overload matches this call.",
     "e2e/content-verification.spec.ts|TS18047|'sectionText' is possibly 'null'.",
     "e2e/content-verification.spec.ts|TS2345|Argument of type is not assignable to parameter of type.",

@@ -90,6 +90,26 @@ function buildMarketplaceText(row: { title: string; description?: string | null;
   return parts.join(' ')
 }
 
+function buildSupplierText(row: { name: string; description?: string | null; supplier_type?: string | null; domain_categories?: string[] | null; capabilities?: unknown }): string {
+  const parts = [row.name]
+  if (row.description) parts.push(row.description)
+  if (row.supplier_type) parts.push(row.supplier_type)
+  if (row.domain_categories?.length) parts.push(row.domain_categories.join(' '))
+  if (row.capabilities && typeof row.capabilities === 'object') {
+    parts.push(JSON.stringify(row.capabilities))
+  }
+  return parts.join(' ')
+}
+
+function buildProviderProfileText(row: { headline?: string | null; bio?: string | null; specializations?: string[] | null; industries?: string[] | null }): string {
+  const parts: string[] = []
+  if (row.headline) parts.push(row.headline)
+  if (row.bio) parts.push(row.bio)
+  if (row.specializations?.length) parts.push(row.specializations.join(' '))
+  if (row.industries?.length) parts.push(row.industries.join(' '))
+  return parts.join(' ')
+}
+
 async function backfillTable(
   table: string,
   selectColumns: string,
@@ -148,6 +168,20 @@ async function main(): Promise<void> {
   if (listings?.length) {
     console.log(`marketplace_listings: ${listings.length} rows`)
     const n = await backfillTable('marketplace_listings', 'id, title, description, category, subcategory, attributes', listings as { id: string; [k: string]: unknown }[], buildMarketplaceText)
+    console.log(`  Updated ${n}`)
+  }
+
+  const { data: suppliers } = await supabase.from('suppliers').select('id, name, description, supplier_type, domain_categories, capabilities').is('embedding', null)
+  if (suppliers?.length) {
+    console.log(`suppliers: ${suppliers.length} rows`)
+    const n = await backfillTable('suppliers', 'id, name, description, supplier_type, domain_categories, capabilities', suppliers as { id: string; [k: string]: unknown }[], buildSupplierText)
+    console.log(`  Updated ${n}`)
+  }
+
+  const { data: providers } = await supabase.from('provider_profiles').select('id, headline, bio, specializations, industries').is('embedding', null)
+  if (providers?.length) {
+    console.log(`provider_profiles: ${providers.length} rows`)
+    const n = await backfillTable('provider_profiles', 'id, headline, bio, specializations, industries', providers as { id: string; [k: string]: unknown }[], buildProviderProfileText)
     console.log(`  Updated ${n}`)
   }
 

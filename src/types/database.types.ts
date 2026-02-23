@@ -10619,6 +10619,7 @@ export type Database = {
           current_order_count: number | null
           day_rate: number | null
           display_name: string | null
+          embedding: string | null
           featured_until: string | null
           forge_discount_percent: number | null
           headline: string | null
@@ -10668,6 +10669,7 @@ export type Database = {
           current_order_count?: number | null
           day_rate?: number | null
           display_name?: string | null
+          embedding?: string | null
           featured_until?: string | null
           forge_discount_percent?: number | null
           headline?: string | null
@@ -10717,6 +10719,7 @@ export type Database = {
           current_order_count?: number | null
           day_rate?: number | null
           display_name?: string | null
+          embedding?: string | null
           featured_until?: string | null
           forge_discount_percent?: number | null
           headline?: string | null
@@ -12769,6 +12772,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           domain_categories: string[] | null
+          embedding: string | null
           id: string
           logo_url: string | null
           metadata: Json | null
@@ -12790,6 +12794,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           domain_categories?: string[] | null
+          embedding?: string | null
           id?: string
           logo_url?: string | null
           metadata?: Json | null
@@ -12811,6 +12816,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           domain_categories?: string[] | null
+          embedding?: string | null
           id?: string
           logo_url?: string | null
           metadata?: Json | null
@@ -15753,6 +15759,24 @@ export type Database = {
           title: string
         }[]
       }
+      match_people_semantic: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          bio: string
+          day_rate: number
+          headline: string
+          id: string
+          industries: string[]
+          is_active: boolean
+          similarity: number
+          specializations: string[]
+          years_experience: number
+        }[]
+      }
       match_project_templates: {
         Args: {
           match_count?: number
@@ -15767,6 +15791,24 @@ export type Database = {
           similarity: number
           slug: string
           title: string
+        }[]
+      }
+      match_suppliers_semantic: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          capabilities: Json
+          community_rating: number
+          description: string
+          domain_categories: string[]
+          id: string
+          name: string
+          similarity: number
+          supplier_type: string
+          verification_status: string
         }[]
       }
       match_tutorials: {

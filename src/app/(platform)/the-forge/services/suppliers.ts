@@ -14,8 +14,26 @@
  */
 
 import { createClient } from "@/lib/supabase/server"
+import { createHash } from "crypto"
+import { embedText } from "@/lib/search/semantic-search"
 
 import type { ModuleSpec } from "./xray-schema"
+
+// ─── Cache ──────────────────────────────────────────────────────────
+
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+interface CacheEntry<T> {
+  data: T
+  ts: number
+}
+
+const supplierCache = new Map<string, CacheEntry<SupplierMatch[]>>()
+
+function supplierCacheKey(module: ModuleSpec): string {
+  const raw = `${module.id}|${module.name}|${module.purpose}|${module.keyParts.join(",")}`
+  return createHash("sha256").update(raw).digest("hex").slice(0, 16)
+}
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -50,6 +68,13 @@ export async function matchSuppliersForModule(
   isGatingDiagComplete: boolean,
 ): Promise<SupplierMatch[]> {
 
+  // Check cache first
+  const cacheKey = supplierCacheKey(module)
+  const cached = supplierCache.get(cacheKey)
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+    return cached.data
+  }
+
   const supabase = await createClient()
 
   // Build search terms from module data
@@ -78,6 +103,29 @@ export async function matchSuppliersForModule(
 
   if (listingsError) {
     console.error("[SupplierMatch] Failed to query marketplace_listings:", listingsError.message)
+  }
+
+  // Semantic matching: embed module description, call RPC for cosine similarity
+  const semanticScores = new Map<string, number>()
+  try {
+    const embeddingText = `${module.name} ${module.purpose} ${module.keyParts.join(" ")}`
+    const embedding = await embedText(embeddingText)
+    if (embedding) {
+      const { data: semanticMatches } = await supabase.rpc("match_suppliers_semantic", {
+        query_embedding: JSON.stringify(embedding),
+        match_threshold: 0.4,
+        match_count: 20,
+      })
+      if (semanticMatches) {
+        for (const sm of semanticMatches) {
+          // Scale similarity (0-1) to 0-10 range for combining with keyword score
+          semanticScores.set(sm.id, (sm.similarity as number) * 10)
+        }
+      }
+    }
+  } catch (err) {
+    // Graceful fallback: if embedding fails, continue with keyword-only scoring
+    console.warn("[SupplierMatch] Semantic matching failed, using keyword-only:", err instanceof Error ? err.message : "Unknown")
   }
 
   const matches: SupplierMatch[] = []
@@ -121,7 +169,11 @@ export async function matchSuppliersForModule(
         }
       }
 
-      if (score > 0) {
+      // Combine keyword score with semantic score
+      const semScore = semanticScores.get(supplier.id) ?? 0
+      const combinedScore = score + semScore
+
+      if (combinedScore > 0) {
         const isVerified = supplier.verification_status === "verified" || supplier.verification_status === "community_verified"
         const leadTime = (caps as Record<string, unknown>)?.lead_time
         const warranty = 12 // Default warranty
@@ -133,7 +185,7 @@ export async function matchSuppliersForModule(
           typicalLeadWeeks: typeof leadTime === "number" ? leadTime : 8,
           warrantyMonths: warranty,
           matchReason: [...new Set(matchReasons)].slice(0, 3).join(", "),
-          matchScore: score + (isVerified ? 3 : 0) + (supplier.community_rating ? Number(supplier.community_rating) : 0),
+          matchScore: combinedScore + (isVerified ? 3 : 0) + (supplier.community_rating ? Number(supplier.community_rating) : 0),
           supplierType: supplier.supplier_type,
           isVerified,
           moduleId: module.id,
@@ -186,7 +238,12 @@ export async function matchSuppliersForModule(
   }
 
   // Sort by score and return top results per module
-  return matches
+  const results = matches
     .sort((a, b) => b.matchScore - a.matchScore)
     .slice(0, 5)
+
+  // Store in cache
+  supplierCache.set(cacheKey, { data: results, ts: Date.now() })
+
+  return results
 }

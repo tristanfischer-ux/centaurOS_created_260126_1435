@@ -11,8 +11,26 @@
  */
 
 import { createClient } from "@/lib/supabase/server"
+import { createHash } from "crypto"
+import { embedText } from "@/lib/search/semantic-search"
 
 import type { Discipline, ModuleSpec } from "./xray-schema"
+
+// ─── Cache ──────────────────────────────────────────────────────────
+
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+interface CacheEntry<T> {
+  data: T
+  ts: number
+}
+
+const peopleCache = new Map<string, CacheEntry<PersonMatch[]>>()
+
+function peopleCacheKey(modules: ModuleSpec[]): string {
+  const raw = modules.map((m) => `${m.id}|${m.name}|${m.purpose}`).join(";")
+  return createHash("sha256").update(raw).digest("hex").slice(0, 16)
+}
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -62,6 +80,13 @@ const DISCIPLINE_KEYWORDS: Record<Discipline, string[]> = {
  * provider_profiles, scoring by keyword overlap with module disciplines.
  */
 export async function matchPeopleForModules(modules: ModuleSpec[]): Promise<PersonMatch[]> {
+  // Check cache first
+  const cacheKey = peopleCacheKey(modules)
+  const cached = peopleCache.get(cacheKey)
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+    return cached.data
+  }
+
   const supabase = await createClient()
 
   // Extract unique disciplines from all modules
@@ -90,6 +115,27 @@ export async function matchPeopleForModules(modules: ModuleSpec[]): Promise<Pers
 
   if (providersError) {
     console.error("[PeopleMatch] Failed to query provider_profiles:", providersError.message)
+  }
+
+  // Semantic matching: embed discipline descriptions, call RPC for cosine similarity
+  const semanticProviderScores = new Map<string, number>()
+  try {
+    const embeddingText = modules.map((m) => `${m.name} ${m.purpose}`).join(". ")
+    const embedding = await embedText(embeddingText)
+    if (embedding) {
+      const { data: semanticMatches } = await supabase.rpc("match_people_semantic", {
+        query_embedding: JSON.stringify(embedding),
+        match_threshold: 0.4,
+        match_count: 20,
+      })
+      if (semanticMatches) {
+        for (const sm of semanticMatches) {
+          semanticProviderScores.set(sm.id, (sm.similarity as number) * 10)
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[PeopleMatch] Semantic matching failed, using keyword-only:", err instanceof Error ? err.message : "Unknown")
   }
 
   const matches: PersonMatch[] = []
@@ -179,7 +225,11 @@ export async function matchPeopleForModules(modules: ModuleSpec[]): Promise<Pers
           }
         }
 
-        if (score > 0) {
+        // Combine keyword score with semantic score
+        const semScore = semanticProviderScores.get(provider.id) ?? 0
+        const combinedScore = score + semScore
+
+        if (combinedScore > 0) {
           const rate = provider.day_rate ? `£${provider.day_rate}/day` : "Rate on request"
           matches.push({
             id: provider.id,
@@ -189,7 +239,7 @@ export async function matchPeopleForModules(modules: ModuleSpec[]): Promise<Pers
             rate,
             matchedDiscipline: discipline,
             isInternal: false,
-            matchScore: score + (provider.years_experience ? Math.min(provider.years_experience, 5) : 0),
+            matchScore: combinedScore + (provider.years_experience ? Math.min(provider.years_experience, 5) : 0),
             isVerified: true,
             listing: null,
           })
@@ -208,6 +258,11 @@ export async function matchPeopleForModules(modules: ModuleSpec[]): Promise<Pers
     }
   }
 
-  return Array.from(uniqueMatches.values())
+  const results = Array.from(uniqueMatches.values())
     .sort((a, b) => b.matchScore - a.matchScore)
+
+  // Store in cache
+  peopleCache.set(cacheKey, { data: results, ts: Date.now() })
+
+  return results
 }
