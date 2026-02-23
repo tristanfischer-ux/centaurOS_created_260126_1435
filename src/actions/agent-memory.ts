@@ -468,22 +468,21 @@ export async function getSpecialistRelationshipSummary(
             }
         }
 
-        // Count user messages (each = one conversation turn)
-        const { count: msgCount } = await supabase
-            .from('agent_memory_messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('thread_id', thread.id)
-            .eq('role', 'user')
+        // Count messages and decisions in parallel (independent queries)
+        const [{ count: msgCount }, { count: decisionCount }] = await Promise.all([
+            supabase
+                .from('agent_memory_messages')
+                .select('*', { count: 'exact', head: true })
+                .eq('thread_id', thread.id)
+                .eq('role', 'user'),
+            supabase
+                .from('specialist_decision_journal')
+                .select('*', { count: 'exact', head: true })
+                .eq('foundry_id', foundryId)
+                .eq('specialist_id', specialistId),
+        ])
 
         const conversationCount = msgCount ?? 0
-
-        // Count decisions made with this specialist
-        const { count: decisionCount } = await supabase
-            .from('specialist_decision_journal')
-            .select('*', { count: 'exact', head: true })
-            .eq('foundry_id', foundryId)
-            .eq('specialist_id', specialistId)
-
         const decisionsCount = decisionCount ?? 0
 
         // Derive trust level from conversation depth
@@ -551,6 +550,7 @@ export async function getSpecialistActivities(): Promise<{
             .in('thread_id', threadIds)
             .eq('role', 'user')
             .order('created_at', { ascending: false })
+            .limit(100)
 
         // Build maps: threadId -> contextId, threadId -> metadata
         const threadToSpecialist: Record<string, string> = {}

@@ -23,12 +23,19 @@ import type { OutcomeStatus, DecisionEntry } from '@/lib/agents/decision-journal
  *
  * @security Verifies foundry ownership before updating
  */
+const VALID_OUTCOME_STATUSES: OutcomeStatus[] = ['pending', 'positive', 'negative', 'mixed', 'unknown']
+
 export async function updateDecisionOutcome(
     decisionId: string,
     outcomeStatus: OutcomeStatus,
     outcomeNotes?: string,
 ): Promise<{ error: string | null }> {
     try {
+        // VALIDATION: Reject unknown outcome statuses before hitting DB
+        if (!VALID_OUTCOME_STATUSES.includes(outcomeStatus)) {
+            return { error: 'Invalid outcome status' }
+        }
+
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { error: 'Unauthorized' }
@@ -36,7 +43,7 @@ export async function updateDecisionOutcome(
         const foundryId = await getFoundryIdCached()
         if (!foundryId) return { error: 'No active foundry' }
 
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('specialist_decision_journal')
             .update({
                 outcome_status: outcomeStatus,
@@ -45,10 +52,15 @@ export async function updateDecisionOutcome(
             })
             .eq('id', decisionId)
             .eq('foundry_id', foundryId)
+            .select()
 
         if (error) {
             console.error('[decision-outcomes] Failed to update:', error.message)
             return { error: 'Failed to update decision outcome' }
+        }
+
+        if (!data || data.length === 0) {
+            return { error: 'Decision not found' }
         }
 
         return { error: null }

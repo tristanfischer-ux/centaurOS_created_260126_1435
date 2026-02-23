@@ -54,37 +54,38 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             (existingInsights ?? []).map(i => (i.domain_data as Record<string, unknown>)?.decision_id as string).filter(Boolean)
         )
 
-        let created = 0
-
-        for (const decision of pendingDecisions) {
-            if (existingDecisionIds.has(decision.id)) continue
-
-            const specialist = SPECIALISTS.find(s => s.id === decision.specialist_id)
-            const specialistName = specialist?.name ?? decision.specialist_id
-            const daysAgo = Math.floor((Date.now() - new Date(decision.created_at).getTime()) / 86400000)
-
-            await admin.from('agent_insights').insert({
-                foundry_id: decision.foundry_id,
-                specialist_id: decision.specialist_id,
-                insight_type: 'reminder',
-                urgency: 'important',
-                title: `How did this decision work out? (${daysAgo}d ago)`,
-                body: `You decided "${decision.decision.slice(0, 150)}" with ${specialistName} ${daysAgo} days ago. Recording the outcome helps us learn from past decisions.`,
-                domain_data: {
-                    decision_id: decision.id,
-                    action_type: 'record_outcome',
-                    days_since_decision: daysAgo,
-                },
-                suggested_actions: [
-                    { label: 'Record outcome', action_type: 'record_outcome', action_data: { decisionId: decision.id } },
-                ],
-                expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        // Build batch of inserts
+        const rows = pendingDecisions
+            .filter(decision => !existingDecisionIds.has(decision.id))
+            .map(decision => {
+                const specialist = SPECIALISTS.find(s => s.id === decision.specialist_id)
+                const specialistName = specialist?.name ?? decision.specialist_id
+                const daysAgo = Math.floor((Date.now() - new Date(decision.created_at).getTime()) / 86400000)
+                return {
+                    foundry_id: decision.foundry_id,
+                    specialist_id: decision.specialist_id,
+                    insight_type: 'reminder' as const,
+                    urgency: 'important' as const,
+                    title: 'How did this decision work out?',
+                    body: `You decided "${decision.decision.slice(0, 150)}" with ${specialistName} ${daysAgo} days ago. Recording the outcome helps us learn from past decisions.`,
+                    domain_data: {
+                        decision_id: decision.id,
+                        decision_created_at: decision.created_at,
+                        action_type: 'record_outcome',
+                        days_since_decision: daysAgo,
+                    },
+                    suggested_actions: [
+                        { label: 'Record outcome', action_type: 'record_outcome', action_data: { decisionId: decision.id } },
+                    ],
+                    expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+                }
             })
 
-            created++
+        if (rows.length > 0) {
+            await admin.from('agent_insights').insert(rows)
         }
 
-        return NextResponse.json({ followUpsCreated: created })
+        return NextResponse.json({ followUpsCreated: rows.length })
     } catch (err) {
         console.error('[Cron] Decision follow-ups failed:', err)
         return NextResponse.json({ error: 'Internal error' }, { status: 500 })

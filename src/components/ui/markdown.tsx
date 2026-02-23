@@ -133,6 +133,11 @@ function MarkdownInner({ content, className }: MarkdownProps) {
         remarkPlugins={[remarkGfm]}
         components={{
         p: ({ children }) => {
+          // Short-circuit: skip expensive extractTextContent if first child doesn't start with '['
+          const firstChild = Array.isArray(children) ? children[0] : children
+          if (typeof firstChild !== 'string' || !firstChild.trimStart().startsWith('[')) {
+            return <p className="my-2.5 leading-relaxed text-inherit">{children}</p>
+          }
           // Detect confidence markers and render styled sections
           const text = extractTextContent(children)
           const marker = detectConfidenceMarker(text)

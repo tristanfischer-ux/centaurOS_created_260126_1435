@@ -114,96 +114,87 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<{
             }
         }
 
-        // Specialist emotional state and relationship depth
-        if (foundryId && threadId && specialistId) {
-            try {
-                const specialist = getSpecialistById(specialistId)
-                const { emotional, relationship } = await getSpecialistState(threadId, foundryId)
-                const stateBlock = compileSpecialistStatePrompt(emotional, relationship, specialist?.name ?? specialistId)
-                if (stateBlock) {
-                    contextBlocks += `\n\n${stateBlock}`
-                    activeLayers.push('Emotional State')
-                }
-            } catch (err) {
-                console.warn("[PromptBuilder] Could not load specialist state:", err)
-            }
-        }
-
-        // Decision journal: past decisions for "remember when" references
+        // Parallel context layer fetching: layers 2-7 are independent of each other
+        // and can run concurrently via Promise.allSettled for independent failability.
         if (foundryId && specialistId) {
-            try {
-                const decisions = await getRecentDecisions(foundryId, specialistId, 10)
-                const journalBlock = compileDecisionJournalPrompt(decisions)
-                if (journalBlock) {
-                    contextBlocks += `\n\n${journalBlock}`
-                    activeLayers.push('Decision Journal')
-                }
-                const allDecisions = await getRecentDecisions(foundryId, undefined, 50)
-                const patterns = detectDecisionPatterns(allDecisions)
-                if (patterns.length > 0) {
-                    contextBlocks += `\n\n## Founder Decision Patterns\n${patterns.join('\n')}`
-                }
-            } catch (err) {
-                console.warn("[PromptBuilder] Could not load decision journal:", err)
-            }
-        }
+            const layerPromises: Array<Promise<{ block: string; layer: string }>> = []
 
-        // External intelligence: recent reports from monitoring sweeps
-        if (foundryId && specialistId) {
-            try {
-                const reports = await getRecentIntelligenceReports(foundryId, 3, specialistId)
-                const intelligenceBlock = compileIntelligencePrompt(reports, specialistId as SpecialistId)
-                if (intelligenceBlock) {
-                    contextBlocks += `\n\n${intelligenceBlock}`
-                    activeLayers.push('External Intelligence')
-                }
-            } catch (err) {
-                console.warn("[PromptBuilder] Failed to load intelligence context:", err)
-            }
-        }
-
-        // Knowledge Vault: inject relevant organizational knowledge
-        if (foundryId && specialistId) {
-            try {
-                const vaultContext = await searchKnowledgeForSpecialist(
-                    foundryId,
-                    input || finalPrompt.slice(0, 500),
-                    specialistId,
-                    8
+            // Layer 2: Specialist emotional state and relationship depth
+            if (threadId) {
+                layerPromises.push(
+                    (async () => {
+                        const specialist = getSpecialistById(specialistId)
+                        const { emotional, relationship } = await getSpecialistState(threadId, foundryId)
+                        const stateBlock = compileSpecialistStatePrompt(emotional, relationship, specialist?.name ?? specialistId)
+                        return { block: stateBlock, layer: 'Emotional State' }
+                    })()
                 )
-                if (vaultContext) {
-                    contextBlocks += `\n\n${vaultContext}`
-                    activeLayers.push('Knowledge Vault')
-                }
-            } catch (err) {
-                console.warn("[PromptBuilder] Could not load Knowledge Vault context:", err)
             }
-        }
 
-        // Task ownership context: tasks this specialist created or owns
-        if (foundryId && specialistId) {
-            try {
-                const { buildSpecialistTaskContext } = await import('./sweep-context')
-                const taskBlock = await buildSpecialistTaskContext(foundryId, specialistId)
-                if (taskBlock) {
-                    contextBlocks += `\n\n${taskBlock}`
-                    activeLayers.push('Task Ownership')
-                }
-            } catch (err) {
-                console.warn("[PromptBuilder] Could not load task context:", err)
+            // Layer 3: Decision journal
+            layerPromises.push(
+                (async () => {
+                    const decisions = await getRecentDecisions(foundryId, specialistId, 10)
+                    const journalBlock = compileDecisionJournalPrompt(decisions)
+                    const allDecisions = await getRecentDecisions(foundryId, undefined, 50)
+                    const patterns = detectDecisionPatterns(allDecisions)
+                    let block = journalBlock
+                    if (patterns.length > 0) {
+                        block += `\n\n## Founder Decision Patterns\n${patterns.join('\n')}`
+                    }
+                    return { block, layer: 'Decision Journal' }
+                })()
+            )
+
+            // Layer 4: External intelligence
+            layerPromises.push(
+                (async () => {
+                    const reports = await getRecentIntelligenceReports(foundryId, 3, specialistId)
+                    const block = compileIntelligencePrompt(reports, specialistId as SpecialistId)
+                    return { block, layer: 'External Intelligence' }
+                })()
+            )
+
+            // Layer 5: Knowledge Vault
+            layerPromises.push(
+                (async () => {
+                    const block = await searchKnowledgeForSpecialist(
+                        foundryId,
+                        input || finalPrompt.slice(0, 500),
+                        specialistId,
+                        8
+                    )
+                    return { block: block ?? '', layer: 'Knowledge Vault' }
+                })()
+            )
+
+            // Layer 6: Task ownership
+            layerPromises.push(
+                (async () => {
+                    const { buildSpecialistTaskContext } = await import('./sweep-context')
+                    const block = await buildSpecialistTaskContext(foundryId, specialistId)
+                    return { block: block ?? '', layer: 'Task Ownership' }
+                })()
+            )
+
+            // Layer 7: "Since we last talked" bridge
+            if (threadId) {
+                layerPromises.push(
+                    (async () => {
+                        const block = await buildSinceLastTalkedContext(foundryId, specialistId, threadId)
+                        return { block, layer: 'Since Last Talked' }
+                    })()
+                )
             }
-        }
 
-        // "Since we last talked" bridge: what changed since last conversation
-        if (foundryId && specialistId && threadId) {
-            try {
-                const sinceBlock = await buildSinceLastTalkedContext(foundryId, specialistId, threadId)
-                if (sinceBlock) {
-                    contextBlocks += `\n\n${sinceBlock}`
-                    activeLayers.push('Since Last Talked')
+            const results = await Promise.allSettled(layerPromises)
+            for (const result of results) {
+                if (result.status === 'fulfilled' && result.value.block) {
+                    contextBlocks += `\n\n${result.value.block}`
+                    activeLayers.push(result.value.layer)
+                } else if (result.status === 'rejected') {
+                    console.warn("[PromptBuilder] Context layer failed:", result.reason)
                 }
-            } catch (err) {
-                console.warn("[PromptBuilder] Could not build 'since last talked' context:", err)
             }
         }
 

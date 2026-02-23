@@ -523,7 +523,8 @@ export function SpecialistsLanding({
                             setBriefSpecialistId(null)
                             setHandoffContext(null)
                             setReferredByName(null)
-                            setHandoffTrail([])
+                            // Don't clear handoffTrail on close — preserve for accidental closes.
+                            // Trail is cleared in handleBrief when opening a new specialist directly.
                         }
                     }}
                     onSwitchSpecialist={(id, context) => {

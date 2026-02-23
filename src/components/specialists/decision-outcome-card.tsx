@@ -81,13 +81,14 @@ export function DecisionOutcomeCard({
                         </Badge>
                     </div>
 
-                    {isPending && daysAgo >= 7 && (
+                    {isPending && (
                         <div className="mt-2">
                             {!expanded ? (
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => setExpanded(true)}
+                                    aria-expanded={expanded}
                                     className="h-6 px-2 text-[10px] text-international-orange hover:text-international-orange"
                                 >
                                     How did this go?

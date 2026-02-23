@@ -33,6 +33,7 @@ export function ContextLayerPill({ activeLayers, className }: ContextLayerPillPr
             <button
                 type="button"
                 onClick={() => setExpanded(!expanded)}
+                aria-expanded={expanded}
                 className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-[10px] text-muted-foreground hover:bg-muted transition-colors"
             >
                 <Brain className="h-3 w-3" />

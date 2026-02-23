@@ -130,6 +130,7 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
             handoffContext: null,
             referredBy: null,
             contextLabel: null,
+            handoffTrail: [],
           }
         }
       }
@@ -145,9 +146,9 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     if (!specialist) return
 
     setState((prev) => {
-      // Append current specialist to handoff trail before switching
+      // Append current specialist to handoff trail before switching, cap at 10
       const updatedTrail = prev.activeSpecialist
-        ? [...prev.handoffTrail, { specialistId: prev.activeSpecialist.id, name: prev.activeSpecialist.name }]
+        ? [...prev.handoffTrail, { specialistId: prev.activeSpecialist.id, name: prev.activeSpecialist.name }].slice(-10)
         : prev.handoffTrail
 
       return {

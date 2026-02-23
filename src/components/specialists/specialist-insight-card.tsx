@@ -20,8 +20,10 @@ import { useState } from 'react'
 
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { MessageCircle, X, Lightbulb, AlertTriangle, TrendingUp, Sparkles, Check, Scale } from 'lucide-react'
+import { toast } from 'sonner'
 import { updateDecisionOutcome } from '@/actions/decision-outcomes'
 import type { OutcomeStatus } from '@/lib/agents/decision-journal'
 import { cn } from '@/lib/utils'
@@ -92,6 +94,9 @@ export function SpecialistInsightCard({
 }: SpecialistInsightCardProps): React.ReactElement | null {
     const [isDismissed, setIsDismissed] = useState(false)
     const [outcomeRecorded, setOutcomeRecorded] = useState(false)
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [selectedOutcome, setSelectedOutcome] = useState<OutcomeStatus | null>(null)
+    const [outcomeNotes, setOutcomeNotes] = useState('')
     const specialist = getSpecialistById(insight.specialist_id)
     const config = URGENCY_CONFIG[insight.urgency]
     const Icon = config.icon
@@ -111,10 +116,37 @@ export function SpecialistInsightCard({
     async function handleRecordOutcome(status: OutcomeStatus): Promise<void> {
         const decisionId = domainData?.decision_id as string | undefined
         if (!decisionId) return
-        const { error } = await updateDecisionOutcome(decisionId, status)
-        if (!error) {
+
+        // If notes UI is showing, submit with notes
+        if (selectedOutcome === status) {
+            setIsSubmitting(true)
+            const { error } = await updateDecisionOutcome(decisionId, status, outcomeNotes || undefined)
+            setIsSubmitting(false)
+            if (error) {
+                toast.error('Failed to record outcome')
+                return
+            }
             setOutcomeRecorded(true)
+            return
         }
+
+        // First click: show notes field
+        setSelectedOutcome(status)
+    }
+
+    async function handleSaveOutcome(): Promise<void> {
+        if (!selectedOutcome) return
+        const decisionId = domainData?.decision_id as string | undefined
+        if (!decisionId) return
+
+        setIsSubmitting(true)
+        const { error } = await updateDecisionOutcome(decisionId, selectedOutcome, outcomeNotes || undefined)
+        setIsSubmitting(false)
+        if (error) {
+            toast.error('Failed to record outcome')
+            return
+        }
+        setOutcomeRecorded(true)
     }
 
     return (
@@ -174,38 +206,70 @@ export function SpecialistInsightCard({
 
                     {/* Decision outcome recording (for record_outcome action type) */}
                     {!compact && domainData?.action_type === 'record_outcome' && !!domainData?.decision_id && !outcomeRecorded && (
-                        <div className="mt-2 flex items-center gap-1.5">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRecordOutcome('positive')}
-                                className="h-6 px-2 text-[10px] text-success hover:text-success hover:bg-success/10"
-                            >
-                                <Check className="h-2.5 w-2.5 mr-1" />
-                                Worked
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRecordOutcome('negative')}
-                                className="h-6 px-2 text-[10px] text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                                <X className="h-2.5 w-2.5 mr-1" />
-                                Didn&apos;t work
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRecordOutcome('mixed')}
-                                className="h-6 px-2 text-[10px] text-warning hover:text-warning hover:bg-warning/10"
-                            >
-                                <Scale className="h-2.5 w-2.5 mr-1" />
-                                Mixed
-                            </Button>
+                        <div className="mt-2 space-y-2">
+                            <div className="flex items-center gap-1.5">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRecordOutcome('positive')}
+                                    disabled={isSubmitting}
+                                    className={cn(
+                                        "h-6 px-2 text-[10px] text-success hover:text-success hover:bg-success/10",
+                                        selectedOutcome === 'positive' && 'bg-success/10',
+                                    )}
+                                >
+                                    <Check className="h-2.5 w-2.5 mr-1" />
+                                    Worked
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRecordOutcome('negative')}
+                                    disabled={isSubmitting}
+                                    className={cn(
+                                        "h-6 px-2 text-[10px] text-destructive hover:text-destructive hover:bg-destructive/10",
+                                        selectedOutcome === 'negative' && 'bg-destructive/10',
+                                    )}
+                                >
+                                    <X className="h-2.5 w-2.5 mr-1" />
+                                    Didn&apos;t work
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRecordOutcome('mixed')}
+                                    disabled={isSubmitting}
+                                    className={cn(
+                                        "h-6 px-2 text-[10px] text-warning hover:text-warning hover:bg-warning/10",
+                                        selectedOutcome === 'mixed' && 'bg-warning/10',
+                                    )}
+                                >
+                                    <Scale className="h-2.5 w-2.5 mr-1" />
+                                    Mixed
+                                </Button>
+                            </div>
+                            {selectedOutcome && (
+                                <div className="space-y-1.5">
+                                    <Textarea
+                                        value={outcomeNotes}
+                                        onChange={(e) => setOutcomeNotes(e.target.value)}
+                                        placeholder="Optional notes about the outcome..."
+                                        className="h-14 text-xs resize-none"
+                                    />
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSaveOutcome}
+                                        disabled={isSubmitting}
+                                        className="h-6 px-3 text-[10px]"
+                                    >
+                                        {isSubmitting ? 'Saving...' : 'Save'}
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
                     {outcomeRecorded && (
-                        <p className="mt-2 text-[10px] text-success font-medium">Outcome recorded</p>
+                        <p className="mt-2 text-[10px] text-success font-medium" aria-live="polite">Outcome recorded</p>
                     )}
 
                     {/* Actions */}

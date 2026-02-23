@@ -52,7 +52,7 @@ import type { StructuredStarter } from "@/lib/utils/starter-parser"
 import { DecisionTimeline } from "@/components/specialists/decision-timeline"
 import { HandoffCard } from "@/components/specialists/handoff-card"
 import { HandoffBreadcrumb } from "@/components/specialists/handoff-breadcrumb"
-import type { HandoffTrailEntry } from "@/components/specialists/handoff-breadcrumb"
+import type { HandoffTrailEntry } from "@/contexts/advisor-panel-context"
 import { getProactiveOpener, markInsightRead, getSpecialistGreetingContext } from "@/actions/agent-insights"
 import { createArtifact, exportArtifactToGoogleDocs } from "@/actions/agent-artifacts"
 import type { ArtifactContentType } from "@/actions/agent-artifacts"
@@ -2554,7 +2554,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         reason={dynamicSuggestion.reason}
                                         messageCount={messages.length}
                                         onContinue={() => handleSwitchSpecialist(suggested.id)}
-                                        onStay={() => {/* dismiss by not switching */}}
+                                        onStay={() => setDynamicSuggestion(null)}
                                     />
                                 </div>
                             )
@@ -3461,7 +3461,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         reason={dynamicSuggestion.reason}
                                         messageCount={messages.length}
                                         onContinue={() => handleSwitchSpecialist(suggested.id)}
-                                        onStay={() => {/* dismiss by not switching */}}
+                                        onStay={() => setDynamicSuggestion(null)}
                                     />
                                 </div>
                             )

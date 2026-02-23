@@ -11,16 +11,9 @@
 import { Badge } from '@/components/ui/badge'
 import { MessageSquare, Scale, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { RelationshipSummary } from '@/actions/agent-memory'
 
 export type TrustLevel = 'new' | 'building' | 'established' | 'deep'
-
-export interface RelationshipSummary {
-    level: TrustLevel
-    conversationCount: number
-    decisionsCount: number
-    lastConversationDate: string | null
-    mood: string | null
-}
 
 const TRUST_CONFIG: Record<TrustLevel, { label: string; className: string }> = {
     new: { label: 'New', className: 'bg-muted text-muted-foreground' },
@@ -72,9 +65,11 @@ export function RelationshipBar({ summary, className }: RelationshipBarProps) {
 }
 
 function formatRelativeDate(dateStr: string): string {
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return 'Unknown'
     const now = Date.now()
-    const then = new Date(dateStr).getTime()
-    const diffMs = now - then
+    const diffMs = now - date.getTime()
+    if (diffMs < 0) return 'Just now'
     const diffDays = Math.floor(diffMs / 86400000)
     if (diffDays === 0) return 'today'
     if (diffDays === 1) return 'yesterday'

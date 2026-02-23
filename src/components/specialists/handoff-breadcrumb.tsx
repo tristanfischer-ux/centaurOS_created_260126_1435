@@ -11,11 +11,7 @@ import Image from 'next/image'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getSpecialistById } from '@/app/(platform)/agents/specialists-data'
-
-export interface HandoffTrailEntry {
-    specialistId: string
-    name: string
-}
+import type { HandoffTrailEntry } from '@/contexts/advisor-panel-context'
 
 interface HandoffBreadcrumbProps {
     /** The handoff trail (oldest first, current last) */
@@ -39,7 +35,7 @@ export function HandoffBreadcrumb({
     if (trail.length === 0) return null
 
     return (
-        <div className={cn('flex items-center gap-1 flex-wrap', className)}>
+        <nav aria-label="Specialist handoff trail" className={cn('flex items-center gap-1 flex-wrap', className)}>
             {trail.map((entry, idx) => {
                 const specialist = getSpecialistById(entry.specialistId)
                 return (
@@ -47,6 +43,7 @@ export function HandoffBreadcrumb({
                         <button
                             type="button"
                             onClick={() => onSwitchBack?.(entry.specialistId)}
+                            aria-label={`Switch back to ${entry.name}`}
                             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-international-orange transition-colors"
                         >
                             {specialist?.avatarImage && (
@@ -63,13 +60,13 @@ export function HandoffBreadcrumb({
                             )}
                             <span>{entry.name}</span>
                         </button>
-                        <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                        <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" aria-hidden="true" />
                     </div>
                 )
             })}
-            <span className="text-xs font-semibold text-foreground">
+            <span className="text-xs font-semibold text-foreground" aria-current="step">
                 {currentName}
             </span>
-        </div>
+        </nav>
     )
 }

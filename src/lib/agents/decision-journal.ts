@@ -226,13 +226,14 @@ export async function generateDecisionFollowUps(foundryId: string): Promise<numb
 
     if (!pendingDecisions?.length) return 0
 
-    // Check for existing follow-ups
+    // Check for existing follow-ups (filtered to only relevant decision IDs)
     const decisionIds = pendingDecisions.map(d => d.id)
     const { data: existing } = await admin
         .from('agent_insights')
         .select('domain_data')
         .eq('foundry_id', foundryId)
         .eq('insight_type', 'reminder')
+        .in('domain_data->>decision_id', decisionIds)
 
     const existingIds = new Set(
         (existing ?? [])
@@ -240,33 +241,36 @@ export async function generateDecisionFollowUps(foundryId: string): Promise<numb
             .filter(Boolean) as string[]
     )
 
-    let created = 0
-    for (const d of pendingDecisions) {
-        if (existingIds.has(d.id)) continue
-
-        const daysAgo = Math.floor((Date.now() - new Date(d.created_at).getTime()) / 86400000)
-
-        await admin.from('agent_insights').insert({
-            foundry_id: foundryId,
-            specialist_id: d.specialist_id,
-            insight_type: 'reminder',
-            urgency: 'important',
-            title: `How did this decision work out? (${daysAgo}d ago)`,
-            body: `You decided "${d.decision.slice(0, 150)}" ${daysAgo} days ago. Recording the outcome helps improve future advice.`,
-            domain_data: {
-                decision_id: d.id,
-                action_type: 'record_outcome',
-                days_since_decision: daysAgo,
-            },
-            suggested_actions: [
-                { label: 'Record outcome', action_type: 'record_outcome', action_data: { decisionId: d.id } },
-            ],
-            expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    // Build batch of inserts
+    const rows = pendingDecisions
+        .filter(d => !existingIds.has(d.id))
+        .map(d => {
+            const daysAgo = Math.floor((Date.now() - new Date(d.created_at).getTime()) / 86400000)
+            return {
+                foundry_id: foundryId,
+                specialist_id: d.specialist_id,
+                insight_type: 'reminder' as const,
+                urgency: 'important' as const,
+                title: 'How did this decision work out?',
+                body: `You decided "${d.decision.slice(0, 150)}" ${daysAgo} days ago. Recording the outcome helps improve future advice.`,
+                domain_data: {
+                    decision_id: d.id,
+                    decision_created_at: d.created_at,
+                    action_type: 'record_outcome',
+                    days_since_decision: daysAgo,
+                },
+                suggested_actions: [
+                    { label: 'Record outcome', action_type: 'record_outcome', action_data: { decisionId: d.id } },
+                ],
+                expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+            }
         })
-        created++
+
+    if (rows.length > 0) {
+        await admin.from('agent_insights').insert(rows)
     }
 
-    return created
+    return rows.length
 }
 
 /**
@@ -286,23 +290,28 @@ export function detectDecisionPatterns(decisions: DecisionEntry[]): string[] {
     const patterns: string[] = []
     const decisionTexts = decisions.map(d => d.decision.toLowerCase())
 
+    /** Word-boundary match to avoid substring false positives (e.g. "now" in "knowledge") */
+    function matchesWord(text: string, word: string): boolean {
+        return new RegExp('\\b' + word + '\\b').test(text)
+    }
+
     // Speed bias detection
     const speedWords = ['fast', 'quick', 'now', 'immediately', 'today', 'this week', 'ship', 'launch']
-    const speedCount = decisionTexts.filter(d => speedWords.some(w => d.includes(w))).length
+    const speedCount = decisionTexts.filter(d => speedWords.some(w => matchesWord(d, w))).length
     if (speedCount > decisions.length * 0.4) {
         patterns.push('This founder tends to favor speed and urgency in decisions. They prefer action over analysis.')
     }
 
     // Caution bias detection
     const cautionWords = ['wait', 'think about', 'more data', 'research', 'careful', 'risk']
-    const cautionCount = decisionTexts.filter(d => cautionWords.some(w => d.includes(w))).length
+    const cautionCount = decisionTexts.filter(d => cautionWords.some(w => matchesWord(d, w))).length
     if (cautionCount > decisions.length * 0.4) {
         patterns.push('This founder tends to be deliberate and data-driven. They prefer thorough analysis before committing.')
     }
 
     // People-first detection
     const peopleWords = ['hire', 'team', 'culture', 'people', 'onboard']
-    const peopleCount = decisionTexts.filter(d => peopleWords.some(w => d.includes(w))).length
+    const peopleCount = decisionTexts.filter(d => peopleWords.some(w => matchesWord(d, w))).length
     if (peopleCount > decisions.length * 0.3) {
         patterns.push('This founder prioritizes people and team decisions. They invest heavily in hiring and culture.')
     }

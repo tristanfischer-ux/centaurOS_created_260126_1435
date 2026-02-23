@@ -84,13 +84,13 @@ export function DecisionTimeline({ specialistId, className }: DecisionTimelinePr
             )}
 
             {/* Timeline */}
-            <div className="relative pl-4">
+            <div className="relative pl-4" role="list">
                 {/* Vertical line */}
-                <div className="absolute left-[7px] top-0 bottom-0 w-px bg-border" />
+                <div className="absolute left-[7px] top-0 bottom-0 w-px bg-border" aria-hidden="true" />
 
                 <div className="space-y-3">
                     {decisions.map((decision) => (
-                        <div key={decision.id} className="relative">
+                        <div key={decision.id} className="relative" role="listitem">
                             {/* Dot */}
                             <div
                                 className={cn(
