@@ -17,6 +17,7 @@
  */
 
 import { useRouter } from "next/navigation"
+import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { useEffect, useMemo, useRef } from "react"
 import {
   Loader2,
@@ -262,7 +263,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                           Continue to the Build stage for full research report, detailed engineering, and parametric CAD.
                         </p>
                       </div>
-                      <Button onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
+                      <Button onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5">
                         Continue to Build
                         <ArrowRight className="h-4 w-4" />
                       </Button>

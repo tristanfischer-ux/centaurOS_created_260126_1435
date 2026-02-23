@@ -38,6 +38,7 @@ import { CadLabMilestone } from "@/components/cad/cad-lab-milestone"
 import { SECTOR_LABELS } from "@/types/foundry"
 
 import { cn } from "@/lib/utils"
+import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { CadLabProvider, useCadLab } from "./cad-lab-context"
 import { CadLabNav } from "./cad-lab-nav"
 import { formatRelativeTime } from "./cad-lab-utils"
@@ -64,7 +65,7 @@ const STAGE_LABELS: Record<string, string> = {
  * Derives the current pipeline stage label from the URL pathname.
  */
 function getCurrentStageLabel(pathname: string): string {
-  const segment = pathname.replace("/the-forge/cad-lab", "").replace(/^\//, "").split("/")[0]
+  const segment = pathname.replace(FORGE_ROUTES.cadLab, "").replace(/^\//, "").split("/")[0]
   return STAGE_LABELS[segment] ?? "Concept"
 }
 
@@ -90,23 +91,14 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     milestone, setMilestone,
   } = useCadLab()
 
-  // Auto-load project: ?new=true → start fresh; ?project=<id> → load that project; else restore last active from localStorage
+  // Load project only when explicitly requested via ?project=<id>.
+  // Bare /the-forge/cad-lab always starts with a blank form (safe default).
   const projectParam = searchParams.get("project")
-  const newParam = searchParams.get("new")
   useEffect(() => {
-    if (newParam === "true") {
-      handleReset()
-      return
-    }
     if (projectParam) {
       handleLoadProject(projectParam)
-      return
     }
-    const stored = typeof window !== "undefined" ? localStorage.getItem("forgeos:cad-lab:active-project") : null
-    if (stored && !activeProjectId) {
-      handleLoadProject(stored)
-    }
-  }, [projectParam, newParam, activeProjectId, handleLoadProject, handleReset])
+  }, [projectParam, handleLoadProject])
 
   const isAnyActive = isResearching || isDecomposing || isBatchRunning || activeModuleId !== null
   const currentStageLabel = getCurrentStageLabel(pathname)
@@ -116,7 +108,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
       {/* ── Breadcrumb ── */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
         <Link
-          href="/the-forge"
+          href={FORGE_ROUTES.home}
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
           The Forge
@@ -274,10 +266,10 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
         <CadLabNav />
         <div className="flex items-center gap-1 self-center sm:self-auto">
           <Link
-            href="/the-forge/cad-lab/templates"
+            href={FORGE_ROUTES.cadLabTemplates}
             className={cn(
               "text-sm font-medium transition-colors rounded-md px-3 py-2",
-              pathname === "/the-forge/cad-lab/templates"
+              pathname === FORGE_ROUTES.cadLabTemplates
                 ? "text-international-orange font-semibold bg-orange-50"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted",
             )}
@@ -285,10 +277,10 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
             Template Library
           </Link>
           <Link
-            href="/the-forge/cad-lab/mashup"
+            href={FORGE_ROUTES.cadLabMashup}
             className={cn(
               "text-sm font-medium transition-colors rounded-md px-3 py-2",
-              pathname === "/the-forge/cad-lab/mashup"
+              pathname === FORGE_ROUTES.cadLabMashup
                 ? "text-international-orange font-semibold bg-orange-50"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted",
             )}

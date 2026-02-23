@@ -9,10 +9,11 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { FORGE_ROUTES } from "@/lib/forge-routes"
 
 export default function CadLabAnalysisRedirect(): React.ReactNode {
   const router = useRouter()
-  useEffect(() => { router.replace("/the-forge/cad-lab/build") }, [router])
+  useEffect(() => { router.replace(FORGE_ROUTES.cadLabBuild) }, [router])
   return (
     <div className="py-12 text-center text-sm text-muted-foreground">
       Redirecting to Build stage...

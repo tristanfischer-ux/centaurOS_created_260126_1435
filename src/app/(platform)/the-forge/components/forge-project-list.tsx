@@ -30,6 +30,7 @@ import type { LucideIcon } from "lucide-react"
 
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
+import { FORGE_ROUTES, cadLabProjectUrl } from "@/lib/forge-routes"
 import { listCadLabProjects } from "@/actions/cad-lab-projects"
 import { RecentProjectsGrid } from "./recent-projects-grid"
 import { ForgeScreenContext } from "./forge-screen-context"
@@ -76,7 +77,7 @@ const STARTING_PATHS: StartingPath[] = [
     accentBorder: "border-l-international-orange",
     headline: "Start from a description",
     description: "Describe your product and get research, CAD models, analysis, and a supplier-ready package.",
-    href: "/the-forge/cad-lab?new=true",
+    href: FORGE_ROUTES.cadLab,
     cta: "Start designing",
     outputs: ["3D CAD", "STEP files", "Engineering report", "DFM analysis", "RFQ package"],
     pipelineStages: [
@@ -162,7 +163,7 @@ function ContinueCard({ project }: { project: CadLabProjectSummary }): React.Rea
 
   return (
     <Link
-      href={`/the-forge/cad-lab?project=${project.id}`}
+      href={cadLabProjectUrl(project.id)}
       className="group flex items-center gap-4 rounded-xl border-2 border-international-orange/20 bg-international-orange-light/30 p-5 transition-all hover:border-international-orange/40 hover:shadow-md"
     >
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-international-orange text-white">

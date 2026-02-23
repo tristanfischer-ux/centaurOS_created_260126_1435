@@ -40,6 +40,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { createClient } from "@/lib/supabase/client"
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -186,14 +187,14 @@ export default function TemplateLibraryPage(): React.ReactElement {
       {/* ── Breadcrumb ── */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
         <Link
-          href="/the-forge"
+          href={FORGE_ROUTES.home}
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
           The Forge
         </Link>
         <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
         <Link
-          href="/the-forge/cad-lab"
+          href={FORGE_ROUTES.cadLab}
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
           Pipeline

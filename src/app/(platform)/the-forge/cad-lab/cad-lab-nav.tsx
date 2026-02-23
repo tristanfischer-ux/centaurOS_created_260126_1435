@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { FORGE_ROUTES } from "@/lib/forge-routes"
 import {
   Dialog,
   DialogContent,
@@ -51,7 +52,7 @@ const STAGES: StageDefinition[] = [
     id: "research",
     label: "Concept",
     icon: Search,
-    href: "/the-forge/cad-lab",
+    href: FORGE_ROUTES.cadLab,
     description: "Describe your product. Get research, module decomposition, and AI blueprint illustrations.",
     unlockHint: "Always available",
     features: ["Engineering research report", "Module decomposition", "AI blueprint illustrations", "Source citations"],
@@ -60,7 +61,7 @@ const STAGES: StageDefinition[] = [
     id: "build",
     label: "Build",
     icon: Box,
-    href: "/the-forge/cad-lab/build",
+    href: FORGE_ROUTES.cadLabBuild,
     description: "Parametric CadQuery model generation for each sub-assembly.",
     unlockHint: "Complete the Concept stage first",
     features: ["Parametric CAD code", "7 orthographic views", "STEP + STL exports", "DFM analysis"],
@@ -69,7 +70,7 @@ const STAGES: StageDefinition[] = [
     id: "review",
     label: "Review",
     icon: ClipboardCheck,
-    href: "/the-forge/cad-lab/review",
+    href: FORGE_ROUTES.cadLabReview,
     description: "Supplier-ready engineering review package.",
     unlockHint: "Generate at least one module in the Build stage",
     features: ["Review document", "Expert discipline matching", "Print & copy support", "RFQ package"],
@@ -120,8 +121,8 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
         <div className="flex items-start w-full max-w-2xl mx-auto">
           {STAGES.map((stage, index) => {
             const { enabled, completed } = access[stage.id]
-            const isActive = stage.href === "/the-forge/cad-lab"
-              ? pathname === "/the-forge/cad-lab"
+            const isActive = stage.href === FORGE_ROUTES.cadLab
+              ? pathname === FORGE_ROUTES.cadLab
               : pathname.startsWith(stage.href)
             const Icon = stage.icon
 

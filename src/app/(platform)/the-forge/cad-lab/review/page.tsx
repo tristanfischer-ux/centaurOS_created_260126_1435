@@ -25,6 +25,7 @@ import {
   FileText,
 } from "lucide-react"
 
+import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -77,7 +78,7 @@ export default function CadLabReviewPage(): React.ReactNode {
           title="No modules generated yet"
           description="Generate at least one module in the Build stage to create a supplier-ready review package with expert discipline recommendations."
           action={
-            <Button onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
+            <Button onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5">
               <Box className="h-4 w-4" />
               Go to Build
             </Button>
@@ -100,7 +101,7 @@ export default function CadLabReviewPage(): React.ReactNode {
             </p>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5 text-xs">
+        <Button variant="ghost" size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5 text-xs">
           <ArrowLeft className="h-3 w-3" /> Back to Build
         </Button>
       </div>
@@ -236,7 +237,7 @@ export default function CadLabReviewPage(): React.ReactNode {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
+              <Button variant="outline" onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5">
                 <Download className="h-4 w-4" />
                 Back to Downloads
               </Button>

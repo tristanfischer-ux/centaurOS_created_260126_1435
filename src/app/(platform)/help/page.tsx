@@ -25,6 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { VideoWalkthrough } from "@/components/ui/video-walkthrough"
 import { typography } from "@/lib/design-system/typography"
 import { VIDEOS, VIDEO_LIBRARY_ORDER } from "@/lib/video-urls"
+import { FORGE_ROUTES } from "@/lib/forge-routes"
 
 export const metadata: Metadata = {
   title: "Help Center | ForgeOS",
@@ -76,7 +77,7 @@ const FEATURE_GUIDES = [
     icon: Flame,
     title: "The Forge",
     description: "Product development and manufacturing",
-    href: "/the-forge/cad-lab",
+    href: FORGE_ROUTES.cadLab,
   },
   {
     icon: Store,

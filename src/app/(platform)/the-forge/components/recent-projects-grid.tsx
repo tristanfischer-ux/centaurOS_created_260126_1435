@@ -16,6 +16,7 @@ import { Search, Clock, Flame } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { cadLabProjectUrl } from "@/lib/forge-routes"
 
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 
@@ -103,7 +104,7 @@ function CadLabProjectCard({ project }: { project: CadLabProjectSummary }): Reac
   const progress = PIPELINE_PROGRESS[project.status] ?? 0
 
   return (
-    <Link href={`/the-forge/cad-lab?project=${project.id}`}>
+    <Link href={cadLabProjectUrl(project.id)}>
       <Card className="group cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5">
         <div className="h-32 rounded-t-xl overflow-hidden bg-gradient-to-br from-international-orange/5 to-muted relative">
           {project.thumbnailSvg ? (

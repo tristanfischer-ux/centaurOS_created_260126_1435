@@ -34,7 +34,7 @@ describe("ForgeProjectList", () => {
     expect(screen.getByRole("heading", { name: "The Forge" })).toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "No designs yet" })).toBeInTheDocument()
     const cadLabLink = screen.getByRole("link", { name: /Start from a description/i })
-    expect(cadLabLink).toHaveAttribute("href", "/the-forge/cad-lab?new=true")
+    expect(cadLabLink).toHaveAttribute("href", "/the-forge/cad-lab")
   })
 
   it("renders project cards when projects exist", async () => {

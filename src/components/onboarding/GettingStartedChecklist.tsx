@@ -19,6 +19,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { FORGE_ROUTES } from '@/lib/forge-routes'
 import type { OnboardingData } from '@/actions/onboarding'
 
 const TOTAL_ITEMS = 6
@@ -36,7 +37,7 @@ const CHECKLIST_ITEMS: Array<{
   { key: 'checklist_objective_created', label: 'Create your first objective', href: '/new-objectives', icon: Target },
   { key: 'checklist_team_member_added', label: 'Invite a team member', href: '/team', icon: Users },
   { key: 'checklist_marketplace_explored', label: 'Explore the marketplace', href: '/marketplace', icon: Store },
-  { key: 'checklist_forge_project_created', label: 'Start a Forge project', href: '/the-forge/cad-lab', icon: Flame },
+  { key: 'checklist_forge_project_created', label: 'Start a Forge project', href: FORGE_ROUTES.cadLab, icon: Flame },
 ]
 
 export interface GettingStartedChecklistProps {

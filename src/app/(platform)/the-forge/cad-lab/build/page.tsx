@@ -43,6 +43,7 @@ import {
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -162,7 +163,7 @@ export default function CadLabBuildPage(): React.ReactNode {
           title="Concept stage not completed"
           description="Complete the Concept stage to identify modules and sub-assemblies for your design."
           action={
-            <Button onClick={() => router.push("/the-forge/cad-lab")} className="gap-1.5">
+            <Button onClick={() => router.push(FORGE_ROUTES.cadLab)} className="gap-1.5">
               <Search className="h-4 w-4" />
               Go to Concept
             </Button>
@@ -202,7 +203,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push("/the-forge/cad-lab/review")}>
+                <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push(FORGE_ROUTES.cadLabReview)}>
                   <ClipboardCheck className="h-3 w-3" /> Review Package
                 </Button>
               </div>
@@ -324,7 +325,7 @@ export default function CadLabBuildPage(): React.ReactNode {
               </Button>
             ) : (
               <Button
-                onClick={() => router.push("/the-forge/cad-lab")}
+                onClick={() => router.push(FORGE_ROUTES.cadLab)}
                 variant="outline"
               >
                 <Search className="h-4 w-4 mr-2" />Go to Concept
