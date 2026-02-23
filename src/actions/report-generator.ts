@@ -323,7 +323,7 @@ async function fetchMetricsData(
   ).length
   const onTimeRate = completedWithDeadline.length > 0
     ? Math.round((onTimeCount / completedWithDeadline.length) * 100)
-    : 100
+    : null
 
   const completedChange = calculatePercentChange(rollup.stats.tasks_completed, rollup.previous_week.tasks_completed)
   const createdChange = calculatePercentChange(rollup.stats.tasks_created, rollup.previous_week.tasks_created)
@@ -348,18 +348,25 @@ async function fetchMetricsData(
       trend: getTrendDirection(rollup.stats.tasks_created - rollup.previous_week.tasks_created, 2),
       changePercent: Math.round(createdChange),
     },
-    {
+  ]
+
+  // Only show velocity when there's actual task creation data to compare against
+  if (rollup.stats.tasks_created > 0) {
+    kpiMetrics.push({
       label: 'Velocity',
       value: velocity,
-      previousValue: 100,
+      previousValue: velocity,
       format: 'percentage',
-      trend: velocity > 105 ? 'up' : velocity < 95 ? 'down' : 'stable',
-      changePercent: velocity - 100,
-    },
+      trend: 'stable',
+      changePercent: 0,
+    })
+  }
+
+  kpiMetrics.push(
     {
       label: 'Blockers Reported',
       value: rollup.stats.blockers_reported,
-      previousValue: 0,
+      previousValue: rollup.stats.blockers_reported,
       format: 'number',
       trend: rollup.stats.blockers_reported > 3 ? 'down' : 'stable',
       changePercent: 0,
@@ -367,20 +374,24 @@ async function fetchMetricsData(
     {
       label: 'Overdue Tasks',
       value: overdueTasks,
-      previousValue: 0,
+      previousValue: overdueTasks,
       format: 'number',
       trend: overdueTasks > 0 ? 'down' : 'stable',
       changePercent: 0,
     },
-    {
+  )
+
+  // Only show on-time rate when there are completed tasks with deadlines
+  if (onTimeRate !== null) {
+    kpiMetrics.push({
       label: 'On-Time Rate',
       value: onTimeRate,
-      previousValue: 100,
+      previousValue: onTimeRate,
       format: 'percentage',
       trend: onTimeRate >= 90 ? 'up' : onTimeRate >= 70 ? 'stable' : 'down',
-      changePercent: onTimeRate - 100,
-    },
-  ]
+      changePercent: 0,
+    })
+  }
 
   // Build a template-based executive summary
   const highlights: string[] = []
@@ -614,7 +625,7 @@ async function fetchBlockersData(
     const profile = s.profiles as unknown as { full_name: string | null; role: string | null } | null
     const reportedDate = (s as Record<string, unknown>).standup_date as string | undefined
     const ageInDays = reportedDate
-      ? Math.ceil((Date.now() - new Date(reportedDate).getTime()) / (1000 * 60 * 60 * 24))
+      ? Math.floor((Date.now() - new Date(reportedDate).getTime()) / (1000 * 60 * 60 * 24))
       : undefined
 
     return {
@@ -686,17 +697,29 @@ async function fetchWeekAheadData(
   const nextWeek = new Date(today)
   nextWeek.setDate(today.getDate() + 7)
 
-  const { data: tasks, error } = await supabase
-    .from('tasks')
-    .select('id, title, end_date, risk_level, assignee_id, objective_id, profiles!tasks_assignee_id_fkey(full_name), objectives!tasks_objective_id_fkey(title)')
-    .eq('foundry_id', foundryId)
-    .in('status', ['Pending', 'Accepted'])
-    .is('deleted_at', null)
-    .not('end_date', 'is', null)
-    .gte('end_date', today.toISOString().split('T')[0])
-    .lte('end_date', nextWeek.toISOString().split('T')[0])
-    .order('end_date', { ascending: true })
-    .limit(20)
+  // Run detail query (limited to 20) and count query (unlimited) in parallel
+  const [{ data: tasks, error }, { count: totalCount }] = await Promise.all([
+    supabase
+      .from('tasks')
+      .select('id, title, end_date, risk_level, assignee_id, objective_id, profiles!tasks_assignee_id_fkey(full_name), objectives!tasks_objective_id_fkey(title)')
+      .eq('foundry_id', foundryId)
+      .in('status', ['Pending', 'Accepted'])
+      .is('deleted_at', null)
+      .not('end_date', 'is', null)
+      .gte('end_date', today.toISOString().split('T')[0])
+      .lte('end_date', nextWeek.toISOString().split('T')[0])
+      .order('end_date', { ascending: true })
+      .limit(20),
+    supabase
+      .from('tasks')
+      .select('*', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId)
+      .in('status', ['Pending', 'Accepted'])
+      .is('deleted_at', null)
+      .not('end_date', 'is', null)
+      .gte('end_date', today.toISOString().split('T')[0])
+      .lte('end_date', nextWeek.toISOString().split('T')[0]),
+  ])
 
   if (error) {
     console.warn('[ReportGenerator] Week ahead fetch failed:', error.message)
@@ -716,7 +739,7 @@ async function fetchWeekAheadData(
     }
   })
 
-  return { tasks: upcomingTasks, totalDueNextWeek: upcomingTasks.length }
+  return { tasks: upcomingTasks, totalDueNextWeek: totalCount ?? upcomingTasks.length }
 }
 
 // ========================
