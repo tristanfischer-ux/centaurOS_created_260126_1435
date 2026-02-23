@@ -46,95 +46,102 @@ export interface EmotionalContext {
 
 // ─── Signal Detection Patterns ──────────────────────────────────────────────
 
+/** A pattern with an associated weight for confidence scoring */
+interface WeightedPattern {
+    pattern: RegExp
+    /** 2.0 = strong/unambiguous signal (clears threshold alone), 1.0 = normal (needs a second match) */
+    weight: number
+}
+
 /** Stress indicators: urgency, pressure, overwhelm */
-const STRESS_PATTERNS = [
-    /\basap\b/i,
-    /\burgent\b/i,
-    /\bhelp\b/i,
-    /\bcrisis\b/i,
-    /\bblocked\b/i,
-    /\bstuck\b/i,
-    /\bpanic\b/i,
-    /\boverwhel/i,
-    /\bfalling apart\b/i,
-    /\bcan't keep up\b/i,
-    /\brunning out of\b/i,
-    /\bdesperately\b/i,
-    /!{2,}/, // Multiple exclamation marks
+const STRESS_PATTERNS: WeightedPattern[] = [
+    { pattern: /\basap\b/i, weight: 1.0 },
+    { pattern: /\burgent\b/i, weight: 2.0 },
+    { pattern: /\bhelp\b/i, weight: 1.0 },
+    { pattern: /\bcrisis\b/i, weight: 2.0 },
+    { pattern: /\bblocked\b/i, weight: 1.0 },
+    { pattern: /\bstuck\b/i, weight: 1.0 },
+    { pattern: /\bpanic\b/i, weight: 2.0 },
+    { pattern: /\boverwhel/i, weight: 2.0 },
+    { pattern: /\bfalling apart\b/i, weight: 2.0 },
+    { pattern: /\bcan't keep up\b/i, weight: 2.0 },
+    { pattern: /\brunning out of\b/i, weight: 2.0 },
+    { pattern: /\bdesperately\b/i, weight: 2.0 },
+    { pattern: /!{2,}/, weight: 1.0 }, // Multiple exclamation marks
 ]
 
 /** Excitement indicators: wins, positive energy, celebration */
-const EXCITEMENT_PATTERNS = [
-    /\bjust (closed|signed|landed|won|shipped|launched)\b/i,
-    /\bgreat news\b/i,
-    /\bexcit/i,
-    /\bamazing\b/i,
-    /\bincredible\b/i,
-    /\bwe (did it|made it|got it|nailed)\b/i,
-    /\bbreakthrough\b/i,
-    /\bhuge\b/i,
-    /\bcelebrat/i,
-    /\b🎉|🚀|💪|🔥/,
+const EXCITEMENT_PATTERNS: WeightedPattern[] = [
+    { pattern: /\bjust (closed|signed|landed|won|shipped|launched)\b/i, weight: 2.0 },
+    { pattern: /\bgreat news\b/i, weight: 2.0 },
+    { pattern: /\bexcit/i, weight: 2.0 },
+    { pattern: /\bamazing\b/i, weight: 1.0 },
+    { pattern: /\bincredible\b/i, weight: 1.0 },
+    { pattern: /\bwe (did it|made it|got it|nailed)\b/i, weight: 2.0 },
+    { pattern: /\bbreakthrough\b/i, weight: 2.0 },
+    { pattern: /\bhuge\b/i, weight: 1.0 },
+    { pattern: /\bcelebrat/i, weight: 2.0 },
+    { pattern: /\b🎉|🚀|💪|🔥/, weight: 1.0 },
 ]
 
 /** Frustration indicators: negativity, repetition, corrections */
-const FRUSTRATION_PATTERNS = [
-    /\balready (said|told|mentioned|asked)\b/i,
-    /\bthat'?s not what i\b/i,
-    /\bnot helpful\b/i,
-    /\bwrong\b/i,
-    /\bno,\s/i,
-    /\bfrustrat/i,
-    /\bannoy/i,
-    /\bwaste of time\b/i,
-    /\bstill (not|isn't|doesn't|won't)\b/i,
-    /\bi (said|asked|meant)\b/i,
-    /\bwhat part of\b/i,
+const FRUSTRATION_PATTERNS: WeightedPattern[] = [
+    { pattern: /\balready (said|told|mentioned|asked)\b/i, weight: 2.0 },
+    { pattern: /\bthat'?s not what i\b/i, weight: 2.0 },
+    { pattern: /\bnot helpful\b/i, weight: 2.0 },
+    { pattern: /\bwrong\b/i, weight: 1.0 },
+    { pattern: /\bno,\s/i, weight: 1.0 },
+    { pattern: /\bfrustrat/i, weight: 2.0 },
+    { pattern: /\bannoy/i, weight: 2.0 },
+    { pattern: /\bwaste of time\b/i, weight: 2.0 },
+    { pattern: /\bstill (not|isn't|doesn't|won't)\b/i, weight: 2.0 },
+    { pattern: /\bi (said|asked|meant)\b/i, weight: 2.0 },
+    { pattern: /\bwhat part of\b/i, weight: 2.0 },
 ]
 
 /** Uncertainty indicators: hedging, many questions, doubt */
-const UNCERTAINTY_PATTERNS = [
-    /\bi'?m not sure\b/i,
-    /\bi don'?t know\b/i,
-    /\bmaybe\b/i,
-    /\bperhaps\b/i,
-    /\bwhat do you think\b/i,
-    /\bshould (i|we)\b/i,
-    /\bis it (worth|possible|a good idea)\b/i,
-    /\bi'?m (confused|lost|torn)\b/i,
-    /\bwhat would you (do|suggest|recommend)\b/i,
-    /\?\s*\?/, // Multiple question marks
+const UNCERTAINTY_PATTERNS: WeightedPattern[] = [
+    { pattern: /\bi'?m not sure\b/i, weight: 2.0 },
+    { pattern: /\bi don'?t know\b/i, weight: 2.0 },
+    { pattern: /\bmaybe\b/i, weight: 1.0 },
+    { pattern: /\bperhaps\b/i, weight: 1.0 },
+    { pattern: /\bwhat do you think\b/i, weight: 2.0 },
+    { pattern: /\bshould (i|we)\b/i, weight: 1.0 },
+    { pattern: /\bis it (worth|possible|a good idea)\b/i, weight: 1.0 },
+    { pattern: /\bi'?m (confused|lost|torn)\b/i, weight: 2.0 },
+    { pattern: /\bwhat would you (do|suggest|recommend)\b/i, weight: 2.0 },
+    { pattern: /\?\s*\?/, weight: 1.0 }, // Multiple question marks
 ]
 
 /** Deflation indicators: low energy, resignation, disengagement */
-const DEFLATION_PATTERNS = [
-    /\bwhatever you think\b/i,
-    /\bi guess\b/i,
-    /\bdoesn't matter\b/i,
-    /\bgive up\b/i,
-    /\bpointless\b/i,
-    /\bwhy bother\b/i,
-    /\btired of\b/i,
-    /\bdon't care\b/i,
-    /\bjust do whatever\b/i,
-    /\bnot sure it'?s worth\b/i,
+const DEFLATION_PATTERNS: WeightedPattern[] = [
+    { pattern: /\bwhatever you think\b/i, weight: 2.0 },
+    { pattern: /\bi guess\b/i, weight: 1.0 },
+    { pattern: /\bdoesn't matter\b/i, weight: 2.0 },
+    { pattern: /\bgive up\b/i, weight: 2.0 },
+    { pattern: /\bpointless\b/i, weight: 2.0 },
+    { pattern: /\bwhy bother\b/i, weight: 2.0 },
+    { pattern: /\btired of\b/i, weight: 2.0 },
+    { pattern: /\bdon't care\b/i, weight: 2.0 },
+    { pattern: /\bjust do whatever\b/i, weight: 2.0 },
+    { pattern: /\bnot sure it'?s worth\b/i, weight: 2.0 },
 ]
 
 // ─── Scoring ────────────────────────────────────────────────────────────────
 
 /**
- * Counts pattern matches in the message text.
+ * Sums the weights of all matching patterns in the message text.
  *
  * @param text - The user's message
- * @param patterns - Array of regex patterns to match against
- * @returns Number of unique pattern matches
+ * @param patterns - Array of weighted patterns to match against
+ * @returns Total weight of matched patterns (strong signals = 2.0, normal = 1.0)
  */
-function countMatches(text: string, patterns: RegExp[]): number {
-    let count = 0
-    for (const pattern of patterns) {
-        if (pattern.test(text)) count++
+function countMatches(text: string, patterns: WeightedPattern[]): number {
+    let score = 0
+    for (const { pattern, weight } of patterns) {
+        if (pattern.test(text)) score += weight
     }
-    return count
+    return score
 }
 
 /**
@@ -278,7 +285,8 @@ export function detectEmotionalSignal(message: string): EmotionalContext {
     }
 
     // Calculate confidence (0-1 scale)
-    // 1 match = 0.3, 2 matches = 0.5, 3+ matches = 0.7+
+    // Strong signal (2.0) = 0.50 (clears 0.3 threshold alone)
+    // Normal signal (1.0) = 0.25 (needs a second match to clear threshold)
     const confidence = Math.min(bestScore * 0.25, 1)
 
     // Below threshold → neutral

@@ -129,6 +129,45 @@ describe('detectEmotionalSignal', () => {
         })
     })
 
+    // ─── Single Strong Signals ────────────────────────────────────────────
+    describe('single strong signal detection', () => {
+        it('detects crisis as stress from a single strong signal', () => {
+            const result = detectEmotionalSignal("We're in crisis mode")
+            expect(result.signal).toBe('stress')
+            expect(result.confidence).toBeGreaterThanOrEqual(0.3)
+        })
+
+        it('detects launch as excitement from a single strong signal', () => {
+            const result = detectEmotionalSignal('We just launched the product')
+            expect(result.signal).toBe('excitement')
+            expect(result.confidence).toBeGreaterThanOrEqual(0.3)
+        })
+
+        it('detects correction as frustration from a single strong signal', () => {
+            const result = detectEmotionalSignal("That's not what I asked for")
+            expect(result.signal).toBe('frustration')
+            expect(result.confidence).toBeGreaterThanOrEqual(0.3)
+        })
+
+        it('detects "I don\'t know" as uncertainty from a single strong signal', () => {
+            const result = detectEmotionalSignal("I don't know what to do")
+            expect(result.signal).toBe('uncertainty')
+            expect(result.confidence).toBeGreaterThanOrEqual(0.3)
+        })
+
+        it('detects giving up as deflation from a single strong signal', () => {
+            const result = detectEmotionalSignal('I give up')
+            expect(result.signal).toBe('deflation')
+            expect(result.confidence).toBeGreaterThanOrEqual(0.3)
+        })
+
+        it('still returns neutral for ambiguous single signals', () => {
+            expect(detectEmotionalSignal('Maybe we should look at Q3').signal).toBe('neutral')
+            expect(detectEmotionalSignal('Can you help me with pricing?').signal).toBe('neutral')
+            expect(detectEmotionalSignal('That is a huge market').signal).toBe('neutral')
+        })
+    })
+
     // ─── Structural Signals ──────────────────────────────────────────────
     describe('structural signal heuristics', () => {
         it('very short messages bias toward stress', () => {
