@@ -44,7 +44,7 @@ import {
   loadCadLabBatchStatus,
 } from "@/actions/cad-lab-projects"
 
-import { generateCadLabSingleImageAction } from "@/actions/cad-lab-images"
+import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction } from "@/actions/cad-lab-images"
 import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 import type {
@@ -140,7 +140,14 @@ export interface CadLabContextValue {
 
   // Image generation (Gemini blueprint illustrations)
   isGeneratingImages: boolean
-  handleGenerateModuleImages: (modules: CadLabModule[]) => Promise<void>
+  handleGenerateModuleImages: (modules: CadLabModule[], explicitProjectId?: string) => Promise<void>
+
+  // Progressive module reveal
+  revealedModuleIds: Set<string>
+
+  // System illustration (research report banner)
+  systemIllustrationUrl: string | null
+  systemIllustrationStatus: "idle" | "generating" | "complete" | "failed"
 
   // Integration (combined system assembly)
   integratedAssemblyStlUrl: string | null
@@ -263,6 +270,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Image generation state (Gemini blueprint illustrations) ──
   const [isGeneratingImages, setIsGeneratingImages] = useState(false)
+
+  // ── Progressive module reveal ──
+  const [revealedModuleIds, setRevealedModuleIds] = useState<Set<string>>(new Set())
+
+  // ── System illustration (research report banner) ──
+  const [systemIllustrationUrl, setSystemIllustrationUrl] = useState<string | null>(null)
+  const [systemIllustrationStatus, setSystemIllustrationStatus] = useState<"idle" | "generating" | "complete" | "failed">("idle")
 
   // ── Progress storytelling ──
   const [progressLines, setProgressLines] = useState<string[]>([])
@@ -427,8 +441,29 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
         // Auto-chain: trigger image generation immediately after decomposition
         // Non-blocking — images fill in progressively while user sees module cards
-        handleGenerateModuleImages(res.modules)
+        // Pass activeProjectId explicitly to avoid stale closure issues
+        handleGenerateModuleImages(res.modules, activeProjectId ?? undefined)
           .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
+
+        // Also trigger system illustration for research report (non-blocking)
+        if (activeProjectId) {
+          setSystemIllustrationStatus("generating")
+          generateCadLabSystemIllustrationAction(
+            activeProjectId,
+            subject,
+            res.modules.map((m) => m.name),
+            res.modules.map((m) => m.purpose),
+          )
+            .then((illRes) => {
+              if ("url" in illRes) {
+                setSystemIllustrationUrl(illRes.url)
+                setSystemIllustrationStatus("complete")
+              } else {
+                setSystemIllustrationStatus("failed")
+              }
+            })
+            .catch(() => setSystemIllustrationStatus("failed"))
+        }
       }
     } catch (err) {
       timers.forEach(clearTimeout)
@@ -439,9 +474,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
   }, [editableReport, subject, modelId, activeProjectId, refreshProjects, addProgressLine])
 
-  // ── Generate Gemini blueprint images for modules (progressive fill) ──
-  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[]) => {
-    if (modulesToProcess.length === 0 || !activeProjectId) return
+  // ── Generate Gemini blueprint images for modules (progressive reveal) ──
+  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string) => {
+    const projectId = explicitProjectId ?? activeProjectId
+    if (modulesToProcess.length === 0 || !projectId) return
     setIsGeneratingImages(true)
 
     // Immediately set all modules to "generating" image status in local state
@@ -454,23 +490,53 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     toast.info(`Generating ${modulesToProcess.length} blueprint illustrations...`)
 
-    // Process concurrently (batch of 3) with progressive fill
+    // Per-module safety timeout (30s) — reveal module even if image hasn't resolved
+    const moduleTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+    for (const mod of modulesToProcess) {
+      const timeout = setTimeout(() => {
+        setRevealedModuleIds((prev) => {
+          if (prev.has(mod.id)) return prev
+          const next = new Set(prev)
+          next.add(mod.id)
+          return next
+        })
+      }, 30_000)
+      moduleTimeouts.set(mod.id, timeout)
+    }
+
+    // Process concurrently (batch of 3) with progressive reveal
     const CONCURRENCY = 3
     let completedCount = 0
 
+    const revealModule = (moduleId: string): void => {
+      // Clear safety timeout since we're revealing now
+      const timeout = moduleTimeouts.get(moduleId)
+      if (timeout) {
+        clearTimeout(timeout)
+        moduleTimeouts.delete(moduleId)
+      }
+      setRevealedModuleIds((prev) => {
+        const next = new Set(prev)
+        next.add(moduleId)
+        return next
+      })
+    }
+
     const generateOne = async (mod: CadLabModule): Promise<void> => {
       try {
-        const res = await generateCadLabSingleImageAction(activeProjectId, mod)
+        const res = await generateCadLabSingleImageAction(projectId, mod)
         if ("module" in res) {
           setModules((prev) =>
-            prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.module.imageUrl, imageStatus: res.module.imageStatus } : m)),
+            prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.module.imageUrl, imageStatus: res.module.imageStatus, imageError: res.module.imageError } : m)),
           )
           if (res.module.imageStatus === "complete") completedCount++
         }
+        revealModule(mod.id)
       } catch {
         setModules((prev) =>
-          prev.map((m) => (m.id === mod.id ? { ...m, imageStatus: "failed" as const } : m)),
+          prev.map((m) => (m.id === mod.id ? { ...m, imageStatus: "failed" as const, imageError: "Network error" } : m)),
         )
+        revealModule(mod.id)
       }
     }
 
@@ -480,18 +546,24 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       await Promise.allSettled(batch.map(generateOne))
     }
 
+    // Clear any remaining safety timeouts
+    for (const timeout of moduleTimeouts.values()) {
+      clearTimeout(timeout)
+    }
+    moduleTimeouts.clear()
+
     // Final persist
     setModules((current) => {
-      if (activeProjectId) {
-        saveCadLabModules(activeProjectId, current)
-          .then(() => setLastSaved(new Date().toISOString()))
-          .catch(() => { /* Non-critical */ })
-      }
+      saveCadLabModules(projectId, current)
+        .then(() => setLastSaved(new Date().toISOString()))
+        .catch(() => { /* Non-critical */ })
       return current
     })
 
     if (completedCount > 0) {
       toast.success(`Generated ${completedCount}/${modulesToProcess.length} blueprint illustrations`)
+    } else if (modulesToProcess.length > 0) {
+      toast.error("All blueprint illustrations failed to generate. Check your API key or try again.")
     }
     setIsGeneratingImages(false)
   }, [activeProjectId])
@@ -974,6 +1046,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setIntegratedAssemblyStlUrl(null)
     setIntegratedAssemblyStepUrl(null)
     setIntegrationError(null)
+    setRevealedModuleIds(new Set())
+    setSystemIllustrationUrl(null)
+    setSystemIllustrationStatus("idle")
   }, [])
 
   // ── Load a saved project ──
@@ -1024,8 +1099,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
       if (p.modules && p.modules.length > 0) {
         setModules(p.modules)
+        // All loaded modules are immediately revealed (no progressive reveal for saved projects)
+        setRevealedModuleIds(new Set(p.modules.map((m) => m.id)))
       } else {
         setModules([])
+        setRevealedModuleIds(new Set())
       }
 
       setLastSaved(p.updatedAt)
@@ -1136,6 +1214,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     handleDecompose, handleModuleGenerate, handleGenerateSingleModule, handleGenerateAllModules,
     isBatchRunning, batchProgress,
     isGeneratingImages, handleGenerateModuleImages,
+    revealedModuleIds,
+    systemIllustrationUrl, systemIllustrationStatus,
     progressLines, milestone, setMilestone,
     isAnyLoading, generatedModuleCount, riskCount, diagCompletedCount,
     integratedAssemblyStlUrl, integratedAssemblyStepUrl, isIntegrating, integrationError, setIntegrationError, handleGenerateIntegration,

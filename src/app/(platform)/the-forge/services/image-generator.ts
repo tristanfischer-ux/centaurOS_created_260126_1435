@@ -255,6 +255,48 @@ export async function generateModuleImage(
 }
 
 /**
+ * Generates a 16:9 illustration banner for a CAD Lab research report.
+ *
+ * @param projectId - The CAD Lab project ID (storage namespace)
+ * @param subject - The product/system being researched
+ * @param moduleNames - Names of decomposed modules (for context)
+ * @param modulePurposes - One-line purposes per module (for context)
+ * @returns The public URL of the generated illustration
+ *
+ * @throws Error if image generation or upload fails
+ */
+export async function generateResearchIllustration(
+  projectId: string,
+  subject: string,
+  moduleNames: string[],
+  modulePurposes: string[],
+): Promise<string> {
+  const moduleList = moduleNames
+    .map((name, i) => `- ${name}: ${modulePurposes[i] ?? ""}`)
+    .join("\n")
+
+  const prompt = `Create a clean, professional technical illustration of a ${subject}.
+
+This is an engineering overview showing the complete system with its major sub-assemblies:
+${moduleList}
+
+Style: Modern technical illustration on a clean white background. Show the complete system in an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible. Use thin, precise lines with subtle color coding to differentiate sub-assemblies. Label each major sub-assembly with clean callout lines and sans-serif text. The composition should feel like a hero image from a professional engineering specification document. No decorative elements, borders, title blocks, or watermarks. Generous whitespace around the illustration.`
+
+  const imageData = await callGeminiImage(SYSTEM_MODEL, prompt, {
+    aspectRatio: "16:9",
+  })
+
+  const url = await uploadToStorage(
+    projectId,
+    "research-illustration.png",
+    imageData.data,
+    imageData.mimeType,
+  )
+
+  return url
+}
+
+/**
  * Generates the system-level P&ID diagram using module images as references.
  *
  * @param scanId - The scan ID for storage namespacing

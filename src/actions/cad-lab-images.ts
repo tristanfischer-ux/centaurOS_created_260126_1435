@@ -18,7 +18,7 @@
 
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import { cadLabModuleToModuleSpec } from "@/lib/cad-lab/module-to-module-spec-adapter"
-import { generateModuleImage } from "@/app/(platform)/the-forge/services/image-generator"
+import { generateModuleImage, generateResearchIllustration } from "@/app/(platform)/the-forge/services/image-generator"
 import { withAuth } from "@/lib/server-action-utils"
 
 /** Concurrency limit — matches xray.ts batch size */
@@ -57,11 +57,13 @@ export async function generateCadLabSingleImageAction(
         },
       }
     } catch (err) {
-      console.error(`[CAD-LAB-IMAGES] Failed to generate image for ${module.name}:`, err)
+      const errorMsg = err instanceof Error ? err.message : "Unknown error"
+      console.error(`[CAD-LAB-IMAGES] Failed to generate image for ${module.name}:`, errorMsg)
       return {
         module: {
           ...module,
           imageStatus: "failed" as const,
+          imageError: errorMsg,
         },
       }
     }
@@ -128,6 +130,33 @@ export async function generateCadLabModuleImagesAction(
       modules: updatedModules,
       successCount,
       failedCount,
+    }
+  })
+}
+
+/**
+ * Generates a 16:9 illustration banner for the research report.
+ *
+ * @param projectId - The CAD Lab project ID (used as storage namespace)
+ * @param subject - The product/system being researched
+ * @param moduleNames - Names of decomposed modules
+ * @param modulePurposes - One-line purpose per module
+ * @returns The public URL of the generated illustration, or an error
+ */
+export async function generateCadLabSystemIllustrationAction(
+  projectId: string,
+  subject: string,
+  moduleNames: string[],
+  modulePurposes: string[],
+): Promise<{ url: string } | { error: string }> {
+  return withAuth(async () => {
+    try {
+      const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes)
+      return { url }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error"
+      console.error("[CAD-LAB-IMAGES] Failed to generate system illustration:", errorMsg)
+      return { error: errorMsg }
     }
   })
 }

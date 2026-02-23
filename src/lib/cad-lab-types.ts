@@ -204,6 +204,8 @@ export interface CadLabModule {
   imageUrl?: string
   /** Image generation status */
   imageStatus?: "pending" | "generating" | "complete" | "failed"
+  /** Error message if image generation failed */
+  imageError?: string
   /** AI-crafted image prompt (set during decomposition or generated on-the-fly) */
   moduleImagePrompt?: string
 }

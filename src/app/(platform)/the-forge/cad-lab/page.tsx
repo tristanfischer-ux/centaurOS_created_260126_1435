@@ -5,9 +5,9 @@
  *
  * @description Orchestrator page for the Concept stage. Before research:
  * shows hero input and optional design intake form. After research: a
- * side-by-side layout with the research report pinned on the left and
- * module image cards on the right. Clicking "Continue" after research
- * auto-chains decomposition → Gemini image generation.
+ * full-width vertical layout with the research report + system illustration,
+ * then a "Continue" button to trigger decomposition, then modules revealed
+ * progressively as each one's image is ready.
  *
  * @related
  * - Context: src/app/(platform)/the-forge/cad-lab/cad-lab-context.tsx
@@ -62,7 +62,11 @@ export default function CadLabResearchPage(): React.ReactNode {
     modules, isDecomposing,
     expandedModuleId, setExpandedModuleId,
     isGeneratingImages,
+    revealedModuleIds,
+    systemIllustrationUrl, systemIllustrationStatus,
   } = useCadLab()
+
+  const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
 
   useRegisterScreenContext(
     useMemo(() => {
@@ -171,82 +175,84 @@ export default function CadLabResearchPage(): React.ReactNode {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════
-          AFTER RESEARCH: Side-by-side layout
-          Left: Research report (sticky on desktop)
-          Right: Continue → Modules with images → Continue to Build
+          AFTER RESEARCH: Full-width vertical flow
+          1. Research report with system illustration banner
+          2. Continue button → decomposition
+          3. Modules revealed progressively (full-width grid)
+          4. Continue to Build CTA (after all modules revealed)
           ══════════════════════════════════════════════════════════════════ */}
       {hasResearch && (
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* ── Left panel: Research report (sticky on desktop) ── */}
-          <div className="w-full lg:w-[420px] xl:w-[480px] lg:sticky lg:top-6 shrink-0 self-start">
-            <ResearchSection
-              hasResearch={hasResearch}
-              isAnyLoading={isAnyLoading}
-              researchResult={researchResult}
-              editableReport={editableReport}
-              setEditableReport={setEditableReport}
-              showSources={showSources}
-              setShowSources={setShowSources}
-              handleReset={handleReset}
-              onRetryResearch={handleResearch}
-            />
-          </div>
+        <div className="space-y-6">
+          {/* ── Research report (full-width) with illustration ── */}
+          <ResearchSection
+            hasResearch={hasResearch}
+            isAnyLoading={isAnyLoading}
+            researchResult={researchResult}
+            editableReport={editableReport}
+            setEditableReport={setEditableReport}
+            showSources={showSources}
+            setShowSources={setShowSources}
+            handleReset={handleReset}
+            onRetryResearch={handleResearch}
+            systemIllustrationUrl={systemIllustrationUrl}
+            systemIllustrationStatus={systemIllustrationStatus}
+          />
 
-          {/* ── Right panel: Modules + CTA ── */}
-          <div className="flex-1 min-w-0 space-y-4">
-            {/* State 1: Research done, decomposition not started */}
-            {modules.length === 0 && !isDecomposing && (
-              <Card className="border-international-orange/20">
-                <CardContent className="pt-6 space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Research complete. Click continue to decompose into sub-assemblies and generate engineering illustrations.
-                  </p>
-                  <Button
-                    onClick={handleDecompose}
-                    className="gap-2"
-                    disabled={!editableReport.trim() || isAnyLoading}
-                  >
-                    <Layers className="h-4 w-4" />
-                    Continue
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+          {/* ── Continue button: triggers decomposition ── */}
+          {modules.length === 0 && !isDecomposing && (
+            <Card className="border-international-orange/20">
+              <CardContent className="pt-6 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Research complete. Click continue to decompose into sub-assemblies and generate engineering illustrations.
+                </p>
+                <Button
+                  onClick={handleDecompose}
+                  className="gap-2"
+                  disabled={!editableReport.trim() || isAnyLoading}
+                >
+                  <Layers className="h-4 w-4" />
+                  Continue
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
-            {/* State 2: Decomposing in progress */}
-            {modules.length === 0 && isDecomposing && (
-              <Card className="border-international-orange/20">
-                <CardContent className="pt-6 flex items-center gap-3">
-                  <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
-                  <p className="text-sm text-muted-foreground">Mapping sub-assemblies...</p>
-                </CardContent>
-              </Card>
-            )}
+          {/* ── Decomposing in progress ── */}
+          {modules.length === 0 && isDecomposing && (
+            <Card className="border-international-orange/20">
+              <CardContent className="pt-6 flex items-center gap-3">
+                <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
+                <p className="text-sm text-muted-foreground">Mapping sub-assemblies...</p>
+              </CardContent>
+            </Card>
+          )}
 
-            {/* State 3: Modules ready — animated image grid */}
-            {modules.length > 0 && (
-              <>
-                {/* Header with image generation progress */}
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-foreground">
-                    {modules.length} sub-assemblies
-                  </p>
-                  {isGeneratingImages && (
-                    <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                      <Loader2 className="h-3 w-3 animate-spin text-international-orange" />
-                      Generating illustrations...
-                    </span>
-                  )}
-                </div>
+          {/* ── Modules: progressive reveal grid (full-width) ── */}
+          {modules.length > 0 && (
+            <>
+              {/* Header with reveal progress */}
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-foreground">
+                  {revealedModuleIds.size} of {modules.length} sub-assemblies
+                </p>
+                {isGeneratingImages && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Loader2 className="h-3 w-3 animate-spin text-international-orange" />
+                    Generating illustrations...
+                  </span>
+                )}
+              </div>
 
-                {/* Module image grid with stagger animation */}
-                <ModuleImageGrid
-                  modules={modules}
-                  expandedModuleId={expandedModuleId}
-                  onToggleExpand={(id) => setExpandedModuleId(expandedModuleId === id ? null : id)}
-                />
+              {/* Module image grid with progressive reveal */}
+              <ModuleImageGrid
+                modules={modules}
+                revealedModuleIds={revealedModuleIds}
+                expandedModuleId={expandedModuleId}
+                onToggleExpand={(id) => setExpandedModuleId(expandedModuleId === id ? null : id)}
+              />
 
-                {/* Continue to Build CTA */}
+              {/* Continue to Build CTA — only after all modules are revealed */}
+              {allModulesRevealed && (
                 <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
@@ -265,9 +271,9 @@ export default function CadLabResearchPage(): React.ReactNode {
                     </div>
                   </CardContent>
                 </Card>
-              </>
-            )}
-          </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

@@ -39,6 +39,8 @@ interface ResearchSectionProps {
   setShowSources: (value: boolean) => void
   handleReset: () => void
   onRetryResearch?: () => void
+  systemIllustrationUrl?: string | null
+  systemIllustrationStatus?: "idle" | "generating" | "complete" | "failed"
 }
 
 /**
@@ -55,6 +57,8 @@ export function ResearchSection({
   setShowSources,
   handleReset,
   onRetryResearch,
+  systemIllustrationUrl,
+  systemIllustrationStatus,
 }: ResearchSectionProps): React.ReactNode {
   if (!hasResearch && !researchResult?.error) return null
 
@@ -89,6 +93,32 @@ export function ResearchSection({
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* ── System Illustration Banner (16:9) ── */}
+      {hasResearch && systemIllustrationStatus && systemIllustrationStatus !== "idle" && (
+        <div className="w-full aspect-video rounded-lg overflow-hidden border bg-muted/30">
+          {systemIllustrationStatus === "generating" && (
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-8 w-8 rounded-full border-2 border-international-orange border-t-transparent animate-spin" />
+                <p className="text-xs text-muted-foreground">Generating system illustration...</p>
+              </div>
+            </div>
+          )}
+          {systemIllustrationStatus === "complete" && systemIllustrationUrl && (
+            <img
+              src={systemIllustrationUrl}
+              alt="System illustration"
+              className="w-full h-full object-cover"
+            />
+          )}
+          {systemIllustrationStatus === "failed" && (
+            <div className="w-full h-full flex items-center justify-center">
+              <p className="text-xs text-muted-foreground">Illustration unavailable</p>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── Research Report (editable) ── */}
