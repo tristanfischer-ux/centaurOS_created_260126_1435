@@ -201,6 +201,8 @@ interface ChatMessage {
     rolloutId?: string | null
     /** Parsed slide deck for presentation messages; rendered as InlinePresentationCard. */
     slideDeck?: SlideDeckContent | null
+    /** Parsed from PROPOSED_PLAN in assistant messages; rendered as ExecutionPlanCard. */
+    executionPlan?: ExecutionPlan | null
 }
 
 /**
@@ -324,6 +326,78 @@ export function stripProposedActionsBlock(content: string): string {
     return result.trim()
 }
 
+// ─── PROPOSED_PLAN Parsing ──────────────────────────────────────────
+
+import type { ExecutionPlan, PlanStep } from "@/lib/agents/execution-plan-types"
+import { buildStepContext, countCompletedSteps, getNextPendingStep } from "@/lib/agents/execution-plan-types"
+import { ExecutionPlanCard } from "@/components/specialists/execution-plan-card"
+
+const PROPOSED_PLAN_PATTERNS: RegExp[] = [
+    /<!--\s*PROPOSED_PLAN\s*([\s\S]*?)\s*-->/i,
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?PROPOSED_PLAN\s*\n?([\s\S]*?)\s*(?:-->)?\s*```/i,
+    /PROPOSED_PLAN\s*\n\s*(\{[\s\S]*?\})\s*(?:-->)?/i,
+]
+
+const STRIP_PROPOSED_PLAN_PATTERNS: RegExp[] = [
+    /<!--\s*PROPOSED_PLAN\s*[\s\S]*?\s*-->/gi,
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?PROPOSED_PLAN\s*\n?[\s\S]*?\s*(?:-->)?\s*```/gi,
+    /PROPOSED_PLAN\s*\n?\s*\{[\s\S]*?\}\s*(?:-->)?/gi,
+]
+
+/**
+ * Parse PROPOSED_PLAN JSON block from specialist response.
+ * Returns an ExecutionPlan or null if no valid plan found.
+ */
+function parseProposedPlan(content: string, proposedBy: string): ExecutionPlan | null {
+    for (const pattern of PROPOSED_PLAN_PATTERNS) {
+        const match = content.match(pattern)
+        if (!match?.[1]) continue
+        try {
+            const raw = JSON.parse(match[1].trim()) as { title?: string; steps?: unknown[] }
+            if (raw.title && Array.isArray(raw.steps) && raw.steps.length >= 2 && raw.steps.length <= 10) {
+                const steps: PlanStep[] = raw.steps
+                    .filter((s): s is Record<string, unknown> =>
+                        typeof s === "object" && s !== null &&
+                        typeof (s as Record<string, unknown>).title === "string" &&
+                        typeof (s as Record<string, unknown>).prompt === "string"
+                    )
+                    .map((s, i) => ({
+                        index: i,
+                        specialistId: (typeof s.specialistId === "string" ? s.specialistId : proposedBy) as SpecialistId,
+                        title: s.title as string,
+                        prompt: s.prompt as string,
+                        description: (typeof s.description === "string" ? s.description : "") as string,
+                        outputLabel: (typeof s.outputLabel === "string" ? s.outputLabel : `Step ${i + 1} output`) as string,
+                    }))
+                if (steps.length >= 2) {
+                    return {
+                        id: `plan_${Date.now()}`,
+                        title: raw.title,
+                        proposedBy: proposedBy as SpecialistId,
+                        steps,
+                        executions: {},
+                        currentStep: -1,
+                        status: "proposed",
+                        createdAt: new Date().toISOString(),
+                    }
+                }
+            }
+        } catch {
+            // JSON parse failed — try next pattern
+        }
+    }
+    return null
+}
+
+/** Remove PROPOSED_PLAN blocks from display content */
+function stripProposedPlanBlock(content: string): string {
+    let result = content
+    for (const pattern of STRIP_PROPOSED_PLAN_PATTERNS) {
+        result = result.replace(pattern, "")
+    }
+    return result.trim()
+}
+
 /** Render mode: "dialog" for centered modal, "panel" for persistent sidebar */
 export type SpecialistRenderMode = "dialog" | "panel"
 
@@ -416,6 +490,9 @@ export function BriefSpecialistDialog({
     const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([])
     const [isDraggingOver, setIsDraggingOver] = useState(false)
     const [isUploadingFile, setIsUploadingFile] = useState(false)
+
+    // Multi-step execution plan state
+    const [activePlan, setActivePlan] = useState<ExecutionPlan | null>(null)
 
     // Speculative dual-stream state
     const [speculativeFastResponse, setSpeculativeFastResponse] = useState("")
@@ -1285,6 +1362,19 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             }
             displayResponse = stripProposedActionsBlock(displayResponse)
 
+            // Parse PROPOSED_PLAN from response (multi-step execution plans)
+            const parsedPlan = parseProposedPlan(displayResponse, specialist.id)
+            if (parsedPlan) {
+                console.info("[SpecialistChat] PROPOSED_PLAN parsed:", {
+                    specialist: specialist.id,
+                    title: parsedPlan.title,
+                    stepCount: parsedPlan.steps.length,
+                    crossSpecialist: parsedPlan.steps.filter(s => s.specialistId !== specialist.id).length,
+                })
+                setActivePlan(parsedPlan)
+            }
+            displayResponse = stripProposedPlanBlock(displayResponse)
+
             // Parse slides when a presentation was requested so the inline
             // card renderer can display a visual carousel instead of raw JSON.
             const parsedDeck = isSlideRequest ? parseSlideDeckFromText(fullResponse) : null
@@ -1297,6 +1387,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 ...(proposals.length > 0 ? { proposals } : {}),
                 ...(rolloutIdFromResponse ? { rolloutId: rolloutIdFromResponse } : {}),
                 ...(parsedDeck ? { slideDeck: parsedDeck } : {}),
+                ...(parsedPlan ? { executionPlan: parsedPlan } : {}),
             }
             setMessages((prev) => [...prev, assistantMessage])
             setStreamingResponse("")
@@ -1381,6 +1472,267 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
         setError(null)
         textareaRef.current?.focus()
     }, [])
+
+    // ─── Multi-Step Execution Plan Handlers ────────────────────────────────
+
+    /** Execute a single step in the active plan. Streams via /api/agents/execute. */
+    const handleExecutePlanStep = useCallback(async (stepIndex: number) => {
+        if (!activePlan) return
+        const step = activePlan.steps[stepIndex]
+        if (!step) return
+
+        // Update plan status
+        setActivePlan((prev) => {
+            if (!prev) return prev
+            return {
+                ...prev,
+                status: "running",
+                currentStep: stepIndex,
+                executions: {
+                    ...prev.executions,
+                    [stepIndex]: { status: "running", startedAt: new Date().toISOString() },
+                },
+            }
+        })
+
+        try {
+            // Build upstream context from completed steps
+            const upstreamContext = buildStepContext(activePlan, stepIndex)
+            const stepSpecialist = getSpecialistById(step.specialistId) ?? specialist
+            const systemExtras: string[] = []
+            if (upstreamContext) {
+                systemExtras.push(`\n\n${upstreamContext}`)
+            }
+            systemExtras.push(`\n\nYou are executing step ${stepIndex + 1} of ${activePlan.steps.length} in the plan "${activePlan.title}". Focus on producing: ${step.outputLabel}.`)
+
+            const controller = new AbortController()
+            executeAbortRef.current = controller
+
+            const res = await fetch("/api/agents/execute", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    prompt: step.prompt,
+                    input: step.prompt,
+                    providerId: getSpecialistModel(stepSpecialist).providerId,
+                    modelId: getSpecialistModel(stepSpecialist).modelId,
+                    modelTier: stepSpecialist.modelTier,
+                    modality: "text",
+                    threadId: threadId ?? undefined,
+                    specialistId: step.specialistId,
+                    customSystemPromptSuffix: systemExtras.join(""),
+                }),
+                signal: controller.signal,
+            })
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({ error: "Step execution failed" }))
+                throw new Error(errData.error || `HTTP ${res.status}`)
+            }
+
+            // Stream the response
+            const reader = res.body?.getReader()
+            if (!reader) throw new Error("No response body")
+
+            const decoder = new TextDecoder()
+            let stepOutput = ""
+
+            while (true) {
+                const { done, value } = await readWithTimeout(reader, STREAM_CHUNK_TIMEOUT_MS)
+                if (done || controller.signal.aborted) break
+
+                const chunk = decoder.decode(value, { stream: true })
+                const lines = chunk.split("\n")
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        const data = line.slice(6)
+                        if (data === "[DONE]") continue
+                        try {
+                            const parsed = JSON.parse(data) as { text?: string; error?: string }
+                            if (parsed.error) throw new Error(parsed.error)
+                            if (parsed.text) {
+                                stepOutput += parsed.text
+                            }
+                        } catch (parseErr) {
+                            if (parseErr instanceof Error && parseErr.message !== data) throw parseErr
+                            stepOutput += data
+                        }
+                    }
+                }
+            }
+
+            // Strip think tags from step output
+            const cleanOutput = stripThinkTags(stepOutput)
+
+            // Move step to review status with output
+            setActivePlan((prev) => {
+                if (!prev) return prev
+                return {
+                    ...prev,
+                    executions: {
+                        ...prev.executions,
+                        [stepIndex]: {
+                            status: "review",
+                            output: cleanOutput,
+                            startedAt: prev.executions[stepIndex]?.startedAt,
+                            completedAt: new Date().toISOString(),
+                        },
+                    },
+                }
+            })
+        } catch (err) {
+            if (err instanceof Error && err.name === "AbortError") return
+            const errorMsg = err instanceof Error ? err.message : "Step execution failed"
+            setActivePlan((prev) => {
+                if (!prev) return prev
+                return {
+                    ...prev,
+                    status: "paused",
+                    executions: {
+                        ...prev.executions,
+                        [stepIndex]: {
+                            status: "error",
+                            error: errorMsg,
+                            startedAt: prev.executions[stepIndex]?.startedAt,
+                            completedAt: new Date().toISOString(),
+                        },
+                    },
+                }
+            })
+        } finally {
+            executeAbortRef.current = null
+        }
+    }, [activePlan, specialist, threadId])
+
+    /** Approve a step's output and auto-trigger the next step. */
+    const handleApprovePlanStep = useCallback((stepIndex: number) => {
+        setActivePlan((prev) => {
+            if (!prev) return prev
+            const updated: ExecutionPlan = {
+                ...prev,
+                executions: {
+                    ...prev.executions,
+                    [stepIndex]: {
+                        ...prev.executions[stepIndex],
+                        status: "approved",
+                    },
+                },
+            }
+            // Check if all steps are done
+            const allDone = updated.steps.every((_, i) => {
+                const exec = updated.executions[i]
+                return exec?.status === "approved" || exec?.status === "skipped"
+            })
+            if (allDone) {
+                updated.status = "completed"
+            }
+            return updated
+        })
+
+        // Auto-trigger next step after a brief delay (allows state to settle)
+        setTimeout(() => {
+            setActivePlan((current) => {
+                if (!current || current.status === "completed") return current
+                const nextIdx = getNextPendingStep(current)
+                if (nextIdx >= 0) {
+                    // Trigger execution of next step (via effect or direct call)
+                    handleExecutePlanStep(nextIdx)
+                }
+                return current
+            })
+        }, 300)
+    }, [handleExecutePlanStep])
+
+    /** Skip a step and move to the next. */
+    const handleSkipPlanStep = useCallback((stepIndex: number) => {
+        setActivePlan((prev) => {
+            if (!prev) return prev
+            const updated: ExecutionPlan = {
+                ...prev,
+                executions: {
+                    ...prev.executions,
+                    [stepIndex]: { status: "skipped", completedAt: new Date().toISOString() },
+                },
+            }
+            const allDone = updated.steps.every((_, i) => {
+                const exec = updated.executions[i]
+                return exec?.status === "approved" || exec?.status === "skipped"
+            })
+            if (allDone) updated.status = "completed"
+            return updated
+        })
+
+        // Auto-trigger next step
+        setTimeout(() => {
+            setActivePlan((current) => {
+                if (!current || current.status === "completed") return current
+                const nextIdx = getNextPendingStep(current)
+                if (nextIdx >= 0) handleExecutePlanStep(nextIdx)
+                return current
+            })
+        }, 300)
+    }, [handleExecutePlanStep])
+
+    /** Run all steps sequentially. Starts from the first pending step. */
+    const handleRunAllSteps = useCallback(() => {
+        if (!activePlan) return
+        const nextIdx = getNextPendingStep(activePlan)
+        if (nextIdx >= 0) handleExecutePlanStep(nextIdx)
+    }, [activePlan, handleExecutePlanStep])
+
+    /** Cancel the active plan. */
+    const handleCancelPlan = useCallback(() => {
+        if (executeAbortRef.current) executeAbortRef.current.abort()
+        setActivePlan((prev) => prev ? { ...prev, status: "cancelled" } : prev)
+    }, [])
+
+    /** Dismiss the plan card (user doesn't want to execute it). */
+    const handleDismissPlan = useCallback(() => {
+        setActivePlan(null)
+    }, [])
+
+    // Save completed plan as artifact
+    useEffect(() => {
+        if (!activePlan || activePlan.status !== "completed") return
+
+        // Combine all approved step outputs into one deliverable
+        const outputParts: string[] = []
+        for (const step of activePlan.steps) {
+            const exec = activePlan.executions[step.index]
+            if (exec?.status === "approved" && exec.output) {
+                outputParts.push(`## ${step.title}\n\n${exec.output}`)
+            }
+        }
+        const combinedOutput = outputParts.join("\n\n---\n\n")
+
+        createArtifact({
+            title: `${activePlan.title} — ${new Date().toLocaleDateString()}`,
+            content: combinedOutput,
+            contentType: "report",
+            metadata: {
+                specialistId: specialist.id,
+                specialistName: specialist.name,
+                source: "execution-plan",
+                planId: activePlan.id,
+                planTitle: activePlan.title,
+                stepCount: activePlan.steps.length,
+                completedSteps: countCompletedSteps(activePlan),
+            },
+        }).then((result) => {
+            if (result.data) {
+                toast.success(`Plan "${activePlan.title}" complete`, {
+                    description: "All outputs saved to Deliverables.",
+                    action: {
+                        label: "Open",
+                        onClick: () => { window.location.href = "/agents/artifacts" },
+                    },
+                    duration: 5000,
+                })
+            }
+        }).catch((err) => {
+            console.warn("[BriefDialog] Plan artifact save failed:", err)
+        })
+    }, [activePlan?.status, activePlan?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const MAX_ATTACHMENTS = 5
 
@@ -2004,6 +2356,22 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                             )
                                         })
                                     }}
+                                />
+                            </div>
+                        )}
+
+                        {/* Execution plan card */}
+                        {activePlan && activePlan.status !== "cancelled" && (
+                            <div className="px-4">
+                                <ExecutionPlanCard
+                                    plan={activePlan}
+                                    specialist={specialist}
+                                    onExecuteStep={handleExecutePlanStep}
+                                    onApproveStep={handleApprovePlanStep}
+                                    onSkipStep={handleSkipPlanStep}
+                                    onRunAll={handleRunAllSteps}
+                                    onCancel={handleCancelPlan}
+                                    onDismiss={handleDismissPlan}
                                 />
                             </div>
                         )}
@@ -2849,6 +3217,20 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         )
                                     })
                                 }}
+                            />
+                        )}
+
+                        {/* Execution plan card (panel mode) */}
+                        {activePlan && activePlan.status !== "cancelled" && (
+                            <ExecutionPlanCard
+                                plan={activePlan}
+                                specialist={specialist}
+                                onExecuteStep={handleExecutePlanStep}
+                                onApproveStep={handleApprovePlanStep}
+                                onSkipStep={handleSkipPlanStep}
+                                onRunAll={handleRunAllSteps}
+                                onCancel={handleCancelPlan}
+                                onDismiss={handleDismissPlan}
                             />
                         )}
 

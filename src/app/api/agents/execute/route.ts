@@ -16,7 +16,7 @@ import {
 } from "@/lib/agent-memory"
 import type { ConversationMessage } from "@/lib/agent-memory"
 import { buildAIContext } from "@/lib/ai-context/builder"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById, SPECIALISTS } from "@/app/(platform)/agents/specialists-data"
 import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
 import { compilePersonalityPrompt, compileRelationshipContext } from "@/lib/agents/personality"
 import { createRollout, finishRollout } from "@/lib/agent-spans"
@@ -680,6 +680,39 @@ ${workflowList}
 
 When the founder triggers one of these (e.g., "draft the plan", "run the numbers"), produce the full deliverable in your response. Don't just outline it — actually write it out completely and thoroughly.`
             }
+
+            // Multi-step execution plan capability
+            const otherSpecialists = SPECIALISTS
+                .filter((s) => s.id !== specialistId)
+                .map((s) => `- ${s.id}: ${s.name} (${s.title})`)
+                .join("\n")
+            systemPromptWithContext += `\n\n## Multi-Step Plans
+
+When a founder's request involves multiple sequential deliverables, cross-specialist coordination, or a complex project that would benefit from step-by-step execution, propose a multi-step plan using this format at the END of your response (after your prose):
+
+<!-- PROPOSED_PLAN
+{
+  "title": "Plan title",
+  "steps": [
+    {
+      "specialistId": "${specialistId}",
+      "title": "Step 1 title",
+      "prompt": "Detailed prompt for this step...",
+      "description": "What the founder will see before execution",
+      "outputLabel": "Name for what this step produces"
+    }
+  ]
+}
+-->
+
+Rules:
+- Only for genuinely multi-step work (2-5 steps). Single deliverables should use workflows or direct responses.
+- Each step must produce a distinct deliverable that feeds into the next.
+- You may include steps for other specialists when their expertise is needed:
+${otherSpecialists}
+- Keep prompts detailed and self-contained — each step executes independently with prior step outputs as context.
+- Place the block at the very end of your response, after your conversational prose.
+- Do NOT propose a plan for simple questions, follow-up responses, or single-deliverable requests.`
         }
     }
 
