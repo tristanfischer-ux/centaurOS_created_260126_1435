@@ -37,15 +37,17 @@ import { AddContactDialog } from './add-contact-dialog'
 import { ImportContactsDialog } from './import-contacts-dialog'
 import { GenerateSequencesDialog } from './generate-sequences-dialog'
 import { ResearchContactsDialog } from './research-contacts-dialog'
+import { ContactDetailDialog } from './contact-detail-dialog'
 import { deleteContacts, updateContactStatus, generateSequenceForContact, researchContact } from '@/actions/outreach'
 import { CONTACT_STATUS_MAP } from '@/types/outreach'
-import type { Campaign, Contact, ContactStatus } from '@/types/outreach'
+import type { Campaign, Contact, ContactStatus, OutreachEmail } from '@/types/outreach'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 interface ContactsTabProps {
     campaign: Campaign
     contacts: Contact[]
+    emails: OutreachEmail[]
     onRefresh: () => Promise<void>
     onSwitchToEmails?: () => void
 }
@@ -59,7 +61,7 @@ function getScoreColor(score: number): string {
     return 'text-destructive font-bold'
 }
 
-export function ContactsTab({ campaign, contacts, onRefresh, onSwitchToEmails }: ContactsTabProps) {
+export function ContactsTab({ campaign, contacts, emails, onRefresh, onSwitchToEmails }: ContactsTabProps) {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [search, setSearch] = useState('')
     const [sortKey, setSortKey] = useState<SortKey>('score')
@@ -68,6 +70,7 @@ export function ContactsTab({ campaign, contacts, onRefresh, onSwitchToEmails }:
     const [isImportOpen, setIsImportOpen] = useState(false)
     const [isGenerateOpen, setIsGenerateOpen] = useState(false)
     const [isResearchOpen, setIsResearchOpen] = useState(false)
+    const [detailContact, setDetailContact] = useState<Contact | null>(null)
     const [isPending, startTransition] = useTransition()
     const [focusedIndex, setFocusedIndex] = useState<number>(-1)
     const searchRef = useRef<HTMLInputElement>(null)
@@ -402,9 +405,13 @@ export function ContactsTab({ campaign, contacts, onRefresh, onSwitchToEmails }:
                                                 />
                                             </td>
                                             <td className="px-3 py-3">
-                                                <div className="font-medium text-foreground">
+                                                <button
+                                                    type="button"
+                                                    className="font-medium text-foreground hover:text-international-orange transition-colors text-left"
+                                                    onClick={() => setDetailContact(contact)}
+                                                >
                                                     {contact.first_name} {contact.last_name}
-                                                </div>
+                                                </button>
                                                 {contact.email && (
                                                     <div className="text-xs text-muted-foreground">{contact.email}</div>
                                                 )}
@@ -482,6 +489,7 @@ export function ContactsTab({ campaign, contacts, onRefresh, onSwitchToEmails }:
                 onOpenChange={setIsGenerateOpen}
                 campaignId={campaign.id}
                 contactIds={Array.from(selectedIds)}
+                contacts={contacts}
                 campaign={campaign}
                 onGenerated={async () => {
                     setSelectedIds(new Set())
@@ -500,6 +508,14 @@ export function ContactsTab({ campaign, contacts, onRefresh, onSwitchToEmails }:
                     setSelectedIds(new Set())
                     await onRefresh()
                 }}
+            />
+            <ContactDetailDialog
+                open={!!detailContact}
+                onOpenChange={(open) => { if (!open) setDetailContact(null) }}
+                contact={detailContact}
+                emails={emails}
+                campaignId={campaign.id}
+                onRefresh={onRefresh}
             />
         </div>
     )
