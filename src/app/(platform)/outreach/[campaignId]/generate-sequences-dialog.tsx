@@ -1,10 +1,12 @@
 'use client'
 
 /**
- * @file generate-sequences-dialog.tsx — Batch AI email generation with progress.
+ * @file generate-sequences-dialog.tsx — Batch AI email generation with
+ * progress indicator and streaming text preview.
  *
- * @description Client-side loop calling generateSequenceForContact per contact
- * with a progress bar, counter, current contact name, and cancel button.
+ * @description Client-side loop that calls the SSE endpoint per contact,
+ * showing a progress bar, counter, current contact name, streaming text
+ * preview, and cancel button.
  */
 
 import { useState, useRef, useCallback } from 'react'
@@ -17,8 +19,8 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Loader2, Wand2, CheckCircle2, XCircle } from 'lucide-react'
-import { generateSequenceForContact } from '@/actions/outreach'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import type { Campaign, Contact } from '@/types/outreach'
 import { toast } from 'sonner'
@@ -45,6 +47,7 @@ export function GenerateSequencesDialog({
     const [isRunning, setIsRunning] = useState(false)
     const [currentIndex, setCurrentIndex] = useState(0)
     const [currentName, setCurrentName] = useState('')
+    const [streamText, setStreamText] = useState('')
     const [succeeded, setSucceeded] = useState(0)
     const [failed, setFailed] = useState(0)
     const [isDone, setIsDone] = useState(false)
@@ -53,11 +56,69 @@ export function GenerateSequencesDialog({
     const total = contactIds.length
     const progress = total > 0 ? (currentIndex / total) * 100 : 0
 
-    // FLOW: Build a lookup for contact names from the contacts array
     const getContactName = useCallback((contactId: string) => {
         const c = contacts.find(ct => ct.id === contactId)
         return c ? `${c.first_name} ${c.last_name}` : 'Contact'
     }, [contacts])
+
+    /**
+     * Generates a sequence for a single contact using the SSE endpoint.
+     * Streams text chunks into setStreamText for live preview.
+     */
+    const generateViaSSE = useCallback(async (contactId: string): Promise<boolean> => {
+        setStreamText('')
+
+        const response = await fetch('/api/outreach/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ campaignId, contactId }),
+        })
+
+        if (!response.ok || !response.body) {
+            return false
+        }
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let success = false
+
+        while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() ?? ''
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue
+                const payload = line.slice(6).trim()
+                if (!payload) continue
+
+                try {
+                    const event = JSON.parse(payload)
+
+                    if (event.text) {
+                        setStreamText(prev => prev + event.text)
+                    }
+
+                    if (event.done) {
+                        success = true
+                    }
+
+                    if (event.error) {
+                        console.error('[Generate SSE]', event.error)
+                        return false
+                    }
+                } catch {
+                    // Skip non-JSON
+                }
+            }
+        }
+
+        return success
+    }, [campaignId])
 
     const handleGenerate = useCallback(async () => {
         setIsRunning(true)
@@ -65,6 +126,7 @@ export function GenerateSequencesDialog({
         setCurrentIndex(0)
         setSucceeded(0)
         setFailed(0)
+        setStreamText('')
         cancelRef.current = false
 
         let ok = 0
@@ -77,8 +139,8 @@ export function GenerateSequencesDialog({
             setCurrentIndex(i)
             setCurrentName(getContactName(contactId))
 
-            const result = await generateSequenceForContact(campaignId, contactId)
-            if (result.success) {
+            const success = await generateViaSSE(contactId)
+            if (success) {
                 ok += 1
                 setSucceeded(ok)
             } else {
@@ -95,7 +157,7 @@ export function GenerateSequencesDialog({
             toast.success(`Generated sequences for ${ok} contact(s)`)
         }
         await onGenerated()
-    }, [contactIds, campaignId, getContactName, onGenerated])
+    }, [contactIds, getContactName, generateViaSSE, onGenerated])
 
     const handleCancel = () => {
         cancelRef.current = true
@@ -105,13 +167,14 @@ export function GenerateSequencesDialog({
         if (!isOpen) {
             setIsDone(false)
             setCurrentIndex(0)
+            setStreamText('')
         }
         onOpenChange(isOpen)
     }
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent size="sm" aria-describedby={undefined}>
+            <DialogContent size="lg" aria-describedby={undefined}>
                 <DialogHeader>
                     <DialogTitle>Generate Email Sequences</DialogTitle>
                 </DialogHeader>
@@ -159,7 +222,7 @@ export function GenerateSequencesDialog({
                     )}
 
                     {isRunning && (
-                        <div className="space-y-4 py-4">
+                        <div className="space-y-4">
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-muted-foreground">
@@ -173,12 +236,23 @@ export function GenerateSequencesDialog({
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
-                                <span className="truncate">{currentName}</span>
+                                <span className="truncate font-medium">{currentName}</span>
                             </div>
                             {(succeeded > 0 || failed > 0) && (
                                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                     {succeeded > 0 && <span className="text-success">{succeeded} done</span>}
                                     {failed > 0 && <span className="text-destructive">{failed} failed</span>}
+                                </div>
+                            )}
+
+                            {/* Streaming text preview */}
+                            {streamText && (
+                                <div className="border border-border rounded-lg bg-muted/30">
+                                    <ScrollArea className="h-[200px]">
+                                        <pre className="p-3 text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                                            {streamText}
+                                        </pre>
+                                    </ScrollArea>
                                 </div>
                             )}
                         </div>
