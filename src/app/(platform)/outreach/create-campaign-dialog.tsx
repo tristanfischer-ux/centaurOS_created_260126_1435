@@ -1,10 +1,10 @@
 'use client'
 
 /**
- * @file create-campaign-dialog.tsx — Multi-step wizard for creating a campaign.
+ * @file create-campaign-dialog.tsx — 2-step wizard for creating a campaign.
  *
- * @description Steps: Name + Tone > Product Context > ICP Description >
- * Value Props > Review. Follows the wizard pattern from company-purpose-dialog.
+ * @description Steps: (1) Name + Tone + Sequence Length, (2) Review & Create.
+ * Product context, ICP, and value props are editable in the Settings tab after creation.
  */
 
 import { useState, useTransition } from 'react'
@@ -18,15 +18,11 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import {
     ChevronLeft,
     ChevronRight,
     Loader2,
-    Send,
     Megaphone,
-    UserSearch,
-    Lightbulb,
     CheckCircle2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -41,13 +37,10 @@ interface CreateCampaignDialogProps {
     onCreated: (campaignId: string) => void
 }
 
-type Step = 'basics' | 'product' | 'icp' | 'value' | 'review'
+type Step = 'basics' | 'review'
 
 const STEPS: { id: Step; title: string; icon: React.ElementType }[] = [
     { id: 'basics', title: 'Basics', icon: Megaphone },
-    { id: 'product', title: 'Product', icon: Send },
-    { id: 'icp', title: 'ICP', icon: UserSearch },
-    { id: 'value', title: 'Value Props', icon: Lightbulb },
     { id: 'review', title: 'Review', icon: CheckCircle2 },
 ]
 
@@ -59,9 +52,6 @@ export function CreateCampaignDialog({ open, onOpenChange, onCreated }: CreateCa
     const [formData, setFormData] = useState({
         name: '',
         tone: 'professional' as CampaignTone,
-        product_context: '',
-        icp_description: '',
-        value_props: [''],
         sequence_length: 4,
     })
 
@@ -70,9 +60,6 @@ export function CreateCampaignDialog({ open, onOpenChange, onCreated }: CreateCa
     const canProceed = () => {
         switch (currentStep) {
             case 'basics': return formData.name.trim().length > 0
-            case 'product': return true // optional
-            case 'icp': return true // optional
-            case 'value': return true // optional
             case 'review': return true
         }
     }
@@ -93,9 +80,6 @@ export function CreateCampaignDialog({ open, onOpenChange, onCreated }: CreateCa
             const result = await createCampaign({
                 name: formData.name.trim(),
                 tone: formData.tone,
-                product_context: formData.product_context.trim(),
-                icp_description: formData.icp_description.trim(),
-                value_props: formData.value_props.filter(v => v.trim()),
                 sequence_length: formData.sequence_length,
             })
 
@@ -106,28 +90,10 @@ export function CreateCampaignDialog({ open, onOpenChange, onCreated }: CreateCa
                 toast.success('Campaign created')
                 onCreated(result.data.id)
                 // Reset form
-                setFormData({ name: '', tone: 'professional', product_context: '', icp_description: '', value_props: [''], sequence_length: 4 })
+                setFormData({ name: '', tone: 'professional', sequence_length: 4 })
                 setCurrentStep('basics')
             }
         })
-    }
-
-    const addValueProp = () => {
-        setFormData(prev => ({ ...prev, value_props: [...prev.value_props, ''] }))
-    }
-
-    const updateValueProp = (index: number, value: string) => {
-        setFormData(prev => ({
-            ...prev,
-            value_props: prev.value_props.map((v, i) => i === index ? value : v),
-        }))
-    }
-
-    const removeValueProp = (index: number) => {
-        setFormData(prev => ({
-            ...prev,
-            value_props: prev.value_props.filter((_, i) => i !== index),
-        }))
     }
 
     return (
@@ -220,84 +186,10 @@ export function CreateCampaignDialog({ open, onOpenChange, onCreated }: CreateCa
                         </div>
                     )}
 
-                    {currentStep === 'product' && (
-                        <div className="space-y-4">
-                            <p className="text-sm text-muted-foreground">
-                                What are you selling? Help Sal understand your product so emails are specific and compelling.
-                            </p>
-                            <div className="space-y-2">
-                                <Label htmlFor="product-context">Product Context</Label>
-                                <Textarea
-                                    id="product-context"
-                                    placeholder="e.g., We build automated compliance monitoring for fintech startups. We catch regulatory violations before auditors do, saving 40+ hours/month of manual review..."
-                                    rows={6}
-                                    value={formData.product_context}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, product_context: e.target.value }))}
-                                />
-                                <p className="text-xs text-muted-foreground text-right">
-                                    {formData.product_context.length}/1000
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {currentStep === 'icp' && (
-                        <div className="space-y-4">
-                            <p className="text-sm text-muted-foreground">
-                                Who are you targeting? The more specific, the better Sal can personalize.
-                            </p>
-                            <div className="space-y-2">
-                                <Label htmlFor="icp-description">Ideal Customer Profile</Label>
-                                <Textarea
-                                    id="icp-description"
-                                    placeholder="e.g., VP of Engineering or CTO at Series A-C fintech companies (50-200 employees). They're dealing with SOC2/PCI compliance and spending too much time on manual audits..."
-                                    rows={6}
-                                    value={formData.icp_description}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, icp_description: e.target.value }))}
-                                />
-                                <p className="text-xs text-muted-foreground text-right">
-                                    {formData.icp_description.length}/1000
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {currentStep === 'value' && (
-                        <div className="space-y-4">
-                            <p className="text-sm text-muted-foreground">
-                                Key value propositions Sal should weave into emails. Add your strongest proof points.
-                            </p>
-                            <div className="space-y-2">
-                                {formData.value_props.map((vp, i) => (
-                                    <div key={i} className="flex gap-2">
-                                        <Input
-                                            placeholder={`Value prop ${i + 1}...`}
-                                            value={vp}
-                                            onChange={(e) => updateValueProp(i, e.target.value)}
-                                        />
-                                        {formData.value_props.length > 1 && (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => removeValueProp(i)}
-                                                className="shrink-0"
-                                            >
-                                                Remove
-                                            </Button>
-                                        )}
-                                    </div>
-                                ))}
-                                <Button variant="outline" size="sm" onClick={addValueProp}>
-                                    + Add Value Prop
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-
                     {currentStep === 'review' && (
                         <div className="space-y-4">
                             <p className="text-sm text-muted-foreground">
-                                Review your campaign settings. You can always edit these later.
+                                Review your campaign settings. You can add product context, ICP, and value props in the Settings tab after creation.
                             </p>
                             <div className="space-y-3 text-sm">
                                 <div className="flex justify-between py-2 border-b border-border">
@@ -308,21 +200,9 @@ export function CreateCampaignDialog({ open, onOpenChange, onCreated }: CreateCa
                                     <span className="text-muted-foreground">Tone</span>
                                     <span className="font-medium text-foreground capitalize">{formData.tone}</span>
                                 </div>
-                                <div className="flex justify-between py-2 border-b border-border">
+                                <div className="flex justify-between py-2">
                                     <span className="text-muted-foreground">Sequence Length</span>
                                     <span className="font-medium text-foreground">{formData.sequence_length} emails</span>
-                                </div>
-                                <div className="flex justify-between py-2 border-b border-border">
-                                    <span className="text-muted-foreground">Product Context</span>
-                                    <span className="font-medium text-foreground">{formData.product_context ? 'Provided' : 'Skipped'}</span>
-                                </div>
-                                <div className="flex justify-between py-2 border-b border-border">
-                                    <span className="text-muted-foreground">ICP</span>
-                                    <span className="font-medium text-foreground">{formData.icp_description ? 'Provided' : 'Skipped'}</span>
-                                </div>
-                                <div className="flex justify-between py-2">
-                                    <span className="text-muted-foreground">Value Props</span>
-                                    <span className="font-medium text-foreground">{formData.value_props.filter(v => v.trim()).length}</span>
                                 </div>
                             </div>
                             {error && (
