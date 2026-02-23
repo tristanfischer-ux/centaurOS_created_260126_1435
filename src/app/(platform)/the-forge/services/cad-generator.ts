@@ -41,8 +41,8 @@ const MAX_RETRY_ATTEMPTS = 3
 
 // ─── CAD Code Validation ─────────────────────────────────────────────
 
-/** Regex to detect dangerous Python code that could escape the Modal sandbox */
-const DANGEROUS_CODE_RE = /(?:^|\s)(?:import|from)\s+(?:os|sys|subprocess|shutil|importlib)\b|__import__\s*\(|__builtins__|(?:exec|eval|compile)\s*\(|getattr\s*\([^)]*__/m
+/** Regex to detect dangerous Python code that could escape the Modal sandbox (F8) */
+const DANGEROUS_CODE_RE = /(?:^|\s)(?:import|from)\s+(?:os|sys|subprocess|shutil|importlib|pickle|marshal|ctypes)\b|__import__\s*\(|__builtins__|(?:exec|eval|compile|open)\s*\(|getattr\s*\([^)]*__|globals\s*\(|locals\s*\(|__subclasses__/m
 
 /**
  * Validates CadQuery Python code before sending to Modal for execution.

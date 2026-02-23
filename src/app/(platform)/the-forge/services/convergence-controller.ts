@@ -300,9 +300,32 @@ ${analysis?.dfm ? `DFM: ${analysis.dfm.printable ? "Printable" : "NOT printable"
     .trim()
 
   try {
-    const changes = JSON.parse(cleaned) as ProposedChange[]
+    const raw = JSON.parse(cleaned)
+
+    // SECURITY: Schema-validate AI-returned design changes (F7)
+    // Untrusted AI output — validate shape, cap array size, truncate strings
+    if (!Array.isArray(raw)) return []
+    const validated: ProposedChange[] = raw
+      .filter((c: unknown) => {
+        if (!c || typeof c !== "object") return false
+        const obj = c as Record<string, unknown>
+        return typeof obj.moduleId === "string" && typeof obj.parameter === "string"
+      })
+      .slice(0, 20)
+      .map((c: Record<string, unknown>) => ({
+        moduleId: String(c.moduleId).slice(0, 100),
+        description: String(c.description ?? "").slice(0, 500),
+        parameter: String(c.parameter).slice(0, 100),
+        currentValue: String(c.currentValue ?? "").slice(0, 100),
+        suggestedValue: String(c.suggestedValue ?? "").slice(0, 100),
+        rationale: String(c.rationale ?? "").slice(0, 1000),
+        severity: (["critical", "recommended", "optional"] as const).includes(c.severity as "critical" | "recommended" | "optional")
+          ? (c.severity as "critical" | "recommended" | "optional")
+          : "recommended",
+      }))
+
     // Apply dampening: interpolate numeric values toward current by CHANGE_DAMPENING_FACTOR
-    return changes.map((change) => {
+    return validated.map((change) => {
       const current = parseFloat(change.currentValue)
       const suggested = parseFloat(change.suggestedValue)
       if (!isNaN(current) && !isNaN(suggested) && isFinite(current) && isFinite(suggested)) {
@@ -315,7 +338,8 @@ ${analysis?.dfm ? `DFM: ${analysis.dfm.printable ? "Printable" : "NOT printable"
           rationale: `${change.rationale} (Dampened ${CHANGE_DAMPENING_FACTOR * 100}%: ${change.suggestedValue} → ${dampenedStr})`,
         }
       }
-      // Non-numeric values (e.g. material names) pass through unchanged
+      // AUDIT: Log non-numeric convergence values (F9)
+      console.warn(`[Convergence] Non-numeric change: ${change.parameter} = "${change.currentValue}" → "${change.suggestedValue}"`)
       return change
     })
   } catch {
