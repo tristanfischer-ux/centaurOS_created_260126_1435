@@ -26,7 +26,7 @@ import { FAST_MODEL_CHAIN, buildSpeculativeFastPrompt, parseComplexityTag } from
 // imports improve readability and eliminate runtime import overhead.
 import { getSpecialistWorkflows } from "@/lib/agents/specialist-workflows"
 // AUDIT: Decision journal imports moved to post-response-handler.ts (2026-02-19, refactor step 7 of 8)
-import { buildContextLayers } from "@/lib/agents/prompt-builder"
+import { buildContextLayers, buildCrossSpecialistContext } from "@/lib/agents/prompt-builder"
 import { createPostResponseCallback } from "@/lib/agents/post-response-handler"
 import { shouldTriggerWebSearch, runPreSearch, formatSearchResultsForPrompt } from "@/lib/agents/web-search"
 
@@ -526,12 +526,22 @@ export async function POST(request: Request) {
 
             // Inject relationship awareness for cross-specialist dynamics
             if (specialist.personality.relationships) {
+                // Build live cross-specialist context from recent insights + decisions
+                let crossContext = typeof customSystemPromptSuffix === "string" && customSystemPromptSuffix.includes("CROSS_SPECIALIST_CONTEXT")
+                    ? customSystemPromptSuffix
+                    : undefined
+                if (!crossContext && foundryId) {
+                    try {
+                        const liveContext = await buildCrossSpecialistContext(foundryId, specialistId)
+                        if (liveContext) crossContext = liveContext
+                    } catch {
+                        // Non-critical — proceed without cross-specialist context
+                    }
+                }
                 const relationshipBlock = compileRelationshipContext(
                     specialist.name,
                     specialist.personality.relationships,
-                    typeof customSystemPromptSuffix === "string" && customSystemPromptSuffix.includes("CROSS_SPECIALIST_CONTEXT")
-                        ? customSystemPromptSuffix
-                        : undefined,
+                    crossContext,
                 )
                 if (relationshipBlock) {
                     systemPromptWithContext += `\n\n${relationshipBlock}`
@@ -679,7 +689,15 @@ DO NOT:
 You can produce these deliverables when the founder asks. Mention them naturally when relevant:
 ${workflowList}
 
-When the founder triggers one of these (e.g., "draft the plan", "run the numbers"), produce the full deliverable in your response. Don't just outline it — actually write it out completely and thoroughly.`
+When the founder triggers one of these (e.g., "draft the plan", "run the numbers"), produce the full deliverable in your response. Don't just outline it — actually write it out completely and thoroughly.
+
+**CRITICAL: Use real data.** Your system context includes the company's actual profile (revenue range, team size, funding status, sector), active objectives with progress, recent decisions from the decision journal, and knowledge vault notes. When producing deliverables:
+- Reference actual team members by name and role
+- Use real metrics from the company profile (revenue range, employee count, funding stage)
+- Incorporate active objectives and their progress into strategic deliverables
+- Reference past decisions and their outcomes when relevant
+- If a data point is missing, say "[DATA NEEDED: X]" — never invent numbers
+- Label clearly: [FROM COMPANY DATA] vs [INDUSTRY BENCHMARK] vs [YOUR ESTIMATE]`
             }
 
             // Multi-step execution plan capability

@@ -43,6 +43,7 @@ import { toast } from "sonner"
 import { Markdown } from "@/components/ui/markdown"
 import { getOrCreateSpecialistThread, getRecentSpecialistOutputs, getSpecialistThreadHistory } from "@/actions/agent-memory"
 import type { SpecialistHistoryMessage } from "@/actions/agent-memory"
+import { getProactiveOpener, markInsightRead, getSpecialistGreetingContext } from "@/actions/agent-insights"
 import { createArtifact, exportArtifactToGoogleDocs } from "@/actions/agent-artifacts"
 import type { ArtifactContentType } from "@/actions/agent-artifacts"
 import { detectWorkflowTrigger } from "@/lib/agents/specialist-workflows"
@@ -203,6 +204,8 @@ interface ChatMessage {
     slideDeck?: SlideDeckContent | null
     /** Parsed from PROPOSED_PLAN in assistant messages; rendered as ExecutionPlanCard. */
     executionPlan?: ExecutionPlan | null
+    /** Marks messages that are proactive openers from background sweeps — specialist-initiated. */
+    isProactive?: boolean
 }
 
 /**
@@ -477,6 +480,14 @@ export function BriefSpecialistDialog({
     const [isUrgentMessage, setIsUrgentMessage] = useState(false)
     /** Tension detected between this specialist and another */
     const [tensionCard, setTensionCard] = useState<{ specialistId: string; description: string } | null>(null)
+    /** Proactive opener from sweep — rendered as first assistant message when specialist initiates */
+    const [proactiveOpener, setProactiveOpener] = useState<{
+        opener: string; insightId: string; title: string; urgency: string
+    } | null>(null)
+    /** Real insight titles and overdue tasks for data-driven greeting context */
+    const [greetingContext, setGreetingContext] = useState<{
+        insightTitles: string[]; overdueTasks: string[]
+    }>({ insightTitles: [], overdueTasks: [] })
     const [isPlayingIntroVideo, setIsPlayingIntroVideo] = useState(false)
     const [introVideoUrl, setIntroVideoUrl] = useState<string | null>(null)
     const [deepThinkEnabled, setDeepThinkEnabled] = useState(() => {
@@ -580,11 +591,13 @@ export function BriefSpecialistDialog({
         async function initialize(): Promise<void> {
             setIsLoadingThread(true)
             try {
-                // Fetch thread, cross-specialist context, AND history in parallel
-                const [threadResult, crossResult, historyResult] = await Promise.all([
+                // Fetch thread, cross-specialist context, history, proactive opener, AND greeting context in parallel
+                const [threadResult, crossResult, historyResult, proactiveResult, greetingCtx] = await Promise.all([
                     getOrCreateSpecialistThread(specialist.id),
                     getRecentSpecialistOutputs(specialist.id, 5),
                     getSpecialistThreadHistory(specialist.id, 20),
+                    getProactiveOpener(specialist.id).catch(() => null),
+                    getSpecialistGreetingContext(specialist.id).catch(() => ({ insightTitles: [], overdueTasks: [] })),
                 ])
 
                 if (cancelled) return
@@ -622,6 +635,20 @@ export function BriefSpecialistDialog({
                         historical: true,
                     }))
                     setMessages(historicalMessages)
+                }
+
+                // Store proactive opener if available (rendered during greeting phase)
+                if (proactiveResult) {
+                    setProactiveOpener(proactiveResult)
+                    // Mark insight as read since we'll render the opener
+                    markInsightRead(proactiveResult.insightId).catch(() => {})
+                } else {
+                    setProactiveOpener(null)
+                }
+
+                // Store greeting context for data-driven conversation starters
+                if (greetingCtx.insightTitles.length > 0 || greetingCtx.overdueTasks.length > 0) {
+                    setGreetingContext(greetingCtx)
                 }
             } catch (err) {
                 console.error("[BriefDialog] Init failed:", err)
@@ -672,6 +699,7 @@ export function BriefSpecialistDialog({
         introVideoPlayedRef.current = false
         setIsPlayingIntroVideo(false)
         setIntroVideoUrl(null)
+        setProactiveOpener(null)
     }, [specialist.id])
 
     // Abort in-flight execute request when dialog closes or specialist changes
@@ -707,7 +735,8 @@ export function BriefSpecialistDialog({
 
     // ─── Proactive Greeting ──────────────────────────────────────────────
     // After initialization, always generate a proactive opening message from the specialist.
-    // Tiered: with history/cross-context reference it; first-time use company context or a compelling opening question.
+    // If the specialist has a proactive opener (from background sweeps), render it as the
+    // first message — the specialist initiated the conversation. Otherwise, generate a greeting.
     useEffect(() => {
         if (isLoadingThread || !open) return
         if (greetingGeneratedRef.current) return
@@ -718,6 +747,21 @@ export function BriefSpecialistDialog({
 
         async function generateGreeting(): Promise<void> {
             setIsGeneratingGreeting(true)
+
+            // If we have a proactive opener from a sweep, render it as the first message
+            // instead of generating a new greeting — the specialist initiated this conversation
+            if (proactiveOpener) {
+                const openerMessage: ChatMessage = {
+                    role: "assistant",
+                    content: proactiveOpener.opener,
+                    timestamp: new Date(),
+                    isProactive: true,
+                }
+                setMessages(prev => [...prev, openerMessage])
+                setIsGeneratingGreeting(false)
+                setProactiveOpener(null)
+                return
+            }
 
             // Build context summary for the greeting prompt.
             // Uses messagesSnapshotRef to avoid re-running this effect when messages change
@@ -734,6 +778,18 @@ export function BriefSpecialistDialog({
             }
             if (crossSpecialistContext) {
                 contextParts.push(`## ${crossSpecialistContext}`)
+            }
+
+            // Inject real sweep insights and overdue tasks for data-driven greetings
+            if (greetingContext.insightTitles.length > 0 || greetingContext.overdueTasks.length > 0) {
+                const dataLines: string[] = []
+                if (greetingContext.insightTitles.length > 0) {
+                    dataLines.push(`Your recent findings: ${greetingContext.insightTitles.join("; ")}`)
+                }
+                if (greetingContext.overdueTasks.length > 0) {
+                    dataLines.push(`Overdue items you're tracking: ${greetingContext.overdueTasks.join("; ")}`)
+                }
+                contextParts.push(`## Your Active Intelligence\n${dataLines.join("\n")}\nReference these naturally — they make your greeting specific and relevant.`)
             }
 
             const hasContextToReference = contextParts.length > 0
@@ -2231,8 +2287,17 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 "max-w-[90%] rounded-lg px-3 py-2.5",
                                                 msg.role === "user"
                                                     ? "bg-international-orange/10 text-foreground"
-                                                    : "bg-muted/50 border border-muted"
+                                                    : msg.isProactive
+                                                        ? "bg-international-orange/5 border border-international-orange/20"
+                                                        : "bg-muted/50 border border-muted"
                                             )}>
+                                                {/* Proactive initiative badge */}
+                                                {msg.isProactive && (
+                                                    <div className="flex items-center gap-1.5 mb-1.5 text-[10px] font-medium uppercase tracking-wider text-international-orange/70">
+                                                        <Sparkles className="h-3 w-3" />
+                                                        <span>{specialist.name} reached out</span>
+                                                    </div>
+                                                )}
                                                 {msg.role === "user" ? (
                                                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                                                 ) : msg.slideDeck ? (
@@ -3103,8 +3168,17 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 "max-w-[85%] rounded-lg px-4 py-3",
                                                 msg.role === "user"
                                                     ? "bg-international-orange/10 text-foreground"
-                                                    : "bg-muted/50 border border-muted"
+                                                    : msg.isProactive
+                                                        ? "bg-international-orange/5 border border-international-orange/20"
+                                                        : "bg-muted/50 border border-muted"
                                             )}>
+                                                {/* Proactive initiative badge */}
+                                                {msg.isProactive && (
+                                                    <div className="flex items-center gap-1.5 mb-1.5 text-[10px] font-medium uppercase tracking-wider text-international-orange/70">
+                                                        <Sparkles className="h-3 w-3" />
+                                                        <span>{specialist.name} reached out</span>
+                                                    </div>
+                                                )}
                                                 {msg.role === "user" ? (
                                                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                                                 ) : msg.slideDeck ? (

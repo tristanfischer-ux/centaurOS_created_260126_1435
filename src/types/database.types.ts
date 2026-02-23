@@ -12301,6 +12301,9 @@ export type Database = {
           foundry_id: string
           id: string
           outcome: string | null
+          outcome_notes: string | null
+          outcome_recorded_at: string | null
+          outcome_status: string
           specialist_id: string
         }
         Insert: {
@@ -12310,6 +12313,9 @@ export type Database = {
           foundry_id: string
           id?: string
           outcome?: string | null
+          outcome_notes?: string | null
+          outcome_recorded_at?: string | null
+          outcome_status?: string
           specialist_id: string
         }
         Update: {
@@ -12319,6 +12325,9 @@ export type Database = {
           foundry_id?: string
           id?: string
           outcome?: string | null
+          outcome_notes?: string | null
+          outcome_recorded_at?: string | null
+          outcome_status?: string
           specialist_id?: string
         }
         Relationships: [

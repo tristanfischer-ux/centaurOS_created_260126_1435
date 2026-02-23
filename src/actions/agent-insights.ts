@@ -412,3 +412,114 @@ export async function getUnreadInsightCount(): Promise<number> {
 
   return count ?? 0
 }
+
+/**
+ * Gets the most recent proactive opener for a specialist.
+ *
+ * @description Fetches the newest unread insight with a `proactive_opener` in
+ * domain_data for the given specialist. Used by the dialog to render
+ * proactive messages when the founder opens a specialist.
+ *
+ * @param specialistId - The specialist to check for proactive openers
+ * @returns The opener text and insight ID, or null if none exists
+ */
+export async function getProactiveOpener(
+  specialistId: string,
+): Promise<{ opener: string; insightId: string; title: string; urgency: string } | null> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('foundry_id, active_foundry_id')
+    .eq('id', user.id)
+    .single()
+
+  const foundryId = profile?.active_foundry_id ?? profile?.foundry_id
+  if (!foundryId) return null
+
+  const { data: insights } = await supabase
+    .from('agent_insights')
+    .select('id, title, urgency, domain_data')
+    .eq('foundry_id', foundryId)
+    .eq('specialist_id', specialistId)
+    .eq('is_read', false)
+    .eq('is_dismissed', false)
+    .in('urgency', ['critical', 'important'])
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  if (!insights?.length) return null
+
+  // Find the first insight with a proactive_opener
+  for (const insight of insights) {
+    const domainData = (insight.domain_data ?? {}) as Record<string, unknown>
+    if (typeof domainData.proactive_opener === 'string' && domainData.proactive_opener.length > 0) {
+      return {
+        opener: domainData.proactive_opener,
+        insightId: insight.id,
+        title: insight.title,
+        urgency: insight.urgency,
+      }
+    }
+  }
+
+  return null
+}
+
+/**
+ * Gets recent insights and overdue tasks for a specialist to use in greeting context.
+ *
+ * @description Fetches the 3 most recent unread insights and up to 2 overdue tasks
+ * owned by this specialist. Used to enrich conversation starters with real data
+ * so the specialist's first message references actual findings and pending work.
+ *
+ * @param specialistId - The specialist to get context for
+ * @returns Object with insight titles and overdue task titles
+ */
+export async function getSpecialistGreetingContext(
+  specialistId: string,
+): Promise<{ insightTitles: string[]; overdueTasks: string[] }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { insightTitles: [], overdueTasks: [] }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('foundry_id, active_foundry_id')
+    .eq('id', user.id)
+    .single()
+
+  const foundryId = profile?.active_foundry_id ?? profile?.foundry_id
+  if (!foundryId) return { insightTitles: [], overdueTasks: [] }
+
+  // Fetch in parallel: recent insights + overdue tasks
+  const [insightsResult, tasksResult] = await Promise.all([
+    supabase
+      .from('agent_insights')
+      .select('title')
+      .eq('foundry_id', foundryId)
+      .eq('specialist_id', specialistId)
+      .eq('is_dismissed', false)
+      .eq('is_read', false)
+      .order('created_at', { ascending: false })
+      .limit(3),
+    supabase
+      .from('tasks')
+      .select('title')
+      .eq('foundry_id', foundryId)
+      .or(`created_by_agent_id.eq.${specialistId},owner_agent_id.eq.${specialistId}`)
+      .not('status', 'in', '("Done","Completed")')
+      .lt('end_date', new Date().toISOString())
+      .is('deleted_at', null)
+      .limit(2),
+  ])
+
+  return {
+    insightTitles: (insightsResult.data ?? []).map(i => i.title),
+    overdueTasks: (tasksResult.data ?? []).map(t => t.title),
+  }
+}

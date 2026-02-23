@@ -20,6 +20,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
+export type OutcomeStatus = 'pending' | 'positive' | 'negative' | 'mixed' | 'unknown'
+
 export interface DecisionEntry {
     id: string
     foundryId: string
@@ -27,6 +29,9 @@ export interface DecisionEntry {
     decision: string
     context: string
     outcome?: string
+    outcomeStatus: OutcomeStatus
+    outcomeNotes?: string
+    outcomeRecordedAt?: string
     createdAt: string
 }
 
@@ -126,7 +131,7 @@ export async function getRecentDecisions(
 
     let query = supabase
         .from('specialist_decision_journal')
-        .select('id, foundry_id, specialist_id, decision, context, outcome, created_at')
+        .select('id, foundry_id, specialist_id, decision, context, outcome, outcome_status, outcome_notes, outcome_recorded_at, created_at')
         .eq('foundry_id', foundryId)
         .order('created_at', { ascending: false })
         .limit(limit)
@@ -149,6 +154,9 @@ export async function getRecentDecisions(
         decision: row.decision,
         context: row.context,
         outcome: row.outcome,
+        outcomeStatus: (row.outcome_status ?? 'pending') as OutcomeStatus,
+        outcomeNotes: row.outcome_notes ?? undefined,
+        outcomeRecordedAt: row.outcome_recorded_at ?? undefined,
         createdAt: row.created_at,
     }))
 }
@@ -162,19 +170,31 @@ export async function getRecentDecisions(
  * @param decisions - Recent decisions
  * @returns Formatted prompt block, or empty string if no decisions
  */
+const OUTCOME_LABELS: Record<OutcomeStatus, string> = {
+    pending: '',
+    positive: '✅ Worked well',
+    negative: '❌ Didn\'t work',
+    mixed: '⚖️ Mixed results',
+    unknown: '❓ Unclear outcome',
+}
+
 export function compileDecisionJournalPrompt(decisions: DecisionEntry[]): string {
     if (decisions.length === 0) return ''
 
     const lines: string[] = [
         '## Decision Journal (decisions this founder made with your help)',
         'Reference these naturally when relevant. "Remember when you decided to..." or "That aligns with your earlier decision to..."',
+        'When a past decision had a known outcome, use it: "Last time we tried X, it [worked/didn\'t work] — here\'s what I\'d suggest differently."',
         '',
     ]
 
     for (const d of decisions.slice(0, 5)) {
         const date = new Date(d.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+        const outcomeLabel = OUTCOME_LABELS[d.outcomeStatus]
         lines.push(`- [${date}] ${d.decision}`)
-        if (d.outcome) {
+        if (outcomeLabel) {
+            lines.push(`  → ${outcomeLabel}${d.outcomeNotes ? `: ${d.outcomeNotes}` : ''}`)
+        } else if (d.outcome) {
             lines.push(`  Outcome: ${d.outcome}`)
         }
     }

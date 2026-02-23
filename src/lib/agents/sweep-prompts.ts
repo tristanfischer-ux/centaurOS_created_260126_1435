@@ -470,8 +470,28 @@ Analyze the business context and identify any noteworthy findings:
 
 Focus on the 2-3 most impactful findings only.
 `
-  return basePrompt + TASK_FOLLOW_UP_PROMPT
+  return basePrompt + TASK_FOLLOW_UP_PROMPT + OUTCOME_DETECTION_PROMPT
 }
+
+/**
+ * Directive for auto-detecting outcomes of past decisions during sweeps.
+ * Appended to every specialist's sweep prompt.
+ */
+const OUTCOME_DETECTION_PROMPT = `
+
+--- DECISION OUTCOME DETECTION ---
+
+If the business context (metrics, objectives progress, task completions) suggests that a past decision had a positive or negative result, create an "observation" insight noting it.
+
+For example:
+- "The decision to focus on enterprise sales 2 months ago seems to be paying off — pipeline value is up."
+- "The pivot to self-serve onboarding may not be working — conversion hasn't improved despite 6 weeks of effort."
+
+Only flag outcomes you can reasonably infer from the data. Use type "observation", urgency "informational".
+Title format: "Outcome: [decision summary] — [positive/negative/mixed]"
+
+--- END OUTCOME DETECTION ---
+`
 
 /**
  * Gets all specialist IDs that have background sweep prompts.

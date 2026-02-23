@@ -647,6 +647,123 @@ export async function autoFollowUpOnOverdueTasks(foundryId: string): Promise<num
   }
 }
 
+// ─── Ambient Milestone Celebrations ──────────────────────────────────
+
+/** Specialist domain keywords for matching celebrations to relevant specialists */
+const SPECIALIST_DOMAINS: Record<string, string[]> = {
+  'strategist': ['strategy', 'market', 'competitive', 'growth', 'expansion', 'launch', 'pivot'],
+  'finance-lead': ['revenue', 'mrr', 'arr', 'funding', 'burn', 'runway', 'budget', 'cash', 'profit', 'cost'],
+  'product-lead': ['product', 'feature', 'release', 'ship', 'user', 'customer', 'prd', 'roadmap'],
+  'growth-marketer': ['marketing', 'content', 'campaign', 'traffic', 'seo', 'brand', 'awareness'],
+  'sales-lead': ['sale', 'deal', 'pipeline', 'contract', 'client', 'enterprise', 'close', 'lead'],
+  'hiring-team': ['hire', 'team', 'onboard', 'recruit', 'culture', 'headcount'],
+  'cto': ['technical', 'architecture', 'infrastructure', 'performance', 'security', 'engineering'],
+  'legal-counsel': ['legal', 'compliance', 'contract', 'ip', 'regulation', 'terms'],
+  'fundraising-advisor': ['fundraise', 'investor', 'pitch', 'round', 'valuation', 'term sheet'],
+  'chief-of-staff': ['milestone', 'objective', 'goal', 'ops', 'process'],
+}
+
+/**
+ * Creates celebration insights from relevant specialists when milestones occur.
+ *
+ * @description Uses each specialist's celebrationStyle to generate brief,
+ * in-character acknowledgments. No AI call needed — the celebration style
+ * data is rich enough to construct compelling messages via template.
+ *
+ * @param foundryId - The foundry
+ * @param milestoneType - What kind of milestone was hit
+ * @param eventData - Details about the milestone
+ * @returns Number of celebrations created
+ */
+export async function celebrateMilestone(
+  foundryId: string,
+  milestoneType: 'task_completed' | 'objective_completed' | 'metric_milestone',
+  eventData: { title: string; description?: string; specialistId?: string },
+): Promise<number> {
+  const supabase = createAdminClient()
+  let celebrationsCreated = 0
+
+  try {
+    const titleLower = (eventData.title + ' ' + (eventData.description ?? '')).toLowerCase()
+
+    // Select 2-3 relevant specialists by domain keyword match
+    const scored: Array<{ id: string; score: number }> = []
+    for (const [specId, keywords] of Object.entries(SPECIALIST_DOMAINS)) {
+      const matchCount = keywords.filter(kw => titleLower.includes(kw)).length
+      if (matchCount > 0) {
+        scored.push({ id: specId, score: matchCount })
+      }
+    }
+    scored.sort((a, b) => b.score - a.score)
+
+    // Always include the specialist who owns/created the work, plus 1-2 domain-relevant others
+    const celebrants = new Set<string>()
+    if (eventData.specialistId) celebrants.add(eventData.specialistId)
+    for (const s of scored) {
+      if (celebrants.size >= 3) break
+      celebrants.add(s.id)
+    }
+    // If still empty, default to chief-of-staff
+    if (celebrants.size === 0) celebrants.add('chief-of-staff')
+
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+
+    for (const specId of celebrants) {
+      const specialist = SPECIALISTS.find(s => s.id === specId)
+      if (!specialist?.personality.celebrationStyle) continue
+
+      const { acknowledgment, domainConnection, nextChallenge } = specialist.personality.celebrationStyle
+      const body = `${acknowledgment} ${domainConnection} ${nextChallenge}`
+
+      const milestoneLabel = milestoneType === 'task_completed' ? 'Task completed'
+        : milestoneType === 'objective_completed' ? 'Objective achieved'
+        : 'Milestone reached'
+
+      const { error } = await supabase.rpc('insert_agent_insight', {
+        p_foundry_id: foundryId,
+        p_specialist_id: specId,
+        p_insight_type: 'observation',
+        p_urgency: 'informational',
+        p_title: `${milestoneLabel}: ${eventData.title.slice(0, 120)}`,
+        p_body: body.slice(0, 2000),
+        p_domain_data: {
+          celebration: true,
+          milestone_type: milestoneType,
+          event_title: eventData.title,
+        },
+        p_suggested_actions: [
+          {
+            label: `Chat with ${specialist.name}`,
+            action_type: 'open_specialist',
+            action_data: { specialist_id: specId },
+          },
+        ],
+      })
+
+      if (!error) {
+        celebrationsCreated++
+      }
+    }
+
+    // Set short TTL on celebrations so they don't clog the feed
+    // (The expires_at is set via a direct update since the RPC doesn't support it)
+    if (celebrationsCreated > 0) {
+      await supabase
+        .from('agent_insights')
+        .update({ expires_at: expires })
+        .eq('foundry_id', foundryId)
+        .eq('insight_type', 'observation')
+        .contains('domain_data', { celebration: true })
+        .gte('created_at', new Date(Date.now() - 60_000).toISOString())
+    }
+
+    return celebrationsCreated
+  } catch (error) {
+    console.error('[AgenticActions] celebrateMilestone failed:', error)
+    return 0
+  }
+}
+
 // ─── Orchestrator ───────────────────────────────────────────────────
 
 /**
@@ -659,16 +776,91 @@ export async function autoFollowUpOnOverdueTasks(foundryId: string): Promise<num
  * @param foundryId - The foundry to process
  * @returns Summary of all actions taken
  */
+// ─── Decision Outcome Follow-ups ────────────────────────────────────
+
+/**
+ * Creates follow-up reminders for decisions 30+ days old with no recorded outcome.
+ *
+ * @description Queries the decision journal for pending-outcome decisions
+ * and creates gentle reminder insights asking the founder how things went.
+ * This closes the learning loop so specialists can reference outcomes in
+ * future conversations.
+ *
+ * @param foundryId - The foundry to check
+ * @returns Number of outcome follow-ups created
+ */
+async function autoFollowUpOnDecisionOutcomes(foundryId: string): Promise<number> {
+  const supabase = createAdminClient()
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  try {
+    // Find decisions 30+ days old with pending outcome status
+    const { data: pendingDecisions } = await supabase
+      .from('specialist_decision_journal')
+      .select('id, specialist_id, decision, created_at')
+      .eq('foundry_id', foundryId)
+      .eq('outcome_status', 'pending')
+      .lt('created_at', thirtyDaysAgo)
+      .order('created_at', { ascending: true })
+      .limit(3)
+
+    if (!pendingDecisions?.length) return 0
+
+    let created = 0
+    for (const d of pendingDecisions) {
+      const daysSince = Math.floor((Date.now() - new Date(d.created_at).getTime()) / (1000 * 60 * 60 * 24))
+      const decisionPreview = d.decision.slice(0, 120)
+
+      // Check we haven't already created a follow-up for this decision recently
+      const { count } = await supabase
+        .from('agent_insights')
+        .select('*', { count: 'exact', head: true })
+        .eq('foundry_id', foundryId)
+        .eq('specialist_id', d.specialist_id)
+        .eq('insight_type', 'reminder')
+        .ilike('title', `%${decisionPreview.slice(0, 50)}%`)
+        .gt('created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
+
+      if ((count ?? 0) > 0) continue
+
+      const { error } = await supabase.rpc('insert_agent_insight', {
+        p_foundry_id: foundryId,
+        p_specialist_id: d.specialist_id,
+        p_insight_type: 'reminder',
+        p_urgency: 'informational',
+        p_title: `How did it go? "${decisionPreview}"`,
+        p_body: `${daysSince} days ago, you decided: "${d.decision.slice(0, 200)}". How did that turn out? Understanding outcomes helps me give you better advice next time.`,
+        p_domain_data: JSON.stringify({ decision_id: d.id, days_since: daysSince }),
+        p_suggested_actions: JSON.stringify([
+          { label: `Tell ${SPECIALISTS.find(s => s.id === d.specialist_id)?.name ?? 'me'} how it went`, action_type: 'open_specialist', action_data: { specialist_id: d.specialist_id } },
+        ]),
+      })
+
+      if (!error) created++
+    }
+
+    if (created > 0) {
+      console.info(`[AgenticActions] Created ${created} decision outcome follow-ups for foundry ${foundryId}`)
+    }
+    return created
+  } catch (error) {
+    console.error('[AgenticActions] Decision outcome follow-up failed:', error)
+    return 0
+  }
+}
+
 export async function runAgenticActions(foundryId: string): Promise<{
   draftTasks: ActionResult[]
   escalations: number
   followUps: number
+  decisionFollowUps: number
 }> {
-  const [draftTasks, escalations, followUps] = await Promise.all([
+  const [draftTasks, escalations, followUps, decisionFollowUps] = await Promise.all([
     autoDraftTasksFromInsights(foundryId),
     autoEscalateThresholdBreaches(foundryId),
     autoFollowUpOnOverdueTasks(foundryId),
+    autoFollowUpOnDecisionOutcomes(foundryId),
   ])
 
-  return { draftTasks, escalations, followUps }
+  return { draftTasks, escalations, followUps, decisionFollowUps }
 }

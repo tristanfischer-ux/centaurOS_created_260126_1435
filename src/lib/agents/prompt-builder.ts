@@ -8,8 +8,10 @@
  *   3. Decision journal (past decisions for "remember when" references)
  *   4. External intelligence (recent monitoring sweep reports)
  *   5. Knowledge Vault (relevant organizational knowledge)
- *   6. Temporal awareness (time/day, milestone proximity)
- *   7. Emotional awareness (detecting the founder's emotional state from their message)
+ *   6. "Since we last talked" bridge (what changed since last conversation)
+ *   7. Cross-specialist intelligence (what related specialists recently said)
+ *   8. Temporal awareness (time/day, milestone proximity)
+ *   9. Emotional awareness (detecting the founder's emotional state from their message)
  *
  * Each layer is independently failable — if any DB query fails, the specialist
  * proceeds with a slightly less rich prompt rather than failing entirely.
@@ -49,6 +51,8 @@ import { compileIntelligencePrompt } from "@/lib/agents/external-intelligence"
 import { searchKnowledgeForSpecialist } from "@/lib/knowledge-vault"
 import { compileTemporalPrompt } from "@/lib/agents/temporal-context"
 import { compileEmotionalPrompt } from "@/lib/agents/emotional-context"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { SPECIALISTS } from "@/app/(platform)/agents/specialists-data"
 
 /**
  * Parameters for building the specialist context layers.
@@ -180,6 +184,18 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<st
             }
         }
 
+        // "Since we last talked" bridge: what changed since last conversation
+        if (foundryId && specialistId && threadId) {
+            try {
+                const sinceBlock = await buildSinceLastTalkedContext(foundryId, specialistId, threadId)
+                if (sinceBlock) {
+                    contextBlocks += `\n\n${sinceBlock}`
+                }
+            } catch (err) {
+                console.warn("[PromptBuilder] Could not build 'since last talked' context:", err)
+            }
+        }
+
         // Temporal awareness with milestone detection
         let foundryCreatedAt: string | null = null
         if (foundryId) {
@@ -215,4 +231,200 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<st
     }
 
     return contextBlocks
+}
+
+// ─── "Since We Last Talked" Context Bridge ─────────────────────────────
+
+/** Minimum gap (hours) before injecting "since we last talked" context */
+const SINCE_LAST_TALKED_MIN_HOURS = 12
+
+/**
+ * Builds a "what changed since you last talked" context block.
+ *
+ * @description Queries for changes since the specialist's last interaction:
+ * sweep insights, decisions made with other specialists, and task status
+ * changes. Gives the specialist ammunition to reference real developments
+ * instead of generic greetings.
+ *
+ * @param foundryId - The foundry ID
+ * @param specialistId - The specialist ID
+ * @param threadId - The memory thread ID (used to find last interaction time)
+ * @returns Formatted markdown block, or empty string if nothing changed
+ */
+export async function buildSinceLastTalkedContext(
+    foundryId: string,
+    specialistId: string,
+    threadId: string,
+): Promise<string> {
+    const admin = createAdminClient()
+
+    // 1. Get last interaction time for this thread
+    const { data: thread } = await admin
+        .from('agent_memory_threads')
+        .select('last_interaction_at')
+        .eq('id', threadId)
+        .single()
+
+    const lastInteraction = thread?.last_interaction_at
+    if (!lastInteraction) return ''
+
+    const lastDate = new Date(lastInteraction)
+    const hoursSince = (Date.now() - lastDate.getTime()) / (1000 * 60 * 60)
+    if (hoursSince < SINCE_LAST_TALKED_MIN_HOURS) return ''
+
+    const sinceISO = lastDate.toISOString()
+    const bullets: string[] = []
+
+    // 2. Recent insights from this specialist's domain (sweep discoveries)
+    const { data: recentInsights } = await admin
+        .from('agent_insights')
+        .select('title, urgency, specialist_id, created_at')
+        .eq('foundry_id', foundryId)
+        .eq('specialist_id', specialistId)
+        .gt('created_at', sinceISO)
+        .eq('is_dismissed', false)
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+    if (recentInsights?.length) {
+        for (const i of recentInsights) {
+            const urgencyTag = i.urgency === 'critical' ? ' [CRITICAL]' : i.urgency === 'important' ? ' [important]' : ''
+            bullets.push(`Your background analysis found:${urgencyTag} ${i.title}`)
+        }
+    }
+
+    // 3. Decisions made with OTHER specialists since last chat
+    const { data: crossDecisions } = await admin
+        .from('specialist_decision_journal')
+        .select('specialist_id, decision, created_at')
+        .eq('foundry_id', foundryId)
+        .neq('specialist_id', specialistId)
+        .gt('created_at', sinceISO)
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+    if (crossDecisions?.length) {
+        for (const d of crossDecisions) {
+            const spec = SPECIALISTS.find(s => s.id === d.specialist_id)
+            const specName = spec?.name ?? d.specialist_id
+            bullets.push(`The founder decided (with ${specName}): ${d.decision.slice(0, 150)}`)
+        }
+    }
+
+    // 4. Task status changes for tasks this specialist owns
+    const { data: completedTasks } = await admin
+        .from('tasks')
+        .select('title, status')
+        .eq('foundry_id', foundryId)
+        .or(`created_by_agent_id.eq.${specialistId},owner_agent_id.eq.${specialistId}`)
+        .in('status', ['Done', 'Completed'])
+        .gt('updated_at', sinceISO)
+        .is('deleted_at', null)
+        .limit(3)
+
+    if (completedTasks?.length) {
+        for (const t of completedTasks) {
+            bullets.push(`Task completed: "${t.title}"`)
+        }
+    }
+
+    const { data: overdueTasks } = await admin
+        .from('tasks')
+        .select('title, end_date')
+        .eq('foundry_id', foundryId)
+        .or(`created_by_agent_id.eq.${specialistId},owner_agent_id.eq.${specialistId}`)
+        .not('status', 'in', '("Done","Completed")')
+        .lt('end_date', new Date().toISOString())
+        .is('deleted_at', null)
+        .limit(3)
+
+    if (overdueTasks?.length) {
+        for (const t of overdueTasks) {
+            const daysOverdue = Math.floor((Date.now() - new Date(t.end_date!).getTime()) / (1000 * 60 * 60 * 24))
+            bullets.push(`Task overdue (${daysOverdue}d): "${t.title}"`)
+        }
+    }
+
+    if (bullets.length === 0) return ''
+
+    const daysSince = Math.floor(hoursSince / 24)
+    const timeLabel = daysSince >= 1 ? `${daysSince} day${daysSince === 1 ? '' : 's'}` : `${Math.floor(hoursSince)} hours`
+
+    return [
+        `## What Changed Since You Last Talked (${timeLabel} ago)`,
+        'Reference these naturally in your opening — show you\'ve been paying attention even when they weren\'t here.',
+        '',
+        ...bullets.map(b => `- ${b}`),
+    ].join('\n')
+}
+
+// ─── Cross-Specialist Intelligence ("Water Cooler") ────────────────────
+
+/**
+ * Builds context about what related specialists have recently said or discovered.
+ *
+ * @description Queries recent insights and decisions from specialists that have
+ * defined relationships with the current specialist. This enables natural
+ * cross-references in 1:1 conversations: "I know Finn flagged the burn rate..."
+ *
+ * @param foundryId - The foundry ID
+ * @param specialistId - The current specialist ID
+ * @returns Formatted context string, or empty string if no relevant activity
+ */
+export async function buildCrossSpecialistContext(
+    foundryId: string,
+    specialistId: string,
+): Promise<string> {
+    const specialist = getSpecialistById(specialistId)
+    if (!specialist?.personality.relationships) return ''
+
+    // Get IDs of specialists we have relationships with
+    const relatedIds = Object.keys(specialist.personality.relationships)
+    if (relatedIds.length === 0) return ''
+
+    const admin = createAdminClient()
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const lines: string[] = []
+
+    // Recent insights from related specialists
+    const { data: relatedInsights } = await admin
+        .from('agent_insights')
+        .select('specialist_id, title, urgency, insight_type')
+        .eq('foundry_id', foundryId)
+        .in('specialist_id', relatedIds)
+        .gt('created_at', sevenDaysAgo)
+        .eq('is_dismissed', false)
+        .in('insight_type', ['recommendation', 'alert', 'observation'])
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+    if (relatedInsights?.length) {
+        for (const insight of relatedInsights) {
+            const spec = SPECIALISTS.find(s => s.id === insight.specialist_id)
+            const name = spec?.name ?? insight.specialist_id
+            lines.push(`${name} recently flagged: ${insight.title}`)
+        }
+    }
+
+    // Recent decisions made with related specialists
+    const { data: relatedDecisions } = await admin
+        .from('specialist_decision_journal')
+        .select('specialist_id, decision')
+        .eq('foundry_id', foundryId)
+        .in('specialist_id', relatedIds)
+        .gt('created_at', sevenDaysAgo)
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+    if (relatedDecisions?.length) {
+        for (const d of relatedDecisions) {
+            const spec = SPECIALISTS.find(s => s.id === d.specialist_id)
+            const name = spec?.name ?? d.specialist_id
+            lines.push(`The founder decided (with ${name}): ${d.decision.slice(0, 120)}`)
+        }
+    }
+
+    if (lines.length === 0) return ''
+
+    return lines.slice(0, 5).join('\n')
 }

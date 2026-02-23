@@ -317,10 +317,43 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
       console.warn(`[SweepOrchestrator] Failed to build task context for ${config.specialistId}:`, err)
     }
 
+    // 1d. Cross-specialist recommendations for disagreement detection
+    let crossSpecialistBlock = ''
+    try {
+      const relationships = specialist.personality.relationships ?? {}
+      const tensionIds = Object.entries(relationships)
+        .filter(([, rel]) => rel?.dynamic === 'creative-tension' || rel?.dynamic === 'challenging')
+        .map(([id]) => id)
+
+      if (tensionIds.length > 0) {
+        const { data: recentRecs } = await supabase
+          .from('agent_insights')
+          .select('specialist_id, title, body')
+          .eq('foundry_id', config.foundryId)
+          .in('specialist_id', tensionIds)
+          .eq('insight_type', 'recommendation')
+          .eq('is_dismissed', false)
+          .gt('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+          .order('created_at', { ascending: false })
+          .limit(5)
+
+        if (recentRecs?.length) {
+          const lines = recentRecs.map(r => {
+            const spec = SPECIALISTS.find(s => s.id === r.specialist_id)
+            return `- ${spec?.name ?? r.specialist_id}: "${r.title}" — ${r.body.slice(0, 150)}`
+          })
+          crossSpecialistBlock = `\n\n## Cross-Specialist Awareness\nRecent recommendations from colleagues you have creative tension with:\n${lines.join('\n')}\n\nIf you DISAGREE with any of these recommendations based on your domain expertise, create an insight flagging the disagreement. Use insight type "recommendation" with title format: "Pushback: [topic] — I see it differently than [specialist name]". Explain your reasoning in the body. This healthy disagreement helps the founder make better decisions.`
+        }
+      }
+    } catch (err) {
+      console.warn(`[SweepOrchestrator] Failed to build cross-specialist context:`, err)
+    }
+
     const contextWithBriefing = [
       companyContext,
       briefingBlock ? '\n\n' + briefingBlock : '',
       taskPortfolio ? '\n\n' + taskPortfolio : '',
+      crossSpecialistBlock,
     ].join('')
 
     // 2. Build the sweep prompt
@@ -548,6 +581,15 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
       }
     }
 
+    // 6d. Generate proactive conversation openers for critical/important insights
+    if (notifiableInsights.length > 0) {
+      generateProactiveOpeners(
+        client, specialist, notifiableInsights.slice(0, 2), supabase,
+      ).catch(err => {
+        console.error('[SweepOrchestrator] Proactive opener generation failed:', err)
+      })
+    }
+
     // 7. Log the sweep
     await supabase.rpc('log_agent_sweep', {
       p_foundry_id: config.foundryId,
@@ -599,6 +641,87 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
       estimatedCostUsd: 0,
       durationMs,
       error: errorMessage,
+    }
+  }
+}
+
+// ─── Proactive Conversation Openers ─────────────────────────────────
+
+/**
+ * Generates proactive conversation openers for critical/important insights.
+ *
+ * @description After a sweep discovers something noteworthy, generates a 2-3
+ * sentence opener in the specialist's voice — stored in `domain_data.proactive_opener`.
+ * When the founder next opens this specialist, the opener appears as if the
+ * specialist initiated the conversation.
+ *
+ * Uses the same MiniMax M2.5 model as sweeps (cheap, fast) with a focused prompt.
+ * Limited to 2 openers per sweep per specialist to control cost.
+ *
+ * @param client - OpenAI-compatible client configured for MiniMax
+ * @param specialist - The specialist who generated the insight
+ * @param insights - The critical/important insights to generate openers for (max 2)
+ * @param supabase - Admin Supabase client for updating insights
+ */
+async function generateProactiveOpeners(
+  client: InstanceType<Awaited<ReturnType<typeof getOpenAIClient>>>,
+  specialist: (typeof SPECIALISTS)[number],
+  insights: AgentInsight[],
+  supabase: ReturnType<typeof createAdminClient>,
+): Promise<void> {
+  for (const insight of insights.slice(0, 2)) {
+    try {
+      const completion = await client.chat.completions.create({
+        model: SWEEP_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: [
+              `You are ${specialist.name}, ${specialist.title}.`,
+              specialist.personality.backstory ? `Background: ${specialist.personality.backstory}` : '',
+              specialist.personality.voice?.tone ? `Your tone: ${specialist.personality.voice.tone}` : '',
+              '',
+              'Write a proactive 2-3 sentence message to the founder about a discovery you made.',
+              'Sound like YOU — not a notification system. Be specific about the finding.',
+              'End with a suggestion or question that makes them want to discuss it with you.',
+              'If the urgency is critical, convey appropriate urgency without being alarmist.',
+            ].filter(Boolean).join('\n'),
+          },
+          {
+            role: 'user',
+            content: [
+              `You just discovered something ${insight.urgency} during your background analysis:`,
+              `Title: ${insight.title}`,
+              `Details: ${insight.body}`,
+              '',
+              'Write your proactive conversation opener (2-3 sentences, in your voice):',
+            ].join('\n'),
+          },
+        ],
+        max_tokens: 200,
+        temperature: 0.7,
+      })
+
+      const opener = completion.choices[0]?.message?.content?.trim()
+      if (!opener) continue
+
+      // Store the opener in domain_data on the insight
+      const existingDomainData = (insight.domain_data ?? {}) as Record<string, unknown>
+      await supabase
+        .from('agent_insights')
+        .update({
+          domain_data: {
+            ...existingDomainData,
+            proactive_opener: opener,
+          },
+        })
+        .eq('id', insight.id)
+
+      console.info(
+        `[SweepOrchestrator] Generated proactive opener for ${specialist.name}: "${opener.slice(0, 80)}..."`
+      )
+    } catch (err) {
+      console.warn(`[SweepOrchestrator] Failed to generate opener for insight ${insight.id}:`, err)
     }
   }
 }

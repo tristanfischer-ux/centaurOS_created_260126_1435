@@ -62,6 +62,12 @@ function formatInCharacterNotification(
         }
     }
 
+    // Use proactive opener as body if available (from sweep-generated AI opener)
+    const domainData = (insight.domain_data ?? {}) as Record<string, unknown>
+    const proactiveOpener = typeof domainData.proactive_opener === 'string'
+        ? domainData.proactive_opener
+        : null
+
     // Generate an in-character opening based on urgency
     let opening: string
     switch (insight.urgency) {
@@ -75,15 +81,19 @@ function formatInCharacterNotification(
             opening = getInformationalOpening(specialist)
     }
 
-    // Build the notification body: in-character opening + insight summary
-    const insightSummary = insight.body.length > 150
-        ? insight.body.slice(0, 147) + "..."
-        : insight.body
+    // If we have a proactive opener, use it as the body — it's already in-character and specific
+    const body = proactiveOpener
+        ? proactiveOpener.slice(0, 300)
+        : insight.body.length > 150
+            ? insight.body.slice(0, 147) + "..."
+            : insight.body
 
-    return {
-        title: `💬 ${specialist.name}: ${opening}`,
-        body: insightSummary,
-    }
+    // Title framing: when proactive opener exists, frame as "wants to talk"
+    const title = proactiveOpener
+        ? `💬 ${specialist.name} wants to talk to you`
+        : `💬 ${specialist.name}: ${opening}`
+
+    return { title, body }
 }
 
 /**
@@ -201,20 +211,32 @@ export async function dispatchInsightNotifications(
       const specialist = SPECIALISTS.find(s => s.id === insight.specialist_id)
       const specialistName = specialist?.name ?? 'Specialist'
 
+      // Disagreement insights ("Pushback: ...") always get elevated notification
+      const isDisagreement = insight.title.startsWith('Pushback:')
+
       const shouldTelegram =
         (insight.urgency === 'critical' && preferences.notify_critical_telegram) ||
         (insight.urgency === 'important' && preferences.notify_important_telegram)
 
       const shouldInApp =
+        isDisagreement || // Disagreements always notify in-app
         (insight.urgency === 'critical' && preferences.notify_critical_in_app) ||
         (insight.urgency === 'important' && preferences.notify_important_in_app)
 
       // Generate in-character notification message that feels like a colleague reaching out
-      const inCharacterMessage = formatInCharacterNotification(
+      let inCharacterMessage = formatInCharacterNotification(
         specialist,
         specialistName,
         insight,
       )
+
+      // Override for disagreement insights — frame as healthy tension
+      if (isDisagreement) {
+        inCharacterMessage = {
+          title: `⚡ ${specialistName} has a different take`,
+          body: insight.body.slice(0, 250),
+        }
+      }
 
       if (shouldInApp) {
         for (const member of notifyMembers) {

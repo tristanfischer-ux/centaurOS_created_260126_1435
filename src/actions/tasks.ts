@@ -1857,6 +1857,26 @@ export async function updateTaskStatus(
             })
         }
 
+        // Celebration: when a task is completed, trigger specialist celebrations
+        if (normalizedStatus === 'Completed' && foundryId) {
+            try {
+                const { data: taskData } = await supabase
+                    .from('tasks')
+                    .select('title, owner_agent_id, created_by_agent_id')
+                    .eq('id', taskId)
+                    .single()
+                if (taskData) {
+                    const { celebrateMilestone } = await import('@/lib/agents/agentic-actions')
+                    celebrateMilestone(foundryId, 'task_completed', {
+                        title: taskData.title,
+                        specialistId: taskData.owner_agent_id ?? taskData.created_by_agent_id ?? undefined,
+                    }).catch(err => console.warn('[TaskService] Celebration failed:', err))
+                }
+            } catch {
+                // Non-critical — celebration failure should never block task completion
+            }
+        }
+
         revalidatePath('/tasks')
         revalidatePath('/new-tasks')
         revalidatePath(`/tasks/${taskId}`)
