@@ -5400,6 +5400,88 @@ export type Database = {
           },
         ]
       }
+      finance_project_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          id: string
+          is_revenue: boolean
+          project_id: string
+          reference_id: string | null
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string
+          id?: string
+          is_revenue?: boolean
+          project_id: string
+          reference_id?: string | null
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          id?: string
+          is_revenue?: boolean
+          project_id?: string
+          reference_id?: string | null
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_project_transactions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "finance_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_projects: {
+        Row: {
+          client_name: string | null
+          created_at: string
+          created_by: string
+          foundry_id: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_name?: string | null
+          created_at?: string
+          created_by: string
+          foundry_id: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_name?: string | null
+          created_at?: string
+          created_by?: string
+          foundry_id?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_projects_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_standalone_invoices: {
         Row: {
           created_at: string

@@ -57,6 +57,7 @@ import {
     Activity,
     BarChart3,
     PiggyBank,
+    FolderKanban,
 } from "lucide-react"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -123,6 +124,7 @@ const financeNavigation = [
     { name: "Cash Flow", href: "/finance/cash-flow", icon: Activity, tooltip: "Forward-looking cash flow projections with scenario modeling" },
     { name: "Reports", href: "/finance/reports", icon: BarChart3, tooltip: "Generate P&L, VAT, and Cash Flow Statement reports" },
     { name: "Budgets", href: "/finance/budgets", icon: PiggyBank, tooltip: "Track budget allocations vs actual spend with variance analysis" },
+    { name: "Projects", href: "/finance/projects", icon: FolderKanban, tooltip: "Per-project profitability tracking and P&L" },
     { name: "Alerts", href: "/finance/settings", icon: BellRing, tooltip: "Configure financial alert thresholds and digest preferences" },
 ]
 

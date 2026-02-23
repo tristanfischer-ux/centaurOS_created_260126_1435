@@ -227,6 +227,59 @@ export interface CreatePaymentLinkInput {
 }
 
 // ============================================================
+// Finance Projects
+// ============================================================
+
+export type ProjectStatus = 'active' | 'completed' | 'on_hold' | 'cancelled'
+
+export type ProjectTransactionType = 'order' | 'retainer_entry' | 'expense' | 'cost_item'
+
+export interface FinanceProject {
+  id: string
+  foundryId: string
+  createdBy: string
+  name: string
+  clientName: string | null
+  status: ProjectStatus
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProjectTransaction {
+  id: string
+  projectId: string
+  transactionType: ProjectTransactionType
+  referenceId: string | null
+  description: string
+  amount: number
+  isRevenue: boolean
+  createdAt: string
+}
+
+export interface ProjectPnL {
+  project: FinanceProject
+  totalRevenue: number
+  totalExpenses: number
+  netProfit: number
+  marginPct: number
+  transactionCount: number
+}
+
+export interface CreateProjectInput {
+  name: string
+  clientName?: string
+}
+
+export interface AddProjectTransactionInput {
+  projectId: string
+  transactionType: ProjectTransactionType
+  description: string
+  amount: number // in pence
+  isRevenue: boolean
+  referenceId?: string
+}
+
+// ============================================================
 // Action Result (local to finance actions)
 // ============================================================
 

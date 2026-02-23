@@ -35,6 +35,7 @@ import {
     Activity,
     BarChart3,
     PiggyBank,
+    FolderKanban,
 } from "lucide-react"
 
 // ─── Section Definitions ────────────────────────────────────────────────────
@@ -270,6 +271,13 @@ export const SECTIONS: Section[] = [
                 description: "Track budget allocations vs actual spend with variance analysis",
                 route: "/finance/budgets",
                 icon: PiggyBank,
+                addedAt: new Date("2026-02-23"),
+            },
+            {
+                name: "Projects",
+                description: "Per-project profitability tracking and P&L",
+                route: "/finance/projects",
+                icon: FolderKanban,
                 addedAt: new Date("2026-02-23"),
             },
             {
