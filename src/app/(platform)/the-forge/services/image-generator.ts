@@ -1,9 +1,9 @@
 /**
  * @file image-generator.ts — Gemini image generation for X-Ray blueprints
  *
- * @description Image generation using Gemini 3.1 Pro for maximum quality:
- * - Module images: gemini-3.1-pro-preview (highest quality module blueprints, 1K)
- * - System diagram: gemini-3.1-pro-preview (highest quality system P&ID diagrams, 2K)
+ * @description Image generation via Gemini 3 Pro Image (Nano Banana Pro):
+ * - Module images: gemini-3-pro-image-preview (professional 4K blueprints)
+ * - System diagram: gemini-3-pro-image-preview (professional 4K, 16:9 system overview)
  *
  * Uses direct Gemini REST API calls with full imageConfig support.
  * No new SDK dependency -- uses fetch like existing code in registry.ts.
@@ -23,8 +23,8 @@ import type { StructuralBrief, SystemStructuralBrief } from "./structural-brief"
 // ─── Constants ───────────────────────────────────────────────────────
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-const MODULE_MODEL = "gemini-3.1-pro-preview" // Gemini 3.1 Pro — highest quality module blueprints
-const SYSTEM_MODEL = "gemini-3.1-pro-preview" // Gemini 3.1 Pro — highest quality system P&ID diagrams
+const MODULE_MODEL = "gemini-3-pro-image-preview" // Gemini 3 Pro Image (Nano Banana Pro) — highest quality 4K blueprints
+const SYSTEM_MODEL = "gemini-3-pro-image-preview" // Gemini 3 Pro Image — professional system P&ID diagrams
 const STORAGE_BUCKET = "xray-images"
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -271,16 +271,18 @@ export async function generateResearchIllustration(
   moduleNames: string[],
   modulePurposes: string[],
 ): Promise<string> {
-  const moduleList = moduleNames
-    .map((name, i) => `- ${name}: ${modulePurposes[i] ?? ""}`)
-    .join("\n")
+  const hasModules = moduleNames.length > 0
+  const moduleList = hasModules
+    ? moduleNames.map((name, i) => `- ${name}: ${modulePurposes[i] ?? ""}`).join("\n")
+    : ""
 
-  const prompt = `Create a clean, professional technical illustration of a ${subject}.
+  const moduleContext = hasModules
+    ? `\n\nThis is an engineering overview showing the complete system with its major sub-assemblies:\n${moduleList}`
+    : ""
 
-This is an engineering overview showing the complete system with its major sub-assemblies:
-${moduleList}
+  const prompt = `Create a clean, professional technical illustration of a ${subject}.${moduleContext}
 
-Style: Modern technical illustration on a clean white background. Show the complete system in an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible. Use thin, precise lines with subtle color coding to differentiate sub-assemblies. Label each major sub-assembly with clean callout lines and sans-serif text. The composition should feel like a hero image from a professional engineering specification document. No decorative elements, borders, title blocks, or watermarks. Generous whitespace around the illustration.`
+Style: Modern technical illustration on a clean white background. Show the complete system in ${hasModules ? "an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible" : "a detailed isometric or three-quarter view showing its key components and overall form factor"}. Use thin, precise lines with subtle color coding to differentiate ${hasModules ? "sub-assemblies" : "major components"}. Label each major ${hasModules ? "sub-assembly" : "component"} with clean callout lines and sans-serif text. The composition should feel like a hero image from a professional engineering specification document. No decorative elements, borders, title blocks, or watermarks. Generous whitespace around the illustration.`
 
   const imageData = await callGeminiImage(SYSTEM_MODEL, prompt, {
     aspectRatio: "16:9",

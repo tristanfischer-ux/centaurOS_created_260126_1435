@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getImageProvider } from "@/lib/ai-providers/registry"
 
-const GEMINI_IMAGE_MODEL = "gemini-3.1-pro-preview"
+const GEMINI_IMAGE_MODEL = "gemini-3-pro-image-preview"
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     const supabase = await createClient()
