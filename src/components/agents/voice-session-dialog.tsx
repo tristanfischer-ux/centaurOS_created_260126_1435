@@ -335,6 +335,7 @@ export function VoiceSessionDialog({
                                         alt={specialist.name}
                                         width={96}
                                         height={96}
+                                        unoptimized
                                         className="rounded-full object-cover"
                                     />
                                 ) : (

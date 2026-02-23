@@ -113,6 +113,7 @@ export function HuddleCard({ huddle, topics, onJoinHuddle, index = 0 }: HuddleCa
                                             src={lead.avatarImage}
                                             alt={lead.name}
                                             fill
+                                            unoptimized
                                             className="object-cover"
                                             sizes="36px"
                                         />
@@ -147,6 +148,7 @@ export function HuddleCard({ huddle, topics, onJoinHuddle, index = 0 }: HuddleCa
                                                 src={member!.avatarImage}
                                                 alt={member!.name}
                                                 fill
+                                                unoptimized
                                                 className="object-cover"
                                                 sizes="24px"
                                             />

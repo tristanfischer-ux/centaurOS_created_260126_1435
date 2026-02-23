@@ -257,6 +257,7 @@ export function SpecialistsLanding({
                                             src={leader.avatarImage}
                                             alt={leader.name}
                                             fill
+                                            unoptimized
                                             className="object-cover"
                                             sizes="44px"
                                         />

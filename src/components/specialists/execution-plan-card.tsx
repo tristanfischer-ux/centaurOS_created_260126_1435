@@ -108,6 +108,7 @@ export function ExecutionPlanCard({
                                 src={specialist.avatarImage}
                                 alt={specialist.name}
                                 fill
+                                unoptimized
                                 className="object-cover"
                                 sizes="24px"
                             />
@@ -214,6 +215,7 @@ export function ExecutionPlanCard({
                                                     src={stepSpecialist.avatarImage}
                                                     alt={stepSpecialist.name}
                                                     fill
+                                                    unoptimized
                                                     className="object-cover"
                                                     sizes="16px"
                                                 />

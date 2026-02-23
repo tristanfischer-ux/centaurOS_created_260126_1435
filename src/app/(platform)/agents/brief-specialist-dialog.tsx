@@ -1980,6 +1980,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                     src={specialist.avatarImage}
                                                     alt={specialist.name}
                                                     fill
+                                                    unoptimized
                                                     className="object-cover"
                                                     sizes="40px"
                                                 />
@@ -2044,6 +2045,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 src={s.avatarImage}
                                                 alt={s.name}
                                                 fill
+                                                unoptimized
                                                 className="object-cover"
                                                 sizes="32px"
                                             />
@@ -2492,7 +2494,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     >
                                         {suggested.avatarImage && (
                                             <div className="relative h-5 w-5 rounded-full overflow-hidden flex-shrink-0">
-                                                <Image src={suggested.avatarImage} alt={suggested.name} fill className="object-cover" sizes="20px" />
+                                                <Image src={suggested.avatarImage} alt={suggested.name} fill unoptimized className="object-cover" sizes="20px" />
                                             </div>
                                         )}
                                         <div className="flex-1 text-left min-w-0">
@@ -2547,7 +2549,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 >
                                                     {s.avatarImage && (
                                                         <div className="relative h-4 w-4 rounded-full overflow-hidden flex-shrink-0">
-                                                            <Image src={s.avatarImage} alt={s.name} fill className="object-cover" sizes="16px" />
+                                                            <Image src={s.avatarImage} alt={s.name} fill unoptimized className="object-cover" sizes="16px" />
                                                         </div>
                                                     )}
                                                     <span className="font-medium text-foreground">{s.name}</span>
@@ -2908,6 +2910,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     src={specialist.avatarImage}
                                     alt={specialist.name}
                                     fill
+                                    unoptimized
                                     className="object-cover"
                                     sizes="48px"
                                 />
@@ -3392,6 +3395,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                     src={suggested.avatarImage}
                                                     alt={suggested.name}
                                                     fill
+                                                    unoptimized
                                                     className="object-cover"
                                                     sizes="24px"
                                                 />
@@ -3455,6 +3459,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                                 src={s.avatarImage}
                                                                 alt={s.name}
                                                                 fill
+                                                                unoptimized
                                                                 className="object-cover"
                                                                 sizes="20px"
                                                             />

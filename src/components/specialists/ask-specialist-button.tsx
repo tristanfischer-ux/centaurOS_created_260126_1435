@@ -166,6 +166,7 @@ export function AskSpecialistButton({
               src={preselected.avatarImage}
               alt={preselected.name}
               fill
+              unoptimized
               className="object-cover"
               sizes="16px"
             />
@@ -207,6 +208,7 @@ export function AskSpecialistButton({
               src={preselected.avatarImage}
               alt={preselected.name}
               fill
+              unoptimized
               className="object-cover"
               sizes="20px"
             />

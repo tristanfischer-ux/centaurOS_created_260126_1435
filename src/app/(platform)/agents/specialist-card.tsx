@@ -162,6 +162,7 @@ export function SpecialistCard({ specialist, onBrief, index = 0, activity }: Spe
                                     src={specialist.avatarImage}
                                     alt={specialist.name}
                                     fill
+                                    unoptimized
                                     className="object-cover"
                                     sizes="56px"
                                 />

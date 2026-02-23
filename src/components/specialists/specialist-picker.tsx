@@ -125,6 +125,7 @@ function SpecialistPickerItem({
             src={specialist.avatarImage}
             alt={specialist.name}
             fill
+            unoptimized
             className="object-cover"
             sizes="36px"
           />

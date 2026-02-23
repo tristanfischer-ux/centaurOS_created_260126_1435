@@ -641,6 +641,7 @@ function MeetingOutputsLoading({
                                     src={s.avatarImage}
                                     alt={s.name}
                                     fill
+                                    unoptimized
                                     className="object-cover"
                                     sizes="40px"
                                 />
@@ -1478,6 +1479,7 @@ export function TeamMeetingDialog({
                                                 src={s.avatarImage}
                                                 alt={s.name}
                                                 fill
+                                                unoptimized
                                                 className="object-cover"
                                                 sizes="24px"
                                             />
@@ -1546,6 +1548,7 @@ export function TeamMeetingDialog({
                                                         src={s.avatarImage}
                                                         alt={s.name}
                                                         fill
+                                                        unoptimized
                                                         className="object-cover"
                                                         sizes="32px"
                                                     />
@@ -1706,6 +1709,7 @@ export function TeamMeetingDialog({
                                                     src={specialist.avatarImage}
                                                     alt={entry.specialistName}
                                                     fill
+                                                    unoptimized
                                                     className="object-cover"
                                                     sizes="24px"
                                                 />
@@ -1770,6 +1774,7 @@ export function TeamMeetingDialog({
                                                     src={specialist.avatarImage}
                                                     alt={lastEntry.specialistName}
                                                     fill
+                                                    unoptimized
                                                     className="object-cover"
                                                     sizes="28px"
                                                 />
@@ -1816,6 +1821,7 @@ export function TeamMeetingDialog({
                                                 src={currentSpecialist.avatarImage}
                                                 alt={currentSpecialist.name}
                                                 fill
+                                                unoptimized
                                                 className="object-cover"
                                                 sizes="28px"
                                             />
@@ -1879,6 +1885,7 @@ export function TeamMeetingDialog({
                                                         src={specialist.avatarImage}
                                                         alt={entry.specialistName}
                                                         fill
+                                                        unoptimized
                                                         className="object-cover"
                                                         sizes="24px"
                                                     />
@@ -1944,6 +1951,7 @@ export function TeamMeetingDialog({
                                                         src={specialist.avatarImage}
                                                         alt={lastEntry.specialistName}
                                                         fill
+                                                        unoptimized
                                                         className="object-cover"
                                                         sizes="28px"
                                                     />
@@ -2022,6 +2030,7 @@ export function TeamMeetingDialog({
                                                             src={s.avatarImage}
                                                             alt={s.name}
                                                             fill
+                                                            unoptimized
                                                             className="object-cover"
                                                             sizes="28px"
                                                         />
@@ -2131,6 +2140,7 @@ export function TeamMeetingDialog({
                                                             src={s.avatarImage}
                                                             alt={s.name}
                                                             fill
+                                                            unoptimized
                                                             className="object-cover"
                                                             sizes="24px"
                                                         />

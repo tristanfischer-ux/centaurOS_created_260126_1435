@@ -30,7 +30,7 @@
  * />
  */
 
-import { useRef, useEffect } from "react"
+import { useRef, useEffect, useState } from "react"
 import Image from "next/image"
 import { AlertCircle, Loader2, Volume2, Mic, Brain, Wifi } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -185,14 +185,18 @@ export function SpecialistPresentation({
  * Renders the specialist's avatar image or initial fallback.
  */
 function AvatarImage({ specialist, size }: { specialist: Specialist; size: string }) {
-    if (specialist.avatarImage) {
+    const [imgError, setImgError] = useState(false)
+
+    if (specialist.avatarImage && !imgError) {
         return (
             <Image
                 src={specialist.avatarImage}
                 alt={specialist.name}
                 fill
+                unoptimized
                 className="object-cover"
                 sizes={size}
+                onError={() => setImgError(true)}
             />
         )
     }
