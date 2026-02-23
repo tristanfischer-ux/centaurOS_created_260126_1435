@@ -558,6 +558,9 @@ Store the final model in a variable called \`result\`.`
  * @param brief - The structural brief from Opus orchestrator
  * @returns Formatted prompt string
  */
+// SECURITY: module.name and module.purpose are interpolated into the AI prompt below.
+// This is a prompt injection surface — the Modal sandbox is the primary defense against
+// any malicious code the AI might generate in response to crafted module names.
 function buildModuleSchematicPrompt(module: ModuleSpec, brief: StructuralBrief): string {
   return `Create a clean 3D schematic model of this engineering sub-assembly.
 

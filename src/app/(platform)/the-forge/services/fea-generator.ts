@@ -196,7 +196,8 @@ What realistic loads and boundary conditions should be applied for structural an
     // Sanity-check AI-inferred magnitudes to prevent physically implausible values
     for (const lc of parsed.loadCases) {
       if (typeof lc.magnitude_N === 'number' && isFinite(lc.magnitude_N)) {
-        const clamped = Math.max(0, Math.min(lc.magnitude_N, 100_000))
+        // SECURITY: Floor at 0.1 for force/pressure to avoid wasting solver resources on zero-magnitude loads
+        const clamped = Math.max(0.1, Math.min(lc.magnitude_N, 100_000))
         if (clamped !== lc.magnitude_N) {
           console.warn(`[XRayFEA] Clamped force magnitude from ${lc.magnitude_N} to ${clamped} N`)
         }
@@ -206,7 +207,7 @@ What realistic loads and boundary conditions should be applied for structural an
         lc.magnitude_N = undefined
       }
       if (typeof lc.magnitude_MPa === 'number' && isFinite(lc.magnitude_MPa)) {
-        const clamped = Math.max(0, Math.min(lc.magnitude_MPa, 1_000))
+        const clamped = Math.max(0.1, Math.min(lc.magnitude_MPa, 1_000))
         if (clamped !== lc.magnitude_MPa) {
           console.warn(`[XRayFEA] Clamped pressure magnitude from ${lc.magnitude_MPa} to ${clamped} MPa`)
         }

@@ -27,6 +27,12 @@ import type { XRaySpec, ModuleSpec, SystemAnalysis } from "./xray-schema"
 import type { ConvergenceEvaluation, ProposedChange } from "./convergence-controller"
 import { createObjectiveFromSubsystem } from "@/actions/objectives"
 
+// SECURITY: Sanitize user-controlled strings before interpolating into markdown descriptions
+// to prevent markdown injection via crafted module names.
+function sanitizeMarkdown(s: string): string {
+  return s.replace(/[[\](){}*_~`#>|!\\]/g, '\\$&').slice(0, 200)
+}
+
 // ─── Types ───────────────────────────────────────────────────────────
 
 /** Result of exporting a single module to an objective */
@@ -117,9 +123,9 @@ export function generateReviewTasks(
     if (analysis.dfm && !analysis.dfm.printable) {
       tasks.push({
         title: `Review: DFM Issues — ${mod.name}`,
-        description: `Module "${mod.name}" has DFM (Design for Manufacturing) issues:\n` +
-          `- Min wall: ${analysis.dfm.minWall_mm?.toFixed(1) ?? "?"} mm\n` +
-          `- Max overhang: ${analysis.dfm.maxOverhang_deg?.toFixed(0) ?? "?"}°\n` +
+        description: `Module "${sanitizeMarkdown(mod.name)}" has DFM (Design for Manufacturing) issues:\n` +
+          `- Est. print time: ${analysis.dfm.estimatedPrintTime_min?.toFixed(0) ?? "?"} min\n` +
+          `- Support volume: ${analysis.dfm.supportVolume_pct?.toFixed(0) ?? "?"}%\n` +
           `- Issues: ${analysis.dfm.issues?.join(", ") ?? "none listed"}\n\n` +
           `Review and determine if redesign is needed or if manufacturing ` +
           `process adjustments can resolve these issues.`,
@@ -134,9 +140,9 @@ export function generateReviewTasks(
     if (structural?.status === "complete" && (structural.safetyFactor ?? 0) < 1.5) {
       tasks.push({
         title: `Review: Structural Safety — ${mod.name}`,
-        description: `Module "${mod.name}" has a safety factor of ` +
+        description: `Module "${sanitizeMarkdown(mod.name)}" has a safety factor of ` +
           `${structural.safetyFactor?.toFixed(2) ?? "unknown"} (minimum 1.5 required).\n` +
-          `- Max stress: ${structural.maxStress_MPa?.toFixed(1) ?? "?"} MPa\n` +
+          `- Max stress: ${structural.maxVonMisesStress_MPa?.toFixed(1) ?? "?"} MPa\n` +
           `- Max deformation: ${structural.maxDeformation_mm?.toFixed(2) ?? "?"} mm\n\n` +
           `This needs immediate attention. Evaluate whether geometry changes, ` +
           `material upgrades, or load case re-evaluation are needed.`,
@@ -153,7 +159,7 @@ export function generateReviewTasks(
       if (thermal.maxTemp_C > materialLimit) {
         tasks.push({
           title: `Review: Thermal Limit Exceeded — ${mod.name}`,
-          description: `Module "${mod.name}" reaches ${thermal.maxTemp_C.toFixed(0)}°C ` +
+          description: `Module "${sanitizeMarkdown(mod.name)}" reaches ${thermal.maxTemp_C.toFixed(0)}°C ` +
             `(material limit ~${materialLimit}°C).\n` +
             `Review thermal management options: ventilation, heat sinks, or material change.`,
           riskLevel: "Medium",
@@ -164,15 +170,15 @@ export function generateReviewTasks(
     }
 
     // Premium analysis issues
-    if (analysis.emiShielding?.status === "complete" && analysis.emiShielding.shieldingEffectiveness_dB != null) {
-      if (analysis.emiShielding.shieldingEffectiveness_dB < 20) {
+    if (analysis.emiShielding?.status === "complete" && analysis.emiShielding.seAt1GHz_dB != null) {
+      if (analysis.emiShielding.seAt1GHz_dB < 20) {
         tasks.push({
           title: `Review: EMI Compliance — ${mod.name}`,
-          description: `Module "${mod.name}" has shielding effectiveness of ` +
-            `${analysis.emiShielding.shieldingEffectiveness_dB.toFixed(0)} dB ` +
+          description: `Module "${sanitizeMarkdown(mod.name)}" has shielding effectiveness of ` +
+            `${analysis.emiShielding.seAt1GHz_dB.toFixed(0)} dB ` +
             `(minimum 20 dB recommended). Review EMI mitigation strategy.`,
           riskLevel: "Medium",
-          gateType: "compliance_review",
+          gateType: "manufacturing_review",
           requiredSkills: ["emi_emc", "electronics"],
         })
       }
@@ -277,23 +283,23 @@ export async function exportModuleToObjective(
     for (const unknown of module.detail.unknownsToResolve) {
       taskDefs.push({
         title: `Resolve: ${unknown}`,
-        description: `From X-Ray module "${module.name}" (${module.purpose}).\n\nThis unknown needs to be resolved before the module design can be finalized.`,
+        description: `From X-Ray module "${sanitizeMarkdown(module.name)}" (${sanitizeMarkdown(module.purpose)}).\n\nThis unknown needs to be resolved before the module design can be finalized.`,
         riskLevel: "Medium",
       })
     }
   }
 
   // Expert questions → expert review tasks
-  if (module.detail?.expertQuestionsNeeded) {
-    for (const question of module.detail.expertQuestionsNeeded) {
-      const skills = module.detail.requiredExpertise ?? []
+  if (module.detail?.expertQuestions) {
+    for (const eq of module.detail.expertQuestions) {
+      const skills = [eq.discipline]
       const recruitsLink = skills.length > 0
         ? `\n\n---\n**Need an expert?** Browse the [Recruits page](/recruits?q=${encodeURIComponent(skills[0])}) to find specialists.`
         : ""
 
       taskDefs.push({
-        title: `Expert: ${question}`,
-        description: `Expert input needed for module "${module.name}".\n\nThis question requires specialist knowledge to answer correctly.${recruitsLink}`,
+        title: `Expert: ${eq.q}`,
+        description: `Expert input needed for module "${sanitizeMarkdown(module.name)}".\n\nThis question requires specialist knowledge to answer correctly.${recruitsLink}`,
         riskLevel: "Medium",
         gateType: "expert_review",
         requiredSkills: skills,
@@ -306,7 +312,7 @@ export async function exportModuleToObjective(
     for (const test of module.tests) {
       taskDefs.push({
         title: `Validate: ${test}`,
-        description: `Validation test for module "${module.name}".`,
+        description: `Validation test for module "${sanitizeMarkdown(module.name)}".`,
         riskLevel: "Low",
         gateType: "quality_gate",
       })
@@ -326,7 +332,7 @@ export async function exportModuleToObjective(
     subsystemName: module.name,
     packId: `xray-module-${module.id}`,
     packTitle: `Build: ${module.name}`,
-    packSummary: `Engineering tasks for X-Ray module "${module.name}" (${module.purpose})`,
+    packSummary: `Engineering tasks for X-Ray module "${sanitizeMarkdown(module.name)}" (${sanitizeMarkdown(module.purpose)})`,
     packDescription: null,
     selectedTaskIndices: tasks.map((_, i) => i),
     tasks,
