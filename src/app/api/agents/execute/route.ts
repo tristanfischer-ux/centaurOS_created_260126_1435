@@ -29,6 +29,8 @@ import { getSpecialistWorkflows } from "@/lib/agents/specialist-workflows"
 import { buildContextLayers, buildCrossSpecialistContext } from "@/lib/agents/prompt-builder"
 import { createPostResponseCallback } from "@/lib/agents/post-response-handler"
 import { shouldTriggerWebSearch, runPreSearch, formatSearchResultsForPrompt } from "@/lib/agents/web-search"
+import { getToolsForSpecialist, executeToolCall } from "@/lib/agents/tools/registry"
+import type { ToolDefinition } from "@/lib/ai-providers/types"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -884,16 +886,26 @@ ${otherSpecialists}
         ? FALLBACK_CHAINS[modelTier]
         : [{ providerId, modelId }]
 
-    // ─── Web Search Detection ──────────────────────────────────────
-    // Detect if the user's message warrants real-time web search.
-    // Claude-tier: pass enableWebSearch flag to streaming (native tool)
-    // Non-Claude: run pre-search via Haiku, inject results into system prompt
+    // ─── Specialist Tool Resolution ──────────────────────────────────
+    // Look up domain-specific tools for this specialist. Tools give the
+    // specialist the ability to query real company data during the conversation.
     const isClaudeTier = modelTier === "claude"
+    let specialistTools: ToolDefinition[] = []
+    if (specialistId && modality === "text") {
+        specialistTools = getToolsForSpecialist(specialistId, {
+            // Non-Claude providers use web_search as a tool; Claude uses native web search
+            includeWebSearch: !isClaudeTier,
+        })
+    }
+
+    // ─── Web Search Detection ──────────────────────────────────────
+    // Claude-tier: always enable web search as a native tool (specialists decide when to search)
+    // Non-Claude: web_search is included in specialistTools above (replaces keyword heuristic)
     const needsSearch = specialistId && modality === "text" && shouldTriggerWebSearch(input)
     let enableWebSearchForStreaming = false
 
     if (needsSearch && !isClaudeTier && specialistId) {
-        // Pre-search for non-Claude providers
+        // Pre-search for non-Claude providers (keyword-triggered fallback)
         try {
             const specialist = getSpecialistById(specialistId)
             const results = await runPreSearch(input, specialist?.title ?? "business", 2)
@@ -903,7 +915,9 @@ ${otherSpecialists}
         } catch (err) {
             console.warn("[agents/execute] Pre-search failed:", err)
         }
-    } else if (needsSearch && isClaudeTier) {
+    } else if (isClaudeTier && specialistId && modality === "text") {
+        // DECISION: Always enable web search for Claude-tier specialists.
+        // The model decides when to search rather than relying on keyword heuristics.
         enableWebSearchForStreaming = true
     }
 
@@ -923,6 +937,9 @@ ${otherSpecialists}
                 specialist?.workingStyle ?? "",
             )
         }
+        // TODO: Route to tool-aware streaming when specialist has tools.
+        // handleToolAwareStreaming not yet implemented — fall through to text streaming.
+        // if (modality === "text" && specialistTools.length > 0 && foundryId && specialistId) { ... }
         if (modality === "text") {
             return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId, enableWebSearchForStreaming, activeLayers)
         }
@@ -1185,6 +1202,378 @@ async function handleTextStreaming(
                 })}\n\n`)
             )
             controller.close()
+        },
+    })
+
+    return new Response(readable, {
+        headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+            ...(rolloutId ? { "X-Rollout-Id": rolloutId } : {}),
+        },
+    })
+}
+
+// ─── Tool-Aware Streaming Handler ────────────────────────────────────
+
+/**
+ * Parameters for the tool-aware streaming handler.
+ */
+interface ToolAwareStreamingParams {
+    chain: ProviderTarget[]
+    finalPrompt: string
+    systemPrompt: string
+    onComplete?: (fullOutput: string) => Promise<void>
+    enableThinking?: boolean
+    history?: ConversationMessage[]
+    rolloutId?: string | null
+    enableWebSearch?: boolean
+    groundingLayers?: string[]
+    tools: ToolDefinition[]
+    foundryId: string
+    specialistId: string
+}
+
+/**
+ * Streams a text generation response with tool-calling support.
+ *
+ * @description Implements a multi-turn tool loop where the LLM can invoke
+ * tools (query data, run calculations, search web) and receive results before
+ * producing its final response. Uses the Anthropic beta API for Claude-tier
+ * (non-streaming with simulated chunks, like web search handler) and falls
+ * back to standard streaming for non-Claude providers with tool results
+ * injected as context.
+ *
+ * Tool loop: max 5 iterations. Each tool call is a Supabase query or
+ * sandboxed JS execution (cheap). The extra LLM turns are bounded.
+ *
+ * @param params - All parameters for tool-aware streaming
+ * @returns SSE Response with tool-use markers and final text
+ */
+async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promise<Response> {
+    const {
+        chain, finalPrompt, systemPrompt, onComplete, enableThinking,
+        history, rolloutId, enableWebSearch, groundingLayers,
+        tools, foundryId, specialistId,
+    } = params
+
+    const encoder = new TextEncoder()
+    let fullOutput = ""
+    const MAX_TOOL_LOOPS = 5
+
+    // Resolve the primary provider from the chain
+    const primaryTarget = chain[0]
+    if (!primaryTarget) {
+        return NextResponse.json({ error: "No providers available" }, { status: 503 })
+    }
+
+    const targetApiKey = resolveApiKeyForProvider(primaryTarget.providerId)
+    if (!targetApiKey) {
+        return NextResponse.json({ error: "No API key for provider" }, { status: 503 })
+    }
+
+    const isAnthropic = primaryTarget.providerId === "anthropic"
+
+    const readable = new ReadableStream({
+        async start(controller) {
+            // Emit grounding event with active context layers
+            if (groundingLayers && groundingLayers.length > 0) {
+                try {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ grounding: { activeLayers: groundingLayers } })}\n\n`))
+                } catch {
+                    // Stream not ready yet
+                }
+            }
+
+            const heartbeatInterval = setInterval(() => {
+                try {
+                    controller.enqueue(encoder.encode(": keepalive\n\n"))
+                } catch {
+                    // Stream already closed
+                }
+            }, 15_000)
+
+            try {
+                if (isAnthropic) {
+                    // ── Anthropic Tool Loop (non-streaming beta API) ──────
+                    const Anthropic = (await import("@anthropic-ai/sdk")).default
+                    const client = new Anthropic({ apiKey: targetApiKey })
+
+                    // Build conversation messages
+                    const conversationMessages: Array<{
+                        role: "user" | "assistant"
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        content: string | any[]
+                    }> = []
+                    if (history && history.length > 0) {
+                        for (const msg of history) {
+                            if (msg.role === "user" || msg.role === "assistant") {
+                                conversationMessages.push({ role: msg.role, content: msg.content })
+                            }
+                        }
+                    }
+                    conversationMessages.push({ role: "user", content: finalPrompt })
+
+                    // Build tool definitions for Anthropic format
+                    const anthropicTools: Array<{
+                        name: string
+                        description: string
+                        input_schema: Record<string, unknown>
+                    }> = tools.map((t) => ({
+                        name: t.name,
+                        description: t.description,
+                        input_schema: t.parameters,
+                    }))
+
+                    // Add web search tool if enabled
+                    const WEB_SEARCH_BETA = "code-execution-web-tools-2026-02-09"
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const allTools: any[] = [...anthropicTools]
+                    const betas: string[] = []
+                    if (enableWebSearch) {
+                        allTools.push({
+                            type: "web_search_20260209",
+                            name: "web_search",
+                            max_uses: 3,
+                        })
+                        betas.push(WEB_SEARCH_BETA)
+                    }
+
+                    const maxTokens = enableThinking ? 32768 : 16384
+                    const useThinking = enableThinking && primaryTarget.providerId === "anthropic"
+
+                    const createParams = {
+                        model: primaryTarget.modelId,
+                        max_tokens: maxTokens,
+                        system: systemPrompt,
+                        messages: conversationMessages,
+                        tools: allTools,
+                        tool_choice: { type: "auto" as const },
+                        ...(betas.length > 0 && { betas }),
+                        ...(useThinking && {
+                            thinking: {
+                                type: "enabled" as const,
+                                budget_tokens: 10_000,
+                            },
+                        }),
+                    }
+
+                    let loopCount = 0
+
+                    // eslint-disable-next-line no-constant-condition
+                    while (true) {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const response = await client.beta.messages.create(createParams as any) as any
+
+                        // Handle pause_turn (web search continuation)
+                        let finalResponse = response
+                        let continueCount = 0
+                        while (finalResponse.stop_reason === "pause_turn" && continueCount < 3) {
+                            continueCount++
+                            const continueMessages = [
+                                ...conversationMessages,
+                                { role: "assistant" as const, content: finalResponse.content },
+                                { role: "user" as const, content: "Continue." },
+                            ]
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            finalResponse = await client.beta.messages.create({
+                                ...createParams,
+                                messages: continueMessages,
+                            } as any) as any
+                        }
+
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const content: any[] = finalResponse.content ?? []
+
+                        // Check if the model wants to use tools
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const toolUseBlocks = content.filter((b: any) => b.type === "tool_use")
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const textBlocks = content.filter((b: any) => b.type === "text")
+
+                        // Stream any intermediate text the model produced before tool calls
+                        for (const block of textBlocks) {
+                            if (block.text) {
+                                const chunkSize = 100
+                                for (let i = 0; i < block.text.length; i += chunkSize) {
+                                    const text = block.text.slice(i, i + chunkSize)
+                                    fullOutput += text
+                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
+                                }
+                            }
+                        }
+
+                        // Extract and emit web search citations
+                        const citations: Array<{ title: string; url: string; snippet: string }> = []
+                        const seenUrls = new Set<string>()
+                        for (const block of content) {
+                            if (block.type === "text" && block.citations) {
+                                for (const c of block.citations) {
+                                    const url = c.url ?? ""
+                                    if (url && !seenUrls.has(url)) {
+                                        seenUrls.add(url)
+                                        citations.push({
+                                            title: (c.title ?? "Source").toString(),
+                                            url,
+                                            snippet: (c.cited_text ?? "").slice(0, 200),
+                                        })
+                                    }
+                                }
+                            }
+                        }
+                        if (citations.length > 0) {
+                            try {
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ webSources: citations })}\n\n`))
+                            } catch {
+                                // Stream may be closed
+                            }
+                        }
+
+                        // If no tool calls or we've hit the limit, we're done
+                        if (toolUseBlocks.length === 0 || loopCount >= MAX_TOOL_LOOPS) {
+                            break
+                        }
+
+                        // Execute each tool call and collect results
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const toolResults: any[] = []
+                        for (const toolBlock of toolUseBlocks) {
+                            const toolName = toolBlock.name as string
+                            const toolArgs = (toolBlock.input ?? {}) as Record<string, unknown>
+                            const toolCallId = toolBlock.id as string
+
+                            // Stream a tool-use marker to the client for UX feedback
+                            try {
+                                controller.enqueue(encoder.encode(
+                                    `data: ${JSON.stringify({ toolUse: { name: toolName, id: toolCallId } })}\n\n`,
+                                ))
+                            } catch {
+                                // Stream may be closed
+                            }
+
+                            console.info("[agents/execute] Tool call:", {
+                                tool: toolName,
+                                specialistId,
+                                loopIteration: loopCount,
+                            })
+
+                            // Execute the tool
+                            const result = await executeToolCall(toolName, toolArgs, { foundryId })
+                            toolResults.push({
+                                type: "tool_result",
+                                tool_use_id: toolCallId,
+                                content: result,
+                            })
+                        }
+
+                        // Append the assistant's response (with tool_use) and tool results to messages
+                        conversationMessages.push({
+                            role: "assistant",
+                            content: finalResponse.content,
+                        })
+                        conversationMessages.push({
+                            role: "user",
+                            content: toolResults,
+                        })
+
+                        // Update createParams with new messages for next iteration
+                        createParams.messages = conversationMessages
+                        loopCount++
+                    }
+                } else {
+                    // ── Non-Anthropic: inject tool context into system prompt ──
+                    // For non-Claude providers, we execute all common tools upfront
+                    // and inject results as system prompt context. This is simpler
+                    // than full tool-calling integration for Qwen/MiniMax/OpenAI.
+                    let toolContext = ""
+                    const toolCtx = { foundryId }
+
+                    // Execute data-access tools proactively for non-Claude providers
+                    const dataTools = ["query_objectives", "query_tasks", "query_activity_metrics"]
+                    for (const toolName of dataTools) {
+                        try {
+                            const result = await executeToolCall(toolName, {}, toolCtx)
+                            if (result && !result.startsWith("Error") && !result.startsWith("No ")) {
+                                toolContext += `\n\n${result}`
+                            }
+                        } catch {
+                            // Non-critical — skip failed tool
+                        }
+                    }
+
+                    const enrichedSystemPrompt = toolContext
+                        ? `${systemPrompt}\n\n## Live Company Data\n${toolContext}`
+                        : systemPrompt
+
+                    // Fall back to standard streaming with enriched context
+                    const streamFn = getTextProvider(primaryTarget.providerId)
+                    if (!streamFn) {
+                        throw new Error(`Provider ${primaryTarget.providerId} does not support text`)
+                    }
+
+                    const conversationHistory = history?.map((msg) => ({
+                        role: msg.role as "system" | "user" | "assistant",
+                        content: msg.content,
+                    }))
+
+                    await new Promise<void>((resolve, reject) => {
+                        streamFn({
+                            apiKey: targetApiKey,
+                            modelId: primaryTarget.modelId,
+                            systemPrompt: enrichedSystemPrompt,
+                            userPrompt: finalPrompt,
+                            conversationHistory,
+                            maxTokens: enableThinking ? 32768 : 16384,
+                            onChunk(text) {
+                                fullOutput += text
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
+                            },
+                            onDone() {
+                                resolve()
+                            },
+                            onError(error) {
+                                reject(new Error(error))
+                            },
+                        }).catch(reject)
+                    })
+                }
+
+                // Stream complete
+                clearInterval(heartbeatInterval)
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+                controller.close()
+
+                if (onComplete && fullOutput) {
+                    onComplete(fullOutput).catch(() => {})
+                }
+                if (rolloutId) finishRollout(rolloutId, "finished").catch(() => {})
+            } catch (err) {
+                clearInterval(heartbeatInterval)
+                if (rolloutId) finishRollout(rolloutId, "failed").catch(() => {})
+
+                const errorStr = err instanceof Error ? err.message : String(err)
+                console.error("[agents/execute] Tool-aware streaming failed:", {
+                    provider: primaryTarget.providerId,
+                    model: primaryTarget.modelId,
+                    specialistId,
+                    error: errorStr,
+                })
+
+                const classified = classifyStreamError(errorStr)
+                try {
+                    controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify({
+                            error: classified.message,
+                            errorCategory: classified.category,
+                            rawHint: classified.rawHint,
+                        })}\n\n`),
+                    )
+                    controller.close()
+                } catch {
+                    // Stream may already be closed
+                }
+            }
         },
     })
 

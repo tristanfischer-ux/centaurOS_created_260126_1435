@@ -79,6 +79,12 @@ const STATUS_CONFIG: Record<
     icon: <RefreshCw className="h-4 w-4" />,
     description: 'Funds returned to buyer',
   },
+  partial_refund: {
+    label: 'Partially Refunded',
+    color: 'bg-muted text-foreground',
+    icon: <RefreshCw className="h-4 w-4" />,
+    description: 'Some funds returned to buyer',
+  },
 }
 
 const TRANSACTION_CONFIG: Record<
