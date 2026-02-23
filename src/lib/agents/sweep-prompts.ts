@@ -398,16 +398,68 @@ export function getHuddleIds(): string[] {
   return Object.keys(HUDDLE_SPECIALIST_MAP)
 }
 
+// ─── Task Follow-Up Prompt ───────────────────────────────────────────
+
+/**
+ * Universal task follow-up block appended to every sweep prompt.
+ *
+ * @description Instructs the specialist to review their task portfolio
+ * (injected separately as "Your Task Portfolio" context) and produce
+ * follow-up insights for overdue, stalled, and completed tasks.
+ *
+ * Nudge cooldown logic:
+ * - Skip if last_nudge_at < 48h ago (shown in portfolio as nudge history)
+ * - Escalate urgency if nudge_count >= 3 (persistent stall)
+ * - Flag systemic patterns (3+ stalled tasks = process issue, not individual issue)
+ */
+const TASK_FOLLOW_UP_PROMPT = `
+
+--- TASK FOLLOW-UP INSTRUCTIONS ---
+
+If a "Your Task Portfolio" section is provided above, review it and produce follow-up insights:
+
+**OVERDUE tasks:**
+- For each overdue task NOT nudged in the last 48 hours, create a "reminder" insight
+- Title format: "Follow-up: [task title]"
+- If a task has been nudged 3+ times without progress, escalate urgency to "critical" and recommend reassignment or scope reduction
+- If 3+ tasks are overdue simultaneously, flag this as a systemic execution problem (not individual task issues)
+- Urgency: "important" for <14 days overdue, "critical" for 14+ days
+
+**STALLED tasks:**
+- For stalled tasks (<50% progress after 7+ days), create a "recommendation" insight
+- Suggest concrete unblocking actions: break into smaller steps, reassign, or clarify scope
+- Urgency: "important"
+
+**COMPLETED tasks:**
+- For recently completed tasks with strategic implications, create an "observation" insight
+- Note what the completion unlocks (dependencies, next phases, milestones)
+- Urgency: "informational"
+
+**IMPORTANT:** Do NOT repeat follow-ups for tasks already nudged within the last 48 hours.
+Only include task follow-ups if the portfolio section exists. If no portfolio is provided, skip this entirely.
+
+--- END TASK FOLLOW-UP ---
+`
+
+/**
+ * Gets the task follow-up prompt block.
+ *
+ * @returns The universal task follow-up instructions
+ */
+export function getTaskFollowUpPrompt(): string {
+  return TASK_FOLLOW_UP_PROMPT
+}
+
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**
- * Gets the background sweep prompt for a specialist.
+ * Gets the background sweep prompt for a specialist, including task follow-up instructions.
  *
  * @param specialistId - The specialist ID to get the prompt for
- * @returns The sweep prompt string, or a generic fallback
+ * @returns The sweep prompt string with task follow-up appended, or a generic fallback
  */
 export function getBackgroundSweepPrompt(specialistId: string): string {
-  return SWEEP_PROMPTS[specialistId as SpecialistId] ?? `
+  const basePrompt = SWEEP_PROMPTS[specialistId as SpecialistId] ?? `
 BACKGROUND SWEEP: General Analysis
 
 Analyze the business context and identify any noteworthy findings:
@@ -418,6 +470,7 @@ Analyze the business context and identify any noteworthy findings:
 
 Focus on the 2-3 most impactful findings only.
 `
+  return basePrompt + TASK_FOLLOW_UP_PROMPT
 }
 
 /**

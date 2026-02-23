@@ -530,13 +530,131 @@ export async function autoEscalateThresholdBreaches(foundryId: string): Promise<
   }
 }
 
+// ─── Auto Follow-Up on Overdue Tasks ─────────────────────────────────
+
+/**
+ * Creates follow-up reminder insights for overdue tasks owned by specialists.
+ *
+ * @description Scans for overdue tasks that have a specialist as creator or owner,
+ * respects nudge cooldown (48h), and creates reminder insights so the specialist
+ * can surface the overdue status in their next interaction or sweep.
+ *
+ * @param foundryId - The foundry to check
+ * @returns Number of follow-up reminders created
+ *
+ * @security Creates read-only insights — no task modifications
+ */
+export async function autoFollowUpOnOverdueTasks(foundryId: string): Promise<number> {
+  const supabase = createAdminClient()
+  let remindersCreated = 0
+
+  try {
+    // Find overdue tasks with specialist ownership
+    const now = new Date()
+    const { data: overdueTasks } = await supabase
+      .from('tasks')
+      .select('id, title, end_date, priority, status, last_nudge_at, nudge_count, created_by_agent_id, owner_agent_id')
+      .eq('foundry_id', foundryId)
+      .is('deleted_at', null)
+      .lt('end_date', now.toISOString())
+      .not('status', 'in', '("Done","Completed")')
+
+    if (!overdueTasks || overdueTasks.length === 0) return 0
+
+    // Filter to tasks with specialist involvement and respect nudge cooldown
+    const nudgeCooldownMs = 48 * 60 * 60 * 1000 // 48 hours
+    const eligibleTasks = overdueTasks.filter(t => {
+      // Must have a specialist creator or owner
+      const specialistId = t.owner_agent_id ?? t.created_by_agent_id
+      if (!specialistId) return false
+
+      // Respect nudge cooldown
+      if (t.last_nudge_at) {
+        const lastNudge = new Date(t.last_nudge_at)
+        if (now.getTime() - lastNudge.getTime() < nudgeCooldownMs) return false
+      }
+
+      return true
+    })
+
+    if (eligibleTasks.length === 0) return 0
+
+    // Cap at 5 reminders per run to avoid noise
+    for (const task of eligibleTasks.slice(0, 5)) {
+      const specialistId = task.owner_agent_id ?? task.created_by_agent_id!
+      const specialist = SPECIALISTS.find(s => s.id === specialistId)
+      const daysOverdue = Math.ceil((now.getTime() - new Date(task.end_date!).getTime()) / (1000 * 60 * 60 * 24))
+      const nudgeCount = task.nudge_count ?? 0
+      const isEscalation = nudgeCount >= 3
+
+      const urgency = daysOverdue >= 14 || isEscalation ? 'critical' : 'important'
+      const escalationNote = isEscalation
+        ? `\n\nThis task has been nudged ${nudgeCount} times without resolution. Consider reassigning, reducing scope, or removing it from the backlog.`
+        : ''
+
+      const { error: insertError } = await supabase.rpc('insert_agent_insight', {
+        p_foundry_id: foundryId,
+        p_specialist_id: specialistId,
+        p_insight_type: 'reminder',
+        p_urgency: urgency,
+        p_title: `Follow-up: ${task.title.slice(0, 150)}`,
+        p_body: [
+          `Task "${task.title}" is ${daysOverdue} day${daysOverdue === 1 ? '' : 's'} overdue (due: ${task.end_date}, priority: ${task.priority ?? 'Medium'}).`,
+          `Current status: ${task.status ?? 'Unknown'}.`,
+          `This task was ${task.owner_agent_id === specialistId ? 'assigned to' : 'created by'} ${specialist?.name ?? 'a specialist'}.`,
+          escalationNote,
+        ].join('\n').trim(),
+        p_domain_data: {
+          task_id: task.id,
+          days_overdue: daysOverdue,
+          nudge_count: nudgeCount + 1,
+          is_escalation: isEscalation,
+        },
+        p_suggested_actions: [
+          {
+            label: `Discuss with ${specialist?.name ?? 'Specialist'}`,
+            action_type: 'open_specialist',
+            action_data: { specialist_id: specialistId },
+          },
+          { label: 'View tasks', action_type: 'view_page', action_data: { page: '/objectives' } },
+        ],
+      })
+
+      if (!insertError) {
+        // Update nudge tracking on the task
+        await supabase
+          .from('tasks')
+          .update({
+            last_nudge_at: now.toISOString(),
+            nudge_count: nudgeCount + 1,
+          })
+          .eq('id', task.id)
+
+        remindersCreated++
+      } else {
+        console.error(`[AgenticActions] Failed to create follow-up for "${task.title}":`, insertError.message)
+      }
+    }
+
+    if (remindersCreated > 0) {
+      console.info(`[AgenticActions] Created ${remindersCreated} task follow-up reminders for foundry ${foundryId}`)
+    }
+
+    return remindersCreated
+  } catch (error) {
+    console.error('[AgenticActions] autoFollowUpOnOverdueTasks failed:', error)
+    return 0
+  }
+}
+
 // ─── Orchestrator ───────────────────────────────────────────────────
 
 /**
  * Runs all agentic actions for a foundry.
  *
  * @description Called after sweep runs to process insights and take
- * autonomous actions (drafting tasks, escalating alerts).
+ * autonomous actions (drafting tasks, escalating alerts, following up
+ * on overdue tasks).
  *
  * @param foundryId - The foundry to process
  * @returns Summary of all actions taken
@@ -544,11 +662,13 @@ export async function autoEscalateThresholdBreaches(foundryId: string): Promise<
 export async function runAgenticActions(foundryId: string): Promise<{
   draftTasks: ActionResult[]
   escalations: number
+  followUps: number
 }> {
-  const [draftTasks, escalations] = await Promise.all([
+  const [draftTasks, escalations, followUps] = await Promise.all([
     autoDraftTasksFromInsights(foundryId),
     autoEscalateThresholdBreaches(foundryId),
+    autoFollowUpOnOverdueTasks(foundryId),
   ])
 
-  return { draftTasks, escalations }
+  return { draftTasks, escalations, followUps }
 }

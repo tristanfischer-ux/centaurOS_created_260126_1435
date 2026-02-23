@@ -11,6 +11,7 @@
  * 3. Active objectives summary
  * 4. Recent tasks with statuses
  * 5. Team composition
+ * 6. Per-specialist task portfolio (for execution loop follow-ups)
  *
  * @security Uses service role client — bypasses RLS. Only called from cron routes.
  */
@@ -157,4 +158,130 @@ export async function buildAIContextWithServiceClient(foundryId: string): Promis
   return sections.length > 0
     ? `\n--- Business Context ---\n${sections.join('\n\n')}\n--- End Business Context ---\n`
     : '\n--- Business Context ---\nNo company data available.\n--- End Business Context ---\n'
+}
+
+// ─── Specialist Task Portfolio ─────────────────────────────────────
+
+/**
+ * Builds a specialist-specific task portfolio for sweep prompts and conversations.
+ *
+ * @description Queries tasks where the specialist created or owns them, and groups
+ * into OVERDUE, STALLED, On Track, and Recently Completed categories. This gives
+ * the specialist awareness of work they've initiated or been assigned, enabling
+ * follow-up nudges and execution loop closure.
+ *
+ * @param foundryId - The foundry to query tasks for
+ * @param specialistId - The specialist ID (e.g., "strategist", "finance-lead")
+ * @returns Formatted markdown block, or empty string if no relevant tasks
+ *
+ * @security Uses service role client — no RLS filtering
+ */
+export async function buildSpecialistTaskContext(
+  foundryId: string,
+  specialistId: string,
+): Promise<string> {
+  const supabase = createAdminClient()
+
+  try {
+    // Fetch tasks this specialist created or owns (limit 15 for prompt budget)
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('id, title, status, progress, end_date, start_date, priority, last_nudge_at, nudge_count, created_at, updated_at, created_by_agent_id, owner_agent_id')
+      .eq('foundry_id', foundryId)
+      .is('deleted_at', null)
+      .or(`created_by_agent_id.eq.${specialistId},owner_agent_id.eq.${specialistId}`)
+      .order('created_at', { ascending: false })
+      .limit(15)
+
+    if (!tasks || tasks.length === 0) return ''
+
+    const now = new Date()
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+    // Categorize tasks
+    const overdue: typeof tasks = []
+    const stalled: typeof tasks = []
+    const onTrack: typeof tasks = []
+    const recentlyCompleted: typeof tasks = []
+
+    for (const task of tasks) {
+      const isDone = task.status === 'Done' || task.status === 'Completed'
+      const isActive = task.status === 'In Progress' || task.status === 'Accepted'
+
+      if (isDone) {
+        // Check if completed in last 7 days
+        const completedAt = task.updated_at ? new Date(task.updated_at) : null
+        if (completedAt && completedAt >= sevenDaysAgo) {
+          recentlyCompleted.push(task)
+        }
+        continue
+      }
+
+      // Overdue: past end_date and not done
+      if (task.end_date && new Date(task.end_date) < now) {
+        overdue.push(task)
+        continue
+      }
+
+      // Stalled: In Progress for >7 days with <50% progress
+      if (isActive && task.start_date) {
+        const startDate = new Date(task.start_date)
+        const daysSinceStart = (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+        if (daysSinceStart > 7 && (task.progress ?? 0) < 50) {
+          stalled.push(task)
+          continue
+        }
+      }
+
+      // On Track: everything else that's active or pending
+      if (!isDone) {
+        onTrack.push(task)
+      }
+    }
+
+    // Build markdown output
+    const sections: string[] = []
+
+    if (overdue.length > 0) {
+      const lines = overdue.map(t => {
+        const daysOverdue = Math.ceil((now.getTime() - new Date(t.end_date!).getTime()) / (1000 * 60 * 60 * 24))
+        const nudgeInfo = t.nudge_count
+          ? ` [nudged ${t.nudge_count}x, last: ${t.last_nudge_at ? new Date(t.last_nudge_at).toLocaleDateString() : 'unknown'}]`
+          : ''
+        return `  - **${t.title}** — ${daysOverdue}d overdue (due: ${t.end_date}, priority: ${t.priority ?? 'Medium'})${nudgeInfo}`
+      })
+      sections.push(`### OVERDUE (${overdue.length})\n${lines.join('\n')}`)
+    }
+
+    if (stalled.length > 0) {
+      const lines = stalled.map(t => {
+        const daysSinceStart = Math.ceil((now.getTime() - new Date(t.start_date!).getTime()) / (1000 * 60 * 60 * 24))
+        return `  - **${t.title}** — ${t.progress ?? 0}% after ${daysSinceStart}d (started: ${t.start_date})`
+      })
+      sections.push(`### STALLED (${stalled.length})\n${lines.join('\n')}`)
+    }
+
+    if (onTrack.length > 0) {
+      const lines = onTrack.slice(0, 5).map(t => {
+        const dueStr = t.end_date ? ` (due: ${t.end_date})` : ''
+        return `  - ${t.title} — ${t.status}, ${t.progress ?? 0}%${dueStr}`
+      })
+      const moreCount = onTrack.length > 5 ? `\n  - ...and ${onTrack.length - 5} more` : ''
+      sections.push(`### On Track (${onTrack.length})\n${lines.join('\n')}${moreCount}`)
+    }
+
+    if (recentlyCompleted.length > 0) {
+      const lines = recentlyCompleted.map(t =>
+        `  - ~~${t.title}~~ — completed`
+      )
+      sections.push(`### Recently Completed (${recentlyCompleted.length})\n${lines.join('\n')}`)
+    }
+
+    if (sections.length === 0) return ''
+
+    return `\n--- Your Task Portfolio ---\nThese are tasks you created or own. Follow up on overdue/stalled items and acknowledge completions.\n\n${sections.join('\n\n')}\n--- End Task Portfolio ---\n`
+  } catch (err) {
+    console.error('[SweepContext] Error building specialist task context:', err)
+    return ''
+  }
 }

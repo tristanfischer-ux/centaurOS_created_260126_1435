@@ -167,6 +167,19 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<st
             }
         }
 
+        // Task ownership context: tasks this specialist created or owns
+        if (foundryId && specialistId) {
+            try {
+                const { buildSpecialistTaskContext } = await import('./sweep-context')
+                const taskBlock = await buildSpecialistTaskContext(foundryId, specialistId)
+                if (taskBlock) {
+                    contextBlocks += `\n\n${taskBlock}`
+                }
+            } catch (err) {
+                console.warn("[PromptBuilder] Could not load task context:", err)
+            }
+        }
+
         // Temporal awareness with milestone detection
         let foundryCreatedAt: string | null = null
         if (foundryId) {

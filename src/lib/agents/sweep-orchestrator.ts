@@ -24,7 +24,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getOpenAIClient } from '@/lib/ai/openai-lazy'
-import { buildAIContextWithServiceClient } from './sweep-context'
+import { buildAIContextWithServiceClient, buildSpecialistTaskContext } from './sweep-context'
 import { estimateAICost } from '@/lib/ai/usage-tracking'
 import { SPECIALISTS } from '@/app/(platform)/agents/specialists-data'
 import { compilePersonalityPrompt } from './personality'
@@ -308,9 +308,20 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
 
     // 1b. Latest news briefing for this specialist (current events context)
     const briefingBlock = await getLatestBriefingFormatted(supabase, config.specialistId)
-    const contextWithBriefing = briefingBlock
-      ? [companyContext, '\n\n', briefingBlock].join('')
-      : companyContext
+
+    // 1c. Specialist task portfolio (for execution loop follow-ups)
+    let taskPortfolio = ''
+    try {
+      taskPortfolio = await buildSpecialistTaskContext(config.foundryId, config.specialistId)
+    } catch (err) {
+      console.warn(`[SweepOrchestrator] Failed to build task context for ${config.specialistId}:`, err)
+    }
+
+    const contextWithBriefing = [
+      companyContext,
+      briefingBlock ? '\n\n' + briefingBlock : '',
+      taskPortfolio ? '\n\n' + taskPortfolio : '',
+    ].join('')
 
     // 2. Build the sweep prompt
     const personalityPrompt = compilePersonalityPrompt(
@@ -473,7 +484,42 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
       })
     }
 
-    // 6b. Trigger decision support packages for critical insights
+    // 6b. Track nudges: update last_nudge_at/nudge_count for tasks referenced in follow-up insights
+    const followUpInsights = storedInsights.filter(i =>
+      i.insight_type === 'reminder' && i.title.startsWith('Follow-up:')
+    )
+    if (followUpInsights.length > 0) {
+      for (const insight of followUpInsights) {
+        // Extract task title from "Follow-up: [task title]"
+        const taskTitle = insight.title.replace(/^Follow-up:\s*/, '').trim()
+        if (!taskTitle) continue
+
+        try {
+          // Find the task, then increment nudge_count
+          const { data: matchedTasks } = await supabase
+            .from('tasks')
+            .select('id, nudge_count')
+            .eq('foundry_id', config.foundryId)
+            .ilike('title', `%${taskTitle.slice(0, 80)}%`)
+            .is('deleted_at', null)
+            .limit(1)
+
+          if (matchedTasks?.[0]) {
+            await supabase
+              .from('tasks')
+              .update({
+                last_nudge_at: new Date().toISOString(),
+                nudge_count: (matchedTasks[0].nudge_count ?? 0) + 1,
+              })
+              .eq('id', matchedTasks[0].id)
+          }
+        } catch (nudgeErr) {
+          console.warn(`[SweepOrchestrator] Failed to update nudge for "${taskTitle}":`, nudgeErr)
+        }
+      }
+    }
+
+    // 6c. Trigger decision support packages for critical insights
     const criticalInsights = storedInsights.filter(i => i.urgency === 'critical')
     if (criticalInsights.length > 0) {
       // Map specialist domains to relevant cross-functional specialists
