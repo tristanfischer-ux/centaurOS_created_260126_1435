@@ -60,6 +60,7 @@ import {
     FolderKanban,
     Receipt,
     Landmark,
+    Link2,
 } from "lucide-react"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -129,6 +130,7 @@ const financeNavigation = [
     { name: "Projects", href: "/finance/projects", icon: FolderKanban, tooltip: "Per-project profitability tracking and P&L" },
     { name: "Expenses", href: "/finance/expenses", icon: Receipt, tooltip: "Track and manage business expenses" },
     { name: "Funding", href: "/finance/funding", icon: Landmark, tooltip: "Track funding opportunities and grant applications" },
+    { name: "Integrations", href: "/finance/integrations", icon: Link2, tooltip: "Connect Xero, QuickBooks, or FreeAgent" },
     { name: "Alerts", href: "/finance/settings", icon: BellRing, tooltip: "Configure financial alert thresholds and digest preferences" },
 ]
 

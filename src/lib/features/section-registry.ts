@@ -38,6 +38,7 @@ import {
     FolderKanban,
     Receipt,
     Landmark,
+    Link2,
 } from "lucide-react"
 
 // ─── Section Definitions ────────────────────────────────────────────────────
@@ -294,6 +295,13 @@ export const SECTIONS: Section[] = [
                 description: "Track funding opportunities and grant applications",
                 route: "/finance/funding",
                 icon: Landmark,
+                addedAt: new Date("2026-02-23"),
+            },
+            {
+                name: "Integrations",
+                description: "Connect Xero, QuickBooks, or FreeAgent for two-way sync",
+                route: "/finance/integrations",
+                icon: Link2,
                 addedAt: new Date("2026-02-23"),
             },
             {

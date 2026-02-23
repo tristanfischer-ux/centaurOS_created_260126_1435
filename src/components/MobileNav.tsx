@@ -50,6 +50,7 @@ import {
     FolderKanban,
     Receipt,
     Landmark,
+    Link2,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -105,6 +106,7 @@ const financeMoreNavigation = [
     { name: "Projects", href: "/finance/projects", icon: FolderKanban },
     { name: "Expenses", href: "/finance/expenses", icon: Receipt },
     { name: "Funding", href: "/finance/funding", icon: Landmark },
+    { name: "Integrations", href: "/finance/integrations", icon: Link2 },
     { name: "Alerts", href: "/finance/settings", icon: BellRing },
 ]
 

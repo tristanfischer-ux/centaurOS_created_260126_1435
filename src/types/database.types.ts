@@ -5483,6 +5483,62 @@ export type Database = {
           },
         ]
       }
+      finance_integrations: {
+        Row: {
+          access_token_encrypted: string | null
+          chart_of_accounts_mapping: Json
+          created_at: string
+          created_by: string
+          external_org_id: string | null
+          foundry_id: string
+          id: string
+          last_sync_at: string | null
+          provider: string
+          refresh_token_encrypted: string | null
+          status: string
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          chart_of_accounts_mapping?: Json
+          created_at?: string
+          created_by: string
+          external_org_id?: string | null
+          foundry_id: string
+          id?: string
+          last_sync_at?: string | null
+          provider: string
+          refresh_token_encrypted?: string | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          chart_of_accounts_mapping?: Json
+          created_at?: string
+          created_by?: string
+          external_org_id?: string | null
+          foundry_id?: string
+          id?: string
+          last_sync_at?: string | null
+          provider?: string
+          refresh_token_encrypted?: string | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_integrations_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_payment_links: {
         Row: {
           amount: number
@@ -5711,6 +5767,50 @@ export type Database = {
             columns: ["payment_link_id"]
             isOneToOne: false
             referencedRelation: "finance_payment_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_sync_log: {
+        Row: {
+          completed_at: string | null
+          direction: string
+          entity_count: number
+          entity_type: string
+          error_message: string | null
+          id: string
+          integration_id: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          direction: string
+          entity_count?: number
+          entity_type: string
+          error_message?: string | null
+          id?: string
+          integration_id: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          direction?: string
+          entity_count?: number
+          entity_type?: string
+          error_message?: string | null
+          id?: string
+          integration_id?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_sync_log_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "finance_integrations"
             referencedColumns: ["id"]
           },
         ]
