@@ -137,6 +137,14 @@ function ReportCard({
     <Card
       className="cursor-pointer transition-shadow hover:shadow-md w-[280px] shrink-0"
       onClick={onClick}
+      tabIndex={0}
+      role="button"
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
     >
       <CardContent className="p-4">
         <div className="flex items-center gap-2">
@@ -167,9 +175,9 @@ function ReportCard({
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-3">
+    <div className="flex gap-4 overflow-x-auto pb-2">
       {Array.from({ length: 3 }).map((_, i) => (
-        <Card key={i}>
+        <Card key={i} className="w-[280px] shrink-0">
           <CardContent className="space-y-3 p-4">
             <div className="flex items-center gap-2">
               <Skeleton className="h-5 w-24" />

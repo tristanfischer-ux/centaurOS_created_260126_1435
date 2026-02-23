@@ -364,11 +364,11 @@ function renderObjectivesSection(objectives: ObjectivesProgressSectionData): str
             <tr>
               <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
                 <p style="margin: 0 0 4px 0; font-size: 14px; color: #1e293b; font-weight: 500;">${escapeHtml(obj.title)}</p>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="font-size: 12px; color: ${healthColor}; font-weight: 600;">${healthLabel}</span>
-                  <span style="font-size: 12px; color: #64748b;">${obj.progress}% complete</span>
-                  ${obj.progressDelta ? `<span style="font-size: 12px; color: ${obj.progressDelta > 0 ? '#16a34a' : '#dc2626'}; font-weight: 500;">${obj.progressDelta > 0 ? '+' : ''}${obj.progressDelta}pp</span>` : ''}
-                </div>
+                <p style="margin: 0;">
+                  <span style="display: inline-block; font-size: 12px; color: ${healthColor}; font-weight: 600; margin-right: 8px;">${healthLabel}</span>
+                  <span style="display: inline-block; font-size: 12px; color: #64748b; margin-right: 8px;">${obj.progress}% complete</span>
+                  ${obj.progressDelta ? `<span style="display: inline-block; font-size: 12px; color: ${obj.progressDelta > 0 ? '#16a34a' : '#dc2626'}; font-weight: 500;">${obj.progressDelta > 0 ? '+' : ''}${obj.progressDelta}pp</span>` : ''}
+                </p>
               </td>
             </tr>`
   }).join('')

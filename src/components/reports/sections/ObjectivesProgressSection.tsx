@@ -111,8 +111,13 @@ export function ObjectivesProgressSection({
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
                 <span className="font-medium text-foreground">{objective.progress}%</span>
-                {objective.progressDelta != null && objective.progressDelta > 0 && (
-                  <span className="text-status-success font-medium"> +{objective.progressDelta}pp</span>
+                {objective.progressDelta != null && objective.progressDelta !== 0 && (
+                  <span className={cn(
+                    'font-medium',
+                    objective.progressDelta > 0 ? 'text-status-success' : 'text-destructive'
+                  )}>
+                    {' '}{objective.progressDelta > 0 ? '+' : ''}{objective.progressDelta}pp
+                  </span>
                 )}
                 {' '}· {objective.tasksRemaining} task{objective.tasksRemaining !== 1 ? 's' : ''} remaining
               </span>

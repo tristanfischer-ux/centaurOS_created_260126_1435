@@ -277,8 +277,8 @@ function parseNarrativeResponse(
   options: NarrativeOptions,
 ): NarrativeResult {
   const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/i, '')
+    .replace(/```(?:json)?\s*/gi, '')
+    .replace(/\s*```/gi, '')
     .trim()
 
   try {
