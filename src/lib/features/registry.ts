@@ -303,7 +303,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/apprenticeship',
         releasedAt: new Date('2026-01-15'),
         category: 'core',
-        status: 'stable',
+        status: 'beta',
         isVisibleInNav: true,
         changelog: 'Launched the Apprenticeship program for tracking on-the-job training. Manage apprentice progress, competencies, and milestones.'
     },
@@ -393,7 +393,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/marketplace-orders',
         releasedAt: new Date('2026-01-10'),
         category: 'marketplace',
-        status: 'stable',
+        status: 'beta',
         isVisibleInNav: true,
         changelog: 'Orders management page for viewing order history, tracking active orders, and managing deliverables.'
     },
