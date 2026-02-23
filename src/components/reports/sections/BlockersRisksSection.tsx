@@ -12,7 +12,7 @@ import { CheckCircle2, AlertTriangle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { ReportSectionHeader, ProgressBar } from '@/components/reports/report-visuals'
+import { ReportSectionHeader, SectionNarrativeIntro, ProgressBar } from '@/components/reports/report-visuals'
 
 import type { BlockersRisksSectionData, BlockerRow, AtRiskObjective, ReportTemplateId } from '@/lib/reports/report-document-types'
 
@@ -61,6 +61,16 @@ function BlockerCard({ blocker }: { blocker: BlockerRow }): React.JSX.Element {
             <Badge variant="destructive" size="sm">
               Needs Help
             </Badge>
+          )}
+          {blocker.ageInDays != null && blocker.ageInDays > 0 && (
+            <span className={cn(
+              'text-xs font-medium rounded-full px-2 py-0.5',
+              blocker.ageInDays >= 7 ? 'bg-status-error-light text-destructive' :
+              blocker.ageInDays >= 3 ? 'bg-status-warning-light text-status-warning-dark' :
+              'bg-muted text-muted-foreground'
+            )}>
+              {blocker.ageInDays}d old
+            </span>
           )}
         </div>
         <p className="text-sm text-foreground leading-relaxed">
@@ -119,6 +129,7 @@ function EmptyState(): React.JSX.Element {
 export function BlockersRisksSection({
   blockers,
   atRiskObjectives,
+  sectionNarrative,
   templateId,
   sectionNumber,
 }: BlockersRisksSectionProps): React.JSX.Element {
@@ -139,6 +150,7 @@ export function BlockersRisksSection({
         templateId={templateId}
         sectionNumber={sectionNumber}
       />
+      <SectionNarrativeIntro narrative={sectionNarrative} />
 
       {!hasContent && <EmptyState />}
 

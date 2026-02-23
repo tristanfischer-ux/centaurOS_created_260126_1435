@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import {
   ReportSectionHeader,
+  SectionNarrativeIntro,
   TrendArrow,
   Sparkline,
   formatMetricValue,
@@ -132,6 +133,7 @@ function generateSyntheticSparkline(metric: KPIMetric): number[] {
 
 export function KeyMetricsSection({
   metrics,
+  sectionNarrative,
   templateId,
   sectionNumber,
 }: KeyMetricsSectionProps): React.JSX.Element {
@@ -145,6 +147,7 @@ export function KeyMetricsSection({
         templateId={templateId}
         sectionNumber={sectionNumber}
       />
+      <SectionNarrativeIntro narrative={sectionNarrative} />
 
       {/* Hero metric — full width */}
       {heroMetric && <HeroMetric metric={heroMetric} />}

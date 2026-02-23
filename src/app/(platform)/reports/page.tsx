@@ -123,6 +123,56 @@ const DETAIL_OPTIONS: { value: ReportDetailLevel; label: string; description: st
   { value: 'detailed', label: 'Detailed', description: 'Full analysis with metrics' },
 ]
 
+function computeDatePreset(label: string): { start: string; end: string } {
+  const now = new Date()
+  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  const dayOfWeek = now.getDay()
+
+  switch (label) {
+    case 'This Week':
+      return getDateRangeFromPreset('this-week')
+    case 'Last Week':
+      return getDateRangeFromPreset('last-week')
+    case 'This Month':
+      return getDateRangeFromPreset('this-month')
+    case 'Last Month':
+      return getDateRangeFromPreset('last-month')
+    case 'Last 2 Weeks': {
+      const twoWeeksAgoMonday = new Date(now)
+      twoWeeksAgoMonday.setDate(now.getDate() - ((dayOfWeek + 6) % 7) - 14)
+      const lastSunday = new Date(twoWeeksAgoMonday)
+      lastSunday.setDate(twoWeeksAgoMonday.getDate() + 13)
+      return { start: fmt(twoWeeksAgoMonday), end: fmt(lastSunday) }
+    }
+    case 'Last Quarter': {
+      const currentQuarter = Math.floor(now.getMonth() / 3)
+      const lastQuarterStart = new Date(now.getFullYear(), (currentQuarter - 1) * 3, 1)
+      const lastQuarterEnd = new Date(now.getFullYear(), currentQuarter * 3, 0)
+      return { start: fmt(lastQuarterStart), end: fmt(lastQuarterEnd) }
+    }
+    default:
+      return getDateRangeFromPreset('last-week')
+  }
+}
+
+const GENERATION_STEPS = [
+  'Collecting metrics…',
+  'Fetching objectives…',
+  'Analysing team activity…',
+  'Checking blockers…',
+  'Generating narrative…',
+  'Assembling report…',
+]
+
+const DATE_RANGE_PRESETS = [
+  { label: 'This Week', getRange: () => computeDatePreset('This Week') },
+  { label: 'Last Week', getRange: () => computeDatePreset('Last Week') },
+  { label: 'Last 2 Weeks', getRange: () => computeDatePreset('Last 2 Weeks') },
+  { label: 'This Month', getRange: () => computeDatePreset('This Month') },
+  { label: 'Last Month', getRange: () => computeDatePreset('Last Month') },
+  { label: 'Last Quarter', getRange: () => computeDatePreset('Last Quarter') },
+]
+
 export default function ReportsPage(): React.JSX.Element {
   const defaultTemplate = getTemplate('weekly-update')
   const defaultDateRange = getDateRangeFromPreset(defaultTemplate.defaultDateRange)
@@ -139,6 +189,7 @@ export default function ReportsPage(): React.JSX.Element {
   const [tone, setTone] = useState<ReportTone>('internal')
   const [detailLevel, setDetailLevel] = useState<ReportDetailLevel>('standard')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generationStep, setGenerationStep] = useState(0)
   const [reportDocument, setReportDocument] = useState<ReportDocumentType | null>(null)
   const [lastSnapshotId, setLastSnapshotId] = useState<string | null>(null)
 
@@ -208,9 +259,15 @@ export default function ReportsPage(): React.JSX.Element {
 
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true)
+    setGenerationStep(0)
     setReportDocument(null)
     setShareUrl(null)
     setLastSnapshotId(null)
+
+    // Cycle through descriptive progress messages during generation
+    const stepInterval = setInterval(() => {
+      setGenerationStep(prev => (prev + 1) % GENERATION_STEPS.length)
+    }, 1500)
 
     try {
       const sections = Array.from(enabledSections)
@@ -243,6 +300,7 @@ export default function ReportsPage(): React.JSX.Element {
       const message = error instanceof Error ? error.message : 'Unexpected error'
       toast.error(`Report generation failed: ${message}`)
     } finally {
+      clearInterval(stepInterval)
       setIsGenerating(false)
     }
   }, [enabledSections, selectedTemplate, dateRange, tone, detailLevel])
@@ -656,7 +714,26 @@ export default function ReportsPage(): React.JSX.Element {
           <section className="space-y-4">
             <h2 className={typography.h3}>Date Range</h2>
             <Card>
-              <CardContent className="p-6">
+              <CardContent className="p-6 space-y-4">
+                {/* Preset buttons */}
+                <div className="flex flex-wrap gap-2">
+                  {DATE_RANGE_PRESETS.map(preset => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setDateRange(preset.getRange())}
+                      className={cn(
+                        'rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
+                        dateRange.start === preset.getRange().start && dateRange.end === preset.getRange().end
+                          ? 'border-international-orange bg-international-orange/5 text-foreground'
+                          : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                      )}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="flex flex-col sm:flex-row items-center gap-3">
                   <div className="w-full sm:flex-1">
                     <label htmlFor="date-start" className="mb-1.5 block text-xs font-medium text-muted-foreground">
@@ -754,7 +831,7 @@ export default function ReportsPage(): React.JSX.Element {
             {isGenerating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating report with narrative…
+                {GENERATION_STEPS[generationStep]}
               </>
             ) : (
               'Generate Report'

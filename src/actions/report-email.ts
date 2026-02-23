@@ -29,6 +29,9 @@ import type {
   ExecutiveSummarySectionData,
   KeyMetricsSectionData,
   KPIMetric,
+  ObjectivesProgressSectionData,
+  BlockersRisksSectionData,
+  TeamActivitySectionData,
 } from '@/lib/reports/report-document-types'
 
 const resend = process.env.RESEND_API_KEY
@@ -182,6 +185,21 @@ function composeEmailHtml(
   )
   const metrics = metricsSection?.data as KeyMetricsSectionData | undefined
 
+  const objectivesSection = document.sections.find(
+    (s) => s.type === 'objectives-progress'
+  )
+  const objectives = objectivesSection?.data as ObjectivesProgressSectionData | undefined
+
+  const blockersSection = document.sections.find(
+    (s) => s.type === 'blockers-risks'
+  )
+  const blockers = blockersSection?.data as BlockersRisksSectionData | undefined
+
+  const teamSection = document.sections.find(
+    (s) => s.type === 'team-activity'
+  )
+  const team = teamSection?.data as TeamActivitySectionData | undefined
+
   const companyName = escapeHtml(
     cover?.companyName ?? document.foundryName
   )
@@ -226,6 +244,9 @@ function composeEmailHtml(
 
           ${summary ? renderSummarySection(summary) : ''}
           ${metrics && metrics.metrics.length > 0 ? renderMetricsSection(metrics) : ''}
+          ${objectives && objectives.objectives.length > 0 ? renderObjectivesSection(objectives) : ''}
+          ${team && team.members.length > 0 ? renderTeamSection(team) : ''}
+          ${blockers && blockers.blockers.length > 0 ? renderBlockersSection(blockers) : ''}
           ${shareUrl ? renderCtaButton(shareUrl) : ''}
 
           <!-- Footer -->
@@ -328,6 +349,96 @@ function formatMetricValue(metric: KPIMetric): string {
     default:
       return metric.value.toLocaleString()
   }
+}
+
+function renderObjectivesSection(objectives: ObjectivesProgressSectionData): string {
+  const rows = objectives.objectives.slice(0, 5).map(obj => {
+    const healthColor = obj.health === 'on-track' ? '#16a34a' :
+      obj.health === 'at-risk' ? '#f59e0b' :
+      obj.health === 'off-track' ? '#dc2626' : '#64748b'
+    const healthLabel = obj.health === 'on-track' ? 'On Track' :
+      obj.health === 'at-risk' ? 'At Risk' :
+      obj.health === 'off-track' ? 'Off Track' : obj.health
+
+    return `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                <p style="margin: 0 0 4px 0; font-size: 14px; color: #1e293b; font-weight: 500;">${escapeHtml(obj.title)}</p>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 12px; color: ${healthColor}; font-weight: 600;">${healthLabel}</span>
+                  <span style="font-size: 12px; color: #64748b;">${obj.progress}% complete</span>
+                  ${obj.progressDelta ? `<span style="font-size: 12px; color: #16a34a; font-weight: 500;">+${obj.progressDelta}pp</span>` : ''}
+                </div>
+              </td>
+            </tr>`
+  }).join('')
+
+  return `
+          <!-- Objectives -->
+          <tr>
+            <td style="padding: 24px 32px 8px 32px;">
+              <h2 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b; text-transform: uppercase; letter-spacing: 0.03em;">Objectives Progress</h2>
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                ${rows}
+              </table>
+            </td>
+          </tr>`
+}
+
+function renderTeamSection(team: TeamActivitySectionData): string {
+  const topMembers = [...team.members]
+    .sort((a, b) => b.tasksCompleted - a.tasksCompleted)
+    .slice(0, 5)
+
+  const rows = topMembers.map(member => `
+            <tr>
+              <td style="padding: 6px 0; font-size: 14px; color: #1e293b;">${escapeHtml(member.name)}</td>
+              <td style="padding: 6px 0; font-size: 14px; color: #64748b; text-align: right; font-weight: 600;">${member.tasksCompleted} tasks</td>
+            </tr>`
+  ).join('')
+
+  return `
+          <!-- Team Activity -->
+          <tr>
+            <td style="padding: 24px 32px 8px 32px;">
+              <h2 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b; text-transform: uppercase; letter-spacing: 0.03em;">Top Contributors</h2>
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                ${rows}
+              </table>
+              ${team.standupParticipationRate != null ? `<p style="margin: 12px 0 0 0; font-size: 13px; color: #64748b;">Standup participation: <strong>${Math.round(team.standupParticipationRate)}%</strong></p>` : ''}
+            </td>
+          </tr>`
+}
+
+function renderBlockersSection(blockers: BlockersRisksSectionData): string {
+  const items = blockers.blockers.slice(0, 5).map(b => {
+    const severityColor = b.severity === 'critical' ? '#dc2626' :
+      b.severity === 'high' ? '#f59e0b' : '#64748b'
+    const severityLabel = b.severity ? b.severity.charAt(0).toUpperCase() + b.severity.slice(1) : ''
+
+    return `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                <p style="margin: 0 0 4px 0; font-size: 14px; color: #1e293b; line-height: 1.5;">${escapeHtml(b.description)}</p>
+                <div>
+                  <span style="font-size: 12px; color: #64748b;">Reported by ${escapeHtml(b.reporterName)}</span>
+                  ${severityLabel ? ` <span style="font-size: 11px; color: ${severityColor}; font-weight: 600; text-transform: uppercase;">${severityLabel}</span>` : ''}
+                  ${b.ageInDays != null && b.ageInDays > 0 ? ` <span style="font-size: 11px; color: ${b.ageInDays >= 7 ? '#dc2626' : '#64748b'};">${b.ageInDays}d old</span>` : ''}
+                </div>
+              </td>
+            </tr>`
+  }).join('')
+
+  return `
+          <!-- Blockers -->
+          <tr>
+            <td style="padding: 24px 32px 8px 32px;">
+              <h2 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b; text-transform: uppercase; letter-spacing: 0.03em;">Blockers &amp; Risks</h2>
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                ${items}
+              </table>
+            </td>
+          </tr>`
 }
 
 function renderCtaButton(shareUrl: string): string {

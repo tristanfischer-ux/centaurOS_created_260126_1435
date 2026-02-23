@@ -20,7 +20,7 @@ import {
 import { BarChart3 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
-import { ReportSectionHeader } from '@/components/reports/report-visuals'
+import { ReportSectionHeader, SectionNarrativeIntro } from '@/components/reports/report-visuals'
 
 import type { CompletionTrendSectionData, ReportTemplateId } from '@/lib/reports/report-document-types'
 
@@ -29,8 +29,21 @@ interface CompletionTrendSectionProps extends CompletionTrendSectionData {
   sectionNumber?: number
 }
 
+// DECISION: Recharts doesn't support CSS variables for fill/stroke, so HSL
+// values are hardcoded here. These must stay in sync with the design tokens:
+// --international-orange: hsl(14, 100%, 50%)  → tokens: bg-international-orange
+// --electric-blue: hsl(217, 91%, 60%)         → tokens: bg-electric-blue
 const INTERNATIONAL_ORANGE = 'hsl(14, 100%, 50%)'
 const ELECTRIC_BLUE = 'hsl(217, 91%, 60%)'
+
+// Axis tick color: maps to --muted-foreground in light mode
+const AXIS_TICK_COLOR = 'hsl(215, 16%, 47%)'
+// Grid line color: maps to --border in light mode
+const GRID_COLOR = '#e2e8f0'
+// Tooltip border: maps to --border in light mode
+const TOOLTIP_BORDER = 'hsl(214, 32%, 91%)'
+// Legend text: maps to --foreground in light mode
+const LEGEND_TEXT = 'hsl(222, 47%, 11%)'
 
 function formatXAxisDate(dateStr: string): string {
   const d = new Date(dateStr)
@@ -41,6 +54,7 @@ function formatXAxisDate(dateStr: string): string {
 export function CompletionTrendSection({
   dataPoints,
   periodLabel,
+  sectionNarrative,
   templateId,
   sectionNumber,
 }: CompletionTrendSectionProps): React.JSX.Element {
@@ -61,6 +75,7 @@ export function CompletionTrendSection({
         templateId={templateId}
         sectionNumber={sectionNumber}
       />
+      <SectionNarrativeIntro narrative={sectionNarrative} />
 
       {/* Summary stat pills */}
       <div className="flex flex-wrap gap-3">
@@ -88,16 +103,16 @@ export function CompletionTrendSection({
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 12, fill: 'hsl(215, 16%, 47%)' }}
+                  tick={{ fontSize: 12, fill: AXIS_TICK_COLOR }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
                   allowDecimals={false}
-                  tick={{ fontSize: 12, fill: 'hsl(215, 16%, 47%)' }}
+                  tick={{ fontSize: 12, fill: AXIS_TICK_COLOR }}
                   axisLine={false}
                   tickLine={false}
                   width={32}
@@ -105,7 +120,7 @@ export function CompletionTrendSection({
                 <Tooltip
                   contentStyle={{
                     borderRadius: '8px',
-                    border: '1px solid hsl(214, 32%, 91%)',
+                    border: `1px solid ${TOOLTIP_BORDER}`,
                     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)',
                     fontSize: '13px',
                   }}
@@ -115,7 +130,7 @@ export function CompletionTrendSection({
                   height={36}
                   iconType="circle"
                   formatter={(value: string) => (
-                    <span style={{ color: 'hsl(222, 47%, 11%)', fontSize: '13px' }}>{value}</span>
+                    <span style={{ color: LEGEND_TEXT, fontSize: '13px' }}>{value}</span>
                   )}
                 />
                 <Bar

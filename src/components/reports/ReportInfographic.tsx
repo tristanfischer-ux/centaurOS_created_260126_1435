@@ -310,6 +310,24 @@ export function ReportInfographic({ document }: ReportInfographicProps): React.J
             ) : (
               <p className="text-xs text-muted-foreground italic">No objectives tracked</p>
             )}
+
+            {/* Health status legend — required by design system rules */}
+            {topObjectives.length > 0 && (
+              <div className="flex items-center gap-3 mt-3">
+                <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-status-success" />
+                  On Track
+                </span>
+                <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-status-warning" />
+                  At Risk
+                </span>
+                <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-destructive" />
+                  Off Track
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

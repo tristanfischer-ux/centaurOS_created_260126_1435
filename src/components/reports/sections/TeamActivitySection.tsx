@@ -13,7 +13,7 @@ import { Users, Trophy } from 'lucide-react'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { ReportSectionHeader } from '@/components/reports/report-visuals'
+import { ReportSectionHeader, SectionNarrativeIntro } from '@/components/reports/report-visuals'
 
 import type { TeamActivitySectionData, ReportTemplateId } from '@/lib/reports/report-document-types'
 
@@ -32,6 +32,7 @@ export function TeamActivitySection({
   members,
   totalTeamCompleted,
   standupParticipationRate,
+  sectionNarrative,
   templateId,
   sectionNumber,
 }: TeamActivitySectionProps): React.JSX.Element {
@@ -49,6 +50,7 @@ export function TeamActivitySection({
         templateId={templateId}
         sectionNumber={sectionNumber}
       />
+      <SectionNarrativeIntro narrative={sectionNarrative} />
 
       {/* Summary stat pills */}
       <div className="flex flex-wrap gap-3">

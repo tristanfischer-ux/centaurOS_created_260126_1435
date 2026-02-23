@@ -36,6 +36,9 @@ export interface NarrativeContext {
   blockersCount: number
   objectivesProgressing: number
   totalActiveObjectives: number
+  overdueTaskCount?: number
+  standupParticipationRate?: number
+  objectivesCompleted?: number
 }
 
 export interface NarrativeOptions {
@@ -70,6 +73,22 @@ const DETAIL_LENGTH: Record<NarrativeOptions['detailLevel'], string> = {
     'Highlights: 5-7 bullet points.',
 }
 
+// INTENT: More deterministic output for formal reports (investor/board),
+// more creative latitude for internal team updates.
+const TONE_TEMPERATURE: Record<NarrativeOptions['tone'], number> = {
+  investor: 0.3,
+  board: 0.5,
+  internal: 0.7,
+}
+
+// INTENT: Section intros are lighter than full narratives, so they get
+// slightly lower temperatures across the board.
+const SECTION_TONE_TEMPERATURE: Record<NarrativeOptions['tone'], number> = {
+  investor: 0.2,
+  board: 0.4,
+  internal: 0.6,
+}
+
 // ─── Executive Narrative ──────────────────────────────────────────
 
 /**
@@ -98,7 +117,7 @@ export async function generateExecutiveNarrative(
 
     const model = genAI.getGenerativeModel({
       model: MODEL_ID,
-      generationConfig: { temperature: 0.6, maxOutputTokens: 1024 },
+      generationConfig: { temperature: TONE_TEMPERATURE[options.tone], maxOutputTokens: 1024 },
     })
 
     const result = await Promise.race([
@@ -155,7 +174,7 @@ export async function generateSectionNarrative(
 
     const model = genAI.getGenerativeModel({
       model: MODEL_ID,
-      generationConfig: { temperature: 0.5, maxOutputTokens: 256 },
+      generationConfig: { temperature: SECTION_TONE_TEMPERATURE[options.tone], maxOutputTokens: 256 },
     })
 
     const result = await Promise.race([
@@ -230,7 +249,11 @@ function buildExecutiveUserPrompt(ctx: NarrativeContext): string {
     ctx.atRiskObjectives.length > 0
       ? `At-risk objectives:\n${ctx.atRiskObjectives.map((o) => `  - ${o.title} (${o.progress}% complete)`).join('\n')}`
       : 'At-risk objectives: none',
-  ].join('\n')
+    '',
+    ctx.overdueTaskCount != null ? `Overdue tasks: ${ctx.overdueTaskCount}` : '',
+    ctx.standupParticipationRate != null ? `Standup participation: ${Math.round(ctx.standupParticipationRate)}%` : '',
+    ctx.objectivesCompleted != null ? `Objectives completed this period: ${ctx.objectivesCompleted}` : '',
+  ].filter(Boolean).join('\n')
 }
 
 // ─── Response Parser ──────────────────────────────────────────────

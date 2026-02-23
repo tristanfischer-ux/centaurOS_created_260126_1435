@@ -12,7 +12,7 @@ import { Target } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { ReportSectionHeader, HealthDot } from '@/components/reports/report-visuals'
+import { ReportSectionHeader, SectionNarrativeIntro, HealthDot } from '@/components/reports/report-visuals'
 
 import type { ObjectivesProgressSectionData, ObjectiveRow, ReportTemplateId } from '@/lib/reports/report-document-types'
 
@@ -56,6 +56,7 @@ export function ObjectivesProgressSection({
   objectives,
   totalActive,
   totalCompleted,
+  sectionNarrative,
   templateId,
   sectionNumber,
 }: ObjectivesProgressSectionProps): React.JSX.Element {
@@ -67,6 +68,7 @@ export function ObjectivesProgressSection({
         templateId={templateId}
         sectionNumber={sectionNumber}
       />
+      <SectionNarrativeIntro narrative={sectionNarrative} />
 
       {/* Summary stat pills */}
       <div className="flex flex-wrap gap-3">
@@ -109,6 +111,9 @@ export function ObjectivesProgressSection({
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
                 <span className="font-medium text-foreground">{objective.progress}%</span>
+                {objective.progressDelta != null && objective.progressDelta > 0 && (
+                  <span className="text-status-success font-medium"> +{objective.progressDelta}pp</span>
+                )}
                 {' '}· {objective.tasksRemaining} task{objective.tasksRemaining !== 1 ? 's' : ''} remaining
               </span>
               {objective.endDate && (

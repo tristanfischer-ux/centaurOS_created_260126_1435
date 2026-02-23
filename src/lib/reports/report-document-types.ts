@@ -60,6 +60,7 @@ export interface KPIMetric {
 
 export interface KeyMetricsSectionData {
   metrics: KPIMetric[]
+  sectionNarrative?: string
 }
 
 export interface ObjectiveRow {
@@ -71,12 +72,14 @@ export interface ObjectiveRow {
   tasksCompleted: number
   tasksRemaining: number
   endDate: string | null
+  progressDelta?: number
 }
 
 export interface ObjectivesProgressSectionData {
   objectives: ObjectiveRow[]
   totalActive: number
   totalCompleted: number
+  sectionNarrative?: string
 }
 
 export interface TeamMemberRow {
@@ -91,6 +94,7 @@ export interface TeamActivitySectionData {
   members: TeamMemberRow[]
   totalTeamCompleted: number
   standupParticipationRate: number | null
+  sectionNarrative?: string
 }
 
 export interface BlockerRow {
@@ -100,6 +104,8 @@ export interface BlockerRow {
   description: string
   severity: 'low' | 'medium' | 'high' | 'critical' | null
   needsHelp: boolean
+  reportedDate?: string
+  ageInDays?: number
 }
 
 export interface AtRiskObjective {
@@ -112,6 +118,7 @@ export interface AtRiskObjective {
 export interface BlockersRisksSectionData {
   blockers: BlockerRow[]
   atRiskObjectives: AtRiskObjective[]
+  sectionNarrative?: string
 }
 
 export interface DailyDataPoint {
@@ -123,6 +130,7 @@ export interface DailyDataPoint {
 export interface CompletionTrendSectionData {
   dataPoints: DailyDataPoint[]
   periodLabel: string
+  sectionNarrative?: string
 }
 
 export interface UpcomingTask {
@@ -137,6 +145,7 @@ export interface UpcomingTask {
 export interface WeekAheadSectionData {
   tasks: UpcomingTask[]
   totalDueNextWeek: number
+  sectionNarrative?: string
 }
 
 export type SectionData =

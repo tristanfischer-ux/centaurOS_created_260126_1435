@@ -11,7 +11,7 @@ import { CalendarDays, Circle, CheckCircle2 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { ReportSectionHeader } from '@/components/reports/report-visuals'
+import { ReportSectionHeader, SectionNarrativeIntro } from '@/components/reports/report-visuals'
 
 import type { WeekAheadSectionData, UpcomingTask, ReportTemplateId } from '@/lib/reports/report-document-types'
 
@@ -88,6 +88,7 @@ function CalendarStrip({ dateGroups }: { dateGroups: Map<string, UpcomingTask[]>
 export function WeekAheadSection({
   tasks,
   totalDueNextWeek,
+  sectionNarrative,
   templateId,
   sectionNumber,
 }: WeekAheadSectionProps): React.JSX.Element {
@@ -102,6 +103,7 @@ export function WeekAheadSection({
         templateId={templateId}
         sectionNumber={sectionNumber}
       />
+      <SectionNarrativeIntro narrative={sectionNarrative} />
 
       {/* Summary callout */}
       <div className="flex items-center gap-3 rounded-xl bg-muted/30 px-5 py-3">

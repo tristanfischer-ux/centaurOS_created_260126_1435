@@ -22,7 +22,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { calculatePercentChange, getTrendDirection } from '@/lib/reports/trends'
-import { generateExecutiveNarrative } from '@/lib/reports/ai-narrative'
+import { generateExecutiveNarrative, generateSectionNarrative } from '@/lib/reports/ai-narrative'
 import type { NarrativeContext, NarrativeOptions } from '@/lib/reports/ai-narrative'
 import type { Json } from '@/types/database.types'
 import type {
@@ -146,12 +146,12 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
     // INTENT: After all data is fetched, enhance the executive summary with
     // an AI-generated narrative via Gemini. The raw metrics are passed as
     // context so the narrative is grounded in real data, not hallucinated.
-    if (requestedSections.includes('executive-summary')) {
-      const narrativeOptions: NarrativeOptions = {
-        tone: tone ?? 'internal',
-        detailLevel: detailLevel ?? 'standard',
-      }
+    const narrativeOpts: NarrativeOptions = {
+      tone: tone ?? 'internal',
+      detailLevel: detailLevel ?? 'standard',
+    }
 
+    if (requestedSections.includes('executive-summary')) {
       const narrativeContext = buildNarrativeContext(
         foundryName,
         templateId === 'board-pack' ? 'Board Pack' : 'Weekly Update',
@@ -160,7 +160,7 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
       )
 
       try {
-        const aiResult = await generateExecutiveNarrative(narrativeContext, narrativeOptions)
+        const aiResult = await generateExecutiveNarrative(narrativeContext, narrativeOpts)
         sectionDataMap.set('executive-summary', {
           type: 'executive-summary',
           data: {
@@ -173,20 +173,60 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
       }
     }
 
-    // Assemble sections in the order they were requested
-    const orderedSections: SectionData[] = requestedSections
+    // INTENT: Generate AI section narratives for all non-cover/non-executive-summary
+    // sections in parallel. Each call is wrapped in .catch() so failures are silent —
+    // sections render as before if the AI call fails.
+    const narrativeSectionTypes: ReportSectionType[] = [
+      'key-metrics', 'objectives-progress', 'team-activity',
+      'blockers-risks', 'completion-trend', 'week-ahead',
+    ]
+
+    await Promise.all(
+      narrativeSectionTypes
+        .filter(sType => sectionDataMap.has(sType))
+        .map(async (sType) => {
+          const section = sectionDataMap.get(sType)!
+          const narrative = await generateSectionNarrative(
+            sType,
+            section.data as unknown as Record<string, unknown>,
+            narrativeOpts,
+          ).catch(() => undefined)
+
+          if (narrative) {
+            const updatedData = { ...section.data, sectionNarrative: narrative }
+            sectionDataMap.set(sType, { ...section, data: updatedData } as SectionData)
+          }
+        })
+    )
+
+    // INTENT: Build a dynamic title that reflects the actual content of the
+    // report, rather than a generic "Weekly Update" / "Board Pack".
+    const dynamicTitle = buildDynamicTitle(templateId, sectionDataMap)
+
+    // Update cover data with the dynamic title now that we have all the data
+    if (sectionDataMap.has('cover')) {
+      const coverSection = sectionDataMap.get('cover')!
+      const coverData = coverSection.data as CoverSectionData
+      sectionDataMap.set('cover', {
+        ...coverSection,
+        data: { ...coverData, reportTitle: dynamicTitle },
+      } as SectionData)
+    }
+
+    // Re-assemble in case cover was updated
+    const finalSections: SectionData[] = requestedSections
       .filter(type => sectionDataMap.has(type))
       .map(type => sectionDataMap.get(type)!)
 
     const document: ReportDocument = {
       id: uuidv4(),
       templateId,
-      title: templateId === 'board-pack' ? 'Board Pack' : 'Weekly Update',
+      title: dynamicTitle,
       dateRange,
       generatedAt: new Date().toISOString(),
       foundryId,
       foundryName,
-      sections: orderedSections,
+      sections: finalSections,
       branding: {
         logoUrl: foundry?.logo_url ?? null,
         primaryColor: foundry?.report_primary_color ?? null,
@@ -253,6 +293,38 @@ async function fetchMetricsData(
     objectives_progress: { title: string; progress: number; tasks_completed_this_week?: number; tasks_remaining?: number }[]
   }
 
+  // INTENT: Fetch overdue tasks and compute on-time completion rate as extra KPIs.
+  // Overdue = past end_date and not completed. On-time = completed within period
+  // that had an end_date on or after completion.
+  const [{ count: overdueCount }, { data: periodTasks }] = await Promise.all([
+    supabase
+      .from('tasks')
+      .select('*', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId)
+      .is('deleted_at', null)
+      .in('status', ['Pending', 'Accepted'])
+      .not('end_date', 'is', null)
+      .lt('end_date', new Date().toISOString().split('T')[0]),
+    supabase
+      .from('tasks')
+      .select('status, end_date, updated_at')
+      .eq('foundry_id', foundryId)
+      .eq('status', 'Completed')
+      .is('deleted_at', null)
+      .not('end_date', 'is', null)
+      .gte('updated_at', `${dateRange.start}T00:00:00`)
+      .lte('updated_at', `${dateRange.end}T23:59:59`),
+  ])
+
+  const overdueTasks = overdueCount ?? 0
+  const completedWithDeadline = periodTasks ?? []
+  const onTimeCount = completedWithDeadline.filter(t =>
+    t.end_date && t.updated_at && t.updated_at.split('T')[0] <= t.end_date
+  ).length
+  const onTimeRate = completedWithDeadline.length > 0
+    ? Math.round((onTimeCount / completedWithDeadline.length) * 100)
+    : 100
+
   const completedChange = calculatePercentChange(rollup.stats.tasks_completed, rollup.previous_week.tasks_completed)
   const createdChange = calculatePercentChange(rollup.stats.tasks_created, rollup.previous_week.tasks_created)
   const velocity = rollup.stats.tasks_created > 0
@@ -291,6 +363,22 @@ async function fetchMetricsData(
       format: 'number',
       trend: rollup.stats.blockers_reported > 3 ? 'down' : 'stable',
       changePercent: 0,
+    },
+    {
+      label: 'Overdue Tasks',
+      value: overdueTasks,
+      previousValue: 0,
+      format: 'number',
+      trend: overdueTasks > 0 ? 'down' : 'stable',
+      changePercent: 0,
+    },
+    {
+      label: 'On-Time Rate',
+      value: onTimeRate,
+      previousValue: 100,
+      format: 'percentage',
+      trend: onTimeRate >= 90 ? 'up' : onTimeRate >= 70 ? 'stable' : 'down',
+      changePercent: onTimeRate - 100,
     },
   ]
 
@@ -332,7 +420,7 @@ async function fetchMetricsData(
 async function fetchObjectivesData(
   supabase: Awaited<ReturnType<typeof createClient>>,
   foundryId: string,
-  _dateRange: { start: string; end: string }
+  dateRange: { start: string; end: string }
 ): Promise<ObjectivesProgressSectionData> {
   const { data: objectives, error } = await supabase
     .from('objectives')
@@ -365,6 +453,23 @@ async function fetchObjectivesData(
     taskCountMap.set(task.objective_id, existing)
   }
 
+  // INTENT: Query tasks completed in-period per objective to compute approximate
+  // progress change (progressDelta) during this reporting period.
+  const { data: periodCompletedTasks } = await supabase
+    .from('tasks')
+    .select('objective_id')
+    .in('objective_id', objectiveIds.length > 0 ? objectiveIds : ['__none__'])
+    .eq('status', 'Completed')
+    .is('deleted_at', null)
+    .gte('updated_at', `${dateRange.start}T00:00:00`)
+    .lte('updated_at', `${dateRange.end}T23:59:59`)
+
+  const periodCompletedByObjective = new Map<string, number>()
+  for (const t of periodCompletedTasks ?? []) {
+    if (!t.objective_id) continue
+    periodCompletedByObjective.set(t.objective_id, (periodCompletedByObjective.get(t.objective_id) ?? 0) + 1)
+  }
+
   const rows: ObjectiveRow[] = (objectives ?? []).map(o => {
     const counts = taskCountMap.get(o.id) ?? { completed: 0, total: 0 }
     const remaining = counts.total - counts.completed
@@ -378,6 +483,13 @@ async function fetchObjectivesData(
     else if (daysRemaining !== null && daysRemaining < 14 && (o.progress ?? 0) < 50) health = 'off-track'
     else if (daysRemaining !== null && daysRemaining < 21 && (o.progress ?? 0) < 70) health = 'at-risk'
 
+    // Approximate progress delta: if the objective has tasks, each completed
+    // task in-period represents roughly (100 / totalTasks) progress points.
+    const periodCompleted = periodCompletedByObjective.get(o.id) ?? 0
+    const progressDelta = counts.total > 0
+      ? Math.round((periodCompleted / counts.total) * 100)
+      : 0
+
     return {
       id: o.id,
       title: o.title,
@@ -387,6 +499,7 @@ async function fetchObjectivesData(
       tasksCompleted: counts.completed,
       tasksRemaining: remaining,
       endDate: o.end_date,
+      progressDelta: progressDelta > 0 ? progressDelta : undefined,
     }
   })
 
@@ -446,10 +559,36 @@ async function fetchTeamActivityData(
     }))
     .sort((a, b) => b.tasksCompleted - a.tasksCompleted)
 
+  // INTENT: Compute standup participation rate. Count distinct users who
+  // submitted standups in the period, divided by total active team members,
+  // adjusted for working days.
+  const { count: standupCount } = await supabase
+    .from('standups')
+    .select('*', { count: 'exact', head: true })
+    .eq('foundry_id', foundryId)
+    .gte('standup_date', dateRange.start)
+    .lte('standup_date', dateRange.end)
+
+  const { count: teamMemberCount } = await supabase
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+    .eq('foundry_id', foundryId)
+
+  const totalMembers = teamMemberCount ?? 1
+  const startDate = new Date(dateRange.start)
+  const endDate = new Date(dateRange.end)
+  const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  // Approximate working days (exclude weekends)
+  const workingDays = Math.max(1, Math.round(daysDiff * (5 / 7)))
+  const expectedStandups = totalMembers * workingDays
+  const participationRate = expectedStandups > 0
+    ? Math.min(100, Math.round(((standupCount ?? 0) / expectedStandups) * 100))
+    : null
+
   return {
     members,
     totalTeamCompleted: completedTasks?.length ?? 0,
-    standupParticipationRate: null,
+    standupParticipationRate: participationRate,
   }
 }
 
@@ -460,7 +599,7 @@ async function fetchBlockersData(
 ): Promise<BlockersRisksSectionData> {
   const { data: standups, error } = await supabase
     .from('standups')
-    .select('id, user_id, blockers, blocker_severity, needs_help, profiles!standups_user_id_fkey(full_name, role)')
+    .select('id, user_id, standup_date, blockers, blocker_severity, needs_help, profiles!standups_user_id_fkey(full_name, role)')
     .eq('foundry_id', foundryId)
     .gte('standup_date', dateRange.start)
     .lte('standup_date', dateRange.end)
@@ -473,6 +612,11 @@ async function fetchBlockersData(
 
   const blockers: BlockerRow[] = (standups ?? []).map(s => {
     const profile = s.profiles as unknown as { full_name: string | null; role: string | null } | null
+    const reportedDate = (s as Record<string, unknown>).standup_date as string | undefined
+    const ageInDays = reportedDate
+      ? Math.ceil((Date.now() - new Date(reportedDate).getTime()) / (1000 * 60 * 60 * 24))
+      : undefined
+
     return {
       id: s.id,
       reporterName: profile?.full_name ?? 'Unknown',
@@ -480,6 +624,8 @@ async function fetchBlockersData(
       description: s.blockers ?? '',
       severity: s.blocker_severity as BlockerRow['severity'],
       needsHelp: s.needs_help ?? false,
+      reportedDate,
+      ageInDays,
     }
   })
 
@@ -542,7 +688,7 @@ async function fetchWeekAheadData(
 
   const { data: tasks, error } = await supabase
     .from('tasks')
-    .select('id, title, end_date, assignee_id, objective_id, profiles!tasks_assignee_id_fkey(full_name), objectives!tasks_objective_id_fkey(title)')
+    .select('id, title, end_date, risk_level, assignee_id, objective_id, profiles!tasks_assignee_id_fkey(full_name), objectives!tasks_objective_id_fkey(title)')
     .eq('foundry_id', foundryId)
     .in('status', ['Pending', 'Accepted'])
     .is('deleted_at', null)
@@ -565,12 +711,63 @@ async function fetchWeekAheadData(
       title: t.title,
       assigneeName: profile?.full_name ?? null,
       dueDate: t.end_date!,
-      priority: null,
+      priority: (t as Record<string, unknown>).risk_level as string | null ?? null,
       objectiveTitle: objective?.title ?? null,
     }
   })
 
   return { tasks: upcomingTasks, totalDueNextWeek: upcomingTasks.length }
+}
+
+// ========================
+// Dynamic Title Builder
+// ========================
+
+// INTENT: Create a content-aware title that reflects the actual data in the
+// report. Reads metrics and blockers to construct titles like
+// "Weekly Update: Strong Sprint, 2 Blockers Need Attention".
+function buildDynamicTitle(
+  templateId: string,
+  sectionDataMap: Map<ReportSectionType, SectionData>,
+): string {
+  const baseTitle = templateId === 'board-pack' ? 'Board Pack' : 'Weekly Update'
+
+  const metricsSection = sectionDataMap.get('key-metrics')
+  const metrics = metricsSection?.type === 'key-metrics'
+    ? (metricsSection.data as KeyMetricsSectionData)
+    : null
+
+  const blockersSection = sectionDataMap.get('blockers-risks')
+  const blockers = blockersSection?.type === 'blockers-risks'
+    ? (blockersSection.data as BlockersRisksSectionData)
+    : null
+
+  const completedMetric = metrics?.metrics.find(m => m.label === 'Tasks Completed')
+  const blockerCount = blockers?.blockers.length ?? 0
+  const criticalBlockers = blockers?.blockers.filter(b => b.severity === 'critical').length ?? 0
+
+  const fragments: string[] = []
+
+  // Completion momentum
+  if (completedMetric) {
+    if (completedMetric.trend === 'up' && completedMetric.changePercent > 10) {
+      fragments.push('Strong Sprint')
+    } else if (completedMetric.trend === 'down' && completedMetric.changePercent < -10) {
+      fragments.push('Slower Week')
+    } else if (completedMetric.value > 0) {
+      fragments.push(`${completedMetric.value} Tasks Shipped`)
+    }
+  }
+
+  // Blocker awareness
+  if (criticalBlockers > 0) {
+    fragments.push(`${criticalBlockers} Critical Blocker${criticalBlockers > 1 ? 's' : ''}`)
+  } else if (blockerCount > 0) {
+    fragments.push(`${blockerCount} Blocker${blockerCount > 1 ? 's' : ''} Need Attention`)
+  }
+
+  if (fragments.length === 0) return baseTitle
+  return `${baseTitle}: ${fragments.join(', ')}`
 }
 
 // ========================
@@ -626,6 +823,9 @@ function buildNarrativeContext(
       o => o.health === 'on-track' || o.health === 'at-risk'
     ).length ?? 0,
     totalActiveObjectives: objectives?.totalActive ?? 0,
+    overdueTaskCount: metrics?.metrics.find(m => m.label === 'Overdue Tasks')?.value,
+    standupParticipationRate: team?.standupParticipationRate ?? undefined,
+    objectivesCompleted: objectives?.totalCompleted,
   }
 }
 

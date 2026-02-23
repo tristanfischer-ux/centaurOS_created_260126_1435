@@ -108,7 +108,7 @@ export function ReportHistory({ onLoadReport }: ReportHistoryProps) {
       {!isLoading && !error && reports.length === 0 && <EmptyState />}
 
       {!isLoading && !error && reports.length > 0 && (
-        <div className="space-y-3">
+        <div className="flex gap-4 overflow-x-auto pb-2">
           {reports.map((report) => (
             <ReportCard
               key={report.id}
@@ -131,21 +131,19 @@ function ReportCard({
 }) {
   return (
     <Card
-      className="cursor-pointer transition-shadow hover:shadow-md"
+      className="cursor-pointer transition-shadow hover:shadow-md w-[280px] shrink-0"
       onClick={onClick}
     >
       <CardContent className="p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">{getReportTypeLabel(report.reportType)}</Badge>
-            <span className="text-xs text-muted-foreground">
-              {new Date(report.reportDate).toLocaleDateString('en-GB', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              })}
-            </span>
-          </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">{getReportTypeLabel(report.reportType)}</Badge>
+          <span className="text-xs text-muted-foreground">
+            {new Date(report.reportDate).toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })}
+          </span>
         </div>
 
         {report.summaryText && (

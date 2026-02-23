@@ -20,6 +20,28 @@ import { cn } from '@/lib/utils'
 import type { ReportTemplateId } from '@/lib/reports/report-document-types'
 
 // ---------------------------------------------------------------------------
+// Section Narrative Intro
+// ---------------------------------------------------------------------------
+
+interface SectionNarrativeIntroProps {
+  narrative?: string
+}
+
+/**
+ * @description Subtle styled intro paragraph for AI-generated section narratives.
+ * Renders nothing if no narrative is provided.
+ */
+export function SectionNarrativeIntro({ narrative }: SectionNarrativeIntroProps): React.JSX.Element | null {
+  if (!narrative) return null
+
+  return (
+    <p className="text-sm leading-relaxed text-muted-foreground italic">
+      {narrative}
+    </p>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Sparkline Mini Bar
 // ---------------------------------------------------------------------------
 
