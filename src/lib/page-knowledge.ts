@@ -514,6 +514,46 @@ const PAGE_KNOWLEDGE: PageKnowledge[] = [
     ],
   },
   {
+    route: "/outreach",
+    title: "Outreach Hub",
+    purpose: "Plan and execute cold outreach campaigns — import prospects, generate personalized email sequences via Sal, review and copy.",
+    features: [
+      {
+        name: "Create Campaign",
+        description: "Set up a new outreach campaign with product context, ICP description, tone, and value propositions.",
+        howToAccess: "Click 'New Campaign' in the top right, or press Cmd+N.",
+        whenToUse: "When starting a new outreach initiative targeting a specific segment.",
+      },
+      {
+        name: "Import Contacts",
+        description: "Paste a CSV from LinkedIn Sales Navigator or any spreadsheet to bulk-import prospects.",
+        howToAccess: "Open a campaign, go to the Contacts tab, click 'Import CSV'.",
+        whenToUse: "When you have a list of prospects from LinkedIn or another source.",
+      },
+      {
+        name: "Generate Email Sequences",
+        description: "Sal creates personalized email sequences for each contact using campaign context and their details.",
+        howToAccess: "Select contacts in the table, then click 'Generate Sequences'.",
+        whenToUse: "After importing contacts — Sal will write personalized multi-email sequences.",
+      },
+      {
+        name: "Review and Copy Emails",
+        description: "Review generated emails, edit inline, copy subject/body to clipboard.",
+        howToAccess: "Go to the Emails tab, expand a contact section, use the copy buttons.",
+        whenToUse: "When ready to send — copy emails into your email client or outreach tool.",
+      },
+    ],
+    gettingStarted: [
+      "Create your first campaign with product context and ICP description",
+      "Import contacts by pasting a CSV (First Name, Company required)",
+      "Select contacts and generate email sequences",
+      "Review emails in the Emails tab, edit if needed, then copy and send",
+    ],
+    workflows: [
+      "Cold outreach: Create campaign -> Import contacts -> Generate sequences -> Review & copy -> Send",
+    ],
+  },
+  {
     route: "/rfq",
     title: "Requests for Quotation",
     purpose: "Create and manage RFQs — send engineering packages to suppliers and compare quotes.",

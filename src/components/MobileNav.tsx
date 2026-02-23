@@ -39,6 +39,7 @@ import {
     Brain,
     Handshake,
     MessageCircle,
+    Send,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -80,6 +81,7 @@ const meMoreNavigation = [
 const planMoreNavigation = [
     { name: "Strategy", href: "/canvas", icon: Waypoints },
     { name: "Objectives", href: "/new-objectives", icon: Target },
+    { name: "Outreach", href: "/outreach", icon: Send },
 ]
 
 // "More" dropdown — Workshop section

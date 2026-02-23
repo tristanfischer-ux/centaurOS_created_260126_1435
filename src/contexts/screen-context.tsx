@@ -153,6 +153,10 @@ const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
     title: "Knowledge Vault",
     summary: "The user is viewing the knowledge vault — organizational notes and documents.",
   },
+  "/outreach": {
+    title: "Outreach Hub",
+    summary: "The user is viewing the outreach command center — cold email campaigns, prospect contacts, and generated email sequences.",
+  },
   "/updates": {
     title: "Activity Feed",
     summary: "The user is viewing the activity feed — recent changes across the organization.",
