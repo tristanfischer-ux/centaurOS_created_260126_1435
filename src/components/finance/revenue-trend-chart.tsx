@@ -19,7 +19,13 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/types/payments'
+import { chartColors } from '@/lib/chart-colors'
 import type { RevenueTrendPoint } from '@/types/finance'
+
+// Semantic aliases from the shared chart palette
+const COLOR_ORDERS = chartColors[2]        // Emerald
+const COLOR_RETAINERS = chartColors[1]     // Electric Blue
+const COLOR_SUBSCRIPTIONS = chartColors[4] // Purple
 
 interface RevenueTrendChartProps {
   data: RevenueTrendPoint[]
@@ -83,16 +89,16 @@ export function RevenueTrendChart({ data, currency = 'GBP', className }: Revenue
           <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="colorOrders" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.05} />
+                <stop offset="5%" stopColor={COLOR_ORDERS} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={COLOR_ORDERS} stopOpacity={0.05} />
               </linearGradient>
               <linearGradient id="colorRetainers" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.05} />
+                <stop offset="5%" stopColor={COLOR_RETAINERS} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={COLOR_RETAINERS} stopOpacity={0.05} />
               </linearGradient>
               <linearGradient id="colorSubscriptions" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(258, 90%, 66%)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(258, 90%, 66%)" stopOpacity={0.05} />
+                <stop offset="5%" stopColor={COLOR_SUBSCRIPTIONS} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={COLOR_SUBSCRIPTIONS} stopOpacity={0.05} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -120,7 +126,7 @@ export function RevenueTrendChart({ data, currency = 'GBP', className }: Revenue
               type="monotone"
               dataKey="orders"
               stackId="1"
-              stroke="hsl(160, 84%, 39%)"
+              stroke={COLOR_ORDERS}
               strokeWidth={2}
               fill="url(#colorOrders)"
             />
@@ -128,7 +134,7 @@ export function RevenueTrendChart({ data, currency = 'GBP', className }: Revenue
               type="monotone"
               dataKey="retainers"
               stackId="1"
-              stroke="hsl(217, 91%, 60%)"
+              stroke={COLOR_RETAINERS}
               strokeWidth={2}
               fill="url(#colorRetainers)"
             />
@@ -136,7 +142,7 @@ export function RevenueTrendChart({ data, currency = 'GBP', className }: Revenue
               type="monotone"
               dataKey="subscriptions"
               stackId="1"
-              stroke="hsl(258, 90%, 66%)"
+              stroke={COLOR_SUBSCRIPTIONS}
               strokeWidth={2}
               fill="url(#colorSubscriptions)"
             />

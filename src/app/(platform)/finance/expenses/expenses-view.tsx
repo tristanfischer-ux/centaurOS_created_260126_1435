@@ -128,7 +128,14 @@ export function ExpensesView({ initialData }: ExpensesViewProps) {
     })
   }
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
   const handleDelete = (expenseId: string) => {
+    if (confirmDeleteId !== expenseId) {
+      setConfirmDeleteId(expenseId)
+      return
+    }
+    setConfirmDeleteId(null)
     startTransition(async () => {
       const result = await deleteExpense(expenseId)
       if (!result.error) {
@@ -258,9 +265,15 @@ export function ExpensesView({ initialData }: ExpensesViewProps) {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDelete(expense.id)}
+                      onBlur={() => setConfirmDeleteId(null)}
                       disabled={isPending}
+                      className={confirmDeleteId === expense.id ? 'text-destructive' : ''}
                     >
-                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      {confirmDeleteId === expense.id ? (
+                        <span className="text-[10px] font-medium">Confirm?</span>
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -333,7 +346,7 @@ export function ExpensesView({ initialData }: ExpensesViewProps) {
                 />
               </div>
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>

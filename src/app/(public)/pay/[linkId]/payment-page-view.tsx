@@ -92,18 +92,18 @@ export function PaymentPageView({ paymentLink, error }: PaymentPageViewProps) {
           </div>
 
           {/* Payment Button */}
+          {/* INTENT: In production, this would initiate Stripe Checkout or
+            * mount a Stripe Payment Element. The payment flow will be connected
+            * when Stripe Checkout sessions are configured for standalone payment links. */}
           <Button
             className="w-full bg-international-orange hover:bg-international-orange/90 h-12 text-base"
-            onClick={() => {
-              // INTENT: In production, this would initiate Stripe Checkout or
-              // mount a Stripe Payment Element. For now, show a placeholder.
-              // The payment flow will be connected when Stripe Checkout sessions
-              // are configured for standalone payment links.
-              alert('Stripe Checkout integration coming soon. This is a preview of the payment page.')
-            }}
+            disabled
           >
             Pay {formatAmount(paymentLink.amount, paymentLink.currency)}
           </Button>
+          <p className="text-xs text-muted-foreground text-center">
+            Online payments coming soon. Contact the sender for alternative payment methods.
+          </p>
 
           {/* Security note */}
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">

@@ -124,10 +124,11 @@ async function fetchReportData(range: DateRange): Promise<RawReportData | null> 
       .eq('foundry_id', foundryId)
       .eq('is_active', true),
 
-    // Payout requests in range
+    // Payout requests in range (scoped to current user)
     supabase
       .from('payout_requests')
       .select('amount, status, requested_at')
+      .eq('user_id', user.id)
       .gte('requested_at', range.from)
       .lte('requested_at', range.to),
 

@@ -124,14 +124,23 @@ async function inferThermalConfig(module: ModuleSpec): Promise<ThermalConfig> {
 
   try {
     const parsed = JSON.parse(content)
-    const ALLOWED_MATERIALS = ["pla", "abs", "petg", "nylon", "tpu", "pc", "peek", "aluminum", "steel", "copper", "titanium", "brass"]
+    const ALLOWED_MATERIALS = ["pla", "abs", "petg", "nylon", "tpu", "pc", "peek", "aluminum", "steel", "copper", "titanium", "brass", "carbon_fiber"]
+    // Normalize common AI-generated aliases to canonical keys
+    const MATERIAL_ALIASES: Record<string, string> = {
+      "aluminum_6061": "aluminum",
+      "aluminium": "aluminum",
+      "steel_mild": "steel",
+      "stainless_steel": "steel",
+      "carbon_fibre": "carbon_fiber",
+    }
     // Sanity-check AI-inferred values
     const heatSources = (parsed.heat_sources ?? [{ power_W: 1.0, description: "Default" }]) as HeatSourceConfig[]
     for (const hs of heatSources) {
       hs.power_W = Math.max(0, Math.min(hs.power_W, 10_000))
     }
     const ambientTemp = Math.max(-60, Math.min(parsed.ambient_temp_C ?? 25.0, 500))
-    const materialKey = ALLOWED_MATERIALS.includes(parsed.material_key) ? parsed.material_key : "pla"
+    const normalizedKey = MATERIAL_ALIASES[parsed.material_key] ?? parsed.material_key
+    const materialKey = ALLOWED_MATERIALS.includes(normalizedKey) ? normalizedKey : "pla"
     return {
       heat_sources: heatSources,
       ambient_temp_C: ambientTemp,

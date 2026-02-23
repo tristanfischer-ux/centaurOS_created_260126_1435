@@ -154,7 +154,14 @@ export function FundingView({ initialData }: FundingViewProps) {
     })
   }
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
   const handleDelete = (oppId: string) => {
+    if (confirmDeleteId !== oppId) {
+      setConfirmDeleteId(oppId)
+      return
+    }
+    setConfirmDeleteId(null)
     startTransition(async () => {
       const result = await deleteFundingOpportunity(oppId)
       if (!result.error) {
@@ -248,11 +255,16 @@ export function FundingView({ initialData }: FundingViewProps) {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              className={`h-auto p-0 opacity-0 group-hover:opacity-100 transition-opacity ${confirmDeleteId === opp.id ? 'opacity-100 text-destructive' : ''}`}
                               onClick={() => handleDelete(opp.id)}
+                              onBlur={() => setConfirmDeleteId(null)}
                               disabled={isPending}
                             >
-                              <Trash2 className="h-3 w-3 text-muted-foreground" />
+                              {confirmDeleteId === opp.id ? (
+                                <span className="text-[10px] font-medium">Delete?</span>
+                              ) : (
+                                <Trash2 className="h-3 w-3 text-muted-foreground" />
+                              )}
                             </Button>
                           </div>
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -393,7 +405,7 @@ export function FundingView({ initialData }: FundingViewProps) {
                 rows={3}
               />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>

@@ -149,7 +149,7 @@ export function buildVATReport(
     .filter(o => ['completed', 'in_progress', 'accepted'].includes(o.status))
     .map(o => {
       const gross = Math.round(o.total_amount * 100)
-      const vat = o.vat_amount ? Math.round(o.vat_amount * 100) : Math.round(gross * DEFAULT_VAT_RATE / (1 + DEFAULT_VAT_RATE))
+      const vat = o.vat_amount !== null ? Math.round(o.vat_amount * 100) : Math.round(gross * DEFAULT_VAT_RATE / (1 + DEFAULT_VAT_RATE))
       const net = gross - vat
       return {
         description: `Order (${new Date(o.created_at).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })})`,

@@ -35,6 +35,7 @@ export interface ObjectiveExportResult {
   taskIds: string[]
   reviewGateIds: string[]
   moduleId: string
+  error?: string
 }
 
 /** Result of creating the full engineering review objective */
@@ -317,7 +318,7 @@ export async function exportModuleToObjective(
     order: i + 1,
     title: td.title,
     description: td.description,
-    role: roleForRisk(td.riskLevel) as "Executive" | "Apprentice" | "AI_Agent",
+    role: roleForRisk(td.riskLevel),
   }))
 
   const result = await createObjectiveFromSubsystem({
@@ -332,15 +333,18 @@ export async function exportModuleToObjective(
   })
 
   if ("error" in result) {
+    const errMsg = typeof result.error === "string" ? result.error : "Unknown error"
     console.error("[XRayToObjectives] Failed to create objective for module:", {
       moduleId: module.id,
-      error: result.error,
+      moduleName: module.name,
+      error: errMsg,
     })
     return {
       objectiveId: "",
       taskIds: [],
       reviewGateIds: [],
       moduleId: module.id,
+      error: errMsg,
     }
   }
 
@@ -373,5 +377,16 @@ export async function exportAllModulesToObjectives(
     const result = await exportModuleToObjective(mod, spec, foundryId)
     results.push(result)
   }
+
+  // Log summary of failed exports
+  const failed = results.filter((r) => r.error)
+  if (failed.length > 0) {
+    console.warn("[XRayToObjectives] Some modules failed to export:", {
+      failedCount: failed.length,
+      totalCount: results.length,
+      failedModules: failed.map((r) => ({ moduleId: r.moduleId, error: r.error })),
+    })
+  }
+
   return results
 }

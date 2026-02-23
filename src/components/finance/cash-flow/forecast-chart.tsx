@@ -18,7 +18,13 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { chartColors } from '@/lib/chart-colors'
 import type { ForecastPoint } from '@/lib/finance/forecast'
+
+// Semantic aliases from the shared chart palette
+const COLOR_EXPECTED = chartColors[0] // International Orange
+const COLOR_BEST = chartColors[2]     // Emerald
+const COLOR_WORST = 'hsl(0, 84%, 60%)'  // Red (loss color from moneyMapColors)
 
 interface ForecastChartProps {
   data: ForecastPoint[]
@@ -58,14 +64,14 @@ function CustomTooltip({ active, payload, label }: {
       )}
       {best && (
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: '#10b981' }} />
+          <span className="h-2 w-2 rounded-full bg-status-success" />
           <span className="text-muted-foreground">Best case:</span>
           <span className="font-medium">{formatAmount(best.value)}</span>
         </div>
       )}
       {worst && (
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: '#ef4444' }} />
+          <span className="h-2 w-2 rounded-full bg-destructive" />
           <span className="text-muted-foreground">Worst case:</span>
           <span className="font-medium">{formatAmount(worst.value)}</span>
         </div>
@@ -103,16 +109,16 @@ export function ForecastChart({ data, className }: ForecastChartProps) {
           <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="gradExpected" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#ff4500" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#ff4500" stopOpacity={0} />
+                <stop offset="5%" stopColor={COLOR_EXPECTED} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={COLOR_EXPECTED} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="gradBest" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                <stop offset="5%" stopColor={COLOR_BEST} stopOpacity={0.15} />
+                <stop offset="95%" stopColor={COLOR_BEST} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="gradWorst" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                <stop offset="5%" stopColor={COLOR_WORST} stopOpacity={0.15} />
+                <stop offset="95%" stopColor={COLOR_WORST} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -135,7 +141,7 @@ export function ForecastChart({ data, className }: ForecastChartProps) {
               type="monotone"
               dataKey="bestCase"
               name="bestCase"
-              stroke="#10b981"
+              stroke={COLOR_BEST}
               fill="url(#gradBest)"
               strokeWidth={1}
               strokeDasharray="4 4"
@@ -144,7 +150,7 @@ export function ForecastChart({ data, className }: ForecastChartProps) {
               type="monotone"
               dataKey="worstCase"
               name="worstCase"
-              stroke="#ef4444"
+              stroke={COLOR_WORST}
               fill="url(#gradWorst)"
               strokeWidth={1}
               strokeDasharray="4 4"
@@ -153,7 +159,7 @@ export function ForecastChart({ data, className }: ForecastChartProps) {
               type="monotone"
               dataKey="balance"
               name="balance"
-              stroke="#ff4500"
+              stroke={COLOR_EXPECTED}
               fill="url(#gradExpected)"
               strokeWidth={2}
             />

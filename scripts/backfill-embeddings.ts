@@ -90,7 +90,7 @@ function buildMarketplaceText(row: { title: string; description?: string | null;
   return parts.join(' ')
 }
 
-function buildSupplierText(row: { name: string; description?: string | null; supplier_type?: string | null; domain_categories?: string[] | null; capabilities?: unknown }): string {
+function buildSupplierText(row: { name: string; description?: string | null; supplier_type?: string | null; domain_categories?: string[] | null; capabilities?: unknown; certifications?: string[] | null; headquarters_country?: string | null }): string {
   const parts = [row.name]
   if (row.description) parts.push(row.description)
   if (row.supplier_type) parts.push(row.supplier_type)
@@ -98,15 +98,19 @@ function buildSupplierText(row: { name: string; description?: string | null; sup
   if (row.capabilities && typeof row.capabilities === 'object') {
     parts.push(JSON.stringify(row.capabilities))
   }
+  if (row.certifications?.length) parts.push(row.certifications.join(' '))
+  if (row.headquarters_country) parts.push(row.headquarters_country)
   return parts.join(' ')
 }
 
-function buildProviderProfileText(row: { headline?: string | null; bio?: string | null; specializations?: string[] | null; industries?: string[] | null }): string {
+function buildProviderProfileText(row: { headline?: string | null; bio?: string | null; specializations?: string[] | null; industries?: string[] | null; years_experience?: number | null; day_rate?: number | null }): string {
   const parts: string[] = []
   if (row.headline) parts.push(row.headline)
   if (row.bio) parts.push(row.bio)
   if (row.specializations?.length) parts.push(row.specializations.join(' '))
   if (row.industries?.length) parts.push(row.industries.join(' '))
+  if (row.years_experience) parts.push(`${row.years_experience} years experience`)
+  if (row.day_rate) parts.push(`day rate ${row.day_rate}`)
   return parts.join(' ')
 }
 
@@ -171,14 +175,14 @@ async function main(): Promise<void> {
     console.log(`  Updated ${n}`)
   }
 
-  const { data: suppliers } = await supabase.from('suppliers').select('id, name, description, supplier_type, domain_categories, capabilities').is('embedding', null)
+  const { data: suppliers } = await supabase.from('suppliers').select('id, name, description, supplier_type, domain_categories, capabilities, certifications, headquarters_country').is('embedding', null)
   if (suppliers?.length) {
     console.log(`suppliers: ${suppliers.length} rows`)
     const n = await backfillTable('suppliers', 'id, name, description, supplier_type, domain_categories, capabilities', suppliers as { id: string; [k: string]: unknown }[], buildSupplierText)
     console.log(`  Updated ${n}`)
   }
 
-  const { data: providers } = await supabase.from('provider_profiles').select('id, headline, bio, specializations, industries').is('embedding', null)
+  const { data: providers } = await supabase.from('provider_profiles').select('id, headline, bio, specializations, industries, years_experience, day_rate').is('embedding', null)
   if (providers?.length) {
     console.log(`provider_profiles: ${providers.length} rows`)
     const n = await backfillTable('provider_profiles', 'id, headline, bio, specializations, industries', providers as { id: string; [k: string]: unknown }[], buildProviderProfileText)

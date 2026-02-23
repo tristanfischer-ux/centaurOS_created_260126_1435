@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { formatCurrency } from '@/types/payments'
 import { createStandaloneInvoice } from '@/actions/finance-invoices'
 import type { InvoiceLineItem, RecurrenceInterval } from '@/types/finance'
 
@@ -193,7 +194,7 @@ export function QuickInvoiceForm({ className }: QuickInvoiceFormProps) {
                 />
               </div>
               <div className="w-24 pt-2 text-sm text-right text-muted-foreground">
-                £{(item.amount / 100).toFixed(2)}
+                {formatCurrency(item.amount)}
               </div>
               <Button
                 variant="ghost"
@@ -215,15 +216,15 @@ export function QuickInvoiceForm({ className }: QuickInvoiceFormProps) {
           <div className="border-t border-border pt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
-              <span>£{(subtotal / 100).toFixed(2)}</span>
+              <span>{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">VAT (20%)</span>
-              <span>£{(vatAmount / 100).toFixed(2)}</span>
+              <span>{formatCurrency(vatAmount)}</span>
             </div>
             <div className="flex justify-between text-base font-semibold">
               <span>Total</span>
-              <span>£{(total / 100).toFixed(2)}</span>
+              <span>{formatCurrency(total)}</span>
             </div>
           </div>
         </CardContent>
@@ -307,7 +308,7 @@ export function QuickInvoiceForm({ className }: QuickInvoiceFormProps) {
           )}
         </Button>
         {error && (
-          <p className="text-sm text-destructive">{error}</p>
+          <p className="text-sm text-destructive" role="alert">{error}</p>
         )}
       </div>
     </div>
