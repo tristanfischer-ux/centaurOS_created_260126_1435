@@ -76,7 +76,7 @@ const STARTING_PATHS: StartingPath[] = [
     accentBorder: "border-l-international-orange",
     headline: "Start from a description",
     description: "Describe your product and get research, CAD models, analysis, and a supplier-ready package.",
-    href: "/the-forge/cad-lab",
+    href: "/the-forge/cad-lab?new=true",
     cta: "Start designing",
     outputs: ["3D CAD", "STEP files", "Engineering report", "DFM analysis", "RFQ package"],
     pipelineStages: [
