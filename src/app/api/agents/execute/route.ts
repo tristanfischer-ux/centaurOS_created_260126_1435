@@ -28,6 +28,7 @@ import { getSpecialistWorkflows } from "@/lib/agents/specialist-workflows"
 // AUDIT: Decision journal imports moved to post-response-handler.ts (2026-02-19, refactor step 7 of 8)
 import { buildContextLayers } from "@/lib/agents/prompt-builder"
 import { createPostResponseCallback } from "@/lib/agents/post-response-handler"
+import { shouldTriggerWebSearch, runPreSearch, formatSearchResultsForPrompt } from "@/lib/agents/web-search"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -827,6 +828,29 @@ ${otherSpecialists}
         ? FALLBACK_CHAINS[modelTier]
         : [{ providerId, modelId }]
 
+    // ─── Web Search Detection ──────────────────────────────────────
+    // Detect if the user's message warrants real-time web search.
+    // Claude-tier: pass enableWebSearch flag to streaming (native tool)
+    // Non-Claude: run pre-search via Haiku, inject results into system prompt
+    const isClaudeTier = modelTier === "claude"
+    const needsSearch = specialistId && modality === "text" && shouldTriggerWebSearch(input)
+    let enableWebSearchForStreaming = false
+
+    if (needsSearch && !isClaudeTier && specialistId) {
+        // Pre-search for non-Claude providers
+        try {
+            const specialist = getSpecialistById(specialistId)
+            const results = await runPreSearch(input, specialist?.title ?? "business", 2)
+            if (results.sources.length > 0) {
+                systemPromptWithContext += "\n\n" + formatSearchResultsForPrompt(results)
+            }
+        } catch (err) {
+            console.warn("[agents/execute] Pre-search failed:", err)
+        }
+    } else if (needsSearch && isClaudeTier) {
+        enableWebSearchForStreaming = true
+    }
+
     try {
         if (modality === "text" && speculative && specialistId) {
             const specialist = getSpecialistById(specialistId)
@@ -844,7 +868,7 @@ ${otherSpecialists}
             )
         }
         if (modality === "text") {
-            return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId)
+            return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId, enableWebSearchForStreaming)
         }
         if (modality === "slides") {
             return await handleTextStreaming(fallbackChain, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback, enableThinking, undefined, rolloutId)
@@ -915,6 +939,7 @@ async function handleTextStreaming(
     enableThinking?: boolean,
     history?: ConversationMessage[],
     rolloutId?: string | null,
+    enableWebSearch?: boolean,
 ): Promise<Response> {
     const conversationHistory = history?.map((msg) => ({
         role: msg.role as "system" | "user" | "assistant",
@@ -966,6 +991,9 @@ async function handleTextStreaming(
                     await new Promise<void>((resolve, reject) => {
                         let hasStartedStreaming = false
 
+                        // Only enable web search for Anthropic providers
+                        const useWebSearch = enableWebSearch && target.providerId === "anthropic"
+
                         streamFn({
                             apiKey: targetApiKey,
                             modelId: target.modelId,
@@ -974,6 +1002,14 @@ async function handleTextStreaming(
                             conversationHistory,
                             maxTokens,
                             enableThinking: useThinking,
+                            enableWebSearch: useWebSearch,
+                            onCitations: useWebSearch ? (sources) => {
+                                try {
+                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ webSources: sources })}\n\n`))
+                                } catch {
+                                    // Stream may be closed
+                                }
+                            } : undefined,
                             onChunk(text) {
                                 hasStartedStreaming = true
                                 fullOutput += text

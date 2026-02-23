@@ -455,6 +455,7 @@ export function BriefSpecialistDialog({
         availableSections: string[]
         missingContextHints: string[]
     } | null>(null)
+    const [webSources, setWebSources] = useState<Array<{ title: string; url: string; snippet: string }>>([])
     const [isLoadingThread, setIsLoadingThread] = useState(false)
     const [crossSpecialistContext, setCrossSpecialistContext] = useState("")
     const [showHistory, setShowHistory] = useState(false)
@@ -571,6 +572,7 @@ export function BriefSpecialistDialog({
         setError(null)
         setCopied(false)
         setShowHistory(false)
+        setWebSources([])
         // Don't reset messages -- we want to preserve the current conversation
 
         let cancelled = false
@@ -1173,6 +1175,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         rawHint?: string
                                         errorCategory?: string
                                         grounding?: { availableSections: string[]; missingContextHints: string[] }
+                                        webSources?: Array<{ title: string; url: string; snippet: string }>
                                         stream?: "fast" | "deep"
                                         done?: boolean
                                         complexity?: "simple" | "complex"
@@ -1180,6 +1183,10 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     }
                                     if (parsed.grounding) {
                                         setContextGrounding(parsed.grounding)
+                                        continue
+                                    }
+                                    if (parsed.webSources) {
+                                        setWebSources(prev => [...prev, ...parsed.webSources!])
                                         continue
                                     }
 
@@ -2338,6 +2345,34 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 </>
                             )}
 
+                        {/* Web sources from search */}
+                        {webSources.length > 0 && (
+                            <div className="px-4 pb-2">
+                                <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
+                                    <p className="text-xs font-medium text-muted-foreground mb-2">Sources</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {webSources.slice(0, 5).map((source, idx) => (
+                                            <a
+                                                key={idx}
+                                                href={source.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 rounded-md bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border border-border/50"
+                                                title={source.snippet || source.title}
+                                            >
+                                                <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                                    <path d="M6.5 3.5h-3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-3" />
+                                                    <path d="M9.5 2.5h4v4" />
+                                                    <path d="M13.5 2.5l-6 6" />
+                                                </svg>
+                                                <span className="truncate max-w-[180px]">{source.title}</span>
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Proposed actions */}
                         {lastAssistantMessage && !isExecuting && lastAssistantMessage.proposals && lastAssistantMessage.proposals.length > 0 && (
                             <div className="px-4">
@@ -3199,6 +3234,34 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                 )}
                                 </>
                             )}
+
+                        {/* Web sources from search (panel mode) */}
+                        {webSources.length > 0 && (
+                            <div className="pb-2">
+                                <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
+                                    <p className="text-xs font-medium text-muted-foreground mb-2">Sources</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {webSources.slice(0, 5).map((source, idx) => (
+                                            <a
+                                                key={idx}
+                                                href={source.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 rounded-md bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border border-border/50"
+                                                title={source.snippet || source.title}
+                                            >
+                                                <svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                                    <path d="M6.5 3.5h-3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-3" />
+                                                    <path d="M9.5 2.5h4v4" />
+                                                    <path d="M13.5 2.5l-6 6" />
+                                                </svg>
+                                                <span className="truncate max-w-[180px]">{source.title}</span>
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Proposed actions (tasks/objectives) from Specialist response */}
                         {lastAssistantMessage && !isExecuting && lastAssistantMessage.proposals && lastAssistantMessage.proposals.length > 0 && (

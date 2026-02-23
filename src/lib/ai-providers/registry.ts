@@ -54,6 +54,10 @@ export interface StreamingTextOptions {
     toolChoice?: "auto" | "none" | "required"
     /** Called when the model requests a tool execution (streaming pauses until tool results are sent). */
     onToolCall?: (toolCall: ToolCall) => void
+    /** Called when web search citations are available (Anthropic web_search beta). */
+    onCitations?: (sources: Array<{ title: string; url: string; snippet: string }>) => void
+    /** Enable Anthropic web_search tool for real-time data access. Only applies to Anthropic models. */
+    enableWebSearch?: boolean
     onChunk: (text: string) => void
     onDone: () => void
     onError: (error: string) => void
@@ -156,6 +160,11 @@ async function streamOpenAI(opts: StreamingTextOptions): Promise<void> {
 }
 
 async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
+    // Route to web search handler if enabled
+    if (opts.enableWebSearch) {
+        return streamAnthropicWithWebSearch(opts)
+    }
+
     const Anthropic = (await import("@anthropic-ai/sdk")).default
     const client = new Anthropic({ apiKey: opts.apiKey })
 
@@ -207,6 +216,112 @@ async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
         console.error("[streamAnthropic] Stream failed:", {
             model: opts.modelId,
             enableThinking: opts.enableThinking,
+            error: errorMessage,
+        })
+        opts.onError(errorMessage)
+    }
+}
+
+/**
+ * Streams Anthropic with web_search tool enabled (non-streaming beta API).
+ *
+ * Uses client.beta.messages.create() (non-streaming) because web_search
+ * requires the beta API which doesn't support streaming. Simulates streaming
+ * by emitting response text in chunks.
+ *
+ * Handles pause_turn continuation (max 5 loops) and citation extraction.
+ */
+async function streamAnthropicWithWebSearch(opts: StreamingTextOptions): Promise<void> {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default
+    const client = new Anthropic({ apiKey: opts.apiKey })
+
+    const conversationMessages: Array<{ role: "user" | "assistant"; content: string | Array<{ type: string; text?: string }> }> = []
+    if (opts.conversationHistory && opts.conversationHistory.length > 0) {
+        for (const msg of opts.conversationHistory) {
+            if (msg.role === "user" || msg.role === "assistant") {
+                conversationMessages.push({ role: msg.role, content: msg.content })
+            }
+        }
+    }
+    conversationMessages.push({ role: "user", content: opts.userPrompt })
+
+    const WEB_SEARCH_BETA = "code-execution-web-tools-2026-02-09"
+    const webSearchTool = {
+        type: "web_search_20260209",
+        name: "web_search",
+        max_uses: 3,
+    }
+
+    const createParams = {
+        model: opts.modelId,
+        max_tokens: opts.maxTokens ?? 4096,
+        system: opts.systemPrompt,
+        messages: conversationMessages,
+        tools: [webSearchTool],
+        betas: [WEB_SEARCH_BETA],
+    }
+
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let response = await client.beta.messages.create(createParams as any) as any
+
+        // Handle pause_turn continuation
+        let continueCount = 0
+        while (response.stop_reason === "pause_turn" && continueCount < 5) {
+            continueCount++
+            const prevMessages = [
+                ...conversationMessages.slice(0, -1),
+                { role: "user" as const, content: opts.userPrompt },
+                { role: "assistant" as const, content: response.content },
+                { role: "user" as const, content: "Continue." },
+            ]
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            response = await client.beta.messages.create({ ...createParams, messages: prevMessages } as any) as any
+        }
+
+        // Extract text and citations from response
+        const content: Array<{ type: string; text?: string; citations?: Array<{ url?: string; title?: string | null; cited_text?: string }> | null }> = response.content ?? []
+
+        // Collect citations
+        const seen = new Set<string>()
+        const sources: Array<{ title: string; url: string; snippet: string }> = []
+        for (const block of content) {
+            if (block.type !== "text" || !block.citations) continue
+            for (const c of block.citations) {
+                const url = c.url ?? ""
+                if (!url || seen.has(url)) continue
+                seen.add(url)
+                sources.push({
+                    title: (c.title ?? "Source").toString(),
+                    url,
+                    snippet: (c.cited_text ?? "").slice(0, 200),
+                })
+            }
+        }
+
+        // Emit citations if any
+        if (sources.length > 0 && opts.onCitations) {
+            opts.onCitations(sources)
+        }
+
+        // Simulate streaming by emitting text in chunks
+        const fullText = content
+            .filter(b => b.type === "text" && b.text)
+            .map(b => b.text!)
+            .join("\n")
+
+        // Emit in ~100 char chunks for a natural streaming feel
+        const chunkSize = 100
+        for (let i = 0; i < fullText.length; i += chunkSize) {
+            if (opts.signal?.aborted) break
+            opts.onChunk(fullText.slice(i, i + chunkSize))
+        }
+
+        opts.onDone()
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        console.error("[streamAnthropicWithWebSearch] Failed:", {
+            model: opts.modelId,
             error: errorMessage,
         })
         opts.onError(errorMessage)
