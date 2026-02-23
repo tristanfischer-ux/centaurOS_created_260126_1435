@@ -820,8 +820,10 @@ export async function processRefund(
       console.error('[Escrow] Failed to record refund transaction:', { error: txResult.error })
     }
 
-    // Update order escrow status
-    await supabase.from('orders').update({ escrow_status: 'refunded' }).eq('id', orderId)
+    // SECURITY: Set escrow status based on whether this is a full or partial refund
+    const isFullRefund = refundAmount >= Number(order.total_amount) - totalRefunded
+    const newEscrowStatus = isFullRefund ? 'refunded' : 'partial_refund'
+    await supabase.from('orders').update({ escrow_status: newEscrowStatus }).eq('id', orderId)
 
     // Log the reason if provided
     if (reason) {

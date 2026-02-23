@@ -13,7 +13,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
+import { isValidUUID, isValidFinancialAmount } from '@/lib/validations'
 
 import type { Json } from '@/types/database.types'
 import type {
@@ -37,6 +40,20 @@ import { computeMoneyMapSummary, computeProfitability } from '@/lib/money-map/al
 interface ActionResult<T = null> {
   data: T | null
   error: string | null
+}
+
+/**
+ * Rate limit Money Map write operations.
+ * @returns Error string if rate limited, null if allowed.
+ */
+async function checkMoneyMapRateLimit(foundryId: string): Promise<string | null> {
+  const headersList = await headers()
+  const clientIP = getClientIP(headersList)
+  const result = await rateLimit('api', `money-map:${foundryId}:${clientIP}`, { limit: 30, window: 60 * 1000 })
+  if (!result.success) {
+    return 'Too many requests. Please try again later.'
+  }
+  return null
 }
 
 /**
@@ -104,9 +121,17 @@ export async function createRevenueStream(input: RevenueStreamInput): Promise<Ac
     const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
+    const rateLimitError = await checkMoneyMapRateLimit(foundryId)
+    if (rateLimitError) return { data: null, error: rateLimitError }
+
     // VALIDATION: Name is required
     if (!input.name?.trim()) {
       return { data: null, error: 'Name is required' }
+    }
+
+    // VALIDATION: Amount must be positive, finite, and within bounds
+    if (!isValidFinancialAmount(input.amount)) {
+      return { data: null, error: 'Amount must be a positive number within a reasonable range' }
     }
 
     const { data, error } = await supabase
@@ -151,9 +176,22 @@ export async function updateRevenueStream(
   input: Partial<RevenueStreamInput>
 ): Promise<ActionResult<RevenueStream>> {
   try {
+    // VALIDATION: Ensure ID is a valid UUID
+    if (!isValidUUID(id)) {
+      return { data: null, error: 'Invalid revenue stream ID' }
+    }
+
     const supabase = await createClient()
     const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
+
+    const rateLimitError = await checkMoneyMapRateLimit(foundryId)
+    if (rateLimitError) return { data: null, error: rateLimitError }
+
+    // VALIDATION: Amount (if provided) must be valid
+    if (input.amount !== undefined && !isValidFinancialAmount(input.amount)) {
+      return { data: null, error: 'Amount must be a positive number within a reasonable range' }
+    }
 
     const updateData: Record<string, unknown> = {}
     if (input.name !== undefined) updateData.name = input.name.trim()
@@ -192,9 +230,16 @@ export async function updateRevenueStream(
  */
 export async function deleteRevenueStream(id: string): Promise<ActionResult> {
   try {
+    if (!isValidUUID(id)) {
+      return { data: null, error: 'Invalid revenue stream ID' }
+    }
+
     const supabase = await createClient()
     const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
+
+    const rateLimitError = await checkMoneyMapRateLimit(foundryId)
+    if (rateLimitError) return { data: null, error: rateLimitError }
 
     const { error } = await supabase
       .from('money_map_revenue_streams')
@@ -264,8 +309,16 @@ export async function createCostItem(input: CostItemInput): Promise<ActionResult
     const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
+    const rateLimitError = await checkMoneyMapRateLimit(foundryId)
+    if (rateLimitError) return { data: null, error: rateLimitError }
+
     if (!input.name?.trim()) {
       return { data: null, error: 'Name is required' }
+    }
+
+    // VALIDATION: Amount must be positive, finite, and within bounds
+    if (!isValidFinancialAmount(input.amount)) {
+      return { data: null, error: 'Amount must be a positive number within a reasonable range' }
     }
 
     const { data, error } = await supabase
@@ -310,9 +363,21 @@ export async function updateCostItem(
   input: Partial<CostItemInput>
 ): Promise<ActionResult<CostItem>> {
   try {
+    if (!isValidUUID(id)) {
+      return { data: null, error: 'Invalid cost item ID' }
+    }
+
     const supabase = await createClient()
     const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
+
+    const rateLimitError = await checkMoneyMapRateLimit(foundryId)
+    if (rateLimitError) return { data: null, error: rateLimitError }
+
+    // VALIDATION: Amount (if provided) must be valid
+    if (input.amount !== undefined && !isValidFinancialAmount(input.amount)) {
+      return { data: null, error: 'Amount must be a positive number within a reasonable range' }
+    }
 
     const updateData: Record<string, unknown> = {}
     if (input.name !== undefined) updateData.name = input.name.trim()
@@ -352,9 +417,16 @@ export async function updateCostItem(
  */
 export async function deleteCostItem(id: string): Promise<ActionResult> {
   try {
+    if (!isValidUUID(id)) {
+      return { data: null, error: 'Invalid cost item ID' }
+    }
+
     const supabase = await createClient()
     const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
+
+    const rateLimitError = await checkMoneyMapRateLimit(foundryId)
+    if (rateLimitError) return { data: null, error: rateLimitError }
 
     const { error } = await supabase
       .from('money_map_cost_items')
@@ -391,17 +463,18 @@ export async function getCostLinks(): Promise<ActionResult<CostLink[]>> {
     const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
-    // RLS handles foundry isolation through the cost_item join
+    // SECURITY: Explicit foundry filter via cost_item join (defense in depth beyond RLS)
     const { data, error } = await supabase
       .from('money_map_cost_links')
-      .select('*')
+      .select('*, cost_item:money_map_cost_items!inner(foundry_id)')
+      .eq('cost_item.foundry_id', foundryId)
 
     if (error) {
       console.error('[MoneyMap] Failed to fetch cost links:', { foundryId, error: error.message })
       return { data: null, error: error.message }
     }
 
-    return { data: data as CostLink[], error: null }
+    return { data: (data ?? []) as CostLink[], error: null }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('[MoneyMap] Unexpected error fetching cost links:', message)
@@ -424,17 +497,37 @@ export async function upsertCostLinks(
     const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
 
+    const rateLimitError = await checkMoneyMapRateLimit(foundryId)
+    if (rateLimitError) return { data: null, error: rateLimitError }
+
     // VALIDATION: Total allocation should not exceed 100%
     const totalPct = links.reduce((sum, l) => sum + l.allocation_pct, 0)
     if (totalPct > 100.01) {
       return { data: null, error: 'Total allocation cannot exceed 100%' }
     }
 
+    // SECURITY: Verify the cost item belongs to the user's foundry before modifying links
+    const { data: costItem, error: costItemError } = await supabase
+      .from('money_map_cost_items')
+      .select('id')
+      .eq('id', costItemId)
+      .eq('foundry_id', foundryId)
+      .single()
+
+    if (costItemError || !costItem) {
+      return { data: null, error: 'Cost item not found or not accessible' }
+    }
+
     // Delete existing links for this cost item
-    await supabase
+    const { error: deleteError } = await supabase
       .from('money_map_cost_links')
       .delete()
       .eq('cost_item_id', costItemId)
+
+    if (deleteError) {
+      console.error('[MoneyMap] Failed to delete existing cost links:', { costItemId, error: deleteError.message })
+      return { data: null, error: deleteError.message }
+    }
 
     // Insert new links
     if (links.length > 0) {
@@ -498,7 +591,8 @@ export async function getMoneyMapData(): Promise<ActionResult<MoneyMapData>> {
         .order('sort_order'),
       supabase
         .from('money_map_cost_links')
-        .select('*'),
+        .select('*, cost_item:money_map_cost_items!inner(foundry_id)')
+        .eq('cost_item.foundry_id', foundryId),
     ])
 
     if (streamsResult.error || costsResult.error || linksResult.error) {
@@ -582,6 +676,9 @@ export async function createSnapshot(
     const supabase = await createClient()
     const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'Not authenticated' }
+
+    const rateLimitError = await checkMoneyMapRateLimit(foundryId)
+    if (rateLimitError) return { data: null, error: rateLimitError }
 
     if (!name?.trim()) return { data: null, error: 'Name is required' }
     if (!periodLabel?.trim()) return { data: null, error: 'Period label is required' }

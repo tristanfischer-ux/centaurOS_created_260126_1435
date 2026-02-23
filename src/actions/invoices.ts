@@ -258,12 +258,24 @@ export async function regenerateInvoice(
   let error: string | null = null
 
   switch (document.document_type) {
-    case "invoice":
+    case "invoice": {
       const buyerResult = await generateBuyerInvoice(supabase, document.order_id)
       invoice = buyerResult.data
       error = buyerResult.error
       break
-    // Add other types as needed
+    }
+    case "self_bill": {
+      const selfBillResult = await generateSellerSelfBill(supabase, document.order_id)
+      invoice = selfBillResult.data
+      error = selfBillResult.error
+      break
+    }
+    case "platform_fee": {
+      const platformResult = await generatePlatformFeeInvoice(supabase, document.order_id)
+      invoice = platformResult.data
+      error = platformResult.error
+      break
+    }
     default:
       return { data: null, error: "Cannot regenerate this document type" }
   }

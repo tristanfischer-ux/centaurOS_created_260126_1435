@@ -474,13 +474,16 @@ export async function requestRefund(
       return { data: null, error: result.error || 'Failed to process refund' }
     }
 
-    // Update order status
-    await supabase
-      .from('orders')
-      .update({
-        status: 'cancelled',
-      })
-      .eq('id', orderId)
+    // SECURITY: Only cancel order for full refunds. Partial refunds keep the order active.
+    const refundAmount = result.refund.amount
+    const isFullRefund = !amount || refundAmount >= order.total_amount
+
+    if (isFullRefund) {
+      await supabase
+        .from('orders')
+        .update({ status: 'cancelled' })
+        .eq('id', orderId)
+    }
 
     revalidatePath(`/marketplace/orders/${orderId}`)
     revalidatePath(`/provider-portal/orders/${orderId}`)

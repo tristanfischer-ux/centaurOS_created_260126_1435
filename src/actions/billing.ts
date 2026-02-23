@@ -23,6 +23,7 @@ import {
   SupportedCurrency,
   DEFAULT_FEE_CONFIG,
 } from '@/types/billing'
+import { DEFAULT_PLATFORM_FEE_PERCENT } from '@/types/payments'
 
 // ==========================================
 // STRIPE CUSTOMER MANAGEMENT
@@ -232,19 +233,31 @@ export async function setDefaultPaymentMethod(
 ): Promise<{ success: boolean; error: string | null }> {
   return withUser(async ({ supabase, user }) => {
     try {
-      // Verify ownership and update
+      // SECURITY: Clear all existing defaults for this user first
+      const { error: clearError } = await supabase
+        .from('saved_payment_methods')
+        .update({ is_default: false, updated_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .eq('is_default', true)
+
+      if (clearError) {
+        console.error('Error clearing existing defaults:', clearError)
+        return { success: false, error: 'Failed to update default payment method' }
+      }
+
+      // Set the new default
       const { error } = await supabase
         .from('saved_payment_methods')
         .update({ is_default: true, updated_at: new Date().toISOString() })
         .eq('id', paymentMethodId)
         .eq('user_id', user.id)
-      
+
       if (error) {
         return { success: false, error: error.message }
       }
-      
+
       revalidatePath('/settings')
-      
+
       return { success: true, error: null }
     } catch (error) {
       console.error('Error in setDefaultPaymentMethod:', error)
@@ -259,6 +272,12 @@ export async function setDefaultPaymentMethod(
 export async function deletePaymentMethod(
   paymentMethodId: string
 ): Promise<{ success: boolean; error: string | null }> {
+  // VALIDATION: Ensure ID is a valid UUID
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!paymentMethodId || !uuidRegex.test(paymentMethodId)) {
+    return { success: false, error: 'Invalid payment method ID' }
+  }
+
   return withUser(async ({ supabase, user }) => {
     try {
       // Get the payment method to get Stripe ID
@@ -476,55 +495,61 @@ export async function createBalanceTopUpIntent(
 export async function confirmBalanceTopUp(
   paymentIntentId: string
 ): Promise<{ success: boolean; newBalance: number | null; error: string | null }> {
-  try {
-    // Retrieve payment intent to verify it succeeded
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
-    
-    if (paymentIntent.status !== 'succeeded') {
-      return { success: false, newBalance: null, error: 'Payment not successful' }
+  // SECURITY: Require authentication — without this, anyone with a payment intent ID could credit balances
+  return withUser(async ({ supabase, user }) => {
+    try {
+      // Retrieve payment intent to verify it succeeded
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
+
+      if (paymentIntent.status !== 'succeeded') {
+        return { success: false, newBalance: null, error: 'Payment not successful' }
+      }
+
+      const userId = paymentIntent.metadata.user_id
+      if (!userId) {
+        return { success: false, newBalance: null, error: 'Missing user ID in payment metadata' }
+      }
+
+      // SECURITY: Verify the authenticated user matches the payment intent owner
+      if (userId !== user.id) {
+        return { success: false, newBalance: null, error: 'Not authorized to confirm this payment' }
+      }
+
+      // Check if already processed (idempotency)
+      const { data: existing } = await supabase
+        .from('balance_transactions')
+        .select('id')
+        .eq('stripe_payment_intent_id', paymentIntentId)
+        .single()
+
+      if (existing) {
+        // Already processed
+        const { balance } = await getAccountBalance()
+        return { success: true, newBalance: balance?.balanceAmount || 0, error: null }
+      }
+
+      // Adjust balance using database function
+      const { data, error } = await supabase.rpc('adjust_account_balance', {
+        p_user_id: userId,
+        p_amount: paymentIntent.amount,
+        p_transaction_type: 'top_up',
+        p_stripe_payment_intent_id: paymentIntentId,
+        p_description: 'Account balance top-up',
+      })
+
+      if (error || !data?.[0]?.success) {
+        return { success: false, newBalance: null, error: error?.message || data?.[0]?.error_message || 'Failed to adjust balance' }
+      }
+
+      revalidatePath('/buyer')
+      revalidatePath('/settings')
+
+      return { success: true, newBalance: data[0].new_balance, error: null }
+    } catch (error) {
+      console.error('Error in confirmBalanceTopUp:', error)
+      return { success: false, newBalance: null, error: 'Failed to confirm top-up' }
     }
-    
-    const userId = paymentIntent.metadata.user_id
-    if (!userId) {
-      return { success: false, newBalance: null, error: 'Missing user ID in payment metadata' }
-    }
-    
-    const supabase = await createClient()
-    
-    // Check if already processed (idempotency)
-    const { data: existing } = await supabase
-      .from('balance_transactions')
-      .select('id')
-      .eq('stripe_payment_intent_id', paymentIntentId)
-      .single()
-    
-    if (existing) {
-      // Already processed
-      const { balance } = await getAccountBalance()
-      return { success: true, newBalance: balance?.balanceAmount || 0, error: null }
-    }
-    
-    // Adjust balance using database function
-    const { data, error } = await supabase.rpc('adjust_account_balance', {
-      p_user_id: userId,
-      p_amount: paymentIntent.amount,
-      p_transaction_type: 'top_up',
-      p_stripe_payment_intent_id: paymentIntentId,
-      p_description: 'Account balance top-up',
-    })
-    
-    if (error || !data?.[0]?.success) {
-      return { success: false, newBalance: null, error: error?.message || data?.[0]?.error_message || 'Failed to adjust balance' }
-    }
-    
-    revalidatePath('/buyer')
-    revalidatePath('/settings')
-    
-    return { success: true, newBalance: data[0].new_balance, error: null }
-  } catch (error) {
-    console.error('Error in confirmBalanceTopUp:', error)
-    return { success: false, newBalance: null, error: 'Failed to confirm top-up' }
-  }
+  })
 }
 
 // ==========================================
@@ -548,18 +573,18 @@ export async function getPlatformFeePercent(
     
     if (error || data === null) {
       // Fall back to default configuration
-      const defaultFee = DEFAULT_FEE_CONFIG[role]?.[orderType] 
-        || DEFAULT_FEE_CONFIG[role]?.default 
+      const defaultFee = DEFAULT_FEE_CONFIG[role]?.[orderType]
+        || DEFAULT_FEE_CONFIG[role]?.default
         || DEFAULT_FEE_CONFIG.default[orderType]
-        || 8
+        || DEFAULT_PLATFORM_FEE_PERCENT
       return { feePercent: defaultFee, error: null }
     }
-    
+
     return { feePercent: Number(data), error: null }
   } catch (error) {
     console.error('Error in getPlatformFeePercent:', error)
     // Fall back to default
-    return { feePercent: DEFAULT_FEE_CONFIG[role]?.[orderType] || 8, error: null }
+    return { feePercent: DEFAULT_FEE_CONFIG[role]?.[orderType] || DEFAULT_PLATFORM_FEE_PERCENT, error: null }
   }
 }
 
@@ -648,6 +673,15 @@ export async function retryFailedPayment(
   failedPaymentId: string,
   paymentMethodId: string
 ): Promise<{ success: boolean; error: string | null }> {
+  // VALIDATION: Ensure IDs are valid UUIDs
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!failedPaymentId || !uuidRegex.test(failedPaymentId)) {
+    return { success: false, error: 'Invalid failed payment ID' }
+  }
+  if (!paymentMethodId || !uuidRegex.test(paymentMethodId)) {
+    return { success: false, error: 'Invalid payment method ID' }
+  }
+
   return withUser(async ({ supabase, user }) => {
     try {
       // Get failed payment details
@@ -1054,10 +1088,11 @@ export async function convertCurrency(
 ): Promise<{
   convertedAmount: number
   rate: number
+  rateSource: 'live' | 'fallback'
   error: string | null
 }> {
   if (fromCurrency === toCurrency) {
-    return { convertedAmount: amount, rate: 1, error: null }
+    return { convertedAmount: amount, rate: 1, rateSource: 'live', error: null }
   }
   
   const { rates } = await getExchangeRates()
@@ -1077,11 +1112,12 @@ export async function convertCurrency(
       return {
         convertedAmount: Math.round(amount * calculatedRate),
         rate: calculatedRate,
+        rateSource: 'live',
         error: null,
       }
     }
-    
-    // Fallback to hardcoded approximate rates
+
+    // Fallback to hardcoded approximate rates — warn consumers these may be stale
     const fallbackRates: Record<string, number> = {
       'GBP_EUR': 1.17,
       'GBP_USD': 1.27,
@@ -1090,22 +1126,25 @@ export async function convertCurrency(
       'USD_GBP': 0.79,
       'USD_EUR': 0.92,
     }
-    
+
     const fallbackRate = fallbackRates[`${fromCurrency}_${toCurrency}`]
     if (fallbackRate) {
+      console.warn(`[Billing] Using fallback exchange rate for ${fromCurrency}→${toCurrency}. Rate may be stale.`)
       return {
         convertedAmount: Math.round(amount * fallbackRate),
         rate: fallbackRate,
+        rateSource: 'fallback',
         error: null,
       }
     }
-    
-    return { convertedAmount: amount, rate: 1, error: 'Exchange rate not available' }
+
+    return { convertedAmount: amount, rate: 1, rateSource: 'fallback', error: 'Exchange rate not available' }
   }
-  
+
   return {
     convertedAmount: Math.round(amount * rate.rate),
     rate: rate.rate,
+    rateSource: 'live',
     error: null,
   }
 }

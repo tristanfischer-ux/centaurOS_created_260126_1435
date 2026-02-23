@@ -169,6 +169,25 @@ export const uploadAttachmentSchema = z.object({
   )
 })
 
+// ==========================================
+// SHARED FINANCE VALIDATORS
+// ==========================================
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Validate a string is a valid UUID v4 */
+export function isValidUUID(value: string): boolean {
+  return UUID_REGEX.test(value)
+}
+
+/** Maximum financial amount in smallest currency unit (£10M = 1,000,000,000 pence) */
+const MAX_FINANCIAL_AMOUNT = 1_000_000_000
+
+/** Validate a financial amount (positive, finite, within bounds) */
+export function isValidFinancialAmount(amount: number): boolean {
+  return Number.isFinite(amount) && amount > 0 && amount <= MAX_FINANCIAL_AMOUNT
+}
+
 // Helper function to validate and return typed result
 export function validate<T>(schema: z.ZodSchema<T>, data: unknown): 
   { success: true; data: T } | { success: false; error: string } {

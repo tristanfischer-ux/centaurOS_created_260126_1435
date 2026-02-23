@@ -7,7 +7,7 @@ export type OrderStatus = 'pending' | 'accepted' | 'in_progress' | 'completed' |
 export type OrderType = 'people_booking' | 'product_rfq' | 'service'
 
 // Escrow status for payment tracking
-export type EscrowStatus = 'pending' | 'held' | 'partial_release' | 'released' | 'refunded'
+export type EscrowStatus = 'pending' | 'held' | 'partial_release' | 'released' | 'refunded' | 'partial_refund'
 
 // Order event types for audit trail
 export type OrderEventType =

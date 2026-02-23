@@ -13,7 +13,7 @@ export type PaymentStatus =
   | 'succeeded'
 
 // Escrow status enum matching database
-export type EscrowStatus = 'pending' | 'held' | 'partial_release' | 'released' | 'refunded'
+export type EscrowStatus = 'pending' | 'held' | 'partial_release' | 'released' | 'refunded' | 'partial_refund'
 
 // Order status enum matching database
 export type OrderStatus =
@@ -149,9 +149,10 @@ export interface MilestoneInput {
 }
 
 /**
- * Platform fee configuration
+ * Lightweight fee configuration for payment calculations.
+ * For the full DB-backed config, see PlatformFeeConfig in types/billing.ts.
  */
-export interface PlatformFeeConfig {
+export interface FeeConfigSimple {
   feePercent: number
   minFee?: number
   maxFee?: number
@@ -172,11 +173,9 @@ export interface PlatformFeeConfig {
 export const DEFAULT_PLATFORM_FEE_PERCENT = 10
 
 /**
- * Platform fee percentage for retainers and bookings (10%)
- * Now matches the standard rate — kept as a separate constant for
- * backward compatibility with existing code that references it.
+ * @deprecated Use DEFAULT_PLATFORM_FEE_PERCENT instead — all fee rates are now unified at 10%.
  */
-export const RETAINER_PLATFORM_FEE_PERCENT = 10
+export const RETAINER_PLATFORM_FEE_PERCENT = DEFAULT_PLATFORM_FEE_PERCENT
 
 /**
  * UK VAT rate (20%)
@@ -228,17 +227,27 @@ export interface MilestoneTrackerProps {
 
 /**
  * Fee breakdown for display
+ *
+ * @description `total` is the buyer-facing amount (subtotal + VAT).
+ * The `platformFee` is deducted from the seller's payout, NOT added to buyer total.
+ * Use `sellerReceives` for the amount transferred to the seller after fee deduction.
  */
 export interface FeeBreakdown {
   subtotal: number
   platformFee: number
   vat: number
+  /** Buyer pays: subtotal + VAT. Platform fee is deducted from seller's payout. */
   total: number
+  /** Amount seller receives after platform fee deduction (subtotal - platformFee). */
+  sellerReceives: number
   currency: string
 }
 
 /**
  * Calculate fee breakdown
+ *
+ * @description Computes buyer total (subtotal + VAT) and seller payout (subtotal - fee).
+ * The platform fee is NOT added to the buyer's total — it is deducted from the seller's share.
  */
 export function calculateFeeBreakdown(
   amount: number,
@@ -249,12 +258,14 @@ export function calculateFeeBreakdown(
   const platformFee = Math.round(amount * (feePercent / 100))
   const vat = Math.round(amount * vatRate)
   const total = amount + vat
+  const sellerReceives = amount - platformFee
 
   return {
     subtotal: amount,
     platformFee,
     vat,
     total,
+    sellerReceives,
     currency,
   }
 }
