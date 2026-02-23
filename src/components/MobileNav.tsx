@@ -44,6 +44,7 @@ import {
     FileText,
     Map,
     BellRing,
+    Activity,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -93,6 +94,7 @@ const financeMoreNavigation = [
     { name: "Finance", href: "/finance", icon: PoundSterling },
     { name: "Money Map", href: "/finance/money-map", icon: Map },
     { name: "Invoices", href: "/finance/invoices", icon: FileText },
+    { name: "Cash Flow", href: "/finance/cash-flow", icon: Activity },
     { name: "Alerts", href: "/finance/settings", icon: BellRing },
 ]
 

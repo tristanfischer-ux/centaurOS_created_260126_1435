@@ -32,6 +32,7 @@ import {
     Map,
     FileText,
     BellRing,
+    Activity,
 } from "lucide-react"
 
 // ─── Section Definitions ────────────────────────────────────────────────────
@@ -246,6 +247,13 @@ export const SECTIONS: Section[] = [
                 description: "Track outstanding payments and aging buckets",
                 route: "/finance/invoices",
                 icon: FileText,
+                addedAt: new Date("2026-02-23"),
+            },
+            {
+                name: "Cash Flow",
+                description: "Forward-looking cash flow projections with scenario modeling",
+                route: "/finance/cash-flow",
+                icon: Activity,
                 addedAt: new Date("2026-02-23"),
             },
             {
