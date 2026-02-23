@@ -171,7 +171,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     // with staleTimes (30s dynamic cache), this means the RSC payload is already
     // in the client cache before the user clicks.
     React.useEffect(() => {
-        const topRoutes = ['/today', '/new-tasks', '/new-objectives', '/team', '/the-forge', '/strategy']
+        const topRoutes = ['/today', '/new-tasks', '/new-objectives', '/team', '/the-forge', '/strategy', '/my-profile', '/updates', '/knowledge', '/reports']
         topRoutes.forEach(route => router.prefetch(route))
     }, [router])
 
