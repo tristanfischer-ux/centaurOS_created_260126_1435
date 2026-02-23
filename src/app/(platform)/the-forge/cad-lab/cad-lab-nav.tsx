@@ -37,6 +37,8 @@ import { useCadLab } from "./cad-lab-context"
 interface StageDefinition {
   id: string
   label: string
+  /** Abbreviated label shown on mobile (e.g., "C", "B", "R") */
+  mobileLabel: string
   icon: LucideIcon
   href: string
   /** Description shown in the locked-stage preview dialog */
@@ -51,6 +53,7 @@ const STAGES: StageDefinition[] = [
   {
     id: "research",
     label: "Concept",
+    mobileLabel: "C",
     icon: Search,
     href: FORGE_ROUTES.cadLab,
     description: "Describe your product. Get research, module decomposition, and AI blueprint illustrations.",
@@ -60,6 +63,7 @@ const STAGES: StageDefinition[] = [
   {
     id: "build",
     label: "Build",
+    mobileLabel: "B",
     icon: Box,
     href: FORGE_ROUTES.cadLabBuild,
     description: "Parametric CadQuery model generation for each sub-assembly.",
@@ -69,6 +73,7 @@ const STAGES: StageDefinition[] = [
   {
     id: "review",
     label: "Review",
+    mobileLabel: "R",
     icon: ClipboardCheck,
     href: FORGE_ROUTES.cadLabReview,
     description: "Supplier-ready engineering review package.",
@@ -163,19 +168,22 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                     </div>
                     <span
                       className={cn(
-                        "hidden text-xs font-medium transition-colors sm:block whitespace-nowrap",
+                        "text-xs font-medium transition-colors whitespace-nowrap",
                         isActive && "text-international-orange font-semibold",
                         completed && !isActive && "text-international-orange",
                         !isActive && !completed && "text-muted-foreground",
                       )}
                     >
-                      {stage.label}
-                      {/* Module count badge for Build stage */}
-                      {stage.id === "build" && generatedModuleCount > 0 && modules.length > 0 && (
-                        <span className="ml-1 text-xs font-mono opacity-75">
-                          {generatedModuleCount}/{modules.length}
-                        </span>
-                      )}
+                      <span className="sm:hidden">{stage.mobileLabel}</span>
+                      <span className="hidden sm:inline">
+                        {stage.label}
+                        {/* Module count badge for Build stage */}
+                        {stage.id === "build" && generatedModuleCount > 0 && modules.length > 0 && (
+                          <span className="ml-1 text-xs font-mono opacity-75">
+                            {generatedModuleCount}/{modules.length}
+                          </span>
+                        )}
+                      </span>
                     </span>
                   </Link>
                 ) : (
@@ -187,8 +195,9 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground/50">
                       <Icon className="h-4 w-4" />
                     </div>
-                    <span className="hidden text-xs font-medium text-muted-foreground/50 sm:block whitespace-nowrap">
-                      {stage.label}
+                    <span className="text-xs font-medium text-muted-foreground/50 whitespace-nowrap">
+                      <span className="sm:hidden">{stage.mobileLabel}</span>
+                      <span className="hidden sm:inline">{stage.label}</span>
                     </span>
                   </button>
                 )}

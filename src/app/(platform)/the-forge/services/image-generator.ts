@@ -127,7 +127,9 @@ async function callGeminiImage(
     throw new Error("[XRayImageGen] GOOGLE_AI_API_KEY is not configured")
   }
 
-  const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`
+  // SECURITY: Use x-goog-api-key header instead of URL query param (F6)
+  // API key in URL is exposed in server logs, proxy logs, and error reports
+  const url = `${GEMINI_API_BASE}/${model}:generateContent`
 
   // Build content parts: text prompt + optional reference images
   const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [
@@ -149,7 +151,7 @@ async function callGeminiImage(
   try {
     response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify(body),
     })
   } catch (fetchError) {

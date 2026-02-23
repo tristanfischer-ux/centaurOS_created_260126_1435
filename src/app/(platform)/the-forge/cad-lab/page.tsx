@@ -18,7 +18,7 @@
 
 import { useRouter } from "next/navigation"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Loader2,
   Search,
@@ -27,9 +27,12 @@ import {
   ClipboardCheck,
   Layers,
   ImageIcon,
+  Pencil,
+  RotateCcw,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
@@ -63,6 +66,7 @@ export default function CadLabResearchPage(): React.ReactNode {
   } = useCadLab()
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
+  const [isEditingSubject, setIsEditingSubject] = useState(false)
 
   useRegisterScreenContext(
     useMemo(() => {
@@ -129,7 +133,13 @@ export default function CadLabResearchPage(): React.ReactNode {
       {isResearching && (
         <Card className="border-international-orange/20">
           <CardContent className="pt-6">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">What happens next</p>
+            <div className="flex items-center gap-3 mb-3">
+              <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">Researching &ldquo;{subject}&rdquo;</p>
+                <p className="text-xs text-muted-foreground">Gathering specs, standards, and manufacturing context — ~30-60 seconds</p>
+              </div>
+            </div>
             <div className="flex items-start gap-2">
               {PIPELINE_STAGES.map((stage, i) => {
                 const Icon = stage.icon
@@ -165,6 +175,39 @@ export default function CadLabResearchPage(): React.ReactNode {
           ══════════════════════════════════════════════════════════════════ */}
       {hasResearch && (
         <div className="space-y-6">
+          {/* ── Product subject heading (stays visible after research) ── */}
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-1 rounded-full bg-international-orange flex-shrink-0" />
+            {isEditingSubject ? (
+              <Input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                onBlur={() => setIsEditingSubject(false)}
+                onKeyDown={(e) => { if (e.key === "Enter") setIsEditingSubject(false) }}
+                className="text-xl font-bold h-auto py-1 px-2"
+                autoFocus
+              />
+            ) : (
+              <button
+                onClick={() => setIsEditingSubject(true)}
+                className="group flex items-center gap-2 text-left"
+              >
+                <h2 className="text-xl font-bold text-foreground">{subject}</h2>
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-xs ml-auto"
+              onClick={handleResearch}
+              disabled={isAnyLoading}
+            >
+              <RotateCcw className="h-3 w-3" />
+              Re-Research
+            </Button>
+          </div>
+
           {/* ── System overview illustration ── */}
           {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
             <Card className="overflow-hidden">
@@ -204,14 +247,17 @@ export default function CadLabResearchPage(): React.ReactNode {
                 <p className="text-sm text-muted-foreground">
                   Research complete. Continue to map sub-assemblies and generate concept illustrations.
                 </p>
-                <Button
-                  onClick={handleDecompose}
-                  className="gap-2"
-                  disabled={!editableReport.trim() || isAnyLoading}
-                >
-                  <Layers className="h-4 w-4" />
-                  Continue
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleDecompose}
+                    className="gap-2"
+                    disabled={!editableReport.trim() || isAnyLoading}
+                  >
+                    <Layers className="h-4 w-4" />
+                    Map sub-assemblies
+                  </Button>
+                  <span className="text-xs text-muted-foreground">~10-15s</span>
+                </div>
               </CardContent>
             </Card>
           )}

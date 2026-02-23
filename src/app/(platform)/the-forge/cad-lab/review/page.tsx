@@ -11,7 +11,7 @@
  * Gate: shows empty state if no generated modules.
  */
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
   ClipboardCheck,
@@ -40,6 +40,7 @@ import { CadLabContracting } from "@/components/cad/cad-lab-contracting"
 import { CadLabFactoryGuide } from "@/components/cad/cad-lab-factory-guide"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 
+import type { CadLabResult } from "@/lib/cad-lab-types"
 import { useCadLab } from "../cad-lab-context"
 
 export default function CadLabReviewPage(): React.ReactNode {
@@ -50,6 +51,7 @@ export default function CadLabReviewPage(): React.ReactNode {
     aiPrefilled, designBrief, assumptionNotes,
     activeProjectId, linkedRfqId,
     systemIllustrationUrl, researchResult,
+    handleDownload,
   } = useCadLab()
 
   const [showBuildContext, setShowBuildContext] = useState(false)
@@ -88,10 +90,49 @@ export default function CadLabReviewPage(): React.ReactNode {
     )
   }
 
+  // ── Section navigation state ──
+  const REVIEW_SECTIONS = useMemo(() => [
+    { id: "review-header", label: "Overview" },
+    { id: "review-package", label: "Review" },
+    { id: "dfm-analysis", label: "DFM" },
+    { id: "diagnostics", label: "Diagnostics" },
+    { id: "supply-chain", label: "Supply Chain" },
+    { id: "cost-estimate", label: "Cost" },
+    { id: "drawing-exports", label: "Exports" },
+    { id: "experts", label: "Experts" },
+    { id: "factory-guide", label: "Factory" },
+    { id: "contracting", label: "Contracts" },
+  ], [])
+
+  const [activeSection, setActiveSection] = useState("review-header")
+
+  const handleSectionClick = useCallback((id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [])
+
+  // Track active section via IntersectionObserver
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id)
+          }
+        }
+      },
+      { rootMargin: "-20% 0px -70% 0px" },
+    )
+    for (const section of REVIEW_SECTIONS) {
+      const el = document.getElementById(section.id)
+      if (el) observer.observe(el)
+    }
+    return () => observer.disconnect()
+  }, [REVIEW_SECTIONS])
+
   return (
     <div className="space-y-6">
       {/* Stage header */}
-      <div className="flex items-center justify-between">
+      <div id="review-header" className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <ClipboardCheck className="h-5 w-5 text-international-orange" />
           <div>
@@ -105,6 +146,25 @@ export default function CadLabReviewPage(): React.ReactNode {
           <ArrowLeft className="h-3 w-3" /> Back to Build
         </Button>
       </div>
+
+      {/* ── Section navigation ── */}
+      <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 bg-background border-b border-border overflow-x-auto">
+        <div className="flex items-center gap-1">
+          {REVIEW_SECTIONS.map((section) => (
+            <button
+              key={section.id}
+              onClick={() => handleSectionClick(section.id)}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
+                activeSection === section.id
+                  ? "bg-international-orange-light text-international-orange"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              {section.label}
+            </button>
+          ))}
+        </div>
+      </nav>
 
       {/* ── Build Context Summary — carries forward key context from Build stage ── */}
       <Card className="overflow-hidden">
@@ -180,35 +240,52 @@ export default function CadLabReviewPage(): React.ReactNode {
       </Card>
 
       {/* Engineering review package — quality scorecard, per-module summary */}
-      <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
+      <div id="review-package">
+        <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
+      </div>
 
       {/* DFM analysis dashboard — manufacturing grade, risk register */}
-      <CadLabAnalysisDashboard modules={modules} projectName={subject} />
+      <div id="dfm-analysis">
+        <CadLabAnalysisDashboard modules={modules} projectName={subject} />
+      </div>
 
       {/* Engineering diagnostics — process, material, tolerance, finish, batch, environment */}
-      <CadLabDiagnostics
-        modules={modules}
-        answers={diagnosticAnswers}
-        onAnswersChange={setDiagnosticAnswers}
-        aiPrefilled={aiPrefilled}
-      />
+      <div id="diagnostics">
+        <CadLabDiagnostics
+          modules={modules}
+          answers={diagnosticAnswers}
+          onAnswersChange={setDiagnosticAnswers}
+          aiPrefilled={aiPrefilled}
+        />
+      </div>
 
       {/* Supply chain specifications per module */}
-      <CadLabSupplyChain modules={modules} diagnosticAnswers={diagnosticAnswers} />
+      <div id="supply-chain">
+        <CadLabSupplyChain modules={modules} diagnosticAnswers={diagnosticAnswers} />
+      </div>
 
       {/* Cost estimate with tooling breakdown */}
-      <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
+      <div id="cost-estimate">
+        <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
+      </div>
 
       {/* Drawing package exports — JSON, Markdown, CSV */}
-      <CadLabDrawingPackage modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
+      <div id="drawing-exports">
+        <CadLabDrawingPackage modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
+      </div>
 
       {/* Expert discipline matching */}
-      <CadLabPeople modules={modules} diagnosticAnswers={diagnosticAnswers} />
+      <div id="experts">
+        <CadLabPeople modules={modules} diagnosticAnswers={diagnosticAnswers} />
+      </div>
 
       {/* Factory conversation guide — what to know before talking to suppliers */}
-      <CadLabFactoryGuide modules={modules} diagnosticAnswers={diagnosticAnswers} />
+      <div id="factory-guide">
+        <CadLabFactoryGuide modules={modules} diagnosticAnswers={diagnosticAnswers} />
+      </div>
 
       {/* Contracting — RFQ, SOW, NDA generation */}
+      <div id="contracting">
       <CadLabContracting
         modules={modules}
         projectName={subject}
@@ -218,6 +295,7 @@ export default function CadLabReviewPage(): React.ReactNode {
         designBrief={designBrief}
         assumptionNotes={assumptionNotes}
       />
+      </div>
 
       {/* Pipeline Complete */}
       <Card className="border-status-success/30 bg-gradient-to-r from-status-success-light/20 to-background">
@@ -237,9 +315,36 @@ export default function CadLabReviewPage(): React.ReactNode {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5">
+              <Button
+                variant="default"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => {
+                  for (const mod of modules) {
+                    const r = mod.result as CadLabResult | undefined
+                    if (!r) continue
+                    if (r.stepData) handleDownload(`${mod.name}.step`, r.stepData, false)
+                    else if (r.stepUrl) {
+                      const link = document.createElement("a")
+                      link.href = r.stepUrl
+                      link.download = `${mod.name}.step`
+                      link.click()
+                    }
+                    if (r.stlData) handleDownload(`${mod.name}.stl`, r.stlData, true)
+                    else if (r.stlUrl) {
+                      const link = document.createElement("a")
+                      link.href = r.stlUrl
+                      link.download = `${mod.name}.stl`
+                      link.click()
+                    }
+                  }
+                }}
+              >
                 <Download className="h-4 w-4" />
-                Back to Downloads
+                Download All STEP + STL
+              </Button>
+              <Button variant="outline" onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5">
+                Back to Build
               </Button>
             </div>
           </div>

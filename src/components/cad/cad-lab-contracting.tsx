@@ -100,7 +100,7 @@ const DOC_TYPES: DocTemplate[] = [
 // ─── Document Generators ────────────────────────────────────────────
 
 /**
- * Generates an RFQ document from project data.
+ * Generates an RFQ document from project data in Markdown format.
  */
 function generateRfq(
   projectName: string,
@@ -119,74 +119,98 @@ function generateRfq(
   })
   const lines: string[] = []
 
-  lines.push("REQUEST FOR QUOTATION (RFQ)")
-  lines.push("=".repeat(50))
+  lines.push("# Request for Quotation (RFQ)")
   lines.push("")
-  lines.push(`Project: ${projectName}`)
-  lines.push(`Date: ${date}`)
-  if (buyerName) lines.push(`Buyer: ${buyerName}`)
-  if (deadline) lines.push(`Submission Deadline: ${deadline}`)
-  if (rfqId) lines.push(`Marketplace RFQ ID: ${rfqId}`)
-  if (rfqStatus) lines.push(`Marketplace Status: ${rfqStatus}`)
-  lines.push(`Modules: ${modules.length}`)
+  lines.push(`**Project:** ${projectName}  `)
+  lines.push(`**Date:** ${date}  `)
+  if (buyerName) lines.push(`**Buyer:** ${buyerName}  `)
+  if (deadline) lines.push(`**Submission Deadline:** ${deadline}  `)
+  if (rfqId) lines.push(`**Marketplace RFQ ID:** ${rfqId}  `)
+  if (rfqStatus) lines.push(`**Marketplace Status:** ${rfqStatus}  `)
+  lines.push(`**Modules:** ${modules.length}`)
   lines.push("")
 
-  lines.push("SCOPE OF SUPPLY")
-  lines.push("-".repeat(30))
+  lines.push("## Scope of Supply")
   lines.push("")
+
+  // Build dynamic table columns based on available data
+  const headers = ["Module", "Purpose", "Key Parts", "Lead Time"]
+  const hasProcess = modules.some((m) => diagnosticAnswers?.[m.id]?.mfg_process)
+  const hasMaterial = modules.some((m) => diagnosticAnswers?.[m.id]?.material)
+  const hasDimensions = modules.some((m) => m.result?.bbox)
+  const hasQuantity = modules.some((m) => diagnosticAnswers?.[m.id]?.batch_size)
+  if (hasProcess) headers.push("Process")
+  if (hasMaterial) headers.push("Material")
+  if (hasDimensions) headers.push("Dimensions")
+  if (hasQuantity) headers.push("Quantity")
+
+  lines.push(`| ${headers.join(" | ")} |`)
+  lines.push(`| ${headers.map(() => "---").join(" | ")} |`)
 
   for (const mod of modules) {
     const diag = diagnosticAnswers?.[mod.id] || {}
-    lines.push(`Module: ${mod.name}`)
-    lines.push(`  Purpose: ${mod.purpose}`)
-    lines.push(`  Key parts: ${mod.keyParts.join(", ")}`)
-    lines.push(`  Lead time: ${mod.leadWeeks} weeks`)
-
-    if (diag.mfg_process) lines.push(`  Process: ${diag.mfg_process}`)
-    if (diag.material) lines.push(`  Material: ${diag.material}`)
-    if (diag.tolerance) lines.push(`  Tolerance: ${diag.tolerance}`)
-    if (diag.finish) lines.push(`  Finish: ${diag.finish}`)
-    if (diag.batch_size) lines.push(`  Quantity: ${diag.batch_size}`)
-    if (diag.environment) lines.push(`  Environment: ${diag.environment}`)
-
-    if (mod.result?.bbox) {
-      lines.push(
-        `  Dimensions: ${mod.result.bbox.xLen.toFixed(0)}×${mod.result.bbox.yLen.toFixed(0)}×${mod.result.bbox.zLen.toFixed(0)} mm`
-      )
-    }
-    if (mod.result?.massGrams) {
-      lines.push(`  Mass: ${mod.result.massGrams.toFixed(1)} g`)
-    }
-
-    lines.push("")
+    const cells = [
+      mod.name,
+      mod.purpose,
+      mod.keyParts.join(", "),
+      `${mod.leadWeeks} wk`,
+    ]
+    if (hasProcess) cells.push(diag.mfg_process || "—")
+    if (hasMaterial) cells.push(diag.material || "—")
+    if (hasDimensions) cells.push(mod.result?.bbox ? `${mod.result.bbox.xLen.toFixed(0)}×${mod.result.bbox.yLen.toFixed(0)}×${mod.result.bbox.zLen.toFixed(0)}mm` : "—")
+    if (hasQuantity) cells.push(diag.batch_size || "—")
+    lines.push(`| ${cells.join(" | ")} |`)
   }
 
-  lines.push("QUOTE REQUIREMENTS")
-  lines.push("-".repeat(30))
+  // Per-module detail for fields not in the table (tolerance, finish, environment, mass)
+  const detailModules = modules.filter((m) => {
+    const d = diagnosticAnswers?.[m.id] || {}
+    return d.tolerance || d.finish || d.environment || m.result?.massGrams
+  })
+  if (detailModules.length > 0) {
+    lines.push("")
+    lines.push("### Additional Specifications")
+    lines.push("")
+    for (const mod of detailModules) {
+      const diag = diagnosticAnswers?.[mod.id] || {}
+      const details: string[] = []
+      if (diag.tolerance) details.push(`Tolerance: ${diag.tolerance}`)
+      if (diag.finish) details.push(`Finish: ${diag.finish}`)
+      if (diag.environment) details.push(`Environment: ${diag.environment}`)
+      if (mod.result?.massGrams) details.push(`Mass: ${mod.result.massGrams.toFixed(1)}g`)
+      if (details.length > 0) {
+        lines.push(`- **${mod.name}:** ${details.join(" · ")}`)
+      }
+    }
+  }
+
+  lines.push("")
+  lines.push("## Quote Requirements")
+  lines.push("")
   lines.push("Please provide:")
-  lines.push("  1. Unit price per module")
-  lines.push("  2. Tooling costs (if applicable)")
-  lines.push("  3. Lead time from order confirmation")
-  lines.push("  4. Minimum order quantity")
-  lines.push("  5. Material certifications available")
-  lines.push("  6. Quality inspection method")
+  lines.push("1. Unit price per module")
+  lines.push("2. Tooling costs (if applicable)")
+  lines.push("3. Lead time from order confirmation")
+  lines.push("4. Minimum order quantity")
+  lines.push("5. Material certifications available")
+  lines.push("6. Quality inspection method")
   lines.push("")
 
   if (specialTerms) {
-    lines.push("SPECIAL TERMS")
-    lines.push("-".repeat(30))
+    lines.push("## Special Terms")
+    lines.push("")
     lines.push(specialTerms)
     lines.push("")
   }
 
-  lines.push("=".repeat(50))
-  lines.push(`Generated by The Forge — ForgeOS — ${date}`)
+  lines.push("---")
+  lines.push(`*Generated by The Forge — ForgeOS — ${date}*`)
 
   return lines.join("\n")
 }
 
 /**
- * Generates a Statement of Work from project data.
+ * Generates a Statement of Work from project data in Markdown format.
  */
 function generateSow(
   projectName: string,
@@ -203,65 +227,66 @@ function generateSow(
   const maxLead = Math.max(...modules.map((m) => m.leadWeeks), 0)
   const lines: string[] = []
 
-  lines.push("STATEMENT OF WORK (SOW)")
-  lines.push("=".repeat(50))
+  lines.push("# Statement of Work (SOW)")
   lines.push("")
-  lines.push(`Project: ${projectName}`)
-  lines.push(`Date: ${date}`)
-  if (buyerName) lines.push(`Client: ${buyerName}`)
-  if (rfqId) lines.push(`Marketplace RFQ Reference: ${rfqId}`)
-  lines.push("")
-
-  lines.push("1. SCOPE")
-  lines.push("-".repeat(30))
-  lines.push(
-    `Manufacturing and delivery of ${modules.length} modules as specified below.`
-  )
+  lines.push(`**Project:** ${projectName}  `)
+  lines.push(`**Date:** ${date}  `)
+  if (buyerName) lines.push(`**Client:** ${buyerName}  `)
+  if (rfqId) lines.push(`**Marketplace RFQ Reference:** ${rfqId}  `)
   lines.push("")
 
-  lines.push("2. DELIVERABLES")
-  lines.push("-".repeat(30))
+  lines.push("## 1. Scope")
+  lines.push("")
+  lines.push(`Manufacturing and delivery of ${modules.length} modules as specified below.`)
+  lines.push("")
+
+  lines.push("## 2. Deliverables")
+  lines.push("")
+  lines.push("| # | Module | Purpose | Key Parts | Lead Time |")
+  lines.push("| --- | --- | --- | --- | --- |")
   for (let i = 0; i < modules.length; i++) {
     const mod = modules[i]
-    lines.push(`  ${i + 1}. ${mod.name} — ${mod.purpose}`)
-    lines.push(`     Parts: ${mod.keyParts.join(", ")}`)
-    lines.push(`     Lead: ${mod.leadWeeks} weeks`)
+    lines.push(`| ${i + 1} | ${mod.name} | ${mod.purpose} | ${mod.keyParts.join(", ")} | ${mod.leadWeeks} wk |`)
   }
   lines.push("")
 
-  lines.push("3. TIMELINE")
-  lines.push("-".repeat(30))
-  lines.push(`  Estimated total duration: ${maxLead} weeks (critical path)`)
-  lines.push("  Milestones:")
-  lines.push("    - Week 0: Kick-off and material procurement")
-  lines.push(`    - Week ${Math.ceil(maxLead * 0.3)}: First article inspection`)
-  lines.push(`    - Week ${Math.ceil(maxLead * 0.7)}: Pre-delivery review`)
-  lines.push(`    - Week ${maxLead}: Final delivery and acceptance`)
+  lines.push("## 3. Timeline")
+  lines.push("")
+  lines.push(`**Estimated total duration:** ${maxLead} weeks (critical path)`)
+  lines.push("")
+  lines.push("| Milestone | Week |")
+  lines.push("| --- | --- |")
+  lines.push("| Kick-off and material procurement | 0 |")
+  lines.push(`| First article inspection | ${Math.ceil(maxLead * 0.3)} |`)
+  lines.push(`| Pre-delivery review | ${Math.ceil(maxLead * 0.7)} |`)
+  lines.push(`| Final delivery and acceptance | ${maxLead} |`)
   lines.push("")
 
-  lines.push("4. ACCEPTANCE CRITERIA")
-  lines.push("-".repeat(30))
-  lines.push("  - Dimensional compliance per specified tolerances")
-  lines.push("  - Material certification provided")
-  lines.push("  - Visual inspection: no defects, correct finish")
-  lines.push("  - Functional test (if applicable)")
+  lines.push("## 4. Acceptance Criteria")
+  lines.push("")
+  lines.push("- Dimensional compliance per specified tolerances")
+  lines.push("- Material certification provided")
+  lines.push("- Visual inspection: no defects, correct finish")
+  lines.push("- Functional test (if applicable)")
   lines.push("")
 
-  lines.push("5. PAYMENT TERMS")
-  lines.push("-".repeat(30))
-  lines.push("  - 30% upon order confirmation")
-  lines.push("  - 40% upon first article approval")
-  lines.push("  - 30% upon final delivery and acceptance")
+  lines.push("## 5. Payment Terms")
+  lines.push("")
+  lines.push("| Milestone | % |")
+  lines.push("| --- | --- |")
+  lines.push("| Order confirmation | 30% |")
+  lines.push("| First article approval | 40% |")
+  lines.push("| Final delivery and acceptance | 30% |")
   lines.push("")
 
-  lines.push("=".repeat(50))
-  lines.push(`Generated by The Forge — ForgeOS — ${date}`)
+  lines.push("---")
+  lines.push(`*Generated by The Forge — ForgeOS — ${date}*`)
 
   return lines.join("\n")
 }
 
 /**
- * Generates a mutual NDA template.
+ * Generates a mutual NDA template in Markdown format.
  */
 function generateNda(projectName: string, buyerName?: string, rfqId?: string): string {
   const date = new Date().toLocaleDateString("en-GB", {
@@ -271,62 +296,54 @@ function generateNda(projectName: string, buyerName?: string, rfqId?: string): s
   })
   const lines: string[] = []
 
-  lines.push("MUTUAL NON-DISCLOSURE AGREEMENT")
-  lines.push("=".repeat(50))
+  lines.push("# Mutual Non-Disclosure Agreement")
   lines.push("")
-  lines.push(`Date: ${date}`)
-  lines.push(`Project: ${projectName}`)
-  if (rfqId) lines.push(`RFQ Reference: ${rfqId}`)
+  lines.push(`**Date:** ${date}  `)
+  lines.push(`**Project:** ${projectName}  `)
+  if (rfqId) lines.push(`**RFQ Reference:** ${rfqId}  `)
   lines.push("")
-  lines.push("BETWEEN:")
-  lines.push(`  Party A (Discloser): ${buyerName || "[BUYER NAME]"}`)
-  lines.push("  Party B (Recipient): [SUPPLIER NAME]")
+  lines.push("**Between:**")
+  lines.push(`- **Party A (Discloser):** ${buyerName || "[BUYER NAME]"}`)
+  lines.push("- **Party B (Recipient):** [SUPPLIER NAME]")
   lines.push("")
-  lines.push("1. PURPOSE")
-  lines.push("-".repeat(30))
-  lines.push(
-    "The parties wish to exchange confidential technical information"
-  )
-  lines.push(
-    `relating to the project "${projectName}" for the purpose of`
-  )
-  lines.push("evaluating a potential manufacturing engagement.")
+
+  lines.push("## 1. Purpose")
   lines.push("")
-  lines.push("2. CONFIDENTIAL INFORMATION INCLUDES")
-  lines.push("-".repeat(30))
-  lines.push("  - CAD models, drawings, and specifications")
-  lines.push("  - Manufacturing processes and parameters")
-  lines.push("  - Material compositions and formulations")
-  lines.push("  - Cost data, pricing, and business terms")
-  lines.push("  - Research reports and analysis results")
+  lines.push(`The parties wish to exchange confidential technical information relating to the project "${projectName}" for the purpose of evaluating a potential manufacturing engagement.`)
   lines.push("")
-  lines.push("3. OBLIGATIONS")
-  lines.push("-".repeat(30))
-  lines.push(
-    "  - Treat all disclosed information as confidential"
-  )
-  lines.push(
-    "  - Use information solely for the stated purpose"
-  )
-  lines.push(
-    "  - Not disclose to third parties without written consent"
-  )
-  lines.push("  - Return or destroy all materials upon request")
+
+  lines.push("## 2. Confidential Information Includes")
   lines.push("")
-  lines.push("4. TERM")
-  lines.push("-".repeat(30))
-  lines.push(
-    "  This agreement shall remain in effect for 3 years from the date above."
-  )
+  lines.push("- CAD models, drawings, and specifications")
+  lines.push("- Manufacturing processes and parameters")
+  lines.push("- Material compositions and formulations")
+  lines.push("- Cost data, pricing, and business terms")
+  lines.push("- Research reports and analysis results")
   lines.push("")
-  lines.push("5. SIGNATURES")
-  lines.push("-".repeat(30))
+
+  lines.push("## 3. Obligations")
   lines.push("")
-  lines.push(`Party A: ________________________  Date: ________`)
-  lines.push(`Party B: ________________________  Date: ________`)
+  lines.push("- Treat all disclosed information as confidential")
+  lines.push("- Use information solely for the stated purpose")
+  lines.push("- Not disclose to third parties without written consent")
+  lines.push("- Return or destroy all materials upon request")
   lines.push("")
-  lines.push("=".repeat(50))
-  lines.push(`Template generated by The Forge — ForgeOS — ${date}`)
+
+  lines.push("## 4. Term")
+  lines.push("")
+  lines.push("This agreement shall remain in effect for **3 years** from the date above.")
+  lines.push("")
+
+  lines.push("## 5. Signatures")
+  lines.push("")
+  lines.push("| | Name | Signature | Date |")
+  lines.push("| --- | --- | --- | --- |")
+  lines.push(`| Party A | ${buyerName || "________________"} | ________________ | ________ |`)
+  lines.push("| Party B | ________________ | ________________ | ________ |")
+  lines.push("")
+
+  lines.push("---")
+  lines.push(`*Template generated by The Forge — ForgeOS — ${date}*`)
 
   return lines.join("\n")
 }
@@ -699,6 +716,46 @@ export function CadLabContracting({
           )}
         </div>
 
+        {/* Buyer details form — fill in before creating documents or RFQ */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="buyer-name" className="text-xs">
+              Buyer / Company Name
+            </Label>
+            <Input
+              id="buyer-name"
+              value={buyerName}
+              onChange={(e) => setBuyerName(e.target.value)}
+              placeholder="Acme Corp"
+              className="text-sm"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="deadline" className="text-xs">
+              Quote Deadline
+            </Label>
+            <Input
+              id="deadline"
+              type="date"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              className="text-sm"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="special-terms" className="text-xs">
+              Special Terms (optional)
+            </Label>
+            <Input
+              id="special-terms"
+              value={specialTerms}
+              onChange={(e) => setSpecialTerms(e.target.value)}
+              placeholder="ISO 9001 required, etc."
+              className="text-sm"
+            />
+          </div>
+        </div>
+
         <div className="rounded-lg border border-status-info/30 bg-status-info-light/20 p-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs font-semibold text-foreground">One-click supplier handoff</p>
@@ -791,46 +848,6 @@ export function CadLabContracting({
             )}
           </div>
         )}
-
-        {/* Buyer details form */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="buyer-name" className="text-xs">
-              Buyer / Company Name
-            </Label>
-            <Input
-              id="buyer-name"
-              value={buyerName}
-              onChange={(e) => setBuyerName(e.target.value)}
-              placeholder="Acme Corp"
-              className="text-sm"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="deadline" className="text-xs">
-              Quote Deadline
-            </Label>
-            <Input
-              id="deadline"
-              type="date"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              className="text-sm"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="special-terms" className="text-xs">
-              Special Terms (optional)
-            </Label>
-            <Input
-              id="special-terms"
-              value={specialTerms}
-              onChange={(e) => setSpecialTerms(e.target.value)}
-              placeholder="ISO 9001 required, etc."
-              className="text-sm"
-            />
-          </div>
-        </div>
 
         {/* Document type cards */}
         <div className="space-y-2">

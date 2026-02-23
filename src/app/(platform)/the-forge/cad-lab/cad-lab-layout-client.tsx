@@ -9,7 +9,7 @@
  * (a server component that also exports maxDuration).
  */
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import {
@@ -23,6 +23,8 @@ import {
   ChevronRight,
   Info,
   Store,
+  X,
+  ShieldAlert,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -103,47 +105,41 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
   const isAnyActive = isResearching || isDecomposing || isBatchRunning || activeModuleId !== null
   const currentStageLabel = getCurrentStageLabel(pathname)
 
+  // Dismissible disclaimer state — persisted in localStorage
+  const DISCLAIMER_KEY = "forge-disclaimer-dismissed"
+  const [disclaimerDismissed, setDisclaimerDismissed] = useState(true) // default hidden to avoid flash
+  useEffect(() => {
+    setDisclaimerDismissed(localStorage.getItem(DISCLAIMER_KEY) === "true")
+  }, [])
+  const handleDismissDisclaimer = useCallback(() => {
+    localStorage.setItem(DISCLAIMER_KEY, "true")
+    setDisclaimerDismissed(true)
+  }, [])
+
   return (
     <div className="space-y-6">
-      {/* ── Breadcrumb ── */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
-        <Link
-          href={FORGE_ROUTES.home}
-          className="text-muted-foreground hover:text-foreground transition-colors"
-        >
-          The Forge
-        </Link>
-        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-        {isMashupOrTemplates(pathname) ? (
-          <span className="text-foreground font-medium">{currentStageLabel}</span>
-        ) : (
-          <>
-            <span className="text-muted-foreground">Pipeline</span>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-foreground font-medium">{currentStageLabel}</span>
-          </>
-        )}
-      </nav>
-
-      {/* ── Header ── */}
-      <div className="pb-4 border-b border-muted">
+      {/* ── Header (consolidated: breadcrumb + title + badges in 2 rows) ── */}
+      <div className="pb-4 border-b border-muted space-y-2">
+        {/* Row 1: Breadcrumb + save status + projects */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-1 rounded-full bg-international-orange" />
-            <h1 className="text-2xl font-bold text-foreground">The Forge</h1>
-            <span className="text-xs font-mono bg-muted text-muted-foreground px-2 py-1 rounded">
-              PIPELINE
-            </span>
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
-              Alpha
-            </span>
-            {sector && (
-              <span className="flex items-center gap-1.5 text-xs font-medium bg-international-orange-light text-international-orange px-2.5 py-1 rounded">
-                <Factory className="h-3 w-3" />
-                {SECTOR_LABELS[sector]} components active
-              </span>
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
+            <Link
+              href={FORGE_ROUTES.home}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              The Forge
+            </Link>
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            {isMashupOrTemplates(pathname) ? (
+              <span className="text-foreground font-medium">{currentStageLabel}</span>
+            ) : (
+              <>
+                <span className="text-muted-foreground">Pipeline</span>
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-foreground font-medium">{currentStageLabel}</span>
+              </>
             )}
-          </div>
+          </nav>
           <div className="flex items-center gap-2">
             {activeProjectId && (
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -168,29 +164,57 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
             </Button>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground mt-2">
-          Explore concepts and get ideas—then bring in experts to validate and finalise.
-        </p>
+        {/* Row 2: Title + inline badges */}
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-1 rounded-full bg-international-orange" />
+          <h1 className="text-2xl font-bold text-foreground">The Forge</h1>
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
+            Alpha
+          </span>
+          {sector && (
+            <span className="flex items-center gap-1.5 text-xs font-medium bg-international-orange-light text-international-orange px-2.5 py-1 rounded">
+              <Factory className="h-3 w-3" />
+              {SECTOR_LABELS[sector]}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ── Disclaimer: outputs are for exploration, not final; recruit experts via marketplace ── */}
-      <Alert variant="default" className="border-status-info bg-status-info-light/30">
-        <Info className="h-4 w-4 text-status-info" />
-        <AlertTitle className="text-sm font-semibold text-foreground">
-          For exploration only—not final drawings
-        </AlertTitle>
-        <AlertDescription className="text-sm text-foreground/90">
-          The information and drawings from this pipeline are to help you get an idea of the things to think about. They are <strong>not</strong> actual final drawings and <strong>must be checked by qualified people</strong> before use. Recruit relevant experts via the marketplace to validate and finalise your design.
-          <div className="mt-2">
-            <Button variant="outline" size="sm" className="gap-1.5 border-electric-blue text-electric-blue hover:bg-electric-blue-light/20" asChild>
-              <Link href="/marketplace">
-                <Store className="h-3.5 w-3.5" />
-                Find experts in the marketplace
-              </Link>
-            </Button>
-          </div>
-        </AlertDescription>
-      </Alert>
+      {disclaimerDismissed ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <ShieldAlert className="h-3.5 w-3.5 text-status-info flex-shrink-0" />
+          <span>For exploration only — outputs must be checked by qualified people.</span>
+          <Link href="/marketplace" className="text-electric-blue hover:underline whitespace-nowrap">
+            Find experts
+          </Link>
+        </div>
+      ) : (
+        <Alert variant="default" className="border-status-info bg-status-info-light/30 relative">
+          <Info className="h-4 w-4 text-status-info" />
+          <AlertTitle className="text-sm font-semibold text-foreground pr-8">
+            For exploration only—not final drawings
+          </AlertTitle>
+          <AlertDescription className="text-sm text-foreground/90">
+            The information and drawings from this pipeline are to help you get an idea of the things to think about. They are <strong>not</strong> actual final drawings and <strong>must be checked by qualified people</strong> before use. Recruit relevant experts via the marketplace to validate and finalise your design.
+            <div className="mt-2">
+              <Button variant="outline" size="sm" className="gap-1.5 border-electric-blue text-electric-blue hover:bg-electric-blue-light/20" asChild>
+                <Link href="/marketplace">
+                  <Store className="h-3.5 w-3.5" />
+                  Find experts in the marketplace
+                </Link>
+              </Button>
+            </div>
+          </AlertDescription>
+          <button
+            onClick={handleDismissDisclaimer}
+            className="absolute top-3 right-3 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            aria-label="Dismiss disclaimer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </Alert>
+      )}
 
       {/* ── Project Browser Dialog ── */}
       <Dialog open={showProjects} onOpenChange={setShowProjects}>

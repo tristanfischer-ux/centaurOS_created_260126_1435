@@ -151,6 +151,9 @@ export function HeroSection({
               </>
             )}
           </Button>
+          {isResearching && (
+            <span className="text-xs text-muted-foreground shrink-0">~30-60s</span>
+          )}
         </div>
 
         {/* Example prompt chips */}

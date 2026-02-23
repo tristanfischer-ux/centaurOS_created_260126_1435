@@ -226,12 +226,13 @@ async function callOpus(
 
   console.info("[StructuralBrief] All Anthropic models refused — falling back to Gemini")
 
+  // SECURITY: Use x-goog-api-key header instead of URL query param (F6)
   const geminiModel = "gemini-3.1-pro-preview"
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`
 
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": geminiKey },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ parts: [{ text: userPrompt }] }],

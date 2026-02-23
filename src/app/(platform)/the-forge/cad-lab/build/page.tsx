@@ -113,7 +113,7 @@ export default function CadLabBuildPage(): React.ReactNode {
   const [activeViewTab, setActiveViewTab] = useState<ViewTab>("3d")
   const [fullscreenView, setFullscreenView] = useState<string | null>(null)
   const [viewingModuleId, setViewingModuleId] = useState<string | null>(null)
-  const [showCode, setShowCode] = useState(false)
+  const [showCodeSet, setShowCodeSet] = useState<Set<string>>(new Set())
   const [codeCopied, setCodeCopied] = useState(false)
   const [isConfirmRemapOpen, setIsConfirmRemapOpen] = useState(false)
 
@@ -156,6 +156,42 @@ export default function CadLabBuildPage(): React.ReactNode {
   const viewingModule = viewingModuleId ? modules.find((m) => m.id === viewingModuleId) : null
   const viewingResult = viewingModule?.result as CadLabResult | undefined
 
+  // ── Section navigation for Build page ──
+  const BUILD_SECTIONS = useMemo(() => {
+    const sections: { id: string; label: string }[] = []
+    if (modules.length > 0 && generatedModuleCount === modules.length) sections.push({ id: "build-integration", label: "Assembly" })
+    if (modules.length > 0) sections.push({ id: "build-overview", label: "Overview" })
+    if (hasResearch) sections.push({ id: "build-research", label: "Research" })
+    if (hasResearch) sections.push({ id: "build-mfg-context", label: "Mfg Context" })
+    if (modules.length > 0) sections.push({ id: "build-architecture", label: "Architecture" })
+    if (modules.length > 0) sections.push({ id: "build-flow", label: "Flow" })
+    if (modules.length > 0) sections.push({ id: "build-modules", label: "Modules" })
+    return sections
+  }, [modules, generatedModuleCount, hasResearch])
+
+  const [activeBuildSection, setActiveBuildSection] = useState("")
+
+  const handleBuildSectionClick = useCallback((id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [])
+
+  useEffect(() => {
+    if (BUILD_SECTIONS.length === 0) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveBuildSection(entry.target.id)
+        }
+      },
+      { rootMargin: "-20% 0px -70% 0px" },
+    )
+    for (const section of BUILD_SECTIONS) {
+      const el = document.getElementById(section.id)
+      if (el) observer.observe(el)
+    }
+    return () => observer.disconnect()
+  }, [BUILD_SECTIONS])
+
   if (!hasResearch) {
     return (
       <div className="py-12">
@@ -175,9 +211,30 @@ export default function CadLabBuildPage(): React.ReactNode {
 
   return (
     <div className="space-y-6">
+      {/* ── Section navigation ── */}
+      {BUILD_SECTIONS.length > 1 && (
+        <nav className="sticky top-12 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 bg-background border-b border-border overflow-x-auto">
+          <div className="flex items-center gap-1">
+            {BUILD_SECTIONS.map((section) => (
+              <button
+                key={section.id}
+                onClick={() => handleBuildSectionClick(section.id)}
+                className={`px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
+                  activeBuildSection === section.id
+                    ? "bg-international-orange-light text-international-orange"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {section.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
+
       {/* ── Integration: combined system assembly (when all modules generated) ── */}
       {modules.length > 0 && generatedModuleCount === modules.length && (
-        <IntegrationView
+        <div id="build-integration"><IntegrationView
           allModulesGenerated
           referenceModel={referenceModel ?? null}
           integratedAssemblyStlUrl={integratedAssemblyStlUrl}
@@ -185,7 +242,7 @@ export default function CadLabBuildPage(): React.ReactNode {
           onGenerateIntegration={handleGenerateIntegration}
           integrationError={integrationError}
           onClearError={() => setIntegrationError(null)}
-        />
+        /></div>
       )}
 
       {/* ── All modules generated celebration ── */}
@@ -198,6 +255,35 @@ export default function CadLabBuildPage(): React.ReactNode {
             <div className="flex-1 min-w-0 space-y-3">
               <div>
                 <h3 className="text-base font-semibold text-foreground">All {modules.length} Modules Generated</h3>
+                {/* Download All — triggers individual STEP + STL downloads for every generated module */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs mt-2"
+                  onClick={() => {
+                    for (const mod of modules) {
+                      const r = mod.result as CadLabResult | undefined
+                      if (!r) continue
+                      if (r.stepData) handleDownload(`${mod.name}.step`, r.stepData, false)
+                      else if (r.stepUrl) {
+                        const link = document.createElement("a")
+                        link.href = r.stepUrl
+                        link.download = `${mod.name}.step`
+                        link.click()
+                      }
+                      if (r.stlData) handleDownload(`${mod.name}.stl`, r.stlData, true)
+                      else if (r.stlUrl) {
+                        const link = document.createElement("a")
+                        link.href = r.stlUrl
+                        link.download = `${mod.name}.stl`
+                        link.click()
+                      }
+                    }
+                  }}
+                >
+                  <Download className="h-3 w-3" />
+                  Download All STEP + STL
+                </Button>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Your product is manufacturing-ready. Continue to the Review stage for supplier-ready documentation and expert matching.
                 </p>
@@ -212,9 +298,33 @@ export default function CadLabBuildPage(): React.ReactNode {
         </div>
       )}
 
+      {/* ── Sticky Generate All action bar (visible when ungenerated modules exist) ── */}
+      {modules.length > 0 && modules.some((m) => m.status !== "generated") && (
+        <div className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background border-b border-border shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate">{subject}</p>
+              <p className="text-xs text-muted-foreground">
+                {generatedModuleCount} of {modules.length} modules generated
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button onClick={handleGenerateAllModules} disabled={isAnyLoading} size="sm" className="gap-1.5">
+                {isBatchRunning ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" />Generating...</>
+                ) : (
+                  <><Play className="h-3.5 w-3.5" />Generate All Modules</>
+                )}
+              </Button>
+              <span className="text-xs text-muted-foreground hidden sm:block">~2-5 min</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Product Overview ── */}
       {modules.length > 0 && (
-        <ProductOverview
+        <div id="build-overview"><ProductOverview
           subject={subject}
           report={editableReport}
           modules={modules}
@@ -224,12 +334,12 @@ export default function CadLabBuildPage(): React.ReactNode {
           totalRisks={modules.reduce((s, m) => s + m.failureModes.length, 0)}
           totalUnknowns={modules.reduce((s, m) => s + m.unknowns.length, 0)}
           systemIllustrationUrl={systemIllustrationUrl}
-        />
+        /></div>
       )}
 
       {/* ── Research Report (moved from Concept — this is where the user first reads it in depth) ── */}
       {hasResearch && (
-        <ResearchSection
+        <div id="build-research"><ResearchSection
           hasResearch={hasResearch}
           isAnyLoading={isAnyLoading}
           researchResult={researchResult}
@@ -241,12 +351,12 @@ export default function CadLabBuildPage(): React.ReactNode {
           onRetryResearch={handleResearch}
           systemIllustrationUrl={systemIllustrationUrl}
           systemIllustrationStatus={systemIllustrationStatus}
-        />
+        /></div>
       )}
 
       {/* ── Manufacturing Context (moved from Concept) ── */}
       {hasResearch && (
-        <CollapsibleSection
+        <div id="build-mfg-context"><CollapsibleSection
           title="Manufacturing Context"
           subtitle="Process, material, tolerance, and compliance preferences"
           icon={<Ruler className="h-4 w-4" />}
@@ -262,25 +372,25 @@ export default function CadLabBuildPage(): React.ReactNode {
             designReadinessPct={designReadinessPct}
             isAnyLoading={isAnyLoading}
           />
-        </CollapsibleSection>
+        </CollapsibleSection></div>
       )}
 
       {/* ── System Architecture ── */}
       {modules.length > 0 && (
-        <SystemArchitecture
+        <div id="build-architecture"><SystemArchitecture
           subject={subject}
           modules={modules}
           onModuleClick={(moduleId) => setExpandedModuleId(expandedModuleId === moduleId ? null : moduleId)}
-        />
+        /></div>
       )}
 
       {/* ── Module Integration Flow ── */}
       {modules.length > 0 && (
-        <ProcessFlowDiagram modules={modules} />
+        <div id="build-flow"><ProcessFlowDiagram modules={modules} /></div>
       )}
 
-      {/* ── Progressive module carousel: one module at a time, read while previous builds ── */}
-      {modules.length > 0 && (
+      {/* ── Progressive module carousel: visible during batch generation for read-ahead ── */}
+      {modules.length > 0 && isBatchRunning && (
         <ModuleCarousel
           modules={modules}
           batchProgress={batchProgress}
@@ -293,7 +403,7 @@ export default function CadLabBuildPage(): React.ReactNode {
       )}
 
       {/* ── Module Decomposition ── */}
-      <Card>
+      <Card id="build-modules">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Box className="h-4 w-4" />
@@ -332,13 +442,16 @@ export default function CadLabBuildPage(): React.ReactNode {
               </Button>
             )}
             {modules.length > 0 && modules.some((m) => m.status !== "generated") && (
-              <Button onClick={handleGenerateAllModules} disabled={isAnyLoading} variant="default">
-                {isBatchRunning ? (
-                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Generating All...</>
-                ) : (
-                  <><Play className="h-4 w-4 mr-2" />Generate All Modules</>
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button onClick={handleGenerateAllModules} disabled={isAnyLoading} variant="default">
+                  {isBatchRunning ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-2" />Generating All...</>
+                  ) : (
+                    <><Play className="h-4 w-4 mr-2" />Generate All Modules</>
+                  )}
+                </Button>
+                <span className="text-xs text-muted-foreground">~2-5 min</span>
+              </div>
             )}
           </div>
 
@@ -577,9 +690,9 @@ export default function CadLabBuildPage(): React.ReactNode {
             />
           )}
 
-          {/* Module list — hidden when batch progress is visible to avoid duplication */}
+          {/* Module list — crossfade in when batch progress finishes */}
           {modules.length > 0 && Object.keys(batchProgress).length === 0 && (
-            <div className="space-y-2 mt-4">
+            <FadeIn><div className="space-y-2 mt-4">
               {modules.map((mod) => (
                 <div key={mod.id} id={`module-${mod.id}`} className="border rounded-md overflow-hidden">
                   {/* Module header */}
@@ -822,8 +935,13 @@ export default function CadLabBuildPage(): React.ReactNode {
                           result={mod.result as CadLabResult}
                           moduleName={mod.name}
                           code={mod.code}
-                          showCode={showCode}
-                          setShowCode={setShowCode}
+                          showCode={showCodeSet.has(mod.id)}
+                          setShowCode={(v: boolean) => setShowCodeSet((prev) => {
+                            const next = new Set(prev)
+                            if (v) next.add(mod.id)
+                            else next.delete(mod.id)
+                            return next
+                          })}
                           codeCopied={codeCopied}
                           onCopyCode={handleCopyCode}
                           activeViewTab={activeViewTab}
@@ -848,7 +966,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                   )}
                 </div>
               ))}
-            </div>
+            </div></FadeIn>
           )}
         </CardContent>
       </Card>
@@ -1499,25 +1617,12 @@ function SystemArchitecture({
                     )}
                   </div>
 
-                  {/* Purpose */}
-                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2 leading-relaxed">
-                    {mod.purpose}
-                  </p>
-
-                  {/* Stats row */}
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-0.5" title={`${mod.leadWeeks} week lead time`}>
-                      <Clock className="h-2.5 w-2.5" />
-                      {mod.leadWeeks}w
-                    </span>
-                    <span className="flex items-center gap-0.5" title={`${mod.keyParts.length} components`}>
-                      <Puzzle className="h-2.5 w-2.5" />
-                      {mod.keyParts.length}
-                    </span>
+                  {/* Compact stats — connections only (details in Module Breakdown below) */}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                     {moduleConnections.length > 0 && (
                       <span className="flex items-center gap-0.5" title={`${moduleConnections.length} interface connection${moduleConnections.length !== 1 ? "s" : ""}`}>
                         <ArrowDownRight className="h-2.5 w-2.5" />
-                        {moduleConnections.length}
+                        {moduleConnections.length} interface{moduleConnections.length !== 1 ? "s" : ""}
                       </span>
                     )}
                     {mod.status === "generated" && (
@@ -1630,6 +1735,29 @@ function CollapsibleSection({
       </button>
       {isOpen && <div className="px-4 pb-4 border-t pt-4">{children}</div>}
     </Card>
+  )
+}
+
+// ─── Fade In (crossfade for batch → module list transition) ──────────
+
+/**
+ * FadeIn — Subtle opacity fade when a section mounts.
+ * Used to smooth the transition when batch progress grid disappears
+ * and the module list appears.
+ */
+function FadeIn({ children }: { children: React.ReactNode }): React.ReactNode {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(raf)
+  }, [])
+  return (
+    <div
+      className="transition-opacity duration-500 ease-out"
+      style={{ opacity: visible ? 1 : 0 }}
+    >
+      {children}
+    </div>
   )
 }
 
