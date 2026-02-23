@@ -29,6 +29,66 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
+
+// ─── Manufacturing Education Content ────────────────────────────────
+
+const PROCESS_EDUCATION: Record<string, { title: string; content: string; costDriver: string }> = {
+  "CNC Machining": {
+    title: "How CNC Machining Works",
+    content: "A rotating cutting tool removes material from a solid block. 3-axis machines cut from one direction; 5-axis machines approach from any angle. Your part starts as a block of material larger than the finished piece — the removed material is waste.",
+    costDriver: "Setup time (fixturing), number of operations (flips), tight tolerances requiring slow feeds, and deep pockets requiring specialty tooling.",
+  },
+  "Sheet Metal": {
+    title: "How Sheet Metal Fabrication Works",
+    content: "Flat sheet is cut (laser/waterjet), then bent on a press brake. Each bend requires a separate tool setup. The grain direction of the sheet affects bendability — bending perpendicular to grain is stronger.",
+    costDriver: "Number of unique bends, tight bend radii requiring special tooling, and secondary operations (welding, hardware insertion, finishing).",
+  },
+  "Injection Molding": {
+    title: "How Injection Molding Works",
+    content: "Molten plastic is injected into a steel mold under high pressure. The mold (tool) costs $5k-$100k+ but each part costs pennies. Design changes after tooling are extremely expensive — the steel mold must be re-cut or scrapped.",
+    costDriver: "Mold complexity (undercuts require side actions at $2-10k each), surface finish requirements, material selection, and part volume.",
+  },
+  Casting: {
+    title: "How Casting Works",
+    content: "Molten metal is poured into a mold cavity and solidifies. Sand casting uses expendable molds (low tooling, rough finish). Die casting uses permanent steel molds (high tooling, smooth finish). Investment casting uses wax patterns for complex shapes.",
+    costDriver: "Tooling type (sand vs die vs investment), wall thickness uniformity, number of cores for internal features, and post-machining requirements.",
+  },
+  "FDM 3D Print": {
+    title: "How FDM 3D Printing Works",
+    content: "A heated nozzle melts plastic filament and deposits it layer by layer. Parts are strongest in the XY plane and weakest between layers (Z direction). Overhangs beyond 45° need support material that leaves surface marks when removed.",
+    costDriver: "Print time (driven by volume and height), support material usage, post-processing (sanding, vapor smoothing), and material choice.",
+  },
+  "SLA/Resin Print": {
+    title: "How SLA Resin Printing Works",
+    content: "A UV laser cures liquid resin one layer at a time. Produces the finest detail of any 3D printing process but parts are brittle unless specially formulated. All parts require post-cure under UV light for final properties.",
+    costDriver: "Print height (not volume), resin cost ($50-300/L), support removal and post-curing labor, and functional resin formulations.",
+  },
+  "SLS/Powder Print": {
+    title: "How SLS Powder Printing Works",
+    content: "A laser sinters (fuses) powder particles layer by layer. No support structures needed — unfused powder supports the part. Produces strong nylon parts with good mechanical properties but grainy surface finish.",
+    costDriver: "Build chamber packing efficiency, powder refresh ratio (used vs virgin), part volume, and post-processing (dyeing, polishing, vapor smoothing).",
+  },
+}
+
+const MATERIAL_EDUCATION: Record<string, string> = {
+  "Aluminum 6061": "Temper matters: T6 means heat-treated and artificially aged (strongest). T651 adds stress-relief for better flatness after machining. Raw (F temper) is soft and will deform under load. Always specify temper.",
+  "Steel (mild)": "Mild steel rusts without coating. Common grades: 1018 (general purpose), 1045 (higher strength, heat-treatable), A36 (structural). If your part will be welded, specify weldable grade and call out weld symbols on the drawing.",
+  "Stainless Steel": "Not all stainless is equal: 304 is the general-purpose default. 316 resists chlorides (marine/medical). 17-4PH can be heat-treated to high strength. Stainless work-hardens during machining, increasing cost.",
+  Titanium: "Grade 5 (Ti-6Al-4V) is the aerospace standard — high strength but 5-10× the machining cost of aluminum. Grade 2 (commercially pure) is cheaper to machine and sufficient for corrosion resistance. Always question whether titanium is truly necessary.",
+  "PLA/PETG": "PLA is for prototypes only — it softens above 60°C and degrades over time. PETG is the minimum for functional parts: better chemical resistance and temperature range. Neither is suitable for outdoor UV exposure without coating.",
+  "ABS/Nylon": "ABS can be vapor-smoothed with acetone for a glossy finish. Nylon (PA6, PA12) has the best mechanical properties of any printable plastic but absorbs moisture — parts must be dried before printing and may change dimensions in humid environments.",
+  "Carbon Fiber": "Carbon fiber composites are not isotropic — strength depends entirely on fiber orientation. Specify layup angles for your load case. Chopped fiber (injection molded) is much weaker than continuous fiber (laminated). Always specify which you need.",
+  "Copper/Brass": "Copper is extremely difficult to machine — it's gummy and clogs tools. Free-machining brass (C360) is 10× easier. For electrical conductivity, specify %IACS requirement. For thermal, specify thermal conductivity in W/m·K.",
+}
+
+const TOLERANCE_EDUCATION: Record<string, string> = {
+  "General (±0.5mm)": "General tolerance is what you get without specifying anything. Suitable for non-mating surfaces and most 3D printed parts. If your parts need to fit together, you probably need tighter tolerances on the interface features only.",
+  "Moderate (±0.25mm)": "Moderate tolerance is achievable with standard CNC machining at no cost premium. Good for clearance fits and most mechanical assemblies. This is the sweet spot for prototyping.",
+  "Tight (±0.1mm)": "Tight tolerance requires careful machining with measured setups. Cost increases 30-50% over general. Only specify on features that genuinely need it — mating surfaces, bearing bores, and alignment pins. Never blanket an entire part with tight tolerance.",
+  "Very tight (±0.05mm)": "Very tight tolerance requires grinding or precision machining. Cost increases 2-3× over general. Only use for precision fits (bearing seats, shaft journals). Your supplier pool shrinks significantly — many shops can't hold this.",
+  "Ultra-tight (±0.01mm)": "Ultra-tight tolerance is near the limit of conventional machining. Requires temperature-controlled inspection and specialized equipment. Cost is 5-10× general tolerance. Only justify for optical, medical, or aerospace-grade interfaces.",
+}
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -39,6 +99,8 @@ interface WhileYouWaitProps {
   diagCompletedCount: number
   /** Whether the user has research to review */
   hasResearch: boolean
+  /** Diagnostic answers for manufacturing-context education */
+  diagnosticAnswers?: DiagnosticAnswers
 }
 
 // ─── Activity Card ───────────────────────────────────────────────────
@@ -153,6 +215,7 @@ export function CadLabWhileYouWait({
   modules,
   diagCompletedCount,
   hasResearch,
+  diagnosticAnswers,
 }: WhileYouWaitProps): React.ReactNode {
   const totalModules = modules.length
   const riskCount = modules.reduce(
@@ -160,6 +223,18 @@ export function CadLabWhileYouWait({
     0,
   )
   const diagsRemaining = totalModules - diagCompletedCount
+
+  // Derive unique processes, materials, and tolerances from diagnostic answers
+  const uniqueProcesses = new Set<string>()
+  const uniqueMaterials = new Set<string>()
+  const uniqueTolerances = new Set<string>()
+  if (diagnosticAnswers) {
+    for (const modAnswers of Object.values(diagnosticAnswers)) {
+      if (modAnswers.mfg_process) uniqueProcesses.add(modAnswers.mfg_process)
+      if (modAnswers.material) uniqueMaterials.add(modAnswers.material)
+      if (modAnswers.tolerance) uniqueTolerances.add(modAnswers.tolerance)
+    }
+  }
 
   const activities: ActivityProps[] = [
     // Review risks — always useful if there are any
@@ -186,6 +261,37 @@ export function CadLabWhileYouWait({
       priority: hasResearch ? 60 : 0,
       completed: !hasResearch,
     },
+    // Manufacturing education — contextual to diagnostic answers
+    ...Array.from(uniqueProcesses).map((proc): ActivityProps => {
+      const edu = PROCESS_EDUCATION[proc]
+      if (!edu) return { icon: <></>, title: "", description: "", priority: 0, completed: true }
+      return {
+        icon: <FileText className="h-4 w-4" />,
+        title: edu.title,
+        description: `${edu.content} Cost driver: ${edu.costDriver}`,
+        priority: 85,
+      }
+    }),
+    ...Array.from(uniqueMaterials).map((mat): ActivityProps => {
+      const edu = MATERIAL_EDUCATION[mat]
+      if (!edu) return { icon: <></>, title: "", description: "", priority: 0, completed: true }
+      return {
+        icon: <FileText className="h-4 w-4" />,
+        title: `Understand your material: ${mat}`,
+        description: edu,
+        priority: 80,
+      }
+    }),
+    ...Array.from(uniqueTolerances).map((tol): ActivityProps => {
+      const edu = TOLERANCE_EDUCATION[tol]
+      if (!edu) return { icon: <></>, title: "", description: "", priority: 0, completed: true }
+      return {
+        icon: <FileText className="h-4 w-4" />,
+        title: `Review your tolerance spec: ${tol}`,
+        description: edu,
+        priority: 75,
+      }
+    }),
     // Check tasks — always useful
     {
       icon: <ListChecks className="h-4 w-4" />,

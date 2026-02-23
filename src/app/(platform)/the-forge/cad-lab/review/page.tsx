@@ -3,10 +3,12 @@
 /**
  * @file review/page.tsx — The Forge: Review stage (Stage 3).
  *
- * @description Final review package with supplier-ready documentation and
- * expert discipline matching. Requires at least one generated module.
+ * @description Complete factory-ready review package with engineering documentation,
+ * DFM analysis, diagnostics, supply chain specifications, cost estimates,
+ * expert discipline matching, factory conversation guide, and contracting
+ * (RFQ/SOW/NDA). Requires at least one generated module.
  *
- * Gate: redirects to /the-forge/cad-lab/build if no generated modules.
+ * Gate: shows empty state if no generated modules.
  */
 
 import { useMemo } from "react"
@@ -25,6 +27,12 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { CadLabReviewPackage } from "@/components/cad/cad-lab-review-package"
 import { CadLabPeople } from "@/components/cad/cad-lab-people"
 import { CadLabDrawingPackage } from "@/components/cad/cad-lab-drawing-package"
+import { CadLabAnalysisDashboard } from "@/components/cad/cad-lab-analysis-dashboard"
+import { CadLabDiagnostics } from "@/components/cad/cad-lab-diagnostics"
+import { CadLabSupplyChain } from "@/components/cad/cad-lab-supply-chain"
+import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
+import { CadLabContracting } from "@/components/cad/cad-lab-contracting"
+import { CadLabFactoryGuide } from "@/components/cad/cad-lab-factory-guide"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 
 import { useCadLab } from "../cad-lab-context"
@@ -33,7 +41,9 @@ export default function CadLabReviewPage(): React.ReactNode {
   const router = useRouter()
   const {
     modules, generatedModuleCount, subject,
-    editableReport, diagnosticAnswers,
+    editableReport, diagnosticAnswers, setDiagnosticAnswers,
+    aiPrefilled, designBrief, assumptionNotes,
+    activeProjectId, linkedRfqId,
   } = useCadLab()
 
   useRegisterScreenContext(
@@ -88,9 +98,45 @@ export default function CadLabReviewPage(): React.ReactNode {
         </Button>
       </div>
 
+      {/* Engineering review package — quality scorecard, per-module summary */}
       <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
-      <CadLabDrawingPackage modules={modules} projectName={subject} />
+
+      {/* DFM analysis dashboard — manufacturing grade, risk register */}
+      <CadLabAnalysisDashboard modules={modules} projectName={subject} />
+
+      {/* Engineering diagnostics — process, material, tolerance, finish, batch, environment */}
+      <CadLabDiagnostics
+        modules={modules}
+        answers={diagnosticAnswers}
+        onAnswersChange={setDiagnosticAnswers}
+        aiPrefilled={aiPrefilled}
+      />
+
+      {/* Supply chain specifications per module */}
+      <CadLabSupplyChain modules={modules} diagnosticAnswers={diagnosticAnswers} />
+
+      {/* Cost estimate with tooling breakdown */}
+      <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
+
+      {/* Drawing package exports — JSON, Markdown, CSV */}
+      <CadLabDrawingPackage modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
+
+      {/* Expert discipline matching */}
       <CadLabPeople modules={modules} diagnosticAnswers={diagnosticAnswers} />
+
+      {/* Factory conversation guide — what to know before talking to suppliers */}
+      <CadLabFactoryGuide modules={modules} diagnosticAnswers={diagnosticAnswers} />
+
+      {/* Contracting — RFQ, SOW, NDA generation */}
+      <CadLabContracting
+        modules={modules}
+        projectName={subject}
+        diagnosticAnswers={diagnosticAnswers}
+        projectId={activeProjectId}
+        linkedRfqId={linkedRfqId}
+        designBrief={designBrief}
+        assumptionNotes={assumptionNotes}
+      />
 
       {/* Pipeline Complete */}
       <Card className="border-status-success/30 bg-gradient-to-r from-status-success-light/20 to-background">

@@ -103,7 +103,7 @@ export function QuoteSection(): React.ReactNode {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <CadLabDrawingPackage modules={modules} projectName={subject} />
+          <CadLabDrawingPackage modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
         </CardContent>
       </Card>
 

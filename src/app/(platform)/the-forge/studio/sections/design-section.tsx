@@ -60,6 +60,7 @@ export function DesignSection(): React.ReactNode {
     generatedModuleCount,
     diagCompletedCount,
     hasResearch,
+    diagnosticAnswers,
     referenceModel,
     integratedAssemblyStlUrl,
     isIntegrating,
@@ -154,6 +155,7 @@ export function DesignSection(): React.ReactNode {
           modules={modules}
           diagCompletedCount={diagCompletedCount}
           hasResearch={hasResearch}
+          diagnosticAnswers={diagnosticAnswers}
         />
       )}
 

@@ -61,10 +61,12 @@ import {
 import type { CadLabResult, CadLabModule } from "@/lib/cad-lab-types"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
+import { ManufacturingInsightCard } from "@/components/cad/manufacturing-insight-card"
 import { useCadLab } from "../cad-lab-context"
 import { Metric, SvgView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
 import { ModuleCarousel } from "../components/module-carousel"
 import { IntegrationView } from "../components/integration-view"
+import { ProcessFlowDiagram } from "../components/process-flow-diagram"
 
 // ─── View Tab Type ───────────────────────────────────────────────────
 
@@ -84,6 +86,7 @@ export default function CadLabBuildPage(): React.ReactNode {
     handleModuleGenerate, handleGenerateSingleModule, handleGenerateAllModules,
     isBatchRunning, batchProgress,
     generatedModuleCount,
+    diagnosticAnswers,
     diagCompletedCount,
     integratedAssemblyStlUrl,
     isIntegrating,
@@ -217,6 +220,11 @@ export default function CadLabBuildPage(): React.ReactNode {
           modules={modules}
           onModuleClick={(moduleId) => setExpandedModuleId(expandedModuleId === moduleId ? null : moduleId)}
         />
+      )}
+
+      {/* ── Module Integration Flow ── */}
+      {modules.length > 0 && (
+        <ProcessFlowDiagram modules={modules} />
       )}
 
       {/* ── Progressive module carousel: one module at a time, read while previous builds ── */}
@@ -513,6 +521,7 @@ export default function CadLabBuildPage(): React.ReactNode {
               modules={modules}
               diagCompletedCount={diagCompletedCount}
               hasResearch={hasResearch}
+              diagnosticAnswers={diagnosticAnswers}
             />
           )}
 
@@ -590,6 +599,50 @@ export default function CadLabBuildPage(): React.ReactNode {
                       <div>
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Description</p>
                         <p className="text-sm text-foreground">{mod.description}</p>
+                      </div>
+
+                      {/* Why This Module Matters */}
+                      {mod.whyItMatters && (
+                        <div className="border-l-2 border-international-orange pl-3">
+                          <p className="text-xs font-semibold text-foreground mb-0.5">Why This Module Matters</p>
+                          <p className="text-sm text-muted-foreground">{mod.whyItMatters}</p>
+                        </div>
+                      )}
+
+                      {/* What the AI Assumed — things the user must validate */}
+                      {((mod.result?.assumptions && mod.result.assumptions.length > 0) || (mod.result?.validationWarnings && mod.result.validationWarnings.length > 0)) && (
+                        <div className="border rounded-lg p-3 space-y-2 bg-status-info-light/10">
+                          <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                            <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
+                            What the AI Assumed — Validate Before Sending to Factory
+                          </p>
+                          {mod.result?.assumptions && mod.result.assumptions.length > 0 && (
+                            <ul className="space-y-1.5">
+                              {mod.result.assumptions.map((assumption, idx) => (
+                                <li key={idx} className="text-xs text-foreground flex items-start gap-1.5">
+                                  <Info className="h-3 w-3 text-status-info flex-shrink-0 mt-0.5" />
+                                  <span>The AI assumed: <span className="font-medium">{assumption}</span> — is this correct for your use case?</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {mod.result?.validationWarnings && mod.result.validationWarnings.length > 0 && (
+                            <ul className="space-y-1.5">
+                              {mod.result.validationWarnings.map((warning, idx) => (
+                                <li key={idx} className="text-xs text-status-warning-dark flex items-start gap-1.5">
+                                  <AlertTriangle className="h-3 w-3 text-status-warning flex-shrink-0 mt-0.5" />
+                                  {warning}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Questions for Your Factory */}
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Questions for Your Factory</p>
+                        <ManufacturingInsightCard moduleAnswers={diagnosticAnswers?.[mod.id]} />
                       </div>
 
                       {/* IO Flow */}
@@ -682,16 +735,16 @@ export default function CadLabBuildPage(): React.ReactNode {
                         )}
                       </div>
 
-                      {/* Dimension plan */}
+                      {/* Dimensional Specification — promoted from hidden <details> */}
                       {mod.interfaceDefinition && (
-                        <details className="border rounded-md">
-                          <summary className="cursor-pointer p-2 text-xs font-medium hover:bg-muted/50 transition-colors">
-                            View dimension plan
-                          </summary>
-                          <div className="p-3 border-t">
-                            <pre className="text-xs font-mono whitespace-pre-wrap text-foreground">{mod.interfaceDefinition}</pre>
-                          </div>
-                        </details>
+                        <div className="border rounded-lg p-3 space-y-2 bg-muted/10">
+                          <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                            <Ruler className="h-3.5 w-3.5 text-international-orange" />
+                            Dimensional Specification
+                            <span className="font-normal text-muted-foreground">— send this to your factory</span>
+                          </p>
+                          <pre className="text-xs font-mono whitespace-pre-wrap text-foreground max-h-[300px] overflow-y-auto">{mod.interfaceDefinition}</pre>
+                        </div>
                       )}
 
                       {/* Module results (when generated) */}
@@ -892,6 +945,33 @@ function ProductOverview({
   )
 }
 
+// ─── DFM Issue Explanations ──────────────────────────────────────────
+
+const DFM_EXPLANATIONS: Record<string, string> = {
+  overhang: "Overhangs above 45° require support material, which increases print time, material usage, and may leave surface marks where supports attach. Consider reorienting the part or adding fillets.",
+  "thin wall": "Thin walls risk warping during cooling and may not survive post-processing. Increase wall thickness to at least 1.2mm for FDM or 0.8mm for SLA.",
+  "small feature": "Very small features may not resolve at the chosen layer height, or may break during removal from the build plate. Consider scaling up or using a higher-resolution process.",
+  bridge: "Unsupported horizontal spans (bridges) can sag during printing. Keep bridges under 10mm for reliable results, or add support structure.",
+  tolerance: "The specified tolerance may not be achievable with this manufacturing process without post-machining. Discuss with your factory which features are truly critical.",
+  "build volume": "The part exceeds the build volume of common printers. You'll need a larger-format printer or may need to split the part into sections.",
+  support: "High support volume means significant material waste and post-processing time. Reorienting the part could reduce support requirements.",
+  geometry: "Complex geometry may cause slicing errors or unpredictable print quality. Simplify where possible, especially internal features.",
+}
+
+function getDfmExplanation(category: string, severity: string): string | null {
+  // Try exact match first
+  const lower = category.toLowerCase()
+  if (DFM_EXPLANATIONS[lower]) return DFM_EXPLANATIONS[lower]
+  // Try keyword match
+  for (const [key, explanation] of Object.entries(DFM_EXPLANATIONS)) {
+    if (lower.includes(key) || key.includes(lower)) return explanation
+  }
+  // Generic fallback for critical/warning
+  if (severity === "critical") return "This is a critical manufacturing issue. Resolve it before sending files to your factory — it will likely cause the part to fail or be unreproducible."
+  if (severity === "warning") return "This may affect part quality or increase cost. Discuss with your factory to determine if it needs to be addressed for your application."
+  return null
+}
+
 // ─── Module Results Viewer ───────────────────────────────────────────
 
 /**
@@ -1025,11 +1105,26 @@ function ModuleResultsView({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 border rounded-md">
         {result.bbox && <Metric icon={<Box className="h-3.5 w-3.5" />} label="Bounding Box" value={`${result.bbox.xLen}×${result.bbox.yLen}×${result.bbox.zLen} mm`} />}
         {result.massGrams != null && <Metric label="Mass" value={`${result.massGrams} g`} />}
-        {result.codeLines != null && <Metric icon={<Code2 className="h-3.5 w-3.5" />} label="Code Lines" value={`${result.codeLines}`} />}
+        {result.volumeMm3 != null && <Metric label="Volume" value={result.volumeMm3 > 1000 ? `${(result.volumeMm3 / 1000).toFixed(1)} cm³` : `${result.volumeMm3.toFixed(0)} mm³`} />}
+        {result.massProperties?.surfaceAreaMm2 != null && <Metric label="Surface Area" value={result.massProperties.surfaceAreaMm2 > 10000 ? `${(result.massProperties.surfaceAreaMm2 / 100).toFixed(0)} cm²` : `${result.massProperties.surfaceAreaMm2.toFixed(0)} mm²`} />}
         {result.generationTime != null && <Metric icon={<Timer className="h-3.5 w-3.5" />} label="Pipeline Time" value={`${(result.generationTime / 1000).toFixed(1)}s`} />}
         {result.fillRatio != null && <Metric label="Fill Ratio" value={`${result.fillRatio}%`} />}
         {result.stepSize != null && <Metric label="STEP Size" value={result.stepSize > 1024 ? `${(result.stepSize / 1024).toFixed(1)} MB` : `${result.stepSize} KB`} />}
+        {result.drawingPackage?.revision && <Metric label="Revision" value={result.drawingPackage.revision} />}
       </div>
+
+      {/* Validation warnings */}
+      {result.validationWarnings && result.validationWarnings.length > 0 && (
+        <div className="border border-status-warning/30 rounded-md p-3 space-y-1.5 bg-status-warning-light/10">
+          <p className="text-xs font-semibold text-status-warning-dark flex items-center gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Geometry Validation Warnings
+          </p>
+          {result.validationWarnings.map((warning, i) => (
+            <p key={i} className="text-xs text-foreground pl-5">{warning}</p>
+          ))}
+        </div>
+      )}
 
       {/* DFM */}
       {result.dfm && (
@@ -1066,17 +1161,28 @@ function ModuleResultsView({
             </div>
           )}
           {result.dfm.issues.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-xs text-muted-foreground">Issues</p>
-              {result.dfm.issues.map((issue, i) => (
-                <div key={i} className={`p-2 rounded text-xs font-mono ${
-                  issue.severity === "critical" ? "bg-status-error-light text-destructive"
-                  : issue.severity === "warning" ? "bg-status-warning-light text-status-warning-dark"
-                  : "bg-muted text-muted-foreground"
-                }`}>
-                  <span className="font-semibold uppercase">{issue.severity}:</span> {issue.message}
-                </div>
-              ))}
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Issues — what to fix before sending to factory</p>
+              {result.dfm.issues.map((issue, i) => {
+                const explanation = getDfmExplanation(issue.category, issue.severity)
+                return (
+                  <div key={i} className={`p-2.5 rounded space-y-1 ${
+                    issue.severity === "critical" ? "bg-status-error-light/50 border border-destructive/20"
+                    : issue.severity === "warning" ? "bg-status-warning-light/50 border border-status-warning/20"
+                    : "bg-muted border border-muted"
+                  }`}>
+                    <p className="text-xs font-mono">
+                      <span className={`font-semibold uppercase ${issue.severity === "critical" ? "text-destructive" : issue.severity === "warning" ? "text-status-warning-dark" : "text-muted-foreground"}`}>
+                        {issue.severity}:
+                      </span>{" "}
+                      <span className="text-foreground">{issue.message}</span>
+                    </p>
+                    {explanation && (
+                      <p className="text-xs text-muted-foreground leading-relaxed">{explanation}</p>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

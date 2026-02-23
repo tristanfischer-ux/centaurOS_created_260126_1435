@@ -24,6 +24,37 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 
+// ─── Manufacturing Micro-Lessons ────────────────────────────────────
+
+const PART_INSIGHTS: Array<{ keywords: string[]; insight: string }> = [
+  { keywords: ["bearing", "bearings"], insight: "Bearings require precise bore tolerances (IT6-IT7). Specify shaft fit class (e.g., h6/H7 for a transition fit) on your drawing." },
+  { keywords: ["gear", "gears", "gearbox"], insight: "Gears need surface hardness callouts (e.g., HRC 58-62 for hardened teeth). Specify module, pressure angle, and quality grade (AGMA or DIN)." },
+  { keywords: ["shaft", "axle"], insight: "Shafts need concentricity callouts between bearing journals. Specify surface finish Ra on bearing seats and keyway tolerances." },
+  { keywords: ["spring", "springs"], insight: "Springs are specified by rate (N/mm), free length, solid height, and material. Never dimension a spring by wire diameter alone — specify the functional requirements." },
+  { keywords: ["seal", "seals", "o-ring", "gasket"], insight: "Seals require surface finish Ra ≤ 0.8μm on mating surfaces. Specify groove dimensions per the seal manufacturer's catalog, not just the seal size." },
+  { keywords: ["pcb", "circuit board", "electronics"], insight: "PCBs need mounting hole positions with ±0.1mm tolerance. Specify standoff height, connector keep-out zones, and thermal relief requirements." },
+  { keywords: ["motor", "actuator", "servo"], insight: "Motors need mounting pattern tolerances of ±0.05mm for shaft alignment. Specify torque, speed, and duty cycle — not just power rating." },
+  { keywords: ["lens", "optic", "optical"], insight: "Optical components need surface quality callouts (scratch-dig per MIL-PRF-13830). Specify focal length tolerance and coating requirements." },
+  { keywords: ["thread", "threads", "screw", "bolt", "fastener"], insight: "Specify thread class (e.g., 6H/6g for metric). Blind holes need minimum thread engagement of 1.5× nominal diameter. Call out thread depth, not just tap depth." },
+  { keywords: ["hinge", "pivot"], insight: "Hinges need clearance fits on the pin (H7/g6 typical). Specify max angular play and fatigue cycle requirement for the intended life." },
+  { keywords: ["housing", "enclosure", "case", "chassis"], insight: "Housings need boss design for fasteners (OD = 2× screw diameter). Specify IP rating if environmental sealing is needed, and EMI shielding if applicable." },
+  { keywords: ["sensor", "transducer", "probe"], insight: "Sensor mounting needs vibration isolation consideration. Specify sensing axis alignment tolerance and cable routing clearance." },
+  { keywords: ["valve", "flow", "manifold"], insight: "Flow components need surface finish Ra ≤ 1.6μm on sealing surfaces. Specify pressure rating, flow coefficient (Cv), and compatible fluid types." },
+  { keywords: ["bracket", "mount", "mounting"], insight: "Brackets need load path analysis. Specify bolt pattern, maximum deflection under load, and material thickness for the expected force." },
+  { keywords: ["heat sink", "heatsink", "thermal", "cooling"], insight: "Heat sinks need thermal interface material (TIM) specification. Call out fin height, spacing, and base flatness (typically ≤ 0.05mm)." },
+  { keywords: ["filter", "mesh", "screen"], insight: "Filters need micron rating and differential pressure specification. Call out flow direction, bypass pressure, and replacement interval." },
+  { keywords: ["cam", "linkage"], insight: "Cam profiles need surface finish Ra ≤ 0.4μm and hardness HRC 55-62. Specify lift curve data points, not just max lift." },
+  { keywords: ["battery", "cell", "power"], insight: "Battery compartments need ventilation for thermal runaway gases. Specify contact spring force, polarity marking, and retention mechanism." },
+]
+
+function getPartInsight(keyParts: string[]): string | null {
+  const joined = keyParts.join(" ").toLowerCase()
+  for (const { keywords, insight } of PART_INSIGHTS) {
+    if (keywords.some((kw) => joined.includes(kw))) return insight
+  }
+  return null
+}
+
 type BatchStatus = "queued" | "interface" | "generating" | "done" | "error"
 
 interface ModuleCarouselProps {
@@ -258,6 +289,20 @@ export function ModuleCarousel({
                 )}
               </div>
             )}
+
+            {/* Manufacturing micro-lesson keyed to key parts */}
+            {(() => {
+              const insight = getPartInsight(focusedModule.keyParts)
+              if (!insight) return null
+              return (
+                <div className="rounded-md bg-international-orange-light/10 border border-international-orange/20 px-3 py-2">
+                  <p className="text-[10px] font-semibold text-international-orange uppercase tracking-wider mb-0.5">
+                    Manufacturing Insight
+                  </p>
+                  <p className="text-xs text-foreground leading-relaxed">{insight}</p>
+                </div>
+              )
+            })()}
           </div>
         )}
       </CardContent>

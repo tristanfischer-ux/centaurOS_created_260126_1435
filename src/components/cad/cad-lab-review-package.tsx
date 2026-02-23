@@ -105,6 +105,9 @@ function generatePlainText(
   lines.push("")
 
   // Per module
+  const allUnknowns: { module: string; items: string[] }[] = []
+  const allAssumptions: { module: string; items: string[] }[] = []
+
   for (const mod of modules) {
     lines.push(`MODULE: ${mod.name.toUpperCase()}`)
     lines.push(`${"-".repeat(30)}`)
@@ -113,6 +116,11 @@ function generatePlainText(
     lines.push(`Lead time: ${mod.leadWeeks} weeks`)
     lines.push(`Key parts: ${mod.keyParts.join(", ")}`)
 
+    // Why this module matters
+    if (mod.whyItMatters) {
+      lines.push(`Critical because: ${mod.whyItMatters}`)
+    }
+
     if (mod.result?.bbox) {
       lines.push(
         `Dimensions: ${mod.result.bbox.xLen.toFixed(0)}×${mod.result.bbox.yLen.toFixed(0)}×${mod.result.bbox.zLen.toFixed(0)} mm`
@@ -120,6 +128,14 @@ function generatePlainText(
     }
     if (mod.result?.massGrams) {
       lines.push(`Mass: ${mod.result.massGrams.toFixed(1)} g`)
+    }
+    if (mod.result?.volumeMm3) {
+      const vol = mod.result.volumeMm3
+      lines.push(`Volume: ${vol > 1000 ? `${(vol / 1000).toFixed(1)} cm³` : `${vol.toFixed(0)} mm³`}`)
+    }
+    if (mod.result?.massProperties?.surfaceAreaMm2) {
+      const sa = mod.result.massProperties.surfaceAreaMm2
+      lines.push(`Surface area: ${sa > 100 ? `${(sa / 100).toFixed(1)} cm²` : `${sa.toFixed(0)} mm²`}`)
     }
     if (mod.result?.dfm) {
       lines.push(`Printable: ${mod.result.dfm.printable ? "Yes" : "No"}`)
@@ -131,6 +147,21 @@ function generatePlainText(
       }
     }
 
+    // AI assumptions — critical for factory validation
+    const assumptions = mod.result?.assumptions
+    if (assumptions && assumptions.length > 0) {
+      lines.push(`AI Assumptions (VERIFY THESE):`)
+      for (const a of assumptions) lines.push(`  ⚠ ${a}`)
+      allAssumptions.push({ module: mod.name, items: assumptions })
+    }
+
+    // Validation warnings
+    const warnings = mod.result?.validationWarnings
+    if (warnings && warnings.length > 0) {
+      lines.push(`Validation Warnings:`)
+      for (const w of warnings) lines.push(`  ⚠ ${w}`)
+    }
+
     if (mod.failureModes.length > 0) {
       lines.push(`Failure Modes:`)
       for (const fm of mod.failureModes) lines.push(`  - ${fm}`)
@@ -138,6 +169,15 @@ function generatePlainText(
     if (mod.unknowns.length > 0) {
       lines.push(`Unknowns:`)
       for (const u of mod.unknowns) lines.push(`  ? ${u}`)
+      allUnknowns.push({ module: mod.name, items: mod.unknowns })
+    }
+
+    // Dimensional specification (interface definition)
+    if (mod.interfaceDefinition) {
+      const iface = mod.interfaceDefinition.trim()
+      const truncated = iface.length > 500 ? `${iface.slice(0, 497)}...` : iface
+      lines.push(`Dimensional Specification:`)
+      lines.push(`  ${truncated}`)
     }
 
     // Diagnostics
@@ -150,6 +190,36 @@ function generatePlainText(
     }
 
     lines.push("")
+  }
+
+  // Aggregated open questions for factory
+  if (allUnknowns.length > 0 || allAssumptions.length > 0) {
+    lines.push(`OPEN QUESTIONS FOR FACTORY`)
+    lines.push(`${"=".repeat(50)}`)
+    lines.push(`These items MUST be resolved before committing to production.`)
+    lines.push("")
+
+    let qNum = 1
+    if (allAssumptions.length > 0) {
+      lines.push(`AI Assumptions to Validate:`)
+      for (const { module, items } of allAssumptions) {
+        for (const item of items) {
+          lines.push(`  ${qNum}. [${module}] ${item}`)
+          qNum++
+        }
+      }
+      lines.push("")
+    }
+    if (allUnknowns.length > 0) {
+      lines.push(`Unresolved Engineering Questions:`)
+      for (const { module, items } of allUnknowns) {
+        for (const item of items) {
+          lines.push(`  ${qNum}. [${module}] ${item}`)
+          qNum++
+        }
+      }
+      lines.push("")
+    }
   }
 
   lines.push(`${"=".repeat(50)}`)
