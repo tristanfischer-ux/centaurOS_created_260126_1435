@@ -49,6 +49,7 @@ import {
     PiggyBank,
     FolderKanban,
     Receipt,
+    Landmark,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -103,6 +104,7 @@ const financeMoreNavigation = [
     { name: "Budgets", href: "/finance/budgets", icon: PiggyBank },
     { name: "Projects", href: "/finance/projects", icon: FolderKanban },
     { name: "Expenses", href: "/finance/expenses", icon: Receipt },
+    { name: "Funding", href: "/finance/funding", icon: Landmark },
     { name: "Alerts", href: "/finance/settings", icon: BellRing },
 ]
 

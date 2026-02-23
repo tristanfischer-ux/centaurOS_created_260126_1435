@@ -37,6 +37,7 @@ import {
     PiggyBank,
     FolderKanban,
     Receipt,
+    Landmark,
 } from "lucide-react"
 
 // ─── Section Definitions ────────────────────────────────────────────────────
@@ -286,6 +287,13 @@ export const SECTIONS: Section[] = [
                 description: "Track and manage business expenses",
                 route: "/finance/expenses",
                 icon: Receipt,
+                addedAt: new Date("2026-02-23"),
+            },
+            {
+                name: "Funding",
+                description: "Track funding opportunities and grant applications",
+                route: "/finance/funding",
+                icon: Landmark,
                 addedAt: new Date("2026-02-23"),
             },
             {

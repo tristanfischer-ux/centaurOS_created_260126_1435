@@ -5412,6 +5412,77 @@ export type Database = {
           },
         ]
       }
+      finance_funding_opportunities: {
+        Row: {
+          amount: number | null
+          applied_date: string | null
+          created_at: string
+          created_by: string
+          currency: string
+          deadline: string | null
+          decision_date: string | null
+          equity_pct: number | null
+          foundry_id: string
+          funder_name: string | null
+          id: string
+          name: string
+          notes: string | null
+          probability_pct: number | null
+          stage: string
+          type: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          amount?: number | null
+          applied_date?: string | null
+          created_at?: string
+          created_by: string
+          currency?: string
+          deadline?: string | null
+          decision_date?: string | null
+          equity_pct?: number | null
+          foundry_id: string
+          funder_name?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          probability_pct?: number | null
+          stage?: string
+          type?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          amount?: number | null
+          applied_date?: string | null
+          created_at?: string
+          created_by?: string
+          currency?: string
+          deadline?: string | null
+          decision_date?: string | null
+          equity_pct?: number | null
+          foundry_id?: string
+          funder_name?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          probability_pct?: number | null
+          stage?: string
+          type?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_funding_opportunities_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_payment_links: {
         Row: {
           amount: number
