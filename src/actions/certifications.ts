@@ -82,7 +82,7 @@ export async function getCertifications(providerId?: string): Promise<{
             return { data: [], error: error.message }
         }
 
-        return { data: data || [], error: null }
+        return { data: (data || []).map(cert => ({ ...cert, is_verified: cert.is_verified ?? false, created_at: cert.created_at ?? '' })), error: null }
     } catch (err) {
         console.error('Failed to fetch certifications:', err)
         return { data: [], error: 'Failed to fetch certifications' }
@@ -145,7 +145,7 @@ export async function addCertification(certification: {
         }
 
         revalidatePath('/provider-portal/certifications')
-        return { data, error: null }
+        return { data: data ? { ...data, is_verified: data.is_verified ?? false, created_at: data.created_at ?? '' } : null, error: null }
     } catch (err) {
         console.error('Failed to add certification:', err)
         return { data: null, error: 'Failed to add certification' }
@@ -312,7 +312,7 @@ export async function requestVerification(certificationId: string): Promise<{
         const { error: updateError } = await supabase
             .from('provider_certifications')
             .update({
-                verification_requested_at: new Date().toISOString(),
+                is_verified: false,
             })
             .eq('id', certificationId)
             .eq('provider_id', profile.id)
@@ -385,8 +385,8 @@ export async function getExpiringCertifications(providerId?: string): Promise<{
             return { data: [], error: error.message }
         }
 
-        const expiringCerts = (data || []).map((cert: { id: string; certification_name: string; expiry_date: string }) => {
-            const expiryDate = new Date(cert.expiry_date)
+        const expiringCerts = (data || []).map((cert: { id: string; certification_name: string; expiry_date: string | null }) => {
+            const expiryDate = new Date(cert.expiry_date ?? '')
             const today = new Date()
             const diffTime = expiryDate.getTime() - today.getTime()
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -394,7 +394,7 @@ export async function getExpiringCertifications(providerId?: string): Promise<{
             return {
                 id: cert.id,
                 certification_name: cert.certification_name,
-                expiry_date: cert.expiry_date,
+                expiry_date: cert.expiry_date ?? '',
                 days_until_expiry: diffDays,
             }
         })

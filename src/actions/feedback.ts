@@ -72,7 +72,7 @@ export async function submitFeedback(input: {
     // VALIDATION: Parse and validate input
     const parsed = feedbackSchema.safeParse(input)
     if (!parsed.success) {
-        const firstError = parsed.error.errors[0]?.message || 'Invalid feedback data'
+        const firstError = parsed.error.issues[0]?.message || 'Invalid feedback data'
         return { success: false, error: firstError }
     }
 

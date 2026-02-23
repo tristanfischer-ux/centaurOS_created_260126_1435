@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils'
 import type { RFQTemplate } from '@/types/review-gates'
 import { SECTOR_LABELS, type Sector } from '@/types/review-gates'
 
-const SECTOR_ICONS: Partial<Record<Sector, React.ElementType>> = {
+const SECTOR_ICONS: Partial<Record<Sector, React.ComponentType<{ className?: string }>>> = {
   robotics: Wrench,
   rockets: Rocket,
   satellites: Radio,

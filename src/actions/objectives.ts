@@ -431,8 +431,8 @@ export async function updateObjective(
  * @security Requires authenticated user who is the creator or has Executive/Founder role
  * @audit Foundry isolation enforced — cannot delete across foundries
  */
-export async function deleteObjective(id: string, childAction: 'keep' | 'cascade' = 'keep') {
-    return withAuth(async ({ supabase, user, foundryId }) => {
+export async function deleteObjective(id: string, childAction: 'keep' | 'cascade' = 'keep'): Promise<{ success?: boolean; error?: string } | undefined> {
+    return withAuth(async ({ supabase, user, foundryId }): Promise<{ success?: boolean; error?: string } | undefined> => {
         // 1. Verify ownership AND foundry isolation
         const { data: objective, error: fetchError } = await supabase
             .from('objectives')

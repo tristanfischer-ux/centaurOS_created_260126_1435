@@ -112,7 +112,7 @@ function getOrderedNodeIds(nodes: Node[], edges: Edge[]): string[] {
 
 // ─── Status helpers ──────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<string, { icon: React.ElementType; label: string; colorClass: string }> = {
+const STATUS_CONFIG: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; colorClass: string }> = {
     approved: { icon: CheckCircle2, label: "Complete", colorClass: "text-emerald-600 bg-emerald-50 border-emerald-200" },
     review: { icon: Clock, label: "Needs review", colorClass: "text-amber-600 bg-amber-50 border-amber-200" },
     running: { icon: Loader2, label: "Running", colorClass: "text-blue-600 bg-blue-50 border-blue-200" },

@@ -560,7 +560,7 @@ function ActionButton({
 }: {
   href?: string
   onClick?: () => void
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   iconColor: string
   label: string
 }) {

@@ -58,8 +58,8 @@ export function getDifficultyColor(difficulty: string | null): string {
 // Icon helpers
 // ---------------------------------------------------------------------------
 
-export function getPackIcon(iconName: string | null): React.ElementType {
-  const map: Record<string, React.ElementType> = {
+export function getPackIcon(iconName: string | null): React.ComponentType<{ className?: string }> {
+  const map: Record<string, React.ComponentType<{ className?: string }>> = {
     users: Users,
     rocket: Rocket,
     target: Target,
@@ -71,8 +71,8 @@ export function getPackIcon(iconName: string | null): React.ElementType {
   return map[iconName || 'target'] || Target
 }
 
-export function getTemplateIcon(iconName: string): React.ElementType {
-  const map: Record<string, React.ElementType> = {
+export function getTemplateIcon(iconName: string): React.ComponentType<{ className?: string }> {
+  const map: Record<string, React.ComponentType<{ className?: string }>> = {
     rocket: Rocket,
     bot: Bot,
     satellite: Radio,

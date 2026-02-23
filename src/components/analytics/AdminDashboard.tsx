@@ -349,8 +349,8 @@ export function AdminDashboard({
                       tick={{ fontSize: 12 }}
                       tickFormatter={(value) => formatCurrency(value)}
                     />
-                    <Tooltip 
-                      formatter={(value: number) => formatCurrency(value)}
+                    <Tooltip
+                      formatter={((value: string | number) => formatCurrency(Number(value))) as never}
                     />
                     <Area 
                       type="monotone" 
@@ -452,7 +452,7 @@ export function AdminDashboard({
                       />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <Tooltip formatter={((value: string | number) => formatCurrency(Number(value))) as never} />
                 </PieChart>
               </ResponsiveContainer>
             </div>

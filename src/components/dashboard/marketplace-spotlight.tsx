@@ -164,11 +164,11 @@ function SpotlightCard({ listing }: { listing: FeaturedListing }) {
               Verified
             </Badge>
           )}
-          {rate && (
+          {rate ? (
             <span className="text-xs font-medium text-foreground">
               {typeof rate === 'number' ? `£${rate}` : String(rate)}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
     </Link>

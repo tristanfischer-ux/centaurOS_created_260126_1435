@@ -84,7 +84,6 @@ async function DashboardContent() {
         id,
         title,
         budget_max,
-        currency,
         deadline,
         rfq_responses(id)
       `)
@@ -98,7 +97,7 @@ async function DashboardContent() {
     id: rfq.id,
     title: rfq.title,
     budget_max: rfq.budget_max,
-    currency: rfq.currency || 'USD',
+    currency: profile.currency || 'USD',
     deadline: rfq.deadline,
     responses_count: rfq.rfq_responses?.length || 0
   }))

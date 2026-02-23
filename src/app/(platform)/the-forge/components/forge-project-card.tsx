@@ -56,7 +56,7 @@ import { deleteScanAction, copyScanAction } from "@/actions/xray"
 
 const STAGE_CONFIG: Record<
   string,
-  { label: string; icon: React.ElementType; variant: "default" | "secondary" | "success" | "warning" | "info" }
+  { label: string; icon: React.ComponentType<{ className?: string }>; variant: "default" | "secondary" | "success" | "warning" | "info" }
 > = {
   concept: { label: "Concept", icon: Lightbulb, variant: "secondary" },
   dossier: { label: "Dossier", icon: Wrench, variant: "info" },

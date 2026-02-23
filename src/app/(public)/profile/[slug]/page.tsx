@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         ...(profile.total_reviews ? { reviews: profile.total_reviews.toString() } : {}),
         ...(profile.specializations?.length ? { skills: profile.specializations.slice(0, 4).join(',') } : {}),
         ...(profile.location ? { location: profile.location } : {}),
-        ...(profile.is_verified ? { verified: 'true' } : {}),
+        ...(profile.tier === 'verified' ? { verified: 'true' } : {}),
     })
     const ogImageUrl = `${appUrl}/api/og/profile?${ogParams.toString()}`
     

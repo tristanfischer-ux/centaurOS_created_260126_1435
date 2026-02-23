@@ -353,14 +353,14 @@ export function BuyerDashboard({
                     outerRadius={80}
                     dataKey="value"
                     nameKey="category"
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                    label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                   >
                     {analytics.spendByCategory.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    formatter={(value: number) => formatCurrency(value, analytics.currency)}
+                  <Tooltip
+                    formatter={((value: string | number) => formatCurrency(Number(value), analytics.currency)) as never}
                   />
                 </PieChart>
               </ResponsiveContainer>

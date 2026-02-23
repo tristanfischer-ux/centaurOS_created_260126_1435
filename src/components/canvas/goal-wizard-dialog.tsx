@@ -92,7 +92,7 @@ type WizardStep = 'define' | 'milestones' | 'suggestions'
 // STEP DEFINITIONS
 // ============================================================================
 
-const STEPS: { id: WizardStep; title: string; icon: React.ElementType }[] = [
+const STEPS: { id: WizardStep; title: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'define', title: 'Define Your Goal', icon: Target },
   { id: 'milestones', title: 'Milestone Spine', icon: MilestoneIcon },
   { id: 'suggestions', title: 'Suggested Work', icon: Sparkles },

@@ -51,7 +51,7 @@ import {
 // Category icon + color mapping
 // ---------------------------------------------------------------------------
 
-const CATEGORY_NAV_ICONS: Record<TechniqueCategory, React.ElementType> = {
+const CATEGORY_NAV_ICONS: Record<TechniqueCategory, React.ComponentType<{ className?: string }>> = {
   additive: Layers,
   subtractive: Scissors,
   forming: Box,

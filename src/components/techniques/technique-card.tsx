@@ -38,7 +38,7 @@ import type { ManufacturingTechnique, TechniqueCategory, CostTier } from '@/lib/
 // Category → icon mapping
 // ---------------------------------------------------------------------------
 
-const CATEGORY_ICONS: Record<TechniqueCategory, React.ElementType> = {
+const CATEGORY_ICONS: Record<TechniqueCategory, React.ComponentType<{ className?: string }>> = {
   additive: Layers,
   subtractive: Scissors,
   forming: Box,

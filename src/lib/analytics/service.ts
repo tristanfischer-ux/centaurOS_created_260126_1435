@@ -166,27 +166,27 @@ export async function getSupplierAnalytics(
     
     // Calculate metrics
     const allOrders = orders || []
-    const periodOrders = allOrders.filter(o => 
-      new Date(o.created_at) >= start && new Date(o.created_at) <= end
+    const periodOrders = allOrders.filter(o =>
+      new Date(o.created_at ?? '') >= start && new Date(o.created_at ?? '') <= end
     )
-    const previousPeriodOrders = allOrders.filter(o => 
-      new Date(o.created_at) >= previous.start && new Date(o.created_at) <= previous.end
+    const previousPeriodOrders = allOrders.filter(o =>
+      new Date(o.created_at ?? '') >= previous.start && new Date(o.created_at ?? '') <= previous.end
     )
-    
+
     const completedOrders = allOrders.filter(o => o.status === 'completed')
     const cancelledOrders = allOrders.filter(o => o.status === 'cancelled')
-    const activeOrders = allOrders.filter(o => 
-      ['pending', 'accepted', 'in_progress'].includes(o.status)
+    const activeOrders = allOrders.filter(o =>
+      ['pending', 'accepted', 'in_progress'].includes(o.status ?? '')
     )
-    
+
     const lifetimeGmv = completedOrders.reduce((sum, o) => sum + o.total_amount, 0)
-    const lifetimeEarnings = completedOrders.reduce((sum, o) => sum + (o.total_amount - o.platform_fee), 0)
+    const lifetimeEarnings = completedOrders.reduce((sum, o) => sum + (o.total_amount - (o.platform_fee ?? 0)), 0)
     
     const periodCompletedOrders = periodOrders.filter(o => o.status === 'completed')
     const previousCompletedOrders = previousPeriodOrders.filter(o => o.status === 'completed')
     
-    const earningsThisMonth = periodCompletedOrders.reduce((sum, o) => sum + (o.total_amount - o.platform_fee), 0)
-    const earningsPreviousMonth = previousCompletedOrders.reduce((sum, o) => sum + (o.total_amount - o.platform_fee), 0)
+    const earningsThisMonth = periodCompletedOrders.reduce((sum, o) => sum + (o.total_amount - (o.platform_fee ?? 0)), 0)
+    const earningsPreviousMonth = previousCompletedOrders.reduce((sum, o) => sum + (o.total_amount - (o.platform_fee ?? 0)), 0)
     
     // Average order value
     const avgOrderValue = completedOrders.length > 0 
@@ -212,7 +212,7 @@ export async function getSupplierAnalytics(
     const earningsTrend = generateTimeSeries(
       periodOrders.filter(o => o.status === 'completed'),
       'created_at',
-      (o) => o.total_amount - o.platform_fee,
+      (o) => o.total_amount - (o.platform_fee ?? 0),
       period
     )
     
@@ -237,11 +237,11 @@ export async function getSupplierAnalytics(
     )
     
     // Orders by status breakdown
-    const ordersByStatus = getStatusBreakdown(allOrders)
-    
+    const ordersByStatus = getStatusBreakdown(allOrders.map(o => ({ status: o.status ?? 'pending' })))
+
     // Orders by type breakdown
     const ordersByType = getTypeBreakdown(allOrders)
-    
+
     // Top clients
     const topClients = await getTopClients(supabase, providerId, 5)
     
@@ -331,16 +331,16 @@ export async function getBuyerAnalytics(
     }
     
     const allOrders = orders || []
-    const periodOrders = allOrders.filter(o => 
-      new Date(o.created_at) >= start && new Date(o.created_at) <= end
+    const periodOrders = allOrders.filter(o =>
+      new Date(o.created_at ?? '') >= start && new Date(o.created_at ?? '') <= end
     )
-    const previousPeriodOrders = allOrders.filter(o => 
-      new Date(o.created_at) >= previous.start && new Date(o.created_at) <= previous.end
+    const previousPeriodOrders = allOrders.filter(o =>
+      new Date(o.created_at ?? '') >= previous.start && new Date(o.created_at ?? '') <= previous.end
     )
-    
+
     const completedOrders = allOrders.filter(o => o.status === 'completed')
-    const activeOrders = allOrders.filter(o => 
-      ['pending', 'accepted', 'in_progress'].includes(o.status)
+    const activeOrders = allOrders.filter(o =>
+      ['pending', 'accepted', 'in_progress'].includes(o.status ?? '')
     )
     const disputedOrders = allOrders.filter(o => o.status === 'disputed')
     
@@ -384,8 +384,8 @@ export async function getBuyerAnalytics(
     const topProviders = await getTopProviders(supabase, userId, 5)
     
     // Orders by status
-    const ordersByStatus = getStatusBreakdown(allOrders)
-    
+    const ordersByStatus = getStatusBreakdown(allOrders.map(o => ({ status: o.status ?? 'pending' })))
+
     // Period comparison
     const periodComparison = {
       orders: createComparison('Orders', periodOrders.length, previousPeriodOrders.length),
@@ -471,11 +471,11 @@ export async function getPlatformAnalytics(
       .lte('created_at', end.toISOString())
     
     const allOrders = orders || []
-    const periodOrders = allOrders.filter(o => 
-      new Date(o.created_at) >= start && new Date(o.created_at) <= end
+    const periodOrders = allOrders.filter(o =>
+      new Date(o.created_at ?? '') >= start && new Date(o.created_at ?? '') <= end
     )
-    const previousPeriodOrders = allOrders.filter(o => 
-      new Date(o.created_at) >= previous.start && new Date(o.created_at) <= previous.end
+    const previousPeriodOrders = allOrders.filter(o =>
+      new Date(o.created_at ?? '') >= previous.start && new Date(o.created_at ?? '') <= previous.end
     )
     
     const completedOrders = allOrders.filter(o => o.status === 'completed')
@@ -488,8 +488,8 @@ export async function getPlatformAnalytics(
     const gmvPreviousMonth = previousCompleted.reduce((sum, o) => sum + o.total_amount, 0)
     
     // Fee calculations
-    const totalFees = completedOrders.reduce((sum, o) => sum + o.platform_fee, 0)
-    const feesThisMonth = periodCompleted.reduce((sum, o) => sum + o.platform_fee, 0)
+    const totalFees = completedOrders.reduce((sum, o) => sum + (o.platform_fee ?? 0), 0)
+    const feesThisMonth = periodCompleted.reduce((sum, o) => sum + (o.platform_fee ?? 0), 0)
     const takeRate = totalGmv > 0 ? (totalFees / totalGmv) * 100 : 0
     
     // Active users
@@ -732,14 +732,14 @@ async function getTopClients(
         avatarUrl: buyer?.avatar_url || undefined,
         totalOrders: 0,
         totalSpend: 0,
-        lastOrderAt: o.created_at
+        lastOrderAt: o.created_at ?? ''
       }
     }
-    
+
     buyerStats[buyerId].totalOrders++
     buyerStats[buyerId].totalSpend += o.total_amount
-    if (o.created_at > buyerStats[buyerId].lastOrderAt) {
-      buyerStats[buyerId].lastOrderAt = o.created_at
+    if ((o.created_at ?? '') > buyerStats[buyerId].lastOrderAt) {
+      buyerStats[buyerId].lastOrderAt = o.created_at ?? ''
     }
   })
   
@@ -796,14 +796,14 @@ async function getTopProviders(
         totalOrders: 0,
         totalSpend: 0,
         averageRating: 0,
-        lastOrderAt: o.created_at
+        lastOrderAt: o.created_at ?? ''
       }
     }
-    
+
     providerStats[sellerId].totalOrders++
     providerStats[sellerId].totalSpend += o.total_amount
-    if (o.created_at > providerStats[sellerId].lastOrderAt) {
-      providerStats[sellerId].lastOrderAt = o.created_at
+    if ((o.created_at ?? '') > providerStats[sellerId].lastOrderAt) {
+      providerStats[sellerId].lastOrderAt = o.created_at ?? ''
     }
   })
   

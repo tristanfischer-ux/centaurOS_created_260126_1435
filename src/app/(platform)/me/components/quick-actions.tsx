@@ -19,7 +19,7 @@ interface QuickAction {
   label: string
   description: string
   href: string
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   accentBg: string
   accentText: string
 }

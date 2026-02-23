@@ -264,7 +264,7 @@ export async function getAvailableSlots(providerSlug: string, startDate: string,
     const start = new Date(startDate)
     const end = new Date(endDate)
     const minNotice = new Date()
-    minNotice.setHours(minNotice.getHours() + settings.min_notice_hours)
+    minNotice.setHours(minNotice.getHours() + (settings.min_notice_hours ?? 0))
     
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const dayOfWeek = d.getDay()
@@ -286,13 +286,13 @@ export async function getAvailableSlots(providerSlug: string, startDate: string,
                     if (slotDate <= minNotice) continue
                     
                     const slotEnd = new Date(slotDate)
-                    slotEnd.setMinutes(slotEnd.getMinutes() + settings.call_duration_minutes)
+                    slotEnd.setMinutes(slotEnd.getMinutes() + (settings.call_duration_minutes ?? 0))
 
                     // Check if slot is already booked in ForgeOS
                     const isBooked = (existingBookings || []).some(booking => {
                         const bookingStart = new Date(booking.scheduled_at)
                         const bookingEnd = new Date(bookingStart)
-                        bookingEnd.setMinutes(bookingEnd.getMinutes() + booking.duration_minutes)
+                        bookingEnd.setMinutes(bookingEnd.getMinutes() + (booking.duration_minutes ?? 0))
                         
                         return slotDate < bookingEnd && slotEnd > bookingStart
                     })
@@ -410,7 +410,7 @@ export async function bookDiscoveryCall(input: {
         const calResult = await syncDiscoveryCallToCalendar(
             booking.id,
             input.scheduledAt,
-            settings.call_duration_minutes,
+            settings.call_duration_minutes ?? 0,
             providerProfile?.full_name || 'Provider',
             buyerProfile?.full_name || 'Buyer',
             providerProfile?.email || undefined,

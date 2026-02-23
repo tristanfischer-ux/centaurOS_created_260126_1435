@@ -39,10 +39,8 @@ async function RFQsContent() {
     .select(`
       id,
       title,
-      description,
       budget_min,
       budget_max,
-      currency,
       deadline,
       category,
       created_at,
@@ -56,19 +54,18 @@ async function RFQsContent() {
     .from("rfq_responses")
     .select(`
       id,
-      status,
-      proposed_amount,
-      created_at,
+      response_type,
+      quoted_price,
+      responded_at,
       rfq:rfqs (
         id,
         title,
         budget_max,
-        currency,
         deadline,
         status
       )
     `)
-    .order("created_at", { ascending: false })
+    .order("responded_at", { ascending: false })
 
   const availableRfqs = openRfqs || []
   const respondedRfqs = myResponses || []
@@ -124,16 +121,11 @@ async function RFQsContent() {
                             <Badge variant="secondary">{rfq.category}</Badge>
                           )}
                         </div>
-                        {rfq.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                            {rfq.description}
-                          </p>
-                        )}
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           {rfq.budget_max && (
                             <span className="flex items-center gap-1">
                               <PoundSterling className="h-3 w-3" />
-                              Budget: {rfq.currency} {rfq.budget_min?.toLocaleString()} - {rfq.budget_max.toLocaleString()}
+                              Budget: {rfq.budget_min?.toLocaleString()} - {rfq.budget_max.toLocaleString()}
                             </span>
                           )}
                           {rfq.deadline && (
@@ -186,24 +178,26 @@ async function RFQsContent() {
                           <h3 className="font-semibold truncate">
                             {response.rfq?.title || 'Unknown RFQ'}
                           </h3>
-                          <Badge 
+                          <Badge
                             variant="secondary"
                             className={cn(
-                              response.status === 'pending' && 'bg-status-warning-light text-status-warning-dark',
-                              response.status === 'accepted' && 'bg-status-success-light text-status-success-dark',
-                              response.status === 'rejected' && 'bg-status-error-light text-status-error-dark'
+                              response.response_type === 'pending' && 'bg-status-warning-light text-status-warning-dark',
+                              response.response_type === 'accepted' && 'bg-status-success-light text-status-success-dark',
+                              response.response_type === 'rejected' && 'bg-status-error-light text-status-error-dark'
                             )}
                           >
-                            {response.status}
+                            {response.response_type}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span>
-                            Your quote: {response.rfq?.currency || 'USD'} {response.proposed_amount?.toLocaleString()}
+                            Your quote: {response.quoted_price?.toLocaleString()}
                           </span>
-                          <span>
-                            Submitted: {new Date(response.created_at).toLocaleDateString()}
-                          </span>
+                          {response.responded_at && (
+                            <span>
+                              Submitted: {new Date(response.responded_at).toLocaleDateString()}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <Link href={`/rfq/${response.rfq?.id}`}>

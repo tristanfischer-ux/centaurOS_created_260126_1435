@@ -83,7 +83,7 @@ export type PlaybookTabId = 'by-need' | 'by-industry' | 'projects' | 'subsystems
 interface Tab {
   id: PlaybookTabId
   label: string
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   count?: number
   activeClasses: string
   iconColor: string

@@ -242,8 +242,8 @@ export async function createBlueprint(input: CreateBlueprintInput): Promise<{
         p_template_id: input.template_id,
         p_foundry_id: foundryId,
         p_name: input.name,
-        p_description: input.description || null,
-        p_created_by: user?.id || null,
+        p_description: input.description ?? undefined,
+        p_created_by: user?.id ?? undefined,
       })
 
     if (error) {
@@ -1339,7 +1339,7 @@ export async function setDomainFamiliarity(input: SetDomainFamiliarityInput): Pr
       p_domain_id: input.domain_id,
       p_foundry_id: input.foundry_id,
       p_familiarity: input.familiarity,
-      p_notes: input.notes || null,
+      p_notes: input.notes ?? undefined,
     })
 
   if (error) {
@@ -1443,8 +1443,8 @@ export async function generateExpertReviewPacket(
     if (blueprint) {
       projectContext = {
         blueprint_name: blueprint.name,
-        project_stage: blueprint.project_stage as ProjectStage | null,
-        project_type: blueprint.project_type as ProjectType | null,
+        project_stage: (blueprint.project_stage as ProjectStage | null) ?? undefined,
+        project_type: (blueprint.project_type as ProjectType | null) ?? undefined,
       }
     }
   }
@@ -1455,7 +1455,7 @@ export async function generateExpertReviewPacket(
     const { data: parentDomains } = await supabase
       .from('knowledge_domains')
       .select('id, name, parent_id')
-      .eq('template_id', domain.template_id)
+      .eq('template_id', domain.template_id ?? '')
 
     if (parentDomains) {
       const domainMap = new Map(parentDomains.map(d => [d.id, d]))
@@ -1466,7 +1466,7 @@ export async function generateExpertReviewPacket(
         const parent = domainMap.get(currentId)
         if (parent) {
           pathParts.unshift(parent.name)
-          currentId = parent.parent_id
+          currentId = parent.parent_id ?? ''
         } else {
           break
         }
@@ -1489,7 +1489,7 @@ export async function generateExpertReviewPacket(
       name: domain.name,
       path,
       category: domain.category as DomainCategory | null,
-      criticality: domain.criticality as DomainCriticality | null,
+      criticality: (domain.criticality as DomainCriticality | null) ?? ('low' as DomainCriticality),
     },
     team_familiarity: familiarity?.familiarity || 'unknown',
     primer_overview: (domain as { primer?: { overview?: string } }).primer?.overview || domain.description || null,

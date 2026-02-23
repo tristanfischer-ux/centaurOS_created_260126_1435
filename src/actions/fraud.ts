@@ -201,7 +201,7 @@ export async function getFraudSignals(
   }
 
   return {
-    data: (data || []).map((s) => ({
+    data: (data || []).map((s: { id: string; signal_type: string; severity: string; details: unknown; action_taken: string | null; reviewed_by: string | null; created_at: string | null }) => ({
       id: s.id,
       signal_type: s.signal_type,
       severity: s.severity,

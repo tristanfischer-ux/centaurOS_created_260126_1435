@@ -377,7 +377,7 @@ export async function releaseFullPayment(
         transferId: result.transfer.id,
         sellerAmount: result.transfer.amount,
         platformFee,
-        currency: order.currency,
+        currency: order.currency ?? '',
       },
       error: null,
     }

@@ -200,12 +200,11 @@ function ExpertCard({ expert }: { expert: ExpertMatch }) {
   return (
     <div className="p-3 border rounded-lg hover:shadow-sm transition-all group">
       <div className="flex items-start gap-3">
-        <UserAvatar 
+        <UserAvatar
           name={expert.name}
-          role={undefined}
           size="md"
           className="border"
-          src={expert.avatar}
+          avatarUrl={expert.avatar}
         />
         
         <div className="flex-1 min-w-0">

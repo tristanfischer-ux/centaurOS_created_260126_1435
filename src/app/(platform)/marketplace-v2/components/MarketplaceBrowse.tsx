@@ -49,7 +49,7 @@ interface MarketplaceBrowseProps {
     pageSubtitle?: string
 }
 
-const TABS: { id: MarketplaceTab; label: string; icon: React.ElementType }[] = [
+const TABS: { id: MarketplaceTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'browse', label: 'Browse', icon: LayoutGrid },
     { id: 'saved', label: 'Saved', icon: Heart },
 ]

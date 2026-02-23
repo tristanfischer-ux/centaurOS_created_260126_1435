@@ -136,7 +136,7 @@ export default async function ApprenticeshipPage() {
 
   // --- Mentor with Mentees → Mentor Dashboard ---
   if (menteeEnrollments && menteeEnrollments.length > 0) {
-    return <MentorDashboard mentees={menteeEnrollments} />
+    return <MentorDashboard mentees={menteeEnrollments as any} />
   }
 
   // --- Executive/Founder → Admin Dashboard or Discover Hub ---

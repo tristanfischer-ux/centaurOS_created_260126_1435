@@ -236,7 +236,7 @@ async function buildProfileResponse(supabase: Awaited<ReturnType<typeof createCl
             end_date: cs.end_date,
             engagement_type: cs.engagement_type,
             hours_per_week: cs.hours_per_week,
-            is_featured: cs.is_featured
+            is_featured: cs.is_featured ?? false
         })),
         portfolio_items: (portfolio || []).map(p => ({
             id: p.id,
@@ -246,7 +246,7 @@ async function buildProfileResponse(supabase: Awaited<ReturnType<typeof createCl
             project_url: p.project_url,
             client_name: p.client_name,
             completion_date: p.completion_date,
-            is_featured: p.is_featured
+            is_featured: p.is_featured ?? false
         })),
         certifications: (certifications || []).map(c => ({
             id: c.id,
@@ -256,11 +256,11 @@ async function buildProfileResponse(supabase: Awaited<ReturnType<typeof createCl
             issued_date: c.issued_date,
             expiry_date: c.expiry_date,
             verification_url: c.verification_url,
-            is_verified: c.is_verified
+            is_verified: c.is_verified ?? false
         })),
         badges: (badges || []).map(b => ({
             badge_type: b.badge_type,
-            earned_at: b.earned_at
+            earned_at: b.earned_at ?? ''
         }))
     }
     

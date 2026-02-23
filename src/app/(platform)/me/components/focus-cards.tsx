@@ -36,7 +36,7 @@ interface FocusCardsProps {
 interface FocusMetric {
   label: string
   value: number
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   href: string
   /** Whether to highlight with a warning/accent color when value > 0 */
   warnWhenPositive?: boolean

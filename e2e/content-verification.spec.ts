@@ -81,7 +81,7 @@ test.describe('Marketing Page Content Verification', () => {
       }
       
       console.log('\n📝 Section text preview:')
-      console.log(sectionText.substring(0, 500))
+      console.log(sectionText!.substring(0, 500))
       
     } else {
       console.log('⚠️  "How a Project Works" heading not found')
@@ -119,9 +119,9 @@ test.describe('Marketing Page Content Verification', () => {
       // Check for testimonial indicators in this section
       const sectionHtml = await parentSection.innerHTML().catch(() => '')
       
-      const hasQuotes = sectionText.includes('"') || sectionText.includes('"') || sectionText.includes('"')
+      const hasQuotes = sectionText!.includes('"') || sectionText!.includes('"') || sectionText!.includes('"')
       const hasStars = sectionHtml.includes('star') || sectionHtml.includes('★')
-      const hasFakeNames = /john|jane|smith|doe|sarah|michael/i.test(sectionText)
+      const hasFakeNames = /john|jane|smith|doe|sarah|michael/i.test(sectionText ?? '')
       
       if (hasQuotes) {
         console.log('⚠️  Found quote marks in this section')
@@ -142,7 +142,7 @@ test.describe('Marketing Page Content Verification', () => {
       }
       
       console.log('\n📝 Section text preview:')
-      console.log(sectionText.substring(0, 800))
+      console.log(sectionText!.substring(0, 800))
       
     } else {
       console.log('⚠️  Neither "What You Get on Day One" nor "The Founding Member Advantage" heading found')

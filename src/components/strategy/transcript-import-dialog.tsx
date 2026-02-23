@@ -80,7 +80,7 @@ interface TranscriptImportDialogProps {
 // CONSTANTS
 // ============================================================================
 
-const STEPS: { id: WizardStep; title: string; icon: React.ElementType }[] = [
+const STEPS: { id: WizardStep; title: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'input', title: 'Paste Text', icon: FileText },
   { id: 'review', title: 'Review Plan', icon: Target },
   { id: 'confirm', title: 'Create', icon: CheckCircle2 },
@@ -888,7 +888,7 @@ function SummaryCard({
 }: {
   label: string
   value: number
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   color: string
 }) {
   return (

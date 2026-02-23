@@ -679,7 +679,7 @@ export async function getActivityFeed(options?: {
         .eq('user_id', user.id)
         .in('comment_id', taskCommentIds)
 
-      const readTaskCommentIds = new Set(taskReads?.map(r => r.comment_id) || [])
+      const readTaskCommentIds = new Set(taskReads?.map((r: { comment_id: string }) => r.comment_id) || [])
 
       if (taskComments) {
         for (const comment of taskComments as RawTaskComment[]) {
@@ -736,7 +736,7 @@ export async function getActivityFeed(options?: {
 
           const content = formatTaskHistoryContent(
             history.action_type,
-            history.changes
+            history.changes as Record<string, { old?: unknown; new?: unknown }> | null
           )
 
           items.push({
@@ -794,7 +794,7 @@ export async function getActivityFeed(options?: {
         .eq('user_id', user.id)
         .in('comment_id', objectiveCommentIds)
 
-      const readObjectiveCommentIds = new Set(objectiveReads?.map(r => r.comment_id) || [])
+      const readObjectiveCommentIds = new Set(objectiveReads?.map((r: { comment_id: string }) => r.comment_id) || [])
 
       if (objectiveComments) {
         for (const comment of objectiveComments as RawObjectiveComment[]) {
@@ -1127,12 +1127,12 @@ export async function getThreadForSource(
         .filter((m: { sender: unknown }) => m.sender !== null)
         .map((m: {
           id: string
-          content: string
+          content: string | null
           created_at: string | null
-          sender: { id: string; full_name: string | null; avatar_url: string | null; role: string | null }
+          sender: { id: string; full_name: string | null; avatar_url: string | null; role: 'Executive' | 'Apprentice' | 'AI_Agent' | 'Founder' }
         }) => ({
           id: m.id,
-          content: m.content,
+          content: m.content ?? '',
           created_at: m.created_at || new Date().toISOString(),
           is_system_log: false,
           is_unread: false, // Messages don't have per-message read tracking

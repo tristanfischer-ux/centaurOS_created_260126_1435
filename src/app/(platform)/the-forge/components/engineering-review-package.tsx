@@ -239,7 +239,7 @@ function StructuralSection({ modules }: { modules: ModuleSpec[] }): React.ReactN
                   <div>
                     <p className="text-sm font-semibold text-foreground">{m.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Max stress: {s.maxStress_MPa?.toFixed(1) ?? "?"} MPa •{" "}
+                      Max stress: {s.maxVonMisesStress_MPa?.toFixed(1) ?? "?"} MPa •{" "}
                       Deformation: {s.maxDeformation_mm?.toFixed(2) ?? "?"} mm
                     </p>
                   </div>
@@ -355,8 +355,8 @@ function DfmSection({ modules }: { modules: ModuleSpec[] }): React.ReactNode {
                   <div>
                     <p className="text-sm font-semibold text-foreground">{m.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Min wall: {dfm.minWall_mm?.toFixed(1) ?? "?"} mm •{" "}
-                      Max overhang: {dfm.maxOverhang_deg?.toFixed(0) ?? "?"}°
+                      Print time: {dfm.estimatedPrintTime_min?.toFixed(0) ?? "?"} min •{" "}
+                      Support vol: {dfm.supportVolume_pct?.toFixed(0) ?? "?"}%
                     </p>
                     {dfm.issues && dfm.issues.length > 0 && (
                       <p className="text-xs text-destructive mt-0.5">
@@ -619,9 +619,9 @@ function collectActionItems(spec: XRaySpec): ActionItem[] {
     }
 
     // FEA errors
-    if (s?.status === "error") {
+    if (s?.status === "failed") {
       items.push({
-        title: `Structural analysis failed: ${s.error ?? "unknown error"}`,
+        title: `Structural analysis failed: ${s.loadCaseDescription ?? "unknown error"}`,
         severity: "warning",
         module: m.name,
       })

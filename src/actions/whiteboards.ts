@@ -101,7 +101,8 @@ export async function createWhiteboard(params: {
       return { data: null, error: 'Title is required' }
     }
 
-    const { data, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
       .from('whiteboards')
       .insert({
         foundry_id: foundryId,

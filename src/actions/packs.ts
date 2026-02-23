@@ -247,12 +247,13 @@ export async function savePack(packId: string): Promise<{
         }
 
         // Insert saved pack
-        const { error } = await supabase
-            .from('saved_packs' as unknown as 'profiles')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase as any)
+            .from('saved_packs')
             .insert({
                 user_id: user.id,
                 pack_id: packId
-            } as unknown as Record<string, unknown>)
+            })
 
         if (error) {
             // Unique constraint violation - already saved

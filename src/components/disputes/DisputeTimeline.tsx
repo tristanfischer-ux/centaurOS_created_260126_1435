@@ -209,12 +209,12 @@ export function DisputeTimeline({
                   )}
                   {event.metadata && Object.keys(event.metadata).length > 0 && (
                     <div className="mt-2 text-xs text-muted-foreground">
-                      {(event.metadata as Record<string, unknown>).from && (event.metadata as Record<string, unknown>).to && (
+                      {!!(event.metadata as Record<string, unknown>).from && !!(event.metadata as Record<string, unknown>).to && (
                         <span>
                           Status: {String((event.metadata as Record<string, unknown>).from)} → {String((event.metadata as Record<string, unknown>).to)}
                         </span>
                       )}
-                      {(event.metadata as Record<string, unknown>).new_files && (
+                      {!!(event.metadata as Record<string, unknown>).new_files && (
                         <span>
                           {((event.metadata as Record<string, unknown>).new_files as string[]).length} file(s) added
                         </span>

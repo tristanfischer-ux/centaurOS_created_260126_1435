@@ -56,8 +56,8 @@ export async function createNotification(data: {
             p_user_id: data.userId,
             p_type: data.type,
             p_title: data.title,
-            p_message: data.message || null,
-            p_link: data.link || null,
+            p_message: data.message ?? undefined,
+            p_link: data.link ?? undefined,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             p_metadata: (data.metadata || null) as any
         })

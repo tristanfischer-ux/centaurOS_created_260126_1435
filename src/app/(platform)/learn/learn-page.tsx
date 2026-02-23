@@ -58,7 +58,7 @@ type LearnTabId = 'techniques' | 'tutorials' | 'qa'
 interface Tab {
   id: LearnTabId
   label: string
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   count?: number
   activeClasses: string
   iconColor: string

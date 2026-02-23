@@ -72,7 +72,7 @@ const CONTENT_TYPE_BADGE_STYLES: Record<ArtifactContentType, string> = {
 }
 
 /** Icon per content type */
-const CONTENT_TYPE_ICONS: Record<ArtifactContentType, React.ElementType> = {
+const CONTENT_TYPE_ICONS: Record<ArtifactContentType, React.ComponentType<{ className?: string }>> = {
   document: FileText,
   email: Mail,
   report: BarChart3,

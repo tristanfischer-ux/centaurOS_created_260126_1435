@@ -206,7 +206,7 @@ export async function acceptDisputeResolution(
     const { data: sellerProfile } = await supabase
       .from("provider_profiles")
       .select("user_id")
-      .eq("id", dispute.order?.seller_id)
+      .eq("id", dispute.order?.seller_id ?? '')
       .single()
 
     if (sellerProfile?.user_id !== user.id) {

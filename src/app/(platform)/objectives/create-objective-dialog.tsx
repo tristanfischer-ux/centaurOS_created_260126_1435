@@ -82,7 +82,7 @@ type CreationMode = 'guided' | 'manual' | 'pack' | 'import' | 'strategic'
 /** Steps for the guided SMART wizard */
 type GuidedStep = 'capture' | 'refine' | 'measure' | 'create'
 
-const GUIDED_STEPS: { id: GuidedStep; title: string; icon: React.ElementType }[] = [
+const GUIDED_STEPS: { id: GuidedStep; title: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'capture', title: 'Capture', icon: Lightbulb },
     { id: 'refine', title: 'Refine', icon: Sparkles },
     { id: 'measure', title: 'Measure', icon: BarChart3 },

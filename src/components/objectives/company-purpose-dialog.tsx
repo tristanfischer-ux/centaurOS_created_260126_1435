@@ -53,7 +53,7 @@ interface CompanyPurposeDialogProps {
 
 type FormStep = 'core' | 'audience' | 'differentiation' | 'vision' | 'review'
 
-const STEPS: { id: FormStep; title: string; icon: React.ElementType }[] = [
+const STEPS: { id: FormStep; title: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'core', title: 'Core Purpose', icon: Compass },
   { id: 'audience', title: 'Problem & Audience', icon: Users },
   { id: 'differentiation', title: 'Differentiation', icon: Lightbulb },

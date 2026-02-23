@@ -421,7 +421,7 @@ export async function getOTJTProgressSummary(enrollmentId: string) {
   const elapsed = Math.max(0, now.getTime() - startDate.getTime())
   const expectedProgressPercent = Math.min(100, (elapsed / totalDuration) * 100)
   
-  const actualProgressPercent = (enrollment.otjt_hours_logged / enrollment.otjt_hours_target) * 100
+  const actualProgressPercent = ((enrollment.otjt_hours_logged ?? 0) / enrollment.otjt_hours_target) * 100
   
   // On track if within 10% of expected progress
   const onTrack = actualProgressPercent >= (expectedProgressPercent * 0.9)
@@ -434,14 +434,14 @@ export async function getOTJTProgressSummary(enrollmentId: string) {
   return {
     hoursLogged: enrollment.otjt_hours_logged,
     hoursTarget: enrollment.otjt_hours_target,
-    hoursRemaining: enrollment.otjt_hours_target - enrollment.otjt_hours_logged,
+    hoursRemaining: enrollment.otjt_hours_target - (enrollment.otjt_hours_logged ?? 0),
     progressPercent: Math.round(actualProgressPercent * 10) / 10,
     expectedProgressPercent: Math.round(expectedProgressPercent * 10) / 10,
     onTrack,
     pendingApprovals: pendingCount || 0,
     weeklyTarget,
     expectedHoursByNow: Math.round(expectedHours * 10) / 10,
-    aheadBehindHours: Math.round((enrollment.otjt_hours_logged - expectedHours) * 10) / 10
+    aheadBehindHours: Math.round(((enrollment.otjt_hours_logged ?? 0) - expectedHours) * 10) / 10
   }
 }
 

@@ -55,7 +55,7 @@ interface PitchPrepFormProps {
 
 type FormStep = 'company' | 'product' | 'traction' | 'services' | 'review'
 
-const STEPS: { id: FormStep; title: string; icon: React.ElementType }[] = [
+const STEPS: { id: FormStep; title: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'company', title: 'Company', icon: Building2 },
   { id: 'product', title: 'Product', icon: Target },
   { id: 'traction', title: 'Traction', icon: TrendingUp },

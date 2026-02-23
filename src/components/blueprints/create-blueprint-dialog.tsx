@@ -34,7 +34,7 @@ import {
 } from 'lucide-react'
 
 // Template icons
-const templateIcons: Record<string, React.ElementType> = {
+const templateIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   'consumer-electronics': Smartphone,
   electronics: Cpu,
   saas: Server,

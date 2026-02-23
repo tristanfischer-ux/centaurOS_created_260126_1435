@@ -42,7 +42,7 @@ export default async function MarketplaceListingPage({ params }: PageProps) {
                 badges: trustResult.badges
             }
         }
-        ratings = ratingsResult
+        ratings = { summary: ratingsResult.data, reviews: [], error: ratingsResult.error }
     }
 
     return (

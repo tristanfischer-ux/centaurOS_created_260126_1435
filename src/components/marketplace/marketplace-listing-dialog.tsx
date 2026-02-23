@@ -516,7 +516,7 @@ function PeopleDetails({ attrs }: { attrs: Record<string, unknown> }) {
     return (
         <div className="space-y-4">
             {/* Education */}
-            {attrs.education && (
+            {!!attrs.education && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -529,7 +529,7 @@ function PeopleDetails({ attrs }: { attrs: Record<string, unknown> }) {
             )}
 
             {/* Previous Companies */}
-            {attrs.previous_companies && (
+            {!!attrs.previous_companies && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -574,7 +574,7 @@ function PeopleDetails({ attrs }: { attrs: Record<string, unknown> }) {
             )}
 
             {/* Certifications */}
-            {attrs.certifications && (
+            {!!attrs.certifications && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -651,7 +651,7 @@ function ServicesDetails({ attrs }: { attrs: Record<string, unknown> }) {
     return (
         <div className="space-y-4">
             {/* Specialty */}
-            {attrs.specialty && (
+            {!!attrs.specialty && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -674,7 +674,7 @@ function ServicesDetails({ attrs }: { attrs: Record<string, unknown> }) {
             )}
 
             {/* Focus Areas */}
-            {attrs.focus_areas && (
+            {!!attrs.focus_areas && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">

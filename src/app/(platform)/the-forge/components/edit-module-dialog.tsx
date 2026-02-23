@@ -86,7 +86,7 @@ function EditableList({
   onChange: (items: string[]) => void
   placeholder: string
   label: string
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
 }): React.ReactNode {
   const handleItemChange = (index: number, value: string): void => {
     const next = [...items]
@@ -151,7 +151,7 @@ function SectionHeader({
   title,
   color,
 }: {
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   title: string
   color: string
 }): React.ReactNode {

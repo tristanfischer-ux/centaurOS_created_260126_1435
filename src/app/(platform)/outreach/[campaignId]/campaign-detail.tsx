@@ -211,6 +211,7 @@ export function CampaignDetail({
                     <ContactsTab
                         campaign={campaign}
                         contacts={contacts}
+                        emails={emails}
                         onRefresh={refreshAll}
                         onSwitchToEmails={() => setActiveTab('emails')}
                     />

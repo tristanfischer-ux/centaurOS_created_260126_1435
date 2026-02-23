@@ -332,7 +332,7 @@ export function MessageBubble({
             )}>
               <MessageActions
                 messageId={message.id}
-                messageContent={message.content}
+                messageContent={message.content ?? ''}
                 isOwn={isOwn}
                 isStarred={isStarred}
                 onReplyInThread={onOpenThread ? handleOpenThread : undefined}

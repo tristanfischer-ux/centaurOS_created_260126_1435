@@ -126,7 +126,7 @@ function LinkRow({
   href,
   displayText,
 }: {
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   label: string
   href: string
   displayText: string
@@ -163,7 +163,7 @@ function InfoRow({
   label,
   value,
 }: {
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   label: string
   value: string
 }) {

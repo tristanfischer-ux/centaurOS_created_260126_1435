@@ -586,3 +586,33 @@ export async function processMemory(
     }
   }
 }
+
+// ─── Update Message Metadata ────────────────────────────────────────
+
+/**
+ * Updates the metadata JSON column on an agent_memory_messages row.
+ *
+ * @param messageId - The message to update
+ * @param foundryId - The foundry for RLS isolation
+ * @param metadata - Metadata object to merge into the existing metadata
+ */
+export async function updateMessageMetadata(
+  messageId: string,
+  foundryId: string,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('agent_memory_messages')
+    .update({ metadata: metadata as Json })
+    .eq('id', messageId)
+    .eq('foundry_id', foundryId)
+
+  if (error) {
+    console.error('[AgentMemory/Manager] Failed to update message metadata:', {
+      messageId,
+      error: error.message,
+    })
+  }
+}

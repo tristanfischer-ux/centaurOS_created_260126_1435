@@ -45,7 +45,7 @@ interface UpdatesFeedItemProps {
 /**
  * Returns an icon and color based on the activity item type.
  */
-function getItemIcon(item: ActivityItem): { icon: React.ElementType; colorClass: string } {
+function getItemIcon(item: ActivityItem): { icon: React.ComponentType<{ className?: string }>; colorClass: string } {
   if (item.type === 'task_history') {
     return { icon: GitCommit, colorClass: 'text-muted-foreground' }
   }

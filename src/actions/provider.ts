@@ -26,6 +26,7 @@ export interface ProviderProfile {
     stripe_account_id: string | null
     stripe_onboarding_complete: boolean
     day_rate: number | null
+    hourly_rate: number | null
     currency: string
     bio: string | null
     headline: string | null
@@ -428,7 +429,7 @@ export async function getProviderOrders(options?: {
             .order('created_at', { ascending: false })
 
         if (options?.status && options.status.length > 0) {
-            query = query.in('status', options.status as readonly string[])
+            query = query.in('status', options.status as unknown as readonly ("pending" | "completed" | "accepted" | "in_progress" | "disputed" | "cancelled" | null)[])
         }
 
         if (options?.limit) {
@@ -447,10 +448,10 @@ export async function getProviderOrders(options?: {
             order_number: order.order_number || '',
             buyer_name: order.buyer?.full_name || 'Unknown',
             listing_title: order.listing?.title || null,
-            status: order.status,
+            status: order.status ?? '',
             total_amount: Number(order.total_amount),
-            currency: order.currency,
-            created_at: order.created_at
+            currency: order.currency ?? '',
+            created_at: order.created_at ?? ''
         }))
 
         return { orders, error: null }
@@ -561,8 +562,8 @@ export async function getProviderRecentActivity(limit: number = 10): Promise<{
                 id: order.id,
                 type: 'order',
                 title: `Order ${order.order_number || order.id.slice(0, 8)}`,
-                description: `Status: ${order.status} - ${order.currency} ${Number(order.total_amount).toFixed(2)}`,
-                created_at: order.created_at
+                description: `Status: ${order.status ?? ''} - ${order.currency ?? ''} ${Number(order.total_amount).toFixed(2)}`,
+                created_at: order.created_at ?? ''
             })
         }
 
@@ -572,8 +573,8 @@ export async function getProviderRecentActivity(limit: number = 10): Promise<{
                 id: review.id,
                 type: 'review',
                 title: 'New Review',
-                description: `Rating: ${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)}`,
-                created_at: review.created_at
+                description: `Rating: ${'★'.repeat(review.rating ?? 0)}${'☆'.repeat(5 - (review.rating ?? 0))}`,
+                created_at: review.created_at ?? ''
             })
         }
 

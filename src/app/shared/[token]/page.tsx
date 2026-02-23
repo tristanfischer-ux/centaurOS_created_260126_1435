@@ -63,7 +63,7 @@ export default function SharedArtifactPage(): React.ReactElement {
     )
   }
 
-  if (!data) return null
+  if (!data) return <></>
 
   return (
     <div className="min-h-screen bg-background">

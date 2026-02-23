@@ -17,7 +17,8 @@ import type { WhiteboardRow } from "@/actions/whiteboards"
  * The Excalidraw component must be loaded client-side only because
  * it uses browser APIs (Canvas, DOM) that are unavailable during SSR.
  */
-const Excalidraw = dynamic(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Excalidraw: any = dynamic(
   async () => {
     const mod = await import("@excalidraw/excalidraw")
     return mod.Excalidraw
@@ -333,8 +334,7 @@ export function WhiteboardEditor({ whiteboard, objectiveId }: WhiteboardEditorPr
       {/* Excalidraw canvas */}
       <div className="flex-1 bg-white">
         <Excalidraw
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ref={excalidrawRef as any}
+          ref={excalidrawRef}
           initialData={{
             elements: (initialData.elements as never[]) || [],
             appState: {

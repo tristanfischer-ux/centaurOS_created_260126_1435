@@ -203,10 +203,13 @@ export async function getBuyerOrders(
             .order('date', { ascending: true })
 
         const slotsByOrder = slots?.reduce((acc, slot) => {
-            if (!acc[slot.booking_id]) {
-                acc[slot.booking_id] = []
+            const bookingId = slot.booking_id
+            if (bookingId != null) {
+                if (!acc[bookingId]) {
+                    acc[bookingId] = []
+                }
+                acc[bookingId].push(slot.date)
             }
-            acc[slot.booking_id].push(slot.date)
             return acc
         }, {} as Record<string, string[]>) || {}
 
@@ -222,21 +225,21 @@ export async function getBuyerOrders(
 
             return {
                 id: order.id,
-                orderNumber: order.order_number,
+                orderNumber: order.order_number ?? '',
                 status: order.status as OrderSummary['status'],
                 bookingType: order.order_type as OrderSummary['bookingType'],
                 providerId: order.seller_id,
                 providerName: providerProfile?.profiles?.full_name || 'Provider',
                 providerAvatarUrl: providerProfile?.profiles?.avatar_url,
-                listingId: order.listing_id,
+                listingId: order.listing_id ?? undefined,
                 listingTitle: listing?.title || 'Booking',
                 listingCategory: (listing?.category as OrderSummary['listingCategory']) || 'Services',
                 startDate: orderSlots[0],
                 endDate: orderSlots[orderSlots.length - 1],
-                createdAt: order.created_at,
-                completedAt: order.completed_at,
+                createdAt: order.created_at ?? '',
+                completedAt: order.completed_at ?? undefined,
                 totalAmount: order.total_amount,
-                currency: order.currency,
+                currency: order.currency ?? '',
                 escrowStatus: order.escrow_status as OrderSummary['escrowStatus'],
                 conversationId: undefined as string | undefined, // Would need another query
                 hasUnreadMessages: ordersWithUnread.has(order.id),
@@ -320,7 +323,7 @@ export async function getRecommendedProviders(limit: number = 6): Promise<{
                 currency: provider.currency || 'GBP',
                 averageRating: ratings?.average_rating ?? undefined,
                 totalReviews: ratings?.total_reviews || 0,
-                isAvailable: provider.is_active,
+                isAvailable: provider.is_active ?? false,
                 addedAt: new Date().toISOString(),
                 notes: undefined as string | undefined,
                 autoNotify: false
@@ -501,9 +504,9 @@ export async function getFavoriteProviders(): Promise<{
                 averageRating: provider?.provider_ratings?.average_rating,
                 totalReviews: provider?.provider_ratings?.total_reviews || 0,
                 isAvailable: provider?.is_active || false,
-                addedAt: fav.created_at,
-                notes: fav.notes,
-                autoNotify: fav.auto_notify_on_availability
+                addedAt: fav.created_at ?? '',
+                notes: fav.notes ?? undefined,
+                autoNotify: fav.auto_notify_on_availability ?? false
             }
         })
 
@@ -611,21 +614,21 @@ export async function getOrderDetail(orderId: string): Promise<{
 
         const orderSummary: OrderSummary = {
             id: order.id,
-            orderNumber: order.order_number,
+            orderNumber: order.order_number ?? '',
             status: order.status as OrderSummary['status'],
             bookingType: order.order_type as OrderSummary['bookingType'],
             providerId: order.seller_id,
             providerName: providerProfile?.profiles?.full_name || 'Provider',
             providerAvatarUrl: providerProfile?.profiles?.avatar_url,
-            listingId: order.listing_id,
+            listingId: order.listing_id ?? undefined,
             listingTitle: listing?.title || 'Booking',
             listingCategory: (listing?.category as OrderSummary['listingCategory']) || 'Services',
             startDate: orderSlots[0],
             endDate: orderSlots[orderSlots.length - 1],
-            createdAt: order.created_at,
-            completedAt: order.completed_at,
+            createdAt: order.created_at ?? '',
+            completedAt: order.completed_at ?? undefined,
             totalAmount: order.total_amount,
-            currency: order.currency,
+            currency: order.currency ?? '',
             escrowStatus: order.escrow_status as OrderSummary['escrowStatus'],
             conversationId: conversation?.id,
             hasUnreadMessages,

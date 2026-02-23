@@ -75,7 +75,7 @@ interface CompanyProfileDialogProps {
 
 type FormStep = 'basics' | 'business' | 'funding' | 'review'
 
-const STEPS: { id: FormStep; title: string; icon: React.ElementType }[] = [
+const STEPS: { id: FormStep; title: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'basics', title: 'Company Basics', icon: Building2 },
   { id: 'business', title: 'Business Model', icon: TrendingUp },
   { id: 'funding', title: 'Funding', icon: BadgePoundSterling },

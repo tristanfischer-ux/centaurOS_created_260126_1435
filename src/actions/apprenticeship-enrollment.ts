@@ -257,7 +257,7 @@ export async function getMenteeEnrollments() {
   ])
   
   // Combine and deduplicate results by ID
-  const enrollmentMap = new Map<string, typeof mentorResult.data[0]>()
+  const enrollmentMap = new Map<string, NonNullable<typeof mentorResult.data>[0]>()
   for (const e of [...(mentorResult.data || []), ...(buddyResult.data || [])]) {
     if (e && !enrollmentMap.has(e.id)) {
       enrollmentMap.set(e.id, e)

@@ -31,7 +31,7 @@ import { SORT_OPTIONS, type SortOption, type MarketplaceCategory } from '../hook
  * @description Maps each marketplace category to its icon and active visual style.
  */
 const CATEGORY_CONFIG: Record<MarketplaceCategory, {
-    icon: React.ElementType
+    icon: React.ComponentType<{ className?: string }>
     activeClasses: string
 }> = {
     All: { icon: LayoutGrid, activeClasses: 'bg-foreground text-background' },

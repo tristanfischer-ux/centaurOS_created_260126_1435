@@ -39,7 +39,7 @@ export interface ViewToggleOption {
   /** Optional text label — if omitted, renders an icon-only button */
   label?: string
   /** Lucide icon component (required unless label is provided) */
-  icon?: React.ElementType
+  icon?: React.ComponentType<{ className?: string }>
   /** Accessible name (required for icon-only options) */
   ariaLabel: string
 }

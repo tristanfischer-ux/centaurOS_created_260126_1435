@@ -144,29 +144,31 @@ export async function retrieveForEngineeringQuery(
 
   const supabase = await createClient()
 
+  const embeddingStr = JSON.stringify(embedding)
+
   const [compRes, compatRes, tutRes, ptRes, mlRes] = await Promise.all([
     supabase.rpc('match_components', {
-      query_embedding: embedding,
+      query_embedding: embeddingStr,
       match_threshold: matchThreshold,
       match_count: componentLimit,
     }),
     supabase.rpc('match_component_compatibility', {
-      query_embedding: embedding,
+      query_embedding: embeddingStr,
       match_threshold: matchThreshold,
       match_count: compatibilityLimit,
     }),
     supabase.rpc('match_tutorials', {
-      query_embedding: embedding,
+      query_embedding: embeddingStr,
       match_threshold: matchThreshold,
       match_count: tutorialLimit,
     }),
     supabase.rpc('match_project_templates', {
-      query_embedding: embedding,
+      query_embedding: embeddingStr,
       match_threshold: matchThreshold,
       match_count: projectTemplateLimit,
     }),
     supabase.rpc('match_marketplace_listings', {
-      query_embedding: embedding,
+      query_embedding: embeddingStr,
       match_threshold: matchThreshold,
       match_count: marketplaceLimit,
     }),

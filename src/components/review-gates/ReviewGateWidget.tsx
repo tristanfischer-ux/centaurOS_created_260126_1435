@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import type { ReviewGate, ReviewGateType } from '@/types/review-gates'
 
-const GATE_ICONS: Record<ReviewGateType, React.ElementType> = {
+const GATE_ICONS: Record<ReviewGateType, React.ComponentType<{ className?: string }>> = {
   expert_review: UserCheck,
   peer_review: Users,
   quality_gate: ShieldCheck,

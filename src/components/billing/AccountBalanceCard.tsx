@@ -147,7 +147,7 @@ export function AccountBalanceCard({ className }: AccountBalanceCardProps) {
                             {getTransactionLabel(tx.transactionType)}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {format(new Date(tx.createdAt), 'MMM d, yyyy')}
+                            {tx.createdAt ? format(new Date(tx.createdAt), 'MMM d, yyyy') : '—'}
                           </p>
                         </div>
                       </div>

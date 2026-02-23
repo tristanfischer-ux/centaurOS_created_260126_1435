@@ -425,7 +425,7 @@ export async function getInvoiceHistory(
     status: "generated",
     total: doc.order?.total_amount || 0,
     currency: doc.order?.currency || "GBP",
-    issueDate: doc.generated_at,
+    issueDate: doc.generated_at ?? '',
     fileUrl: doc.file_url,
   }))
 

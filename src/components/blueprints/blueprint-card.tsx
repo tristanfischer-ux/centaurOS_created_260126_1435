@@ -31,7 +31,7 @@ import {
 } from 'lucide-react'
 
 // Icon mapping for product categories
-const categoryIcons: Record<string, React.ElementType> = {
+const categoryIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   electronics: Cpu,
   'consumer-electronics': Smartphone,
   saas: Server,

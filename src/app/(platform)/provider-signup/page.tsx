@@ -201,10 +201,20 @@ async function SignupContent({ listingId }: { listingId?: string }) {
             
             {/* Signup Form or Auth Prompt */}
             {user ? (
-                <ProviderSignupForm 
+                <ProviderSignupForm
                     listingId={listingId}
-                    listing={listing}
-                    migrationRecord={migrationRecord}
+                    listing={listing ? {
+                        id: listing.id,
+                        title: listing.title,
+                        category: listing.category,
+                        subcategory: listing.subcategory,
+                        description: listing.description,
+                        attributes: listing.attributes as Record<string, unknown> | null,
+                    } : null}
+                    migrationRecord={migrationRecord ? {
+                        id: migrationRecord.id,
+                        status: migrationRecord.status ?? 'pending',
+                    } : null}
                 />
             ) : (
                 <Card>

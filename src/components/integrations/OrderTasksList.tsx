@@ -42,7 +42,7 @@ interface OrderTasksListProps {
   maxHeight?: string
 }
 
-const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
+const statusConfig: Record<string, { icon: React.ComponentType<{ className?: string }>; color: string; label: string }> = {
   Pending: { icon: Circle, color: 'text-muted-foreground', label: 'Pending' },
   Accepted: { icon: Clock, color: 'text-status-info', label: 'Accepted' },
   In_Progress: { icon: Clock, color: 'text-amber-500', label: 'In Progress' },

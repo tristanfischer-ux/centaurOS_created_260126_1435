@@ -236,7 +236,7 @@ export function ConversationThread({
         toast.error(result.error || 'Failed to mark as unread')
       }
     },
-    inputRef,
+    inputRef: inputRef as React.RefObject<HTMLInputElement>,
   })
 
   // Get other participant
@@ -332,6 +332,7 @@ export function ConversationThread({
       return
     }
 
+    if (!conversationId) return
     setIsUploadingFile(true)
 
     try {

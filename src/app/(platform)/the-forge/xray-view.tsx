@@ -553,7 +553,6 @@ export function XRayView(): React.ReactNode {
             onModuleUpdate={handleModuleUpdate}
             scanId={scanId}
             onDeriveProcessClass={handleDeriveProcessClass}
-            onGenerateCadModel={handleGenerateCadModel}
             onOpenInterview={setInterviewModule}
             onEditModule={setEditingModule}
           />

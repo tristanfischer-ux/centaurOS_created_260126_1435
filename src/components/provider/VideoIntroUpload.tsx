@@ -211,7 +211,7 @@ export function VideoIntroUpload({ currentVideoUrl, currentThumbnailUrl }: Video
                 {/* Save Button */}
                 <Button 
                     onClick={handleSave} 
-                    disabled={isLoading || (videoUrl && !isValid)}
+                    disabled={isLoading || (!!videoUrl && !isValid)}
                     className="w-full"
                 >
                     {isLoading ? (

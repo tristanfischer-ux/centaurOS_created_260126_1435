@@ -504,7 +504,7 @@ export async function getSkillsGapAnalysis(enrollmentId: string) {
     const skill = assessment.skill as { id: string; name: string; category: string } | null
     if (skill) {
       skillsMap.set(skill.name, {
-        current: assessment.current_level,
+        current: assessment.current_level ?? 0,
         target: assessment.target_level || 3,
         category: skill.category
       })
@@ -839,7 +839,7 @@ export async function generateComplianceReport(
         .gte('completed_date', start)
         .lte('completed_date', end)
       
-      const actualProgress = (enrollment.otjt_hours_logged / enrollment.otjt_hours_target) * 100
+      const actualProgress = ((enrollment.otjt_hours_logged ?? 0) / enrollment.otjt_hours_target) * 100
       const onTrack = actualProgress >= (expectedProgress * 0.9)
       
       const programme = enrollment.programme as { title: string; level: number; standard_code: string } | null
@@ -878,7 +878,7 @@ export async function generateComplianceReport(
     onTrack: apprenticeReports.filter(a => a.otjt.onTrack).length,
     atRisk: apprenticeReports.filter(a => !a.otjt.onTrack).length,
     documentsPending: apprenticeReports.filter(a => !a.documents.agreementSigned || !a.documents.commitmentSigned).length,
-    totalOTJTHours: apprenticeReports.reduce((sum, a) => sum + a.otjt.logged, 0),
+    totalOTJTHours: apprenticeReports.reduce((sum, a) => sum + (a.otjt.logged ?? 0), 0),
     averageProgress: apprenticeReports.length > 0 
       ? Math.round(apprenticeReports.reduce((sum, a) => sum + a.otjt.progress, 0) / apprenticeReports.length)
       : 0

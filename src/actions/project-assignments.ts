@@ -215,12 +215,12 @@ export async function getFoundryAssignments(): Promise<{
     assignments: (data || []).map(a => ({
       id: a.id,
       apprenticeId: a.apprentice_id,
-      apprenticeName: (a.profiles as any)?.full_name || 'Unknown',
-      apprenticeEmail: (a.profiles as any)?.email || '',
+      apprenticeName: (a.profiles as { full_name?: string } | null)?.full_name || 'Unknown',
+      apprenticeEmail: (a.profiles as { email?: string } | null)?.email || '',
       projectName: a.project_name || 'Unnamed Project',
       projectDescription: a.project_description,
       status: a.status,
-      startedAt: a.started_at,
+      startedAt: a.started_at ?? '',
       endedAt: a.ended_at
     }))
   }
@@ -284,12 +284,12 @@ export async function getMyAssignments(): Promise<{
   return {
     assignments: (data || []).map(a => ({
       id: a.id,
-      foundryName: (a.foundries as any)?.name || 'Unknown Company',
+      foundryName: (a.foundries as { name?: string } | null)?.name || 'Unknown Company',
       projectName: a.project_name || 'Unnamed Project',
       projectDescription: a.project_description,
       status: a.status,
-      startedAt: a.started_at,
-      assignedByName: (a.profiles as any)?.full_name || 'Unknown'
+      startedAt: a.started_at ?? '',
+      assignedByName: (a.profiles as { full_name?: string } | null)?.full_name || 'Unknown'
     }))
   }
 }

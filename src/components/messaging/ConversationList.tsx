@@ -61,6 +61,7 @@ export function ConversationList({
     // Search filter
     if (searchQuery) {
       const otherParticipant = conv.buyer_id === currentUserId ? conv.seller : conv.buyer
+      if (!otherParticipant) return false
       const searchLower = searchQuery.toLowerCase()
       const nameMatch = otherParticipant.full_name?.toLowerCase().includes(searchLower)
       const emailMatch = otherParticipant.email.toLowerCase().includes(searchLower)
@@ -170,9 +171,10 @@ export function ConversationList({
         ) : (
           <div className="py-2">
             {filteredConversations.map(conversation => {
-              const otherParticipant = conversation.buyer_id === currentUserId 
-                ? conversation.seller 
+              const otherParticipant = conversation.buyer_id === currentUserId
+                ? conversation.seller
                 : conversation.buyer
+              if (!otherParticipant) return null
               const isSelected = selectedId === conversation.id
               const hasUnread = (conversation.unread_count || 0) > 0
 
@@ -182,8 +184,8 @@ export function ConversationList({
                   onClick={() => onSelect(conversation)}
                   className={cn(
                     'w-full px-4 py-3 flex items-start gap-3 text-left transition-colors',
-                    isSelected 
-                      ? 'bg-muted' 
+                    isSelected
+                      ? 'bg-muted'
                       : 'hover:bg-muted/50'
                   )}
                 >

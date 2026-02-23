@@ -210,13 +210,14 @@ export async function getStarredMessages(
     
     if (conversationId) {
       // Join with messages to filter by conversation
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       query = supabase
         .from('message_stars')
         .select(`
           message_id,
           message:messages!message_stars_message_id_fkey(conversation_id)
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', user.id) as any
     }
     
     const { data, error } = await query

@@ -52,8 +52,8 @@ export async function createTrialOrder(input: TrialOrderInput) {
     let baseRate = provider.hourly_rate || (provider.day_rate ? provider.day_rate / 8 : 100)
     
     // Apply trial discount if any
-    if (provider.trial_rate_discount > 0) {
-        baseRate = baseRate * (1 - provider.trial_rate_discount / 100)
+    if ((provider.trial_rate_discount ?? 0) > 0) {
+        baseRate = baseRate * (1 - (provider.trial_rate_discount ?? 0) / 100)
     }
     
     const totalHours = input.trialDurationWeeks * input.trialHoursPerWeek
@@ -285,7 +285,7 @@ export async function getTrialConversionStats() {
     const totalTrials = trials.length
     const completedTrials = trials.filter(t => t.status === 'completed').length
     const convertedTrials = trials.filter(t => t.trial_converted_at).length
-    const activeTrials = trials.filter(t => ['pending', 'accepted', 'in_progress'].includes(t.status)).length
+    const activeTrials = trials.filter(t => ['pending', 'accepted', 'in_progress'].includes(t.status ?? '')).length
     
     const conversionRate = completedTrials > 0 
         ? Math.round((convertedTrials / completedTrials) * 100) 

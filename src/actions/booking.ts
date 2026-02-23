@@ -424,7 +424,7 @@ export async function confirmBookingPayment(
         const { data: listing } = await supabase
             .from('marketplace_listings')
             .select('title')
-            .eq('id', order.listing_id)
+            .eq('id', order.listing_id ?? '')
             .single()
 
         // Get conversation
@@ -446,7 +446,7 @@ export async function confirmBookingPayment(
 
         const confirmation: BookingConfirmation = {
             orderId: order.id,
-            orderNumber: order.order_number,
+            orderNumber: order.order_number ?? '',
             status: 'confirmed',
             providerId: order.seller_id,
             providerName: (provider?.profiles as { full_name?: string })?.full_name || 'Provider',
@@ -454,9 +454,9 @@ export async function confirmBookingPayment(
             listingTitle: listing?.title || 'Booking',
             startDate,
             endDate,
-            createdAt: order.created_at,
+            createdAt: order.created_at ?? '',
             totalAmount: order.total_amount,
-            currency: order.currency,
+            currency: order.currency ?? '',
             paymentIntentId,
             conversationId: conversation?.id,
             nextSteps: [
@@ -540,7 +540,7 @@ export async function getListingForBooking(listingId: string): Promise<{
                     id: listing.id,
                     title: listing.title,
                     description: listing.description,
-                    category: listing.category,
+                    category: (['People', 'Products', 'Services'].includes(listing.category) ? listing.category : 'Services') as 'People' | 'Products' | 'Services',
                     subcategory: listing.subcategory,
                     attributes: (listing.attributes as Record<string, unknown>) || {}
                 },
@@ -552,7 +552,7 @@ export async function getListingForBooking(listingId: string): Promise<{
                     dayRate: provider.day_rate ?? undefined,
                     currency: provider.currency || 'GBP',
                     minimumDays: DEFAULT_MINIMUM_DAYS,
-                    isActive: provider.is_active
+                    isActive: provider.is_active ?? false
                 } : null
             },
             error: null

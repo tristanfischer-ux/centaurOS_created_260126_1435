@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '../src/types/database.types'
 
 /**
  * Apprentice Onboarding — Full End-to-End Flow
@@ -37,10 +38,10 @@ test.describe('Apprentice Onboarding — Full E2E Flow', () => {
 
   const testEmail = generateTestEmail()
   let testUserId: string | null = null
-  let adminClient: ReturnType<typeof createClient>
+  let adminClient: ReturnType<typeof createClient<Database>>
 
   test.beforeAll(async () => {
-    adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+    adminClient = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
     console.log(`🧪 Test email: ${testEmail}`)
@@ -60,7 +61,7 @@ test.describe('Apprentice Onboarding — Full E2E Flow', () => {
       id: testUserId,
       email: testEmail,
       full_name: TEST_NAME,
-      role: 'Apprentice',
+      role: 'Apprentice' as const,
       foundry_id: 'forge-guild',
       active_foundry_id: 'forge-guild',
     })
@@ -69,7 +70,7 @@ test.describe('Apprentice Onboarding — Full E2E Flow', () => {
     await adminClient.from('foundry_memberships').insert({
       user_id: testUserId,
       foundry_id: 'forge-guild',
-      role: 'Apprentice',
+      role: 'Apprentice' as const,
       is_primary: true,
       joined_at: new Date().toISOString(),
     })
@@ -78,7 +79,7 @@ test.describe('Apprentice Onboarding — Full E2E Flow', () => {
       user_id: testUserId,
       headline: 'Apprentice',
       bio: null,
-      tier: 'approved',
+      tier: 'approved' as const,
       is_active: true,
       is_public: true,
     })

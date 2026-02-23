@@ -54,7 +54,7 @@ interface MarketplaceListingGridProps {
 
 type ViewMode = 'cards' | 'list'
 
-function getAIIcon(subcategory: string): React.ElementType {
+function getAIIcon(subcategory: string): React.ComponentType<{ className?: string }> {
     switch (subcategory) {
         case 'Agent': return Bot
         case 'Assistant': return Sparkles

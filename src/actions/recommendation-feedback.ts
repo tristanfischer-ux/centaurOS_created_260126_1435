@@ -36,7 +36,8 @@ export async function submitRecommendationFeedback(
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ foundryId, user }) => {
     const supabase = await createClient()
-    const { error } = await supabase.from("recommendation_feedback").insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from("recommendation_feedback").insert({
       foundry_id: foundryId,
       user_id: user.id,
       source_type: input.sourceType,

@@ -52,7 +52,7 @@ import {
 
 interface InsightStep {
   /** Lucide icon component */
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   /** Short title for this stage */
   title: string
   /** Educational description of what's happening */

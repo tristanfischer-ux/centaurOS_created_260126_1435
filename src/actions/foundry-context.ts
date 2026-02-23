@@ -70,7 +70,7 @@ export async function getFoundryContext(): Promise<FoundryContext> {
                 gaps = functions.map(f => ({
                     category: f.category,
                     name: f.name,
-                    isCritical: f.is_critical,
+                    isCritical: f.is_critical ?? false,
                 }))
                 gapCategories = [...new Set(functions.map(f => f.category))]
             }

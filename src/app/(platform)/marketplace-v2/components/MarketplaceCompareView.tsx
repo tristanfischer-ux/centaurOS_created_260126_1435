@@ -40,7 +40,7 @@ interface MarketplaceCompareViewProps {
     onRemove: (id: string) => void
 }
 
-function getAIIcon(subcategory: string): React.ElementType {
+function getAIIcon(subcategory: string): React.ComponentType<{ className?: string }> {
     switch (subcategory) {
         case 'Agent': return Bot
         case 'Assistant': return Sparkles
@@ -51,8 +51,8 @@ function getAIIcon(subcategory: string): React.ElementType {
 }
 
 /** Get all unique attribute keys worth comparing across listings */
-function getComparisonRows(listings: MarketplaceListing[]): { key: string; label: string; icon?: React.ElementType }[] {
-    const rows: { key: string; label: string; icon?: React.ElementType }[] = [
+function getComparisonRows(listings: MarketplaceListing[]): { key: string; label: string; icon?: React.ComponentType<{ className?: string }> }[] {
+    const rows: { key: string; label: string; icon?: React.ComponentType<{ className?: string }> }[] = [
         { key: 'price', label: 'Price' },
         { key: 'rating', label: 'Rating', icon: Star },
         { key: 'reviews', label: 'Reviews' },

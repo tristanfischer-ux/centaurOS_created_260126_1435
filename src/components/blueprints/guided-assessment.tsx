@@ -314,7 +314,7 @@ export function GuidedAssessment({
 // Answer button component
 interface AnswerButtonProps {
   status: CoverageStatus
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   label: string
   description: string
   selected: boolean

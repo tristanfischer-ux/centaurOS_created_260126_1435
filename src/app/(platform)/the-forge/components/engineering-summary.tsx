@@ -868,7 +868,7 @@ function ModuleAnalysisRow({ module: m }: { module: ModuleSpec }): React.ReactNo
 
 // ─── Pipeline Progress Cards ─────────────────────────────────────────
 
-const STAGE_ICONS: Record<string, React.ElementType> = {
+const STAGE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   mass_dfm: Scale,
   structural: ShieldAlert,
   thermal: FlaskConical,

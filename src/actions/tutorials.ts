@@ -166,7 +166,7 @@ export async function getTutorialBySlug(slug: string): Promise<
     tags: (data.tags as string[]) ?? [],
     prerequisites: (data.prerequisites as string[]) ?? [],
     tools_mentioned: (data.tools_mentioned as string[]) ?? [],
-    sections: (data.sections as TutorialSection[]) ?? [],
+    sections: (data.sections as unknown as TutorialSection[]) ?? [],
     common_mistakes: (data.common_mistakes as string[]) ?? [],
     further_reading: (data.further_reading as string[]) ?? [],
     key_takeaways: (data.key_takeaways as string[]) ?? [],

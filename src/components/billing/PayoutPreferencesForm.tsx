@@ -54,8 +54,8 @@ export function PayoutPreferencesForm({
     
     if (prefs) {
       setPreferences(prefs)
-      setSchedule(prefs.payoutSchedule)
-      setMinimumAmount((prefs.minimumPayoutAmount / 100).toString())
+      setSchedule((prefs.payoutSchedule ?? 'automatic') as PayoutSchedule)
+      setMinimumAmount(((prefs.minimumPayoutAmount ?? 0) / 100).toString())
       setPreferredDay(prefs.preferredPayoutDay?.toString())
     }
     

@@ -294,13 +294,112 @@ export async function getSearchSuggestions(
 // MARKETPLACE SEARCH ACTIONS
 // ==========================================
 
-import { 
-  AppliedFilters, 
-  MarketplaceCategory, 
-  PopularSearch, 
-  RecentSearch, 
-  SearchSuggestion 
+import {
+  AppliedFilters,
+  MarketplaceCategory,
+  PopularSearch,
+  RecentSearch,
+  SavedSearch,
+  SearchSuggestion,
+  SearchParams as MarketplaceSearchParams,
+  SearchResponse,
+  FilterOption,
 } from '@/types/search'
+import { searchMarketplace, getSavedSearches as getSavedSearchesService, deleteSavedSearch as deleteSavedSearchService } from '@/lib/search/service'
+
+/**
+ * Search marketplace providers (server action wrapper)
+ */
+export async function searchProviders(params: MarketplaceSearchParams): Promise<SearchResponse> {
+  return searchMarketplace(params)
+}
+
+/**
+ * Get available search filters for a category
+ */
+export async function getSearchFilters(
+  category?: MarketplaceCategory
+): Promise<{ filters: { categories: FilterOption[]; subcategories: FilterOption[]; locations: FilterOption[] } }> {
+  const supabase = await createClient()
+
+  let listingsQuery = supabase
+    .from('marketplace_listings')
+    .select('category, subcategory, attributes')
+
+  if (category) {
+    listingsQuery = listingsQuery.eq('category', category)
+  }
+
+  const { data: listings } = await listingsQuery.limit(500)
+
+  const categories: Record<string, number> = {}
+  const subcategories: Record<string, number> = {}
+  const locations: Record<string, number> = {}
+
+  for (const listing of listings || []) {
+    if (listing.category) {
+      categories[listing.category] = (categories[listing.category] || 0) + 1
+    }
+    if (listing.subcategory) {
+      subcategories[listing.subcategory] = (subcategories[listing.subcategory] || 0) + 1
+    }
+    const attrs = listing.attributes as Record<string, unknown> | null
+    if (attrs?.location && typeof attrs.location === 'string') {
+      locations[attrs.location] = (locations[attrs.location] || 0) + 1
+    }
+  }
+
+  const toOptions = (map: Record<string, number>): FilterOption[] =>
+    Object.entries(map).map(([value, count]) => ({ value, label: value, count }))
+
+  return {
+    filters: {
+      categories: toOptions(categories),
+      subcategories: toOptions(subcategories),
+      locations: toOptions(locations),
+    },
+  }
+}
+
+/**
+ * Get saved searches for the current user
+ */
+export async function getSavedSearches(): Promise<{ success: boolean; searches: SavedSearch[]; error?: string }> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false, searches: [] }
+    }
+
+    const searches = await getSavedSearchesService(user.id)
+    return { success: true, searches }
+  } catch (error) {
+    console.error('Error fetching saved searches:', error)
+    return { success: false, searches: [], error: 'Failed to fetch saved searches' }
+  }
+}
+
+/**
+ * Delete a saved search
+ */
+export async function deleteSavedSearch(searchId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false, error: 'Not authenticated' }
+    }
+
+    const result = await deleteSavedSearchService(user.id, searchId)
+    return { success: result.success, error: result.error ?? undefined }
+  } catch (error) {
+    console.error('Error deleting saved search:', error)
+    return { success: false, error: 'Failed to delete saved search' }
+  }
+}
 
 /**
  * Get recent searches for the current user
@@ -364,10 +463,10 @@ export async function getPopularSearches(
       success: true, 
       searches: (data || []).map(item => ({
         query: item.query,
-        category: item.category as MarketplaceCategory | undefined,
-        count: item.search_count,
-        trending: item.trending
-      })) 
+        category: (item.category !== 'AI' ? item.category : undefined) as MarketplaceCategory | undefined,
+        count: item.search_count ?? 0,
+        trending: item.trending ?? false
+      }))
     }
   } catch (error) {
     console.error('Error fetching popular searches:', error)
@@ -394,7 +493,8 @@ export async function saveSearchQuery(
     }
 
     // Also add to recent searches
-    await supabase.from('recent_searches').upsert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('recent_searches').upsert({
       user_id: user.id,
       query,
       filters,
@@ -402,7 +502,8 @@ export async function saveSearchQuery(
     }, { onConflict: 'user_id, query' })
 
     // Save to saved_searches
-    const { error } = await supabase.from('saved_searches').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from('saved_searches').insert({
       user_id: user.id,
       name,
       query,
