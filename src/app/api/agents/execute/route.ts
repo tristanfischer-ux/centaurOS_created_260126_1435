@@ -116,7 +116,7 @@ interface ProviderTarget {
  */
 const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
     claude: [
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
+        { providerId: "anthropic", modelId: "claude-opus-4-6" },
         { providerId: "openai", modelId: "gpt-4o" },
         { providerId: "google", modelId: "gemini-3-flash-preview" },
     ],

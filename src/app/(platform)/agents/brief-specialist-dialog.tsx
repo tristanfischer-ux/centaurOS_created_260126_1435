@@ -85,7 +85,7 @@ function detectPresentationIntent(message: string): boolean {
 // Each specialist declares its tier in specialists-data.ts via `modelTier`.
 
 const MODEL_TIERS = {
-    claude: { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
+    claude: { providerId: "anthropic", modelId: "claude-opus-4-6" },
     qwen: { providerId: "qwen", modelId: "qwen3.5-plus" },
     "qwen-local": { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },
     minimax: { providerId: "minimax", modelId: "MiniMax-M2.5" },
