@@ -33,6 +33,7 @@ import {
     FileText,
     BellRing,
     Activity,
+    BarChart3,
 } from "lucide-react"
 
 // ─── Section Definitions ────────────────────────────────────────────────────
@@ -254,6 +255,13 @@ export const SECTIONS: Section[] = [
                 description: "Forward-looking cash flow projections with scenario modeling",
                 route: "/finance/cash-flow",
                 icon: Activity,
+                addedAt: new Date("2026-02-23"),
+            },
+            {
+                name: "Reports",
+                description: "Generate P&L, VAT, and Cash Flow Statement reports",
+                route: "/finance/reports",
+                icon: BarChart3,
                 addedAt: new Date("2026-02-23"),
             },
             {
