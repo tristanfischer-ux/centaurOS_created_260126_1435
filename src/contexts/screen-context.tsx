@@ -149,10 +149,6 @@ const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
     title: "Component Library",
     summary: "The user is browsing the component library — parametric parts with specs and pricing.",
   },
-  "/the-forge/assembly-builder": {
-    title: "Assembly Builder",
-    summary: "The user is in the assembly builder — combining components into assemblies.",
-  },
   "/knowledge": {
     title: "Knowledge Vault",
     summary: "The user is viewing the knowledge vault — organizational notes and documents.",

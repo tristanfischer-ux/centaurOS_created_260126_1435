@@ -17,7 +17,6 @@ import {
   Ruler,
   MapPin,
   FileText,
-  Plus,
 } from 'lucide-react'
 
 import {
@@ -35,7 +34,6 @@ import { cn } from '@/lib/utils'
 import { getComponentDetail } from '@/actions/component-library'
 import type { ComponentDetail } from '@/actions/component-library'
 import { STLViewer } from '@/components/cad/stl-viewer'
-import { AssemblyPickerDialog } from '@/components/forge/assembly-picker-dialog'
 
 // ============================================================================
 // CONSTANTS
@@ -116,7 +114,7 @@ export function ComponentDetailDialog({
   const [error, setError] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [stlData, setStlData] = useState<string | null>(null)
-  const [assemblyPickerOpen, setAssemblyPickerOpen] = useState(false)
+
 
   const loadDetail = useCallback(async () => {
     if (!componentId) return
@@ -318,27 +316,10 @@ export function ComponentDetailDialog({
                 </Button>
               )}
 
-              <Button
-                size="sm"
-                onClick={() => componentId && setAssemblyPickerOpen(true)}
-                disabled={!componentId}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add to Assembly
-              </Button>
             </div>
           </div>
         </DialogFooter>
       </DialogContent>
-      {componentId && (
-        <AssemblyPickerDialog
-          open={assemblyPickerOpen}
-          onOpenChange={setAssemblyPickerOpen}
-          componentId={componentId}
-          componentName={displayName}
-          onSuccess={() => onOpenChange(false)}
-        />
-      )}
     </Dialog>
   )
 }
