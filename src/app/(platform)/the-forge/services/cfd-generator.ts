@@ -148,12 +148,16 @@ export async function generateFlowConditions(
     const velocity = Math.max(0, Math.min(parsed.velocity_m_s ?? 10.0, 500))
     const density = Math.max(0.001, Math.min(parsed.density_kg_m3 ?? 1.225, 20_000))
     const viscosity = Math.max(1e-8, Math.min(parsed.kinematic_viscosity_m2_s ?? 1.5e-5, 1))
-    // Normalize direction to unit vector
+    // Normalize direction to unit vector (with Infinity/NaN guard)
     const rawDir: [number, number, number] = parsed.direction ?? [1, 0, 0]
-    const mag = Math.sqrt(rawDir[0] ** 2 + rawDir[1] ** 2 + rawDir[2] ** 2)
-    const direction: [number, number, number] = mag > 0
-      ? [rawDir[0] / mag, rawDir[1] / mag, rawDir[2] / mag]
-      : [1, 0, 0]
+    const dirValid = rawDir.every((v: number) => typeof v === 'number' && isFinite(v))
+    let direction: [number, number, number] = [1, 0, 0]
+    if (dirValid) {
+      const mag = Math.sqrt(rawDir[0] ** 2 + rawDir[1] ** 2 + rawDir[2] ** 2)
+      if (isFinite(mag) && mag > 0) {
+        direction = [rawDir[0] / mag, rawDir[1] / mag, rawDir[2] / mag]
+      }
+    }
     return {
       velocity_m_s: velocity,
       direction,

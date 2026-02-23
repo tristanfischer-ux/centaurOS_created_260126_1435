@@ -184,11 +184,43 @@ What realistic loads and boundary conditions should be applied for structural an
 
   try {
     const parsed = JSON.parse(cleaned) as LoadCaseSet
+    // Validate loadCases is an array before iterating
+    if (!Array.isArray(parsed.loadCases)) {
+      console.warn("[XRayFEA] AI returned non-array loadCases, using gravity fallback")
+      parsed.loadCases = [{ type: "gravity", description: "Self-weight under gravity", rationale: "Fallback: loadCases was not an array" }]
+    }
     // Sanity-check AI-inferred magnitudes to prevent physically implausible values
     for (const lc of parsed.loadCases) {
-      if (lc.magnitude_N != null) lc.magnitude_N = Math.max(0, Math.min(lc.magnitude_N, 100_000))
-      if (lc.magnitude_MPa != null) lc.magnitude_MPa = Math.max(0, Math.min(lc.magnitude_MPa, 1_000))
-      if (lc.magnitude_g != null) lc.magnitude_g = Math.max(0, Math.min(lc.magnitude_g, 50))
+      if (typeof lc.magnitude_N === 'number' && isFinite(lc.magnitude_N)) {
+        lc.magnitude_N = Math.max(0, Math.min(lc.magnitude_N, 100_000))
+      } else if (lc.magnitude_N != null) {
+        lc.magnitude_N = undefined
+      }
+      if (typeof lc.magnitude_MPa === 'number' && isFinite(lc.magnitude_MPa)) {
+        lc.magnitude_MPa = Math.max(0, Math.min(lc.magnitude_MPa, 1_000))
+      } else if (lc.magnitude_MPa != null) {
+        lc.magnitude_MPa = undefined
+      }
+      if (typeof lc.magnitude_g === 'number' && isFinite(lc.magnitude_g)) {
+        lc.magnitude_g = Math.max(0, Math.min(lc.magnitude_g, 50))
+      } else if (lc.magnitude_g != null) {
+        lc.magnitude_g = undefined
+      }
+      // Normalize direction vector
+      if (lc.direction) {
+        const [dx, dy, dz] = lc.direction
+        if (typeof dx === 'number' && typeof dy === 'number' && typeof dz === 'number'
+            && isFinite(dx) && isFinite(dy) && isFinite(dz)) {
+          const mag = Math.sqrt(dx * dx + dy * dy + dz * dz)
+          if (isFinite(mag) && mag > 0) {
+            lc.direction = [dx / mag, dy / mag, dz / mag]
+          } else {
+            lc.direction = [0, 0, 1] // Zero-vector fallback
+          }
+        } else {
+          lc.direction = [0, 0, 1] // Invalid values fallback
+        }
+      }
     }
     return parsed
   } catch (parseError) {

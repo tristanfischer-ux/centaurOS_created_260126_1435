@@ -19,6 +19,7 @@ import type { Discipline, ModuleSpec } from "./xray-schema"
 // ─── Cache ──────────────────────────────────────────────────────────
 
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+const MAX_CACHE_SIZE = 100
 
 interface CacheEntry<T> {
   data: T
@@ -26,6 +27,19 @@ interface CacheEntry<T> {
 }
 
 const peopleCache = new Map<string, CacheEntry<PersonMatch[]>>()
+
+/** Evict expired entries, then oldest if still over limit */
+function evictPeopleCache(): void {
+  const now = Date.now()
+  for (const [key, entry] of peopleCache) {
+    if (now - entry.ts >= CACHE_TTL_MS) peopleCache.delete(key)
+  }
+  if (peopleCache.size > MAX_CACHE_SIZE) {
+    const sorted = [...peopleCache.entries()].sort((a, b) => a[1].ts - b[1].ts)
+    const toDelete = sorted.slice(0, peopleCache.size - MAX_CACHE_SIZE)
+    for (const [key] of toDelete) peopleCache.delete(key)
+  }
+}
 
 function peopleCacheKey(modules: ModuleSpec[]): string {
   const raw = modules.map((m) => `${m.id}|${m.name}|${m.purpose}`).join(";")
@@ -123,11 +137,15 @@ export async function matchPeopleForModules(modules: ModuleSpec[]): Promise<Pers
     const embeddingText = modules.map((m) => `${m.name} ${m.purpose}`).join(". ")
     const embedding = await embedText(embeddingText)
     if (embedding) {
-      const { data: semanticMatches } = await supabase.rpc("match_people_semantic", {
-        query_embedding: JSON.stringify(embedding),
+      // GOTCHA: Supabase types map vector(1536) → string, but the client correctly sends number[] at runtime
+      const { data: semanticMatches, error: rpcError } = await supabase.rpc("match_people_semantic", {
+        query_embedding: embedding as unknown as string,
         match_threshold: 0.4,
         match_count: 20,
       })
+      if (rpcError) {
+        console.error("[PeopleMatch] Semantic RPC error:", rpcError.message)
+      }
       if (semanticMatches) {
         for (const sm of semanticMatches) {
           semanticProviderScores.set(sm.id, (sm.similarity as number) * 10)
@@ -225,8 +243,8 @@ export async function matchPeopleForModules(modules: ModuleSpec[]): Promise<Pers
           }
         }
 
-        // Combine keyword score with semantic score
-        const semScore = semanticProviderScores.get(provider.id) ?? 0
+        // Combine keyword score with semantic score (×1.5 so semantic max ~15 is comparable to keyword range)
+        const semScore = (semanticProviderScores.get(provider.id) ?? 0) * 1.5
         const combinedScore = score + semScore
 
         if (combinedScore > 0) {
@@ -263,6 +281,7 @@ export async function matchPeopleForModules(modules: ModuleSpec[]): Promise<Pers
 
   // Store in cache
   peopleCache.set(cacheKey, { data: results, ts: Date.now() })
+  if (peopleCache.size > MAX_CACHE_SIZE) evictPeopleCache()
 
   return results
 }

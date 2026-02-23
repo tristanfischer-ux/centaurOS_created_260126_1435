@@ -22,6 +22,7 @@ import type { ModuleSpec } from "./xray-schema"
 // ─── Cache ──────────────────────────────────────────────────────────
 
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+const MAX_CACHE_SIZE = 100
 
 interface CacheEntry<T> {
   data: T
@@ -29,6 +30,21 @@ interface CacheEntry<T> {
 }
 
 const supplierCache = new Map<string, CacheEntry<SupplierMatch[]>>()
+
+/** Evict expired entries, then oldest if still over limit */
+function evictSupplierCache(): void {
+  const now = Date.now()
+  // First pass: remove expired
+  for (const [key, entry] of supplierCache) {
+    if (now - entry.ts >= CACHE_TTL_MS) supplierCache.delete(key)
+  }
+  // Second pass: if still over limit, delete oldest
+  if (supplierCache.size > MAX_CACHE_SIZE) {
+    const sorted = [...supplierCache.entries()].sort((a, b) => a[1].ts - b[1].ts)
+    const toDelete = sorted.slice(0, supplierCache.size - MAX_CACHE_SIZE)
+    for (const [key] of toDelete) supplierCache.delete(key)
+  }
+}
 
 function supplierCacheKey(module: ModuleSpec): string {
   const raw = `${module.id}|${module.name}|${module.purpose}|${module.keyParts.join(",")}`
@@ -111,11 +127,15 @@ export async function matchSuppliersForModule(
     const embeddingText = `${module.name} ${module.purpose} ${module.keyParts.join(" ")}`
     const embedding = await embedText(embeddingText)
     if (embedding) {
-      const { data: semanticMatches } = await supabase.rpc("match_suppliers_semantic", {
-        query_embedding: JSON.stringify(embedding),
+      // GOTCHA: Supabase types map vector(1536) → string, but the client correctly sends number[] at runtime
+      const { data: semanticMatches, error: rpcError } = await supabase.rpc("match_suppliers_semantic", {
+        query_embedding: embedding as unknown as string,
         match_threshold: 0.4,
         match_count: 20,
       })
+      if (rpcError) {
+        console.error("[SupplierMatch] Semantic RPC error:", rpcError.message)
+      }
       if (semanticMatches) {
         for (const sm of semanticMatches) {
           // Scale similarity (0-1) to 0-10 range for combining with keyword score
@@ -169,8 +189,8 @@ export async function matchSuppliersForModule(
         }
       }
 
-      // Combine keyword score with semantic score
-      const semScore = semanticScores.get(supplier.id) ?? 0
+      // Combine keyword score with semantic score (×1.5 so semantic max ~15 is comparable to keyword range)
+      const semScore = (semanticScores.get(supplier.id) ?? 0) * 1.5
       const combinedScore = score + semScore
 
       if (combinedScore > 0) {
@@ -244,6 +264,7 @@ export async function matchSuppliersForModule(
 
   // Store in cache
   supplierCache.set(cacheKey, { data: results, ts: Date.now() })
+  if (supplierCache.size > MAX_CACHE_SIZE) evictSupplierCache()
 
   return results
 }

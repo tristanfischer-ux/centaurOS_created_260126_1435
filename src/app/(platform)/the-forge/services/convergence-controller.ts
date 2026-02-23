@@ -305,7 +305,7 @@ ${analysis?.dfm ? `DFM: ${analysis.dfm.printable ? "Printable" : "NOT printable"
     return changes.map((change) => {
       const current = parseFloat(change.currentValue)
       const suggested = parseFloat(change.suggestedValue)
-      if (!isNaN(current) && !isNaN(suggested)) {
+      if (!isNaN(current) && !isNaN(suggested) && isFinite(current) && isFinite(suggested)) {
         const dampened = current + (suggested - current) * CHANGE_DAMPENING_FACTOR
         // Clean trailing zeros: "12.50" → "12.5", "12.00" → "12"
         const dampenedStr = parseFloat(dampened.toFixed(6)).toString()
