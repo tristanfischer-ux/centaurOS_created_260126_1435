@@ -146,6 +146,87 @@ export type QuickActionType =
   | 'add_expense'
 
 // ============================================================
+// Payment Links
+// ============================================================
+
+export type PaymentLinkStatus = 'active' | 'paid' | 'expired' | 'cancelled'
+
+export interface PaymentLink {
+  id: string
+  foundryId: string
+  createdBy: string
+  shortCode: string
+  amount: number
+  currency: string
+  description: string
+  status: PaymentLinkStatus
+  expiresAt: string | null
+  paidAt: string | null
+  stripePaymentIntentId: string | null
+  invoiceId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+// ============================================================
+// Standalone Invoices
+// ============================================================
+
+export type StandaloneInvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+
+export type RecurrenceInterval = 'weekly' | 'fortnightly' | 'monthly' | 'quarterly' | 'annual'
+
+export interface InvoiceLineItem {
+  description: string
+  quantity: number
+  unitPrice: number // in pence
+  amount: number    // in pence
+}
+
+export interface StandaloneInvoice {
+  id: string
+  foundryId: string
+  createdBy: string
+  invoiceNumber: string
+  recipientName: string
+  recipientEmail: string
+  lineItems: InvoiceLineItem[]
+  subtotal: number
+  vatAmount: number
+  total: number
+  currency: string
+  status: StandaloneInvoiceStatus
+  dueDate: string
+  paymentLinkId: string | null
+  isRecurring: boolean
+  recurrenceInterval: RecurrenceInterval | null
+  nextRecurrenceDate: string | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateInvoiceInput {
+  recipientName: string
+  recipientEmail: string
+  lineItems: InvoiceLineItem[]
+  dueDate: string
+  currency?: string
+  notes?: string
+  isRecurring?: boolean
+  recurrenceInterval?: RecurrenceInterval
+  generatePaymentLink?: boolean
+}
+
+export interface CreatePaymentLinkInput {
+  amount: number
+  currency?: string
+  description: string
+  expiresAt?: string
+  invoiceId?: string
+}
+
+// ============================================================
 // Action Result (local to finance actions)
 // ============================================================
 

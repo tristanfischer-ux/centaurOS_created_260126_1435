@@ -5278,6 +5278,156 @@ export type Database = {
           },
         ]
       }
+      finance_payment_links: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          currency: string
+          description: string
+          expires_at: string | null
+          foundry_id: string
+          id: string
+          invoice_id: string | null
+          paid_at: string | null
+          short_code: string
+          status: string
+          stripe_payment_intent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          currency?: string
+          description?: string
+          expires_at?: string | null
+          foundry_id: string
+          id?: string
+          invoice_id?: string | null
+          paid_at?: string | null
+          short_code: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          currency?: string
+          description?: string
+          expires_at?: string | null
+          foundry_id?: string
+          id?: string
+          invoice_id?: string | null
+          paid_at?: string | null
+          short_code?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_payment_links_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_payment_links_invoice"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "finance_standalone_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_standalone_invoices: {
+        Row: {
+          created_at: string
+          created_by: string
+          currency: string
+          due_date: string
+          foundry_id: string
+          id: string
+          invoice_number: string
+          is_recurring: boolean
+          line_items: Json
+          next_recurrence_date: string | null
+          notes: string | null
+          payment_link_id: string | null
+          recipient_email: string
+          recipient_name: string
+          recurrence_interval: string | null
+          status: string
+          subtotal: number
+          total: number
+          updated_at: string
+          vat_amount: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          currency?: string
+          due_date: string
+          foundry_id: string
+          id?: string
+          invoice_number: string
+          is_recurring?: boolean
+          line_items?: Json
+          next_recurrence_date?: string | null
+          notes?: string | null
+          payment_link_id?: string | null
+          recipient_email: string
+          recipient_name: string
+          recurrence_interval?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          vat_amount?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          currency?: string
+          due_date?: string
+          foundry_id?: string
+          id?: string
+          invoice_number?: string
+          is_recurring?: boolean
+          line_items?: Json
+          next_recurrence_date?: string | null
+          notes?: string | null
+          payment_link_id?: string | null
+          recipient_email?: string
+          recipient_name?: string
+          recurrence_interval?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          vat_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_standalone_invoices_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_invoices_payment_link"
+            columns: ["payment_link_id"]
+            isOneToOne: false
+            referencedRelation: "finance_payment_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forge_contracts: {
         Row: {
           created_at: string

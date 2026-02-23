@@ -1,12 +1,13 @@
 /**
  * @file page.tsx — Finance Invoices listing page
  *
- * @description Displays all invoices (orders) with filtering by status
- * and aging buckets. Reuses order data from the marketplace.
+ * @description Displays all invoices (marketplace orders + standalone)
+ * with filtering by status and aging buckets.
  */
 
 import type { Metadata } from 'next'
 import { getOutstandingInvoices } from '@/actions/finance-dashboard'
+import { getStandaloneInvoices } from '@/actions/finance-invoices'
 import { InvoicesView } from './invoices-view'
 
 export const metadata: Metadata = {
@@ -15,10 +16,15 @@ export const metadata: Metadata = {
 }
 
 export default async function InvoicesPage(): Promise<React.ReactNode> {
-  const result = await getOutstandingInvoices().catch(() => ({
-    data: null,
-    error: 'Failed to load invoices',
-  }))
+  const [outstandingResult, standaloneResult] = await Promise.all([
+    getOutstandingInvoices().catch(() => ({ data: null, error: 'Failed to load invoices' })),
+    getStandaloneInvoices().catch(() => ({ data: null, error: 'Failed to load invoices' })),
+  ])
 
-  return <InvoicesView initialInvoices={result.data ?? []} />
+  return (
+    <InvoicesView
+      initialInvoices={outstandingResult.data ?? []}
+      standaloneInvoices={standaloneResult.data ?? []}
+    />
+  )
 }
