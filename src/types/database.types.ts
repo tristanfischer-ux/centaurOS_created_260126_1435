@@ -5278,6 +5278,62 @@ export type Database = {
           },
         ]
       }
+      finance_budgets: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string
+          currency: string
+          end_date: string | null
+          foundry_id: string
+          id: string
+          is_active: boolean
+          name: string
+          period: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          created_by: string
+          currency?: string
+          end_date?: string | null
+          foundry_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          period?: string
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string
+          currency?: string
+          end_date?: string | null
+          foundry_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          period?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_budgets_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_payment_links: {
         Row: {
           amount: number

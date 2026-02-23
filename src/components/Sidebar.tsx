@@ -56,6 +56,7 @@ import {
     BellRing,
     Activity,
     BarChart3,
+    PiggyBank,
 } from "lucide-react"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -121,6 +122,7 @@ const financeNavigation = [
     { name: "Invoices", href: "/finance/invoices", icon: FileText, tooltip: "Track outstanding payments and aging buckets" },
     { name: "Cash Flow", href: "/finance/cash-flow", icon: Activity, tooltip: "Forward-looking cash flow projections with scenario modeling" },
     { name: "Reports", href: "/finance/reports", icon: BarChart3, tooltip: "Generate P&L, VAT, and Cash Flow Statement reports" },
+    { name: "Budgets", href: "/finance/budgets", icon: PiggyBank, tooltip: "Track budget allocations vs actual spend with variance analysis" },
     { name: "Alerts", href: "/finance/settings", icon: BellRing, tooltip: "Configure financial alert thresholds and digest preferences" },
 ]
 

@@ -46,6 +46,7 @@ import {
     BellRing,
     Activity,
     BarChart3,
+    PiggyBank,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -97,6 +98,7 @@ const financeMoreNavigation = [
     { name: "Invoices", href: "/finance/invoices", icon: FileText },
     { name: "Cash Flow", href: "/finance/cash-flow", icon: Activity },
     { name: "Reports", href: "/finance/reports", icon: BarChart3 },
+    { name: "Budgets", href: "/finance/budgets", icon: PiggyBank },
     { name: "Alerts", href: "/finance/settings", icon: BellRing },
 ]
 

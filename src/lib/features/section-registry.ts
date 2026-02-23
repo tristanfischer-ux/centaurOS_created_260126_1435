@@ -34,6 +34,7 @@ import {
     BellRing,
     Activity,
     BarChart3,
+    PiggyBank,
 } from "lucide-react"
 
 // ─── Section Definitions ────────────────────────────────────────────────────
@@ -262,6 +263,13 @@ export const SECTIONS: Section[] = [
                 description: "Generate P&L, VAT, and Cash Flow Statement reports",
                 route: "/finance/reports",
                 icon: BarChart3,
+                addedAt: new Date("2026-02-23"),
+            },
+            {
+                name: "Budgets",
+                description: "Track budget allocations vs actual spend with variance analysis",
+                route: "/finance/budgets",
+                icon: PiggyBank,
                 addedAt: new Date("2026-02-23"),
             },
             {
