@@ -1,6 +1,6 @@
 "use client"
 
-import { Hammer, Store, UserCircle, Waypoints } from "lucide-react"
+import { Hammer, PoundSterling, Store, UserCircle, Waypoints } from "lucide-react"
 import { motion } from "framer-motion"
 import Link from "next/link"
 
@@ -12,6 +12,7 @@ import type { SectionId } from "@/lib/features/section-registry"
 const JOURNEY_STEPS = [
     { id: "me" as SectionId, label: "You", icon: UserCircle, route: "/me" },
     { id: "plan" as SectionId, label: "Plan", icon: Waypoints, route: "/plan" },
+    { id: "finance" as SectionId, label: "Finance", icon: PoundSterling, route: "/finance/intro" },
     {
         id: "workshop" as SectionId,
         label: "Build",
@@ -31,7 +32,7 @@ const JOURNEY_STEPS = [
 /**
  * JourneyIndicator — Horizontal stepper showing position in the ForgeOS section flow.
  *
- * @description Renders a 4-step journey indicator (You → Plan → Build → Scale)
+ * @description Renders a 5-step journey indicator (You → Plan → Finance → Build → Scale)
  * with circles connected by lines. The current section is highlighted with
  * International Orange and a subtle glow. Other steps are clickable links
  * to their section intro pages. Uses Framer Motion for entrance animation.

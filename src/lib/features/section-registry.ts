@@ -1,7 +1,7 @@
 /**
  * @file section-registry.ts — Section definitions for sidebar navigation
  *
- * @description Defines the four navigation sections (Me, Plan, Workshop, Marketplace)
+ * @description Defines the five navigation sections (Me, Plan, Finance, Workshop, Marketplace)
  * and maps features from the feature registry into their respective sections.
  * Used by the sidebar "New" badge system to detect unseen features per section,
  * and by the section intro pages for visual metadata (hero images, accents, connections).
@@ -28,11 +28,14 @@ import {
     BookOpen,
     Store,
     ShoppingBag,
+    PoundSterling,
+    Map,
+    FileText,
 } from "lucide-react"
 
 // ─── Section Definitions ────────────────────────────────────────────────────
 
-export type SectionId = "me" | "plan" | "workshop" | "marketplace"
+export type SectionId = "me" | "plan" | "finance" | "workshop" | "marketplace"
 
 export interface SectionFeature {
     /** Display name in the intro page */
@@ -199,6 +202,54 @@ export const SECTIONS: Section[] = [
         ],
     },
     {
+        id: "finance",
+        label: "Finance",
+        introRoute: "/finance/intro",
+        tagline: "Your financial command centre",
+        description: "See your complete financial picture in one place. Revenue, expenses, cash flow, invoices, and profitability — all unified from your existing data. No spreadsheets. No guesswork.",
+        valueProps: [
+            { title: "See everything at a glance", text: "Cash position, revenue trends, expense breakdown, and outstanding invoices — all on a single dashboard." },
+            { title: "Know your margins", text: "Real-time profitability from your Money Map data. Understand where every pound goes and what drives your bottom line." },
+            { title: "Stay on top of payments", text: "Track outstanding invoices with aging buckets. Never miss an overdue payment again." },
+        ],
+        visual: {
+            heroImage: "/images/sections/finance-hero.png",
+            heroAlt: "Clean financial dashboard showing revenue charts and KPI cards",
+            accentGradient: "from-orange-500 to-emerald-400",
+            accentBg: "bg-emerald-50",
+            accentText: "text-status-success",
+            journeyStep: 3,
+            journeyLabel: "Finance",
+        },
+        connections: [
+            { targetId: "plan", relationship: "informed by", description: "Your strategic plans drive financial projections and budget allocation." },
+            { targetId: "marketplace", relationship: "tracks", description: "Orders, payments, and invoices from the Marketplace flow into your financial overview." },
+        ],
+        features: [
+            {
+                name: "Overview",
+                description: "Your unified financial dashboard — KPIs, charts, and transaction feed",
+                route: "/finance",
+                icon: PoundSterling,
+                addedAt: new Date("2026-02-23"),
+            },
+            {
+                name: "Money Map",
+                description: "Visualise revenue streams, costs, and profitability",
+                route: "/finance/money-map",
+                icon: Map,
+                addedAt: new Date("2026-02-23"),
+            },
+            {
+                name: "Invoices",
+                description: "Track outstanding payments and aging buckets",
+                route: "/finance/invoices",
+                icon: FileText,
+                addedAt: new Date("2026-02-23"),
+            },
+        ],
+    },
+    {
         id: "workshop",
         label: "Workshop",
         introRoute: "/workshop",
@@ -215,7 +266,7 @@ export const SECTIONS: Section[] = [
             accentGradient: "from-orange-600 to-amber-500",
             accentBg: "bg-orange-50",
             accentText: "text-international-orange",
-            journeyStep: 3,
+            journeyStep: 4,
             journeyLabel: "Build",
         },
         connections: [
@@ -270,7 +321,7 @@ export const SECTIONS: Section[] = [
             accentGradient: "from-orange-500 to-teal-400",
             accentBg: "bg-teal-50",
             accentText: "text-teal-600",
-            journeyStep: 4,
+            journeyStep: 5,
             journeyLabel: "Scale",
         },
         connections: [

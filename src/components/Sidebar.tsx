@@ -1,9 +1,10 @@
 /**
  * @file Sidebar.tsx — Main navigation component with four-section layout.
  *
- * @description Organizes navigation into four sections:
+ * @description Organizes navigation into five sections:
  * - "Me": personal pages (Today, My Profile, Updates)
  * - "Plan": strategy and execution (Strategy, Objectives, Tasks, Reports)
+ * - "Finance": financial overview (Overview, Money Map, Invoices)
  * - "Workshop": collaboration and building (The Forge, Team, AI Team, AI Outputs, Browse, Inspiration)
  * - "Marketplace": recruits and supplies (Recruits, Guild, Apprenticeship, Marketplace, Orders)
  *
@@ -49,6 +50,9 @@ import {
     Brain,
     MessageCircle,
     Send,
+    PoundSterling,
+    FileText,
+    Map,
 } from "lucide-react"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -106,7 +110,16 @@ const planNavigation = [
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Section 3: "Workshop" — Where the work happens
+// Section 3: "Finance" — Financial overview and management
+// ─────────────────────────────────────────────────────────────────────────────
+const financeNavigation = [
+    { name: "Overview", href: "/finance", icon: PoundSterling, tooltip: "Your unified financial dashboard — revenue, expenses, cash flow, and invoices" },
+    { name: "Money Map", href: "/finance/money-map", icon: Map, tooltip: "Visualise revenue streams, costs, and profitability" },
+    { name: "Invoices", href: "/finance/invoices", icon: FileText, tooltip: "Track outstanding payments and aging buckets" },
+]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 4: "Workshop" — Where the work happens
 // ─────────────────────────────────────────────────────────────────────────────
 const workshopNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame, tooltip: "Turn product ideas into manufacturing-ready engineering packages" },
@@ -173,7 +186,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     // with staleTimes (30s dynamic cache), this means the RSC payload is already
     // in the client cache before the user clicks.
     React.useEffect(() => {
-        const topRoutes = ['/today', '/new-tasks', '/new-objectives', '/team', '/the-forge', '/strategy', '/my-profile', '/updates', '/knowledge', '/reports']
+        const topRoutes = ['/today', '/new-tasks', '/new-objectives', '/team', '/the-forge', '/strategy', '/my-profile', '/updates', '/knowledge', '/reports', '/finance']
         topRoutes.forEach(route => router.prefetch(route))
     }, [router])
 
@@ -315,7 +328,15 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {planNavigation.map(renderNavItem)}
 
                 {/* ══════════════════════════════════════════════════ */}
-                {/* Section 3: "Workshop" — Where the work happens     */}
+                {/* Section 3: "Finance" — Financial overview            */}
+                {/* ══════════════════════════════════════════════════ */}
+                <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
+
+                <SectionHeader label="Finance" introRoute="/finance/intro" hasNew={badges.finance} />
+                {financeNavigation.map(renderNavItem)}
+
+                {/* ══════════════════════════════════════════════════ */}
+                {/* Section 4: "Workshop" — Where the work happens     */}
                 {/* ══════════════════════════════════════════════════ */}
                 <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
 
@@ -323,7 +344,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {workshopNavigation.map(renderNavItem)}
 
                 {/* ══════════════════════════════════════════════════ */}
-                {/* Section 4: "Marketplace" — Recruits and supplies   */}
+                {/* Section 5: "Marketplace" — Recruits and supplies   */}
                 {/* ══════════════════════════════════════════════════ */}
                 <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
 

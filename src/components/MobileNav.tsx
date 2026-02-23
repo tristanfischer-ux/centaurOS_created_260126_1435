@@ -40,6 +40,9 @@ import {
     Handshake,
     MessageCircle,
     Send,
+    PoundSterling,
+    FileText,
+    Map,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -84,6 +87,13 @@ const planMoreNavigation = [
     { name: "Outreach", href: "/outreach", icon: Send },
 ]
 
+// "More" dropdown — Finance section
+const financeMoreNavigation = [
+    { name: "Finance", href: "/finance", icon: PoundSterling },
+    { name: "Money Map", href: "/finance/money-map", icon: Map },
+    { name: "Invoices", href: "/finance/invoices", icon: FileText },
+]
+
 // "More" dropdown — Workshop section
 const workshopMoreNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame },
@@ -119,7 +129,7 @@ export function MobileNav() {
         router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
 
-    const allMoreItems = [...meMoreNavigation, ...planMoreNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
+    const allMoreItems = [...meMoreNavigation, ...planMoreNavigation, ...financeMoreNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
 
     /**
      * Renders a dropdown menu item with active state highlighting.
@@ -212,6 +222,14 @@ export function MobileNav() {
                             Plan
                         </DropdownMenuLabel>
                         {planMoreNavigation.map(renderDropdownItem)}
+
+                        <DropdownMenuSeparator />
+
+                        {/* Finance section */}
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                            Finance
+                        </DropdownMenuLabel>
+                        {financeMoreNavigation.map(renderDropdownItem)}
 
                         <DropdownMenuSeparator />
 

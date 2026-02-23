@@ -80,6 +80,7 @@ export function useSectionNewBadges(): {
     const [badges, setBadges] = useState<Record<SectionId, boolean>>({
         me: false,
         plan: false,
+        finance: false,
         workshop: false,
         marketplace: false,
     })
@@ -89,6 +90,7 @@ export function useSectionNewBadges(): {
         setBadges({
             me: hasUnseenFeatures("me"),
             plan: hasUnseenFeatures("plan"),
+            finance: hasUnseenFeatures("finance"),
             workshop: hasUnseenFeatures("workshop"),
             marketplace: hasUnseenFeatures("marketplace"),
         })
