@@ -25,6 +25,7 @@
 "use server"
 
 import { withAuth } from "@/lib/server-action-utils"
+import { checkRateLimit } from "@/lib/security/rate-limit"
 import { scanIdea as scanIdeaService, deriveProcessClassAI, refineScanAI, refineModuleAI } from "@/app/(platform)/the-forge/services/scan"
 import { matchPeopleForModules } from "@/app/(platform)/the-forge/services/people"
 import { matchSuppliersForModule } from "@/app/(platform)/the-forge/services/suppliers"
@@ -52,6 +53,23 @@ import type { Json } from "@/types/database.types"
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 type SupabaseClient = Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>
+
+/**
+ * SECURITY: Server-side field length validation for module spec edits (F5).
+ * Prevents unbounded strings from being persisted via updateScanSpecAction.
+ *
+ * @param mod - The module spec to validate
+ * @returns Error message if invalid, null if OK
+ */
+function validateModuleFieldLengths(mod: ModuleSpec): string | null {
+  if (mod.name.length > 200) return "Module name too long (max 200)"
+  if (mod.purpose.length > 500) return "Module purpose too long (max 500)"
+  if ((mod.detail.whatItIs?.length ?? 0) > 5000) return "whatItIs too long (max 5000)"
+  if (mod.keyParts.length > 20) return "Too many keyParts (max 20)"
+  if (mod.keyParts.some(p => p.length > 500)) return "keyPart too long (max 500)"
+  if (mod.tests.length > 20) return "Too many tests (max 20)"
+  return null
+}
 
 /**
  * Loads a scan by ID with foundry isolation.
@@ -100,6 +118,10 @@ export async function scanIdeaAction(idea: string, researchReport?: string): Pro
   { scanId: string; spec: XRaySpec } | { error: string }
 > {
   return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit AI-powered scan
+    const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
+    if (rl) return { error: rl }
+
     // VALIDATION: Ensure idea is non-empty
     if (!idea?.trim()) {
       return { error: "Please enter a product idea to scan" }
@@ -107,6 +129,9 @@ export async function scanIdeaAction(idea: string, researchReport?: string): Pro
     if (idea.length > 5000) {
       return { error: "Idea text is too long (max 5000 characters)" }
     }
+
+    // SECURITY: Cap research report length to prevent unbounded AI prompt (F2)
+    const cappedReport = researchReport?.slice(0, 50_000)
 
     // Create placeholder row first with scan_status = 'scanning'
     // so Realtime subscribers see the scan-in-progress state
@@ -137,8 +162,8 @@ export async function scanIdeaAction(idea: string, researchReport?: string): Pro
 
     let spec: XRaySpec
     try {
-      // AI scan — pass research report for grounded module decomposition
-      spec = await scanIdeaService(idea.trim(), researchReport)
+      // AI scan — pass capped research report for grounded module decomposition
+      spec = await scanIdeaService(idea.trim(), cappedReport)
     } catch (aiError) {
       // Cleanup: delete orphaned placeholder so it does not remain stuck as "scanning"
       await supabase
@@ -209,6 +234,10 @@ export async function refineScanAction(
   researchReport?: string,
 ): Promise<{ scanId: string; spec: XRaySpec } | { error: string }> {
   return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit AI-powered refinement
+    const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
+    if (rl) return { error: rl }
+
     // VALIDATION: Ensure idea is non-empty
     if (!updatedIdea?.trim()) {
       return { error: "Please enter a product idea to refine" }
@@ -217,6 +246,9 @@ export async function refineScanAction(
       return { error: "Idea text is too long (max 5000 characters)" }
     }
 
+    // SECURITY: Cap research report length to prevent unbounded AI prompt (F2)
+    const cappedReport = researchReport?.slice(0, 50_000)
+
     // Mark scan as in-progress so Realtime subscribers see the state change
     await supabase
       .from("xray_scans")
@@ -224,8 +256,8 @@ export async function refineScanAction(
       .eq("id", scanId)
       .eq("foundry_id", foundryId)
 
-    // AI refine scan — pass research report for grounded refinement
-    const refinedSpec = await refineScanAI(updatedIdea.trim(), currentSpec, researchReport)
+    // AI refine scan — pass capped research report for grounded refinement
+    const refinedSpec = await refineScanAI(updatedIdea.trim(), currentSpec, cappedReport)
 
     // Persist refined spec and mark scan as complete
     const { error: updateError } = await supabase
@@ -309,7 +341,11 @@ export async function deriveProcessClassAction(
   moduleId: string,
   answers: Record<string, string>,
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit AI-powered diagnostic derivation
+    const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
+    if (rl) return { error: rl }
+
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
     if ("error" in loadResult) return { error: loadResult.error }
     const { scan } = loadResult
@@ -465,7 +501,11 @@ export async function generateImagesAction(scanId: string): Promise<
 export async function generateModuleImagesAction(scanId: string): Promise<
   { spec: XRaySpec } | { error: string }
 > {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit image generation
+    const rl = await checkRateLimit("aiCadLab", `xray:${user.id}`)
+    if (rl) return { error: rl }
+
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
     if ("error" in loadResult) return { error: loadResult.error }
     const { scan } = loadResult
@@ -549,7 +589,11 @@ export async function generateCadModelsAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit CAD model generation
+    const rl = await checkRateLimit("aiCadLab", `xray:${user.id}`)
+    if (rl) return { error: rl }
+
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
     if ("error" in loadResult) return { error: loadResult.error }
     const { scan } = loadResult
@@ -683,7 +727,11 @@ export async function generateCadModelsAction(
 export async function generateSystemCadAction(scanId: string): Promise<
   { spec: XRaySpec } | { error: string }
 > {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit system CAD generation
+    const rl = await checkRateLimit("aiCadLab", `xray:${user.id}`)
+    if (rl) return { error: rl }
+
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
     if ("error" in loadResult) return { error: loadResult.error }
     const { scan } = loadResult
@@ -755,6 +803,12 @@ export async function updateScanSpecAction(
   spec: XRaySpec,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase, foundryId }) => {
+    // SECURITY: Validate module field lengths before persisting (F5)
+    for (const mod of spec.modules) {
+      const fieldError = validateModuleFieldLengths(mod)
+      if (fieldError) return { error: fieldError }
+    }
+
     const { error } = await supabase
       .from("xray_scans")
       .update({
@@ -940,7 +994,11 @@ export async function matchPeopleAction(
   modules: ModuleSpec[],
   forceRefresh = false,
 ): Promise<{ people: PersonMatch[] } | { error: string }> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit AI matching
+    const rl = await checkRateLimit("aiMatch", `xray:${user.id}`)
+    if (rl) return { error: rl }
+
     // Check for cached data first
     if (scanId && !forceRefresh) {
       const loadResult = await loadScanForFoundry<{ people_matches: unknown }>(supabase, scanId, foundryId, "id, people_matches")
@@ -987,7 +1045,11 @@ export async function matchSuppliersAction(
   isGatingDiagComplete: boolean,
   forceRefresh = false,
 ): Promise<{ suppliersByModule: Record<string, SupplierMatch[]> } | { error: string }> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit AI matching
+    const rl = await checkRateLimit("aiMatch", `xray:${user.id}`)
+    if (rl) return { error: rl }
+
     // Check for cached data first
     if (scanId && !forceRefresh) {
       const loadResult = await loadScanForFoundry<{ supplier_matches: unknown }>(supabase, scanId, foundryId, "id, supplier_matches")
@@ -1246,7 +1308,11 @@ export async function runStructuralAnalysisAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit structural analysis
+    const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
+    if (rl) return { error: rl }
+
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
     if ("error" in loadResult) return { error: loadResult.error }
     const { scan } = loadResult
@@ -1367,7 +1433,11 @@ export async function runCfdAnalysisAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit CFD analysis
+    const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
+    if (rl) return { error: rl }
+
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
     if ("error" in loadResult) return { error: loadResult.error }
     const { scan } = loadResult
@@ -1548,7 +1618,11 @@ export async function runThermalAnalysisAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit thermal analysis
+    const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
+    if (rl) return { error: rl }
+
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
     if ("error" in loadResult) return { error: loadResult.error }
     const { scan } = loadResult
@@ -1751,7 +1825,11 @@ export async function runConvergenceStepAction(
   shouldContinue: boolean
   spec: XRaySpec
 } | { error: string }> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: Rate limit convergence step (calls AI)
+    const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
+    if (rl) return { error: rl }
+
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
     if ("error" in loadResult) return { error: loadResult.error }
     const { scan } = loadResult

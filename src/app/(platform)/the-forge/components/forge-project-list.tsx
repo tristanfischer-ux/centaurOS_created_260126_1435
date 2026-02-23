@@ -20,11 +20,14 @@ import {
   ArrowRight,
   Sparkles,
   PlayCircle,
-  Flame,
+  PenTool,
   FileCheck2,
   Search,
   Box,
   ClipboardCheck,
+  Eye,
+  CheckCircle2,
+  Layers,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -129,14 +132,16 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
       <StartingPointsSection />
 
       {!hasRecent ? (
-        <div className="rounded-xl bg-muted/30 py-12 px-8 flex flex-col items-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-international-orange-light mb-5">
-            <Flame className="h-7 w-7 text-international-orange" />
+        <div className="space-y-8">
+          <div className="rounded-xl bg-muted/30 py-12 px-8 flex flex-col items-center text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-international-orange-light mb-5">
+              <PenTool className="h-7 w-7 text-international-orange" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground mb-2">No designs yet</h3>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Pick a starting point above to create your first engineering package.
+            </p>
           </div>
-          <h3 className="text-lg font-semibold text-foreground mb-2">No designs yet</h3>
-          <p className="text-sm text-muted-foreground max-w-md">
-            Pick a starting point above to create your first engineering package.
-          </p>
         </div>
       ) : (
         <RecentProjectsGrid projects={projects} />
@@ -298,6 +303,81 @@ function StartingPathCard({ path }: { path: StartingPath }): React.ReactNode {
         </span>
       </div>
     </Link>
+  )
+}
+
+// ─── Sample Project Preview ──────────────────────────────────────────
+
+const SAMPLE_MODULES = [
+  { name: "Handle Assembly", dims: "120×45×30 mm" },
+  { name: "Lever Mechanism", dims: "85×20×15 mm" },
+  { name: "Cap Grip", dims: "40×40×25 mm" },
+  { name: "Pivot Housing", dims: "30×30×20 mm" },
+]
+
+const SAMPLE_DELIVERABLES = [
+  "STEP + STL files",
+  "7 orthographic views",
+  "DFM analysis",
+  "Cost estimate",
+  "RFQ package",
+]
+
+/**
+ * SampleProjectPreview — Shows first-timers what a completed engineering
+ * package looks like, reducing uncertainty before they start.
+ */
+function SampleProjectPreview(): React.ReactNode {
+  return (
+    <div className="rounded-xl border bg-muted/20 p-6 space-y-4">
+      <div className="flex items-center gap-2">
+        <Eye className="h-4 w-4 text-international-orange" />
+        <h3 className="text-sm font-semibold text-foreground">See what you&apos;ll get</h3>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Here&apos;s what a completed engineering package looks like for a sample product — a &quot;Smart Bottle Opener&quot; with 4 modules.
+      </p>
+
+      {/* Sample modules */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {SAMPLE_MODULES.map((mod) => (
+          <div key={mod.name} className="rounded-lg border bg-background p-3 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 rounded-md bg-status-success-light flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 className="h-3.5 w-3.5 text-status-success" />
+              </div>
+              <p className="text-xs font-medium text-foreground truncate">{mod.name}</p>
+            </div>
+            <p className="text-[10px] text-muted-foreground font-mono">{mod.dims}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Stats row */}
+      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <Layers className="h-3 w-3" /> 4 sub-assemblies
+        </span>
+        <span className="flex items-center gap-1">
+          <Box className="h-3 w-3" /> 12 components
+        </span>
+        <span className="flex items-center gap-1">
+          <CheckCircle2 className="h-3 w-3 text-status-success" /> All CAD generated
+        </span>
+      </div>
+
+      {/* Deliverables */}
+      <div className="space-y-1.5">
+        <p className="text-xs font-medium text-muted-foreground">What you&apos;ll receive:</p>
+        <div className="flex flex-wrap gap-1.5">
+          {SAMPLE_DELIVERABLES.map((d) => (
+            <span key={d} className="text-xs bg-status-success-light text-status-success px-2 py-0.5 rounded-full font-medium">
+              {d}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 

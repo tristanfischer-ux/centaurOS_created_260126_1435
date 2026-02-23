@@ -108,6 +108,103 @@ Generate the ${campaign.sequence_length}-email sequence as a JSON array. Remembe
     return { systemPrompt, userPrompt }
 }
 
+// ─── Research Prompt ────────────────────────────────────────────────────────
+
+export interface ResearchResult {
+    research_brief: string
+    pain_points: string[]
+    signals: string[]
+    tech_stack: string[]
+    recommended_angle: string
+    score: number
+    score_reasoning: string
+}
+
+/**
+ * Builds a prompt for Sal to research a contact and produce enrichment data.
+ */
+export function buildResearchPrompt(contact: Contact, campaign: Campaign): {
+    systemPrompt: string
+    userPrompt: string
+} {
+    const systemPrompt = `You are Sal, an elite B2B sales researcher. Your job is to analyze a prospect and produce structured research that will power a cold email campaign. You combine publicly available signals with strategic sales intelligence.
+
+OUTPUT FORMAT:
+You MUST respond with ONLY a JSON object. No markdown, no explanation, no preamble.
+The JSON object must have these fields:
+- research_brief (string): 2-3 sentence summary of who this person is and why they're a good prospect
+- pain_points (string[]): 2-5 likely pain points based on their role, company, and industry
+- signals (string[]): 1-4 buying signals or triggers (growth, hiring, funding, tech changes, etc.)
+- tech_stack (string[]): 0-5 likely technologies based on their company and role
+- recommended_angle (string): The single best angle for a cold email approach
+- score (number): 1-10 fit score for this campaign's ICP
+- score_reasoning (string): 1-2 sentence explanation of the score`
+
+    const contactDetails = [
+        `Name: ${contact.first_name} ${contact.last_name}`,
+        contact.job_title && `Title: ${contact.job_title}`,
+        contact.company_name && `Company: ${contact.company_name}`,
+        contact.email && `Email: ${contact.email}`,
+        contact.linkedin_url && `LinkedIn: ${contact.linkedin_url}`,
+        contact.industry && `Industry: ${contact.industry}`,
+        contact.company_size && `Company Size: ${contact.company_size}`,
+        contact.company_domain && `Domain: ${contact.company_domain}`,
+        contact.funding_stage && `Funding Stage: ${contact.funding_stage}`,
+    ].filter(Boolean).join("\n")
+
+    const campaignContext = [
+        campaign.product_context && `Product: ${campaign.product_context}`,
+        campaign.icp_description && `ICP: ${campaign.icp_description}`,
+        campaign.value_props?.length > 0 && `Value Props: ${campaign.value_props.join("; ")}`,
+    ].filter(Boolean).join("\n")
+
+    const userPrompt = `Research this prospect and produce enrichment data for a cold outreach campaign.
+
+── PROSPECT ──
+${contactDetails}
+
+── CAMPAIGN CONTEXT ──
+${campaignContext || "No campaign context provided. Infer from the prospect's details."}
+
+Respond with ONLY the JSON object.`
+
+    return { systemPrompt, userPrompt }
+}
+
+/**
+ * Parses the AI research response into structured data.
+ */
+export function parseResearchResponse(aiOutput: string): ResearchResult {
+    let jsonStr = aiOutput.trim()
+
+    // Strip markdown code blocks if present
+    const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (codeBlockMatch) {
+        jsonStr = codeBlockMatch[1].trim()
+    }
+
+    // Find the JSON object boundaries
+    const objStart = jsonStr.indexOf("{")
+    const objEnd = jsonStr.lastIndexOf("}")
+
+    if (objStart === -1 || objEnd === -1 || objEnd <= objStart) {
+        throw new Error("No valid JSON object found in AI research response")
+    }
+
+    jsonStr = jsonStr.slice(objStart, objEnd + 1)
+    const parsed = JSON.parse(jsonStr)
+
+    return {
+        research_brief: String(parsed.research_brief || ""),
+        pain_points: Array.isArray(parsed.pain_points) ? parsed.pain_points.map(String) : [],
+        signals: Array.isArray(parsed.signals) ? parsed.signals.map(String) : [],
+        tech_stack: Array.isArray(parsed.tech_stack) ? parsed.tech_stack.map(String) : [],
+        recommended_angle: String(parsed.recommended_angle || ""),
+        score: typeof parsed.score === "number" ? parsed.score : 5,
+        score_reasoning: String(parsed.score_reasoning || ""),
+    }
+}
+
 // ─── Response Parser ────────────────────────────────────────────────────────
 
 /**

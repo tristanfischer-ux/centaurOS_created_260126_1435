@@ -36,7 +36,8 @@ import {
 import { AddContactDialog } from './add-contact-dialog'
 import { ImportContactsDialog } from './import-contacts-dialog'
 import { GenerateSequencesDialog } from './generate-sequences-dialog'
-import { deleteContacts, updateContactStatus, generateSequenceForContact } from '@/actions/outreach'
+import { ResearchContactsDialog } from './research-contacts-dialog'
+import { deleteContacts, updateContactStatus, generateSequenceForContact, researchContact } from '@/actions/outreach'
 import { CONTACT_STATUS_MAP } from '@/types/outreach'
 import type { Campaign, Contact, ContactStatus } from '@/types/outreach'
 import { toast } from 'sonner'
@@ -66,6 +67,7 @@ export function ContactsTab({ campaign, contacts, onRefresh, onSwitchToEmails }:
     const [isAddOpen, setIsAddOpen] = useState(false)
     const [isImportOpen, setIsImportOpen] = useState(false)
     const [isGenerateOpen, setIsGenerateOpen] = useState(false)
+    const [isResearchOpen, setIsResearchOpen] = useState(false)
     const [isPending, startTransition] = useTransition()
     const [focusedIndex, setFocusedIndex] = useState<number>(-1)
     const searchRef = useRef<HTMLInputElement>(null)
@@ -154,6 +156,18 @@ export function ContactsTab({ campaign, contacts, onRefresh, onSwitchToEmails }:
             }
         })
     }
+
+    const handleRowResearch = useCallback((contactId: string) => {
+        startTransition(async () => {
+            const result = await researchContact(campaign.id, contactId)
+            if (result.error) {
+                toast.error(result.error)
+            } else {
+                toast.success('Contact researched')
+                await onRefresh()
+            }
+        })
+    }, [campaign.id, onRefresh])
 
     const handleRowGenerate = useCallback((contactId: string) => {
         startTransition(async () => {
@@ -245,6 +259,15 @@ export function ContactsTab({ campaign, contacts, onRefresh, onSwitchToEmails }:
                     {someSelected && (
                         <>
                             <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsResearchOpen(true)}
+                                disabled={isPending}
+                            >
+                                <Search className="h-4 w-4 mr-1" />
+                                Research ({selectedIds.size})
+                            </Button>
+                            <Button
                                 variant="default"
                                 size="sm"
                                 onClick={handleGenerate}
@@ -275,6 +298,16 @@ export function ContactsTab({ campaign, contacts, onRefresh, onSwitchToEmails }:
                                 Delete ({selectedIds.size})
                             </Button>
                         </>
+                    )}
+                    {!someSelected && contacts.length > 0 && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsResearchOpen(true)}
+                        >
+                            <Search className="h-4 w-4 mr-1" />
+                            Research All
+                        </Button>
                     )}
                     <Button variant="outline" size="sm" onClick={() => setIsImportOpen(true)}>
                         <Upload className="h-4 w-4 mr-1" />
@@ -403,6 +436,10 @@ export function ContactsTab({ campaign, contacts, onRefresh, onSwitchToEmails }:
                                                                 View Emails
                                                             </DropdownMenuItem>
                                                         )}
+                                                        <DropdownMenuItem onClick={() => handleRowResearch(contact.id)} disabled={isPending}>
+                                                            <Search className="h-4 w-4 mr-2" />
+                                                            Research
+                                                        </DropdownMenuItem>
                                                         <DropdownMenuItem onClick={() => handleRowGenerate(contact.id)} disabled={isPending}>
                                                             <Wand2 className="h-4 w-4 mr-2" />
                                                             Generate Sequence
@@ -447,6 +484,19 @@ export function ContactsTab({ campaign, contacts, onRefresh, onSwitchToEmails }:
                 contactIds={Array.from(selectedIds)}
                 campaign={campaign}
                 onGenerated={async () => {
+                    setSelectedIds(new Set())
+                    await onRefresh()
+                }}
+            />
+            <ResearchContactsDialog
+                open={isResearchOpen}
+                onOpenChange={setIsResearchOpen}
+                campaignId={campaign.id}
+                contacts={someSelected
+                    ? contacts.filter(c => selectedIds.has(c.id))
+                    : contacts.filter(c => c.status === 'new')
+                }
+                onResearched={async () => {
                     setSelectedIds(new Set())
                     await onRefresh()
                 }}

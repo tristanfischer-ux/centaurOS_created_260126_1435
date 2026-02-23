@@ -18,7 +18,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
-import { buildOutreachPrompt, parseSequenceResponse } from '@/lib/outreach/prompt-builder'
+import { buildOutreachPrompt, parseSequenceResponse, buildResearchPrompt, parseResearchResponse } from '@/lib/outreach/prompt-builder'
 import type {
     Campaign,
     CampaignStatus,
@@ -403,12 +403,11 @@ export async function deleteContacts(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// AI EMAIL GENERATION
+// AI HELPER
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Calls Claude to generate a cold email sequence for a single contact.
- * Uses Sal's direct response outreach methodology.
+ * Calls Claude for any outreach AI task (research, email generation, etc.).
  */
 async function callClaude(
     systemPrompt: string,
@@ -441,6 +440,90 @@ async function callClaude(
     const data = await response.json()
     return { text: data.content?.[0]?.text ?? "" }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONTACT RESEARCH
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export async function researchContact(
+    campaignId: string,
+    contactId: string,
+): Promise<{ success?: boolean; error?: string }> {
+    const ctx = await getAuthContext()
+    if ('error' in ctx) return { error: ctx.error }
+    const { supabase, foundry_id } = ctx
+
+    // Fetch campaign and contact
+    const [campaignRes, contactRes] = await Promise.all([
+        supabase.from('outreach_campaigns').select('*').eq('id', campaignId).eq('foundry_id', foundry_id).single(),
+        supabase.from('outreach_contacts').select('*').eq('id', contactId).eq('foundry_id', foundry_id).single(),
+    ])
+
+    if (campaignRes.error || !campaignRes.data) return { error: 'Campaign not found' }
+    if (contactRes.error || !contactRes.data) return { error: 'Contact not found' }
+
+    const campaign: Campaign = {
+        ...campaignRes.data,
+        value_props: campaignRes.data.value_props as string[],
+        case_studies: campaignRes.data.case_studies as string[],
+        metadata: campaignRes.data.metadata as Record<string, unknown>,
+    }
+
+    const contact: Contact = {
+        ...contactRes.data,
+        tech_stack: contactRes.data.tech_stack as string[],
+        signals: contactRes.data.signals as string[],
+        pain_points: contactRes.data.pain_points as string[],
+    }
+
+    const { systemPrompt, userPrompt } = buildResearchPrompt(contact, campaign)
+
+    let aiText: string
+    try {
+        const result = await callClaude(systemPrompt, userPrompt)
+        aiText = result.text
+    } catch (err) {
+        console.error('[Outreach] Research failed:', err)
+        return { error: 'Failed to research contact. Please try again.' }
+    }
+
+    let research
+    try {
+        research = parseResearchResponse(aiText)
+    } catch (err) {
+        console.error('[Outreach] Failed to parse research response:', err, aiText.slice(0, 500))
+        return { error: 'Failed to parse research data. Please try again.' }
+    }
+
+    // Update contact with research data
+    const { error: updateError } = await supabase
+        .from('outreach_contacts')
+        .update({
+            research_brief: research.research_brief,
+            pain_points: research.pain_points,
+            signals: research.signals,
+            tech_stack: research.tech_stack,
+            recommended_angle: research.recommended_angle,
+            score: research.score,
+            score_reasoning: research.score_reasoning,
+            status: 'researched',
+            updated_at: new Date().toISOString(),
+        })
+        .eq('id', contactId)
+        .eq('foundry_id', foundry_id)
+
+    if (updateError) {
+        console.error('[Outreach] Failed to save research:', updateError)
+        return { error: 'Researched contact but failed to save results' }
+    }
+
+    revalidatePath(`/outreach/${campaignId}`)
+    return { success: true }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI EMAIL GENERATION
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export async function generateSequenceForContact(
     campaignId: string,
