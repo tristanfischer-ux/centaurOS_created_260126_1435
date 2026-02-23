@@ -56,6 +56,17 @@ import { useRegisterScreenContext } from "@/contexts/screen-context"
 
 import type { FormattedReport, DailyPulseData } from "@/lib/reports/types"
 
+// ─── Props ────────────────────────────────────────────────────────
+
+interface TodayViewProps {
+    initialBriefing: MorningBriefing | null
+    initialPulse: FormattedReport | null
+    initialStrategyHealth: StrategyHealthItem[]
+    initialUnreadCount: number
+    initialBriefingError: boolean
+    initialPulseError: boolean
+}
+
 // ─── Constants ────────────────────────────────────────────────────
 
 /** Streak day counts that trigger a celebration on page load */
@@ -93,14 +104,21 @@ function getTimeGreeting(name: string): string {
 
 // ─── Component ────────────────────────────────────────────────────
 
-export function TodayView(): React.ReactElement {
-    const [briefing, setBriefing] = useState<MorningBriefing | null>(null)
-    const [pulse, setPulse] = useState<FormattedReport | null>(null)
-    const [strategyHealth, setStrategyHealth] = useState<StrategyHealthItem[]>([])
-    const [unreadCount, setUnreadCount] = useState(0)
-    const [isLoading, setIsLoading] = useState(true)
-    const [briefingError, setBriefingError] = useState(false)
-    const [pulseError, setPulseError] = useState(false)
+export function TodayView({
+    initialBriefing,
+    initialPulse,
+    initialStrategyHealth,
+    initialUnreadCount,
+    initialBriefingError,
+    initialPulseError,
+}: TodayViewProps): React.ReactElement {
+    const [briefing, setBriefing] = useState<MorningBriefing | null>(initialBriefing)
+    const [pulse, setPulse] = useState<FormattedReport | null>(initialPulse)
+    const [strategyHealth, setStrategyHealth] = useState<StrategyHealthItem[]>(initialStrategyHealth)
+    const [unreadCount, setUnreadCount] = useState(initialUnreadCount)
+    const [isLoading, setIsLoading] = useState(false)
+    const [briefingError, setBriefingError] = useState(initialBriefingError)
+    const [pulseError, setPulseError] = useState(initialPulseError)
 
     const confettiFiredRef = useRef(false)
     const streakCelebratedRef = useRef(false)
@@ -138,10 +156,6 @@ export function TodayView(): React.ReactElement {
 
         setIsLoading(false)
     }, [])
-
-    useEffect(() => {
-        loadData()
-    }, [loadData])
 
     // Register screen context so specialists know what the user is viewing
     useRegisterScreenContext(useMemo(() => {
