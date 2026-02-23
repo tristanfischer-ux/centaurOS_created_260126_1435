@@ -258,6 +258,7 @@ export default function ReportsPage(): React.JSX.Element {
   }, [])
 
   const handleGenerate = useCallback(async () => {
+    if (isGenerating) return
     setIsGenerating(true)
     setGenerationStep(0)
     setReportDocument(null)
@@ -303,7 +304,7 @@ export default function ReportsPage(): React.JSX.Element {
       clearInterval(stepInterval)
       setIsGenerating(false)
     }
-  }, [enabledSections, selectedTemplate, dateRange, tone, detailLevel])
+  }, [isGenerating, enabledSections, selectedTemplate, dateRange, tone, detailLevel])
 
   const handleGenerateBriefing = useCallback(async () => {
     if (!briefingContext.trim()) {

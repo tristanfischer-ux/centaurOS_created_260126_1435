@@ -37,7 +37,7 @@ export function TeamActivitySection({
   sectionNumber,
 }: TeamActivitySectionProps): React.JSX.Element {
   const sorted = [...members].sort((a, b) => b.tasksCompleted - a.tasksCompleted)
-  const maxTasks = sorted[0]?.tasksCompleted ?? 1
+  const maxTasks = sorted[0]?.tasksCompleted || 1
   const uniqueContributors = members.filter((m) => m.tasksCompleted > 0).length
   const topThree = sorted.slice(0, 3)
   const remaining = sorted.slice(3)

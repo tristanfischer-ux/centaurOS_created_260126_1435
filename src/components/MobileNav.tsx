@@ -48,6 +48,7 @@ import {
     BarChart3,
     PiggyBank,
     FolderKanban,
+    Receipt,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -101,6 +102,7 @@ const financeMoreNavigation = [
     { name: "Reports", href: "/finance/reports", icon: BarChart3 },
     { name: "Budgets", href: "/finance/budgets", icon: PiggyBank },
     { name: "Projects", href: "/finance/projects", icon: FolderKanban },
+    { name: "Expenses", href: "/finance/expenses", icon: Receipt },
     { name: "Alerts", href: "/finance/settings", icon: BellRing },
 ]
 

@@ -367,7 +367,7 @@ function renderObjectivesSection(objectives: ObjectivesProgressSectionData): str
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <span style="font-size: 12px; color: ${healthColor}; font-weight: 600;">${healthLabel}</span>
                   <span style="font-size: 12px; color: #64748b;">${obj.progress}% complete</span>
-                  ${obj.progressDelta ? `<span style="font-size: 12px; color: #16a34a; font-weight: 500;">+${obj.progressDelta}pp</span>` : ''}
+                  ${obj.progressDelta ? `<span style="font-size: 12px; color: ${obj.progressDelta > 0 ? '#16a34a' : '#dc2626'}; font-weight: 500;">${obj.progressDelta > 0 ? '+' : ''}${obj.progressDelta}pp</span>` : ''}
                 </div>
               </td>
             </tr>`

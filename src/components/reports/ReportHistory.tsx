@@ -72,14 +72,18 @@ export function ReportHistory({ onLoadReport }: ReportHistoryProps) {
     setIsLoading(true)
     setError(null)
 
-    const result = await getReportHistory()
-    if (result.success && result.reports) {
-      setReports(result.reports)
-    } else {
-      setError(result.error ?? 'Failed to load report history')
+    try {
+      const result = await getReportHistory()
+      if (result.success && result.reports) {
+        setReports(result.reports)
+      } else {
+        setError(result.error ?? 'Failed to load report history')
+      }
+    } catch {
+      setError('Failed to load report history')
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }, [])
 
   useEffect(() => {

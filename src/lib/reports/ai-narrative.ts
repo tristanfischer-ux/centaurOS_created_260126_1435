@@ -120,17 +120,22 @@ export async function generateExecutiveNarrative(
       generationConfig: { temperature: TONE_TEMPERATURE[options.tone], maxOutputTokens: 1024 },
     })
 
-    const result = await Promise.race([
-      model.generateContent({
-        contents: [
-          { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] },
-        ],
-      }),
-      timeout(API_TIMEOUT_MS),
-    ])
+    const t = timeoutWithCleanup(API_TIMEOUT_MS)
+    try {
+      const result = await Promise.race([
+        model.generateContent({
+          contents: [
+            { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] },
+          ],
+        }),
+        t.promise,
+      ])
 
-    const text = result.response.text()
-    return parseNarrativeResponse(text, context, options)
+      const text = result.response.text()
+      return parseNarrativeResponse(text, context, options)
+    } finally {
+      t.clear()
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('[ReportNarrative] Executive narrative generation failed:', { message })
@@ -177,15 +182,20 @@ export async function generateSectionNarrative(
       generationConfig: { temperature: SECTION_TONE_TEMPERATURE[options.tone], maxOutputTokens: 256 },
     })
 
-    const result = await Promise.race([
-      model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      }),
-      timeout(API_TIMEOUT_MS),
-    ])
+    const t = timeoutWithCleanup(API_TIMEOUT_MS)
+    try {
+      const result = await Promise.race([
+        model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        }),
+        t.promise,
+      ])
 
-    const text = result.response.text().trim()
-    return text || buildSectionFallback(sectionType)
+      const text = result.response.text().trim()
+      return text || buildSectionFallback(sectionType)
+    } finally {
+      t.clear()
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('[ReportNarrative] Section narrative failed:', {
@@ -377,8 +387,11 @@ function buildSectionFallback(sectionType: string): string {
 // AbortSignal because the @google/generative-ai SDK doesn't expose an
 // abort option on generateContent. This guarantees we never wait longer
 // than API_TIMEOUT_MS regardless of network conditions.
-function timeout(ms: number): Promise<never> {
-  return new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms),
-  )
+// Returns a clearable handle so the timer doesn't dangle after the race resolves.
+function timeoutWithCleanup(ms: number) {
+  let timer: ReturnType<typeof setTimeout>
+  const promise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms)
+  })
+  return { promise, clear: () => clearTimeout(timer!) }
 }

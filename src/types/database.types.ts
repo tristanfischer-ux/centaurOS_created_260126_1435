@@ -5334,6 +5334,84 @@ export type Database = {
           },
         ]
       }
+      finance_expenses: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          category: string
+          created_at: string
+          created_by: string
+          currency: string
+          description: string
+          expense_date: string
+          foundry_id: string
+          id: string
+          mileage_km: number | null
+          project_id: string | null
+          receipt_data: Json | null
+          receipt_url: string | null
+          status: string
+          updated_at: string
+          vendor: string | null
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          approved_by?: string | null
+          category: string
+          created_at?: string
+          created_by: string
+          currency?: string
+          description: string
+          expense_date: string
+          foundry_id: string
+          id?: string
+          mileage_km?: number | null
+          project_id?: string | null
+          receipt_data?: Json | null
+          receipt_url?: string | null
+          status?: string
+          updated_at?: string
+          vendor?: string | null
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string
+          currency?: string
+          description?: string
+          expense_date?: string
+          foundry_id?: string
+          id?: string
+          mileage_km?: number | null
+          project_id?: string | null
+          receipt_data?: Json | null
+          receipt_url?: string | null
+          status?: string
+          updated_at?: string
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_expenses_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_expenses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "finance_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_payment_links: {
         Row: {
           amount: number
