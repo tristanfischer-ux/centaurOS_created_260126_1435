@@ -29,6 +29,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { useForgeProject } from "./forge-project-context"
 import { ScanHero } from "./scan-hero"
 import { ConceptResearch } from "./concept-research"
+import { SubAssemblyDiagram } from "./sub-assembly-diagram"
 
 /**
  * ConceptView — Stage 1 client component.
@@ -80,6 +81,14 @@ export function ConceptView(): React.ReactNode {
           scanId={scanId}
           savedResearch={project.researchReport}
           isScanning={effectivelyScanning}
+        />
+      )}
+
+      {/* Sub-assembly interaction diagram — shown when modules are ready */}
+      {hasModules && !effectivelyScanning && (
+        <SubAssemblyDiagram
+          modules={spec.modules}
+          systemFunction={spec.function}
         />
       )}
 
