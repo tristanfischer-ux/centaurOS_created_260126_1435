@@ -47,18 +47,6 @@ const SECTION_RENDERERS: Record<string, React.ComponentType<any>> = {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-// INTENT: Non-cover sections get numbered headings for the Board Pack template.
-// The section number is based on position among non-cover sections.
-const SECTION_ORDER = [
-  'executive-summary',
-  'key-metrics',
-  'completion-trend',
-  'objectives-progress',
-  'team-activity',
-  'blockers-risks',
-  'week-ahead',
-]
-
 interface ReportDocumentProps {
   document: ReportDocumentType
   forPrint?: boolean
