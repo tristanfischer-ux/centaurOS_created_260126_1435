@@ -11,7 +11,7 @@
  * Gate: shows empty state if no generated modules.
  */
 
-import { useMemo } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
   ClipboardCheck,
@@ -19,6 +19,10 @@ import {
   CheckCircle2,
   Download,
   Box,
+  ChevronDown,
+  ChevronRight,
+  Layers,
+  FileText,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -44,7 +48,10 @@ export default function CadLabReviewPage(): React.ReactNode {
     editableReport, diagnosticAnswers, setDiagnosticAnswers,
     aiPrefilled, designBrief, assumptionNotes,
     activeProjectId, linkedRfqId,
+    systemIllustrationUrl, researchResult,
   } = useCadLab()
+
+  const [showBuildContext, setShowBuildContext] = useState(false)
 
   useRegisterScreenContext(
     useMemo(() => {
@@ -97,6 +104,79 @@ export default function CadLabReviewPage(): React.ReactNode {
           <ArrowLeft className="h-3 w-3" /> Back to Build
         </Button>
       </div>
+
+      {/* ── Build Context Summary — carries forward key context from Build stage ── */}
+      <Card className="overflow-hidden">
+        <div className="flex items-start gap-4 p-5">
+          {/* System illustration thumbnail */}
+          {systemIllustrationUrl && (
+            <div className="w-24 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 hidden sm:block border">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={systemIllustrationUrl} alt="System overview" className="w-full h-full object-cover" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-base font-semibold text-foreground">{subject}</h3>
+            <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Layers className="h-3 w-3" /> {modules.length} modules
+              </span>
+              <span className="flex items-center gap-1">
+                <Box className="h-3 w-3" /> {generatedModuleCount} generated
+              </span>
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3 text-status-success" /> {modules.reduce((s, m) => s + m.keyParts.length, 0)} components
+              </span>
+              {researchResult?.sources && (
+                <span className="flex items-center gap-1">
+                  <FileText className="h-3 w-3" /> {researchResult.sources.length} research sources
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* Collapsible: Build module overview */}
+        <button
+          onClick={() => setShowBuildContext(!showBuildContext)}
+          className="flex items-center justify-between w-full px-5 py-2.5 border-t text-left hover:bg-muted/50 transition-colors"
+        >
+          <span className="text-xs font-medium text-muted-foreground">Build Stage Summary</span>
+          {showBuildContext
+            ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+          }
+        </button>
+        {showBuildContext && (
+          <div className="px-5 pb-4 space-y-2 border-t pt-3">
+            {modules.map((mod) => (
+              <div key={mod.id} className="flex items-center gap-3 text-xs p-2 rounded border border-muted">
+                {mod.imageUrl && mod.imageStatus === "complete" && (
+                  <div className="h-8 w-8 rounded overflow-hidden bg-muted flex-shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={mod.imageUrl} alt="" className="h-full w-full object-cover" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-foreground truncate">{mod.name}</p>
+                  <p className="text-muted-foreground truncate">{mod.purpose}</p>
+                </div>
+                <span className={`text-xs px-1.5 py-0.5 rounded ${
+                  mod.status === "generated"
+                    ? "bg-status-success-light text-status-success"
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  {mod.status === "generated" ? "CAD done" : mod.status}
+                </span>
+                {mod.result?.bbox && (
+                  <span className="text-muted-foreground font-mono hidden sm:inline">
+                    {mod.result.bbox.xLen}×{mod.result.bbox.yLen}×{mod.result.bbox.zLen}mm
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* Engineering review package — quality scorecard, per-module summary */}
       <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />

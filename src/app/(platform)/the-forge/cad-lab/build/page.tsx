@@ -39,6 +39,7 @@ import {
   Network,
   ArrowDownRight,
   Search,
+  FileText,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -48,6 +49,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { STLViewer } from "@/components/cad/stl-viewer"
 import { CadLabWhileYouWait } from "@/components/cad/cad-lab-while-you-wait"
 import { EmptyState } from "@/components/ui/empty-state"
+import { ResearchSection } from "../components/research-section"
+import { DesignIntakeForm } from "../components/design-intake-form"
+import { RedlineDiff, type RedlineItem } from "../components/redline-diff"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -78,8 +82,16 @@ export default function CadLabBuildPage(): React.ReactNode {
   const router = useRouter()
   const {
     hasResearch, isAnyLoading,
-    subject, editableReport,
+    subject, editableReport, setEditableReport,
     referenceModel,
+    modelId, setModelId,
+    designBrief, setDesignBrief,
+    assumptionNotes, setAssumptionNotes,
+    designReadinessPct,
+    researchResult,
+    showSources, setShowSources,
+    handleReset, handleResearch,
+    systemIllustrationUrl, systemIllustrationStatus,
     modules, expandedModuleId, setExpandedModuleId,
     activeModuleId,
     isDecomposing, handleDecompose,
@@ -210,7 +222,46 @@ export default function CadLabBuildPage(): React.ReactNode {
           criticalPathWeeks={Math.max(...modules.map((m) => m.leadWeeks))}
           totalRisks={modules.reduce((s, m) => s + m.failureModes.length, 0)}
           totalUnknowns={modules.reduce((s, m) => s + m.unknowns.length, 0)}
+          systemIllustrationUrl={systemIllustrationUrl}
         />
+      )}
+
+      {/* ── Research Report (moved from Concept — this is where the user first reads it in depth) ── */}
+      {hasResearch && (
+        <ResearchSection
+          hasResearch={hasResearch}
+          isAnyLoading={isAnyLoading}
+          researchResult={researchResult}
+          editableReport={editableReport}
+          setEditableReport={setEditableReport}
+          showSources={showSources}
+          setShowSources={setShowSources}
+          handleReset={handleReset}
+          onRetryResearch={handleResearch}
+          systemIllustrationUrl={systemIllustrationUrl}
+          systemIllustrationStatus={systemIllustrationStatus}
+        />
+      )}
+
+      {/* ── Manufacturing Context (moved from Concept) ── */}
+      {hasResearch && (
+        <CollapsibleSection
+          title="Manufacturing Context"
+          subtitle="Process, material, tolerance, and compliance preferences"
+          icon={<Ruler className="h-4 w-4" />}
+          defaultOpen={false}
+        >
+          <DesignIntakeForm
+            modelId={modelId}
+            setModelId={setModelId}
+            designBrief={designBrief}
+            setDesignBrief={setDesignBrief}
+            assumptionNotes={assumptionNotes}
+            setAssumptionNotes={setAssumptionNotes}
+            designReadinessPct={designReadinessPct}
+            isAnyLoading={isAnyLoading}
+          />
+        </CollapsibleSection>
       )}
 
       {/* ── System Architecture ── */}
@@ -595,6 +646,23 @@ export default function CadLabBuildPage(): React.ReactNode {
                   {/* Expanded module detail */}
                   {expandedModuleId === mod.id && (
                     <div className="border-t p-4 space-y-4 bg-muted/20">
+                      {/* Blueprint illustration from Concept stage */}
+                      {mod.imageUrl && mod.imageStatus === "complete" && (
+                        <div className="aspect-[3/2] w-full max-w-md rounded-lg overflow-hidden bg-muted border">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={mod.imageUrl}
+                            alt={`Concept blueprint: ${mod.name}`}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <p className="text-[10px] text-muted-foreground text-center py-1 bg-muted/50">Concept illustration</p>
+                        </div>
+                      )}
+
+                      {/* Concept → Build redline diffs */}
+                      <ConceptBuildDiff module={mod} />
+
                       {/* Description */}
                       <div>
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Description</p>
@@ -834,6 +902,7 @@ function ProductOverview({
   criticalPathWeeks,
   totalRisks,
   totalUnknowns,
+  systemIllustrationUrl,
 }: {
   subject: string
   report: string
@@ -843,6 +912,7 @@ function ProductOverview({
   criticalPathWeeks: number
   totalRisks: number
   totalUnknowns: number
+  systemIllustrationUrl?: string | null
 }): React.ReactNode {
   const summary = extractProductSummary(report)
 
@@ -880,6 +950,13 @@ function ProductOverview({
               </p>
             )}
           </div>
+          {/* System illustration thumbnail */}
+          {systemIllustrationUrl && (
+            <div className="w-32 h-20 rounded-lg overflow-hidden bg-muted flex-shrink-0 hidden sm:block border">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={systemIllustrationUrl} alt="System overview" className="w-full h-full object-cover" />
+            </div>
+          )}
         </div>
 
         {/* Aggregate stats */}
@@ -1508,4 +1585,118 @@ function SystemArchitecture({
       </CardContent>
     </Card>
   )
+}
+
+// ─── Collapsible Section ──────────────────────────────────────────────
+
+/**
+ * CollapsibleSection — Reusable collapsible card wrapper for carrying
+ * content from earlier stages into later stages without overwhelming the page.
+ */
+function CollapsibleSection({
+  title,
+  subtitle,
+  icon,
+  defaultOpen = false,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  icon?: React.ReactNode
+  defaultOpen?: boolean
+  children: React.ReactNode
+}): React.ReactNode {
+  const [isOpen, setIsOpen] = useState(defaultOpen)
+  return (
+    <Card>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-full p-4 text-left hover:bg-muted/50 transition-colors"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          {icon}
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">{title}</p>
+            {subtitle && (
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>
+            )}
+          </div>
+        </div>
+        {isOpen
+          ? <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          : <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        }
+      </button>
+      {isOpen && <div className="px-4 pb-4 border-t pt-4">{children}</div>}
+    </Card>
+  )
+}
+
+// ─── Concept → Build Diff ─────────────────────────────────────────────
+
+/**
+ * ConceptBuildDiff — Shows redline diffs for a module between what Concept
+ * assumed and what Build determined through CAD generation.
+ *
+ * Data sources:
+ * - mod.result?.assumptions — what the AI resolved during CAD generation
+ * - mod.result?.validationWarnings — what Build found that needs attention
+ * - mod.interfaceDefinition — Build's dimensional spec (enriches Concept)
+ * - mod.result?.bbox — precise dimensions from CAD (vs Concept's vague estimates)
+ */
+function ConceptBuildDiff({ module: mod }: { module: CadLabModule }): React.ReactNode {
+  const items: RedlineItem[] = []
+
+  // Resolved assumptions — things the AI had to decide during Build
+  if (mod.result?.assumptions) {
+    for (const assumption of mod.result.assumptions) {
+      items.push({
+        label: "Assumption",
+        before: "Unspecified in concept",
+        after: assumption,
+      })
+    }
+  }
+
+  // Dimensional refinement — Concept had vague key parts, Build has precise dimensions
+  if (mod.result?.bbox && mod.keyParts.length > 0) {
+    items.push({
+      label: "Dimensions",
+      before: `${mod.keyParts.length} components (no dimensions)`,
+      after: `${mod.result.bbox.xLen}×${mod.result.bbox.yLen}×${mod.result.bbox.zLen} mm bounding box, ${mod.result.massGrams ?? "?"} g`,
+    })
+  }
+
+  // Mass refinement
+  if (mod.result?.massGrams != null) {
+    items.push({
+      label: "Mass",
+      before: "Estimated from concept",
+      after: `${mod.result.massGrams} g (from CAD model)`,
+    })
+  }
+
+  // DFM findings — things Concept couldn't know
+  if (mod.result?.dfm && !mod.result.dfm.printable) {
+    items.push({
+      label: "Printability",
+      before: "Assumed printable",
+      after: `Not printable — ${mod.result.dfm.issues.length} DFM issue${mod.result.dfm.issues.length !== 1 ? "s" : ""} found`,
+    })
+  }
+
+  // Validation warnings become redline items
+  if (mod.result?.validationWarnings) {
+    for (const warning of mod.result.validationWarnings) {
+      items.push({
+        label: "Warning",
+        before: null,
+        after: warning,
+      })
+    }
+  }
+
+  if (items.length === 0) return null
+
+  return <RedlineDiff fromStage="Concept" toStage="Build" items={items} />
 }

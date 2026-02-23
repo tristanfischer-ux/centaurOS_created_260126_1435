@@ -3,16 +3,17 @@
 /**
  * @file page.tsx — The Forge: Concept stage (Stage 1).
  *
- * @description Orchestrator page for the Concept stage. Before research:
- * shows hero input and optional design intake form. After research: a
- * full-width vertical layout with the research report + system illustration,
- * then a "Continue" button to trigger decomposition, then modules revealed
- * progressively as each one's image is ready.
+ * @description Lightweight "napkin sketch" stage. Collects the product idea,
+ * runs research in the background (report is displayed in Build), generates a
+ * system overview illustration, decomposes into modules, and reveals them
+ * progressively as blueprint images arrive. Concept is intentionally fast and
+ * minimal — the detailed engineering happens in the Build stage.
  *
  * @related
  * - Context: src/app/(platform)/the-forge/cad-lab/cad-lab-context.tsx
  * - Image card: src/app/(platform)/the-forge/cad-lab/components/module-image-card.tsx
  * - Image grid: src/app/(platform)/the-forge/cad-lab/components/module-image-grid.tsx
+ * - Build stage: src/app/(platform)/the-forge/cad-lab/build/page.tsx
  */
 
 import { useRouter } from "next/navigation"
@@ -24,6 +25,7 @@ import {
   ArrowRight,
   ClipboardCheck,
   Layers,
+  ImageIcon,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -32,15 +34,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
-import { DesignIntakeForm } from "./components/design-intake-form"
-import { ResearchSection } from "./components/research-section"
 import { ModuleImageGrid } from "./components/module-image-grid"
 
 // ─── Pipeline preview shown during research wait ─────────────────────
 
 const PIPELINE_STAGES = [
-  { icon: Search, label: "Concept", desc: "Research from real specs" },
-  { icon: Box, label: "Build", desc: "Parametric CAD per module" },
+  { icon: Search, label: "Concept", desc: "Quick overview & modules" },
+  { icon: Box, label: "Build", desc: "Research, CAD & engineering" },
   { icon: ClipboardCheck, label: "Review", desc: "Supplier-ready package" },
 ]
 
@@ -51,14 +51,9 @@ export default function CadLabResearchPage(): React.ReactNode {
   const {
     subject, setSubject,
     referenceModel,
-    modelId, setModelId,
-    designBrief, setDesignBrief,
-    assumptionNotes, setAssumptionNotes,
-    designReadinessPct,
-    isResearching, researchResult, editableReport, setEditableReport,
-    showSources, setShowSources,
+    isResearching, editableReport,
     hasResearch, isAnyLoading,
-    handleResearch, handleReset, handleDecompose,
+    handleResearch, handleDecompose,
     modules, isDecomposing,
     expandedModuleId, setExpandedModuleId,
     isGeneratingImages,
@@ -160,50 +155,53 @@ export default function CadLabResearchPage(): React.ReactNode {
         </Card>
       )}
 
-      {/* ── Collapsible manufacturing details ── */}
-      {!hasResearch && !isResearching && (
-        <DesignIntakeForm
-          modelId={modelId}
-          setModelId={setModelId}
-          designBrief={designBrief}
-          setDesignBrief={setDesignBrief}
-          assumptionNotes={assumptionNotes}
-          setAssumptionNotes={setAssumptionNotes}
-          designReadinessPct={designReadinessPct}
-          isAnyLoading={isAnyLoading}
-        />
-      )}
-
       {/* ══════════════════════════════════════════════════════════════════
-          AFTER RESEARCH: Full-width vertical flow
-          1. Research report with system illustration banner
-          2. Continue button → decomposition
-          3. Modules revealed progressively (full-width grid)
-          4. Continue to Build CTA (after all modules revealed)
+          AFTER RESEARCH: Lightweight concept view
+          1. System overview illustration (if available)
+          2. Auto-trigger decomposition (or manual Continue button)
+          3. Modules revealed progressively (name + image + purpose only)
+          4. Continue to Build CTA
           ══════════════════════════════════════════════════════════════════ */}
       {hasResearch && (
         <div className="space-y-6">
-          {/* ── Research report (full-width) with illustration ── */}
-          <ResearchSection
-            hasResearch={hasResearch}
-            isAnyLoading={isAnyLoading}
-            researchResult={researchResult}
-            editableReport={editableReport}
-            setEditableReport={setEditableReport}
-            showSources={showSources}
-            setShowSources={setShowSources}
-            handleReset={handleReset}
-            onRetryResearch={handleResearch}
-            systemIllustrationUrl={systemIllustrationUrl}
-            systemIllustrationStatus={systemIllustrationStatus}
-          />
+          {/* ── System overview illustration ── */}
+          {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
+            <Card className="overflow-hidden">
+              <div className="aspect-[16/9] w-full bg-muted">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={systemIllustrationUrl}
+                  alt={`System overview: ${subject}`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <CardContent className="pt-4 pb-4">
+                <h2 className="text-base font-semibold text-foreground">{subject}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  System overview — full research report available in the Build stage.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── System illustration generating ── */}
+          {systemIllustrationStatus === "generating" && (
+            <Card className="overflow-hidden">
+              <div className="aspect-[16/9] w-full bg-muted animate-pulse flex items-center justify-center">
+                <div className="flex flex-col items-center gap-2">
+                  <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
+                  <span className="text-xs text-muted-foreground">Generating system overview...</span>
+                </div>
+              </div>
+            </Card>
+          )}
 
           {/* ── Continue button: triggers decomposition ── */}
           {modules.length === 0 && !isDecomposing && (
             <Card className="border-international-orange/20">
               <CardContent className="pt-6 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Research complete. Click continue to decompose into sub-assemblies and generate engineering illustrations.
+                  Research complete. Continue to map sub-assemblies and generate concept illustrations.
                 </p>
                 <Button
                   onClick={handleDecompose}
@@ -227,7 +225,7 @@ export default function CadLabResearchPage(): React.ReactNode {
             </Card>
           )}
 
-          {/* ── Modules: progressive reveal grid (full-width) ── */}
+          {/* ── Modules: progressive reveal grid (name + image + purpose only) ── */}
           {modules.length > 0 && (
             <>
               {/* Header with reveal progress */}
@@ -261,7 +259,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                           Ready to build
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Generate parametric CAD for each module.
+                          Continue to the Build stage for full research report, detailed engineering, and parametric CAD.
                         </p>
                       </div>
                       <Button onClick={() => router.push("/the-forge/cad-lab/build")} className="gap-1.5">
@@ -275,21 +273,6 @@ export default function CadLabResearchPage(): React.ReactNode {
             </>
           )}
         </div>
-      )}
-
-      {/* Research section shown below hero when research hasn't started yet */}
-      {!hasResearch && (
-        <ResearchSection
-          hasResearch={hasResearch}
-          isAnyLoading={isAnyLoading}
-          researchResult={researchResult}
-          editableReport={editableReport}
-          setEditableReport={setEditableReport}
-          showSources={showSources}
-          setShowSources={setShowSources}
-          handleReset={handleReset}
-          onRetryResearch={handleResearch}
-        />
       )}
     </div>
   )
