@@ -3,27 +3,22 @@
  *
  * @description Abstraction layer for specialist conversation modes. Defines a
  * ConversationEngine interface that decouples **how** a conversation happens
- * (text chat, real-time voice, live avatar) from the specialist UI.
+ * from the specialist UI.
  *
  * Follows the same registry pattern as `src/lib/ai-providers/` — each engine
  * type is a swappable implementation behind a shared interface.
  *
- * The abstraction has three tiers:
- * - **text**:   Current SSE streaming + optional TTS/STT (Tier 0–1)
- * - **voice**:  OpenAI Realtime API for bidirectional voice (Tier 2)
- * - **avatar**: Voice engine + video avatar provider (Tier 3–4)
+ * Currently only "text" mode is supported (SSE streaming + optional TTS/STT).
  *
  * @related
- * - src/lib/agents/engines/text-chat-engine.ts — Tier 0/1 implementation
- * - src/lib/agents/engines/realtime-voice-engine.ts — Tier 2 implementation
- * - src/lib/agents/engines/avatar-engine.ts — Tier 3/4 implementation
+ * - src/lib/agents/engines/text-chat-engine.ts — Text chat implementation
  * - src/lib/ai-providers/types.ts — Sibling pattern for AI providers
  * - src/lib/billing/plans.ts — Tier limits per subscription
  */
 
 // ─── Conversation Modes ──────────────────────────────────────────────────────
 
-export const CONVERSATION_MODES = ["text", "voice", "avatar"] as const
+export const CONVERSATION_MODES = ["text"] as const
 export type ConversationMode = (typeof CONVERSATION_MODES)[number]
 
 // ─── Event System ────────────────────────────────────────────────────────────
@@ -215,8 +210,6 @@ type EngineFactory = () => ConversationEngine
 
 const ENGINE_FACTORIES: Record<ConversationMode, EngineFactory | null> = {
     text: null,   // Set by registerEngine()
-    voice: null,  // Set by registerEngine()
-    avatar: null, // Set by registerEngine()
 }
 
 /**
@@ -257,14 +250,11 @@ export function isEngineAvailable(mode: ConversationMode): boolean {
 }
 
 /**
- * Get the best available conversation mode, falling back through the hierarchy.
- * avatar -> voice -> text
+ * Get the best available conversation mode. Currently always returns "text".
  *
  * @param preferred - The mode the user's tier allows
  * @returns The best available mode that's actually registered
  */
 export function resolveConversationMode(preferred: ConversationMode): ConversationMode {
-    if (preferred === "avatar" && ENGINE_FACTORIES.avatar) return "avatar"
-    if ((preferred === "avatar" || preferred === "voice") && ENGINE_FACTORIES.voice) return "voice"
     return "text"
 }

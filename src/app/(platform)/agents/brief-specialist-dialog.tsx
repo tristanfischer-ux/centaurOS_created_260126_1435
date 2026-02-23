@@ -78,15 +78,6 @@ function detectPresentationIntent(message: string): boolean {
     return PRESENTATION_KEYWORDS.some((kw) => lower.includes(kw))
 }
 
-// ─── Conversation Mode (Feature Flag) ────────────────────────────────────────
-// When NEXT_PUBLIC_ENABLE_VOICE_AVATAR is set, users with eligible tiers
-// can switch between text, voice, and avatar modes. Until the relay server
-// endpoints are deployed, only "text" mode is functional.
-//
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const ENABLE_ADVANCED_MODES = typeof window !== "undefined"
-    && process.env.NEXT_PUBLIC_ENABLE_VOICE_AVATAR === "true"
-
 // ─── Specialist Model Configuration ───────────────────────────────────────────
 // Per-specialist model tiers: "claude" for high-stakes reasoning (strategy,
 // finance, legal, CTO, chief of staff) and "minimax" for high-volume work

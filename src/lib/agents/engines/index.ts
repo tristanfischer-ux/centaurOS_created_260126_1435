@@ -12,9 +12,3 @@
 
 // Tier 0/1: SSE text streaming + optional TTS/STT
 export { TextChatEngine } from "./text-chat-engine"
-
-// Tier 2: OpenAI Realtime API for bidirectional voice (EXPERIMENTAL)
-export { RealtimeVoiceEngine } from "./realtime-voice-engine"
-
-// Tier 3/4: Voice + visual avatar (EXPERIMENTAL)
-export { AvatarEngine, HeyGenAvatarProvider } from "./avatar-engine"
