@@ -5,7 +5,7 @@
 // and Q&A. Action content (packs, projects, subsystems) now lives on the
 // Objectives page as "Other ideas for you to be getting on with".
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   BookOpen,
   Factory,
@@ -15,6 +15,12 @@ import {
   Clock,
   ChevronRight,
   X,
+  Lightbulb,
+  AlertTriangle,
+  CheckCircle2,
+  Wrench,
+  ListChecks,
+  Loader2,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -33,7 +39,8 @@ import { AskModal } from '@/components/advisory/ask-modal'
 import { StatusLegend } from '@/components/advisory/status-legend'
 import { createAdvisoryQuestion } from '@/actions/advisory'
 import { toast } from 'sonner'
-import type { TutorialListItem } from '@/actions/tutorials'
+import type { TutorialListItem, TutorialDetail } from '@/actions/tutorials'
+import { getTutorialBySlug } from '@/actions/tutorials'
 import {
   Dialog,
   DialogContent,
@@ -76,6 +83,32 @@ export function LearnPage({
   const [qaSearchQuery, setQaSearchQuery] = useState('')
 
   const [selectedTutorial, setSelectedTutorial] = useState<TutorialListItem | null>(null)
+  const [tutorialDetail, setTutorialDetail] = useState<TutorialDetail | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+
+  // Fetch full tutorial detail when a tutorial card is clicked
+  useEffect(() => {
+    if (!selectedTutorial) {
+      setTutorialDetail(null)
+      return
+    }
+
+    let cancelled = false
+    setLoadingDetail(true)
+    setTutorialDetail(null)
+
+    getTutorialBySlug(selectedTutorial.slug).then((result) => {
+      if (cancelled) return
+      if ('error' in result) {
+        toast.error(result.error)
+      } else {
+        setTutorialDetail(result)
+      }
+      setLoadingDetail(false)
+    })
+
+    return () => { cancelled = true }
+  }, [selectedTutorial])
 
   const filteredQuestions = useMemo(() => {
     if (!qaSearchQuery.trim()) return questions
@@ -306,12 +339,10 @@ export function LearnPage({
                   {selectedTutorial?.title}
                 </DialogTitle>
               </DialogHeader>
-              {selectedTutorial && (
-                <div className="flex-1 overflow-y-auto space-y-6 pb-4">
-                  {selectedTutorial.description && (
-                    <p className="text-sm text-muted-foreground">{selectedTutorial.description}</p>
-                  )}
 
+              {selectedTutorial && (
+                <div className="flex-1 overflow-y-auto space-y-6 pb-4 pr-1">
+                  {/* Meta badges */}
                   <div className="flex flex-wrap gap-2">
                     {selectedTutorial.difficulty && (
                       <Badge variant={
@@ -333,17 +364,115 @@ export function LearnPage({
                     )}
                   </div>
 
-                  {selectedTutorial.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedTutorial.tags.map((tag, i) => (
-                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                          {tag}
-                        </span>
-                      ))}
+                  {selectedTutorial.description && (
+                    <p className="text-sm text-muted-foreground">{selectedTutorial.description}</p>
+                  )}
+
+                  {/* Loading state */}
+                  {loadingDetail && (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-electric-blue" />
+                      <span className="ml-2 text-sm text-muted-foreground">Loading tutorial...</span>
                     </div>
+                  )}
+
+                  {/* Full tutorial content */}
+                  {tutorialDetail && (
+                    <>
+                      {/* Prerequisites */}
+                      {tutorialDetail.prerequisites.length > 0 && (
+                        <div className="rounded-lg border border-muted bg-muted/30 p-4 space-y-2">
+                          <h3 className="text-sm font-semibold flex items-center gap-2">
+                            <ListChecks className="h-4 w-4 text-electric-blue" />
+                            Prerequisites
+                          </h3>
+                          <ul className="text-sm text-muted-foreground space-y-1 ml-6 list-disc">
+                            {tutorialDetail.prerequisites.map((p, i) => (
+                              <li key={i}>{p}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Tools mentioned */}
+                      {tutorialDetail.tools_mentioned.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          <Wrench className="h-4 w-4 text-muted-foreground mt-0.5" />
+                          {tutorialDetail.tools_mentioned.map((tool, i) => (
+                            <Badge key={i} variant="outline" className="text-xs">
+                              {tool}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Sections */}
+                      {tutorialDetail.sections.map((section, idx) => (
+                        <div key={idx} className="space-y-3">
+                          <h3 className="text-base font-semibold text-foreground border-b border-muted pb-1">
+                            {section.heading}
+                          </h3>
+                          <div className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">
+                            {section.content}
+                          </div>
+                          {section.tips.length > 0 && (
+                            <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 p-3 space-y-1.5">
+                              {section.tips.map((tip, i) => (
+                                <p key={i} className="text-sm flex gap-2">
+                                  <Lightbulb className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                                  <span className="text-muted-foreground">{tip}</span>
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Common mistakes */}
+                      {tutorialDetail.common_mistakes.length > 0 && (
+                        <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-4 space-y-2">
+                          <h3 className="text-sm font-semibold flex items-center gap-2 text-destructive">
+                            <AlertTriangle className="h-4 w-4" />
+                            Common Mistakes
+                          </h3>
+                          <ul className="text-sm text-muted-foreground space-y-1.5 ml-6 list-disc">
+                            {tutorialDetail.common_mistakes.map((m, i) => (
+                              <li key={i}>{m}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Key takeaways */}
+                      {tutorialDetail.key_takeaways.length > 0 && (
+                        <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-4 space-y-2">
+                          <h3 className="text-sm font-semibold flex items-center gap-2 text-emerald-600">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Key Takeaways
+                          </h3>
+                          <ul className="text-sm text-muted-foreground space-y-1.5 ml-6 list-disc">
+                            {tutorialDetail.key_takeaways.map((t, i) => (
+                              <li key={i}>{t}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Tags */}
+                      {selectedTutorial.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-2 border-t border-muted">
+                          {selectedTutorial.tags.map((tag, i) => (
+                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
+
               <DialogFooter>
                 <Button variant="outline" onClick={() => setSelectedTutorial(null)}>
                   Close
