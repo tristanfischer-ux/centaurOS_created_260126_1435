@@ -29,3 +29,6 @@ scripts/*_stderr.log
 /test-results/
 /e2e/.auth/
 /.playwright/
+.expo/
+apps/mobile/.expo/
+apps/web/tsconfig.tsbuildinfo
