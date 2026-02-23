@@ -10,7 +10,7 @@
 import { useState, useCallback, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, Users, Mail, Settings } from 'lucide-react'
+import { ChevronLeft, Users, Mail, Settings, BookOpen } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
@@ -25,8 +25,9 @@ import { updateCampaign, getContacts, getEmails } from '@/actions/outreach'
 import { ContactsTab } from './contacts-tab'
 import { EmailsTab } from './emails-tab'
 import { SettingsTab } from './settings-tab'
+import { KnowledgeTab } from './knowledge-tab'
 import { CAMPAIGN_STATUS_MAP } from '@/types/outreach'
-import type { Campaign, CampaignStatus, Contact, OutreachEmail } from '@/types/outreach'
+import type { Campaign, CampaignStatus, Contact, OutreachEmail, OutreachKBEntry } from '@/types/outreach'
 import { toast } from 'sonner'
 import { useRegisterScreenContext } from '@/contexts/screen-context'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
@@ -35,6 +36,7 @@ interface CampaignDetailProps {
     campaign: Campaign
     initialContacts: Contact[]
     initialEmails: OutreachEmail[]
+    initialKnowledgeBase: OutreachKBEntry[]
     foundryId: string
     userId: string
 }
@@ -43,6 +45,7 @@ export function CampaignDetail({
     campaign: initialCampaign,
     initialContacts,
     initialEmails,
+    initialKnowledgeBase,
     foundryId,
     userId,
 }: CampaignDetailProps) {
@@ -194,6 +197,10 @@ export function CampaignDetail({
                         <Mail className="h-4 w-4" />
                         Emails
                     </TabsTrigger>
+                    <TabsTrigger value="knowledge" className="gap-2">
+                        <BookOpen className="h-4 w-4" />
+                        Knowledge
+                    </TabsTrigger>
                     <TabsTrigger value="settings" className="gap-2">
                         <Settings className="h-4 w-4" />
                         Settings
@@ -216,6 +223,10 @@ export function CampaignDetail({
                         emails={emails}
                         onRefresh={refreshEmails}
                     />
+                </TabsContent>
+
+                <TabsContent value="knowledge">
+                    <KnowledgeTab initialKnowledgeBase={initialKnowledgeBase} />
                 </TabsContent>
 
                 <TabsContent value="settings">

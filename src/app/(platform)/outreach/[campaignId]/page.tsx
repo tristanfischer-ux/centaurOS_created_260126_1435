@@ -3,7 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
 import { CampaignDetail } from './campaign-detail'
 import type { Metadata } from 'next'
-import type { Campaign, Contact, OutreachEmail } from '@/types/outreach'
+import type { Campaign, Contact, OutreachEmail, OutreachKBEntry } from '@/types/outreach'
 
 export const revalidate = 30
 
@@ -44,8 +44,8 @@ export default async function CampaignPage({
 
     const foundryId = profile.foundry_id
 
-    // FLOW: Fetch campaign, contacts, and emails in parallel
-    const [campaignRes, contactsRes, emailsRes] = await Promise.all([
+    // FLOW: Fetch campaign, contacts, emails, and KB in parallel
+    const [campaignRes, contactsRes, emailsRes, kbRes] = await Promise.all([
         supabase
             .from('outreach_campaigns')
             .select('*')
@@ -65,6 +65,11 @@ export default async function CampaignPage({
             .eq('foundry_id', foundryId)
             .order('contact_id')
             .order('sequence_position', { ascending: true }),
+        supabase
+            .from('outreach_knowledge_base')
+            .select('*')
+            .eq('foundry_id', foundryId)
+            .order('updated_at', { ascending: false }),
     ])
 
     if (campaignRes.error || !campaignRes.data) {
@@ -92,11 +97,17 @@ export default async function CampaignPage({
         qa_report: e.qa_report as Record<string, unknown> | null,
     }))
 
+    const knowledgeBase: OutreachKBEntry[] = (kbRes.data || []).map(kb => ({
+        ...kb,
+        tags: kb.tags as string[],
+    }))
+
     return (
         <CampaignDetail
             campaign={campaign}
             initialContacts={contacts}
             initialEmails={emails}
+            initialKnowledgeBase={knowledgeBase}
             foundryId={foundryId}
             userId={user.id}
         />

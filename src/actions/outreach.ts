@@ -679,3 +679,109 @@ export async function deleteEmails(
     revalidatePath(`/outreach/${campaignId}`)
     return { success: true }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// KNOWLEDGE BASE CRUD
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export async function getKnowledgeBase(): Promise<{ data?: OutreachKBEntry[]; error?: string }> {
+    const ctx = await getAuthContext()
+    if ('error' in ctx) return { error: ctx.error }
+    const { supabase, foundry_id } = ctx
+
+    const { data, error } = await supabase
+        .from('outreach_knowledge_base')
+        .select('*')
+        .eq('foundry_id', foundry_id)
+        .order('updated_at', { ascending: false })
+
+    if (error) {
+        console.error('[Outreach] Failed to fetch knowledge base:', error)
+        return { error: 'Failed to fetch knowledge base' }
+    }
+
+    return {
+        data: (data || []).map(kb => ({
+            ...kb,
+            tags: kb.tags as string[],
+        })),
+    }
+}
+
+export async function addKnowledgeEntry(input: {
+    title: string
+    content: string
+    category: string
+}): Promise<{ data?: { id: string }; error?: string }> {
+    const ctx = await getAuthContext()
+    if ('error' in ctx) return { error: ctx.error }
+    const { supabase, user, foundry_id } = ctx
+
+    if (!input.title?.trim()) return { error: 'Title is required' }
+    if (!input.content?.trim()) return { error: 'Content is required' }
+
+    const { data, error } = await supabase
+        .from('outreach_knowledge_base')
+        .insert({
+            foundry_id,
+            created_by: user.id,
+            title: input.title.trim(),
+            content: input.content.trim(),
+            content_type: 'text',
+            category: input.category || 'product',
+            tags: [],
+        })
+        .select('id')
+        .single()
+
+    if (error) {
+        console.error('[Outreach] Failed to add knowledge entry:', error)
+        return { error: 'Failed to add knowledge entry' }
+    }
+
+    revalidatePath('/outreach')
+    return { data: { id: data.id } }
+}
+
+export async function updateKnowledgeEntry(
+    entryId: string,
+    updates: Partial<Pick<OutreachKBEntry, 'title' | 'content' | 'category'>>
+): Promise<{ success?: boolean; error?: string }> {
+    const ctx = await getAuthContext()
+    if ('error' in ctx) return { error: ctx.error }
+    const { supabase, foundry_id } = ctx
+
+    const { error } = await supabase
+        .from('outreach_knowledge_base')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', entryId)
+        .eq('foundry_id', foundry_id)
+
+    if (error) {
+        console.error('[Outreach] Failed to update knowledge entry:', error)
+        return { error: 'Failed to update knowledge entry' }
+    }
+
+    revalidatePath('/outreach')
+    return { success: true }
+}
+
+export async function deleteKnowledgeEntry(entryId: string): Promise<{ success?: boolean; error?: string }> {
+    const ctx = await getAuthContext()
+    if ('error' in ctx) return { error: ctx.error }
+    const { supabase, foundry_id } = ctx
+
+    const { error } = await supabase
+        .from('outreach_knowledge_base')
+        .delete()
+        .eq('id', entryId)
+        .eq('foundry_id', foundry_id)
+
+    if (error) {
+        console.error('[Outreach] Failed to delete knowledge entry:', error)
+        return { error: 'Failed to delete knowledge entry' }
+    }
+
+    revalidatePath('/outreach')
+    return { success: true }
+}
