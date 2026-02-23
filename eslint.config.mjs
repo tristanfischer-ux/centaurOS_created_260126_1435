@@ -1,8 +1,6 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
-import reactPlugin from "eslint-plugin-react";
-import reactHooksPlugin from "eslint-plugin-react-hooks";
 
 const eslintConfig = defineConfig([
   // Global ignores must come first to take effect before any config applies files patterns.
@@ -61,12 +59,11 @@ const eslintConfig = defineConfig([
   ]),
   ...nextVitals,
   ...nextTs,
-  // Downgrade non-critical rules to warnings for CI to pass
+  // Downgrade non-critical rules to warnings for CI to pass.
+  // NOTE: Do not re-declare react/react-hooks plugins here — they are
+  // already registered by eslint-config-next and ESLint 9 flat config
+  // forbids redefining a plugin.
   {
-    plugins: {
-      react: reactPlugin,
-      "react-hooks": reactHooksPlugin,
-    },
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
