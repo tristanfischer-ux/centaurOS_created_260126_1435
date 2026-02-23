@@ -184,6 +184,12 @@ What realistic loads and boundary conditions should be applied for structural an
 
   try {
     const parsed = JSON.parse(cleaned) as LoadCaseSet
+    // Sanity-check AI-inferred magnitudes to prevent physically implausible values
+    for (const lc of parsed.loadCases) {
+      if (lc.magnitude_N != null) lc.magnitude_N = Math.max(0, Math.min(lc.magnitude_N, 100_000))
+      if (lc.magnitude_MPa != null) lc.magnitude_MPa = Math.max(0, Math.min(lc.magnitude_MPa, 1_000))
+      if (lc.magnitude_g != null) lc.magnitude_g = Math.max(0, Math.min(lc.magnitude_g, 50))
+    }
     return parsed
   } catch (parseError) {
     console.error("[XRayFEA] Failed to parse AI load cases:", cleaned.slice(0, 200))

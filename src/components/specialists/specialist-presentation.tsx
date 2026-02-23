@@ -3,14 +3,8 @@
 /**
  * @file specialist-presentation.tsx
  *
- * @description Renders the specialist's visual representation, adapting
- * based on the active ConversationMode. This component is the visual
- * "face" of the specialist in the dialog.
- *
- * Modes:
- * - **text**: Static avatar image with state-based indicators (typing dots, speaking pulse)
- * - **voice**: Animated avatar with audio visualizer and speaking indicators
- * - **avatar**: Live video stream from avatar provider via <video> element
+ * @description Renders the specialist's visual representation in text mode.
+ * This component is the visual "face" of the specialist in the dialog.
  *
  * @component
  *
@@ -20,19 +14,11 @@
  *   mode="text"
  *   state="speaking"
  * />
- *
- * @example
- * <SpecialistPresentation
- *   specialist={specialist}
- *   mode="avatar"
- *   state="speaking"
- *   videoStream={videoStream}
- * />
  */
 
-import { useRef, useEffect, useState } from "react"
+import { useState } from "react"
 import Image from "next/image"
-import { AlertCircle, Loader2, Volume2, Mic, Brain, Wifi } from "lucide-react"
+import { AlertCircle, Loader2, Volume2, Brain } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ConversationMode, SpecialistState } from "@/lib/agents/conversation-engine"
 import type { Specialist } from "@/app/(platform)/agents/specialists-data"
@@ -46,8 +32,6 @@ interface SpecialistPresentationProps {
     mode: ConversationMode
     /** Current specialist visual state */
     state: SpecialistState
-    /** Video stream from avatar provider (only for avatar mode) */
-    videoStream?: MediaStream | null
     /** Size variant */
     size?: "sm" | "md" | "lg"
     /** Additional CSS classes */
@@ -62,30 +46,10 @@ interface SpecialistPresentationProps {
  */
 export function SpecialistPresentation({
     specialist,
-    mode,
     state,
-    videoStream,
     size = "md",
     className,
 }: SpecialistPresentationProps) {
-    const videoRef = useRef<HTMLVideoElement>(null)
-
-    // Attach video stream to <video> element when available
-    useEffect(() => {
-        if (videoRef.current && videoStream) {
-            videoRef.current.srcObject = videoStream
-            videoRef.current.play().catch((err) => {
-                console.warn("[SpecialistPresentation] Video play failed:", err)
-            })
-        }
-        return () => {
-            if (videoRef.current) {
-                // eslint-disable-next-line react-hooks/exhaustive-deps
-                videoRef.current.srcObject = null
-            }
-        }
-    }, [videoStream])
-
     const sizeClasses = {
         sm: "h-7 w-7",
         md: "h-12 w-12",
@@ -96,69 +60,6 @@ export function SpecialistPresentation({
         sm: "28px",
         md: "48px",
         lg: "128px",
-    }
-
-    // ─── Avatar Mode: Live video stream ──────────────────────────────────
-    if (mode === "avatar" && videoStream) {
-        return (
-            <div className={cn("relative", className)}>
-                {/* Live video avatar */}
-                <div className={cn(
-                    "relative overflow-hidden rounded-2xl bg-muted",
-                    size === "lg" ? "h-64 w-64" : sizeClasses[size],
-                )}>
-                    <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="h-full w-full object-cover"
-                        aria-label={`${specialist.name} avatar video`}
-                    />
-
-                    {/* State overlay */}
-                    {state === "connecting" && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm">
-                            <div className="flex flex-col items-center gap-2">
-                                <Wifi className="h-5 w-5 text-international-orange animate-pulse" />
-                                <span className="text-xs text-muted-foreground">Connecting...</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* State indicator badges */}
-                <StateIndicator state={state} mode={mode} />
-            </div>
-        )
-    }
-
-    // ─── Voice Mode: Animated static avatar ──────────────────────────────
-    if (mode === "voice") {
-        return (
-            <div className={cn("relative flex flex-col items-center gap-2", className)}>
-                {/* Avatar with animated ring for speaking */}
-                <div className={cn(
-                    "relative rounded-full overflow-hidden",
-                    sizeClasses[size],
-                    state === "speaking" && "ring-2 ring-international-orange ring-offset-2 ring-offset-background",
-                    state === "listening" && "ring-2 ring-destructive ring-offset-2 ring-offset-background animate-pulse",
-                )}>
-                    <AvatarImage specialist={specialist} size={imageSizes[size]} />
-                </div>
-
-                {/* Audio visualizer dots (speaking state) */}
-                {state === "speaking" && size !== "sm" && (
-                    <div className="flex items-center gap-1">
-                        <div className="h-1.5 w-1.5 rounded-full bg-international-orange animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <div className="h-1.5 w-1.5 rounded-full bg-international-orange animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <div className="h-1.5 w-1.5 rounded-full bg-international-orange animate-bounce" style={{ animationDelay: "300ms" }} />
-                    </div>
-                )}
-
-                <StateIndicator state={state} mode={mode} />
-            </div>
-        )
     }
 
     // ─── Text Mode: Static avatar with state indicators ──────────────────
@@ -216,28 +117,26 @@ function AvatarImage({ specialist, size }: { specialist: Specialist; size: strin
  */
 function StateIndicator({
     state,
-    mode,
 }: {
     state: SpecialistState
-    mode: ConversationMode
 }) {
     if (state === "idle") return null
 
     const indicators: Record<SpecialistState, { icon: typeof Loader2; label: string; className: string } | null> = {
         idle: null,
         connecting: {
-            icon: Wifi,
+            icon: Loader2,
             label: "Connecting",
             className: "text-muted-foreground",
         },
         listening: {
-            icon: Mic,
+            icon: Loader2,
             label: "Listening",
             className: "text-destructive animate-pulse",
         },
         thinking: {
             icon: Brain,
-            label: mode === "text" ? "Thinking" : "Processing",
+            label: "Thinking",
             className: "text-international-orange animate-pulse",
         },
         speaking: {

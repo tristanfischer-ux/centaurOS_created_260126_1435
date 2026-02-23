@@ -161,7 +161,6 @@
     "src/components/review-gates/ReviewGateWidget.tsx|TS2322|Type is not assignable to type.",
     "src/components/rfq/RFQTemplatePicker.tsx|TS2322|Type is not assignable to type.",
     "src/components/search/SearchResults.tsx|TS2322|Type is not assignable to type.",
-    "src/components/specialists/specialist-presentation.tsx|TS2367|This comparison appears to be unintentional because compared types have no overlap.",
     "src/components/settings/company-profile-dialog.tsx|TS2322|Type is not assignable to type.",
     "src/components/strategy/transcript-import-dialog.tsx|TS2322|Type is not assignable to type.",
     "src/components/techniques/technique-card.tsx|TS2322|Type is not assignable to type.",

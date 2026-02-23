@@ -18,6 +18,7 @@ import React, { memo } from "react"
 import { Handle, Position } from "@xyflow/react"
 import { AlertTriangle, Box, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getStatusDotColor } from "../lib/status-colors"
 
 import type { NodeProps } from "@xyflow/react"
 
@@ -45,18 +46,8 @@ export interface XRayModuleNodeData {
 
 // ─── Status helpers ──────────────────────────────────────────────────
 
-function statusDotColor(status: XRayModuleNodeData["status"]): string {
-  switch (status) {
-    case "complete":
-      return "#10b981"
-    case "needs-diagnostic":
-      return "#f59e0b"
-    case "partial":
-      return "#3b82f6"
-    default:
-      return "#94a3b8"
-  }
-}
+// DECISION: statusDotColor moved to ../lib/status-colors.ts for DRY across x-ray views
+const statusDotColor = (status: XRayModuleNodeData["status"]) => getStatusDotColor(status)
 
 function statusLabel(status: XRayModuleNodeData["status"]): string {
   switch (status) {

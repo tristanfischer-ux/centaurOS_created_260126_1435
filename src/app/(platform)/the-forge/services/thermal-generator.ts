@@ -124,10 +124,18 @@ async function inferThermalConfig(module: ModuleSpec): Promise<ThermalConfig> {
 
   try {
     const parsed = JSON.parse(content)
+    const ALLOWED_MATERIALS = ["pla", "abs", "petg", "nylon", "tpu", "pc", "peek", "aluminum", "steel", "copper", "titanium", "brass"]
+    // Sanity-check AI-inferred values
+    const heatSources = (parsed.heat_sources ?? [{ power_W: 1.0, description: "Default" }]) as HeatSourceConfig[]
+    for (const hs of heatSources) {
+      hs.power_W = Math.max(0, Math.min(hs.power_W, 10_000))
+    }
+    const ambientTemp = Math.max(-60, Math.min(parsed.ambient_temp_C ?? 25.0, 500))
+    const materialKey = ALLOWED_MATERIALS.includes(parsed.material_key) ? parsed.material_key : "pla"
     return {
-      heat_sources: parsed.heat_sources ?? [{ power_W: 1.0, description: "Default" }],
-      ambient_temp_C: parsed.ambient_temp_C ?? 25.0,
-      material_key: parsed.material_key ?? "pla",
+      heat_sources: heatSources,
+      ambient_temp_C: ambientTemp,
+      material_key: materialKey,
       description: parsed.description ?? "AI-inferred thermal conditions",
     }
   } catch {

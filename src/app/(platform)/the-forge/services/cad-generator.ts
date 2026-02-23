@@ -39,6 +39,48 @@ const MODAL_TIMEOUT_MS = 180_000
 /** Number of retry attempts when CadQuery execution fails on Modal */
 const MAX_RETRY_ATTEMPTS = 3
 
+// ─── CAD Code Validation ─────────────────────────────────────────────
+
+/** Dangerous Python imports that must not appear in CadQuery code sent to Modal */
+const DANGEROUS_IMPORTS = ["import os", "import sys", "import subprocess", "import shutil", "from os", "from sys", "from subprocess", "from shutil"]
+
+/**
+ * Validates CadQuery Python code before sending to Modal for execution.
+ *
+ * @param code - The CadQuery Python source code
+ * @returns null if valid, or a human-readable error string describing the problem
+ */
+function validateCadQueryCode(code: string): string | null {
+  if (code.length < 50) {
+    return "Code too short to be a valid CadQuery script"
+  }
+  if (!code.includes("import cadquery") && !code.includes("import cq")) {
+    return "Missing CadQuery import (expected 'import cadquery' or 'import cq')"
+  }
+  if (!code.includes("result") && !code.includes("show_object")) {
+    return "No 'result' variable or 'show_object' call — Modal has nothing to export"
+  }
+  for (const dangerous of DANGEROUS_IMPORTS) {
+    if (code.includes(dangerous)) {
+      return `Dangerous import detected: '${dangerous}'`
+    }
+  }
+  // Check balanced parentheses and brackets
+  let parenDepth = 0
+  let bracketDepth = 0
+  for (const ch of code) {
+    if (ch === "(") parenDepth++
+    else if (ch === ")") parenDepth--
+    else if (ch === "[") bracketDepth++
+    else if (ch === "]") bracketDepth--
+    if (parenDepth < 0) return "Unbalanced parentheses (extra closing paren)"
+    if (bracketDepth < 0) return "Unbalanced brackets (extra closing bracket)"
+  }
+  if (parenDepth !== 0) return `Unbalanced parentheses (${parenDepth} unclosed)`
+  if (bracketDepth !== 0) return `Unbalanced brackets (${bracketDepth} unclosed)`
+  return null
+}
+
 // ─── Common Material Densities (kg/m³) ───────────────────────────────
 
 /**
@@ -676,8 +718,15 @@ export async function generateModuleCadModel(
   // Stage 1: Gemini generates schematic CadQuery code
   let cadQueryCode = await generateModuleSchematicCode(module, brief)
 
-  // Stage 2: Modal executes the code (with auto-retry on failure)
-  let modalResult = await executeCadQueryOnModal(cadQueryCode, module.id, materialDensity)
+  // Stage 2: Validate code before sending to Modal
+  const validationError = validateCadQueryCode(cadQueryCode)
+  let modalResult: ModalCadResponse
+  if (validationError) {
+    console.warn("[XRayCadGen] Module code failed pre-validation:", { moduleId: module.id, error: validationError })
+    modalResult = { error: `Pre-validation: ${validationError}` } as ModalCadResponse
+  } else {
+    modalResult = await executeCadQueryOnModal(cadQueryCode, module.id, materialDensity)
+  }
 
   // Retry loop: Gemini retries with error feedback (all Gemini, no Opus needed)
   if (modalResult.error) {
@@ -694,6 +743,13 @@ export async function generateModuleCadModel(
         cadQueryCode = await regenerateModuleSchematicCode(
           module, brief, cadQueryCode, lastError,
         )
+
+        // Validate regenerated code before executing
+        const retryValidation = validateCadQueryCode(cadQueryCode)
+        if (retryValidation) {
+          lastError = `Pre-validation: ${retryValidation}`
+          continue
+        }
 
         modalResult = await executeCadQueryOnModal(cadQueryCode, module.id, materialDensity)
 
@@ -1265,8 +1321,15 @@ export async function generateSystemCadModel(
   // SECURITY: Temperature 0.2 for precise geometry generation (lower = more deterministic)
   let cadQueryCode = stripCodeFences(await callOpus(SYSTEM_CAD_PROMPT, userPrompt, 0.2, 32768))
 
-  // Stage 2: Execute on Modal with retry loop
-  let modalResult = await executeCadQueryOnModal(cadQueryCode, "system", 1240)
+  // Stage 2: Validate code before sending to Modal, then execute with retry loop
+  const sysValidation = validateCadQueryCode(cadQueryCode)
+  let modalResult: ModalCadResponse
+  if (sysValidation) {
+    console.warn("[XRayCadGen] System code failed pre-validation:", { error: sysValidation })
+    modalResult = { error: `Pre-validation: ${sysValidation}` } as ModalCadResponse
+  } else {
+    modalResult = await executeCadQueryOnModal(cadQueryCode, "system", 1240)
+  }
 
   for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS && modalResult.error; attempt++) {
     const isFinalAttempt = attempt === MAX_RETRY_ATTEMPTS
@@ -1280,7 +1343,6 @@ export async function generateSystemCadModel(
 
     try {
       if (isFinalAttempt) {
-        // Final attempt: Gemini with full spec context (still no brief)
         cadQueryCode = stripCodeFences(
           await callGemini(
             SYSTEM_CAD_PROMPT,
@@ -1288,7 +1350,6 @@ export async function generateSystemCadModel(
           ),
         )
       } else {
-        // Opus retry with error feedback
         cadQueryCode = stripCodeFences(
           await callOpus(
             SYSTEM_CAD_PROMPT,
@@ -1297,6 +1358,12 @@ export async function generateSystemCadModel(
             32768,
           ),
         )
+      }
+      // Validate regenerated code before executing
+      const retryValidation = validateCadQueryCode(cadQueryCode)
+      if (retryValidation) {
+        modalResult = { error: `Pre-validation: ${retryValidation}` } as ModalCadResponse
+        continue
       }
       modalResult = await executeCadQueryOnModal(cadQueryCode, "system", 1240)
     } catch (retryError) {

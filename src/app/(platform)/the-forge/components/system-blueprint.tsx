@@ -17,6 +17,7 @@
 import React, { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { getStatusDotColor, STATUS_LEGEND } from "../lib/status-colors"
 
 import { motion, type Variants } from "framer-motion"
 
@@ -76,20 +77,8 @@ function getNodeStatus(
   return "not-started"
 }
 
-/**
- * Returns the dot color for a given module status.
- *
- * @param status - The module status
- * @returns A hex color string
- */
-function statusDotColor(status: string): string {
-  switch (status) {
-    case "complete": return "#10b981"
-    case "needs-diagnostic": return "#f59e0b"
-    case "partial": return "#3b82f6"
-    default: return "#94a3b8"
-  }
-}
+// DECISION: statusDotColor moved to ../lib/status-colors.ts for DRY across x-ray views
+const statusDotColor = getStatusDotColor
 
 /**
  * Checks whether the gating module's diagnostic has been completed.
@@ -385,12 +374,7 @@ export function SystemBlueprint({
               {/* Status legend */}
               <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
                 <span className="font-medium">Status:</span>
-                {[
-                  { label: "Complete", color: "#10b981" },
-                  { label: "In progress", color: "#3b82f6" },
-                  { label: "Needs diagnostic", color: "#f59e0b" },
-                  { label: "Not started", color: "#94a3b8" },
-                ].map((s) => (
+                {STATUS_LEGEND.map((s) => (
                   <div key={s.label} className="flex items-center gap-1.5">
                     <span
                       className="inline-block w-2 h-2 rounded-full"

@@ -22,6 +22,7 @@
 "use client"
 
 import React, { useMemo, useCallback, useState } from "react"
+import { getStatusDotColor, SCHEMATIC_ACCENT_STROKE, STATUS_LEGEND } from "../lib/status-colors"
 import {
   ReactFlow,
   Background,
@@ -164,7 +165,7 @@ function buildNodesAndEdges(
         source: `module-${prevModule.id}`,
         target: `module-${m.id}`,
         animated: true,
-        style: { stroke: "#ff4500", strokeWidth: 2 },
+        style: { stroke: SCHEMATIC_ACCENT_STROKE, strokeWidth: 2 },
       })
     }
   })
@@ -172,20 +173,8 @@ function buildNodesAndEdges(
   return { nodes, edges }
 }
 
-// ─── Status dot color ────────────────────────────────────────────────
-
-function statusDotColor(status: string): string {
-  switch (status) {
-    case "complete":
-      return "#10b981"
-    case "needs-diagnostic":
-      return "#f59e0b"
-    case "partial":
-      return "#3b82f6"
-    default:
-      return "#94a3b8"
-  }
-}
+// DECISION: statusDotColor moved to ../lib/status-colors.ts for DRY across x-ray views
+const statusDotColor = getStatusDotColor
 
 // ─── Component ───────────────────────────────────────────────────────
 
@@ -343,7 +332,7 @@ export function XRaySchematic({ spec, onOpenDiagnostic }: XRaySchematicProps) {
                 onNodeClick={handleNodeClick}
                 defaultEdgeOptions={{
                   animated: true,
-                  style: { stroke: "#ff4500", strokeWidth: 2 },
+                  style: { stroke: SCHEMATIC_ACCENT_STROKE, strokeWidth: 2 },
                 }}
                 fitView
                 fitViewOptions={{ padding: 0.3 }}
@@ -406,34 +395,15 @@ export function XRaySchematic({ spec, onOpenDiagnostic }: XRaySchematicProps) {
         {/* Status legend */}
         <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
           <span className="font-medium">Status:</span>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: "#10b981" }}
-            />
-            Complete
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: "#3b82f6" }}
-            />
-            In progress
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: "#f59e0b" }}
-            />
-            Needs diagnostic
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: "#94a3b8" }}
-            />
-            Not started
-          </div>
+          {STATUS_LEGEND.map((s) => (
+            <div key={s.label} className="flex items-center gap-1.5">
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: s.color }}
+              />
+              {s.label}
+            </div>
+          ))}
         </div>
       </CardContent>
 

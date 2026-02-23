@@ -144,11 +144,21 @@ export async function generateFlowConditions(
 
   try {
     const parsed = JSON.parse(content)
+    // Sanity-check AI-inferred flow values
+    const velocity = Math.max(0, Math.min(parsed.velocity_m_s ?? 10.0, 500))
+    const density = Math.max(0.001, Math.min(parsed.density_kg_m3 ?? 1.225, 20_000))
+    const viscosity = Math.max(1e-8, Math.min(parsed.kinematic_viscosity_m2_s ?? 1.5e-5, 1))
+    // Normalize direction to unit vector
+    const rawDir: [number, number, number] = parsed.direction ?? [1, 0, 0]
+    const mag = Math.sqrt(rawDir[0] ** 2 + rawDir[1] ** 2 + rawDir[2] ** 2)
+    const direction: [number, number, number] = mag > 0
+      ? [rawDir[0] / mag, rawDir[1] / mag, rawDir[2] / mag]
+      : [1, 0, 0]
     return {
-      velocity_m_s: parsed.velocity_m_s ?? 10.0,
-      direction: parsed.direction ?? [1, 0, 0],
-      density_kg_m3: parsed.density_kg_m3 ?? 1.225,
-      kinematic_viscosity_m2_s: parsed.kinematic_viscosity_m2_s ?? 1.5e-5,
+      velocity_m_s: velocity,
+      direction,
+      density_kg_m3: density,
+      kinematic_viscosity_m2_s: viscosity,
       medium: parsed.medium ?? "air",
       description: parsed.description ?? "AI-generated flow conditions",
     }

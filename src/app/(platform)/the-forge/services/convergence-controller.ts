@@ -301,13 +301,23 @@ ${analysis?.dfm ? `DFM: ${analysis.dfm.printable ? "Printable" : "NOT printable"
 
   try {
     const changes = JSON.parse(cleaned) as ProposedChange[]
-    // Apply dampening: scale suggested values toward current values
-    return changes.map((change) => ({
-      ...change,
-      // Note: actual dampening would require numeric parsing of currentValue/suggestedValue
-      // For now, we mark the dampening factor in the rationale
-      rationale: `${change.rationale} (Applied with ${CHANGE_DAMPENING_FACTOR * 100}% dampening)`,
-    }))
+    // Apply dampening: interpolate numeric values toward current by CHANGE_DAMPENING_FACTOR
+    return changes.map((change) => {
+      const current = parseFloat(change.currentValue)
+      const suggested = parseFloat(change.suggestedValue)
+      if (!isNaN(current) && !isNaN(suggested)) {
+        const dampened = current + (suggested - current) * CHANGE_DAMPENING_FACTOR
+        // Clean trailing zeros: "12.50" → "12.5", "12.00" → "12"
+        const dampenedStr = parseFloat(dampened.toFixed(6)).toString()
+        return {
+          ...change,
+          suggestedValue: dampenedStr,
+          rationale: `${change.rationale} (Dampened ${CHANGE_DAMPENING_FACTOR * 100}%: ${change.suggestedValue} → ${dampenedStr})`,
+        }
+      }
+      // Non-numeric values (e.g. material names) pass through unchanged
+      return change
+    })
   } catch {
     console.warn("[Convergence] Failed to parse AI design changes")
     return []
