@@ -33,6 +33,7 @@ import { createPostResponseCallback } from "@/lib/agents/post-response-handler"
 import { shouldTriggerWebSearch, runPreSearch, formatSearchResultsForPrompt } from "@/lib/agents/web-search"
 import { getToolsForSpecialist, executeToolCall } from "@/lib/agents/tools/registry"
 import type { ToolDefinition } from "@/lib/ai-providers/types"
+import { loadDomainKnowledge } from "@/lib/agents/domain-knowledge"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -598,10 +599,13 @@ export async function POST(request: Request) {
     if (specialistId) {
         const specialist = getSpecialistById(specialistId)
         if (specialist) {
+            // INTENT: Load curated domain knowledge (frameworks, methodologies) for the specialist.
+            // Falls back to the short description if no domain knowledge file exists yet.
+            const domainContext = loadDomainKnowledge(specialistId, specialist.description)
             const personalityPrompt = compilePersonalityPrompt(
                 `${specialist.name}, the ${specialist.title} specialist`,
                 specialist.personality,
-                specialist.description,
+                domainContext,
                 specialistId,
             )
             systemPromptWithContext = personalityPrompt
