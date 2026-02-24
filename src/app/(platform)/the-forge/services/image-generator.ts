@@ -18,6 +18,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 
+import { overlayModuleLabels, overlaySystemLegend } from "./image-overlay"
 import type { ModuleSpec, XRaySpec } from "./xray-schema"
 import type { StructuralBrief, SystemStructuralBrief } from "./structural-brief"
 
@@ -337,10 +338,18 @@ export async function generateModuleImage(
     aspectRatio: "3:2",
   })
 
+  // Post-process: add engineering annotation frame with labels
+  const labeledData = await overlayModuleLabels(imageData.data, {
+    name: module.name,
+    purpose: module.purpose,
+    keyParts: module.keyParts,
+    io: module.io,
+  })
+
   const url = await uploadToStorage(
     scanId,
     `module-${module.id}.png`,
-    imageData.data,
+    labeledData,
     imageData.mimeType,
   )
 
@@ -412,10 +421,17 @@ export async function generateSystemImage(
     aspectRatio: "16:9",
   })
 
+  // Post-process: add bottom legend bar with module names
+  const labeledData = await overlaySystemLegend(
+    imageData.data,
+    spec.function,
+    spec.modules.map((m) => ({ name: m.name, purpose: m.purpose })),
+  )
+
   const url = await uploadToStorage(
     scanId,
     "system-diagram.png",
-    imageData.data,
+    labeledData,
     imageData.mimeType,
   )
 
