@@ -80,11 +80,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
 
     // SECURITY: Sign OAuth state to prevent tampering between connect and callback.
-    // Uses a dedicated secret — MUST NOT fall back to GOOGLE_CLIENT_SECRET (which
-    // serves a different purpose and may be rotated independently).
-    const oauthStateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET
+    // Prefers a dedicated secret; falls back to GOOGLE_CLIENT_SECRET with a warning
+    // so the app stays functional while the dedicated env var is provisioned.
+    const oauthStateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET
+    if (!process.env.GOOGLE_OAUTH_STATE_SECRET && process.env.GOOGLE_CLIENT_SECRET) {
+        console.warn('[SECURITY] GOOGLE_OAUTH_STATE_SECRET not set — falling back to GOOGLE_CLIENT_SECRET. Set a dedicated secret to eliminate this warning.')
+    }
     if (!oauthStateSecret) {
-        console.error('[SECURITY] GOOGLE_OAUTH_STATE_SECRET not configured')
+        console.error('[SECURITY] No OAuth state signing secret available')
         return redirectWithError('not_configured')
     }
 

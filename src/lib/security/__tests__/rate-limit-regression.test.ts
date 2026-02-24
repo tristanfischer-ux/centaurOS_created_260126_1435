@@ -495,9 +495,9 @@ describe('google oauth state hardening regressions', () => {
 
     expect(source).toContain('createSignedOAuthState')
     expect(source).toContain('buildOAuthStatePayload')
-    // SECURITY: Must NOT fall back to GOOGLE_CLIENT_SECRET — dedicated secret required
+    // SECURITY: Prefers dedicated secret, logs warning on fallback
     expect(source).toContain("process.env.GOOGLE_OAUTH_STATE_SECRET")
-    expect(source).not.toContain("process.env.GOOGLE_OAUTH_STATE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET")
+    expect(source).toContain("GOOGLE_OAUTH_STATE_SECRET not set")
     expect(source).toContain("redirectWithError('not_configured')")
     expect(source).toContain("await rateLimit('api', `google-connect:${user.id}`")
   })
