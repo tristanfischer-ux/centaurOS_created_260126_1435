@@ -60,7 +60,8 @@ export async function withNetworkRetry<T>(fn: () => Promise<T>): Promise<T> {
         message.includes('econnreset') ||
         message.includes('fetch') ||
         message.includes('503') ||
-        message.includes('502')
+        message.includes('502') ||
+        message.includes('529')
       )
     }
   })

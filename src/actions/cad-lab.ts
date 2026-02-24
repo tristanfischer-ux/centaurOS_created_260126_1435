@@ -53,6 +53,7 @@ import {
   getMashupCodeGenUserPrompt,
 } from "@/lib/cad-lab/mashup-prompts"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { withRetry } from "@/lib/retry"
 
 // ─── Sector Lookup ───────────────────────────────────────────────────
 
@@ -113,34 +114,60 @@ async function callClaude(
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: modelId,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }),
-    signal: AbortSignal.timeout(600_000), // 10 min — building models need extended generation time
-  })
+  const FALLBACK_MODEL: ClaudeModelId = "claude-haiku-4-5-20251001"
 
-  if (!response.ok) {
-    const errText = await response.text()
-    throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
+  const makeRequest = async (model: ClaudeModelId) => {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+      signal: AbortSignal.timeout(600_000), // 10 min — building models need extended generation time
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
+    }
+
+    const data = await response.json()
+    const text: string = data.content?.[0]?.text ?? ""
+
+    return {
+      text,
+      tokensIn: data.usage?.input_tokens ?? 0,
+      tokensOut: data.usage?.output_tokens ?? 0,
+    }
   }
 
-  const data = await response.json()
-  const text: string = data.content?.[0]?.text ?? ""
-
-  return {
-    text,
-    tokensIn: data.usage?.input_tokens ?? 0,
-    tokensOut: data.usage?.output_tokens ?? 0,
+  // INTENT: Retry on transient API errors (rate limit, overloaded), then fall back to a smaller model
+  try {
+    return await withRetry(() => makeRequest(modelId), {
+      maxRetries: 3,
+      baseDelay: 2000,
+      shouldRetry: (error) => {
+        const msg = error.message
+        return msg.includes("429") || msg.includes("529")
+      },
+    })
+  } catch (primaryError) {
+    // Primary model exhausted retries — try fallback model once
+    if (modelId !== FALLBACK_MODEL) {
+      console.warn(
+        `[callClaude] Primary model ${modelId} failed after retries, falling back to ${FALLBACK_MODEL}:`,
+        primaryError instanceof Error ? primaryError.message : primaryError,
+      )
+      return await makeRequest(FALLBACK_MODEL)
+    }
+    throw primaryError
   }
 }
 
@@ -528,6 +555,14 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
     const webSources = webResult.status === "fulfilled" ? webResult.value.sources : []
     const cadModels = cadResult.status === "fulfilled" ? cadResult.value : []
 
+    // Log Gemini/Thingiverse failures so they aren't silent
+    if (webResult.status === "rejected") {
+      console.error("[THE-FORGE] Step 1: Gemini web search failed:", webResult.reason)
+    }
+    if (cadResult.status === "rejected") {
+      console.error("[THE-FORGE] Step 1: Thingiverse CAD search failed:", cadResult.reason)
+    }
+
     // 2. Build raw data context for Claude
     const rawDataSections: string[] = []
 
@@ -543,25 +578,38 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
     }
 
     const rawContext = rawDataSections.join("\n\n")
-
-    // 3. Domain-specific synthesis: detect domain from description, then use domain prompt
-    const domain = await detectDomainFromProductDescription(description)
-    const synthesisPrompt = getResearchSynthesisPrompt(domain)
-    console.info("[THE-FORGE] Step 1: Synthesizing report with Claude (domain: %s)...", domain)
-    const claudeResult = await callClaude(
-      synthesisPrompt,
-      `Product to research: ${description}\n\n${rawContext}`,
-    )
-
     const referenceModels = cadModels.map((m) => ({ name: m.name, url: m.url }))
 
+    // 3. Domain-specific synthesis: detect domain from description, then use domain prompt
+    // INTENT: Claude synthesis is wrapped separately so Gemini results are preserved on failure
+    let report: string
+    let synthesisSucceeded = true
+    try {
+      const domain = await detectDomainFromProductDescription(description)
+      const synthesisPrompt = getResearchSynthesisPrompt(domain)
+      console.info("[THE-FORGE] Step 1: Synthesizing report with Claude (domain: %s)...", domain)
+      const claudeResult = await callClaude(
+        synthesisPrompt,
+        `Product to research: ${description}\n\n${rawContext}`,
+      )
+      report = claudeResult.text
+    } catch (synthesisError) {
+      console.error(
+        "[THE-FORGE] Step 1: Claude synthesis failed:",
+        synthesisError instanceof Error ? synthesisError.message : synthesisError,
+      )
+      report = "Research sources found but report synthesis failed — tap Retry to try again."
+      synthesisSucceeded = false
+    }
+
     console.info(
-      `[THE-FORGE] Step 1 complete: ${webSources.length} web sources, ${referenceModels.length} CAD refs, ${Date.now() - start}ms`,
+      `[THE-FORGE] Step 1 complete: ${webSources.length} web sources, ${referenceModels.length} CAD refs, synthesis=${synthesisSucceeded ? "ok" : "failed"}, ${Date.now() - start}ms`,
     )
 
     return {
-      success: true,
-      report: claudeResult.text,
+      success: synthesisSucceeded,
+      ...(!synthesisSucceeded && { error: "Claude synthesis failed — sources were still collected" }),
+      report,
       sources: webSources,
       referenceModels,
       researchTime: Date.now() - start,
