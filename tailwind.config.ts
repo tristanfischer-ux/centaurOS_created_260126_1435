@@ -140,6 +140,20 @@ const config: Config = {
                 'elevation-4': '0 20px 40px rgba(0, 0, 0, 0.15)',
                 'brand': '0 10px 25px -5px rgba(255, 69, 0, 0.2)',
                 'brand-lg': '0 20px 40px -10px rgba(255, 69, 0, 0.3)',
+            },
+            keyframes: {
+                'collapsible-down': {
+                    from: { height: '0' },
+                    to: { height: 'var(--radix-collapsible-content-height)' },
+                },
+                'collapsible-up': {
+                    from: { height: 'var(--radix-collapsible-content-height)' },
+                    to: { height: '0' },
+                },
+            },
+            animation: {
+                'collapsible-down': 'collapsible-down 0.2s ease-out',
+                'collapsible-up': 'collapsible-up 0.2s ease-out',
             }
         }
     },

@@ -71,7 +71,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 import { SectionHeader } from "@/components/sidebar/SectionHeader"
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
 import { useSectionNewBadges } from "@/hooks/useSectionNewBadge"
+import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { isRouteAlpha, isRouteBeta } from "@/lib/features/registry"
 import { signOut } from "@/actions/auth"
 import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
@@ -192,6 +194,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     const router = useRouter()
     const { setZoom } = useZoomContext()
     const { badges } = useSectionNewBadges()
+    const { openSections, toggleSection } = useSidebarCollapse(pathname)
     const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false)
     const [feedbackFeatureName, setFeedbackFeatureName] = React.useState<string | undefined>(undefined)
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
@@ -326,61 +329,80 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 1: "Me" — Personal pages                  */}
                 {/* ══════════════════════════════════════════════════ */}
-                <SectionHeader label="Me" introRoute="/me" hasNew={badges.me} />
-                {renderNavItem(todayNavItem)}
-                {meNavigation.map(renderNavItem)}
+                <SectionHeader label="Me" introRoute="/me" hasNew={badges.me} isOpen={openSections.me} onToggle={() => toggleSection("me")} />
+                <Collapsible open={openSections.me}>
+                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                        {renderNavItem(todayNavItem)}
+                        {meNavigation.map(renderNavItem)}
 
-                {/* Unread messages indicator */}
-                <div className="px-0 pb-1">
-                    <UnreadIndicator />
-                </div>
+                        {/* Unread messages indicator */}
+                        <div className="px-0 pb-1">
+                            <UnreadIndicator />
+                        </div>
+                    </CollapsibleContent>
+                </Collapsible>
 
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 2: "Plan" — Strategy and execution         */}
                 {/* ══════════════════════════════════════════════════ */}
                 <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
 
-                <SectionHeader label="Plan" introRoute="/plan" hasNew={badges.plan} />
-                {planNavigation.map(renderNavItem)}
+                <SectionHeader label="Plan" introRoute="/plan" hasNew={badges.plan} isOpen={openSections.plan} onToggle={() => toggleSection("plan")} />
+                <Collapsible open={openSections.plan}>
+                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                        {planNavigation.map(renderNavItem)}
+                    </CollapsibleContent>
+                </Collapsible>
 
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 3: "Finance" — Financial overview            */}
                 {/* ══════════════════════════════════════════════════ */}
                 <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
 
-                <SectionHeader label="Finance" introRoute="/finance/intro" hasNew={badges.finance} />
-                {financeNavigation.map(renderNavItem)}
+                <SectionHeader label="Finance" introRoute="/finance/intro" hasNew={badges.finance} isOpen={openSections.finance} onToggle={() => toggleSection("finance")} />
+                <Collapsible open={openSections.finance}>
+                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                        {financeNavigation.map(renderNavItem)}
+                    </CollapsibleContent>
+                </Collapsible>
 
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 4: "Workshop" — Where the work happens     */}
                 {/* ══════════════════════════════════════════════════ */}
                 <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
 
-                <SectionHeader label="Workshop" introRoute="/workshop" hasNew={badges.workshop} />
-                {workshopNavigation.map(renderNavItem)}
+                <SectionHeader label="Workshop" introRoute="/workshop" hasNew={badges.workshop} isOpen={openSections.workshop} onToggle={() => toggleSection("workshop")} />
+                <Collapsible open={openSections.workshop}>
+                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                        {workshopNavigation.map(renderNavItem)}
+                    </CollapsibleContent>
+                </Collapsible>
 
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 5: "Marketplace" — Recruits and supplies   */}
                 {/* ══════════════════════════════════════════════════ */}
                 <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
 
-                <SectionHeader label="Marketplace" introRoute="/marketplace-hub" hasNew={badges.marketplace} />
+                <SectionHeader label="Marketplace" introRoute="/marketplace-hub" hasNew={badges.marketplace} isOpen={openSections.marketplace} onToggle={() => toggleSection("marketplace")} />
+                <Collapsible open={openSections.marketplace}>
+                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                        {/* People sub-label */}
+                        <div className="px-3 pt-1 pb-0.5">
+                            <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
+                                People
+                            </p>
+                        </div>
+                        {marketplacePeopleNavigation.map(renderNavItem)}
 
-                {/* People sub-label */}
-                <div className="px-3 pt-1 pb-0.5">
-                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
-                        People
-                    </p>
-                </div>
-                {marketplacePeopleNavigation.map(renderNavItem)}
-
-                {/* Supplies sub-label */}
-                <div className="px-3 pt-2 pb-0.5">
-                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
-                        Supplies
-                    </p>
-                </div>
-                {marketplaceSuppliesNavigation.map(renderNavItem)}
+                        {/* Supplies sub-label */}
+                        <div className="px-3 pt-2 pb-0.5">
+                            <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
+                                Supplies
+                            </p>
+                        </div>
+                        {marketplaceSuppliesNavigation.map(renderNavItem)}
+                    </CollapsibleContent>
+                </Collapsible>
             </nav>
 
             {/* Footer — Settings, What's New, Sign Out, Zoom, Feedback, Version */}
