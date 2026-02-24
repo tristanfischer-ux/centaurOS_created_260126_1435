@@ -18,7 +18,7 @@
 
 import { useRouter } from "next/navigation"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import {
   Loader2,
   ArrowRight,
@@ -102,20 +102,6 @@ export default function CadLabResearchPage(): React.ReactNode {
   )
 
   // When a template is selected, set the subject and flag that research
-  // should auto-trigger on the next render (after state updates).
-  const pendingTemplateResearchRef = useRef(false)
-
-  function handleSelectTemplate(templateSubject: string): void {
-    setSubject(templateSubject)
-    pendingTemplateResearchRef.current = true
-  }
-
-  useEffect(() => {
-    if (pendingTemplateResearchRef.current && subject.trim()) {
-      pendingTemplateResearchRef.current = false
-      handleResearch()
-    }
-  }, [subject, handleResearch])
 
   return (
     <div className="space-y-6">
@@ -129,7 +115,6 @@ export default function CadLabResearchPage(): React.ReactNode {
           isResearching={isResearching}
           hasResearch={hasResearch}
           onResearch={handleResearch}
-          onSelectTemplate={handleSelectTemplate}
         />
       )}
 

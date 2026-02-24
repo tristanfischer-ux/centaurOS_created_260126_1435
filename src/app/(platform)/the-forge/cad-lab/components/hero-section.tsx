@@ -9,11 +9,9 @@
  */
 
 import { useState, useMemo } from "react"
-import Image from "next/image"
-import { Search, ArrowRight, Loader2, RotateCcw, Box, Sparkles } from "lucide-react"
+import { Search, ArrowRight, Loader2, RotateCcw, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { InputWithSpeech } from "@/components/ui/input-with-speech"
 import {
   AlertDialog,
@@ -40,17 +38,6 @@ const EXAMPLE_PROMPTS = [
   "Robotic gripper",
 ]
 
-// ─── Quick-start templates ───────────────────────────────────────────
-
-const QUICK_START_TEMPLATES = [
-  { id: "cubesat", label: "CubeSat Bus", subject: "1U CubeSat structural bus frame (100×100×100mm) with PC-104 avionics stack mounting, solar panel rail interfaces, and deployment switch cutout per CDS rev 14", image: "/cad-lab/templates/cubesat.png", complexity: "Aerospace" },
-  { id: "rocket", label: "Rocket Thrust Mount", subject: "Bipropellant rocket engine thrust structure with gimbal bearing attachment points, regenerative cooling channel interfaces, and propellant feed-through ports for 5kN class engine", image: "/cad-lab/templates/rocket-mount.png", complexity: "Aerospace" },
-  { id: "ev-battery", label: "EV Battery Module", subject: "Prismatic cell battery module enclosure with liquid cooling channels, BMS mounting plate, thermal runaway vent ports, and HV busbar connectors for 400V architecture", image: "/cad-lab/templates/ev-battery.png", complexity: "Automotive" },
-  { id: "robotic-arm", label: "Robotic Arm Joint", subject: "6-DOF robotic arm wrist joint with harmonic drive gear housing, precision encoder mount, cable passthrough channels, and force-torque sensor interface", image: "/cad-lab/templates/robotic-arm.png", complexity: "Robotics" },
-  { id: "reaction-wheel", label: "Reaction Wheel", subject: "Satellite reaction wheel assembly with precision flywheel housing, BLDC motor mount, optical encoder interface, and vibration-isolated mounting flange", image: "/cad-lab/templates/reaction-wheel.png", complexity: "Aerospace" },
-  { id: "heavy-drone", label: "Heavy-Lift Drone", subject: "Octocopter heavy-lift drone frame with coaxial motor mounts, central payload bay with 3-axis gimbal interface, retractable landing gear, and folding arm hinges in carbon fiber", image: "/cad-lab/templates/heavy-drone.png", complexity: "UAV" },
-] as const
-
 // ─── Component ───────────────────────────────────────────────────────
 
 interface HeroSectionProps {
@@ -68,8 +55,6 @@ interface HeroSectionProps {
   hasResearch: boolean
   /** Trigger the research action */
   onResearch: () => void
-  /** Callback when a quick-start template is selected */
-  onSelectTemplate: (subject: string) => void
 }
 
 /**
@@ -84,7 +69,6 @@ export function HeroSection({
   isResearching,
   hasResearch,
   onResearch,
-  onSelectTemplate,
 }: HeroSectionProps): React.ReactNode {
   const subjectTrimmed = subject.trim().length > 0
   const [isSpecialistOpen, setIsSpecialistOpen] = useState(false)
@@ -187,55 +171,13 @@ export function HeroSection({
           </div>
         )}
 
-        {referenceModel && !hasResearch && !isResearching && (
-          <>
-            <div className="flex items-center gap-2 pt-2 border-t border-border">
-              <Box className="h-4 w-4 text-muted-foreground shrink-0" />
-              <div className="min-w-0">
-                <span className="text-sm font-medium text-foreground">Reference: {referenceModel.name}</span>
-                {referenceModel.description && (
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{referenceModel.description}</p>
-                )}
-              </div>
-            </div>
-            {referenceModel.stlUrl && (
-              <div className="pt-2">
-                <ReferenceModelViewer stlUrl={referenceModel.stlUrl} minHeight={220} />
-              </div>
-            )}
-          </>
+        {referenceModel?.stlUrl && !hasResearch && !isResearching && (
+          <div className="pt-2">
+            <ReferenceModelViewer stlUrl={referenceModel.stlUrl} minHeight={220} />
+          </div>
         )}
       </div>
 
-      {/* Quick-start templates */}
-      {!hasResearch && !isResearching && (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Or start from a template:
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {QUICK_START_TEMPLATES.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => onSelectTemplate(t.subject)}
-                className="group flex flex-col items-center gap-2 p-3 rounded-lg border border-muted bg-card hover:border-international-orange/50 hover:bg-international-orange-light/10 transition-all text-center cursor-pointer"
-              >
-                <Image
-                  src={t.image}
-                  alt={t.label}
-                  width={80}
-                  height={80}
-                  className="rounded-md group-hover:scale-105 transition-transform"
-                />
-                <span className="text-xs font-medium text-foreground">{t.label}</span>
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
-                  {t.complexity}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {fang && (
         <BriefSpecialistDialog
