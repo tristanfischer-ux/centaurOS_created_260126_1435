@@ -149,8 +149,8 @@ export async function updateSession(request: NextRequest) {
 
             const foundryCount = count || 0
 
-            // Multiple foundries without active selection — show picker
-            if (foundryCount > 1 && !profile.active_foundry_id) {
+            // Multiple foundries — always show workspace picker
+            if (foundryCount > 1) {
                 redirectUrl.pathname = '/workspace-picker'
                 return NextResponse.redirect(redirectUrl)
             }

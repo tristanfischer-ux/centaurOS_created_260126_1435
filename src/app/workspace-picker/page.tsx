@@ -28,12 +28,12 @@ export default async function WorkspacePickerPage() {
     if (profile?.account_type === 'supplier') {
       redirect('/supplier-portal')
     }
-    redirect('/updates')
+    redirect('/today')
   }
 
-  // If user has no foundries at all, redirect to join page
+  // If user has no foundries at all, redirect to default page
   if (foundries.length === 0) {
-    redirect('/updates')
+    redirect('/today')
   }
 
   return <WorkspacePickerView foundries={foundries} />

@@ -101,8 +101,8 @@ export async function login(formData: FormData) {
 
         const foundryCount = count || 0
 
-        // Multiple foundries and no active one selected - show workspace picker
-        if (foundryCount > 1 && !profile?.active_foundry_id) {
+        // Multiple foundries - always show workspace picker so user chooses
+        if (foundryCount > 1) {
             redirect('/workspace-picker')
         }
 
