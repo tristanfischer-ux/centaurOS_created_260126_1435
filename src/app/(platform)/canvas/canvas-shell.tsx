@@ -10,7 +10,7 @@
  * - StrategyRiver: src/components/canvas/StrategyRiver.tsx
  * - Adapter: src/lib/canvas/strategy-river-adapter.ts
  * - components/whiteboard-list.tsx — whiteboard CRUD list
- * - money-map-client.tsx — Money Map financial visualization
+ * - ../finance/money-map/money-map-client.tsx — Money Map financial visualization
  * - cost-of-delay-view.tsx — Cost of Delay calculator
  */
 
@@ -23,7 +23,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import StrategyRiver, { computeRiverStats } from '@/components/canvas/StrategyRiver'
 import { goalBundlesToRiverData } from '@/lib/canvas/strategy-river-adapter'
 import { NodeDetailsDialog } from '@/components/canvas/node-details-dialog'
-import { MoneyMapClient } from '../money-map/money-map-client'
+import { MoneyMapClient } from '../finance/money-map/money-map-client'
 import { CostOfDelayView } from '@/components/tools/cost-of-delay/cost-of-delay-view'
 import { StrategyLinkView } from './strategy-link-view'
 import { WhiteboardList } from './components/whiteboard-list'

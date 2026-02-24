@@ -10,7 +10,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
-import { MoneyMapClient } from '@/app/(platform)/money-map/money-map-client'
+import { MoneyMapClient } from './money-map-client'
 
 export const metadata: Metadata = {
   title: 'Money Map | Finance | ForgeOS',
