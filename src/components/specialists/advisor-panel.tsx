@@ -29,6 +29,7 @@ import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-
 export function AdvisorPanel(): React.ReactElement {
   const {
     isOpen,
+    isFullscreen,
     activeSpecialist,
     handoffContext,
     referredBy,
@@ -38,6 +39,7 @@ export function AdvisorPanel(): React.ReactElement {
     handoffSourceSpecialistId,
     closePanel,
     switchSpecialist,
+    setFullscreen,
   } = useAdvisorPanel()
 
   const handleSwitchSpecialist = useCallback(
@@ -47,6 +49,44 @@ export function AdvisorPanel(): React.ReactElement {
     [switchSpecialist],
   )
 
+  // Fullscreen mode renders as fixed overlay
+  if (isFullscreen && isOpen && activeSpecialist) {
+    return (
+      <>
+        {/* Backdrop overlay */}
+        <div
+          className="fixed inset-0 z-[99] bg-black/40 transition-opacity duration-300"
+          onClick={() => setFullscreen(false)}
+          aria-label="Close fullscreen panel"
+        />
+
+        {/* Fullscreen panel */}
+        <div
+          className="fixed inset-0 z-[100] flex flex-col bg-background transition-all duration-300"
+          role="complementary"
+          aria-label="Fullscreen advisor panel"
+        >
+          <BriefSpecialistDialog
+            specialist={activeSpecialist}
+            open={isOpen}
+            onOpenChange={(open) => {
+              if (!open) closePanel()
+            }}
+            onSwitchSpecialist={handleSwitchSpecialist}
+            handoffContext={handoffContext}
+            referredBy={referredBy}
+            contextLabel={contextLabel}
+            renderMode="panel"
+            handoffTrail={handoffTrail}
+            handoffSourceThreadId={handoffSourceThreadId}
+            handoffSourceSpecialistId={handoffSourceSpecialistId}
+          />
+        </div>
+      </>
+    )
+  }
+
+  // Normal sidebar mode
   return (
     <div
       className={cn(

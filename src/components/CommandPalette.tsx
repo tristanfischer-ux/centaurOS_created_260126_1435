@@ -31,6 +31,7 @@ import {
 import { toast } from 'sonner'
 import { QuickCaptureDialog } from '@/components/smart/quick-capture-dialog'
 import { TranscriptImportDialog } from '@/components/strategy/transcript-import-dialog'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 
 import type { SmartGoalSuggestion } from '@/actions/smart-goals'
 
@@ -63,6 +64,7 @@ export function CommandPalette() {
   const [userRole, setUserRole] = useState<string | null>(null)
   const router = useRouter()
   const { myPresence, goFocus, goOnline } = usePresenceContext()
+  const advisorPanel = useAdvisorPanel()
 
   const handleCaptureObjective = useCallback((rawIdea: string, suggestion?: SmartGoalSuggestion) => {
     const prefillText = suggestion?.title || rawIdea
@@ -102,6 +104,13 @@ export function CommandPalette() {
         e.preventDefault()
         toggleFocusMode()
       }
+      // Cmd+Shift+E - Toggle advisor panel fullscreen (only when panel is open)
+      if (e.key === 'e' && (e.metaKey || e.ctrlKey) && e.shiftKey && !isInputElement(e.target)) {
+        e.preventDefault()
+        if (advisorPanel.isOpen && advisorPanel.activeSpecialist) {
+          advisorPanel.toggleFullscreen()
+        }
+      }
       // Cmd+/ - Show keyboard shortcuts
       if (e.key === '/' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
@@ -120,7 +129,7 @@ export function CommandPalette() {
 
     document.addEventListener('keydown', down)
     return () => document.removeEventListener('keydown', down)
-  }, [router, toggleFocusMode])
+  }, [router, toggleFocusMode, advisorPanel])
 
   const loadData = useCallback(async (isMounted: () => boolean) => {
     try {

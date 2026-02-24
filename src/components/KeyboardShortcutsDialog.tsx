@@ -14,6 +14,7 @@ const shortcuts = [
   { category: 'Actions', items: [
     { keys: '⌘N', description: 'Create New Task' },
     { keys: '⌘⇧F', description: 'Toggle Focus Mode' },
+    { keys: '⌘⇧E', description: 'Toggle Advisor Panel Fullscreen' },
     { keys: '⌘⇧A', description: 'Approve Selected Task (Exec)' },
   ]},
   { category: 'Quick Navigation', items: [

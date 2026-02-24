@@ -55,6 +55,7 @@ import { DecisionTimeline } from "@/components/specialists/decision-timeline"
 import { HandoffCard } from "@/components/specialists/handoff-card"
 import { HandoffBreadcrumb } from "@/components/specialists/handoff-breadcrumb"
 import type { HandoffTrailEntry } from "@/contexts/advisor-panel-context"
+import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 import { getProactiveOpener, markInsightRead, getSpecialistGreetingContext } from "@/actions/agent-insights"
 import { createArtifact, exportArtifactToGoogleDocs, updateArtifactContent } from "@/actions/agent-artifacts"
 import type { ArtifactContentType } from "@/actions/agent-artifacts"
@@ -817,6 +818,10 @@ export function BriefSpecialistDialog({
     handoffSourceSpecialistId,
 }: BriefSpecialistDialogProps) {
     const isPanel = renderMode === "panel"
+
+    // ─── AdvisorPanel State (for panel mode only) ────────────────────────────
+    const advisorPanel = isPanel ? useAdvisorPanel() : null
+
     // ─── State ────────────────────────────────────────────────────────────
     const [briefText, setBriefText] = useState("")
     const [isExecuting, setIsExecuting] = useState(false)
@@ -2581,6 +2586,22 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                     </div>
                 </PopoverContent>
             </Popover>
+                {/* Fullscreen toggle button (panel mode only) */}
+                {isPanel && advisorPanel && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={advisorPanel.toggleFullscreen}
+                        className="h-8 w-8 p-0 flex-shrink-0 text-muted-foreground hover:text-foreground"
+                        aria-label={advisorPanel.isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                    >
+                        {advisorPanel.isFullscreen ? (
+                            <Minimize2 className="h-4 w-4" />
+                        ) : (
+                            <Maximize2 className="h-4 w-4" />
+                        )}
+                    </Button>
+                )}
                 <Button
                     variant="ghost"
                     size="sm"

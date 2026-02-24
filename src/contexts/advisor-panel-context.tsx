@@ -22,6 +22,7 @@ import {
   useState,
   useCallback,
   useMemo,
+  useEffect,
   type ReactNode,
 } from "react"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
@@ -47,6 +48,8 @@ export interface HandoffTrailEntry {
 interface AdvisorPanelState {
   /** Whether the panel is visible */
   isOpen: boolean
+  /** Whether the panel is in fullscreen overlay mode */
+  isFullscreen: boolean
   /** The active specialist in the panel */
   activeSpecialist: Specialist | null
   /** Context passed from page or referring specialist */
@@ -74,6 +77,10 @@ interface AdvisorPanelContextValue extends AdvisorPanelState {
   switchSpecialist: (specialistId: string, handoffCtx?: string, sourceThreadId?: string, sourceSpecialistId?: string) => void
   /** Clear the handoff trail (when user opens specialist directly) */
   clearTrail: () => void
+  /** Toggle fullscreen mode for the panel */
+  toggleFullscreen: () => void
+  /** Set fullscreen mode explicitly */
+  setFullscreen: (value: boolean) => void
 }
 
 // ─── Context ────────────────────────────────────────────────────────────────
@@ -91,6 +98,7 @@ const AdvisorPanelContext = createContext<AdvisorPanelContextValue | null>(null)
 export function AdvisorPanelProvider({ children }: { children: ReactNode }): React.ReactElement {
   const [state, setState] = useState<AdvisorPanelState>(() => ({
     isOpen: false,
+    isFullscreen: false, // Default to false, will be hydrated from localStorage
     activeSpecialist: null,
     handoffContext: null,
     referredBy: null,
@@ -99,6 +107,15 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     handoffSourceThreadId: null,
     handoffSourceSpecialistId: null,
   }))
+
+  // Hydrate fullscreen preference from localStorage on mount
+  useEffect(() => {
+    const storedFullscreen = localStorage.getItem('forgeos:advisor:fullscreen')
+    setState((prev) => ({
+      ...prev,
+      isFullscreen: storedFullscreen === 'true',
+    }))
+  }, [])
 
   const openPanel = useCallback((specialistId: string, options?: OpenPanelOptions) => {
     const specialist = getSpecialistById(specialistId)
@@ -178,6 +195,21 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     setState((prev) => ({ ...prev, handoffTrail: [] }))
   }, [])
 
+  const toggleFullscreen = useCallback(() => {
+    setState((prev) => {
+      const newFullscreen = !prev.isFullscreen
+      localStorage.setItem('forgeos:advisor:fullscreen', newFullscreen.toString())
+      return { ...prev, isFullscreen: newFullscreen }
+    })
+  }, [])
+
+  const setFullscreen = useCallback((value: boolean) => {
+    setState((prev) => {
+      localStorage.setItem('forgeos:advisor:fullscreen', value.toString())
+      return { ...prev, isFullscreen: value }
+    })
+  }, [])
+
   const value = useMemo<AdvisorPanelContextValue>(
     () => ({
       ...state,
@@ -186,8 +218,10 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
       togglePanel,
       switchSpecialist,
       clearTrail,
+      toggleFullscreen,
+      setFullscreen,
     }),
-    [state, openPanel, closePanel, togglePanel, switchSpecialist, clearTrail],
+    [state, openPanel, closePanel, togglePanel, switchSpecialist, clearTrail, toggleFullscreen, setFullscreen],
   )
 
   return (
