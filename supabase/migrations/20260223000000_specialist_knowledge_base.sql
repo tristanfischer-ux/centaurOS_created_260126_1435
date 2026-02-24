@@ -3,7 +3,7 @@
 
 create table if not exists specialist_knowledge_base (
     id uuid primary key default gen_random_uuid(),
-    foundry_id uuid not null references foundries(id) on delete cascade,
+    foundry_id text not null references foundries(id) on delete cascade,
     specialist_id text not null,
     knowledge_type text not null check (knowledge_type in ('fact', 'preference', 'decision', 'metric', 'relationship', 'goal')),
     key text not null,
