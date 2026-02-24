@@ -10,7 +10,7 @@
  * Gate: redirects to /the-forge/cad-lab (Concept stage) if no research exists.
  */
 
-import { useState, useCallback, useEffect, useMemo } from "react"
+import { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   Loader2,
@@ -63,6 +63,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import type { CadLabResult, CadLabModule } from "@/lib/cad-lab-types"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
@@ -117,6 +118,7 @@ export default function CadLabBuildPage(): React.ReactNode {
   const [showCodeSet, setShowCodeSet] = useState<Set<string>>(new Set())
   const [codeCopied, setCodeCopied] = useState(false)
   const [isConfirmRemapOpen, setIsConfirmRemapOpen] = useState(false)
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; alt: string } | null>(null)
 
   // Register screen context so specialists can see what the user is working on
   useRegisterScreenContext(
@@ -788,9 +790,13 @@ export default function CadLabBuildPage(): React.ReactNode {
                     {/* Expanded module detail — readable while CAD generates */}
                     {expandedModuleId === mod.id && (
                       <div className="border-t mt-3 pt-3 space-y-4" onClick={(e) => e.stopPropagation()}>
-                        {/* Blueprint illustration from Concept stage */}
+                        {/* Blueprint illustration from Concept stage — click to zoom */}
                         {mod.imageUrl && mod.imageStatus === "complete" && (
-                          <div className="aspect-[3/2] w-full max-w-md rounded-lg overflow-hidden bg-muted border">
+                          <button
+                            type="button"
+                            className="aspect-[3/2] w-full max-w-md rounded-lg overflow-hidden bg-muted border cursor-zoom-in hover:ring-2 hover:ring-international-orange/30 transition-shadow text-left"
+                            onClick={() => setLightboxImage({ url: mod.imageUrl!, alt: `Concept blueprint: ${mod.name}` })}
+                          >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={mod.imageUrl}
@@ -798,8 +804,8 @@ export default function CadLabBuildPage(): React.ReactNode {
                               className="w-full h-full object-cover"
                               loading="lazy"
                             />
-                            <p className="text-[10px] text-muted-foreground text-center py-1 bg-muted/50">Concept illustration</p>
-                          </div>
+                            <p className="text-[10px] text-muted-foreground text-center py-1 bg-muted/50">Click to zoom</p>
+                          </button>
                         )}
 
                         {/* Description */}
@@ -1032,9 +1038,13 @@ export default function CadLabBuildPage(): React.ReactNode {
                   {/* Expanded module detail */}
                   {expandedModuleId === mod.id && (
                     <div className="border-t p-4 space-y-4 bg-muted/20">
-                      {/* Blueprint illustration from Concept stage */}
+                      {/* Blueprint illustration from Concept stage — click to zoom */}
                       {mod.imageUrl && mod.imageStatus === "complete" && (
-                        <div className="aspect-[3/2] w-full max-w-md rounded-lg overflow-hidden bg-muted border">
+                        <button
+                          type="button"
+                          className="aspect-[3/2] w-full max-w-md rounded-lg overflow-hidden bg-muted border cursor-zoom-in hover:ring-2 hover:ring-international-orange/30 transition-shadow text-left"
+                          onClick={() => setLightboxImage({ url: mod.imageUrl!, alt: `Concept blueprint: ${mod.name}` })}
+                        >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={mod.imageUrl}
@@ -1042,8 +1052,8 @@ export default function CadLabBuildPage(): React.ReactNode {
                             className="w-full h-full object-cover"
                             loading="lazy"
                           />
-                          <p className="text-[10px] text-muted-foreground text-center py-1 bg-muted/50">Concept illustration</p>
-                        </div>
+                          <p className="text-[10px] text-muted-foreground text-center py-1 bg-muted/50">Click to zoom</p>
+                        </button>
                       )}
 
                       {/* Concept → Build redline diffs */}
@@ -1289,6 +1299,23 @@ export default function CadLabBuildPage(): React.ReactNode {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Image lightbox ── */}
+      <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
+        <DialogContent className="max-w-4xl w-[90vw] p-2">
+          {lightboxImage && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={lightboxImage.url}
+                alt={lightboxImage.alt}
+                className="w-full h-auto rounded-lg"
+              />
+              <p className="text-xs text-muted-foreground text-center mt-1">{lightboxImage.alt}</p>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
