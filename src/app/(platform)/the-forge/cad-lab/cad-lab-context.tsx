@@ -590,13 +590,16 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const handleModuleGenerate = useCallback(async (moduleId: string, step: "interface" | "generate") => {
     const mod = modules.find((m) => m.id === moduleId)
     if (!mod) return
+
     setActiveModuleId(moduleId)
+    setProgressLines([])
 
     const moduleResearchText = mod.moduleResearch ||
       `Module: ${mod.name}\nPurpose: ${mod.purpose}\nKey Parts: ${mod.keyParts.join(", ")}\nDescription: ${mod.description}\n\nFrom parent research:\n${editableReport}`
 
     if (step === "interface") {
       try {
+        addProgressLine(`Planning dimensions for ${mod.name}...`)
         const res = await generateCadLabInterface(`${mod.name} — ${mod.purpose}`, moduleResearchText, modelId)
         if (res.success) {
           const updated = modules.map((m) =>
@@ -607,14 +610,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             await saveCadLabModules(activeProjectId, updated)
             setLastSaved(new Date().toISOString())
           }
+          addProgressLine(`Dimensions planned for ${mod.name}!`)
+        } else {
+          addProgressLine(`Failed to plan dimensions for ${mod.name}.`)
         }
       } catch (err) {
         console.error("[CAD-LAB] Module interface generation failed:", err)
+        addProgressLine(`Failed to plan dimensions for ${mod.name}: ${err instanceof Error ? err.message : "Unknown error"}`)
       }
     } else {
       try {
         if (!activeProjectId) throw new Error("Project not initialized")
 
+        addProgressLine(`Generating CAD model for ${mod.name}...`)
         const response = await fetch("/api/cad-lab/generate-module", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -638,12 +646,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           await saveCadLabModules(activeProjectId, updated)
           setLastSaved(new Date().toISOString())
         }
+        addProgressLine(`${mod.name} generated successfully!`)
+        setExpandedModuleId(moduleId)
       } catch (err) {
         console.error("[CAD-LAB] Module CAD generation failed:", err)
+        addProgressLine(`Failed to generate ${mod.name}: ${err instanceof Error ? err.message : "Unknown error"}`)
       }
     }
     setActiveModuleId(null)
-  }, [modules, editableReport, modelId, activeProjectId])
+  }, [modules, editableReport, modelId, activeProjectId, addProgressLine])
 
   /**
    * Single-click handler that runs the full pipeline for one module
