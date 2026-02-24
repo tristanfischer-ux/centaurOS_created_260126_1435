@@ -23,7 +23,6 @@ import {
   ChevronRight,
   Layers,
   FileText,
-  Loader2,
 } from "lucide-react"
 
 import { FORGE_ROUTES } from "@/lib/forge-routes"
@@ -53,7 +52,7 @@ export default function CadLabReviewPage(): React.ReactNode {
     aiPrefilled, designBrief, assumptionNotes,
     activeProjectId, linkedRfqId,
     systemIllustrationUrl, researchResult,
-    handleDownload, isBatchRunning,
+    handleDownload,
   } = useCadLab()
 
   const [showBuildContext, setShowBuildContext] = useState(false)
@@ -94,20 +93,17 @@ export default function CadLabReviewPage(): React.ReactNode {
     }, [subject, modules, generatedModuleCount, diagnosticAnswers, linkedRfqId, designBrief]),
   )
 
-  // Show empty state instead of redirect
-  if (generatedModuleCount === 0) {
+  // Show empty state only if no modules exist at all (pre-decomposition)
+  if (modules.length === 0) {
     return (
       <div className="py-12">
         <EmptyState
-          title={isBatchRunning ? "Modules are generating..." : "No modules generated yet"}
-          description={isBatchRunning
-            ? "CAD generation is running in the Build stage. This page will populate with a supplier-ready review package as modules complete. You can safely switch back and forth."
-            : "Generate at least one module in the Build stage to create a supplier-ready review package with expert discipline recommendations."
-          }
+          title="No modules mapped yet"
+          description="Map sub-assemblies in the Build stage first, then come back here for supplier-ready documentation."
           action={
             <Button onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5">
-              {isBatchRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Box className="h-4 w-4" />}
-              {isBatchRunning ? "Back to Build" : "Go to Build"}
+              <Box className="h-4 w-4" />
+              Go to Build
             </Button>
           }
         />
