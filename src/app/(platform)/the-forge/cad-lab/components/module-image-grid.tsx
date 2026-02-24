@@ -58,15 +58,23 @@ function ModuleDetailDialog({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Image */}
+          {/* Illustration */}
           {module.imageStatus === "complete" && module.imageUrl && (
-            <div className="rounded-lg overflow-hidden bg-muted">
+            <div className="rounded-lg overflow-hidden border bg-muted/5 p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={module.imageUrl}
                 alt={`Engineering blueprint of ${module.name}`}
-                className="w-full h-auto max-h-64 object-contain"
+                className="w-full h-auto max-h-[400px] object-contain"
               />
+              <p className="text-[10px] text-muted-foreground text-center mt-2 italic">
+                Conceptual illustration — not an engineering drawing
+              </p>
+            </div>
+          )}
+          {module.imageStatus === "generating" && (
+            <div className="rounded-lg overflow-hidden border bg-muted/5 p-3 h-48 flex items-center justify-center">
+              <p className="text-xs text-muted-foreground">Generating illustration...</p>
             </div>
           )}
 
