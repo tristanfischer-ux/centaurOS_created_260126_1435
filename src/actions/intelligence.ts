@@ -13,7 +13,6 @@
  * @related
  * - Sweep orchestrator: src/lib/agents/intelligence-sweep-orchestrator.ts
  * - Intelligence sources: src/lib/agents/external-intelligence.ts
- * - Dashboard UI: src/components/specialists/intelligence-feed.tsx
  */
 
 import { createClient } from '@/lib/supabase/server'
