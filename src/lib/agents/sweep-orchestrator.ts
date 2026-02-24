@@ -86,6 +86,33 @@ interface FoundryPreferences {
 /** Default sweep interval if no preferences are set (2 hours) */
 const DEFAULT_SWEEP_INTERVAL_MINUTES = 120
 
+/**
+ * Per-specialist default intervals (minutes).
+ *
+ * DECISION: Different specialists need different cadences. Strategy and finance
+ * change frequently and benefit from hourly sweeps. Support roles like legal
+ * and fundraising are more stable and can sweep every 8 hours.
+ */
+const DEFAULT_SPECIALIST_INTERVALS: Record<string, number> = {
+  // High-frequency: strategy and finance change often
+  strategist: 60,
+  'finance-lead': 60,
+  // Medium-frequency: technical and operational leaders
+  cto: 120,
+  'chief-of-staff': 120,
+  'product-lead': 120,
+  'vp-engineering': 120,
+  // Lower-frequency: growth, sales, HR, manufacturing, supply chain
+  'growth-marketer': 240,
+  'sales-lead': 240,
+  'hiring-team': 240,
+  'vp-manufacturing': 240,
+  'vp-supply-chain': 240,
+  // Infrequent: advisory roles
+  'fundraising-advisor': 480,
+  'legal-counsel': 480,
+}
+
 /** Maximum concurrent sweep executions per cron invocation */
 const MAX_CONCURRENT_SWEEPS = 10
 
@@ -120,8 +147,8 @@ const SWEEP_DATA_TOOLS: Record<string, string> = {
   'sales-lead': 'query_financial_overview',
   'vp-manufacturing': 'query_activity_metrics',
   'vp-supply-chain': 'query_activity_metrics',
-  'growth-marketer': 'query_objectives',
-  'legal-counsel': 'query_objectives',
+  'growth-marketer': 'query_growth_metrics',
+  'legal-counsel': 'query_compliance_status',
 }
 
 /**
@@ -269,7 +296,7 @@ export async function runSweepOrchestration(): Promise<OrchestrationResult> {
       const override = overrides[specialistId]
       if (override?.enabled === false) continue
 
-      const interval = override?.interval_minutes ?? defaultInterval
+      const interval = override?.interval_minutes ?? DEFAULT_SPECIALIST_INTERVALS[specialistId] ?? defaultInterval
       const lastSweep = lastSweepMap.get(`${foundry.id}:${specialistId}`)
       const minutesSinceLastSweep = lastSweep
         ? (Date.now() - lastSweep.getTime()) / 60_000
