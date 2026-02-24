@@ -72,7 +72,7 @@ import { useCadLab } from "../cad-lab-context"
 import { Metric, SvgView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
 import { ModuleCarousel } from "../components/module-carousel"
 import { IntegrationView } from "../components/integration-view"
-import { ProcessFlowDiagram } from "../components/process-flow-diagram"
+// ProcessFlowDiagram removed — IO info is shown inline in System Architecture cards
 
 // ─── View Tab Type ───────────────────────────────────────────────────
 
@@ -184,7 +184,6 @@ export default function CadLabBuildPage(): React.ReactNode {
     if (hasResearch) sections.push({ id: "build-research", label: "Research" })
     if (hasResearch) sections.push({ id: "build-mfg-context", label: "Mfg Context" })
     if (modules.length > 0) sections.push({ id: "build-architecture", label: "Architecture" })
-    if (modules.length > 0) sections.push({ id: "build-flow", label: "Flow" })
     if (modules.length > 0) sections.push({ id: "build-modules", label: "Modules" })
     return sections
   }, [modules, generatedModuleCount, hasResearch])
@@ -506,14 +505,20 @@ export default function CadLabBuildPage(): React.ReactNode {
         <div id="build-architecture"><SystemArchitecture
           subject={subject}
           modules={modules}
-          onModuleClick={(moduleId) => setExpandedModuleId(expandedModuleId === moduleId ? null : moduleId)}
+          onModuleClick={(moduleId) => {
+            const isCollapsing = expandedModuleId === moduleId
+            setExpandedModuleId(isCollapsing ? null : moduleId)
+            if (!isCollapsing) {
+              // Scroll to the module detail after React renders the expanded section
+              setTimeout(() => {
+                document.getElementById(`module-${moduleId}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }, 50)
+            }
+          }}
         /></div>
       )}
 
-      {/* ── Module Integration Flow ── */}
-      {modules.length > 0 && (
-        <div id="build-flow"><ProcessFlowDiagram modules={modules} /></div>
-      )}
+      {/* Module Integration Flow removed — IO info is now shown inline in System Architecture cards */}
 
       {/* ── Progressive module carousel: visible during batch generation for read-ahead ── */}
       {modules.length > 0 && isBatchRunning && (
@@ -1728,9 +1733,39 @@ interface ModuleConnection {
   label: string
 }
 
+/** Stop words excluded from keyword matching. */
+const KEYWORD_STOP_WORDS = new Set([
+  "the", "a", "an", "to", "of", "for", "from", "in", "on", "at", "and",
+  "or", "via", "per", "with", "each", "all", "into", "between", "by",
+])
+
+/** Extracts significant keywords from an IO label for fuzzy matching. */
+function extractKeywords(text: string): Set<string> {
+  return new Set(
+    text.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !KEYWORD_STOP_WORDS.has(w)),
+  )
+}
+
+/** Returns true if two IO labels share at least `minShared` keywords. */
+function hasKeywordOverlap(a: string, b: string, minShared: number = 2): boolean {
+  const kA = extractKeywords(a)
+  const kB = extractKeywords(b)
+  let shared = 0
+  for (const w of kA) {
+    if (kB.has(w)) {
+      shared++
+      if (shared >= minShared) return true
+    }
+  }
+  return false
+}
+
 /**
  * Builds the interface connection graph by matching module outputs to other
- * modules' inputs using case-insensitive substring matching.
+ * modules' inputs using keyword overlap (2+ shared significant words).
  *
  * @param modules - Array of decomposed modules
  * @returns Array of connections between modules
@@ -1740,16 +1775,10 @@ function buildConnectionGraph(modules: CadLabModule[]): ModuleConnection[] {
 
   for (const source of modules) {
     for (const output of source.outputs) {
-      const outputLower = output.toLowerCase()
       for (const target of modules) {
         if (target.id === source.id) continue
         for (const input of target.inputs) {
-          const inputLower = input.toLowerCase()
-          if (
-            outputLower === inputLower ||
-            outputLower.includes(inputLower) ||
-            inputLower.includes(outputLower)
-          ) {
+          if (hasKeywordOverlap(output, input)) {
             // Avoid duplicate connections between same pair with same label
             const isDuplicate = connections.some(
               (c) => c.fromId === source.id && c.toId === target.id && c.label === output,
@@ -1906,7 +1935,35 @@ function SystemArchitecture({
                     )}
                   </div>
 
-                  {/* Compact stats — connections only (details in Module Breakdown below) */}
+                  {/* IO summary — inputs & outputs at a glance */}
+                  {(mod.outputs.length > 0 || mod.inputs.length > 0) && (
+                    <div className="hidden md:block space-y-1 mt-1.5">
+                      {mod.outputs.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-[10px] font-semibold text-muted-foreground uppercase">Out:</span>
+                          {mod.outputs.slice(0, 2).map((out, j) => (
+                            <span key={j} className="text-[10px] text-foreground bg-muted/60 rounded px-1 py-0.5 leading-tight truncate max-w-[100px]">{out}</span>
+                          ))}
+                          {mod.outputs.length > 2 && (
+                            <span className="text-[10px] text-muted-foreground">+{mod.outputs.length - 2}</span>
+                          )}
+                        </div>
+                      )}
+                      {mod.inputs.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-[10px] font-semibold text-muted-foreground uppercase">In:</span>
+                          {mod.inputs.slice(0, 2).map((inp, j) => (
+                            <span key={j} className="text-[10px] text-foreground bg-muted/60 rounded px-1 py-0.5 leading-tight truncate max-w-[100px]">{inp}</span>
+                          ))}
+                          {mod.inputs.length > 2 && (
+                            <span className="text-[10px] text-muted-foreground">+{mod.inputs.length - 2}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Compact stats */}
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                     {moduleConnections.length > 0 && (
                       <span className="flex items-center gap-0.5" title={`${moduleConnections.length} interface connection${moduleConnections.length !== 1 ? "s" : ""}`}>

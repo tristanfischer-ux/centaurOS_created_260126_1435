@@ -29,27 +29,55 @@ interface FlowEdge {
   label?: string
 }
 
+/** Stop words excluded from keyword matching. */
+const STOP_WORDS = new Set([
+  "the", "a", "an", "to", "of", "for", "from", "in", "on", "at", "and",
+  "or", "via", "per", "with", "each", "all", "into", "between", "by",
+])
+
+/** Extracts significant keywords from an IO label. */
+function extractKeywords(text: string): Set<string> {
+  return new Set(
+    text.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !STOP_WORDS.has(w)),
+  )
+}
+
+/** Returns true if two IO labels share at least `minShared` keywords. */
+function hasKeywordOverlap(a: string, b: string, minShared: number = 2): boolean {
+  const kA = extractKeywords(a)
+  const kB = extractKeywords(b)
+  let shared = 0
+  for (const w of kA) {
+    if (kB.has(w)) {
+      shared++
+      if (shared >= minShared) return true
+    }
+  }
+  return false
+}
+
 /**
  * Builds edges by matching outputs of one module to inputs of another
- * (by signal name or keyword overlap).
+ * using keyword overlap (2+ shared significant words).
  */
 function buildEdges(modules: CadLabModule[]): FlowEdge[] {
   const edges: FlowEdge[] = []
-  const outputToModules = new Map<string, { moduleId: string; output: string }[]>()
-  for (const m of modules) {
-    for (const out of m.outputs) {
-      const key = out.toLowerCase().replace(/\s+/g, "-")
-      if (!outputToModules.has(key)) outputToModules.set(key, [])
-      outputToModules.get(key)!.push({ moduleId: m.id, output: out })
-    }
-  }
-  for (const m of modules) {
-    for (const inp of m.inputs) {
-      const key = inp.toLowerCase().replace(/\s+/g, "-")
-      const producers = outputToModules.get(key)
-      if (producers) {
-        for (const { moduleId } of producers) {
-          if (moduleId !== m.id) edges.push({ from: moduleId, to: m.id, label: inp })
+  for (const source of modules) {
+    for (const output of source.outputs) {
+      for (const target of modules) {
+        if (target.id === source.id) continue
+        for (const input of target.inputs) {
+          if (hasKeywordOverlap(output, input)) {
+            const isDuplicate = edges.some(
+              (e) => e.from === source.id && e.to === target.id && e.label === output,
+            )
+            if (!isDuplicate) {
+              edges.push({ from: source.id, to: target.id, label: output })
+            }
+          }
         }
       }
     }
