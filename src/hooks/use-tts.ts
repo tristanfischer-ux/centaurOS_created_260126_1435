@@ -46,19 +46,18 @@ function stripMarkdownForTTS(text: string): string {
 
 // ─── Chunking Configuration ─────────────────────────────────────────────────
 
-/** Minimum words before the first chunk can be spoken (eagerness for fast start) */
-const FIRST_CHUNK_MIN_WORDS = 5
+/** Minimum words before the first chunk can be spoken */
+const FIRST_CHUNK_MIN_WORDS = 15
 /** Minimum words before a clause boundary triggers a split */
-const CLAUSE_SPLIT_MIN_WORDS = 8
+const CLAUSE_SPLIT_MIN_WORDS = 25
 /** Force-split at this many words even without punctuation */
-const FORCE_SPLIT_WORDS = 14
+const FORCE_SPLIT_WORDS = 50
 
 /**
- * DECISION: Aggressive chunking instead of sentence-only splitting.
- * The previous `splitIntoSentences` waited for `.!?` which meant 30+ words
- * could accumulate before TTS started. This splitter also breaks on clause
- * boundaries (`,;:—`) after enough words, and force-breaks long runs,
- * cutting time-to-first-audio by 2-5 seconds.
+ * DECISION: Balanced chunking — large enough to sound natural, small enough
+ * to start within ~2s. Previous thresholds (5/8/14 words) caused 10-20 tiny
+ * API calls per response with audible gaps between each. Current thresholds
+ * (15/25/50 words) yield ~3 chunks per response — each a complete thought.
  */
 function splitIntoSpeakableChunks(text: string): string[] {
     const trimmed = text.trim()
@@ -189,7 +188,6 @@ export function useTts(): UseTtsReturn {
     }, [])
 
     const stopPlayback = useCallback(() => {
-        cancelBrowserTTS()
         if (abortRef.current) {
             abortRef.current.abort()
             abortRef.current = null
@@ -371,7 +369,7 @@ export function useTts(): UseTtsReturn {
         [stopPlayback, ensureAudioContext, fetchAudio, playAudioBuffer],
     )
 
-    // ─── Streaming TTS with aggressive chunking + browser bridge ────────
+    // ─── Streaming TTS with balanced chunking + look-ahead prefetch ─────
 
     const streamVoiceRef = useRef<string | null>(null)
     const streamChunksSentRef = useRef<number>(0)
@@ -380,13 +378,11 @@ export function useTts(): UseTtsReturn {
     const streamControllerRef = useRef<AbortController | null>(null)
     const streamFinishedRef = useRef(false)
     const streamPrefetchRef = useRef<Promise<ArrayBuffer | null> | null>(null)
-    const browserBridgeActiveRef = useRef(false)
 
     /**
      * INTENT: Drain the streaming chunk queue with look-ahead prefetch.
      * While playing chunk N, we kick off the fetch for chunk N+1.
-     * On the very first chunk, cancel the browser SpeechSynthesis bridge
-     * so the high-quality OpenAI voice takes over seamlessly.
+     * If a chunk fails, skip it and continue — don't stall the pipeline.
      */
     const drainStreamQueue = useCallback(async () => {
         if (streamPlayingRef.current) return
@@ -405,17 +401,19 @@ export function useTts(): UseTtsReturn {
             return
         }
 
+        const MAX_CONSECUTIVE_FAILURES = 3
+        let consecutiveFailures = 0
+
         while (streamQueueRef.current.length > 0) {
             if (controller.signal.aborted) break
+            if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                console.warn("[TTS-Stream] Too many consecutive failures, stopping")
+                streamQueueRef.current = []
+                break
+            }
 
             const chunk = streamQueueRef.current.shift()!
             if (!chunk.trim()) continue
-
-            // Cancel browser bridge when first OpenAI audio is about to play
-            if (browserBridgeActiveRef.current) {
-                cancelBrowserTTS()
-                browserBridgeActiveRef.current = false
-            }
 
             try {
                 setIsLoading(true)
@@ -429,8 +427,11 @@ export function useTts(): UseTtsReturn {
                     arrayBuffer = await fetchAudio(chunk, voice, controller.signal)
                 }
 
-                if (!arrayBuffer || controller.signal.aborted) {
-                    setIsLoading(false)
+                if (controller.signal.aborted) break
+
+                if (!arrayBuffer) {
+                    consecutiveFailures++
+                    console.warn(`[TTS-Stream] Chunk fetch failed (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`)
                     continue
                 }
 
@@ -450,6 +451,7 @@ export function useTts(): UseTtsReturn {
 
                 setIsLoading(false)
                 setIsPlaying(true)
+                consecutiveFailures = 0
 
                 await new Promise<void>((resolve) => {
                     source.onended = () => {
@@ -462,8 +464,8 @@ export function useTts(): UseTtsReturn {
                 setIsPlaying(false)
             } catch (err) {
                 if (err instanceof Error && err.name === "AbortError") break
+                consecutiveFailures++
                 console.warn("[TTS-Stream] Chunk playback failed:", err instanceof Error ? err.message : err)
-                setIsLoading(false)
                 setIsPlaying(false)
             }
         }
@@ -485,7 +487,6 @@ export function useTts(): UseTtsReturn {
             streamPlayingRef.current = false
             streamFinishedRef.current = false
             streamPrefetchRef.current = null
-            browserBridgeActiveRef.current = false
             const controller = new AbortController()
             streamControllerRef.current = controller
             abortRef.current = controller
@@ -494,19 +495,11 @@ export function useTts(): UseTtsReturn {
     )
 
     /**
-     * INTENT: Feed accumulated text and extract speakable chunks aggressively.
+     * INTENT: Feed accumulated text and extract speakable chunks.
      *
-     * Layer 1 (aggressive chunking): Uses clause boundaries and word-count
-     * thresholds instead of waiting for sentence-ending punctuation.
-     *
-     * Layer 1b (first-chunk eagerness): If nothing has been queued yet and
-     * the text has FIRST_CHUNK_MIN_WORDS words, promote it immediately —
-     * don't wait for a boundary.
-     *
-     * Layer 2 (browser bridge): Before the first OpenAI TTS fetch even starts,
-     * speak the initial words with the browser's built-in SpeechSynthesis API
-     * for near-instant audio (~50ms). The bridge is cancelled when OpenAI
-     * audio arrives in drainStreamQueue.
+     * Chunks are promoted when they're confirmed complete (a subsequent chunk
+     * exists in the split output). The first chunk requires sentence-ending
+     * punctuation (.!?) so the first spoken audio is always a complete thought.
      */
     const feedStreamingText = useCallback(
         (fullText: string) => {
@@ -519,23 +512,13 @@ export function useTts(): UseTtsReturn {
             let completeChunks = chunks.slice(0, -1)
             const alreadySent = streamChunksSentRef.current
 
-            // First-chunk eagerness: if nothing sent yet and only one chunk
-            // exists with enough words, promote it to "complete" immediately
+            // First-chunk promotion: if nothing sent yet and only one chunk
+            // exists, promote it only when it ends with sentence punctuation
+            // so the first spoken audio is a complete thought
             if (alreadySent === 0 && completeChunks.length === 0 && chunks.length === 1) {
-                const words = chunks[0].trim().split(/\s+/)
-                if (words.length >= FIRST_CHUNK_MIN_WORDS) {
+                const text = chunks[0].trim()
+                if (/[.!?]$/.test(text) && text.split(/\s+/).length >= FIRST_CHUNK_MIN_WORDS) {
                     completeChunks = [chunks[0]]
-                }
-            }
-
-            // Browser bridge: speak first words instantly while OpenAI loads
-            if (!browserBridgeActiveRef.current && alreadySent === 0 && chunks.length > 0) {
-                const firstText = chunks[0].trim()
-                const wordCount = firstText.split(/\s+/).length
-                if (wordCount >= 3 && hasBrowserSpeechSynthesis()) {
-                    speakBrowserTTS(firstText)
-                    browserBridgeActiveRef.current = true
-                    setIsPlaying(true)
                 }
             }
 
