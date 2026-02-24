@@ -183,14 +183,35 @@ export const COMMON_TOOLS: ToolDefinition[] = [
 export const TOOL_RUN_CALCULATION: ToolDefinition = {
     name: "run_calculation",
     description:
-        "Execute a JavaScript calculation in a sandboxed environment. Has access to Math, JSON, Date, Array, Object, Number, String, parseFloat, parseInt. Use this for financial models, unit economics, scenario analysis, growth projections, and any quantitative work. The last expression's value is returned as the result. You can use console.log() for intermediate output.",
+        `Execute a JavaScript calculation in a sandboxed environment. Has access to Math, JSON, Date, Array, Object, Number, String, parseFloat, parseInt, Map, Set, RegExp.
+
+Domain libraries available:
+- finance.npv(rate, cashflows) — Net Present Value (rate as decimal, e.g. 0.1 for 10%)
+- finance.irr(cashflows) — Internal Rate of Return
+- finance.roi(gain, cost) — Return on Investment
+- finance.paybackPeriod(cashflows) — Payback period in years
+- finance.compoundGrowth(startValue, endValue, years) — CAGR
+
+- charts.bar(title, data, options?) — Create a bar chart (data: [{label, value}])
+- charts.line(title, data, options?) — Create a line chart
+- charts.pie(title, data) — Create a pie chart
+- charts.area(title, data, options?) — Create an area chart
+  Options: {xLabel?, yLabel?, seriesName?, series2Name?}. Data points can include value2 for dual-series.
+
+- stats.mean(values) — Arithmetic mean
+- stats.median(values) — Median
+- stats.stddev(values) — Sample standard deviation
+- stats.percentile(values, p) — Percentile (p: 0-100)
+
+To output a chart, return a chart spec object using charts.bar(), charts.line(), etc. as the last expression.
+The last expression's value is returned as the result. Use console.log() for intermediate output.`,
     parameters: {
         type: "object",
         properties: {
             code: {
                 type: "string",
                 description:
-                    "JavaScript code to execute. The value of the last expression is returned. Use console.log() for intermediate output.",
+                    "JavaScript code to execute. The value of the last expression is returned. Use console.log() for intermediate output. Use finance.*, charts.*, stats.* for domain-specific calculations.",
             },
         },
         required: ["code"],
