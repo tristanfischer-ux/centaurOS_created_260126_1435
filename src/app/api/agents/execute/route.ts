@@ -660,8 +660,8 @@ In the same response where you explain your recommendation in prose, include thi
 [
   { "type": "archive_objective", "title": "Exact title from objectives list", "description": "Why" },
   { "type": "archive_task", "title": "Exact task title", "description": "Why" },
-  { "type": "objective", "title": "New objective title", "description": "Details", "strategicGoalTitle": "Parent goal title" },
-  { "type": "task", "title": "New task title", "description": "Details", "objectiveTitle": "Parent objective title" }
+  { "type": "objective", "title": "New objective title", "description": "Details", "strategicGoalTitle": "Parent goal title", "estimatedWeeks": 6 },
+  { "type": "task", "title": "New task title", "description": "Details", "objectiveTitle": "Parent objective title", "estimatedWeeks": 2 }
 ]
 -->
 \`\`\`
@@ -726,7 +726,16 @@ Your proposed actions must be **grounded in the company's actual data** from the
 - Include TIMEFRAMES — "by [date]" or "within [N] weeks"
 - Reference ACTUAL company products, features, or initiatives by name
 - For tasks, include what DONE looks like (acceptance criteria in the description)
-- If you don't have enough data to be specific, say so in the description and give the best estimate you can with "[estimated]" markers`
+- If you don't have enough data to be specific, say so in the description and give the best estimate you can with "[estimated]" markers
+
+### TIMELINE SCHEDULING
+For every "objective" and "task" action, include \`"estimatedWeeks"\` (integer, 1-12) — how many weeks this item should realistically take. The system uses this to auto-schedule staggered start/end dates so work is sequenced properly. Tasks under the same objective will be spread across waves (3 concurrent), not all starting on the same day.
+
+Guidelines:
+- Quick tasks (send an email, schedule a meeting): 1 week
+- Medium tasks (build a prototype, write a report): 2-4 weeks
+- Large tasks (launch a product, complete a hiring cycle): 4-8 weeks
+- Do NOT default everything to the same number — vary based on realistic effort`
 
             // Reinforce PROPOSED_ACTIONS format for non-Claude models that struggle
             // with HTML comment syntax. MiniMax and Qwen need extra emphasis and
@@ -740,8 +749,8 @@ You MUST output the PROPOSED_ACTIONS block using EXACTLY this format. Copy the d
 
 <!-- PROPOSED_ACTIONS
 [
-  { "type": "objective", "title": "Your objective title here", "description": "Description", "strategicGoalTitle": "Name of existing strategic goal" },
-  { "type": "task", "title": "Your task title here", "description": "Description", "objectiveTitle": "Name of parent objective" }
+  { "type": "objective", "title": "Your objective title here", "description": "Description", "strategicGoalTitle": "Name of existing strategic goal", "estimatedWeeks": 6 },
+  { "type": "task", "title": "Your task title here", "description": "Description", "objectiveTitle": "Name of parent objective", "estimatedWeeks": 2 }
 ]
 -->
 
@@ -1129,7 +1138,7 @@ Rules:
     }
 
     try {
-        if (modality === "text" && speculative && specialistId) {
+        if (modality === "text" && speculative && specialistId && specialistTools.length === 0) {
             const specialist = getSpecialistById(specialistId)
             return await handleSpeculativeStreaming(
                 fallbackChain,
