@@ -2412,6 +2412,23 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
         }
     }, [handleExecute])
 
+    const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        const items = e.clipboardData?.items
+        if (!items) return
+        const files: File[] = []
+        for (const item of items) {
+            if (item.kind === "file") {
+                const file = item.getAsFile()
+                if (file) files.push(file)
+            }
+        }
+        if (files.length === 0) return
+        // Prevent pasted file data from appearing as text in the textarea
+        e.preventDefault()
+        files.slice(0, MAX_ATTACHMENTS - pendingAttachments.length)
+            .forEach((file) => handleFileAttach(file))
+    }, [handleFileAttach, pendingAttachments.length])
+
     const handleToggleHistory = useCallback(async () => {
         if (showHistory) {
             setShowHistory(false)
@@ -3374,6 +3391,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         if (error) setError(null)
                                     }}
                                     onKeyDown={handleKeyDown}
+                                    onPaste={handlePaste}
                                     placeholder={
                                         speechRecognition.isProcessing
                                             ? "Transcribing..."
