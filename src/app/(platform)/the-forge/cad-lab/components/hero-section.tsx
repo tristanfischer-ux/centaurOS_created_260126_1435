@@ -187,7 +187,7 @@ export function HeroSection({
           </div>
         )}
 
-        {referenceModel && !hasResearch && (
+        {referenceModel && !hasResearch && !isResearching && (
           <>
             <div className="flex items-center gap-2 pt-2 border-t border-border">
               <Box className="h-4 w-4 text-muted-foreground shrink-0" />

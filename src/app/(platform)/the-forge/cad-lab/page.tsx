@@ -21,10 +21,7 @@ import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Loader2,
-  Search,
-  Box,
   ArrowRight,
-  ClipboardCheck,
   Layers,
   ImageIcon,
   Pencil,
@@ -32,7 +29,6 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { InputWithSpeech } from "@/components/ui/input-with-speech"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -54,14 +50,6 @@ function extractExecutiveSummary(report: string): string | null {
   const trimmed = body.trim()
   return trimmed.length > 0 ? trimmed : null
 }
-
-// ─── Pipeline preview shown during research wait ─────────────────────
-
-const PIPELINE_STAGES = [
-  { icon: Search, label: "Concept", desc: "Quick overview & modules" },
-  { icon: Box, label: "Build", desc: "Research, CAD & engineering" },
-  { icon: ClipboardCheck, label: "Review", desc: "Supplier-ready package" },
-]
 
 // ─── Page Component ──────────────────────────────────────────────────
 
@@ -145,42 +133,6 @@ export default function CadLabResearchPage(): React.ReactNode {
         />
       )}
 
-      {/* ── Pipeline preview during research wait ── */}
-      {isResearching && (
-        <Card className="border-international-orange/20">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3 mb-3">
-              <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
-              <div>
-                <p className="text-sm font-semibold text-foreground">Researching &ldquo;{subject}&rdquo;</p>
-                <p className="text-xs text-muted-foreground">Gathering specs, standards, and manufacturing context — ~30-60 seconds</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              {PIPELINE_STAGES.map((stage, i) => {
-                const Icon = stage.icon
-                const isCurrent = i === 0
-                return (
-                  <div key={stage.label} className="flex items-start flex-1">
-                    {i > 0 && <div className={`h-0.5 flex-1 mt-4 ${isCurrent ? "bg-international-orange" : "bg-muted"}`} />}
-                    <div className="flex flex-col items-center gap-1.5 text-center">
-                      <div className={`flex h-8 w-8 items-center justify-center rounded-full ${isCurrent ? "bg-international-orange text-white" : "bg-muted text-muted-foreground"}`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <span className={`text-[10px] font-medium ${isCurrent ? "text-international-orange" : "text-muted-foreground"}`}>
-                        {stage.label}
-                      </span>
-                      <span className="text-[9px] text-muted-foreground leading-tight hidden sm:block">
-                        {stage.desc}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* ══════════════════════════════════════════════════════════════════
           AFTER RESEARCH: Lightweight concept view

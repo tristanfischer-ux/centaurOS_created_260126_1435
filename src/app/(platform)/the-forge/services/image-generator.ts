@@ -58,11 +58,11 @@ function buildModulePrompt(module: ModuleSpec, brief?: StructuralBrief): string 
   // Fallback: build prompt directly from module spec
   return `Create a clean, professional technical engineering illustration showing a ${module.detail.whatItIs}.
 
-The diagram should clearly depict these key components, each labeled with callout lines: ${module.keyParts.join(", ")}.
+The diagram should clearly show these key components through visual differentiation (color coding, positioning, distinct shapes): ${module.keyParts.join(", ")}.
 
 Show inputs (${module.io.in.join(", ")}) flowing in from the left side, and outputs (${module.io.out.join(", ")}) flowing out to the right.
 
-Style: Modern industrial engineering diagram on a white background with thin, precise lines. Use an isometric or cutaway view to show internal arrangement of components. No decorative elements -- this should look like a page from a professional engineering specification document. Labeled components with clean callout lines. Subtle light gray grid lines in the background for a technical feel.`
+Style: Modern industrial engineering diagram on a white background with thin, precise lines. Use an isometric or cutaway view to show internal arrangement of components. No decorative elements -- this should look like a page from a professional engineering specification document. Use color coding to distinguish components. Subtle light gray grid lines in the background for a technical feel. Do NOT include any text, labels, words, or annotations anywhere in the image.`
 }
 
 /**
@@ -94,7 +94,7 @@ ${moduleFlow}
 
 Material/signal flow path: ${ioChain}
 
-Style: Clean, modern process flow diagram on a pure white background. Each subsystem shown as a distinct, softly color-coded rounded block with clear flow arrows showing material and signal paths between them. Label each subsystem block and each flow arrow with clean sans-serif typography. Use a minimal, contemporary design style with generous whitespace — NOT a traditional P&ID with dense annotations. The overall composition should read left-to-right. With ${spec.modules.length} modules, use a multi-row layout if needed to fit all blocks clearly without crowding — maintain clear spacing between blocks and keep all labels legible. Do NOT include any title block, document ID, revision number, date, project name, or engineer name anywhere on the diagram. No borders or frames around the diagram.`
+Style: Clean, modern process flow diagram on a pure white background. Each subsystem shown as a distinct, softly color-coded rounded block with clear flow arrows showing material and signal paths between them. Differentiate each subsystem block using distinct colors and shapes. Use a minimal, contemporary design style with generous whitespace — NOT a traditional P&ID with dense annotations. The overall composition should read left-to-right. With ${spec.modules.length} modules, use a multi-row layout if needed to fit all blocks clearly without crowding — maintain clear spacing between blocks. Do NOT include any text, labels, words, annotations, title block, document ID, revision number, date, project name, or engineer name anywhere on the diagram. No borders or frames around the diagram.`
 }
 
 // ─── Imagen 4 API Caller ────────────────────────────────────────────
@@ -375,7 +375,7 @@ export async function generateResearchIllustration(
 
   const prompt = `Create a clean, professional technical illustration of a ${subject}.${moduleContext}
 
-Style: Modern technical illustration on a clean white background. Show the complete system in ${hasModules ? "an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible" : "a detailed isometric or three-quarter view showing its key components and overall form factor"}. Use thin, precise lines with subtle color coding to differentiate ${hasModules ? "sub-assemblies" : "major components"}. Label each major ${hasModules ? "sub-assembly" : "component"} with clean callout lines and sans-serif text. The composition should feel like a hero image from a professional engineering specification document. No decorative elements, borders, title blocks, or watermarks. Generous whitespace around the illustration.`
+Style: Modern technical illustration on a clean white background. Show the complete system in ${hasModules ? "an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible" : "a detailed isometric or three-quarter view showing its key components and overall form factor"}. Use thin, precise lines with subtle color coding to differentiate ${hasModules ? "sub-assemblies" : "major components"}. Differentiate each major ${hasModules ? "sub-assembly" : "component"} using distinct colors and visual separation. The composition should feel like a hero image from a professional engineering specification document. No decorative elements, borders, title blocks, or watermarks. Do NOT include any text, labels, words, or annotations anywhere in the image. Generous whitespace around the illustration.`
 
   const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "16:9",

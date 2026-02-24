@@ -84,7 +84,7 @@ Be SPECIFIC about shapes: "a horizontal cylindrical pressure vessel" not "a cont
 ### IMAGE PROMPT
 Write a prompt (80-150 words) for Gemini image generation. This should produce a clean, professional isometric technical illustration. Include:
 - Specific visual style: "clean isometric technical illustration, white background, thin precise lines, subtle gray grid, engineering specification style"
-- All key components that should be labeled with callout lines
+- All key components visually differentiated by color, position, and shape — NO text labels (image models cannot render text)
 - Input/output flow direction (left-to-right)
 - Cutaway or transparency if needed to show internal components
 
@@ -125,7 +125,7 @@ Describe the assembled product (150-250 words):
 - General material and finish
 
 ### IMAGE PROMPT
-Write a prompt (80-120 words) for a process flow diagram showing all modules as connected blocks with flow arrows. Clean, modern style.
+Write a prompt (80-120 words) for a process flow diagram showing all modules as connected, color-coded blocks with flow arrows. Clean, modern style. IMPORTANT: Do NOT request any text, labels, or annotations — image models cannot render readable text.
 
 ### CAD INSTRUCTIONS
 Detailed instructions (200-400 words) for a CadQuery model of the assembled product. This is the HERO model — the main visualization. Be thorough:
