@@ -6,7 +6,7 @@
  * so timelines show sensible sequencing instead of everything on one date.
  */
 
-const DEFAULT_TASK_DAYS = 3
+const DEFAULT_TASK_DAYS = 5
 const WAVE_CONCURRENCY = 3
 
 /**
@@ -146,7 +146,11 @@ function scheduleWithWaves(
       waveStart = clampToWorkday(dayAfter)
     }
 
-    const taskStart = waveIndex === 0 ? new Date(waveStart) : new Date(waveStart)
+    // DECISION: Stagger tasks within a wave by 1 working day each so they
+    // fan out visually on the timeline instead of all stacking on the same date.
+    const taskStart = waveIndex === 0
+      ? new Date(waveStart)
+      : addWorkingDays(new Date(waveStart), waveIndex)
     const duration = tasks[i].estimatedDays ?? DEFAULT_TASK_DAYS
     const taskEnd = addWorkingDays(taskStart, duration - 1)
 

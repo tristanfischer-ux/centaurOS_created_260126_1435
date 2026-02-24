@@ -466,9 +466,12 @@ async function executeCreateActions(params: {
         tasksByObjective.set(objTitle, existing)
     }
 
-    // Compute staggered dates for each objective's tasks
+    // INTENT: Objectives run in parallel with a small stagger (1 work week per
+    // objective) so the timeline shows overlapping work streams, not a sequential
+    // waterfall that bunches everything at the end.
+    const OBJECTIVE_STAGGER_DAYS = 5
     const taskDatesMap = new Map<number, { start_date: string; end_date: string }>()
-    let objectiveOffset = 0
+    let objectiveIndex = 0
     for (const [, taskIndices] of tasksByObjective) {
         const scheduleInputs = taskIndices.map((i) => ({
             title: proposals[i].title,
@@ -476,19 +479,14 @@ async function executeCreateActions(params: {
                 ? proposals[i].estimatedWeeks * 5 // weeks → working days
                 : undefined,
         }))
-        const startFrom = objectiveOffset > 0
-            ? addWorkingDays(new Date(), objectiveOffset)
+        const startFrom = objectiveIndex > 0
+            ? addWorkingDays(new Date(), objectiveIndex * OBJECTIVE_STAGGER_DAYS)
             : undefined
         const scheduled = scheduleTaskDates(scheduleInputs, startFrom)
         taskIndices.forEach((taskIdx, schedIdx) => {
             taskDatesMap.set(taskIdx, scheduled[schedIdx])
         })
-        // Advance offset past this objective's tasks for inter-objective staggering
-        if (scheduled.length > 0) {
-            const lastEnd = new Date(scheduled[scheduled.length - 1].end_date)
-            const today = new Date()
-            objectiveOffset = Math.ceil((lastEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-        }
+        objectiveIndex++
     }
 
     // Now create tasks with their scheduled dates
