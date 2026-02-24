@@ -63,7 +63,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     expandedModuleId, setExpandedModuleId,
     isGeneratingImages,
     revealedModuleIds,
-    systemIllustrationUrl, systemIllustrationStatus,
+    systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError,
   } = useCadLab()
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
@@ -254,6 +254,21 @@ export default function CadLabResearchPage(): React.ReactNode {
                   <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
                   <span className="text-xs text-muted-foreground">Generating system overview...</span>
                 </div>
+              </div>
+            </Card>
+          )}
+
+          {/* ── System illustration failed ── */}
+          {systemIllustrationStatus === "failed" && (
+            <Card className="overflow-hidden border-destructive/30">
+              <div className="aspect-[16/9] w-full bg-muted/50 flex flex-col items-center justify-center gap-2 px-6">
+                <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+                <span className="text-sm text-destructive text-center">
+                  {systemIllustrationError || "System illustration failed"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Re-research to retry illustration generation.
+                </span>
               </div>
             </Card>
           )}

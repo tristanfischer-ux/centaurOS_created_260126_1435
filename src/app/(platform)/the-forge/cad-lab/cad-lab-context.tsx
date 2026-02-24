@@ -148,6 +148,7 @@ export interface CadLabContextValue {
   // System illustration (research report banner)
   systemIllustrationUrl: string | null
   systemIllustrationStatus: "idle" | "generating" | "complete" | "failed"
+  systemIllustrationError: string | null
 
   // Integration (combined system assembly)
   integratedAssemblyStlUrl: string | null
@@ -277,6 +278,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── System illustration (research report banner) ──
   const [systemIllustrationUrl, setSystemIllustrationUrl] = useState<string | null>(null)
   const [systemIllustrationStatus, setSystemIllustrationStatus] = useState<"idle" | "generating" | "complete" | "failed">("idle")
+  const [systemIllustrationError, setSystemIllustrationError] = useState<string | null>(null)
 
   // ── Progress storytelling ──
   const [progressLines, setProgressLines] = useState<string[]>([])
@@ -448,6 +450,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         // Also trigger system illustration for research report (non-blocking)
         if (activeProjectId) {
           setSystemIllustrationStatus("generating")
+          setSystemIllustrationError(null)
           generateCadLabSystemIllustrationAction(
             activeProjectId,
             subject,
@@ -459,10 +462,18 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 setSystemIllustrationUrl(illRes.url)
                 setSystemIllustrationStatus("complete")
               } else {
+                const msg = "error" in illRes ? illRes.error : "System illustration generation failed"
+                setSystemIllustrationError(msg)
                 setSystemIllustrationStatus("failed")
+                toast.error(msg)
               }
             })
-            .catch(() => setSystemIllustrationStatus("failed"))
+            .catch((err) => {
+              const msg = err instanceof Error ? err.message : "System illustration generation failed"
+              setSystemIllustrationError(msg)
+              setSystemIllustrationStatus("failed")
+              toast.error(msg)
+            })
         }
       }
     } catch (err) {
@@ -530,6 +541,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.module.imageUrl, imageStatus: res.module.imageStatus, imageError: res.module.imageError } : m)),
           )
           if (res.module.imageStatus === "complete") completedCount++
+        } else if ("error" in res) {
+          setModules((prev) =>
+            prev.map((m) => (m.id === mod.id ? { ...m, imageStatus: "failed" as const, imageError: res.error } : m)),
+          )
         }
         revealModule(mod.id)
       } catch {
@@ -1215,7 +1230,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isBatchRunning, batchProgress,
     isGeneratingImages, handleGenerateModuleImages,
     revealedModuleIds,
-    systemIllustrationUrl, systemIllustrationStatus,
+    systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError,
     progressLines, milestone, setMilestone,
     isAnyLoading, generatedModuleCount, riskCount, diagCompletedCount,
     integratedAssemblyStlUrl, integratedAssemblyStepUrl, isIntegrating, integrationError, setIntegrationError, handleGenerateIntegration,

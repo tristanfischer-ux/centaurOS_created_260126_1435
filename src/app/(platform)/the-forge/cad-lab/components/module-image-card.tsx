@@ -71,22 +71,27 @@ function ImageSection({ module }: { module: CadLabModule }): React.ReactNode {
     )
   }
 
-  // Failed — placeholder
+  // Failed — show error when available, fallback to generic message
   return (
-    <div className="aspect-[3/2] w-full rounded-t-xl bg-muted/50 flex flex-col items-center justify-center gap-1.5">
+    <div className="aspect-[3/2] w-full rounded-t-xl bg-muted/50 flex flex-col items-center justify-center gap-1.5 px-4">
       <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
-      <span className="text-xs text-muted-foreground/60">Image unavailable</span>
+      <span className="text-xs text-muted-foreground/60 text-center line-clamp-2">
+        {module.imageError || "Image unavailable"}
+      </span>
     </div>
   )
 }
 
 // ─── Main Component ───────────────────────────────────────────────────
 
-export function ModuleImageCard({ module }: ModuleImageCardProps): React.ReactNode {
+export function ModuleImageCard({ module, onToggleExpand }: ModuleImageCardProps): React.ReactNode {
   const [imgError, setImgError] = useState(false)
 
   return (
-    <Card className="overflow-hidden border hover:border-international-orange/30 transition-colors">
+    <Card
+      className="overflow-hidden border hover:border-international-orange/30 transition-colors cursor-pointer hover:-translate-y-0.5 active:scale-[0.99] duration-200"
+      onClick={onToggleExpand}
+    >
       {/* Image */}
       {!imgError ? (
         <ImageSection module={module} />
