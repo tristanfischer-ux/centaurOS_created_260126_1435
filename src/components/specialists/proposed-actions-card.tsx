@@ -13,6 +13,7 @@ import { archiveTaskByTitle } from "@/actions/tasks"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { scheduleTaskDates, addWorkingDays } from "@/lib/schedule-task-dates"
 import { isDestructiveAction } from "@/app/(platform)/agents/brief-specialist-dialog"
 import type { ProposedAction } from "@/app/(platform)/agents/brief-specialist-dialog"
 import type { Specialist } from "@/app/(platform)/agents/specialists-data"
@@ -368,7 +369,45 @@ async function executeCreateActions(params: {
         }
     }
 
-    // ── Phase 2: Create tasks ────────────────────────────────────────────────
+    // ── Phase 2: Schedule and create tasks ─────────────────────────────────
+    // Group task indices by objective so we can stagger dates within each objective
+    const tasksByObjective = new Map<string, number[]>()
+    for (const i of createIndices) {
+        if (!selected.has(i) || executed[i]) continue
+        const p = proposals[i]
+        if (p.type !== "task" || !p.objectiveTitle?.trim()) continue
+        const objTitle = p.objectiveTitle.trim()
+        const existing = tasksByObjective.get(objTitle) ?? []
+        existing.push(i)
+        tasksByObjective.set(objTitle, existing)
+    }
+
+    // Compute staggered dates for each objective's tasks
+    const taskDatesMap = new Map<number, { start_date: string; end_date: string }>()
+    let objectiveOffset = 0
+    for (const [, taskIndices] of tasksByObjective) {
+        const scheduleInputs = taskIndices.map((i) => ({
+            title: proposals[i].title,
+            estimatedDays: proposals[i].estimatedWeeks
+                ? proposals[i].estimatedWeeks * 5 // weeks → working days
+                : undefined,
+        }))
+        const startFrom = objectiveOffset > 0
+            ? addWorkingDays(new Date(), objectiveOffset)
+            : undefined
+        const scheduled = scheduleTaskDates(scheduleInputs, startFrom)
+        taskIndices.forEach((taskIdx, schedIdx) => {
+            taskDatesMap.set(taskIdx, scheduled[schedIdx])
+        })
+        // Advance offset past this objective's tasks for inter-objective staggering
+        if (scheduled.length > 0) {
+            const lastEnd = new Date(scheduled[scheduled.length - 1].end_date)
+            const today = new Date()
+            objectiveOffset = Math.ceil((lastEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        }
+    }
+
+    // Now create tasks with their scheduled dates
     for (const i of createIndices) {
         if (!selected.has(i) || executed[i]) continue
         const p = proposals[i]
@@ -412,6 +451,13 @@ async function executeCreateActions(params: {
         fd.set("objective_id", objectiveId)
         if (rolloutId) fd.set("rollout_id", rolloutId)
         if (sourceThreadId) fd.set("source_thread_id", sourceThreadId)
+
+        // Pass staggered dates from schedule computation
+        const dates = taskDatesMap.get(i)
+        if (dates) {
+            fd.set("start_date", dates.start_date)
+            fd.set("end_date", dates.end_date)
+        }
 
         const result = await createTask(fd)
         if (result.error) {

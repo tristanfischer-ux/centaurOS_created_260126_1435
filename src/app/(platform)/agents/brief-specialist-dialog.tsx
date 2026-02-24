@@ -189,6 +189,8 @@ export interface ProposedAction {
     objectiveTitle?: string
     /** For objectives: title of the strategic goal this objective should be nested under. */
     strategicGoalTitle?: string
+    /** AI-estimated duration in weeks (1-12). Used to auto-schedule staggered start/end dates. */
+    estimatedWeeks?: number
 }
 
 /** Whether a proposed action is destructive (archive/remove). */
