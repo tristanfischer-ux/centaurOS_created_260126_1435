@@ -233,6 +233,7 @@ async function callOpenAIImage(
     prompt,
     n: 1,
     size,
+    quality: "high",
   })
 
   const b64Data = response.data?.[0]?.b64_json
