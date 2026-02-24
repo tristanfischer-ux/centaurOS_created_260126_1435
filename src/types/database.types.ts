@@ -12927,6 +12927,106 @@ export type Database = {
           },
         ]
       }
+      specialist_documents: {
+        Row: {
+          content: string
+          content_type: string
+          created_at: string
+          created_by: string | null
+          foundry_id: string
+          id: string
+          metadata: Json | null
+          specialist_id: string
+          thread_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          foundry_id: string
+          id?: string
+          metadata?: Json | null
+          specialist_id: string
+          thread_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          foundry_id?: string
+          id?: string
+          metadata?: Json | null
+          specialist_id?: string
+          thread_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "specialist_documents_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      specialist_knowledge_base: {
+        Row: {
+          confidence: number
+          created_at: string
+          foundry_id: string
+          id: string
+          key: string
+          knowledge_type: string
+          last_updated_at: string
+          source: string | null
+          source_thread_id: string | null
+          specialist_id: string
+          value: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          foundry_id: string
+          id?: string
+          key: string
+          knowledge_type: string
+          last_updated_at?: string
+          source?: string | null
+          source_thread_id?: string | null
+          specialist_id: string
+          value: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          key?: string
+          knowledge_type?: string
+          last_updated_at?: string
+          source?: string | null
+          source_thread_id?: string | null
+          specialist_id?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "specialist_knowledge_base_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       standup_summaries: {
         Row: {
           blockers_summary: string | null

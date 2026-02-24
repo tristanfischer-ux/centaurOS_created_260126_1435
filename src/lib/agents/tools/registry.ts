@@ -22,6 +22,8 @@ import {
     COMMON_TOOLS,
     TOOL_RUN_CALCULATION,
     TOOL_WEB_SEARCH,
+    TOOL_WRITE_DOCUMENT,
+    TOOL_QUERY_PAST_ADVICE,
     FINANCE_TOOLS,
     ENGINEERING_TOOLS,
     PRODUCT_TOOLS,
@@ -48,6 +50,8 @@ import { handleRunCalculation } from "./handlers/compute"
 import { handleWebSearch } from "./handlers/web-search"
 import { handleQueryGrowthMetrics, handleQueryCompetitorLandscape } from "./handlers/marketing"
 import { handleQueryComplianceStatus, handleQueryContractsOverview } from "./handlers/legal"
+import { handleWriteDocument } from "./handlers/documents"
+import { handleQueryPastAdvice } from "./handlers/memory-search"
 
 // ─── Tool Name → Handler Map ─────────────────────────────────────────
 
@@ -80,6 +84,10 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
     // Legal tools
     query_compliance_status: handleQueryComplianceStatus,
     query_contracts_overview: handleQueryContractsOverview,
+
+    // Document & memory tools
+    write_document: handleWriteDocument,
+    query_past_advice: handleQueryPastAdvice,
 
     // Utility tools
     run_calculation: handleRunCalculation,

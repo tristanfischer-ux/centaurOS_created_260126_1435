@@ -111,12 +111,71 @@ export const TOOL_QUERY_ACTIVITY_METRICS: ToolDefinition = {
     },
 }
 
+// ─── Document Persistence Tool ───────────────────────────────────
+
+export const TOOL_WRITE_DOCUMENT: ToolDefinition = {
+    name: "write_document",
+    description:
+        "Save a document (analysis, report, framework, template) for future reference. The document is persisted and can be retrieved later. Use this when you produce a substantial deliverable the founder may want to revisit.",
+    parameters: {
+        type: "object",
+        properties: {
+            title: {
+                type: "string",
+                description: "Document title (e.g., 'Q2 Financial Analysis', 'Hiring Framework').",
+            },
+            content: {
+                type: "string",
+                description: "Document content in the specified format.",
+            },
+            content_type: {
+                type: "string",
+                enum: ["markdown", "csv", "json"],
+                description: "Content format. Defaults to 'markdown'.",
+            },
+        },
+        required: ["title", "content"],
+    },
+}
+
+// ─── Past Advice Search Tool ────────────────────────────────────
+
+export const TOOL_QUERY_PAST_ADVICE: ToolDefinition = {
+    name: "query_past_advice",
+    description:
+        "Search previous specialist conversations and knowledge base for relevant past advice. Use this to check what was previously recommended on a topic, avoid contradicting past guidance, or build on prior analysis.",
+    parameters: {
+        type: "object",
+        properties: {
+            query: {
+                type: "string",
+                description: "Search query (keywords describing the topic to find past advice about).",
+            },
+            specialist_id: {
+                type: "string",
+                description: "Optional: filter to a specific specialist's past advice.",
+            },
+            days: {
+                type: "number",
+                description: "Look-back period in days. Defaults to 90.",
+            },
+            limit: {
+                type: "number",
+                description: "Maximum number of results. Defaults to 10.",
+            },
+        },
+        required: ["query"],
+    },
+}
+
 /** Tools available to every specialist. */
 export const COMMON_TOOLS: ToolDefinition[] = [
     TOOL_QUERY_OBJECTIVES,
     TOOL_QUERY_TASKS,
     TOOL_QUERY_TEAM_MEMBERS,
     TOOL_QUERY_ACTIVITY_METRICS,
+    TOOL_WRITE_DOCUMENT,
+    TOOL_QUERY_PAST_ADVICE,
 ]
 
 // ─── Computation Tool ────────────────────────────────────────────────
