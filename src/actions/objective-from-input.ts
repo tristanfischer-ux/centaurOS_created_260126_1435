@@ -112,26 +112,38 @@ export async function createObjectiveFromInput(input: ObjectiveInput) {
         aiAgentId = aiAgents?.[0]?.id || null
     }
 
-    // Resolve task dates: use provided dates (clamped to not be in past) or schedule via waves
-    const allHaveDates = input.tasks.every((t) => t.start_date && t.end_date)
-    let resolvedDates: Array<{ start_date: string; end_date: string }>
+    // DECISION: Respect explicit dates where provided, schedule only tasks that
+    // lack them. Previous all-or-nothing approach discarded all dates if even one
+    // task was missing them, causing unnecessary re-scheduling and timeline bunching.
+    const tasksWithoutDates: number[] = []
+    const resolvedDates: Array<{ start_date: string; end_date: string }> = new Array(input.tasks.length)
 
-    if (allHaveDates) {
-        resolvedDates = input.tasks.map((t) => {
-            const start = ensureNotInPast(new Date(t.start_date!))
-            let end = new Date(t.end_date!)
+    for (let i = 0; i < input.tasks.length; i++) {
+        const t = input.tasks[i]
+        if (t.start_date && t.end_date) {
+            const start = ensureNotInPast(new Date(t.start_date))
+            let end = new Date(t.end_date)
             if (end < start) {
                 end = new Date(start)
                 end.setDate(end.getDate() + 1)
             }
-            return {
+            resolvedDates[i] = {
                 start_date: start.toISOString(),
                 end_date: end.toISOString(),
             }
+        } else {
+            tasksWithoutDates.push(i)
+        }
+    }
+
+    if (tasksWithoutDates.length > 0) {
+        const scheduleInputs = tasksWithoutDates.map((i) => ({
+            title: input.tasks[i].title?.trim() ?? '',
+        }))
+        const scheduled = scheduleTaskDates(scheduleInputs)
+        tasksWithoutDates.forEach((taskIdx, schedIdx) => {
+            resolvedDates[taskIdx] = scheduled[schedIdx]
         })
-    } else {
-        const scheduleInputs = input.tasks.map((t) => ({ title: t.title?.trim() ?? '' }))
-        resolvedDates = scheduleTaskDates(scheduleInputs)
     }
 
     // Create tasks
