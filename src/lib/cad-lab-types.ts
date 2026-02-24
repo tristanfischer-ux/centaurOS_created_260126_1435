@@ -197,7 +197,7 @@ export interface CadLabModule {
   /** Generated CadQuery code */
   code?: string
   /** Pipeline status */
-  status: "pending" | "researched" | "interface_ready" | "generated"
+  status: "pending" | "researched" | "interface_ready" | "generated" | "failed"
 
   // ── Image generation (Gemini blueprint illustrations) ──
 

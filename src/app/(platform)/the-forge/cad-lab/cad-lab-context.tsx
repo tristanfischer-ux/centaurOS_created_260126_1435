@@ -722,6 +722,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     } catch (err) {
       console.error("[CAD-LAB] Single module generation failed:", err)
       addProgressLine(`Failed to generate ${mod.name}: ${err instanceof Error ? err.message : "Unknown error"}`)
+
+      // Mark module as failed in status
+      setModules((prev) =>
+        prev.map((m) =>
+          m.id === moduleId ? { ...m, status: "failed" as const } : m,
+        ),
+      )
     } finally {
       setActiveModuleId(null)
     }

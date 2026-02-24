@@ -154,7 +154,9 @@ export default function CadLabBuildPage(): React.ReactNode {
               ? "CAD generated"
               : m.status === "interface_ready"
                 ? "dimensions planned"
-                : "pending",
+                : m.status === "failed"
+                  ? "generation failed"
+                  : "pending",
         })),
       }
     }, [hasResearch, subject, modules, generatedModuleCount, isBatchRunning, designBrief, integratedAssemblyStlUrl]),
@@ -350,6 +352,71 @@ export default function CadLabBuildPage(): React.ReactNode {
               <div className="flex flex-wrap gap-2">
                 <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push(FORGE_ROUTES.cadLabReview)}>
                   <ClipboardCheck className="h-3 w-3" /> Review Package
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Partial completion with failures ── */}
+      {generatedModuleCount > 0 && generatedModuleCount < modules.length && (
+        <div className="rounded-xl border border-warning/30 bg-gradient-to-r from-warning/10 via-background to-info-light/10 p-5">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 h-12 w-12 rounded-full bg-warning/20 flex items-center justify-center">
+              <AlertTriangle className="h-6 w-6 text-warning" />
+            </div>
+            <div className="flex-1 min-w-0 space-y-3">
+              <div>
+                <h3 className="text-base font-semibold text-foreground">
+                  {generatedModuleCount} of {modules.length} Modules Generated
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Some modules failed during generation. You can proceed to Review with available modules or retry the failed ones.
+                </p>
+
+                {/* Download Generated — only successful modules */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs mt-2"
+                  onClick={() => {
+                    for (const mod of modules.filter(m => m.status === "generated")) {
+                      const r = mod.result as CadLabResult | undefined
+                      if (!r) continue
+                      if (r.stepData) handleDownload(`${mod.name}.step`, r.stepData, false)
+                      else if (r.stepUrl) {
+                        const link = document.createElement("a")
+                        link.href = r.stepUrl
+                        link.download = `${mod.name}.step`
+                        link.click()
+                      }
+                      if (r.stlData) handleDownload(`${mod.name}.stl`, r.stlData, true)
+                      else if (r.stlUrl) {
+                        const link = document.createElement("a")
+                        link.href = r.stlUrl
+                        link.download = `${mod.name}.stl`
+                        link.click()
+                      }
+                    }
+                  }}
+                >
+                  <Download className="h-3 w-3" />
+                  Download Generated ({generatedModuleCount})
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push(FORGE_ROUTES.cadLabReview)}>
+                  <ClipboardCheck className="h-3 w-3" /> Review Package
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs border-warning/40 text-warning hover:bg-warning/20"
+                  onClick={handleGenerateAllModules}
+                  disabled={isAnyLoading}
+                >
+                  <RotateCcw className="h-3 w-3" /> Retry Failed Modules
                 </Button>
               </div>
             </div>
@@ -769,6 +836,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                       <div className={`h-2 w-2 rounded-full flex-shrink-0 ${
                         mod.status === "generated" ? "bg-status-success"
                         : mod.status === "interface_ready" ? "bg-status-info"
+                        : mod.status === "failed" ? "bg-destructive"
                         : "bg-muted-foreground"
                       }`} />
                       <div className="min-w-0">
@@ -973,6 +1041,26 @@ export default function CadLabBuildPage(): React.ReactNode {
                               </span>
                             )}
                           </span>
+                        )}
+                        {mod.status === "failed" && (
+                          <>
+                            <span className="text-xs text-destructive flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" /> Generation failed
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                              onClick={() => handleModuleGenerate(mod.id, mod.interfaceDefinition ? "generate" : "interface")}
+                              disabled={activeModuleId !== null}
+                            >
+                              {activeModuleId === mod.id ? (
+                                <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Retrying...</>
+                              ) : (
+                                <><RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Retry</>
+                              )}
+                            </Button>
+                          </>
                         )}
                       </div>
 
@@ -1648,6 +1736,7 @@ function SystemArchitecture({
                     "hover:shadow-md focus:outline-none focus:ring-2 focus:ring-international-orange focus:ring-offset-2",
                     mod.status === "generated" && "border-status-success/40 bg-status-success-light/10",
                     mod.status === "interface_ready" && "border-status-info/40 bg-status-info-light/10",
+                    mod.status === "failed" && "border-destructive/40 bg-destructive/5",
                     mod.status === "pending" && "border-muted bg-muted/10",
                     isCriticalPath && mod.status !== "generated" && "border-l-2 border-l-international-orange",
                     isHovered && "shadow-md ring-1 ring-international-orange/30",
@@ -1664,6 +1753,7 @@ function SystemArchitecture({
                           "h-2 w-2 rounded-full flex-shrink-0",
                           mod.status === "generated" && "bg-status-success",
                           mod.status === "interface_ready" && "bg-status-info",
+                          mod.status === "failed" && "bg-destructive",
                           mod.status === "pending" && "bg-muted-foreground",
                         )}
                       />

@@ -106,7 +106,7 @@ export default function CadLabResearchPage(): React.ReactNode {
             ? modules.map((m) => ({
                 type: "module",
                 title: m.name,
-                status: m.status === "generated" ? "CAD generated" : "pending",
+                status: m.status === "generated" ? "CAD generated" : m.status === "failed" ? "generation failed" : "pending",
               }))
             : undefined,
       }
