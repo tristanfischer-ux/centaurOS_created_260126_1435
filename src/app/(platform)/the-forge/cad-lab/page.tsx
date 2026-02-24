@@ -41,6 +41,18 @@ import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
 import { ModuleImageGrid } from "./components/module-image-grid"
 
+// ─── Extract executive summary from research report markdown ─────────
+
+function extractExecutiveSummary(report: string): string | null {
+  const startMatch = report.match(/^##\s+Executive\s+Summary/im)
+  if (!startMatch || startMatch.index === undefined) return null
+  const afterHeading = report.slice(startMatch.index + startMatch[0].length)
+  const nextHeading = afterHeading.search(/^##\s/m)
+  const body = nextHeading === -1 ? afterHeading : afterHeading.slice(0, nextHeading)
+  const trimmed = body.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
 // ─── Pipeline preview shown during research wait ─────────────────────
 
 const PIPELINE_STAGES = [
@@ -68,6 +80,7 @@ export default function CadLabResearchPage(): React.ReactNode {
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
   const [isEditingSubject, setIsEditingSubject] = useState(false)
+  const executiveSummary = useMemo(() => extractExecutiveSummary(editableReport), [editableReport])
 
   useRegisterScreenContext(
     useMemo(() => {
@@ -240,7 +253,9 @@ export default function CadLabResearchPage(): React.ReactNode {
               <CardContent className="pt-4 pb-4">
                 <h2 className="text-base font-semibold text-foreground">{subject}</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  System overview — full research report available in the Build stage.
+                  {modules.length === 0
+                    ? "Concept illustration — this will be refined when sub-assemblies are mapped."
+                    : "System overview — full research report available in the Build stage."}
                 </p>
               </CardContent>
             </Card>
@@ -270,6 +285,18 @@ export default function CadLabResearchPage(): React.ReactNode {
                   Re-research to retry illustration generation.
                 </span>
               </div>
+            </Card>
+          )}
+
+          {/* ── Executive summary (extracted from research report) ── */}
+          {executiveSummary && modules.length === 0 && (
+            <Card>
+              <CardContent className="pt-5 pb-5">
+                <h3 className="text-sm font-semibold text-foreground mb-2">Product Overview</h3>
+                <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
+                  {executiveSummary}
+                </p>
+              </CardContent>
             </Card>
           )}
 

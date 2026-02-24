@@ -157,6 +157,26 @@ const SPECIALIST_TOOLS: Record<SpecialistId, ToolDefinition[]> = {
     "legal-counsel": [...COMMON_TOOLS, ...LEGAL_TOOLS],
 }
 
+// ─── Tool Result Cache (60s TTL) ─────────────────────────────────────
+// INTENT: Data-query tools hit Supabase on every message. Caching with a short
+// TTL avoids redundant queries within a conversation turn while keeping data fresh.
+// Works on warm serverless instances; empty on cold starts (safe degradation).
+
+const CACHEABLE_TOOLS = new Set([
+    "query_objectives", "query_tasks", "query_team_members",
+    "query_activity_metrics", "query_financial_overview",
+    "query_engineering_metrics", "query_product_roadmap",
+    "query_team_overview", "query_strategic_goals",
+])
+
+const TOOL_CACHE_TTL_MS = 60_000
+
+const toolResultCache = new Map<string, { result: string; timestamp: number }>()
+
+function getCacheKey(toolName: string, foundryId: string, args: Record<string, unknown>): string {
+    return `${toolName}:${foundryId}:${JSON.stringify(args)}`
+}
+
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**
@@ -203,8 +223,26 @@ export async function executeToolCall(
         return `Unknown tool: ${toolName}. Available tools: ${Object.keys(TOOL_HANDLERS).join(", ")}`
     }
 
+    // Check cache for data-query tools
+    const isCacheable = CACHEABLE_TOOLS.has(toolName)
+    if (isCacheable) {
+        const key = getCacheKey(toolName, ctx.foundryId, args)
+        const cached = toolResultCache.get(key)
+        if (cached && Date.now() - cached.timestamp < TOOL_CACHE_TTL_MS) {
+            return cached.result
+        }
+    }
+
     try {
-        return await handler(args, ctx)
+        const result = await handler(args, ctx)
+
+        // Store in cache for cacheable tools
+        if (isCacheable) {
+            const key = getCacheKey(toolName, ctx.foundryId, args)
+            toolResultCache.set(key, { result, timestamp: Date.now() })
+        }
+
+        return result
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         console.error(`[ToolRegistry] Tool "${toolName}" failed:`, msg)

@@ -395,6 +395,7 @@ export const SPECIALISTS: Specialist[] = [
             "Sprint plan taking shape — almost ready.",
         ],
         modelTier: "minimax",
+        speculativeEnabled: true,
     },
     {
         id: "vp-manufacturing",
@@ -486,6 +487,7 @@ export const SPECIALISTS: Specialist[] = [
             "Path from prototype to volume is clear — writing it up.",
         ],
         modelTier: "minimax",
+        speculativeEnabled: true,
     },
     {
         id: "vp-supply-chain",
@@ -576,6 +578,7 @@ export const SPECIALISTS: Specialist[] = [
             "Supply strategy locked in — finalizing recommendations.",
         ],
         modelTier: "minimax",
+        speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // PRODUCT — What we build
@@ -672,6 +675,7 @@ export const SPECIALISTS: Specialist[] = [
             "Scope is tight — writing the recommendation.",
         ],
         modelTier: "minimax",
+        speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // GROWTH — How we get customers
@@ -777,6 +781,7 @@ export const SPECIALISTS: Specialist[] = [
             "Strategy and tactics aligned — here it comes.",
         ],
         modelTier: "minimax",
+        speculativeEnabled: true,
     },
     {
         id: "sales-lead",
@@ -878,6 +883,7 @@ export const SPECIALISTS: Specialist[] = [
             "Scripts and numbers ready — let's close this.",
         ],
         modelTier: "minimax",
+        speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // OPERATIONS — Keeping the machine running
@@ -1172,6 +1178,7 @@ export const SPECIALISTS: Specialist[] = [
             "The story is coming together — almost there.",
         ],
         modelTier: "minimax",
+        speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // PEOPLE — Who does the work
@@ -1268,6 +1275,7 @@ export const SPECIALISTS: Specialist[] = [
             "Practical plan ready — no corporate fluff.",
         ],
         modelTier: "minimax",
+        speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // LEGAL — Protecting the company

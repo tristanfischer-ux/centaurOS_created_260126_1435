@@ -1011,6 +1011,26 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           setLastSaved(new Date().toISOString())
           setIsSaving(false)
           refreshProjects()
+
+          // Fire concept illustration immediately after research (non-blocking).
+          // Empty module arrays → image-generator uses "detailed isometric view" prompt.
+          // When handleDecompose runs later it overwrites with a richer module-aware image.
+          setSystemIllustrationStatus("generating")
+          setSystemIllustrationError(null)
+          generateCadLabSystemIllustrationAction(projId, subject, [], [])
+            .then((illRes) => {
+              if ("url" in illRes) {
+                setSystemIllustrationUrl(illRes.url)
+                setSystemIllustrationStatus("complete")
+              } else {
+                setSystemIllustrationStatus("failed")
+                setSystemIllustrationError("error" in illRes ? illRes.error : "Illustration failed")
+              }
+            })
+            .catch(() => {
+              setSystemIllustrationStatus("failed")
+              setSystemIllustrationError("Illustration generation failed")
+            })
         }
       }
     } catch (err) {

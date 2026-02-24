@@ -358,11 +358,11 @@ export async function POST(request: Request) {
     // When a user sends a follow-up message in an existing conversation, skip the
     // ~15 DB queries for company context, preferences, intelligence, knowledge vault,
     // etc. The conversation history and specialist personality are sufficient for a
-    // responsive reply. Triggers when: short-ish input (<200 chars), existing thread,
+    // responsive reply. Triggers when: short-ish input (<400 chars), existing thread,
     // text mode, no cross-specialist context injection.
     const isConversationalFastPath = !!(
         input.length > 0 &&
-        input.length < 200 &&
+        input.length < 400 &&
         threadId &&
         specialistId &&
         modality === "text" &&
@@ -1138,8 +1138,34 @@ Rules:
     }
 
     try {
-        if (modality === "text" && speculative && specialistId && specialistTools.length === 0) {
+        // DECISION: Non-claude-tier specialists (minimax/qwen) use speculative dual-stream
+        // for instant perceived response. Pre-fetch data tools (parallel) so the fast model
+        // has company context even without native tool calling. With tool caching (60s TTL),
+        // this pre-fetch is near-instant on cache hits.
+        if (modality === "text" && speculative && specialistId && !isClaudeTier) {
             const specialist = getSpecialistById(specialistId)
+
+            // Pre-fetch data tools for specialists that have tools (all minimax specialists do)
+            if (specialistTools.length > 0 && foundryId) {
+                const dataTools = ["query_objectives", "query_tasks", "query_activity_metrics"]
+                const toolCtx = { foundryId }
+                const results = await Promise.all(
+                    dataTools.map(async (toolName) => {
+                        try { return await executeToolCall(toolName, {}, toolCtx) }
+                        catch { return null }
+                    })
+                )
+                let toolContext = ""
+                for (const result of results) {
+                    if (result && !result.startsWith("Error") && !result.startsWith("No ")) {
+                        toolContext += `\n\n${result}`
+                    }
+                }
+                if (toolContext) {
+                    systemPromptWithContext += `\n\n## Live Company Data\n${toolContext}`
+                }
+            }
+
             return await handleSpeculativeStreaming(
                 fallbackChain,
                 finalPrompt,
@@ -1153,7 +1179,7 @@ Rules:
                 specialist?.workingStyle ?? "",
             )
         }
-        // DECISION: Route to tool-aware streaming when specialist has tools.
+        // DECISION: Route to tool-aware streaming when specialist has tools (claude-tier).
         // This enables the multi-turn tool loop where the model can query data,
         // run calculations, and search the web before responding.
         if (modality === "text" && specialistTools.length > 0 && foundryId && specialistId) {
@@ -1735,15 +1761,20 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                     const toolCtx = { foundryId }
 
                     // Execute data-access tools proactively for non-Claude providers
+                    // DECISION: Run in parallel since each queries a different Supabase table (~200-400ms saved)
                     const dataTools = ["query_objectives", "query_tasks", "query_activity_metrics"]
-                    for (const toolName of dataTools) {
-                        try {
-                            const result = await executeToolCall(toolName, {}, toolCtx)
-                            if (result && !result.startsWith("Error") && !result.startsWith("No ")) {
-                                toolContext += `\n\n${result}`
+                    const dataResults = await Promise.all(
+                        dataTools.map(async (toolName) => {
+                            try {
+                                return await executeToolCall(toolName, {}, toolCtx)
+                            } catch {
+                                return null
                             }
-                        } catch {
-                            // Non-critical — skip failed tool
+                        })
+                    )
+                    for (const result of dataResults) {
+                        if (result && !result.startsWith("Error") && !result.startsWith("No ")) {
+                            toolContext += `\n\n${result}`
                         }
                     }
 

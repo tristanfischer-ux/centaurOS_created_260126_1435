@@ -91,6 +91,8 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     progressLines, isResearching, isDecomposing, isBatchRunning, activeModuleId,
     // Milestone
     milestone, setMilestone,
+    // Post-research idle detection
+    hasResearch, modules,
   } = useCadLab()
 
   // Load project only when explicitly requested via ?project=<id>.
@@ -104,6 +106,13 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
 
   const isAnyActive = isResearching || isDecomposing || isBatchRunning || activeModuleId !== null
   const currentStageLabel = getCurrentStageLabel(pathname)
+
+  // Auto-dismiss the research milestone banner after 8s (other milestones stay until dismissed)
+  useEffect(() => {
+    if (milestone !== "research") return
+    const timer = setTimeout(() => setMilestone(null), 8000)
+    return () => clearTimeout(timer)
+  }, [milestone, setMilestone])
 
   // Dismissible disclaimer state — persisted in localStorage
   const DISCLAIMER_KEY = "forge-disclaimer-dismissed"
@@ -323,13 +332,15 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
         />
       )}
 
-      {/* ── Live progress ── */}
-      <CadLabProgress
-        lines={progressLines}
-        isActive={isAnyActive}
-        operationType={isResearching ? "research" : isDecomposing ? "breakdown" : isBatchRunning ? "batch" : "generate"}
-        subject={subject}
-      />
+      {/* ── Live progress (hidden in post-research idle: research done, no modules, nothing active) ── */}
+      {!(hasResearch && modules.length === 0 && !isAnyActive) && (
+        <CadLabProgress
+          lines={progressLines}
+          isActive={isAnyActive}
+          operationType={isResearching ? "research" : isDecomposing ? "breakdown" : isBatchRunning ? "batch" : "generate"}
+          subject={subject}
+        />
+      )}
 
       {/* ── Page content (sub-route) with fade transition ── */}
       <PageTransition>
