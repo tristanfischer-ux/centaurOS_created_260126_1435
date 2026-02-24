@@ -168,6 +168,34 @@ export const TOOL_QUERY_PAST_ADVICE: ToolDefinition = {
     },
 }
 
+// ─── Specialist Delegation Tool ──────────────────────────────────────
+
+export const TOOL_ASK_SPECIALIST: ToolDefinition = {
+    name: "ask_specialist",
+    description:
+        "Ask another specialist for their brief opinion on a topic. Use this when a question falls outside your domain — e.g., ask Finn about financial implications, Leo about legal risk, or Mia about marketing angles. The specialist will receive company data and respond in character. Max 2 delegations per turn.",
+    parameters: {
+        type: "object",
+        properties: {
+            specialist_id: {
+                type: "string",
+                enum: [
+                    "strategist", "cto", "vp-engineering", "vp-manufacturing",
+                    "vp-supply-chain", "product-lead", "growth-marketer", "sales-lead",
+                    "chief-of-staff", "finance-lead", "fundraising-advisor",
+                    "hiring-team", "legal-counsel",
+                ],
+                description: "The specialist to consult.",
+            },
+            question: {
+                type: "string",
+                description: "A specific question for the specialist. Be concise and focused.",
+            },
+        },
+        required: ["specialist_id", "question"],
+    },
+}
+
 /** Tools available to every specialist. */
 export const COMMON_TOOLS: ToolDefinition[] = [
     TOOL_QUERY_OBJECTIVES,
@@ -176,6 +204,7 @@ export const COMMON_TOOLS: ToolDefinition[] = [
     TOOL_QUERY_ACTIVITY_METRICS,
     TOOL_WRITE_DOCUMENT,
     TOOL_QUERY_PAST_ADVICE,
+    TOOL_ASK_SPECIALIST,
 ]
 
 // ─── Computation Tool ────────────────────────────────────────────────

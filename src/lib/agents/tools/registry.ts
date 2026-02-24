@@ -52,6 +52,7 @@ import { handleQueryGrowthMetrics, handleQueryCompetitorLandscape } from "./hand
 import { handleQueryComplianceStatus, handleQueryContractsOverview } from "./handlers/legal"
 import { handleWriteDocument } from "./handlers/documents"
 import { handleQueryPastAdvice } from "./handlers/memory-search"
+import { handleAskSpecialist } from "./handlers/delegation"
 
 // ─── Tool Name → Handler Map ─────────────────────────────────────────
 
@@ -88,6 +89,9 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
     // Document & memory tools
     write_document: handleWriteDocument,
     query_past_advice: handleQueryPastAdvice,
+
+    // Delegation tool
+    ask_specialist: handleAskSpecialist,
 
     // Utility tools
     run_calculation: handleRunCalculation,
