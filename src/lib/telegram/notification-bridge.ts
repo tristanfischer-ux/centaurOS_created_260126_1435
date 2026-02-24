@@ -180,10 +180,15 @@ export async function pushNotificationToMultipleUsers(
 }
 
 /**
- * Create a decision and push to Telegram
+ * Create a decision and push to Telegram.
+ *
+ * @param params.callerFoundryId - The foundry_id of the calling context. Used to
+ *   verify the caller belongs to the same foundry as the target user, preventing
+ *   cross-tenant notification injection.
  */
 export async function createAndPushDecision(params: {
     profile_id: string
+    callerFoundryId: string
     decision_type: 'task_review' | 'rfq_proposal' | 'order_milestone' | 'team_request' | 'expense_approval' | 'other'
     title: string
     description?: string
@@ -203,6 +208,18 @@ export async function createAndPushDecision(params: {
 
         if (!profile?.foundry_id) {
             throw new Error('User has no foundry')
+        }
+
+        // SECURITY: Verify the caller's foundry matches the target user's foundry.
+        // Prevents cross-tenant notification injection where a user in foundry A
+        // could push decisions/notifications to users in foundry B.
+        if (profile.foundry_id !== params.callerFoundryId) {
+            console.warn('[SECURITY] Cross-foundry notification blocked:', {
+                callerFoundry: params.callerFoundryId,
+                targetFoundry: profile.foundry_id,
+                targetUser: params.profile_id,
+            })
+            return null
         }
 
         // Create the decision

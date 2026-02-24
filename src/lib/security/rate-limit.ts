@@ -124,7 +124,7 @@ async function distributedRateLimit(
 ): Promise<RateLimitResult> {
     const supabase = getRateLimitClient()
     if (!supabase) {
-        // Fall back to in-memory if no Supabase client
+        console.warn('[SECURITY] Rate limiter falling back to in-memory — no Supabase client available, distributed coordination lost')
         return inMemoryRateLimit(action, identifier, limit, windowMs)
     }
     
@@ -143,7 +143,7 @@ async function distributedRateLimit(
         })
         
         if (error) {
-            console.warn('[RATE_LIMIT] Supabase error, falling back to in-memory:', error.message)
+            console.warn('[SECURITY] Rate limiter falling back to in-memory — Supabase error, distributed coordination lost:', error.message)
             return inMemoryRateLimit(action, identifier, limit, windowMs)
         }
         
@@ -166,7 +166,7 @@ async function distributedRateLimit(
             resetTime: now.getTime() + windowMs
         }
     } catch (err) {
-        console.warn('[RATE_LIMIT] Error, falling back to in-memory:', err)
+        console.warn('[SECURITY] Rate limiter falling back to in-memory — distributed coordination lost:', err)
         return inMemoryRateLimit(action, identifier, limit, windowMs)
     }
 }
@@ -238,36 +238,38 @@ export async function rateLimit(
 }
 
 /**
- * Get the client IP address from request headers
- * Works with Vercel, Cloudflare, and direct connections
+ * Get the client IP address from request headers.
+ *
+ * SECURITY: Header trust order matters. `x-real-ip` and `x-vercel-forwarded-for`
+ * are set by the platform (Vercel/nginx) and cannot be spoofed by clients.
+ * `x-forwarded-for` CAN be spoofed if not behind a trusted proxy — when used as
+ * fallback, we take the LAST entry (closest to the proxy, hardest to spoof).
  */
 export function getClientIP(headers: Headers): string {
-    // Check for forwarded headers (in order of preference)
-    const forwarded = headers.get('x-forwarded-for')
-    if (forwarded) {
-        // x-forwarded-for can contain multiple IPs, take the first (client)
-        return forwarded.split(',')[0].trim()
-    }
-    
-    // Vercel
+    // SECURITY: Prefer platform-set headers that cannot be spoofed by clients
+
+    // Vercel sets x-real-ip to the true client IP
+    const realIp = headers.get('x-real-ip')
+    if (realIp) return realIp
+
+    // Vercel's own forwarded header
     const vercelIp = headers.get('x-vercel-forwarded-for')
     if (vercelIp) {
         return vercelIp.split(',')[0].trim()
     }
-    
+
     // Cloudflare
     const cfIp = headers.get('cf-connecting-ip')
-    if (cfIp) {
-        return cfIp
+    if (cfIp) return cfIp
+
+    // SECURITY: x-forwarded-for is client-spoofable — take the LAST entry
+    // (rightmost IP is added by the closest trusted proxy)
+    const forwarded = headers.get('x-forwarded-for')
+    if (forwarded) {
+        const ips = forwarded.split(',').map(s => s.trim())
+        return ips[ips.length - 1] || 'unknown'
     }
-    
-    // Real IP header (nginx)
-    const realIp = headers.get('x-real-ip')
-    if (realIp) {
-        return realIp
-    }
-    
-    // Fallback to a default (shouldn't happen in production)
+
     return 'unknown'
 }
 
