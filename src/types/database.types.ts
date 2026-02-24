@@ -3546,6 +3546,7 @@ export type Database = {
           stage: string
           status: string
           subject: string
+          system_illustration_url: string | null
           thumbnail_svg: string | null
           updated_at: string
         }
@@ -3568,6 +3569,7 @@ export type Database = {
           stage?: string
           status?: string
           subject: string
+          system_illustration_url?: string | null
           thumbnail_svg?: string | null
           updated_at?: string
         }
@@ -3590,6 +3592,7 @@ export type Database = {
           stage?: string
           status?: string
           subject?: string
+          system_illustration_url?: string | null
           thumbnail_svg?: string | null
           updated_at?: string
         }

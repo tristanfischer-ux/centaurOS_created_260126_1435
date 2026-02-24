@@ -70,6 +70,9 @@ export interface CadLabProjectData {
   /** Linked RFQ created from this project (if any) */
   linkedRfqId: string | null
 
+  /** System overview illustration URL */
+  systemIllustrationUrl: string | null
+
   /** Integrated system assembly (after all modules generated) */
   integratedAssemblyStlUrl: string | null
   integratedAssemblyStepUrl: string | null
@@ -172,6 +175,7 @@ export async function loadCadLabProject(
         generatedCode: project.generated_code,
         modules,
         linkedRfqId,
+        systemIllustrationUrl: project.system_illustration_url ?? null,
         integratedAssemblyStlUrl: project.integrated_assembly_stl_url ?? null,
         integratedAssemblyStepUrl: project.integrated_assembly_step_url ?? null,
         createdAt: project.created_at,
@@ -383,6 +387,36 @@ export async function saveCadLabModules(
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save modules:", error.message)
       return { error: `Failed to save modules: ${error.message}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Save System Illustration URL ─────────────────────────────────────
+
+/**
+ * Persists the system overview illustration URL to the project record.
+ *
+ * @param projectId - Project to update
+ * @param url - Public URL of the generated illustration
+ * @returns Success or error
+ */
+export async function saveCadLabSystemIllustration(
+  projectId: string,
+  url: string,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ system_illustration_url: url })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save system illustration URL:", error.message)
+      return { error: `Failed to save system illustration: ${error.message}` }
     }
 
     return { success: true as const }
