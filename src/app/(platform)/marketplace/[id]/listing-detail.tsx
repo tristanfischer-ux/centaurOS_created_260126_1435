@@ -7,7 +7,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import { safeParseAttributes, safeStringArray } from "@/lib/marketplace-utils"
+import {
+    safeParseAttributes,
+    safeStringArray,
+    HIDDEN_ATTRIBUTES,
+    ATTRIBUTE_GROUP_ORDER,
+    formatAttributeLabel,
+    isURL,
+} from "@/lib/marketplace-utils"
 import { getCategoryBadgeClasses, type MarketplaceCategory } from "@/lib/marketplace-colors"
 import {
     ShieldCheck,
@@ -34,9 +41,11 @@ import {
     Calendar,
     MessageSquare,
     Loader2,
+    ExternalLink,
 } from "lucide-react"
 import Link from "next/link"
 import { ProviderTrustSection } from "@/components/marketplace/ProviderTrustSection"
+import { VerificationBadge } from "@/components/marketplace/VerificationBadge"
 import type { PortfolioItem, Certification, ProviderBadge } from "@/actions/trust-signals"
 import type { RatingsSummary, ProviderRating } from "@/actions/ratings"
 import { toast } from "sonner"
@@ -105,12 +114,7 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
                         >
                             {listing.subcategory}
                         </Badge>
-                        {listing.is_verified && (
-                            <div className="flex items-center gap-1 text-status-success" title="Verified">
-                                <ShieldCheck className="h-4 w-4" />
-                                <span className="text-xs font-medium">Verified</span>
-                            </div>
-                        )}
+                        <VerificationBadge tier={listing.verification_tier} size="md" showLabel />
                         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
                             {listing.title}
                         </h1>
@@ -123,13 +127,33 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <Button variant="secondary" asChild>
-                        <Link href={`/marketplace/${listing.id}/book`}>
-                            <Calendar className="h-4 w-4 mr-2" />
-                            Book Consultation
-                        </Link>
-                    </Button>
-                    <Button 
+                    {category === 'People' ? (
+                        <Button variant="secondary" asChild>
+                            <Link href={`/marketplace/${listing.id}/book`}>
+                                <Calendar className="h-4 w-4 mr-2" />
+                                Book Consultation
+                            </Link>
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="secondary"
+                            onClick={handleContact}
+                            disabled={isContacting}
+                        >
+                            {isContacting ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Sending...
+                                </>
+                            ) : (
+                                <>
+                                    <MessageSquare className="h-4 w-4 mr-2" />
+                                    Send Enquiry
+                                </>
+                            )}
+                        </Button>
+                    )}
+                    <Button
                         variant="default"
                         onClick={handleContact}
                         disabled={isContacting}
@@ -404,7 +428,7 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
 
 // Attributes Section - renders all remaining attributes
 function AttributesSection({ attrs, category }: { attrs: Record<string, any>; category: string }) {
-    // Keys already shown in category-specific sections
+    // Keys already shown in category-specific sections or key metrics
     const shownKeys = new Set([
         'role', 'rate', 'pricing', 'cost', 'price',
         'years_experience', 'projects_completed', 'education',
@@ -416,9 +440,19 @@ function AttributesSection({ attrs, category }: { attrs: Record<string, any>; ca
         'location', 'availability'
     ])
 
-    const remainingAttrs = Object.entries(attrs).filter(([key]) => !shownKeys.has(key))
+    const remainingAttrs = Object.entries(attrs)
+        .filter(([key]) => !shownKeys.has(key) && !HIDDEN_ATTRIBUTES.has(key))
 
     if (remainingAttrs.length === 0) return null
+
+    // Sort: known keys in ATTRIBUTE_GROUP_ORDER first, then unknown keys alphabetically
+    const orderIndex = new Map(ATTRIBUTE_GROUP_ORDER.map((k, i) => [k, i]))
+    remainingAttrs.sort(([a], [b]) => {
+        const ia = orderIndex.get(a) ?? Infinity
+        const ib = orderIndex.get(b) ?? Infinity
+        if (ia !== ib) return ia - ib
+        return a.localeCompare(b)
+    })
 
     return (
         <section>
@@ -429,7 +463,7 @@ function AttributesSection({ attrs, category }: { attrs: Record<string, any>; ca
                 <CardContent className="pt-6">
                     <div className="space-y-3">
                         {remainingAttrs.map(([key, value]) => (
-                            <AttributeRow key={key} label={key} value={value} />
+                            <AttributeRow key={key} attrKey={key} value={value} />
                         ))}
                     </div>
                 </CardContent>
@@ -438,8 +472,8 @@ function AttributesSection({ attrs, category }: { attrs: Record<string, any>; ca
     )
 }
 
-function AttributeRow({ label, value }: { label: string; value: any }) {
-    const formattedLabel = label.replace(/_/g, ' ')
+function AttributeRow({ attrKey, value }: { attrKey: string; value: any }) {
+    const label = formatAttributeLabel(attrKey)
 
     if (value === undefined || value === null) return null
 
@@ -447,7 +481,7 @@ function AttributeRow({ label, value }: { label: string; value: any }) {
     if (Array.isArray(value)) {
         return (
             <div>
-                <p className="text-sm text-muted-foreground mb-2 capitalize">{formattedLabel}</p>
+                <p className="text-sm text-muted-foreground mb-2">{label}</p>
                 <div className="flex flex-wrap gap-2">
                     {value.map((item, i) => (
                         <Badge key={i} variant="secondary" className="text-xs">
@@ -463,7 +497,7 @@ function AttributeRow({ label, value }: { label: string; value: any }) {
     if (typeof value === 'boolean') {
         return (
             <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                <span className="text-sm text-muted-foreground capitalize">{formattedLabel}</span>
+                <span className="text-sm text-muted-foreground">{label}</span>
                 <Badge variant={value ? "success" : "secondary"} className="text-xs">
                     {value ? 'Yes' : 'No'}
                 </Badge>
@@ -475,7 +509,7 @@ function AttributeRow({ label, value }: { label: string; value: any }) {
     if (typeof value === 'object') {
         return (
             <div>
-                <p className="text-sm text-muted-foreground mb-2 capitalize">{formattedLabel}</p>
+                <p className="text-sm text-muted-foreground mb-2">{label}</p>
                 <pre className="bg-muted p-3 rounded text-xs text-muted-foreground overflow-x-auto">
                     {JSON.stringify(value, null, 2)}
                 </pre>
@@ -483,12 +517,50 @@ function AttributeRow({ label, value }: { label: string; value: any }) {
         )
     }
 
+    const strValue = String(value)
+
+    // Render URLs as clickable links
+    if (typeof value === 'string' && isURL(value)) {
+        return (
+            <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <span className="text-sm text-muted-foreground">{label}</span>
+                <a
+                    href={value}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-medium text-international-orange hover:underline inline-flex items-center gap-1"
+                >
+                    {new URL(value).hostname.replace(/^www\./, '')}
+                    <ExternalLink className="h-3 w-3" />
+                </a>
+            </div>
+        )
+    }
+
+    // Render ISO dates as human-readable
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}(T|\s)/.test(value)) {
+        const date = new Date(value)
+        if (!isNaN(date.getTime())) {
+            const formatted = date.toLocaleDateString('en-GB', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+            })
+            return (
+                <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                    <span className="text-sm text-muted-foreground">{label}</span>
+                    <span className="text-sm font-medium text-foreground">{formatted}</span>
+                </div>
+            )
+        }
+    }
+
     // Render strings/numbers
     return (
         <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
-            <span className="text-sm text-muted-foreground capitalize">{formattedLabel}</span>
+            <span className="text-sm text-muted-foreground">{label}</span>
             <span className="text-sm font-medium text-foreground">
-                {String(value)}
+                {strValue}
             </span>
         </div>
     )

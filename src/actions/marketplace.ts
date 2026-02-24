@@ -163,6 +163,8 @@ export async function getSavedResources() {
     })
 }
 
+export type VerificationTier = 'unverified' | 'claimed' | 'verified'
+
 export interface MarketplaceListing {
     id: string
     category: 'People' | 'Products' | 'Services' | 'AI'
@@ -173,6 +175,8 @@ export interface MarketplaceListing {
     attributes: Record<string, any>
     image_url: string | null
     is_verified: boolean
+    /** Three-tier verification: unverified → claimed → verified */
+    verification_tier: VerificationTier
     /** Whether this listing is demo/sample data vs a real user's listing */
     is_demo: boolean
     /** Provider profile ID linking to the real user who created this listing */

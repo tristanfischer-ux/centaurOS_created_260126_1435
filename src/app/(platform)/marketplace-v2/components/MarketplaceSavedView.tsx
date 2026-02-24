@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn, getInitials } from '@/lib/utils'
 import { safeParseAttributes } from '@/lib/marketplace-utils'
+import { VerificationBadge } from '@/components/marketplace/VerificationBadge'
 import {
     getCategoryBadgeClasses,
     getAvatarGradient,
@@ -254,9 +255,7 @@ export function MarketplaceSavedView({
                                         <h3 className="text-sm font-semibold text-foreground truncate">
                                             {listing.title}
                                         </h3>
-                                        {listing.is_verified && (
-                                            <ShieldCheck className="w-3.5 h-3.5 text-status-success shrink-0" aria-label="Verified" />
-                                        )}
+                                        <VerificationBadge tier={listing.verification_tier} />
                                     </div>
                                     <p className="text-xs text-muted-foreground truncate">
                                         {headline || listing.description}

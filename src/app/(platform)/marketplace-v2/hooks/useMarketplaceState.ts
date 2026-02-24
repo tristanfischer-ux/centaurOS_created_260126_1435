@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import type { MarketplaceListing, MarketplaceSortOption } from '@/actions/marketplace'
 import { searchMarketplaceListings } from '@/actions/marketplace'
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
-import { safeParseAttributes, safeStringArray } from '@/lib/marketplace-utils'
+import { safeParseAttributes, safeStringArray, deriveRegion, type MarketplaceRegion } from '@/lib/marketplace-utils'
 import { getTechniqueById } from '@/lib/manufacturing-techniques'
 import type { ManufacturingTechnique } from '@/lib/manufacturing-techniques/types'
 
@@ -119,6 +119,7 @@ export function useMarketplaceState({
     const [selectedListing, setSelectedListing] = useState<MarketplaceListing | null>(null)
     /** When set, shows "AI interpreted" badge with this explanation. Cleared when user changes filters. */
     const [aiInterpretation, setAIInterpretation] = useState<string | null>(null)
+    const [selectedRegion, setSelectedRegion] = useState<MarketplaceRegion>('All Regions')
 
     // Server-driven listing state
     const [listings, setListings] = useState<MarketplaceListing[]>(initialListings)
@@ -303,6 +304,7 @@ export function useMarketplaceState({
         setSelectedSubcategories(new Set())
         setSortBy('relevance')
         setAIInterpretation(null)
+        setSelectedRegion('All Regions')
         if (techniqueSlug) {
             const params = new URLSearchParams(searchParams?.toString() || '')
             params.delete('technique')
@@ -316,8 +318,9 @@ export function useMarketplaceState({
             debouncedQuery.trim() !== '' ||
             selectedSubcategories.size > 0 ||
             sortBy !== 'relevance' ||
-            activeTechnique !== null,
-        [debouncedQuery, selectedSubcategories.size, sortBy, activeTechnique]
+            activeTechnique !== null ||
+            selectedRegion !== 'All Regions',
+        [debouncedQuery, selectedSubcategories.size, sortBy, activeTechnique, selectedRegion]
     )
 
     const filteredListings = useMemo(() => {
@@ -347,8 +350,16 @@ export function useMarketplaceState({
                 )
             })
         }
+        // Client-side region filtering
+        if (selectedRegion !== 'All Regions') {
+            result = result.filter(l => {
+                const attrs = safeParseAttributes(l.attributes)
+                const region = deriveRegion(attrs)
+                return region === selectedRegion
+            })
+        }
         return result
-    }, [listings, activeTechnique])
+    }, [listings, activeTechnique, selectedRegion])
 
     const availableSubcategories = useMemo(() => {
         const catListings =
@@ -405,6 +416,8 @@ export function useMarketplaceState({
         setSelectedListing,
         clearFilters,
         clearTechniqueFilter,
+        selectedRegion,
+        setSelectedRegion,
         aiInterpretation,
         applyAIFilters,
         clearAIInterpretation,

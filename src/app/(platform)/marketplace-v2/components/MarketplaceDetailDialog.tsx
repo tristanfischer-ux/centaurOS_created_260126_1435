@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import {
     Dialog,
     DialogContent,
@@ -34,10 +35,14 @@ import {
     ExternalLink,
     CheckCircle2,
     FlaskConical,
+    Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { ActOnThisButton } from '@/components/smart/act-on-this-button'
 import { InviteToCompanyButton } from '@/components/marketplace/invite-to-company-button'
+import { contactExpert } from '@/actions/messaging'
+import { toast } from 'sonner'
+import { VerificationBadge } from '@/components/marketplace/VerificationBadge'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
 interface MarketplaceDetailDialogProps {
@@ -56,6 +61,8 @@ function getAIIcon(subcategory: string): React.ComponentType<{ className?: strin
 }
 
 export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailDialogProps) {
+    const [isSendingEnquiry, setIsSendingEnquiry] = useState(false)
+
     if (!listing) return null
 
     const attrs = safeParseAttributes(listing.attributes)
@@ -75,6 +82,28 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
     const tags = safeStringArray(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications)
     const hiredCount = attrs.total_bookings as number | undefined
     const specialties = safeStringArray(attrs.specialties || attrs.capabilities)
+    const isPeople = listing.category === 'People'
+
+    const handleSendEnquiry = async () => {
+        const providerId = attrs.provider_id as string
+        if (!providerId) {
+            toast.error('Unable to contact this provider')
+            return
+        }
+        setIsSendingEnquiry(true)
+        try {
+            const result = await contactExpert(providerId, listing.id)
+            if (result.success) {
+                toast.success('Conversation started! Check the Messages sidebar.')
+            } else {
+                toast.error(result.error || 'Failed to start conversation')
+            }
+        } catch {
+            toast.error('Failed to send enquiry')
+        } finally {
+            setIsSendingEnquiry(false)
+        }
+    }
 
     return (
         <Dialog open={!!listing} onOpenChange={() => onClose()}>
@@ -107,12 +136,7 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                                         >
                                             {listing.subcategory}
                                         </Badge>
-                                        {listing.is_verified && (
-                                            <Badge variant="secondary" className="gap-1 text-status-success bg-status-success-light border-0 text-xs">
-                                                <ShieldCheck className="w-3 h-3" aria-hidden="true" />
-                                                Verified
-                                            </Badge>
-                                        )}
+                                        <VerificationBadge tier={listing.verification_tier} showLabel />
                                         {listing.is_demo && (
                                             <Badge variant="secondary" className="gap-1 text-muted-foreground bg-muted border-0 text-xs">
                                                 <FlaskConical className="w-3 h-3" aria-hidden="true" />
@@ -226,7 +250,7 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                                     )}
                                 </div>
 
-                                {listing.is_verified && (
+                                {listing.verification_tier !== 'unverified' && (
                                     <div className="flex items-center gap-1.5 text-xs text-status-success">
                                         <ShieldCheck className="w-4 h-4" aria-hidden="true" />
                                         <span className="font-medium">Escrow Protected</span>
@@ -238,18 +262,28 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                                 {/* Invite to Company — shown to Founders for real People listings */}
                                 <InviteToCompanyButton listing={listing} />
 
-                                <Button className="flex-1 gap-2 h-12" asChild>
-                                    <Link href={`/marketplace/${listing.id}/book`}>
-                                        <CalendarDays className="w-4 h-4" />
-                                        {listing.category === 'People' ? 'Book Now' :
-                                         listing.category === 'Products' ? 'Request Quote' :
-                                         listing.category === 'AI' ? 'Get Started' : 'Hire Now'}
-                                    </Link>
-                                </Button>
-                                <Button variant="secondary" className="flex-1 gap-2 h-12" disabled>
-                                    <MessageSquare className="w-4 h-4" />
-                                    Send Message (Coming soon)
-                                </Button>
+                                {isPeople ? (
+                                    <Button className="flex-1 gap-2 h-12" asChild>
+                                        <Link href={`/marketplace/${listing.id}/book`}>
+                                            <CalendarDays className="w-4 h-4" />
+                                            Book Now
+                                        </Link>
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="flex-1 gap-2 h-12"
+                                        onClick={handleSendEnquiry}
+                                        disabled={isSendingEnquiry}
+                                    >
+                                        {isSendingEnquiry ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <MessageSquare className="w-4 h-4" />
+                                        )}
+                                        {listing.category === 'Products' ? 'Request Quote' :
+                                         listing.category === 'AI' ? 'Get Started' : 'Send Enquiry'}
+                                    </Button>
+                                )}
                             </div>
 
                             {/* Act on this - turn into objective/task */}

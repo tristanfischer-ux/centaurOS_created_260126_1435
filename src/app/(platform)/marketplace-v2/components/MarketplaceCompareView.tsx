@@ -17,6 +17,7 @@ import {
     Briefcase,
     Users,
     CalendarDays,
+    MessageSquare,
     ArrowLeft,
     X,
     Heart,
@@ -30,6 +31,7 @@ import {
 import Link from 'next/link'
 import { saveMarketplaceListing, unsaveMarketplaceListing } from '@/actions/marketplace'
 import { toast } from 'sonner'
+import { VerificationBadge } from '@/components/marketplace/VerificationBadge'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
 interface MarketplaceCompareViewProps {
@@ -114,11 +116,8 @@ function getComparisonValue(listing: MarketplaceListing, key: string): React.Rea
         case 'experience':
             return (attrs.experience as string) || '—'
         case 'verified':
-            return listing.is_verified ? (
-                <div className="flex items-center gap-1 text-status-success">
-                    <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
-                    <span>Yes</span>
-                </div>
+            return listing.verification_tier !== 'unverified' ? (
+                <VerificationBadge tier={listing.verification_tier} showLabel />
             ) : (
                 <div className="flex items-center gap-1 text-muted-foreground">
                     <MinusCircle className="w-4 h-4" aria-hidden="true" />
@@ -387,14 +386,21 @@ export function MarketplaceCompareView({
                             </td>
                             {listings.map((listing) => (
                                 <td key={listing.id} className="px-4 py-4 text-center border-l border-border">
-                                    <Button size="sm" className="gap-1.5" asChild>
-                                        <Link href={`/marketplace/${listing.id}/book`}>
-                                            <CalendarDays className="w-3.5 h-3.5" />
-                                            {listing.category === 'People' ? 'Book' :
-                                             listing.category === 'Products' ? 'Quote' :
-                                             listing.category === 'AI' ? 'Try' : 'Hire'}
-                                        </Link>
-                                    </Button>
+                                    {listing.category === 'People' ? (
+                                        <Button size="sm" className="gap-1.5" asChild>
+                                            <Link href={`/marketplace/${listing.id}/book`}>
+                                                <CalendarDays className="w-3.5 h-3.5" />
+                                                Book
+                                            </Link>
+                                        </Button>
+                                    ) : (
+                                        <Button size="sm" className="gap-1.5" asChild>
+                                            <Link href={`/marketplace/${listing.id}`}>
+                                                <MessageSquare className="w-3.5 h-3.5" />
+                                                Enquire
+                                            </Link>
+                                        </Button>
+                                    )}
                                 </td>
                             ))}
                         </tr>

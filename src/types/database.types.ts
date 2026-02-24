@@ -7607,6 +7607,7 @@ export type Database = {
           search_vector: unknown
           subcategory: string
           title: string
+          verification_tier: Database["public"]["Enums"]["verification_tier"]
         }
         Insert: {
           approval_notes?: string | null
@@ -7629,6 +7630,7 @@ export type Database = {
           search_vector?: unknown
           subcategory: string
           title: string
+          verification_tier?: Database["public"]["Enums"]["verification_tier"]
         }
         Update: {
           approval_notes?: string | null
@@ -7651,6 +7653,7 @@ export type Database = {
           search_vector?: unknown
           subcategory?: string
           title?: string
+          verification_tier?: Database["public"]["Enums"]["verification_tier"]
         }
         Relationships: [
           {
@@ -17449,6 +17452,7 @@ export type Database = {
         | "Completed"
         | "Pending_Peer_Review"
         | "Pending_Executive_Approval"
+      verification_tier: "unverified" | "claimed" | "verified"
     }
     CompositeTypes: {
       geometry_dump: {
@@ -17684,6 +17688,7 @@ export const Constants = {
         "Pending_Peer_Review",
         "Pending_Executive_Approval",
       ],
+      verification_tier: ["unverified", "claimed", "verified"],
     },
   },
 } as const

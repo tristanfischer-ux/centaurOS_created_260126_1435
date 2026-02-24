@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SORT_OPTIONS, type SortOption, type MarketplaceCategory } from '../hooks/useMarketplaceState'
+import { REGION_OPTIONS, type MarketplaceRegion } from '@/lib/marketplace-utils'
 
 /**
  * Category pill configuration with icons and active colors.
@@ -89,6 +90,10 @@ interface MarketplaceToolbarProps {
      * Defaults to all categories.
      */
     visibleCategories?: { id: MarketplaceCategory; label: string; icon: string }[]
+    /** Currently selected region filter. */
+    selectedRegion?: MarketplaceRegion
+    /** Called when user changes the region filter. */
+    onRegionChange?: (region: MarketplaceRegion) => void
 }
 
 /**
@@ -117,6 +122,8 @@ export function MarketplaceToolbar({
     aiInterpretation = null,
     onClearAIInterpretation,
     visibleCategories,
+    selectedRegion = 'All Regions',
+    onRegionChange,
 }: MarketplaceToolbarProps) {
     const [showSuggestions, setShowSuggestions] = useState(false)
     const searchRef = useRef<HTMLInputElement>(null)
@@ -279,8 +286,23 @@ export function MarketplaceToolbar({
                     )}
                 </div>
 
-                {/* Sort + Filter buttons */}
+                {/* Region + Sort + Filter buttons */}
                 <div className="flex items-center gap-2">
+                    {onRegionChange && (
+                        <Select value={selectedRegion} onValueChange={(val) => onRegionChange(val as MarketplaceRegion)}>
+                            <SelectTrigger className="w-[140px]" aria-label="Filter by region">
+                                <SelectValue placeholder="Region" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {REGION_OPTIONS.map((region) => (
+                                    <SelectItem key={region} value={region}>
+                                        {region}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+
                     <Select value={sortBy} onValueChange={(val) => onSortChange(val as SortOption)}>
                         <SelectTrigger className="w-[160px]" aria-label="Sort listings">
                             <SelectValue placeholder="Sort by" />

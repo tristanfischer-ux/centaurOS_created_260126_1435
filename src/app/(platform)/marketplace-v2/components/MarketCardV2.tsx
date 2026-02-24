@@ -28,6 +28,7 @@ import {
 import { saveMarketplaceListing, unsaveMarketplaceListing } from '@/actions/marketplace'
 import { toast } from 'sonner'
 import { ActOnThisButton } from '@/components/smart/act-on-this-button'
+import { VerificationBadge } from '@/components/marketplace/VerificationBadge'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
 interface MarketCardV2Props {
@@ -228,9 +229,7 @@ export const MarketCardV2 = memo(function MarketCardV2({
                             >
                                 {listing.subcategory}
                             </Badge>
-                            {listing.is_verified && (
-                                <ShieldCheck className="w-3.5 h-3.5 text-status-success shrink-0" aria-label="Verified" />
-                            )}
+                            <VerificationBadge tier={listing.verification_tier} />
                         </div>
 
                         {/* Title */}

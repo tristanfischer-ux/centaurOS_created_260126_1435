@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import { saveMarketplaceListing, unsaveMarketplaceListing } from '@/actions/marketplace'
 import { toast } from 'sonner'
+import { VerificationBadge } from '@/components/marketplace/VerificationBadge'
 import type { MarketplaceListing } from '@/actions/marketplace'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Loader2 } from 'lucide-react'
@@ -175,9 +176,7 @@ function ListRow({
                     >
                         {listing.subcategory}
                     </Badge>
-                    {listing.is_verified && (
-                        <ShieldCheck className="w-3 h-3 text-status-success shrink-0" aria-label="Verified" />
-                    )}
+                    <VerificationBadge tier={listing.verification_tier} size="sm" />
                 </div>
                 <h3 className="text-sm font-semibold text-foreground truncate mt-0.5">
                     {listing.title}

@@ -85,6 +85,7 @@ export function TeamMap({
       attributes: { rate: p.rate, expertise: p.tags, skills: p.tags },
       image_url: null,
       is_verified: p.isVerified,
+      verification_tier: p.isVerified ? 'claimed' : 'unverified',
       is_demo: false,
       created_by_provider_id: null,
     }

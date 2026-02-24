@@ -286,6 +286,8 @@ export function MarketplaceBrowse({
                         aiInterpretation={state.aiInterpretation}
                         onClearAIInterpretation={state.clearAIInterpretation}
                         visibleCategories={state.visibleCategories}
+                        selectedRegion={state.selectedRegion}
+                        onRegionChange={state.setSelectedRegion}
                     />
 
                     {/* Technique filter banner (conditional - when arriving from Techniques Explorer) */}
