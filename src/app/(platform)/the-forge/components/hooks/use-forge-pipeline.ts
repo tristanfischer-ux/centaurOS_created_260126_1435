@@ -9,7 +9,9 @@
  */
 
 import { useState, useCallback } from "react"
+import { usePathname } from "next/navigation"
 import { toast } from "sonner"
+import { useBackgroundOps } from "@/contexts/background-ops-context"
 
 import {
   analyzeModulesAction,
@@ -68,6 +70,9 @@ export function useForgePipeline({
   specRef,
   setSpecDirect,
 }: UseForgePipelineOptions): UseForgePipelineReturn {
+  const pathname = usePathname()
+  const { startOp, updateOp: updateBgOp, completeOp, failOp } = useBackgroundOps()
+
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isRunningStructural, setIsRunningStructural] = useState(false)
   const [isRunningConvergence, setIsRunningConvergence] = useState(false)
@@ -156,12 +161,24 @@ export function useForgePipeline({
   const handleRunFullPipeline = useCallback(async (): Promise<void> => {
     setPipelineProgress({ isRunning: true, stages: INITIAL_PIPELINE_STAGES.map((s) => ({ ...s })) })
 
+    // FLOW: Register with global background ops so progress survives navigation
+    const bgOpId = startOp("Full pipeline analysis", pathname)
+
     // Functional updater avoids stale closure over a mutable local array
     const updateStage = (id: PipelineStageId, update: Partial<PipelineStageStatus>): void => {
       setPipelineProgress((prev) => ({
         ...prev,
         stages: prev.stages.map((s) => (s.id === id ? { ...s, ...update } : s)),
       }))
+    }
+
+    // Progress mapping: 5 stages × 20% each
+    const STAGE_PROGRESS: Record<string, number> = {
+      mass_dfm: 0,
+      structural: 20,
+      thermal: 40,
+      topology: 60,
+      convergence: 80,
     }
 
     type StageRunner = { id: PipelineStageId; label: string; run: () => Promise<{ spec: XRaySpec } | { error: string }> }
@@ -178,6 +195,7 @@ export function useForgePipeline({
       // Stages 1-4: sequential analysis passes
       for (const stage of stageRunners) {
         updateStage(stage.id, { status: "running" })
+        updateBgOp(bgOpId, { progress: STAGE_PROGRESS[stage.id], stepLabel: stage.label })
         toast.info(`Pipeline: Running ${stage.label}...`)
         try {
           const r = await stage.run()
@@ -195,18 +213,20 @@ export function useForgePipeline({
         }
         // Abort pipeline on first error — downstream stages depend on prior results
         if (hasError) {
-          toast.error(`Pipeline stopped: ${stage.label} failed. Fix the issue and re-run.`)
+          failOp(bgOpId, `Pipeline stopped: ${stage.label} failed`)
           return
         }
       }
 
       // Stage 5: Convergence evaluation
       updateStage("convergence", { status: "running" })
+      updateBgOp(bgOpId, { progress: STAGE_PROGRESS.convergence, stepLabel: "Convergence Check" })
       toast.info("Pipeline: Evaluating convergence criteria...")
       try {
         const r = await runConvergenceStepAction(scanId)
         if ("error" in r) {
           updateStage("convergence", { status: "error", error: r.error })
+          failOp(bgOpId, "Convergence evaluation failed")
         } else {
           setSpecDirect(r.spec)
           updateStage("convergence", { status: "complete" })
@@ -219,18 +239,19 @@ export function useForgePipeline({
           }))
 
           if (r.evaluation.isConverged) {
-            toast.success("Full analysis pipeline complete — all criteria met!")
+            completeOp(bgOpId, "Full analysis pipeline complete — all criteria met!")
           } else {
-            toast.info(`Pipeline complete — ${r.evaluation.proposedChanges.length} design changes proposed`)
+            completeOp(bgOpId, `Pipeline complete — ${r.evaluation.proposedChanges.length} design changes proposed`)
           }
         }
       } catch (err) {
         updateStage("convergence", { status: "error", error: err instanceof Error ? err.message : "Unknown" })
+        failOp(bgOpId, "Convergence evaluation failed")
       }
     } finally {
       setPipelineProgress((prev) => ({ ...prev, isRunning: false }))
     }
-  }, [scanId, setSpecDirect])
+  }, [scanId, setSpecDirect, pathname, startOp, updateBgOp, completeOp, failOp])
 
   const dismissPipelineChanges = useCallback((): void => {
     setPipelineProgress((prev) => ({

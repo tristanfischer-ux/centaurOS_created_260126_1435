@@ -18,11 +18,13 @@ import { ZoomProvider, MobileZoomControl } from "@/components/ZoomProvider";
 import { MainContentArea } from "@/components/MainContentArea";
 import { ScreenContextProvider } from "@/contexts/screen-context";
 import { AdvisorPanelProvider } from "@/contexts/advisor-panel-context";
+import { BackgroundOpsProvider } from "@/contexts/background-ops-context";
 
 import { BrowseContextProvider } from "@/contexts/browse-context";
 import { AdvisorPanel } from "@/components/specialists/advisor-panel";
 import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
 import { ProfileSetupRequired } from "@/components/ProfileSetupRequired";
+import { BackgroundOpsIndicator } from "@/components/BackgroundOpsIndicator";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedLayoutData } from "@/lib/supabase/cached-layout-data";
 import { redirect } from "next/navigation";
@@ -94,6 +96,7 @@ export default async function PlatformLayout({
         <TooltipProvider>
             <PresenceProvider>
                 <ZoomProvider>
+                  <BackgroundOpsProvider>
                   <AdvisorPanelProvider>
                   <BrowseContextProvider>
                   <ScreenContextProvider>
@@ -126,6 +129,7 @@ export default async function PlatformLayout({
                         <PWARegister />
                         <DragDropPolyfill />
                         <OfflineIndicator />
+                        <BackgroundOpsIndicator />
                         <ActivityTracker />
                         {!needsProfileRepair && (
                             <>
@@ -140,6 +144,7 @@ export default async function PlatformLayout({
                   </ScreenContextProvider>
                   </BrowseContextProvider>
                   </AdvisorPanelProvider>
+                  </BackgroundOpsProvider>
                 </ZoomProvider>
             </PresenceProvider>
         </TooltipProvider>
