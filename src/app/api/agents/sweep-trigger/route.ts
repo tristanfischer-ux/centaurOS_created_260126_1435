@@ -8,7 +8,7 @@
  *
  * Event → Specialist Mapping:
  * - objective_created/updated → Sage (strategy) + Priya (product)
- * - task_overdue → Cal (chief of staff) + domain specialist
+ * - task_overdue → Cal (chief of staff) + Priya (product)
  * - financial_data_updated → Finn (finance) + Fiona (fundraising)
  * - team_member_added → Harper (HR)
  * - contract_expiring → Leo (legal)
@@ -48,9 +48,9 @@ const EVENT_SPECIALIST_MAP: Record<string, string[]> = {
   'objective_at_risk': ['chief-of-staff', 'strategist', 'product-lead'],
 
   // Tasks
-  'task_overdue': ['chief-of-staff', 'forge-ops'],
+  'task_overdue': ['chief-of-staff', 'product-lead'],
   'task_blocked': ['chief-of-staff', 'product-lead'],
-  'tasks_bulk_completed': ['chief-of-staff', 'forge-ops'],
+  'tasks_bulk_completed': ['chief-of-staff', 'strategist'],
 
   // Financial
   'financial_data_updated': ['finance-lead', 'fundraising-advisor'],
@@ -71,8 +71,8 @@ const EVENT_SPECIALIST_MAP: Record<string, string[]> = {
   'compliance_deadline': ['legal-counsel', 'chief-of-staff'],
 
   // Operations
-  'production_bottleneck': ['forge-ops'],
-  'capacity_threshold': ['forge-ops', 'chief-of-staff'],
+  'production_bottleneck': ['vp-manufacturing'],
+  'capacity_threshold': ['vp-manufacturing', 'chief-of-staff'],
 
   // General
   'weekly_review': ['chief-of-staff', 'finance-lead', 'strategist'],

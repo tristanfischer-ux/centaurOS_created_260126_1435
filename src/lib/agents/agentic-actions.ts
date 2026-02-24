@@ -830,10 +830,10 @@ async function autoFollowUpOnDecisionOutcomes(foundryId: string): Promise<number
         p_urgency: 'informational',
         p_title: `How did it go? "${decisionPreview}"`,
         p_body: `${daysSince} days ago, you decided: "${d.decision.slice(0, 200)}". How did that turn out? Understanding outcomes helps me give you better advice next time.`,
-        p_domain_data: JSON.stringify({ decision_id: d.id, days_since: daysSince }),
-        p_suggested_actions: JSON.stringify([
+        p_domain_data: { decision_id: d.id, days_since: daysSince },
+        p_suggested_actions: [
           { label: `Tell ${SPECIALISTS.find(s => s.id === d.specialist_id)?.name ?? 'me'} how it went`, action_type: 'open_specialist', action_data: { specialist_id: d.specialist_id } },
-        ]),
+        ],
       })
 
       if (!error) created++
