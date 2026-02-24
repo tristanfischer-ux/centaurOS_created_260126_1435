@@ -1059,6 +1059,8 @@ Rules:
                 tools: specialistTools,
                 foundryId,
                 specialistId,
+                userId: user.id,
+                threadId,
             })
         }
         if (modality === "text") {
@@ -1354,6 +1356,8 @@ interface ToolAwareStreamingParams {
     tools: ToolDefinition[]
     foundryId: string
     specialistId: string
+    userId?: string
+    threadId?: string
 }
 
 /**
@@ -1379,7 +1383,7 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
     const {
         chain, finalPrompt, systemPrompt, onComplete, enableThinking,
         history, rolloutId, enableWebSearch, groundingLayers,
-        tools, foundryId, specialistId,
+        tools, foundryId, specialistId, userId, threadId,
     } = params
 
     const encoder = new TextEncoder()
@@ -1580,7 +1584,7 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                                 const result = await executeToolCall(
                                     toolBlock.name,
                                     (toolBlock.input ?? {}) as Record<string, unknown>,
-                                    { foundryId },
+                                    { foundryId, specialistId, userId, threadId },
                                 )
                                 return {
                                     type: "tool_result" as const,

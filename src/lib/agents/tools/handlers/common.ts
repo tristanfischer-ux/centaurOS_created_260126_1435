@@ -19,6 +19,9 @@ import { createAdminClient } from "@/lib/supabase/admin"
 
 export interface ToolHandlerContext {
     foundryId: string
+    specialistId?: string
+    userId?: string
+    threadId?: string
 }
 
 export type ToolHandler = (

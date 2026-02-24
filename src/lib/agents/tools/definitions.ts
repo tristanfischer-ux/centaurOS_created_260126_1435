@@ -226,6 +226,61 @@ export const PEOPLE_TOOLS: ToolDefinition[] = [
     },
 ]
 
+// ─── Marketing Tools ─────────────────────────────────────────────
+
+export const MARKETING_TOOLS: ToolDefinition[] = [
+    {
+        name: "query_growth_metrics",
+        description:
+            "Query growth and marketing-related metrics: objectives and tasks with growth/marketing keywords, activity trends over a configurable period, and completion velocity. Use this to assess marketing initiatives and growth momentum.",
+        parameters: {
+            type: "object",
+            properties: {
+                days: {
+                    type: "number",
+                    description: "Look-back period in days. Defaults to 30.",
+                },
+            },
+            required: [],
+        },
+    },
+    {
+        name: "query_competitor_landscape",
+        description:
+            "Query the competitive landscape context: company profile (sector, stage, revenue range), strategic goals, and competitive positioning data. Use this for market analysis and competitive strategy.",
+        parameters: {
+            type: "object",
+            properties: {},
+            required: [],
+        },
+    },
+]
+
+// ─── Legal Tools ─────────────────────────────────────────────────
+
+export const LEGAL_TOOLS: ToolDefinition[] = [
+    {
+        name: "query_compliance_status",
+        description:
+            "Query the compliance and risk status: high-risk/urgent tasks, blocked items, overdue work, and compliance-related tasks. Use this to assess legal risk exposure and compliance gaps.",
+        parameters: {
+            type: "object",
+            properties: {},
+            required: [],
+        },
+    },
+    {
+        name: "query_contracts_overview",
+        description:
+            "Query contracts and financial commitments: invoice history, funding pipeline, and vendor relationships. Use this to understand the company's contractual obligations and financial commitments.",
+        parameters: {
+            type: "object",
+            properties: {},
+            required: [],
+        },
+    },
+]
+
 // ─── Strategy Tools ──────────────────────────────────────────────────
 
 export const STRATEGY_TOOLS: ToolDefinition[] = [

@@ -27,6 +27,8 @@ import {
     PRODUCT_TOOLS,
     PEOPLE_TOOLS,
     STRATEGY_TOOLS,
+    MARKETING_TOOLS,
+    LEGAL_TOOLS,
 } from "./definitions"
 
 import {
@@ -44,6 +46,8 @@ import {
 } from "./handlers/domain"
 import { handleRunCalculation } from "./handlers/compute"
 import { handleWebSearch } from "./handlers/web-search"
+import { handleQueryGrowthMetrics, handleQueryCompetitorLandscape } from "./handlers/marketing"
+import { handleQueryComplianceStatus, handleQueryContractsOverview } from "./handlers/legal"
 
 // ─── Tool Name → Handler Map ─────────────────────────────────────────
 
@@ -68,6 +72,14 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
 
     // Strategy tools
     query_strategic_goals: handleQueryStrategicGoals,
+
+    // Marketing tools
+    query_growth_metrics: handleQueryGrowthMetrics,
+    query_competitor_landscape: handleQueryCompetitorLandscape,
+
+    // Legal tools
+    query_compliance_status: handleQueryComplianceStatus,
+    query_contracts_overview: handleQueryContractsOverview,
 
     // Utility tools
     run_calculation: handleRunCalculation,
@@ -100,8 +112,8 @@ const SPECIALIST_TOOLS: Record<SpecialistId, ToolDefinition[]> = {
     // Product Lead — product roadmap + common
     "product-lead": [...COMMON_TOOLS, ...PRODUCT_TOOLS, TOOL_RUN_CALCULATION],
 
-    // Growth Marketing — common + web search for competitive research
-    "growth-marketer": [...COMMON_TOOLS],
+    // Growth Marketing — common + marketing tools + calculation
+    "growth-marketer": [...COMMON_TOOLS, ...MARKETING_TOOLS, TOOL_RUN_CALCULATION],
 
     // Sales Lead — common + financial overview (revenue context)
     "sales-lead": [...COMMON_TOOLS, ...FINANCE_TOOLS],
@@ -124,8 +136,8 @@ const SPECIALIST_TOOLS: Record<SpecialistId, ToolDefinition[]> = {
     // People/HR — people tools + team overview
     "hiring-team": [...COMMON_TOOLS, ...PEOPLE_TOOLS],
 
-    // Legal Counsel — common tools only
-    "legal-counsel": [...COMMON_TOOLS],
+    // Legal Counsel — common tools + legal tools
+    "legal-counsel": [...COMMON_TOOLS, ...LEGAL_TOOLS],
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
