@@ -819,8 +819,8 @@ export function BriefSpecialistDialog({
 }: BriefSpecialistDialogProps) {
     const isPanel = renderMode === "panel"
 
-    // ─── AdvisorPanel State (for panel mode only) ────────────────────────────
-    const advisorPanel = isPanel ? useAdvisorPanel() : null
+    // ─── AdvisorPanel State (always call hook, use result conditionally) ─────
+    const advisorPanel = useAdvisorPanel()
 
     // ─── State ────────────────────────────────────────────────────────────
     const [briefText, setBriefText] = useState("")
@@ -2587,7 +2587,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 </PopoverContent>
             </Popover>
                 {/* Fullscreen toggle button (panel mode only) */}
-                {isPanel && advisorPanel && (
+                {isPanel && (
                     <Button
                         variant="ghost"
                         size="sm"
