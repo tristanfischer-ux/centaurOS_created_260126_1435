@@ -17512,6 +17512,7 @@ export const Constants = {
         "partial_release",
         "released",
         "refunded",
+        "partial_refund",
       ],
       feedback_category: ["bug", "idea", "confusion", "praise"],
       funding_stage: [
