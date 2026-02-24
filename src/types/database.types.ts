@@ -8789,6 +8789,7 @@ export type Database = {
           is_milestone: boolean
           is_private: boolean
           is_strategic_goal: boolean | null
+          metadata: Json | null
           milestone_date: string | null
           milestone_order_index: number
           owner_agent_id: string | null
@@ -8823,6 +8824,7 @@ export type Database = {
           is_milestone?: boolean
           is_private?: boolean
           is_strategic_goal?: boolean | null
+          metadata?: Json | null
           milestone_date?: string | null
           milestone_order_index?: number
           owner_agent_id?: string | null
@@ -8857,6 +8859,7 @@ export type Database = {
           is_milestone?: boolean
           is_private?: boolean
           is_strategic_goal?: boolean | null
+          metadata?: Json | null
           milestone_date?: string | null
           milestone_order_index?: number
           owner_agent_id?: string | null

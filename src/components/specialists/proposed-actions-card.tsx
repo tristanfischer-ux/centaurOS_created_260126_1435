@@ -24,6 +24,8 @@ interface ProposedActionsCardProps {
     onCreated?: (count: number) => void
     /** Rollout id from execute response; attached to created tasks for reward attribution. */
     rolloutId?: string | null
+    /** Forge thread id; stored as source_thread_id in task/objective metadata for provenance. */
+    sourceThreadId?: string | null
 }
 
 /** Tracks which proposals have been executed (by index). */
@@ -172,6 +174,7 @@ async function executeCreateActions(params: {
     executed: ExecutedState
     userId: string
     rolloutId?: string | null
+    sourceThreadId?: string | null
     onProgress?: (completed: number, total: number, currentTitle: string) => void
     onItemComplete?: (index: number, result: { success: boolean; id?: string }) => void
 }): Promise<{
@@ -182,7 +185,7 @@ async function executeCreateActions(params: {
     autoCreatedGoals: string[]
     autoCreatedObjectives: string[]
 }> {
-    const { proposals, createIndices, selected, executed, userId, rolloutId, onProgress, onItemComplete } = params
+    const { proposals, createIndices, selected, executed, userId, rolloutId, sourceThreadId, onProgress, onItemComplete } = params
     const results: ExecutedState = { ...executed }
     const rejectedObjectives: string[] = []
     const rejectedTasks: string[] = []
@@ -288,6 +291,7 @@ async function executeCreateActions(params: {
             fd.set("description", p.description.trim().slice(0, 10000))
         }
         fd.set("parent_objective_id", goalId)
+        if (sourceThreadId) fd.set("source_thread_id", sourceThreadId)
 
         const result = await createObjective(fd)
         if (result.error) {
@@ -407,6 +411,7 @@ async function executeCreateActions(params: {
         fd.set("assignee_ids", JSON.stringify([userId]))
         fd.set("objective_id", objectiveId)
         if (rolloutId) fd.set("rollout_id", rolloutId)
+        if (sourceThreadId) fd.set("source_thread_id", sourceThreadId)
 
         const result = await createTask(fd)
         if (result.error) {
@@ -433,6 +438,7 @@ export function ProposedActionsCard({
     onDismiss,
     onCreated,
     rolloutId,
+    sourceThreadId,
 }: ProposedActionsCardProps) {
     const [isExecuting, setIsExecuting] = useState(false)
     const [dismissed, setDismissed] = useState(false)
@@ -671,6 +677,7 @@ export function ProposedActionsCard({
                 executed,
                 userId: user.id,
                 rolloutId,
+                sourceThreadId,
                 onProgress: (completed, total, current) => setProgress({ completed, total, current }),
                 onItemComplete: (index, result) => setExecuted((prev) => ({ ...prev, [index]: result })),
             })
@@ -785,6 +792,7 @@ export function ProposedActionsCard({
                 executed: archiveResults,
                 userId: user.id,
                 rolloutId,
+                sourceThreadId,
                 onProgress: (completed, total, current) => setProgress({ completed, total, current }),
                 onItemComplete: (index, result) => setExecuted((prev) => ({ ...prev, [index]: result })),
             })

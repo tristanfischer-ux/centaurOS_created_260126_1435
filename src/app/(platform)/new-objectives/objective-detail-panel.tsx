@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import {
   X, ListChecks, AlertTriangle, Clock, CheckCircle2,
-  FileText, Circle, Waypoints, ChevronRight, MessageSquare, Pencil,
+  FileText, Circle, Waypoints, ChevronRight, MessageSquare, Pencil, Flame,
 } from 'lucide-react'
 import Link from 'next/link'
 import { getStatusBadgeClass } from '@/lib/status-colors'
@@ -128,6 +128,15 @@ export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect, onEdit 
           <h2 className="text-base font-semibold text-foreground truncate pr-4 min-w-0">
             {objective.title}
           </h2>
+          {objective.metadata?.source_thread_id && (
+            <Link
+              href={`/the-forge?thread=${objective.metadata.source_thread_id}`}
+              className="inline-flex items-center gap-1 text-[11px] text-international-orange hover:underline mt-0.5"
+            >
+              <Flame className="h-3 w-3" />
+              Created from Forge
+            </Link>
+          )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0 mt-1">
           {onEdit && (

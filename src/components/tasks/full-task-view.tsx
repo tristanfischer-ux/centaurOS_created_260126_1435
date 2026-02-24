@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, memo } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { formatDistanceToNow, format } from "date-fns"
 import {
@@ -60,6 +61,7 @@ import {
     Lock,
     Unlock,
     HardDrive,
+    Flame,
 } from "lucide-react"
 import { PrivacyShareControl, PrivacyBadge, type ShareTarget } from "@/components/ui/privacy-share-control"
 import { Database } from "@/types/database.types"
@@ -107,6 +109,7 @@ interface Task {
     objective?: { id: string; title: string } | null
     is_private?: boolean
     creator_id?: string
+    metadata?: unknown
 }
 
 interface Comment {
@@ -651,6 +654,18 @@ function FullTaskViewComponent({ open, onOpenChange, task, members, currentUserI
                                             {task.objective.title}
                                         </p>
                                     )}
+                                    {(() => {
+                                        const tid = task.metadata && typeof task.metadata === 'object' && !Array.isArray(task.metadata) ? (task.metadata as Record<string, unknown>).source_thread_id : null
+                                        return typeof tid === 'string' ? (
+                                            <Link
+                                                href={`/the-forge?thread=${tid}`}
+                                                className="inline-flex items-center gap-1 text-xs text-international-orange hover:underline mt-1"
+                                            >
+                                                <Flame className="h-3 w-3" />
+                                                Created from Forge
+                                            </Link>
+                                        ) : null
+                                    })()}
                                 </div>
                             )}
                         </div>

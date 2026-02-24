@@ -24,7 +24,7 @@ import { formatDistanceToNow } from 'date-fns'
 import {
   X, Calendar, Clock, User, Target, FileText, AlertTriangle,
   MessageSquare, Paperclip, Shield, Eye, Pencil, Waypoints, ChevronRight,
-  Sparkles, Send, Loader2,
+  Sparkles, Send, Loader2, Flame,
 } from 'lucide-react'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
@@ -228,6 +228,15 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
           <h2 className="text-base font-semibold text-foreground leading-snug break-words">
             {task.title}
           </h2>
+          {task.metadata?.source_thread_id && (
+            <Link
+              href={`/the-forge?thread=${task.metadata.source_thread_id}`}
+              className="inline-flex items-center gap-1 text-[11px] text-international-orange hover:underline mt-0.5"
+            >
+              <Flame className="h-3 w-3" />
+              Created from Forge
+            </Link>
+          )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           {onEdit && (

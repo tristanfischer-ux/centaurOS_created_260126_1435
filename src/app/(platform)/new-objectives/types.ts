@@ -44,6 +44,7 @@ export interface ObjectiveWithTasks {
   is_private?: boolean
   is_strategic_goal?: boolean | null
   is_demo?: boolean
+  metadata?: { source_thread_id?: string; [key: string]: unknown } | null
   tasks: ObjectiveTask[]
   totalTasks: number
   completedTasks: number

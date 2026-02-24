@@ -2992,6 +2992,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     proposals={lastAssistantMessage.proposals}
                                     specialist={specialist}
                                     rolloutId={lastAssistantMessage.rolloutId ?? undefined}
+                                    sourceThreadId={threadId}
                                     onDismiss={() => {
                                         setMessages((prev) => {
                                             const idx = prev.map((m, i) => ({ m, i }))

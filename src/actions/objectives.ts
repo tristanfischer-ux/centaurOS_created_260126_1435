@@ -41,6 +41,7 @@ export async function createObjective(formData: FormData) {
         const isPrivate = formData.get('is_private') === 'true'
         const shareWithJson = formData.get('share_with') as string
         const parentObjectiveId = formData.get('parent_objective_id') as string | null
+        const sourceThreadId = (formData.get('source_thread_id') as string)?.trim() || null
 
         // Get selected tasks (handle multiple values with same name)
         const selectedTaskIds = formData.getAll('selectedTaskIds') as string[]
@@ -85,6 +86,7 @@ export async function createObjective(formData: FormData) {
                     foundry_id: foundryId,
                     is_private: isPrivate,
                     ...(parentObjectiveId ? { parent_objective_id: parentObjectiveId } : {}),
+                    ...(sourceThreadId ? { metadata: { source_thread_id: sourceThreadId } } : {}),
                 }).select().single()
                 if (res.error) throw res.error
                 return res.data

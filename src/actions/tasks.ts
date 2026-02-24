@@ -188,6 +188,7 @@ export async function createTask(formData: FormData) {
       const isPrivate = formData.get('is_private') === 'true'
       const shareWithJson = formData.get('share_with') as string
       const rolloutId = (formData.get('rollout_id') as string)?.trim() || null
+      const sourceThreadId = (formData.get('source_thread_id') as string)?.trim() || null
 
       // Parse multiple assignees (if provided)
       let assigneeIds: string[] = [assigneeId]
@@ -278,7 +279,10 @@ export async function createTask(formData: FormData) {
                   risk_level: riskLevel,
                   client_visible: false, // Always hidden initially
                   is_private: isPrivate,
-                  metadata: rolloutId ? { rollout_id: rolloutId } : undefined,
+                  metadata: (rolloutId || sourceThreadId) ? {
+                      ...(rolloutId ? { rollout_id: rolloutId } : {}),
+                      ...(sourceThreadId ? { source_thread_id: sourceThreadId } : {}),
+                  } : undefined,
               }).select().single()
               if (result.error) throw result.error
               return result.data
@@ -2349,6 +2353,7 @@ export async function getTaskById(taskId: string) {
                 foundry_id,
                 is_private,
                 creator_id,
+                metadata,
                 assignee:profiles!assignee_id(id, full_name, role, email, avatar_url),
                 objective:objectives!objective_id(id, title),
                 task_files(id)
