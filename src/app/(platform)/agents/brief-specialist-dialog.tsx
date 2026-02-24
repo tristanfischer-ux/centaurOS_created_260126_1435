@@ -82,6 +82,9 @@ import type { StructuredOutputSpec } from "@/lib/agents/tools/structured-output-
 import { ExternalActionCard } from "@/components/specialists/external-action-card"
 import { validateExternalAction } from "@/lib/agents/tools/permission-guard"
 import type { ProposedExternalAction } from "@/lib/agents/tools/permission-guard"
+import { PageActionCard } from "@/components/specialists/page-action-card"
+import { validatePageAction } from "@/lib/agents/tools/page-action-types"
+import type { ProposedPageAction } from "@/lib/agents/tools/page-action-types"
 import type { Specialist } from "./specialists-data"
 
 // ─── Presentation Intent Detection ───────────────────────────────────────────
@@ -222,6 +225,8 @@ interface ChatMessage {
     charts?: ChartSpec[]
     /** Parsed from PROPOSED_EXTERNAL_ACTION blocks; rendered as ExternalActionCards for founder approval. */
     externalActions?: ProposedExternalAction[]
+    /** Parsed from PROPOSED_PAGE_ACTION blocks; rendered as PageActionCards for founder approval. */
+    pageActions?: ProposedPageAction[]
     /** Parsed from STRUCTURED_OUTPUT blocks; rendered as rich visual components. */
     structuredOutputs?: StructuredOutputSpec[]
 }
@@ -639,6 +644,67 @@ function parseExternalActions(content: string): ProposedExternalAction[] {
 function stripExternalActionBlocks(content: string): string {
     let result = content
     for (const pattern of STRIP_EXTERNAL_ACTION_PATTERNS) {
+        result = result.replace(pattern, "")
+    }
+    return result.trim()
+}
+
+// ─── PROPOSED_PAGE_ACTION Parsing ────────────────────────────────────
+
+/**
+ * Regex patterns to extract PROPOSED_PAGE_ACTION blocks from specialist output.
+ * Same multi-pattern approach as PROPOSED_EXTERNAL_ACTION to handle LLM format variations.
+ */
+const PROPOSED_PAGE_ACTION_PATTERNS: RegExp[] = [
+    /<!--\s*PROPOSED_PAGE_ACTION\s*([\s\S]*?)\s*-->/gi,
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?PROPOSED_PAGE_ACTION\s*\n?([\s\S]*?)\s*(?:-->)?\s*```/gi,
+    /PROPOSED_PAGE_ACTION\s*\n\s*(\{[\s\S]*?\})\s*(?:-->)?/gi,
+]
+
+const STRIP_PAGE_ACTION_PATTERNS: RegExp[] = [
+    /<!--\s*PROPOSED_PAGE_ACTION\s*[\s\S]*?\s*-->/gi,
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?PROPOSED_PAGE_ACTION\s*\n?[\s\S]*?\s*(?:-->)?\s*```/gi,
+    /PROPOSED_PAGE_ACTION\s*\n?\s*\{[\s\S]*?\}\s*(?:-->)?/gi,
+]
+
+/**
+ * Parse all PROPOSED_PAGE_ACTION JSON blocks from specialist response.
+ *
+ * @param content - The raw specialist response text
+ * @returns Array of validated ProposedPageAction objects (empty if none found)
+ */
+function parsePageActions(content: string): ProposedPageAction[] {
+    const actions: ProposedPageAction[] = []
+    for (const pattern of PROPOSED_PAGE_ACTION_PATTERNS) {
+        pattern.lastIndex = 0
+        let match: RegExpExecArray | null
+        while ((match = pattern.exec(content)) !== null) {
+            if (!match[1]) continue
+            try {
+                const parsed = JSON.parse(match[1].trim())
+                const validated = validatePageAction(parsed)
+                if (validated) {
+                    actions.push(validated)
+                }
+            } catch {
+                // JSON parse failed — skip this match
+            }
+        }
+    }
+
+    if (actions.length === 0 && content.includes("PROPOSED_PAGE_ACTION")) {
+        console.warn("[PageActions] Content contains PROPOSED_PAGE_ACTION keyword but no pattern matched.")
+    }
+
+    return actions
+}
+
+/**
+ * Remove all PROPOSED_PAGE_ACTION blocks from display content.
+ */
+function stripPageActionBlocks(content: string): string {
+    let result = content
+    for (const pattern of STRIP_PAGE_ACTION_PATTERNS) {
         result = result.replace(pattern, "")
     }
     return result.trim()
@@ -1502,6 +1568,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             : undefined,
                         handoffSourceThreadId: isFirstExchange ? (handoffSourceThreadId ?? undefined) : undefined,
                         handoffSourceSpecialistId: isFirstExchange ? (handoffSourceSpecialistId ?? undefined) : undefined,
+                        currentRoute: screenContext.route || undefined,
                     }),
                     signal: controller.signal,
                 })
@@ -1818,6 +1885,17 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             }
             displayResponse = stripExternalActionBlocks(displayResponse)
 
+            // Parse PROPOSED_PAGE_ACTION blocks from response (in-app mutations)
+            const parsedPageActions = parsePageActions(displayResponse)
+            if (parsedPageActions.length > 0) {
+                console.info("[SpecialistChat] PROPOSED_PAGE_ACTION blocks parsed:", {
+                    specialist: specialist.id,
+                    actionCount: parsedPageActions.length,
+                    types: parsedPageActions.map((a) => a.type),
+                })
+            }
+            displayResponse = stripPageActionBlocks(displayResponse)
+
             // Parse STRUCTURED_OUTPUT blocks (kanban, comparison, dashboard, org chart)
             const parsedStructuredOutputs = parseStructuredOutputs(displayResponse)
             if (parsedStructuredOutputs.length > 0) {
@@ -1844,6 +1922,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 ...(parsedPlan ? { executionPlan: parsedPlan } : {}),
                 ...(parsedCharts.length > 0 ? { charts: parsedCharts } : {}),
                 ...(parsedExternalActions.length > 0 ? { externalActions: parsedExternalActions } : {}),
+                ...(parsedPageActions.length > 0 ? { pageActions: parsedPageActions } : {}),
                 ...(parsedStructuredOutputs.length > 0 ? { structuredOutputs: parsedStructuredOutputs } : {}),
             }
             setMessages((prev) => [...prev, assistantMessage])
@@ -2953,6 +3032,31 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                             </div>
                         )}
 
+                        {/* Page action proposals (in-app mutations: create project, objective, task) */}
+                        {lastAssistantMessage && !isExecuting && lastAssistantMessage.pageActions && lastAssistantMessage.pageActions.length > 0 && (
+                            <div className="px-4 space-y-2">
+                                {lastAssistantMessage.pageActions.map((pa, paIdx) => (
+                                    <PageActionCard
+                                        key={`page-action-${paIdx}-${pa.type}`}
+                                        action={pa}
+                                        onDismiss={() => {
+                                            setMessages((prev) => {
+                                                const idx = prev.map((m, i) => ({ m, i }))
+                                                    .reverse()
+                                                    .find(({ m }) => m.role === "assistant" && !m.historical)?.i
+                                                if (idx === undefined) return prev
+                                                const current = prev[idx].pageActions ?? []
+                                                const updated = current.filter((_, i) => i !== paIdx)
+                                                return prev.map((msg, i) =>
+                                                    i === idx ? { ...msg, pageActions: updated.length > 0 ? updated : undefined } : msg
+                                                )
+                                            })
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        )}
+
                         {/* Execution plan card */}
                         {activePlan && activePlan.status !== "cancelled" && (
                             <div className="px-4">
@@ -3906,6 +4010,31 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 const updated = current.filter((_, i) => i !== eaIdx)
                                                 return prev.map((msg, i) =>
                                                     i === idx ? { ...msg, externalActions: updated.length > 0 ? updated : undefined } : msg
+                                                )
+                                            })
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Page action proposals (in-app mutations) — panel mode */}
+                        {lastAssistantMessage && !isExecuting && lastAssistantMessage.pageActions && lastAssistantMessage.pageActions.length > 0 && (
+                            <div className="space-y-2">
+                                {lastAssistantMessage.pageActions.map((pa, paIdx) => (
+                                    <PageActionCard
+                                        key={`page-action-panel-${paIdx}-${pa.type}`}
+                                        action={pa}
+                                        onDismiss={() => {
+                                            setMessages((prev) => {
+                                                const idx = prev.map((m, i) => ({ m, i }))
+                                                    .reverse()
+                                                    .find(({ m }) => m.role === "assistant" && !m.historical)?.i
+                                                if (idx === undefined) return prev
+                                                const current = prev[idx].pageActions ?? []
+                                                const updated = current.filter((_, i) => i !== paIdx)
+                                                return prev.map((msg, i) =>
+                                                    i === idx ? { ...msg, pageActions: updated.length > 0 ? updated : undefined } : msg
                                                 )
                                             })
                                         }}

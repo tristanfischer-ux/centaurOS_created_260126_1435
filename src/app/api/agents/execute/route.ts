@@ -34,6 +34,7 @@ import { shouldTriggerWebSearch, runPreSearch, formatSearchResultsForPrompt } fr
 import { getToolsForSpecialist, executeToolCall } from "@/lib/agents/tools/registry"
 import type { ToolDefinition } from "@/lib/ai-providers/types"
 import { loadDomainKnowledge } from "@/lib/agents/domain-knowledge"
+import { getPageActions, filterActionsBySpecialist, serializePageActions } from "@/lib/page-actions"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
@@ -206,6 +207,7 @@ export async function POST(request: Request) {
     let speculative: boolean
     let handoffSourceThreadId: string | undefined
     let handoffSourceSpecialistId: string | undefined
+    let currentRoute: string | undefined
 
     try {
         const body = await request.json()
@@ -235,6 +237,7 @@ export async function POST(request: Request) {
         speculative = body.speculative === true
         handoffSourceThreadId = typeof body.handoffSourceThreadId === "string" ? body.handoffSourceThreadId : undefined
         handoffSourceSpecialistId = typeof body.handoffSourceSpecialistId === "string" ? body.handoffSourceSpecialistId : undefined
+        currentRoute = typeof body.currentRoute === "string" ? body.currentRoute : undefined
 
         if (!prompt || typeof prompt !== "string") {
             return NextResponse.json({ error: "prompt is required" }, { status: 400 })
@@ -919,6 +922,15 @@ Rules:
 - Include all relevant data in the payload — do not reference conversation context
 - You can include multiple PROPOSED_EXTERNAL_ACTION blocks (one per action)
 - Place external action blocks at the very end of your response, after all prose and after any PROPOSED_ACTIONS blocks`
+
+            // Page-specific action instructions (executable mutations on the current page)
+            if (currentRoute && specialistId) {
+                const allPageActions = getPageActions(currentRoute)
+                const specialistPageActions = filterActionsBySpecialist(allPageActions, specialistId)
+                if (specialistPageActions.length > 0) {
+                    systemPromptWithContext += `\n\n${serializePageActions(specialistPageActions)}`
+                }
+            }
 
             // Add STRUCTURED_OUTPUT documentation
             systemPromptWithContext += `\n\n## Structured Visual Outputs
