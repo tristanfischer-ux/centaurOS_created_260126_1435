@@ -2,11 +2,11 @@
  * @file image-generator.ts — Image generation for X-Ray blueprints
  *
  * @description Image generation with automatic provider fallback:
- * - Primary: Gemini 3 Pro Image (gemini-3-pro-image-preview) — highest quality 4K blueprints
- * - Fallback: OpenAI gpt-image-1 — activated on retryable errors (503, 429, network)
+ * - Primary: Imagen 4 (imagen-4.0-generate-001) — 2K resolution, best for technical diagrams
+ * - Fallback: OpenAI gpt-image-1 — activated on any Imagen failure
  *
- * Uses direct Gemini REST API calls with full imageConfig support.
- * Falls back to OpenAI SDK when Gemini is unavailable.
+ * Uses Imagen 4 predict API for high-quality technical illustrations.
+ * Falls back to OpenAI SDK when Imagen is unavailable.
  *
  * @security Requires GOOGLE_AI_API_KEY; optionally OPENAI_API_KEY for fallback
  *
@@ -23,27 +23,19 @@ import type { StructuralBrief, SystemStructuralBrief } from "./structural-brief"
 
 // ─── Constants ───────────────────────────────────────────────────────
 
-const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-const MODULE_MODEL = "gemini-3-pro-image-preview" // Gemini 3 Pro Image (Nano Banana Pro) — highest quality 4K blueprints
-const SYSTEM_MODEL = "gemini-3-pro-image-preview" // Gemini 3 Pro Image — professional system P&ID diagrams
+const GOOGLE_AI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+const IMAGEN_MODEL = "imagen-4.0-generate-001" // Imagen 4 — 2K resolution, best text/label rendering
 const OPENAI_IMAGE_MODEL = "gpt-image-1" // OpenAI fallback — high-quality technical illustrations
 const STORAGE_BUCKET = "xray-images"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-interface GeminiImageResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string
-        inlineData?: {
-          mimeType: string
-          data: string
-        }
-      }>
-    }
+interface ImagenResponse {
+  predictions?: Array<{
+    bytesBase64Encoded?: string
+    mimeType?: string
   }>
-  error?: { message: string }
+  error?: { code: number; message: string; status: string }
 }
 
 // ─── Prompt Templates ────────────────────────────────────────────────
@@ -105,47 +97,57 @@ Material/signal flow path: ${ioChain}
 Style: Clean, modern process flow diagram on a pure white background. Each subsystem shown as a distinct, softly color-coded rounded block with clear flow arrows showing material and signal paths between them. Label each subsystem block and each flow arrow with clean sans-serif typography. Use a minimal, contemporary design style with generous whitespace — NOT a traditional P&ID with dense annotations. The overall composition should read left-to-right. With ${spec.modules.length} modules, use a multi-row layout if needed to fit all blocks clearly without crowding — maintain clear spacing between blocks and keep all labels legible. Do NOT include any title block, document ID, revision number, date, project name, or engineer name anywhere on the diagram. No borders or frames around the diagram.`
 }
 
-// ─── Gemini API Caller ───────────────────────────────────────────────
+// ─── Imagen 4 API Caller ────────────────────────────────────────────
 
 /**
- * Calls the Gemini API to generate an image.
+ * Maps caller aspect ratios to Imagen 4 supported ratios.
+ * Imagen 4 supports: "1:1", "3:4", "4:3", "9:16", "16:9".
+ * Note: "3:2" is NOT supported — maps to "4:3" (closest landscape).
+ */
+function toImagenAspectRatio(aspectRatio?: string): string {
+  switch (aspectRatio) {
+    case "16:9":
+      return "16:9"
+    case "9:16":
+      return "9:16"
+    case "3:2":
+    case "4:3":
+      return "4:3"
+    case "2:3":
+    case "3:4":
+      return "3:4"
+    default:
+      return "1:1"
+  }
+}
+
+/**
+ * Calls the Imagen 4 predict API to generate an image.
  *
- * @param model - The Gemini model to use
  * @param prompt - The text prompt
- * @param imageConfig - Image generation configuration
- * @param referenceImages - Optional base64 image buffers to include as references
+ * @param aspectRatio - Aspect ratio (mapped to Imagen 4 supported values)
  * @returns Base64 image data and mime type
  *
  * @throws Error if GOOGLE_AI_API_KEY is missing or API call fails
  */
-async function callGeminiImage(
-  model: string,
+async function callImagenImage(
   prompt: string,
-  imageConfig: { aspectRatio?: string; imageSize?: string } = {},
-  referenceImages: Array<{ mimeType: string; data: string }> = [],
+  aspectRatio?: string,
 ): Promise<{ mimeType: string; data: string }> {
   const apiKey = process.env.GOOGLE_AI_API_KEY
   if (!apiKey) {
     throw new Error("[XRayImageGen] GOOGLE_AI_API_KEY is not configured")
   }
 
-  // SECURITY: Use x-goog-api-key header instead of URL query param (F6)
-  // API key in URL is exposed in server logs, proxy logs, and error reports
-  const url = `${GEMINI_API_BASE}/${model}:generateContent`
-
-  // Build content parts: text prompt + optional reference images
-  const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [
-    { text: prompt },
-    ...referenceImages.map((img) => ({
-      inlineData: { mimeType: img.mimeType, data: img.data },
-    })),
-  ]
+  // SECURITY: Use x-goog-api-key header instead of URL query param
+  const url = `${GOOGLE_AI_API_BASE}/${IMAGEN_MODEL}:predict`
 
   const body = {
-    contents: [{ parts }],
-    generationConfig: {
-      responseModalities: ["TEXT", "IMAGE"],
-      ...(Object.keys(imageConfig).length > 0 ? { imageConfig } : {}),
+    instances: [{ prompt }],
+    parameters: {
+      sampleCount: 1,
+      aspectRatio: toImagenAspectRatio(aspectRatio),
+      imageSize: "2K",
     },
   }
 
@@ -158,32 +160,30 @@ async function callGeminiImage(
     })
   } catch (fetchError) {
     const msg = fetchError instanceof Error ? fetchError.message : "Network error"
-    console.error("[XRayImageGen] Fetch failed:", { model, error: msg })
-    throw new Error(`[XRayImageGen] Network error calling Gemini: ${msg}`)
+    console.error("[XRayImageGen] Fetch failed:", { model: IMAGEN_MODEL, error: msg })
+    throw new Error(`[XRayImageGen] Network error calling Imagen 4: ${msg}`)
   }
 
   if (!response.ok) {
     const errText = await response.text()
-    console.error("[XRayImageGen] Gemini API error:", { model, status: response.status, body: errText.slice(0, 500) })
-    throw new Error(`[XRayImageGen] Gemini API error (${response.status}): ${errText.slice(0, 200)}`)
+    console.error("[XRayImageGen] Imagen 4 API error:", { status: response.status, body: errText.slice(0, 500) })
+    throw new Error(`[XRayImageGen] Imagen 4 API error (${response.status}): ${errText.slice(0, 200)}`)
   }
 
-  const data = (await response.json()) as GeminiImageResponse
+  const data = (await response.json()) as ImagenResponse
 
   if (data.error) {
-    console.error("[XRayImageGen] Gemini returned error:", { model, error: data.error.message })
-    throw new Error(`[XRayImageGen] Gemini error: ${data.error.message}`)
+    console.error("[XRayImageGen] Imagen 4 returned error:", { error: data.error.message })
+    throw new Error(`[XRayImageGen] Imagen 4 error: ${data.error.message}`)
   }
 
-  const parts_ = data.candidates?.[0]?.content?.parts ?? []
-  const imagePart = parts_.find((p) => p.inlineData)
-
-  if (!imagePart?.inlineData) {
-    console.error("[XRayImageGen] No image in response:", { model, partsCount: parts_.length, hasText: parts_.some(p => p.text) })
-    throw new Error("[XRayImageGen] No image data returned from Gemini — model may have returned text-only response")
+  const b64Data = data.predictions?.[0]?.bytesBase64Encoded
+  if (!b64Data) {
+    console.error("[XRayImageGen] No image in Imagen 4 response:", { predictionsCount: data.predictions?.length ?? 0 })
+    throw new Error("[XRayImageGen] No image data returned from Imagen 4")
   }
 
-  return imagePart.inlineData
+  return { mimeType: "image/png", data: b64Data }
 }
 
 // ─── OpenAI Fallback ─────────────────────────────────────────────────
@@ -211,7 +211,7 @@ function geminiAspectToOpenAISize(
  * Calls the OpenAI gpt-image-1 API to generate an image.
  * Used as a fallback when Gemini is unavailable.
  *
- * @returns Base64 image data and mime type (same shape as callGeminiImage)
+ * @returns Base64 image data and mime type (same shape as callImagenImage)
  * @throws Error if OPENAI_API_KEY is missing or API call fails
  */
 async function callOpenAIImage(
@@ -245,33 +245,28 @@ async function callOpenAIImage(
 }
 
 /**
- * Generates an image using Gemini with automatic OpenAI fallback.
+ * Generates an image using Imagen 4 with automatic OpenAI fallback.
  *
- * FLOW: callGeminiImage() → [any error] → callOpenAIImage() → result
+ * FLOW: callImagenImage() → [any error] → callOpenAIImage() → result
  *
- * Falls back to OpenAI on ANY Gemini failure (model deprecation, content
- * filter, API errors, etc.) as long as OPENAI_API_KEY is set. Image
- * generation providers have different capabilities, so unlike text LLMs
- * it's worth trying the fallback even for non-retryable errors.
+ * Falls back to OpenAI on ANY Imagen failure as long as OPENAI_API_KEY is set.
  */
 async function callImageWithFallback(
-  model: string,
   prompt: string,
-  imageConfig: { aspectRatio?: string; imageSize?: string } = {},
-  referenceImages: Array<{ mimeType: string; data: string }> = [],
+  imageConfig: { aspectRatio?: string } = {},
 ): Promise<{ mimeType: string; data: string }> {
   try {
-    return await callGeminiImage(model, prompt, imageConfig, referenceImages)
-  } catch (geminiError) {
-    const errorMessage = geminiError instanceof Error ? geminiError.message : String(geminiError)
+    return await callImagenImage(prompt, imageConfig.aspectRatio)
+  } catch (imagenError) {
+    const errorMessage = imagenError instanceof Error ? imagenError.message : String(imagenError)
 
     if (!process.env.OPENAI_API_KEY) {
-      console.warn("[XRayImageGen] Gemini failed and OPENAI_API_KEY is not set — no fallback available")
-      throw geminiError
+      console.warn("[XRayImageGen] Imagen 4 failed and OPENAI_API_KEY is not set — no fallback available")
+      throw imagenError
     }
 
     console.warn(
-      "[XRayImageGen] Gemini failed, falling back to OpenAI gpt-image-1:",
+      "[XRayImageGen] Imagen 4 failed, falling back to OpenAI gpt-image-1:",
       { error: errorMessage.slice(0, 200) },
     )
 
@@ -338,7 +333,7 @@ export async function generateModuleImage(
 ): Promise<string> {
   const prompt = buildModulePrompt(module, brief)
 
-  const imageData = await callImageWithFallback(MODULE_MODEL, prompt, {
+  const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "3:2",
   })
 
@@ -382,7 +377,7 @@ export async function generateResearchIllustration(
 
 Style: Modern technical illustration on a clean white background. Show the complete system in ${hasModules ? "an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible" : "a detailed isometric or three-quarter view showing its key components and overall form factor"}. Use thin, precise lines with subtle color coding to differentiate ${hasModules ? "sub-assemblies" : "major components"}. Label each major ${hasModules ? "sub-assembly" : "component"} with clean callout lines and sans-serif text. The composition should feel like a hero image from a professional engineering specification document. No decorative elements, borders, title blocks, or watermarks. Generous whitespace around the illustration.`
 
-  const imageData = await callImageWithFallback(SYSTEM_MODEL, prompt, {
+  const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "16:9",
   })
 
@@ -413,9 +408,7 @@ export async function generateSystemImage(
 ): Promise<string> {
   const prompt = buildSystemPrompt(spec, brief)
 
-  // For now, generate without reference images (simpler, still effective)
-  // Future: download module images and pass as references to Pro model
-  const imageData = await callImageWithFallback(SYSTEM_MODEL, prompt, {
+  const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "16:9",
   })
 
