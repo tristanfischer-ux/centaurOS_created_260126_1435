@@ -195,9 +195,11 @@ export function HeroSection({
                 )}
               </div>
             </div>
-            <div className="pt-2">
-              <ReferenceModelViewer stlUrl={referenceModel.stlUrl} minHeight={220} />
-            </div>
+            {referenceModel.stlUrl && (
+              <div className="pt-2">
+                <ReferenceModelViewer stlUrl={referenceModel.stlUrl} minHeight={220} />
+              </div>
+            )}
           </>
         )}
       </div>

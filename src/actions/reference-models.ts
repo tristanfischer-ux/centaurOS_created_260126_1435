@@ -94,7 +94,7 @@ export async function matchReferenceModel(subject: string): Promise<ReferenceMod
     for (const keyword of model.searchKeywords) {
       const kw = keyword.toLowerCase()
       if (lower.includes(kw)) score += 2
-      if (words.some((w) => w === kw || w.startsWith(kw) || kw.startsWith(w))) score += 1
+      if (words.some((w) => w === kw || (w.length >= 4 && w.startsWith(kw)) || (w.length >= 4 && kw.startsWith(w)))) score += 1
     }
     if (score > 0 && (!best || score > best.score)) {
       best = { model, score }
