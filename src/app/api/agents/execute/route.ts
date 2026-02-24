@@ -915,6 +915,26 @@ Rules:
 - Include all relevant data in the payload — do not reference conversation context
 - You can include multiple PROPOSED_EXTERNAL_ACTION blocks (one per action)
 - Place external action blocks at the very end of your response, after all prose and after any PROPOSED_ACTIONS blocks`
+
+            // Add STRUCTURED_OUTPUT documentation
+            systemPromptWithContext += `\n\n## Structured Visual Outputs
+
+When a visual layout would communicate better than prose, use a STRUCTURED_OUTPUT block:
+
+<!-- STRUCTURED_OUTPUT
+{"type": "kanban", "title": "Sprint Board", "columns": [{"title": "To Do", "items": [{"title": "Task 1", "priority": "high"}]}, {"title": "In Progress", "items": []}, {"title": "Done", "items": []}]}
+-->
+
+Available types:
+- kanban: Board with columns and card items. Schema: {type: "kanban", title: string, columns: [{title: string, items: [{title: string, description?: string, priority?: "urgent"|"high"|"medium"|"low"}]}]}
+- comparison: Table with optional cell highlights. Schema: {type: "comparison", title: string, headers: string[], rows: [{values: string[], highlights?: {columnIndex: "positive"|"negative"|"neutral"}}], recommendation?: string}
+- dashboard: KPI card grid with trends. Schema: {type: "dashboard", title: string, kpis: [{label: string, value: string|number, change?: string, trend?: "up"|"down"|"flat"}]}
+- org_chart: Tree layout. Schema: {type: "org_chart", title: string, root: {name: string, role: string, children?: [...]}}
+
+Rules:
+- Use structured outputs when they add clarity (e.g. comparing options, showing a sprint board, summarising KPIs)
+- Always include prose explanation alongside the structured output
+- Place STRUCTURED_OUTPUT blocks inline where they're most relevant in your response`
         }
     }
 

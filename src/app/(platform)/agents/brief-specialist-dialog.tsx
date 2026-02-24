@@ -74,8 +74,11 @@ import { AiDisclaimer } from "@/components/ui/ai-disclaimer"
 import { InlinePresentationCard } from "@/components/specialists/inline-presentation-card"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import { ChartRenderer } from "@/components/specialists/chart-renderer"
+import { StructuredOutputRenderer } from "@/components/specialists/structured-output-renderer"
 import { validateChartSpec } from "@/lib/agents/tools/chart-spec"
 import type { ChartSpec } from "@/lib/agents/tools/chart-spec"
+import { validateStructuredOutput } from "@/lib/agents/tools/structured-output-spec"
+import type { StructuredOutputSpec } from "@/lib/agents/tools/structured-output-spec"
 import { ExternalActionCard } from "@/components/specialists/external-action-card"
 import { validateExternalAction } from "@/lib/agents/tools/permission-guard"
 import type { ProposedExternalAction } from "@/lib/agents/tools/permission-guard"
@@ -219,6 +222,8 @@ interface ChatMessage {
     charts?: ChartSpec[]
     /** Parsed from PROPOSED_EXTERNAL_ACTION blocks; rendered as ExternalActionCards for founder approval. */
     externalActions?: ProposedExternalAction[]
+    /** Parsed from STRUCTURED_OUTPUT blocks; rendered as rich visual components. */
+    structuredOutputs?: StructuredOutputSpec[]
 }
 
 /**
@@ -634,6 +639,53 @@ function parseExternalActions(content: string): ProposedExternalAction[] {
 function stripExternalActionBlocks(content: string): string {
     let result = content
     for (const pattern of STRIP_EXTERNAL_ACTION_PATTERNS) {
+        result = result.replace(pattern, "")
+    }
+    return result.trim()
+}
+
+// ─── STRUCTURED_OUTPUT Parsing ──────────────────────────────────────
+
+const STRUCTURED_OUTPUT_PATTERNS: RegExp[] = [
+    /<!--\s*STRUCTURED_OUTPUT\s*([\s\S]*?)\s*-->/gi,
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?STRUCTURED_OUTPUT\s*\n?([\s\S]*?)\s*(?:-->)?\s*```/gi,
+]
+
+const STRIP_STRUCTURED_OUTPUT_PATTERNS: RegExp[] = [
+    /<!--\s*STRUCTURED_OUTPUT\s*[\s\S]*?\s*-->/gi,
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?STRUCTURED_OUTPUT\s*\n?[\s\S]*?\s*(?:-->)?\s*```/gi,
+]
+
+/**
+ * Parse all STRUCTURED_OUTPUT JSON blocks from specialist response.
+ */
+function parseStructuredOutputs(content: string): StructuredOutputSpec[] {
+    const outputs: StructuredOutputSpec[] = []
+    for (const pattern of STRUCTURED_OUTPUT_PATTERNS) {
+        pattern.lastIndex = 0
+        let match: RegExpExecArray | null
+        while ((match = pattern.exec(content)) !== null) {
+            if (!match[1]) continue
+            try {
+                const parsed = JSON.parse(match[1].trim())
+                const validated = validateStructuredOutput(parsed)
+                if (validated) {
+                    outputs.push(validated)
+                }
+            } catch {
+                // JSON parse failed — skip
+            }
+        }
+    }
+    return outputs
+}
+
+/**
+ * Remove all STRUCTURED_OUTPUT blocks from display content.
+ */
+function stripStructuredOutputBlocks(content: string): string {
+    let result = content
+    for (const pattern of STRIP_STRUCTURED_OUTPUT_PATTERNS) {
         result = result.replace(pattern, "")
     }
     return result.trim()
@@ -1766,6 +1818,17 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             }
             displayResponse = stripExternalActionBlocks(displayResponse)
 
+            // Parse STRUCTURED_OUTPUT blocks (kanban, comparison, dashboard, org chart)
+            const parsedStructuredOutputs = parseStructuredOutputs(displayResponse)
+            if (parsedStructuredOutputs.length > 0) {
+                console.info("[SpecialistChat] STRUCTURED_OUTPUT blocks parsed:", {
+                    specialist: specialist.id,
+                    outputCount: parsedStructuredOutputs.length,
+                    types: parsedStructuredOutputs.map((o) => o.type),
+                })
+            }
+            displayResponse = stripStructuredOutputBlocks(displayResponse)
+
             // Parse slides when a presentation was requested so the inline
             // card renderer can display a visual carousel instead of raw JSON.
             const parsedDeck = isSlideRequest ? parseSlideDeckFromText(fullResponse) : null
@@ -1781,6 +1844,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 ...(parsedPlan ? { executionPlan: parsedPlan } : {}),
                 ...(parsedCharts.length > 0 ? { charts: parsedCharts } : {}),
                 ...(parsedExternalActions.length > 0 ? { externalActions: parsedExternalActions } : {}),
+                ...(parsedStructuredOutputs.length > 0 ? { structuredOutputs: parsedStructuredOutputs } : {}),
             }
             setMessages((prev) => [...prev, assistantMessage])
             setStreamingResponse("")
@@ -2699,6 +2763,13 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                             <div className="mt-3 space-y-3">
                                                                 {msg.charts.map((chart, ci) => (
                                                                     <ChartRenderer key={`chart-${ci}`} spec={chart} />
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {msg.structuredOutputs && msg.structuredOutputs.length > 0 && (
+                                                            <div className="mt-3 space-y-3">
+                                                                {msg.structuredOutputs.map((so, si) => (
+                                                                    <StructuredOutputRenderer key={`so-${si}`} spec={so} />
                                                                 ))}
                                                             </div>
                                                         )}
@@ -3644,6 +3715,13 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                             <div className="mt-3 space-y-3">
                                                                 {msg.charts.map((chart, ci) => (
                                                                     <ChartRenderer key={`chart-${ci}`} spec={chart} />
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {msg.structuredOutputs && msg.structuredOutputs.length > 0 && (
+                                                            <div className="mt-3 space-y-3">
+                                                                {msg.structuredOutputs.map((so, si) => (
+                                                                    <StructuredOutputRenderer key={`so-${si}`} spec={so} />
                                                                 ))}
                                                             </div>
                                                         )}
