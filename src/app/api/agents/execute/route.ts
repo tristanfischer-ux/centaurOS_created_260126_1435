@@ -487,17 +487,24 @@ export async function POST(request: Request) {
                     if (totalChars >= MAX_ATTACHMENT_CONTEXT_CHARS) break
                     continue
                 }
-                // Excel (.xlsx) — convert each sheet to CSV via xlsx
+                // Excel (.xlsx) — convert each sheet to CSV via exceljs
                 if (mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || name.endsWith(".xlsx") || name.endsWith(".xls")) {
                     const buf = await res.arrayBuffer()
                     // eslint-disable-next-line @typescript-eslint/no-require-imports
-                    const XLSX = require("xlsx") as { read: (data: ArrayBuffer, opts?: Record<string, unknown>) => { SheetNames: string[]; Sheets: Record<string, unknown> }; utils: { sheet_to_csv: (sheet: unknown) => string } }
-                    const workbook = XLSX.read(buf, { type: "array" })
+                    const ExcelJS = require("exceljs") as typeof import("exceljs")
+                    const workbook = new ExcelJS.Workbook()
+                    // GOTCHA: exceljs types expect old Buffer; TS 5.9 made Buffer generic
+                    await workbook.xlsx.load(Buffer.from(buf) as never)
                     const sheetTexts: string[] = []
-                    for (const sheetName of workbook.SheetNames) {
-                        const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName])
+                    for (const worksheet of workbook.worksheets) {
+                        const rows: string[] = []
+                        worksheet.eachRow((row) => {
+                            const values = (row.values as (string | number | null | undefined)[]).slice(1)
+                            rows.push(values.map(v => String(v ?? "")).join(","))
+                        })
+                        const csv = rows.join("\n")
                         if (csv.trim()) {
-                            sheetTexts.push(`#### Sheet: ${sheetName}\n\n${csv}`)
+                            sheetTexts.push(`#### Sheet: ${worksheet.name}\n\n${csv}`)
                         }
                     }
                     const text = sheetTexts.join("\n\n").slice(0, MAX_ATTACHMENT_CONTEXT_CHARS - totalChars)
@@ -508,25 +515,17 @@ export async function POST(request: Request) {
                     if (totalChars >= MAX_ATTACHMENT_CONTEXT_CHARS) break
                     continue
                 }
-                // PowerPoint (.pptx) — extract text from slides
+                // PowerPoint (.pptx) — extract text from slides via officeparser
                 if (mime === "application/vnd.openxmlformats-officedocument.presentationml.presentation" || name.endsWith(".pptx")) {
                     const buf = await res.arrayBuffer()
                     // eslint-disable-next-line @typescript-eslint/no-require-imports
-                    const XLSX = require("xlsx") as { read: (data: ArrayBuffer, opts?: Record<string, unknown>) => { SheetNames: string[]; Sheets: Record<string, unknown> }; utils: { sheet_to_csv: (sheet: unknown) => string } }
-                    // PPTX files can be partially read by xlsx for embedded data; fall back to raw text extraction
+                    const officeparser = require("officeparser") as { parseOffice: (buffer: Buffer) => Promise<string> }
                     try {
-                        const workbook = XLSX.read(buf, { type: "array" })
-                        const slideTexts: string[] = []
-                        for (const sheetName of workbook.SheetNames) {
-                            const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName])
-                            if (csv.trim()) {
-                                slideTexts.push(`#### ${sheetName}\n\n${csv}`)
-                            }
-                        }
-                        if (slideTexts.length > 0) {
-                            const text = slideTexts.join("\n\n").slice(0, MAX_ATTACHMENT_CONTEXT_CHARS - totalChars)
-                            parts.push(`### Contents of "${name}" (PowerPoint)\n\n${text}`)
-                            totalChars += text.length
+                        const text = await officeparser.parseOffice(Buffer.from(buf))
+                        if (text.trim()) {
+                            const trimmed = text.slice(0, MAX_ATTACHMENT_CONTEXT_CHARS - totalChars)
+                            parts.push(`### Contents of "${name}" (PowerPoint)\n\n${trimmed}`)
+                            totalChars += trimmed.length
                         } else {
                             parts.push(`[User attached PowerPoint: ${name} — text extraction limited]`)
                         }
