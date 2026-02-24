@@ -239,7 +239,7 @@ export default function CadLabResearchPage(): React.ReactNode {
             />
           </div>
 
-          {/* ── System overview illustration ── */}
+          {/* ── System overview illustration (silently hidden on failure — enhancement, not blocker) ── */}
           {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
             <Card className="overflow-hidden">
               <div className="aspect-[16/9] w-full bg-muted">
@@ -248,6 +248,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                   src={systemIllustrationUrl}
                   alt={`System overview: ${subject}`}
                   className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).parentElement!.parentElement!.style.display = "none" }}
                 />
               </div>
               <CardContent className="pt-4 pb-4">
@@ -267,23 +268,8 @@ export default function CadLabResearchPage(): React.ReactNode {
               <div className="aspect-[16/9] w-full bg-muted animate-pulse flex items-center justify-center">
                 <div className="flex flex-col items-center gap-2">
                   <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
-                  <span className="text-xs text-muted-foreground">Generating system overview...</span>
+                  <span className="text-xs text-muted-foreground">Generating concept illustration...</span>
                 </div>
-              </div>
-            </Card>
-          )}
-
-          {/* ── System illustration failed ── */}
-          {systemIllustrationStatus === "failed" && (
-            <Card className="overflow-hidden border-destructive/30">
-              <div className="aspect-[16/9] w-full bg-muted/50 flex flex-col items-center justify-center gap-2 px-6">
-                <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
-                <span className="text-sm text-destructive text-center">
-                  {systemIllustrationError || "System illustration failed"}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  Re-research to retry illustration generation.
-                </span>
               </div>
             </Card>
           )}
@@ -338,7 +324,7 @@ export default function CadLabResearchPage(): React.ReactNode {
               {/* Header with reveal progress */}
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-foreground">
-                  {revealedModuleIds.size} of {modules.length} sub-assemblies
+                  {Math.min(revealedModuleIds.size, modules.length)} of {modules.length} sub-assemblies
                 </p>
                 {isGeneratingImages && (
                   <span className="text-xs text-muted-foreground flex items-center gap-1.5">

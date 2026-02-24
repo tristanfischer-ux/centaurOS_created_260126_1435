@@ -31,7 +31,7 @@ import {
   generateSystemAssembly,
 } from "@/actions/cad-lab"
 import { matchReferenceModel } from "@/actions/reference-models"
-import { saveCadLabIntegratedAssembly } from "@/actions/cad-lab-projects"
+import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration } from "@/actions/cad-lab-projects"
 import type { ReferenceModel } from "@/actions/reference-models"
 import {
   listCadLabProjects,
@@ -405,6 +405,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
       if (res.success && res.modules.length > 0) {
         setModules(res.modules)
+        setRevealedModuleIds(new Set()) // Reset so counter starts fresh on re-decompose
         setMilestone("breakdown")
 
         // Build a rich summary from the actual result data
@@ -461,18 +462,17 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               if ("url" in illRes) {
                 setSystemIllustrationUrl(illRes.url)
                 setSystemIllustrationStatus("complete")
+                // Persist to DB so the image survives page reloads
+                saveCadLabSystemIllustration(activeProjectId!, illRes.url)
+                  .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
               } else {
-                const msg = "error" in illRes ? illRes.error : "System illustration generation failed"
-                setSystemIllustrationError(msg)
-                setSystemIllustrationStatus("failed")
-                toast.error(msg)
+                // Silent failure — illustration is enhancement, not blocker
+                setSystemIllustrationStatus("idle")
               }
             })
-            .catch((err) => {
-              const msg = err instanceof Error ? err.message : "System illustration generation failed"
-              setSystemIllustrationError(msg)
-              setSystemIllustrationStatus("failed")
-              toast.error(msg)
+            .catch(() => {
+              // Silent failure — illustration is enhancement, not blocker
+              setSystemIllustrationStatus("idle")
             })
         }
       }
@@ -1022,14 +1022,17 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               if ("url" in illRes) {
                 setSystemIllustrationUrl(illRes.url)
                 setSystemIllustrationStatus("complete")
+                // Persist to DB so the image survives page reloads
+                saveCadLabSystemIllustration(projId, illRes.url)
+                  .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
               } else {
-                setSystemIllustrationStatus("failed")
-                setSystemIllustrationError("error" in illRes ? illRes.error : "Illustration failed")
+                // Silent failure — illustration is enhancement, not blocker
+                setSystemIllustrationStatus("idle")
               }
             })
             .catch(() => {
-              setSystemIllustrationStatus("failed")
-              setSystemIllustrationError("Illustration generation failed")
+              // Silent failure — illustration is enhancement, not blocker
+              setSystemIllustrationStatus("idle")
             })
         }
       }
@@ -1145,6 +1148,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setShowProjects(false)
       setMilestone(null)
       setProgressLines([])
+      setSystemIllustrationUrl(p.systemIllustrationUrl ?? null)
+      setSystemIllustrationStatus(p.systemIllustrationUrl ? "complete" : "idle")
+      setSystemIllustrationError(null)
       setIntegratedAssemblyStlUrl(p.integratedAssemblyStlUrl ?? null)
       setIntegratedAssemblyStepUrl(p.integratedAssemblyStepUrl ?? null)
     } catch {
