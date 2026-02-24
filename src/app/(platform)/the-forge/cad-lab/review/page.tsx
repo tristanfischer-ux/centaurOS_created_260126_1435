@@ -39,6 +39,7 @@ import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 import { CadLabContracting } from "@/components/cad/cad-lab-contracting"
 import { CadLabFactoryGuide } from "@/components/cad/cad-lab-factory-guide"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
+import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 
 import type { CadLabResult } from "@/lib/cad-lab-types"
 import { useCadLab } from "../cad-lab-context"
@@ -142,9 +143,62 @@ export default function CadLabReviewPage(): React.ReactNode {
             </p>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5 text-xs">
-          <ArrowLeft className="h-3 w-3" /> Back to Build
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <AskSpecialistButton
+            context={{
+              type: "general",
+              title: subject,
+              description: "Product in Review stage — DFM analysis and diagnostics",
+              metadata: {
+                status: `${generatedModuleCount}/${modules.length} modules generated`,
+                notes: [
+                  `${modules.reduce((s, m) => (m.result as CadLabResult | undefined)?.dfm?.issues?.length ? s + (m.result as CadLabResult).dfm!.issues.length : s, 0)} DFM issues`,
+                  diagnosticAnswers && `Diagnostics: ${Object.keys(diagnosticAnswers).length} modules answered`,
+                ].filter(Boolean).join(". "),
+              },
+            }}
+            specialistId="vp-manufacturing"
+            specialistName="Fang"
+            variant="chip"
+            label="Ask Fang"
+          />
+          <AskSpecialistButton
+            context={{
+              type: "general",
+              title: subject,
+              description: "Product in Review stage — supplier selection, procurement, and cost",
+              metadata: {
+                status: `${generatedModuleCount} modules ready for supplier matching`,
+                notes: [
+                  `${modules.length} sub-assemblies`,
+                  linkedRfqId ? "RFQ linked" : "No RFQ linked yet",
+                ].filter(Boolean).join(". "),
+              },
+            }}
+            specialistId="vp-supply-chain"
+            specialistName="Chase"
+            variant="chip"
+            label="Ask Chase"
+          />
+          <AskSpecialistButton
+            context={{
+              type: "general",
+              title: subject,
+              description: "Product in Review stage — architecture review",
+              metadata: {
+                status: `${generatedModuleCount}/${modules.length} modules generated`,
+                notes: `Reviewing engineering package for "${subject}" with ${modules.length} sub-assemblies.`,
+              },
+            }}
+            specialistId="cto"
+            specialistName="Max"
+            variant="chip"
+            label="Ask Max"
+          />
+          <Button variant="ghost" size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5 text-xs">
+            <ArrowLeft className="h-3 w-3" /> Back to Build
+          </Button>
+        </div>
       </div>
 
       {/* ── Section navigation ── */}

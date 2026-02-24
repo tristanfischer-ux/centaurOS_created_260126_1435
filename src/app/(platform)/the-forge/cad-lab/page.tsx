@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
+import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
 import { ModuleImageGrid } from "./components/module-image-grid"
@@ -206,6 +207,23 @@ export default function CadLabResearchPage(): React.ReactNode {
               <RotateCcw className="h-3 w-3" />
               Re-Research
             </Button>
+            <AskSpecialistButton
+              context={{
+                type: "general",
+                title: subject,
+                description: "Product concept in The Forge",
+                metadata: {
+                  status: hasResearch ? "researched" : "new",
+                  notes: modules.length > 0
+                    ? `${modules.length} sub-assemblies mapped: ${modules.map((m) => m.name).join(", ")}`
+                    : undefined,
+                },
+              }}
+              specialistId="cto"
+              specialistName="Max"
+              variant="chip"
+              label="Ask Max"
+            />
           </div>
 
           {/* ── System overview illustration ── */}

@@ -66,6 +66,7 @@ import {
 import type { CadLabResult, CadLabModule } from "@/lib/cad-lab-types"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
+import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 import { ManufacturingInsightCard } from "@/components/cad/manufacturing-insight-card"
 import { useCadLab } from "../cad-lab-context"
 import { Metric, SvgView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
@@ -228,6 +229,47 @@ export default function CadLabBuildPage(): React.ReactNode {
                 {section.label}
               </button>
             ))}
+            <div className="ml-auto flex items-center gap-1.5">
+              <AskSpecialistButton
+                context={{
+                  type: "general",
+                  title: subject,
+                  description: "Product in Build stage of The Forge CAD Lab",
+                  metadata: {
+                    status: isBatchRunning ? "batch generating" : `${generatedModuleCount}/${modules.length} generated`,
+                    notes: [
+                      designBrief.useCase && `Use case: ${designBrief.useCase}`,
+                      designBrief.targetProcess && `Process: ${designBrief.targetProcess}`,
+                      designBrief.targetMaterial && `Material: ${designBrief.targetMaterial}`,
+                      `${modules.reduce((s, m) => s + m.failureModes.length, 0)} failure modes, ${modules.reduce((s, m) => s + m.unknowns.length, 0)} unknowns`,
+                    ].filter(Boolean).join(". "),
+                  },
+                }}
+                specialistId="cto"
+                specialistName="Max"
+                variant="chip"
+                label="Ask Max about design"
+              />
+              <AskSpecialistButton
+                context={{
+                  type: "general",
+                  title: subject,
+                  description: "Product in Build stage — DFM and manufacturing questions",
+                  metadata: {
+                    status: `${generatedModuleCount}/${modules.length} modules generated`,
+                    notes: [
+                      designBrief.targetProcess && `Target process: ${designBrief.targetProcess}`,
+                      designBrief.targetMaterial && `Target material: ${designBrief.targetMaterial}`,
+                      `${modules.length} sub-assemblies`,
+                    ].filter(Boolean).join(". "),
+                  },
+                }}
+                specialistId="vp-manufacturing"
+                specialistName="Fang"
+                variant="chip"
+                label="Ask Fang about DFM"
+              />
+            </div>
           </div>
         </nav>
       )}
