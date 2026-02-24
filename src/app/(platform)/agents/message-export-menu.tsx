@@ -17,9 +17,9 @@
 
 "use client"
 
-import React, { useState, useCallback } from "react"
+import React, { useState, useCallback, useMemo } from "react"
 import { toast } from "sonner"
-import { MoreVertical, Copy, FileIcon, ArrowRight } from "lucide-react"
+import { MoreVertical, Copy, FileIcon, ArrowRight, Download } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -30,20 +30,27 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { createArtifact, exportArtifactToGoogleDocs } from "@/actions/agent-artifacts"
 import { exportAsPDF } from "@/lib/export-utils"
+import { parseMarkdownTables, tableToCsv, downloadCsv } from "@/lib/agents/tools/table-export"
 
 /**
  * Per-message export menu for specialist chat messages.
  *
- * @description Provides 4 export options for any message content:
+ * @description Provides export options for any message content:
  *   1. Copy text — copies to clipboard
  *   2. Save as artifact — persists to the Deliverables library
  *   3. Export as PDF — downloads as PDF file
- *   4. Send to Google Drive — creates artifact + opens in Google Docs
+ *   4. Download as CSV — appears when message contains markdown tables
+ *   5. Send to Google Drive — creates artifact + opens in Google Docs
  *
  * @param props.content - The message text content to export
+ * @param props.specialistName - Optional specialist name for CSV filename
  */
-export function MessageExportMenu({ content }: { content: string }): React.ReactElement {
+export function MessageExportMenu({ content, specialistName }: { content: string; specialistName?: string }): React.ReactElement {
     const [open, setOpen] = useState(false)
+
+    // INTENT: Only show CSV option when the message actually contains tables
+    const tables = useMemo(() => parseMarkdownTables(content), [content])
+    const hasTables = tables.length > 0
 
     const handleCopy = useCallback(async () => {
         try {
@@ -101,6 +108,20 @@ export function MessageExportMenu({ content }: { content: string }): React.React
         setOpen(false)
     }, [content])
 
+    const handleDownloadCsv = useCallback(() => {
+        try {
+            const csvParts = tables.map(tableToCsv)
+            const combined = csvParts.join("\r\n\r\n")
+            const slug = (specialistName ?? "export").toLowerCase().replace(/\s+/g, "-")
+            const date = new Date().toISOString().slice(0, 10)
+            downloadCsv(combined, `${slug}-${date}.csv`)
+            toast.success("CSV downloaded")
+            setOpen(false)
+        } catch {
+            toast.error("Failed to export CSV")
+        }
+    }, [tables, specialistName])
+
     return (
         <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>
@@ -121,6 +142,12 @@ export function MessageExportMenu({ content }: { content: string }): React.React
                     <FileIcon className="h-4 w-4 mr-2" />
                     Export as PDF
                 </DropdownMenuItem>
+                {hasTables && (
+                    <DropdownMenuItem onClick={handleDownloadCsv}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download as CSV
+                    </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={handleGoogleDrive}>
                     <ArrowRight className="h-4 w-4 mr-2" />
                     Send to Google Drive

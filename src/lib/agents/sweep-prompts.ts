@@ -450,13 +450,38 @@ export function getTaskFollowUpPrompt(): string {
   return TASK_FOLLOW_UP_PROMPT
 }
 
+// ─── Live Data Injection Prompt ──────────────────────────────────────
+
+/**
+ * Instructions appended to every sweep prompt telling the specialist
+ * to use real company data from the "Current Company Data" section
+ * (injected by the sweep orchestrator via one-shot tool calls).
+ */
+const LIVE_DATA_PROMPT = `
+
+--- LIVE COMPANY DATA ---
+
+If a "Current Company Data" section is provided in the context above, it contains REAL data fetched from the company's database specifically for your analysis. This is not hypothetical — use these actual numbers, statuses, and metrics to ground your insights.
+
+When the live data section is present:
+- Reference specific metrics, counts, and statuses from the data
+- Compare actual numbers against what would be expected for the company's stage
+- Flag concrete discrepancies (e.g., "3 of 5 objectives are stalled" rather than "objectives may be stalling")
+- Use the data to validate or challenge assumptions in the general business context
+
+If no "Current Company Data" section is present, proceed with your analysis using the general business context as before.
+
+--- END LIVE DATA ---
+`
+
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**
- * Gets the background sweep prompt for a specialist, including task follow-up instructions.
+ * Gets the background sweep prompt for a specialist, including task follow-up,
+ * outcome detection, and live data instructions.
  *
  * @param specialistId - The specialist ID to get the prompt for
- * @returns The sweep prompt string with task follow-up appended, or a generic fallback
+ * @returns The sweep prompt string with all addenda appended, or a generic fallback
  */
 export function getBackgroundSweepPrompt(specialistId: string): string {
   const basePrompt = SWEEP_PROMPTS[specialistId as SpecialistId] ?? `
@@ -470,7 +495,7 @@ Analyze the business context and identify any noteworthy findings:
 
 Focus on the 2-3 most impactful findings only.
 `
-  return basePrompt + TASK_FOLLOW_UP_PROMPT + OUTCOME_DETECTION_PROMPT
+  return basePrompt + LIVE_DATA_PROMPT + TASK_FOLLOW_UP_PROMPT + OUTCOME_DETECTION_PROMPT
 }
 
 /**

@@ -338,6 +338,7 @@ export async function sendToSpecialist(
         const cleanOutput = fullOutput
             .replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/gi, '')
             .replace(/<!--\s*PROPOSED_ACTIONS\s*[\s\S]*?\s*-->/gi, '')
+            .replace(/<!--\s*PROPOSED_EXTERNAL_ACTION\s*[\s\S]*?\s*-->/gi, '')
             .trim()
 
         supabase.from('agent_memory_messages').insert({
@@ -368,8 +369,9 @@ export async function sendToSpecialist(
 export function formatForTelegram(text: string): string {
     let formatted = text
 
-    // Strip PROPOSED_ACTIONS blocks
+    // Strip PROPOSED_ACTIONS and PROPOSED_EXTERNAL_ACTION blocks
     formatted = formatted.replace(/<!--\s*PROPOSED_ACTIONS[\s\S]*?-->/gi, '')
+    formatted = formatted.replace(/<!--\s*PROPOSED_EXTERNAL_ACTION[\s\S]*?-->/gi, '')
 
     // Strip NEXT_SPECIALIST directives
     formatted = formatted.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/gi, '')

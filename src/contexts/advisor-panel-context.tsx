@@ -57,6 +57,10 @@ interface AdvisorPanelState {
   contextLabel: string | null
   /** Trail of specialist handoffs for breadcrumb display */
   handoffTrail: HandoffTrailEntry[]
+  /** Source specialist's thread ID for deep handoff context */
+  handoffSourceThreadId: string | null
+  /** Source specialist's ID for deep handoff context */
+  handoffSourceSpecialistId: string | null
 }
 
 interface AdvisorPanelContextValue extends AdvisorPanelState {
@@ -67,7 +71,7 @@ interface AdvisorPanelContextValue extends AdvisorPanelState {
   /** Toggle the panel open/closed */
   togglePanel: (specialistId?: string) => void
   /** Switch to a different specialist without closing */
-  switchSpecialist: (specialistId: string, handoffCtx?: string) => void
+  switchSpecialist: (specialistId: string, handoffCtx?: string, sourceThreadId?: string, sourceSpecialistId?: string) => void
   /** Clear the handoff trail (when user opens specialist directly) */
   clearTrail: () => void
 }
@@ -92,6 +96,8 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     referredBy: null,
     contextLabel: null,
     handoffTrail: [],
+    handoffSourceThreadId: null,
+    handoffSourceSpecialistId: null,
   }))
 
   const openPanel = useCallback((specialistId: string, options?: OpenPanelOptions) => {
@@ -108,6 +114,8 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
       referredBy: options?.referredBy ?? null,
       contextLabel: options?.contextLabel ?? null,
       handoffTrail: [], // Direct open = fresh start, clear trail
+      handoffSourceThreadId: null,
+      handoffSourceSpecialistId: null,
     }))
   }, [])
 
@@ -131,6 +139,8 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
             referredBy: null,
             contextLabel: null,
             handoffTrail: [],
+            handoffSourceThreadId: null,
+            handoffSourceSpecialistId: null,
           }
         }
       }
@@ -141,7 +151,7 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
     })
   }, [])
 
-  const switchSpecialist = useCallback((specialistId: string, handoffCtx?: string) => {
+  const switchSpecialist = useCallback((specialistId: string, handoffCtx?: string, sourceThreadId?: string, sourceSpecialistId?: string) => {
     const specialist = getSpecialistById(specialistId)
     if (!specialist) return
 
@@ -158,6 +168,8 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
         handoffContext: handoffCtx ?? null,
         referredBy: handoffCtx ? prev.activeSpecialist?.name ?? null : null,
         handoffTrail: updatedTrail,
+        handoffSourceThreadId: sourceThreadId ?? null,
+        handoffSourceSpecialistId: sourceSpecialistId ?? null,
       }
     })
   }, [])

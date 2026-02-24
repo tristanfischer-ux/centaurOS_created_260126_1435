@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { checkAILimit } from "@/lib/ai/limit-check"
@@ -27,6 +28,7 @@ import { FAST_MODEL_CHAIN, buildSpeculativeFastPrompt, parseComplexityTag } from
 import { getSpecialistWorkflows } from "@/lib/agents/specialist-workflows"
 // AUDIT: Decision journal imports moved to post-response-handler.ts (2026-02-19, refactor step 7 of 8)
 import { buildContextLayers, buildCrossSpecialistContext } from "@/lib/agents/prompt-builder"
+import { buildHandoffContext } from "@/lib/agents/handoff-context"
 import { createPostResponseCallback } from "@/lib/agents/post-response-handler"
 import { shouldTriggerWebSearch, runPreSearch, formatSearchResultsForPrompt } from "@/lib/agents/web-search"
 import { getToolsForSpecialist, executeToolCall } from "@/lib/agents/tools/registry"
@@ -201,6 +203,8 @@ export async function POST(request: Request) {
     let modelTier: ModelTier | undefined
     let attachments: Array<{ path?: string; url?: string | null; filename?: string; mimeType?: string }> | undefined
     let speculative: boolean
+    let handoffSourceThreadId: string | undefined
+    let handoffSourceSpecialistId: string | undefined
 
     try {
         const body = await request.json()
@@ -228,6 +232,8 @@ export async function POST(request: Request) {
             )
             : undefined
         speculative = body.speculative === true
+        handoffSourceThreadId = typeof body.handoffSourceThreadId === "string" ? body.handoffSourceThreadId : undefined
+        handoffSourceSpecialistId = typeof body.handoffSourceSpecialistId === "string" ? body.handoffSourceSpecialistId : undefined
 
         if (!prompt || typeof prompt !== "string") {
             return NextResponse.json({ error: "prompt is required" }, { status: 400 })
@@ -731,6 +737,64 @@ ${toolList}
 - If a tool returns no data or an error, acknowledge it honestly and work with what you have.`
             }
 
+            // Chart output capability for data-heavy specialists
+            const DATA_HEAVY_SPECIALISTS = ["finance-lead", "strategist", "cto", "vp-engineering", "product-lead", "fundraising-advisor"]
+            if (specialistId && DATA_HEAVY_SPECIALISTS.includes(specialistId)) {
+                systemPromptWithContext += `\n\n## Chart Output
+
+When presenting quantitative data, trends, or comparisons, include a chart visualization using this format:
+
+<!-- CHART {"type": "bar|line|pie|area", "title": "Chart Title", "xLabel": "X Label", "yLabel": "Y Label", "seriesName": "Series 1", "data": [{"label": "Item", "value": 42}]} -->
+
+Rules:
+- Use bar charts for comparisons, line/area for trends over time, pie for proportions
+- Keep data to 12 points or fewer for readability
+- Place charts after the relevant analysis section, not at the end
+- You can include multiple charts in one response`
+            }
+
+            // INTENT: Inject recent deliverables so the specialist can iterate on them
+            // when the founder asks to revise/update an existing artifact.
+            if (specialistId && foundryId && modality === "text") {
+                try {
+                    const adminClient = createAdminClient()
+                    const { data: recentArtifacts } = await adminClient
+                        .from("agent_artifacts")
+                        .select("id, title, content_type, metadata, created_at, updated_at")
+                        .eq("foundry_id", foundryId)
+                        .filter("metadata->>specialistId", "eq", specialistId)
+                        .order("created_at", { ascending: false })
+                        .limit(5)
+
+                    if (recentArtifacts && recentArtifacts.length > 0) {
+                        const artifactRows = recentArtifacts
+                            .map((a, i) => {
+                                const date = new Date(a.created_at).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                })
+                                return `| ${i + 1} | ${a.title} | ${a.content_type} | ${date} | ${a.id} |`
+                            })
+                            .join("\n")
+
+                        systemPromptWithContext += `\n\n## Your Recent Deliverables
+
+You've previously produced these deliverables for this founder. If they ask to revise, update, or iterate on any of these, produce the updated version and include a PROPOSED_EDIT block.
+
+| # | Title | Type | Date | ID |
+|---|-------|------|------|----|
+${artifactRows}
+
+When the founder asks to revise an existing deliverable, output the FULL updated content followed by:
+<!-- PROPOSED_EDIT {"artifactId": "uuid-here", "title": "Updated title", "changeSummary": "Brief description of what changed"} -->`
+                    }
+                } catch (artifactCtxErr) {
+                    // GOTCHA: Non-blocking — if artifact lookup fails, the specialist
+                    // simply won't have revision context. This is acceptable degradation.
+                    console.warn("[execute] Failed to fetch recent artifacts for specialist context:", artifactCtxErr)
+                }
+            }
+
             // Multi-step execution plan capability
             const otherSpecialists = SPECIALISTS
                 .filter((s) => s.id !== specialistId)
@@ -763,6 +827,27 @@ ${otherSpecialists}
 - Keep prompts detailed and self-contained — each step executes independently with prior step outputs as context.
 - Place the block at the very end of your response, after your conversational prose.
 - Do NOT propose a plan for simple questions, follow-up responses, or single-deliverable requests.`
+
+            // External service integration instructions
+            systemPromptWithContext += `\n\n## External Actions
+
+When your analysis warrants creating an external deliverable (spreadsheet, calendar event, or email), propose it at the END of your response using:
+
+<!-- PROPOSED_EXTERNAL_ACTION
+{"type": "create_google_sheet", "title": "Budget Forecast Q2", "description": "Spreadsheet with projected expenses", "payload": {"title": "Budget Forecast Q2 2026", "headers": ["Category", "Jan", "Feb", "Mar", "Total"], "rows": [["Engineering", "50000", "52000", "54000", "156000"]]}}
+-->
+
+Available types:
+- create_google_sheet: Creates a Google Sheet. Payload: {title: string, headers: string[], rows: string[][]}
+- create_calendar_event: Schedules a calendar event. Payload: {title: string, startTime: ISO string, endTime: ISO string, description?: string, attendees?: string[]}
+- draft_email: Drafts an email. Payload: {to: string, subject: string, body: string}
+
+Rules:
+- Only propose external actions when the conversation naturally warrants them (e.g. the founder asks for a spreadsheet, a meeting, or an email)
+- The founder must approve before any action is executed
+- Include all relevant data in the payload — do not reference conversation context
+- You can include multiple PROPOSED_EXTERNAL_ACTION blocks (one per action)
+- Place external action blocks at the very end of your response, after all prose and after any PROPOSED_ACTIONS blocks`
         }
     }
 
@@ -796,6 +881,8 @@ ${otherSpecialists}
         input,
         finalPrompt,
         isConversationalFastPath,
+        handoffSourceThreadId,
+        handoffSourceSpecialistId,
     })
     systemPromptWithContext += contextLayers
 
@@ -1279,8 +1366,11 @@ interface ToolAwareStreamingParams {
  * back to standard streaming for non-Claude providers with tool results
  * injected as context.
  *
- * Tool loop: max 5 iterations. Each tool call is a Supabase query or
+ * Tool loop: max 8 iterations. Each tool call is a Supabase query or
  * sandboxed JS execution (cheap). The extra LLM turns are bounded.
+ * A `tools_remaining` counter is injected so the model can plan its
+ * tool usage. Multiple tool_use blocks in a single response are
+ * executed in parallel via Promise.all.
  *
  * @param params - All parameters for tool-aware streaming
  * @returns SSE Response with tool-use markers and final text
@@ -1294,7 +1384,7 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
 
     const encoder = new TextEncoder()
     let fullOutput = ""
-    const MAX_TOOL_LOOPS = 5
+    const MAX_TOOL_LOOPS = 8
 
     // Resolve the primary provider from the chain
     const primaryTarget = chain[0]
@@ -1409,7 +1499,7 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                                 { role: "assistant" as const, content: finalResponse.content },
                                 { role: "user" as const, content: "Continue." },
                             ]
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- beta API types incomplete
                             finalResponse = await client.beta.messages.create({
                                 ...createParams,
                                 messages: continueMessages,
@@ -1468,51 +1558,58 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                             break
                         }
 
-                        // Execute each tool call and collect results
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const toolResults: any[] = []
+                        // Stream tool-use markers to the client for UX feedback
                         for (const toolBlock of toolUseBlocks) {
-                            const toolName = toolBlock.name as string
-                            const toolArgs = (toolBlock.input ?? {}) as Record<string, unknown>
-                            const toolCallId = toolBlock.id as string
-
-                            // Stream a tool-use marker to the client for UX feedback
                             try {
                                 controller.enqueue(encoder.encode(
-                                    `data: ${JSON.stringify({ toolUse: { name: toolName, id: toolCallId } })}\n\n`,
+                                    `data: ${JSON.stringify({ toolUse: { name: toolBlock.name, id: toolBlock.id } })}\n\n`,
                                 ))
                             } catch {
                                 // Stream may be closed
                             }
-
                             console.info("[agents/execute] Tool call:", {
-                                tool: toolName,
+                                tool: toolBlock.name,
                                 specialistId,
                                 loopIteration: loopCount,
                             })
-
-                            // Execute the tool
-                            const result = await executeToolCall(toolName, toolArgs, { foundryId })
-                            toolResults.push({
-                                type: "tool_result",
-                                tool_use_id: toolCallId,
-                                content: result,
-                            })
                         }
+
+                        // Execute all tool calls in parallel for lower latency
+                        const toolResults = await Promise.all(
+                            toolUseBlocks.map(async (toolBlock: { name: string; input?: Record<string, unknown>; id: string }) => {
+                                const result = await executeToolCall(
+                                    toolBlock.name,
+                                    (toolBlock.input ?? {}) as Record<string, unknown>,
+                                    { foundryId },
+                                )
+                                return {
+                                    type: "tool_result" as const,
+                                    tool_use_id: toolBlock.id,
+                                    content: result,
+                                }
+                            })
+                        )
 
                         // Append the assistant's response (with tool_use) and tool results to messages
                         conversationMessages.push({
                             role: "assistant",
                             content: finalResponse.content,
                         })
+
+                        loopCount++
+                        const remaining = MAX_TOOL_LOOPS - loopCount
+
+                        // Inject tools_remaining counter so the model can plan its tool usage
                         conversationMessages.push({
                             role: "user",
-                            content: toolResults,
+                            content: [
+                                ...toolResults,
+                                { type: "text", text: `[System: ${remaining} tool call${remaining === 1 ? "" : "s"} remaining]` },
+                            ],
                         })
 
                         // Update createParams with new messages for next iteration
                         createParams.messages = conversationMessages
-                        loopCount++
                     }
                 } else {
                     // ── Non-Anthropic: inject tool context into system prompt ──

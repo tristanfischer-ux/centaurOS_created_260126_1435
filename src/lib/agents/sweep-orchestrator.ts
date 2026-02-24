@@ -33,6 +33,7 @@ import { dispatchInsightNotifications } from './sweep-notifications'
 import { generateDecisionSupportPackage } from './sweep-synthesis'
 import { runAgenticActions } from './agentic-actions'
 import { getLatestBriefingFormatted } from './specialist-briefings'
+import { executeToolCall } from '@/lib/agents/tools/registry'
 import type { AgentInsight } from '@/actions/agent-insights'
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -96,6 +97,65 @@ const SWEEP_MODEL = 'MiniMax-M2.5'
 
 /** Maximum tokens for sweep output */
 const SWEEP_MAX_TOKENS = 4096
+
+// ─── Sweep Data Tool Mapping ────────────────────────────────────────
+
+/**
+ * Maps specialist IDs to their primary data tool for one-shot data injection
+ * during background sweeps. This is cheaper than a full tool-calling loop —
+ * each specialist gets a single proactive data fetch to ground their analysis
+ * in real company data.
+ *
+ * Specialists not in this map fall back to `query_objectives`.
+ */
+const SWEEP_DATA_TOOLS: Record<string, string> = {
+  'finance-lead': 'query_financial_overview',
+  'vp-engineering': 'query_engineering_metrics',
+  'product-lead': 'query_product_roadmap',
+  'hiring-team': 'query_team_overview',
+  strategist: 'query_strategic_goals',
+  'chief-of-staff': 'query_activity_metrics',
+  cto: 'query_engineering_metrics',
+  'fundraising-advisor': 'query_financial_overview',
+  'sales-lead': 'query_financial_overview',
+  'vp-manufacturing': 'query_activity_metrics',
+  'vp-supply-chain': 'query_activity_metrics',
+  'growth-marketer': 'query_objectives',
+  'legal-counsel': 'query_objectives',
+}
+
+/**
+ * Fetches current company data for a specialist's background sweep.
+ *
+ * @description Executes the specialist's primary data tool to inject real-time
+ * company data into the sweep prompt. This is a one-shot fetch (not a tool loop)
+ * to keep sweep costs low. If the tool call fails, returns empty string so the
+ * sweep proceeds without data (non-breaking).
+ *
+ * @param specialistId - The specialist running the sweep
+ * @param foundryId - The foundry to query data for
+ * @returns Formatted "Current Company Data" section, or empty string on failure
+ */
+async function fetchSweepDataForSpecialist(
+  specialistId: string,
+  foundryId: string,
+): Promise<string> {
+  try {
+    const primaryTool = SWEEP_DATA_TOOLS[specialistId] ?? 'query_objectives'
+    const result = await executeToolCall(primaryTool, {}, { foundryId })
+
+    // Skip if the tool returned an error or empty result
+    if (!result || result.startsWith('Error') || result.startsWith('No ') || result.startsWith('Unknown tool')) {
+      return ''
+    }
+
+    return `\n\n## Current Company Data\nThe following live data was fetched for your analysis. Use it to ground your insights in real metrics rather than assumptions.\n\n${result}`
+  } catch (err) {
+    // INTENT: Non-breaking — if data fetch fails, sweep proceeds without it
+    console.warn(`[SweepOrchestrator] Data tool fetch failed for ${specialistId}:`, err)
+    return ''
+  }
+}
 
 // ─── Orchestrator ───────────────────────────────────────────────────
 
@@ -349,11 +409,15 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
       console.warn(`[SweepOrchestrator] Failed to build cross-specialist context:`, err)
     }
 
+    // 1e. Fetch live data via specialist's primary tool (one-shot, non-breaking)
+    const liveDataBlock = await fetchSweepDataForSpecialist(config.specialistId, config.foundryId)
+
     const contextWithBriefing = [
       companyContext,
       briefingBlock ? '\n\n' + briefingBlock : '',
       taskPortfolio ? '\n\n' + taskPortfolio : '',
       crossSpecialistBlock,
+      liveDataBlock,
     ].join('')
 
     // 2. Build the sweep prompt

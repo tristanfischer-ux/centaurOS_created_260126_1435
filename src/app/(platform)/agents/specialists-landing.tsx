@@ -116,6 +116,8 @@ export function SpecialistsLanding({
     const [handoffContext, setHandoffContext] = useState<string | null>(null)
     const [referredByName, setReferredByName] = useState<string | null>(null)
     const [handoffTrail, setHandoffTrail] = useState<HandoffTrailEntry[]>([])
+    const [handoffSourceThreadId, setHandoffSourceThreadId] = useState<string | null>(null)
+    const [handoffSourceSpecialistId, setHandoffSourceSpecialistId] = useState<string | null>(null)
     const [showOrgChart, setShowOrgChart] = useState(false)
     const [specialistActivities, setSpecialistActivities] = useState<Record<string, SpecialistActivity>>({})
     const [unreadInsights, setUnreadInsights] = useState<AgentInsight[]>([])
@@ -182,6 +184,8 @@ export function SpecialistsLanding({
             setHandoffContext(null)
             setReferredByName(null)
             setHandoffTrail([]) // Direct open = fresh start
+            setHandoffSourceThreadId(null)
+            setHandoffSourceSpecialistId(null)
             setBriefSpecialistId(specialistId)
         }
     }, [isDesktop, advisorPanel])
@@ -523,22 +527,28 @@ export function SpecialistsLanding({
                             setBriefSpecialistId(null)
                             setHandoffContext(null)
                             setReferredByName(null)
+                            setHandoffSourceThreadId(null)
+                            setHandoffSourceSpecialistId(null)
                             // Don't clear handoffTrail on close — preserve for accidental closes.
                             // Trail is cleared in handleBrief when opening a new specialist directly.
                         }
                     }}
-                    onSwitchSpecialist={(id, context) => {
+                    onSwitchSpecialist={(id, context, sourceThreadId, sourceSpecialistId) => {
                         const fromName = selectedSpecialist.name
                         const fromId = selectedSpecialist.id
                         // Append current specialist to trail before switching
                         setHandoffTrail(prev => [...prev, { specialistId: fromId, name: fromName }])
                         setHandoffContext(context ?? null)
                         setReferredByName(context ? fromName : null)
+                        setHandoffSourceThreadId(sourceThreadId ?? null)
+                        setHandoffSourceSpecialistId(sourceSpecialistId ?? null)
                         setBriefSpecialistId(id)
                     }}
                     handoffContext={handoffContext}
                     referredBy={referredByName}
                     handoffTrail={handoffTrail}
+                    handoffSourceThreadId={handoffSourceThreadId}
+                    handoffSourceSpecialistId={handoffSourceSpecialistId}
                 />
             )}
 

@@ -7,8 +7,9 @@
  *   3. Records the interaction for trust level progression
  *   4. Triggers async memory processing (observe/reflect cycles)
  *   5. Extracts knowledge notes for the Knowledge Vault
- *   6. Logs AI usage for billing
- *   7. Records rollout spans for tracing
+ *   6. Extracts structured facts for the Specialist Knowledge Base
+ *   7. Logs AI usage for billing
+ *   8. Records rollout spans for tracing
  *
  * All operations are independently failable — none blocks the response or crashes
  * the specialist if they fail. The callback runs after the response stream has already
@@ -100,6 +101,7 @@ export function createPostResponseCallback(
             try {
                 let cleanOutput = fullOutput.replace(/NEXT_SPECIALIST:\s*\S+\s*\|.*/i, "").trim()
                 cleanOutput = cleanOutput.replace(/<!--\s*PROPOSED_ACTIONS\s*[\s\S]*?\s*-->/gi, "").trim()
+                cleanOutput = cleanOutput.replace(/<!--\s*PROPOSED_EXTERNAL_ACTION\s*[\s\S]*?\s*-->/gi, "").trim()
                 await addMemoryMessage(threadId, foundryId, "assistant", cleanOutput || fullOutput)
 
                 try {
@@ -133,6 +135,20 @@ export function createPostResponseCallback(
                             foundryId,
                         }).catch((err) => {
                             console.warn("[PostResponse] Knowledge extraction failed:", err)
+                        })
+                    }).catch(() => {})
+
+                    // Specialist knowledge base extraction (persistent facts)
+                    import("@/lib/agents/knowledge-extraction").then(({ extractAndStoreKnowledge }) => {
+                        const userMsg = input.trim() || finalPrompt.slice(0, 500)
+                        extractAndStoreKnowledge(
+                            foundryId!,
+                            specialistId!,
+                            threadId!,
+                            userMsg,
+                            cleanOutput || fullOutput,
+                        ).catch((err) => {
+                            console.warn("[PostResponse] Specialist knowledge extraction failed:", err)
                         })
                     }).catch(() => {})
                 }

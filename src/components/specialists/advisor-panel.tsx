@@ -34,13 +34,15 @@ export function AdvisorPanel(): React.ReactElement {
     referredBy,
     contextLabel,
     handoffTrail,
+    handoffSourceThreadId,
+    handoffSourceSpecialistId,
     closePanel,
     switchSpecialist,
   } = useAdvisorPanel()
 
   const handleSwitchSpecialist = useCallback(
-    (specialistId: string, handoffCtx?: string) => {
-      switchSpecialist(specialistId, handoffCtx)
+    (specialistId: string, handoffCtx?: string, sourceThreadId?: string, sourceSpecialistId?: string) => {
+      switchSpecialist(specialistId, handoffCtx, sourceThreadId, sourceSpecialistId)
     },
     [switchSpecialist],
   )
@@ -69,6 +71,8 @@ export function AdvisorPanel(): React.ReactElement {
           contextLabel={contextLabel}
           renderMode="panel"
           handoffTrail={handoffTrail}
+          handoffSourceThreadId={handoffSourceThreadId}
+          handoffSourceSpecialistId={handoffSourceSpecialistId}
         />
       )}
     </div>

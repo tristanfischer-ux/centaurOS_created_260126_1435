@@ -54,7 +54,7 @@ import { HandoffCard } from "@/components/specialists/handoff-card"
 import { HandoffBreadcrumb } from "@/components/specialists/handoff-breadcrumb"
 import type { HandoffTrailEntry } from "@/contexts/advisor-panel-context"
 import { getProactiveOpener, markInsightRead, getSpecialistGreetingContext } from "@/actions/agent-insights"
-import { createArtifact, exportArtifactToGoogleDocs } from "@/actions/agent-artifacts"
+import { createArtifact, exportArtifactToGoogleDocs, updateArtifactContent } from "@/actions/agent-artifacts"
 import type { ArtifactContentType } from "@/actions/agent-artifacts"
 import { detectWorkflowTrigger } from "@/lib/agents/specialist-workflows"
 import type { SpecialistId } from "./specialists-data"
@@ -71,6 +71,12 @@ import { SpecialistChatAvatar } from "@/components/specialists/specialist-presen
 import { AiDisclaimer } from "@/components/ui/ai-disclaimer"
 import { InlinePresentationCard } from "@/components/specialists/inline-presentation-card"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
+import { ChartRenderer } from "@/components/specialists/chart-renderer"
+import { validateChartSpec } from "@/lib/agents/tools/chart-spec"
+import type { ChartSpec } from "@/lib/agents/tools/chart-spec"
+import { ExternalActionCard } from "@/components/specialists/external-action-card"
+import { validateExternalAction } from "@/lib/agents/tools/permission-guard"
+import type { ProposedExternalAction } from "@/lib/agents/tools/permission-guard"
 import type { Specialist } from "./specialists-data"
 
 // ─── Presentation Intent Detection ───────────────────────────────────────────
@@ -207,6 +213,10 @@ interface ChatMessage {
     executionPlan?: ExecutionPlan | null
     /** Marks messages that are proactive openers from background sweeps — specialist-initiated. */
     isProactive?: boolean
+    /** Parsed from CHART blocks in assistant messages; rendered as inline Recharts visualizations. */
+    charts?: ChartSpec[]
+    /** Parsed from PROPOSED_EXTERNAL_ACTION blocks; rendered as ExternalActionCards for founder approval. */
+    externalActions?: ProposedExternalAction[]
 }
 
 /**
@@ -402,6 +412,231 @@ function stripProposedPlanBlock(content: string): string {
     return result.trim()
 }
 
+// ─── PROPOSED_EDIT Parsing ──────────────────────────────────────────
+
+/**
+ * Ordered regex patterns to extract PROPOSED_EDIT from specialist output.
+ *
+ * @description Handles the same LLM format variations as PROPOSED_ACTIONS/PROPOSED_PLAN.
+ * PROPOSED_EDIT contains a single JSON object (not an array) with
+ * {artifactId, title, changeSummary}.
+ */
+const PROPOSED_EDIT_PATTERNS: RegExp[] = [
+    // Pattern 1: Standard HTML comment (Claude-reliable)
+    /<!--\s*PROPOSED_EDIT\s*([\s\S]*?)\s*-->/i,
+    // Pattern 2: Markdown code fence with PROPOSED_EDIT label
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?PROPOSED_EDIT\s*\n?([\s\S]*?)\s*(?:-->)?\s*```/i,
+    // Pattern 3: PROPOSED_EDIT on its own line followed by JSON object (no delimiters)
+    /PROPOSED_EDIT\s*\n\s*(\{[\s\S]*?\})\s*(?:-->)?/i,
+]
+
+/** Combined regex for stripping ALL variations of PROPOSED_EDIT blocks from display content. */
+const STRIP_PROPOSED_EDIT_PATTERNS: RegExp[] = [
+    /<!--\s*PROPOSED_EDIT\s*[\s\S]*?\s*-->/gi,
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?PROPOSED_EDIT\s*\n?[\s\S]*?\s*(?:-->)?\s*```/gi,
+    /PROPOSED_EDIT\s*\n?\s*\{[\s\S]*?\}\s*(?:-->)?/gi,
+]
+
+interface ProposedEdit {
+    artifactId: string
+    title: string
+    changeSummary: string
+}
+
+/**
+ * Parse PROPOSED_EDIT JSON block from specialist response.
+ *
+ * @description Extracts a single edit instruction {artifactId, title, changeSummary}
+ * from the specialist output when they revise an existing deliverable.
+ *
+ * @param content - The raw specialist response text
+ * @returns Parsed ProposedEdit or null if none found
+ */
+function parseProposedEdit(content: string): ProposedEdit | null {
+    for (let i = 0; i < PROPOSED_EDIT_PATTERNS.length; i++) {
+        const pattern = PROPOSED_EDIT_PATTERNS[i]
+        const match = content.match(pattern)
+        if (!match?.[1]) continue
+
+        try {
+            const raw = JSON.parse(match[1].trim()) as Record<string, unknown>
+            if (
+                typeof raw.artifactId === "string" &&
+                typeof raw.title === "string" &&
+                typeof raw.changeSummary === "string"
+            ) {
+                if (i > 0) {
+                    console.info("[ProposedEdit] Parsed via fallback pattern", i)
+                }
+                return {
+                    artifactId: raw.artifactId,
+                    title: raw.title,
+                    changeSummary: raw.changeSummary,
+                }
+            }
+        } catch (parseErr) {
+            console.warn("[ProposedEdit] Pattern", i, "matched but JSON parse failed:", {
+                snippet: match[1].slice(0, 200),
+                error: parseErr instanceof Error ? parseErr.message : "Unknown parse error",
+            })
+        }
+    }
+
+    if (content.includes("PROPOSED_EDIT")) {
+        console.warn("[ProposedEdit] Content contains PROPOSED_EDIT keyword but no pattern matched.")
+    }
+
+    return null
+}
+
+/** Remove PROPOSED_EDIT blocks from display content */
+function stripProposedEditBlock(content: string): string {
+    let result = content
+    for (const pattern of STRIP_PROPOSED_EDIT_PATTERNS) {
+        result = result.replace(pattern, "")
+    }
+    return result.trim()
+}
+
+// ─── CHART Block Parsing ──────────────────────────────────────────
+
+/**
+ * Regex patterns to extract CHART blocks from specialist output.
+ *
+ * @description Uses the `g` flag because a single response can contain MULTIPLE
+ * charts. Each match captures the JSON body of the chart specification.
+ */
+const CHART_PATTERNS: RegExp[] = [
+    /<!--\s*CHART\s*([\s\S]*?)\s*-->/gi,
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?CHART\s*\n?([\s\S]*?)\s*(?:-->)?\s*```/gi,
+]
+
+/** Combined regex for stripping ALL chart blocks from display content. */
+const STRIP_CHART_PATTERNS: RegExp[] = [
+    /<!--\s*CHART\s*[\s\S]*?\s*-->/gi,
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?CHART\s*\n?[\s\S]*?\s*(?:-->)?\s*```/gi,
+]
+
+/**
+ * Parse all CHART JSON blocks from specialist response.
+ *
+ * @description Finds every <!-- CHART {...} --> block in the content,
+ * validates each as a ChartSpec, and returns the valid ones.
+ *
+ * @param content - The raw specialist response text
+ * @returns Array of validated ChartSpec objects (empty if none found)
+ */
+function parseCharts(content: string): ChartSpec[] {
+    const charts: ChartSpec[] = []
+    for (const pattern of CHART_PATTERNS) {
+        // GOTCHA: Reset lastIndex before each exec loop since patterns use the `g` flag
+        pattern.lastIndex = 0
+        let match: RegExpExecArray | null
+        while ((match = pattern.exec(content)) !== null) {
+            if (!match[1]) continue
+            try {
+                const parsed = JSON.parse(match[1].trim())
+                const validated = validateChartSpec(parsed)
+                if (validated) {
+                    charts.push(validated)
+                }
+            } catch {
+                // JSON parse failed — skip this match
+            }
+        }
+    }
+    return charts
+}
+
+/**
+ * Remove all CHART blocks from display content.
+ *
+ * @param content - Raw specialist response text
+ * @returns Content with chart blocks stripped
+ */
+function stripChartBlocks(content: string): string {
+    let result = content
+    for (const pattern of STRIP_CHART_PATTERNS) {
+        result = result.replace(pattern, "")
+    }
+    return result.trim()
+}
+
+// ─── PROPOSED_EXTERNAL_ACTION Parsing ────────────────────────────────
+
+/**
+ * Regex patterns to extract PROPOSED_EXTERNAL_ACTION blocks from specialist output.
+ *
+ * @description Uses the `g` flag because a single response can contain MULTIPLE
+ * external action proposals. Each match captures the JSON body of the action.
+ */
+const PROPOSED_EXTERNAL_ACTION_PATTERNS: RegExp[] = [
+    // Pattern 1: Standard HTML comment (Claude-reliable)
+    /<!--\s*PROPOSED_EXTERNAL_ACTION\s*([\s\S]*?)\s*-->/gi,
+    // Pattern 2: Markdown code fence with PROPOSED_EXTERNAL_ACTION label
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?PROPOSED_EXTERNAL_ACTION\s*\n?([\s\S]*?)\s*(?:-->)?\s*```/gi,
+    // Pattern 3: PROPOSED_EXTERNAL_ACTION on its own line followed by JSON object (no delimiters)
+    /PROPOSED_EXTERNAL_ACTION\s*\n\s*(\{[\s\S]*?\})\s*(?:-->)?/gi,
+]
+
+/** Combined regex for stripping ALL variations of PROPOSED_EXTERNAL_ACTION blocks from display content. */
+const STRIP_EXTERNAL_ACTION_PATTERNS: RegExp[] = [
+    /<!--\s*PROPOSED_EXTERNAL_ACTION\s*[\s\S]*?\s*-->/gi,
+    /```(?:json)?\s*\n?\s*(?:<!--\s*)?PROPOSED_EXTERNAL_ACTION\s*\n?[\s\S]*?\s*(?:-->)?\s*```/gi,
+    /PROPOSED_EXTERNAL_ACTION\s*\n?\s*\{[\s\S]*?\}\s*(?:-->)?/gi,
+]
+
+/**
+ * Parse all PROPOSED_EXTERNAL_ACTION JSON blocks from specialist response.
+ *
+ * @description Finds every <!-- PROPOSED_EXTERNAL_ACTION {...} --> block in the content,
+ * validates each using validateExternalAction, and returns the valid ones.
+ *
+ * @param content - The raw specialist response text
+ * @returns Array of validated ProposedExternalAction objects (empty if none found)
+ */
+function parseExternalActions(content: string): ProposedExternalAction[] {
+    const actions: ProposedExternalAction[] = []
+    for (const pattern of PROPOSED_EXTERNAL_ACTION_PATTERNS) {
+        // GOTCHA: Reset lastIndex before each exec loop since patterns use the `g` flag
+        pattern.lastIndex = 0
+        let match: RegExpExecArray | null
+        while ((match = pattern.exec(content)) !== null) {
+            if (!match[1]) continue
+            try {
+                const parsed = JSON.parse(match[1].trim())
+                const validated = validateExternalAction(parsed)
+                if (validated) {
+                    actions.push(validated)
+                }
+            } catch {
+                // JSON parse failed — skip this match
+            }
+        }
+    }
+
+    // Diagnostic: check if keyword exists but no pattern matched
+    if (actions.length === 0 && content.includes("PROPOSED_EXTERNAL_ACTION")) {
+        console.warn("[ExternalActions] Content contains PROPOSED_EXTERNAL_ACTION keyword but no pattern matched.")
+    }
+
+    return actions
+}
+
+/**
+ * Remove all PROPOSED_EXTERNAL_ACTION blocks from display content.
+ *
+ * @param content - Raw specialist response text
+ * @returns Content with external action blocks stripped
+ */
+function stripExternalActionBlocks(content: string): string {
+    let result = content
+    for (const pattern of STRIP_EXTERNAL_ACTION_PATTERNS) {
+        result = result.replace(pattern, "")
+    }
+    return result.trim()
+}
+
 /** Render mode: "dialog" for centered modal, "panel" for persistent sidebar */
 export type SpecialistRenderMode = "dialog" | "panel"
 
@@ -413,11 +648,15 @@ interface BriefSpecialistDialogProps {
     /** Dialog state change handler */
     onOpenChange: (open: boolean) => void
     /** Callback to open a different specialist's dialog with optional handoff context */
-    onSwitchSpecialist?: (specialistId: string, handoffContext?: string) => void
+    onSwitchSpecialist?: (specialistId: string, handoffContext?: string, sourceThreadId?: string, sourceSpecialistId?: string) => void
     /** Context passed from a referring specialist when switching */
     handoffContext?: string | null
     /** Name of the specialist that referred the user */
     referredBy?: string | null
+    /** Source specialist's thread ID for deep handoff context (server-side enrichment) */
+    handoffSourceThreadId?: string | null
+    /** Source specialist's ID for deep handoff context (server-side enrichment) */
+    handoffSourceSpecialistId?: string | null
     /** Optional label shown as a badge in the header indicating what entity is being discussed */
     contextLabel?: string | null
     /** Render mode: "dialog" for centered modal (default), "panel" for sidebar layout */
@@ -448,6 +687,8 @@ export function BriefSpecialistDialog({
     contextLabel,
     renderMode = "dialog",
     handoffTrail = [],
+    handoffSourceThreadId,
+    handoffSourceSpecialistId,
 }: BriefSpecialistDialogProps) {
     const isPanel = renderMode === "panel"
     // ─── State ────────────────────────────────────────────────────────────
@@ -935,6 +1176,8 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
                         modelTier: specialist.modelTier,
                         threadId: threadId ?? undefined,
                         specialistId: specialist.id,
+                        handoffSourceThreadId: handoffSourceThreadId ?? undefined,
+                        handoffSourceSpecialistId: handoffSourceSpecialistId ?? undefined,
                     }),
                     signal,
                 })
@@ -1178,6 +1421,10 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                     setSpeculativeComplexity(null)
                 }
 
+                // INTENT: Pass handoff source IDs on the first exchange only, so the
+                // server can build deep handoff context from the source specialist's
+                // conversation transcript, artifacts, and decisions.
+                const isFirstExchange = messages.length <= 1
                 const res = await fetch("/api/agents/execute", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1196,6 +1443,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         attachments: attachmentsToSend.length > 0
                             ? attachmentsToSend.map((a) => ({ path: a.path, url: a.url, filename: a.filename, mimeType: a.mimeType }))
                             : undefined,
+                        handoffSourceThreadId: isFirstExchange ? (handoffSourceThreadId ?? undefined) : undefined,
+                        handoffSourceSpecialistId: isFirstExchange ? (handoffSourceSpecialistId ?? undefined) : undefined,
                     }),
                     signal: controller.signal,
                 })
@@ -1450,6 +1699,68 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             }
             displayResponse = stripProposedPlanBlock(displayResponse)
 
+            // Parse PROPOSED_EDIT from response (iterative artifact revisions)
+            const proposedEdit = parseProposedEdit(displayResponse)
+            if (proposedEdit) {
+                console.info("[SpecialistChat] PROPOSED_EDIT parsed:", {
+                    specialist: specialist.id,
+                    artifactId: proposedEdit.artifactId,
+                    title: proposedEdit.title,
+                    changeSummary: proposedEdit.changeSummary,
+                })
+                // Fire-and-forget: update the existing artifact with revised content
+                // INTENT: The display content (after stripping the edit block) IS the
+                // full updated artifact body the specialist produced.
+                const editContent = stripProposedEditBlock(displayResponse)
+                updateArtifactContent(
+                    proposedEdit.artifactId,
+                    editContent,
+                    proposedEdit.title,
+                    proposedEdit.changeSummary,
+                ).then((result) => {
+                    if (result.data) {
+                        toast.success("Deliverable updated", {
+                            description: proposedEdit.changeSummary,
+                            action: {
+                                label: "Open",
+                                onClick: () => { window.location.href = "/agents/artifacts" },
+                            },
+                            duration: 4000,
+                        })
+                    } else if (result.error) {
+                        console.warn("[SpecialistChat] PROPOSED_EDIT update failed:", result.error)
+                        toast.error("Failed to update deliverable", {
+                            description: result.error,
+                        })
+                    }
+                }).catch((err) => {
+                    console.warn("[SpecialistChat] PROPOSED_EDIT update error:", err)
+                })
+            }
+            displayResponse = stripProposedEditBlock(displayResponse)
+
+            // Parse CHART blocks from response (inline data visualizations)
+            const parsedCharts = parseCharts(displayResponse)
+            if (parsedCharts.length > 0) {
+                console.info("[SpecialistChat] CHART blocks parsed:", {
+                    specialist: specialist.id,
+                    chartCount: parsedCharts.length,
+                    types: parsedCharts.map((c) => c.type),
+                })
+            }
+            displayResponse = stripChartBlocks(displayResponse)
+
+            // Parse PROPOSED_EXTERNAL_ACTION blocks from response (Google Sheets, Calendar, Email)
+            const parsedExternalActions = parseExternalActions(displayResponse)
+            if (parsedExternalActions.length > 0) {
+                console.info("[SpecialistChat] PROPOSED_EXTERNAL_ACTION blocks parsed:", {
+                    specialist: specialist.id,
+                    actionCount: parsedExternalActions.length,
+                    types: parsedExternalActions.map((a) => a.type),
+                })
+            }
+            displayResponse = stripExternalActionBlocks(displayResponse)
+
             // Parse slides when a presentation was requested so the inline
             // card renderer can display a visual carousel instead of raw JSON.
             const parsedDeck = isSlideRequest ? parseSlideDeckFromText(fullResponse) : null
@@ -1463,6 +1774,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 ...(rolloutIdFromResponse ? { rolloutId: rolloutIdFromResponse } : {}),
                 ...(parsedDeck ? { slideDeck: parsedDeck } : {}),
                 ...(parsedPlan ? { executionPlan: parsedPlan } : {}),
+                ...(parsedCharts.length > 0 ? { charts: parsedCharts } : {}),
+                ...(parsedExternalActions.length > 0 ? { externalActions: parsedExternalActions } : {}),
             }
             setMessages((prev) => [...prev, assistantMessage])
             setStreamingResponse("")
@@ -1526,7 +1839,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             setIsUrgentMessage(false)
             setIsSpeculativeMode(false)
         }
-    }, [briefText, specialist, threadId, crossSpecialistContext, handoffContext, messages, pendingAttachments, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext, formatBrowseContext])
+    }, [briefText, specialist, threadId, crossSpecialistContext, handoffContext, handoffSourceThreadId, handoffSourceSpecialistId, messages, pendingAttachments, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext, formatBrowseContext])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
@@ -1923,17 +2236,22 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
         executeAbortRef.current?.abort()
         executeAbortRef.current = null
 
+        // INTENT: Pass the source threadId and specialistId so the receiving specialist
+        // can fetch deep handoff context server-side (full transcript + artifacts + decisions).
+        const sourceThread = threadId ?? undefined
+        const sourceSpecialist = specialist.id
+
         if (isPanel) {
             // Panel mode: switch directly without close/reopen cycle.
             // The close-then-reopen pattern causes a race condition where the
             // open→false→true transition triggers cleanup effects that abort
             // the new specialist's greeting stream mid-flight.
-            onSwitchSpecialist?.(id, handoff)
+            onSwitchSpecialist?.(id, handoff, sourceThread, sourceSpecialist)
         } else {
             // Dialog mode: close first, then reopen with new specialist
             // after the close animation finishes.
             onOpenChange(false)
-            setTimeout(() => onSwitchSpecialist?.(id, handoff), 200)
+            setTimeout(() => onSwitchSpecialist?.(id, handoff, sourceThread, sourceSpecialist), 200)
         }
     }, [isPanel, onOpenChange, onSwitchSpecialist, messages, specialist, dynamicSuggestion])
 
@@ -2365,16 +2683,23 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                         <InlinePresentationCard deck={msg.slideDeck} />
                                                         {!msg.historical && (
                                                             <div className="mt-2 flex justify-end">
-                                                                <MessageExportMenu content={msg.content} />
+                                                                <MessageExportMenu content={msg.content} specialistName={specialist.name} />
                                                             </div>
                                                         )}
                                                     </>
                                                 ) : (
                                                     <>
                                                         <Markdown content={msg.content} className="text-sm" />
+                                                        {msg.charts && msg.charts.length > 0 && (
+                                                            <div className="mt-3 space-y-3">
+                                                                {msg.charts.map((chart, ci) => (
+                                                                    <ChartRenderer key={`chart-${ci}`} spec={chart} />
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                         {!msg.historical && (
                                                             <div className="mt-2 flex justify-end">
-                                                                <MessageExportMenu content={msg.content} />
+                                                                <MessageExportMenu content={msg.content} specialistName={specialist.name} />
                                                             </div>
                                                         )}
                                                     </>
@@ -2524,6 +2849,31 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         })
                                     }}
                                 />
+                            </div>
+                        )}
+
+                        {/* External action proposals (Google Sheets, Calendar, Email) */}
+                        {lastAssistantMessage && !isExecuting && lastAssistantMessage.externalActions && lastAssistantMessage.externalActions.length > 0 && (
+                            <div className="px-4 space-y-2">
+                                {lastAssistantMessage.externalActions.map((ea, eaIdx) => (
+                                    <ExternalActionCard
+                                        key={`ext-action-${eaIdx}-${ea.type}`}
+                                        action={ea}
+                                        onDismiss={() => {
+                                            setMessages((prev) => {
+                                                const idx = prev.map((m, i) => ({ m, i }))
+                                                    .reverse()
+                                                    .find(({ m }) => m.role === "assistant" && !m.historical)?.i
+                                                if (idx === undefined) return prev
+                                                const current = prev[idx].externalActions ?? []
+                                                const updated = current.filter((_, i) => i !== eaIdx)
+                                                return prev.map((msg, i) =>
+                                                    i === idx ? { ...msg, externalActions: updated.length > 0 ? updated : undefined } : msg
+                                                )
+                                            })
+                                        }}
+                                    />
+                                ))}
                             </div>
                         )}
 
@@ -3264,16 +3614,23 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                         <InlinePresentationCard deck={msg.slideDeck} />
                                                         {!msg.historical && (
                                                             <div className="mt-2 flex justify-end">
-                                                                <MessageExportMenu content={msg.content} />
+                                                                <MessageExportMenu content={msg.content} specialistName={specialist.name} />
                                                             </div>
                                                         )}
                                                     </>
                                                 ) : (
                                                     <>
                                                         <Markdown content={msg.content} className="text-sm" />
+                                                        {msg.charts && msg.charts.length > 0 && (
+                                                            <div className="mt-3 space-y-3">
+                                                                {msg.charts.map((chart, ci) => (
+                                                                    <ChartRenderer key={`chart-${ci}`} spec={chart} />
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                         {!msg.historical && (
                                                             <div className="mt-2 flex justify-end">
-                                                                <MessageExportMenu content={msg.content} />
+                                                                <MessageExportMenu content={msg.content} specialistName={specialist.name} />
                                                             </div>
                                                         )}
                                                     </>
@@ -3433,6 +3790,31 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     })
                                 }}
                             />
+                        )}
+
+                        {/* External action proposals (Google Sheets, Calendar, Email) — panel mode */}
+                        {lastAssistantMessage && !isExecuting && lastAssistantMessage.externalActions && lastAssistantMessage.externalActions.length > 0 && (
+                            <div className="space-y-2">
+                                {lastAssistantMessage.externalActions.map((ea, eaIdx) => (
+                                    <ExternalActionCard
+                                        key={`ext-action-panel-${eaIdx}-${ea.type}`}
+                                        action={ea}
+                                        onDismiss={() => {
+                                            setMessages((prev) => {
+                                                const idx = prev.map((m, i) => ({ m, i }))
+                                                    .reverse()
+                                                    .find(({ m }) => m.role === "assistant" && !m.historical)?.i
+                                                if (idx === undefined) return prev
+                                                const current = prev[idx].externalActions ?? []
+                                                const updated = current.filter((_, i) => i !== eaIdx)
+                                                return prev.map((msg, i) =>
+                                                    i === idx ? { ...msg, externalActions: updated.length > 0 ? updated : undefined } : msg
+                                                )
+                                            })
+                                        }}
+                                    />
+                                ))}
+                            </div>
                         )}
 
                         {/* Execution plan card (panel mode) */}

@@ -10,8 +10,9 @@
  *   5. Knowledge Vault (relevant organizational knowledge)
  *   6. "Since we last talked" bridge (what changed since last conversation)
  *   7. Cross-specialist intelligence (what related specialists recently said)
- *   8. Temporal awareness (time/day, milestone proximity)
- *   9. Emotional awareness (detecting the founder's emotional state from their message)
+ *   8. Specialist knowledge base (persistent facts from past conversations)
+ *   9. Temporal awareness (time/day, milestone proximity)
+ *  10. Emotional awareness (detecting the founder's emotional state from their message)
  *
  * Each layer is independently failable — if any DB query fails, the specialist
  * proceeds with a slightly less rich prompt rather than failing entirely.
@@ -53,6 +54,7 @@ import { compileTemporalPrompt } from "@/lib/agents/temporal-context"
 import { compileEmotionalPrompt } from "@/lib/agents/emotional-context"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { SPECIALISTS } from "@/app/(platform)/agents/specialists-data"
+import { buildHandoffContext } from "@/lib/agents/handoff-context"
 
 /**
  * Parameters for building the specialist context layers.
@@ -70,6 +72,10 @@ export interface ContextLayerParams {
     finalPrompt: string
     /** True for conversational follow-ups — skips DB queries, uses lightweight layers only */
     isConversationalFastPath: boolean
+    /** Source specialist's thread ID for cross-specialist handoff context (optional) */
+    handoffSourceThreadId?: string
+    /** Source specialist's ID for cross-specialist handoff context (optional) */
+    handoffSourceSpecialistId?: string
 }
 
 /**
@@ -87,11 +93,29 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<{
     contextBlocks: string
     activeLayers: string[]
 }> {
-    const { foundryId, specialistId, threadId, input, finalPrompt, isConversationalFastPath } = params
+    const {
+        foundryId, specialistId, threadId, input, finalPrompt, isConversationalFastPath,
+        handoffSourceThreadId, handoffSourceSpecialistId,
+    } = params
     let contextBlocks = ""
     const activeLayers: string[] = []
 
     if (!isConversationalFastPath) {
+        // Deep handoff context: when specialist B is receiving a handoff from specialist A,
+        // inject A's full conversation transcript, artifacts, and decisions so B can
+        // continue seamlessly without the founder re-explaining.
+        if (foundryId && handoffSourceThreadId && handoffSourceSpecialistId) {
+            try {
+                const handoffBlock = await buildHandoffContext(foundryId, handoffSourceSpecialistId, handoffSourceThreadId)
+                if (handoffBlock) {
+                    contextBlocks += `\n\n${handoffBlock}`
+                    activeLayers.push('Handoff Context')
+                }
+            } catch (err) {
+                console.warn("[PromptBuilder] Could not load handoff context:", err)
+            }
+        }
+
         // Founder preferences: learned communication style, trust level, pet peeves
         if (foundryId && specialistId && threadId) {
             try {
@@ -186,6 +210,17 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<{
                     })()
                 )
             }
+
+            // Layer 8: Specialist knowledge base (persistent facts from past conversations)
+            layerPromises.push(
+                (async () => {
+                    const { getSpecialistKnowledge, compileKnowledgePrompt } = await import('./knowledge-base')
+                    const entries = await getSpecialistKnowledge(foundryId, specialistId, { limit: 30 })
+                    const specialist = getSpecialistById(specialistId)
+                    const block = compileKnowledgePrompt(entries, specialist?.name ?? specialistId)
+                    return { block, layer: 'Specialist Knowledge' }
+                })()
+            )
 
             const results = await Promise.allSettled(layerPromises)
             for (const result of results) {
