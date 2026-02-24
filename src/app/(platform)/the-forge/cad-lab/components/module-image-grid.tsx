@@ -16,8 +16,9 @@
  * - Build detail layout: src/app/(platform)/the-forge/cad-lab/build/page.tsx
  */
 
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { AlertTriangle, ArrowRight, Clock, Info } from "lucide-react"
+import { AlertTriangle, ArrowRight, Clock, Download, Info, Maximize2, X } from "lucide-react"
 import { ModuleImageCard } from "./module-image-card"
 import {
   Dialog,
@@ -27,6 +28,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -49,7 +51,29 @@ function ModuleDetailDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }): React.ReactNode {
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+
+  async function handleDownload() {
+    if (!module.imageUrl) return
+    try {
+      const res = await fetch(module.imageUrl)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${module.name.replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-")}-blueprint.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      // Fallback: open in new tab
+      window.open(module.imageUrl, "_blank")
+    }
+  }
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
         <DialogHeader>
@@ -60,16 +84,34 @@ function ModuleDetailDialog({
         <div className="space-y-6">
           {/* Illustration */}
           {module.imageStatus === "complete" && module.imageUrl && (
-            <div className="rounded-lg overflow-hidden border bg-muted/5 p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={module.imageUrl}
-                alt={`Engineering blueprint of ${module.name}`}
-                className="w-full h-auto max-h-[400px] object-contain"
-              />
-              <p className="text-[10px] text-muted-foreground text-center mt-2 italic">
-                Conceptual illustration — not an engineering drawing
-              </p>
+            <div className="rounded-lg overflow-hidden border bg-muted/5">
+              <div className="relative group">
+                <button
+                  onClick={() => setLightboxOpen(true)}
+                  className="w-full cursor-zoom-in"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={module.imageUrl}
+                    alt={`Engineering blueprint of ${module.name}`}
+                    className="w-full h-auto object-contain"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-background/90 rounded-full p-2 shadow-sm">
+                      <Maximize2 className="h-4 w-4 text-foreground" />
+                    </div>
+                  </div>
+                </button>
+              </div>
+              <div className="flex items-center justify-between px-3 py-2 border-t">
+                <p className="text-[10px] text-muted-foreground italic">
+                  Conceptual illustration — not an engineering drawing
+                </p>
+                <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={handleDownload}>
+                  <Download className="h-3 w-3" />
+                  Download
+                </Button>
+              </div>
             </div>
           )}
           {module.imageStatus === "generating" && (
@@ -165,6 +207,44 @@ function ModuleDetailDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Full-screen lightbox */}
+    <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+      <DialogContent size="xl" className="max-w-[95vw] max-h-[95vh] p-0">
+        <div className="relative">
+          <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="bg-background/90 hover:bg-background shadow-sm"
+              onClick={handleDownload}
+              aria-label="Download"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="bg-background/90 hover:bg-background shadow-sm"
+              onClick={() => setLightboxOpen(false)}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="overflow-auto max-h-[95vh] p-6">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={module.imageUrl || ""}
+              alt={`Technical blueprint: ${module.name}`}
+              className="w-full h-auto"
+            />
+          </div>
+        </div>
+        <DialogTitle className="sr-only">{module.name} Technical Blueprint</DialogTitle>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
 
