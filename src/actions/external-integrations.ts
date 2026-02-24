@@ -23,7 +23,15 @@ import { getGoogleClient } from '@/lib/google/client'
 import { google } from 'googleapis'
 import { createCalendarEvent } from '@/lib/google/calendar'
 import type { CalendarEventParams } from '@/lib/google/calendar'
-import type { SheetPayload, CalendarPayload, EmailPayload } from '@/lib/agents/tools/permission-guard'
+import type {
+    SheetPayload,
+    CalendarPayload,
+    EmailPayload,
+    LinearIssuePayload,
+    SlackMessagePayload,
+    InvoiceDraftPayload,
+    PitchDeckPayload,
+} from '@/lib/agents/tools/permission-guard'
 
 // ─── Google Sheets ──────────────────────────────────────────────────
 
@@ -309,5 +317,145 @@ export async function sendDraftEmail(
             userId: user.id,
         })
         return { success: false, error: `Failed to send email: ${message}` }
+    }
+}
+
+// ─── Linear Issue Creation ──────────────────────────────────────────
+
+/**
+ * Create a Linear issue from a specialist proposal.
+ *
+ * @param payload - Linear issue details
+ * @returns Issue URL or error
+ *
+ * @security Requires authenticated user. Delegates to Linear API via api key.
+ */
+export async function createLinearIssueFromProposal(
+    payload: LinearIssuePayload
+): Promise<{ issueUrl: string | null; error: string | null }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { issueUrl: null, error: 'Not authenticated' }
+
+    if (!payload.title?.trim()) {
+        return { issueUrl: null, error: 'Issue title is required' }
+    }
+
+    try {
+        const { createLinearIssue } = await import('@/lib/agents/external-actions/linear')
+        return await createLinearIssue(payload)
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        return { issueUrl: null, error: `Failed to create Linear issue: ${message}` }
+    }
+}
+
+// ─── Slack Message ──────────────────────────────────────────────────
+
+/**
+ * Send a Slack message from a specialist proposal.
+ *
+ * @param payload - Slack message details
+ * @returns Success or error
+ *
+ * @security Requires authenticated user. Delegates to Slack Web API via bot token.
+ */
+export async function sendSlackMessageFromProposal(
+    payload: SlackMessagePayload
+): Promise<{ success: boolean; error: string | null }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Not authenticated' }
+
+    if (!payload.channel?.trim()) {
+        return { success: false, error: 'Slack channel is required' }
+    }
+    if (!payload.message?.trim()) {
+        return { success: false, error: 'Message content is required' }
+    }
+
+    try {
+        const { sendSlackMessage } = await import('@/lib/agents/external-actions/slack')
+        return await sendSlackMessage(payload)
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        return { success: false, error: `Failed to send Slack message: ${message}` }
+    }
+}
+
+// ─── Invoice Draft ──────────────────────────────────────────────────
+
+/**
+ * Create an invoice draft from a specialist proposal.
+ *
+ * @param payload - Invoice details
+ * @returns Invoice ID or error
+ *
+ * @security Requires authenticated user with an active foundry.
+ */
+export async function createInvoiceDraftFromProposal(
+    payload: InvoiceDraftPayload
+): Promise<{ invoiceId: string | null; error: string | null }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { invoiceId: null, error: 'Not authenticated' }
+
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { invoiceId: null, error: 'No active foundry' }
+
+    if (!payload.recipientName?.trim()) {
+        return { invoiceId: null, error: 'Recipient name is required' }
+    }
+    if (!payload.items || payload.items.length === 0) {
+        return { invoiceId: null, error: 'At least one line item is required' }
+    }
+
+    try {
+        const { createInvoiceDraft } = await import('@/lib/agents/external-actions/invoice')
+        return await createInvoiceDraft(payload, foundryId)
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        return { invoiceId: null, error: `Failed to create invoice: ${message}` }
+    }
+}
+
+// ─── Pitch Deck Generation ─────────────────────────────────────────
+
+/**
+ * Generate a PowerPoint pitch deck from a specialist proposal.
+ *
+ * @param payload - Deck structure with slides
+ * @returns Download URL (data URI) or error
+ *
+ * @security Requires authenticated user. Generated deck is returned as base64 data URI.
+ */
+export async function generatePitchDeckFromProposal(
+    payload: PitchDeckPayload
+): Promise<{ downloadUrl: string | null; filename: string | null; error: string | null }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { downloadUrl: null, filename: null, error: 'Not authenticated' }
+
+    if (!payload.title?.trim()) {
+        return { downloadUrl: null, filename: null, error: 'Deck title is required' }
+    }
+    if (!payload.slides || payload.slides.length === 0) {
+        return { downloadUrl: null, filename: null, error: 'At least one slide is required' }
+    }
+
+    try {
+        const { generatePitchDeck } = await import('@/lib/agents/external-actions/pitch-deck')
+        const result = await generatePitchDeck(payload)
+
+        if (result.error || !result.base64) {
+            return { downloadUrl: null, filename: null, error: result.error ?? 'Failed to generate deck' }
+        }
+
+        // Return as data URI for client-side download
+        const downloadUrl = `data:application/vnd.openxmlformats-officedocument.presentationml.presentation;base64,${result.base64}`
+        return { downloadUrl, filename: result.filename, error: null }
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        return { downloadUrl: null, filename: null, error: `Failed to generate deck: ${message}` }
     }
 }

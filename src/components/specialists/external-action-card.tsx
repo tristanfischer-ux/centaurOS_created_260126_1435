@@ -17,15 +17,28 @@
  */
 
 import { useState, useCallback } from "react"
-import { Table2, Calendar, Mail, Loader2, Check, X, ExternalLink } from "lucide-react"
+import { Table2, Calendar, Mail, Loader2, Check, X, ExternalLink, Bug, MessageSquare, Receipt, Presentation } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import type { ProposedExternalAction, SheetPayload, CalendarPayload, EmailPayload } from "@/lib/agents/tools/permission-guard"
+import type {
+    ProposedExternalAction,
+    SheetPayload,
+    CalendarPayload,
+    EmailPayload,
+    LinearIssuePayload,
+    SlackMessagePayload,
+    InvoiceDraftPayload,
+    PitchDeckPayload,
+} from "@/lib/agents/tools/permission-guard"
 import {
     createGoogleSheet,
     createCalendarEventFromProposal,
     sendDraftEmail,
+    createLinearIssueFromProposal,
+    sendSlackMessageFromProposal,
+    createInvoiceDraftFromProposal,
+    generatePitchDeckFromProposal,
 } from "@/actions/external-integrations"
 
 interface ExternalActionCardProps {
@@ -58,6 +71,38 @@ const ACTION_CONFIG = {
         colorClass: "text-international-orange",
         bgClass: "bg-international-orange/10",
         borderClass: "border-international-orange/20",
+    },
+    create_linear_issue: {
+        icon: Bug,
+        label: "Linear Issue",
+        approveLabel: "Create Issue",
+        colorClass: "text-violet-600",
+        bgClass: "bg-violet-50",
+        borderClass: "border-violet-200",
+    },
+    send_slack_message: {
+        icon: MessageSquare,
+        label: "Slack Message",
+        approveLabel: "Send Message",
+        colorClass: "text-info",
+        bgClass: "bg-info/10",
+        borderClass: "border-info/20",
+    },
+    draft_invoice: {
+        icon: Receipt,
+        label: "Invoice Draft",
+        approveLabel: "Create Invoice",
+        colorClass: "text-amber-600",
+        bgClass: "bg-amber-50",
+        borderClass: "border-amber-200",
+    },
+    generate_pitch_deck: {
+        icon: Presentation,
+        label: "Pitch Deck",
+        approveLabel: "Generate Deck",
+        colorClass: "text-fuchsia-600",
+        bgClass: "bg-fuchsia-50",
+        borderClass: "border-fuchsia-200",
     },
 } as const
 
@@ -124,6 +169,74 @@ export function ExternalActionCard({ action, onDismiss }: ExternalActionCardProp
                     } else {
                         toast.success("Email sent", {
                             description: `To: ${payload.to}`,
+                        })
+                        setResult({ success: true })
+                    }
+                    break
+                }
+
+                case "create_linear_issue": {
+                    const payload = action.payload as unknown as LinearIssuePayload
+                    const res = await createLinearIssueFromProposal(payload)
+                    if (res.error) {
+                        toast.error("Failed to create issue", { description: res.error })
+                        setResult({ success: false })
+                    } else {
+                        toast.success("Linear issue created", {
+                            description: payload.title,
+                            action: res.issueUrl
+                                ? { label: "Open", onClick: () => window.open(res.issueUrl!, "_blank") }
+                                : undefined,
+                        })
+                        setResult({ success: true, url: res.issueUrl ?? undefined })
+                    }
+                    break
+                }
+
+                case "send_slack_message": {
+                    const payload = action.payload as unknown as SlackMessagePayload
+                    const res = await sendSlackMessageFromProposal(payload)
+                    if (res.error) {
+                        toast.error("Failed to send message", { description: res.error })
+                        setResult({ success: false })
+                    } else {
+                        toast.success("Slack message sent", {
+                            description: `Channel: ${payload.channel}`,
+                        })
+                        setResult({ success: true })
+                    }
+                    break
+                }
+
+                case "draft_invoice": {
+                    const payload = action.payload as unknown as InvoiceDraftPayload
+                    const res = await createInvoiceDraftFromProposal(payload)
+                    if (res.error) {
+                        toast.error("Failed to create invoice", { description: res.error })
+                        setResult({ success: false })
+                    } else {
+                        toast.success("Invoice draft created", {
+                            description: `${payload.recipientName} — ${payload.items.length} item(s)`,
+                        })
+                        setResult({ success: true })
+                    }
+                    break
+                }
+
+                case "generate_pitch_deck": {
+                    const payload = action.payload as unknown as PitchDeckPayload
+                    const res = await generatePitchDeckFromProposal(payload)
+                    if (res.error) {
+                        toast.error("Failed to generate deck", { description: res.error })
+                        setResult({ success: false })
+                    } else if (res.downloadUrl) {
+                        // Trigger download
+                        const a = document.createElement("a")
+                        a.href = res.downloadUrl
+                        a.download = res.filename ?? "pitch-deck.pptx"
+                        a.click()
+                        toast.success("Pitch deck generated", {
+                            description: payload.title,
                         })
                         setResult({ success: true })
                     }
@@ -276,6 +389,62 @@ function PayloadPreview({ action }: { action: ProposedExternalAction }) {
                     {p.body && (
                         <p className="text-muted-foreground truncate line-clamp-2">{p.body}</p>
                     )}
+                </div>
+            )
+        }
+
+        case "create_linear_issue": {
+            const p = action.payload as unknown as LinearIssuePayload
+            return (
+                <div className="rounded bg-card/50 border border-border/50 p-2 text-[10px] space-y-1">
+                    <p className="text-foreground font-medium truncate">{p.title}</p>
+                    {p.description && (
+                        <p className="text-muted-foreground truncate line-clamp-2">{p.description}</p>
+                    )}
+                    {p.priority && (
+                        <p className="text-muted-foreground">
+                            Priority: <span className="capitalize">{p.priority}</span>
+                        </p>
+                    )}
+                </div>
+            )
+        }
+
+        case "send_slack_message": {
+            const p = action.payload as unknown as SlackMessagePayload
+            return (
+                <div className="rounded bg-card/50 border border-border/50 p-2 text-[10px] space-y-1">
+                    <p className="text-foreground">
+                        <span className="text-muted-foreground">Channel:</span> {p.channel}
+                    </p>
+                    <p className="text-muted-foreground truncate line-clamp-2">{p.message}</p>
+                </div>
+            )
+        }
+
+        case "draft_invoice": {
+            const p = action.payload as unknown as InvoiceDraftPayload
+            const total = (p.items ?? []).reduce((s, i) => s + i.quantity * i.unitPrice, 0)
+            return (
+                <div className="rounded bg-card/50 border border-border/50 p-2 text-[10px] space-y-1">
+                    <p className="text-foreground">
+                        <span className="text-muted-foreground">To:</span> {p.recipientName}
+                    </p>
+                    <p className="text-muted-foreground">
+                        {p.items?.length ?? 0} item(s) &middot; Total: {total.toLocaleString()} {p.currency ?? "USD"}
+                    </p>
+                </div>
+            )
+        }
+
+        case "generate_pitch_deck": {
+            const p = action.payload as unknown as PitchDeckPayload
+            return (
+                <div className="rounded bg-card/50 border border-border/50 p-2 text-[10px] space-y-1">
+                    <p className="text-foreground font-medium">{p.title}</p>
+                    <p className="text-muted-foreground">
+                        {p.slides?.length ?? 0} slide(s){p.subtitle ? ` — ${p.subtitle}` : ""}
+                    </p>
                 </div>
             )
         }

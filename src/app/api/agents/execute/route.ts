@@ -904,6 +904,10 @@ Available types:
 - create_google_sheet: Creates a Google Sheet. Payload: {title: string, headers: string[], rows: string[][]}
 - create_calendar_event: Schedules a calendar event. Payload: {title: string, startTime: ISO string, endTime: ISO string, description?: string, attendees?: string[]}
 - draft_email: Drafts an email. Payload: {to: string, subject: string, body: string}
+- create_linear_issue: Creates a Linear issue. Payload: {title: string, description: string, priority?: "urgent"|"high"|"medium"|"low"|"none", labels?: string[], teamName?: string}
+- send_slack_message: Sends a Slack message. Payload: {channel: string, message: string, threadTs?: string}
+- draft_invoice: Creates an invoice draft. Payload: {recipientName: string, recipientEmail?: string, items: [{description: string, quantity: number, unitPrice: number}], currency?: string, dueDate?: string, notes?: string}
+- generate_pitch_deck: Generates a PowerPoint pitch deck. Payload: {title: string, subtitle?: string, slides: [{title: string, bullets?: string[], content?: string}], companyName?: string}
 
 Rules:
 - Only propose external actions when the conversation naturally warrants them (e.g. the founder asks for a spreadsheet, a meeting, or an email)

@@ -20,7 +20,14 @@
 
 // ─── Types ──────────────────────────────────────────────────────────
 
-export type ExternalActionType = "create_google_sheet" | "create_calendar_event" | "draft_email"
+export type ExternalActionType =
+    | "create_google_sheet"
+    | "create_calendar_event"
+    | "draft_email"
+    | "create_linear_issue"
+    | "send_slack_message"
+    | "draft_invoice"
+    | "generate_pitch_deck"
 
 /**
  * A structured proposal for an external service action, parsed from
@@ -56,12 +63,50 @@ export interface EmailPayload {
     body: string
 }
 
+/** Payload shape for Linear issue creation. */
+export interface LinearIssuePayload {
+    title: string
+    description: string
+    priority?: "urgent" | "high" | "medium" | "low" | "none"
+    labels?: string[]
+    teamName?: string
+}
+
+/** Payload shape for Slack message sending. */
+export interface SlackMessagePayload {
+    channel: string
+    message: string
+    threadTs?: string
+}
+
+/** Payload shape for invoice draft creation. */
+export interface InvoiceDraftPayload {
+    recipientName: string
+    recipientEmail?: string
+    items: Array<{ description: string; quantity: number; unitPrice: number }>
+    currency?: string
+    dueDate?: string
+    notes?: string
+}
+
+/** Payload shape for pitch deck generation. */
+export interface PitchDeckPayload {
+    title: string
+    subtitle?: string
+    slides: Array<{ title: string; bullets?: string[]; content?: string }>
+    companyName?: string
+}
+
 // ─── Validation ─────────────────────────────────────────────────────
 
 const VALID_EXTERNAL_TYPES: ExternalActionType[] = [
     "create_google_sheet",
     "create_calendar_event",
     "draft_email",
+    "create_linear_issue",
+    "send_slack_message",
+    "draft_invoice",
+    "generate_pitch_deck",
 ]
 
 /**
