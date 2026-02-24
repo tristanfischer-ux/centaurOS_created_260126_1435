@@ -18,6 +18,83 @@ import { isDestructiveAction } from "@/app/(platform)/agents/brief-specialist-di
 import type { ProposedAction } from "@/app/(platform)/agents/brief-specialist-dialog"
 import type { Specialist } from "@/app/(platform)/agents/specialists-data"
 
+/** Maximum number of days into the future we allow for proposed dates (2 years). */
+const MAX_DATE_HORIZON_DAYS = 730
+
+/**
+ * Converts an estimatedWeeks value into start/end ISO date strings.
+ *
+ * @param estimatedWeeks - Number of weeks from today
+ * @returns Start (today) and end (today + weeks*7) as YYYY-MM-DD strings
+ */
+function computeDatesFromWeeks(estimatedWeeks: number): { startDate: string; endDate: string } {
+    const start = new Date()
+    const end = new Date()
+    end.setDate(end.getDate() + estimatedWeeks * 7)
+    return {
+        startDate: start.toISOString().split("T")[0],
+        endDate: end.toISOString().split("T")[0],
+    }
+}
+
+/**
+ * Clamps a date string to within MAX_DATE_HORIZON_DAYS from today.
+ * Returns null if the date is invalid or in the past.
+ *
+ * @param dateStr - ISO date string (YYYY-MM-DD)
+ * @returns Clamped ISO date string, or null if invalid
+ */
+function clampDate(dateStr: string): string | null {
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) {
+        console.warn("[ProposedActions] Invalid date from proposal, skipping:", dateStr)
+        return null
+    }
+    const maxDate = new Date()
+    maxDate.setDate(maxDate.getDate() + MAX_DATE_HORIZON_DAYS)
+    if (date > maxDate) {
+        console.warn("[ProposedActions] Clamping date beyond 2-year horizon:", dateStr, "→", maxDate.toISOString().split("T")[0])
+        return maxDate.toISOString().split("T")[0]
+    }
+    return date.toISOString().split("T")[0]
+}
+
+/**
+ * Resolves start/end dates from a ProposedAction, preferring explicit dates
+ * over estimatedWeeks computation.
+ *
+ * @param proposal - The proposed action to extract dates from
+ * @returns Object with startDate/endDate strings, or null if no dates available
+ */
+function resolveDatesFromProposal(proposal: ProposedAction): { startDate: string; endDate: string } | null {
+    let startDate = proposal.startDate ? clampDate(proposal.startDate) : null
+    let endDate = proposal.endDate ? clampDate(proposal.endDate) : null
+
+    // If explicit dates are partially set, fill in the gap
+    if (startDate && !endDate) {
+        endDate = startDate // single-day default; better than nothing
+    }
+    if (!startDate && endDate) {
+        startDate = new Date().toISOString().split("T")[0] // start today
+    }
+
+    // If we have explicit dates, use them
+    if (startDate && endDate) {
+        return { startDate, endDate }
+    }
+
+    // Fall back to estimatedWeeks computation
+    if (proposal.estimatedWeeks && proposal.estimatedWeeks > 0) {
+        const computed = computeDatesFromWeeks(proposal.estimatedWeeks)
+        return {
+            startDate: clampDate(computed.startDate) ?? computed.startDate,
+            endDate: clampDate(computed.endDate) ?? computed.endDate,
+        }
+    }
+
+    return null
+}
+
 interface ProposedActionsCardProps {
     proposals: ProposedAction[]
     specialist: Specialist
@@ -294,6 +371,13 @@ async function executeCreateActions(params: {
         fd.set("parent_objective_id", goalId)
         if (sourceThreadId) fd.set("source_thread_id", sourceThreadId)
 
+        // INTENT: Pass dates from the proposal so objectives land on the timeline
+        const objDates = resolveDatesFromProposal(p)
+        if (objDates) {
+            fd.set("start_date", objDates.startDate)
+            fd.set("end_date", objDates.endDate)
+        }
+
         const result = await createObjective(fd)
         if (result.error) {
             results[i] = { success: false }
@@ -452,11 +536,18 @@ async function executeCreateActions(params: {
         if (rolloutId) fd.set("rollout_id", rolloutId)
         if (sourceThreadId) fd.set("source_thread_id", sourceThreadId)
 
-        // Pass staggered dates from schedule computation
-        const dates = taskDatesMap.get(i)
-        if (dates) {
-            fd.set("start_date", dates.start_date)
-            fd.set("end_date", dates.end_date)
+        // INTENT: Explicit dates from the LLM override staggered schedule
+        const explicitDates = resolveDatesFromProposal(p)
+        if (explicitDates) {
+            fd.set("start_date", explicitDates.startDate)
+            fd.set("end_date", explicitDates.endDate)
+        } else {
+            // Fall back to staggered dates from schedule computation
+            const dates = taskDatesMap.get(i)
+            if (dates) {
+                fd.set("start_date", dates.start_date)
+                fd.set("end_date", dates.end_date)
+            }
         }
 
         const result = await createTask(fd)
