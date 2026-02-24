@@ -14,6 +14,7 @@ import { Search, ArrowRight, Loader2, RotateCcw, Box, Sparkles } from "lucide-re
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { InputWithSpeech } from "@/components/ui/input-with-speech"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -112,10 +113,12 @@ export function HeroSection({
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
+            <InputWithSpeech
               id="subject"
+              enableSpeech
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
+              onSpeechTranscript={(text) => setSubject(subject ? subject + " " + text : text)}
               placeholder="e.g., 1U CubeSat bus structure, EV battery module enclosure, 6-DOF robotic arm joint"
               className="pl-10 h-12 text-base"
               disabled={isAnyLoading}

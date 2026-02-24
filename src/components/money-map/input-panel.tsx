@@ -40,6 +40,7 @@ import {
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { InputWithSpeech } from '@/components/ui/input-with-speech'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -205,9 +206,11 @@ function InlineAddForm({
   return (
     <div className="space-y-2 pt-2 pb-1 border-t border-dashed">
       <div className="flex gap-2">
-        <Input
+        <InputWithSpeech
+          enableSpeech
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onSpeechTranscript={(text) => setName((prev) => prev ? prev + " " + text : text)}
           placeholder="Name"
           className="flex-1 h-8 text-sm"
           autoFocus
@@ -322,10 +325,12 @@ function ItemRow({
   if (isEditing) {
     return (
       <div className="flex items-center gap-1.5 py-1.5 px-1 rounded bg-muted/30">
-        <Input
+        <InputWithSpeech
+          enableSpeech
           ref={nameInputRef}
           value={editName}
           onChange={(e) => setEditName(e.target.value)}
+          onSpeechTranscript={(text) => setEditName((prev) => prev ? prev + " " + text : text)}
           onKeyDown={handleKeyDown}
           className="flex-1 h-8 text-sm font-medium"
         />

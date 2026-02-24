@@ -55,6 +55,7 @@ import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { InputWithSpeech } from '@/components/ui/input-with-speech'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -1060,11 +1061,13 @@ export default function ReportsPage(): React.JSX.Element {
               <label htmlFor="email-recipients" className="mb-1.5 block text-sm font-medium text-foreground">
                 Recipients
               </label>
-              <Input
+              <InputWithSpeech
                 id="email-recipients"
+                enableSpeech
                 placeholder="Enter email addresses, separated by commas"
                 value={emailRecipients}
                 onChange={e => setEmailRecipients(e.target.value)}
+                onSpeechTranscript={(text) => setEmailRecipients((prev) => prev ? prev + ", " + text : text)}
               />
               <p className="mt-1 text-xs text-muted-foreground">
                 Separate multiple addresses with commas
@@ -1195,11 +1198,13 @@ export default function ReportsPage(): React.JSX.Element {
                   <label htmlFor="schedule-recipients" className="text-sm font-medium text-foreground">
                     Recipients
                   </label>
-                  <Input
+                  <InputWithSpeech
                     id="schedule-recipients"
+                    enableSpeech
                     placeholder="ceo@company.com, board@company.com"
                     value={scheduleRecipients}
                     onChange={e => setScheduleRecipients(e.target.value)}
+                    onSpeechTranscript={(text) => setScheduleRecipients((prev) => prev ? prev + ", " + text : text)}
                   />
                   <p className="text-xs text-muted-foreground">
                     Comma-separated email addresses

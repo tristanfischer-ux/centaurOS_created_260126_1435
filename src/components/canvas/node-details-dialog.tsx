@@ -52,7 +52,9 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { InputWithSpeech } from '@/components/ui/input-with-speech'
 import { Textarea } from '@/components/ui/textarea'
+import { TextareaWithSpeech } from '@/components/ui/textarea-with-speech'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
@@ -578,10 +580,12 @@ function GoalFields({
       {/* Title */}
       <div className="space-y-2">
         <Label htmlFor="goal-title">Title</Label>
-        <Input
+        <InputWithSpeech
+          enableSpeech
           id="goal-title"
           value={details.title ?? ''}
           onChange={(e) => onFieldChange('title', e.target.value)}
+          onSpeechTranscript={(text) => onFieldChange('title', (details.title ?? '') ? (details.title ?? '') + " " + text : text)}
         />
       </div>
 
@@ -640,11 +644,13 @@ function GoalFields({
       {/* Success criteria / description */}
       <div className="space-y-2">
         <Label htmlFor="goal-desc">Success criteria</Label>
-        <Textarea
+        <TextareaWithSpeech
+          enableSpeech
           id="goal-desc"
           rows={3}
           value={details.description ?? ''}
           onChange={(e) => onFieldChange('description', e.target.value)}
+          onSpeechTranscript={(text) => onFieldChange('description', (details.description ?? '') ? (details.description ?? '') + " " + text : text)}
           placeholder="What does success look like?"
         />
       </div>
@@ -701,10 +707,12 @@ function MilestoneFields({
       {/* Title */}
       <div className="space-y-2">
         <Label htmlFor="ms-title">Title</Label>
-        <Input
+        <InputWithSpeech
+          enableSpeech
           id="ms-title"
           value={details.title ?? ''}
           onChange={(e) => onFieldChange('title', e.target.value)}
+          onSpeechTranscript={(text) => onFieldChange('title', (details.title ?? '') ? (details.title ?? '') + " " + text : text)}
         />
       </div>
 
@@ -887,10 +895,12 @@ function ObjectiveFields({
       {/* Title */}
       <div className="space-y-2">
         <Label htmlFor="obj-title">Title</Label>
-        <Input
+        <InputWithSpeech
+          enableSpeech
           id="obj-title"
           value={details.title ?? ''}
           onChange={(e) => onFieldChange('title', e.target.value)}
+          onSpeechTranscript={(text) => onFieldChange('title', (details.title ?? '') ? (details.title ?? '') + " " + text : text)}
         />
       </div>
 
@@ -951,10 +961,12 @@ function ObjectiveFields({
       {/* Workstream */}
       <div className="space-y-2">
         <Label htmlFor="obj-workstream">Workstream</Label>
-        <Input
+        <InputWithSpeech
+          enableSpeech
           id="obj-workstream"
           value={details.workstream ?? ''}
           onChange={(e) => onFieldChange('workstream', e.target.value)}
+          onSpeechTranscript={(text) => onFieldChange('workstream', (details.workstream ?? '') ? (details.workstream ?? '') + " " + text : text)}
           placeholder="e.g. Engineering, Marketing"
         />
       </div>
@@ -962,11 +974,13 @@ function ObjectiveFields({
       {/* Description */}
       <div className="space-y-2">
         <Label htmlFor="obj-desc">Description</Label>
-        <Textarea
+        <TextareaWithSpeech
+          enableSpeech
           id="obj-desc"
           rows={3}
           value={details.description ?? ''}
           onChange={(e) => onFieldChange('description', e.target.value)}
+          onSpeechTranscript={(text) => onFieldChange('description', (details.description ?? '') ? (details.description ?? '') + " " + text : text)}
         />
       </div>
 
@@ -1063,10 +1077,12 @@ function TaskFields({
       {/* Title */}
       <div className="space-y-2">
         <Label htmlFor="task-title">Title</Label>
-        <Input
+        <InputWithSpeech
+          enableSpeech
           id="task-title"
           value={details.title ?? ''}
           onChange={(e) => onFieldChange('title', e.target.value)}
+          onSpeechTranscript={(text) => onFieldChange('title', (details.title ?? '') ? (details.title ?? '') + " " + text : text)}
         />
       </div>
 
@@ -1156,11 +1172,13 @@ function TaskFields({
       {/* Description */}
       <div className="space-y-2">
         <Label htmlFor="task-desc">Description</Label>
-        <Textarea
+        <TextareaWithSpeech
+          enableSpeech
           id="task-desc"
           rows={3}
           value={details.description ?? ''}
           onChange={(e) => onFieldChange('description', e.target.value)}
+          onSpeechTranscript={(text) => onFieldChange('description', (details.description ?? '') ? (details.description ?? '') + " " + text : text)}
         />
       </div>
 

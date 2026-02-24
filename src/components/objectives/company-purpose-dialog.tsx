@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { TextareaWithSpeech } from '@/components/ui/textarea-with-speech'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Compass,
@@ -457,10 +458,12 @@ function StepCore({
         <Label htmlFor="whyExists">
           Your answer <span className="text-destructive" aria-label="required">*</span>
         </Label>
-        <Textarea
+        <TextareaWithSpeech
+          enableSpeech
           id="whyExists"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onSpeechTranscript={(text) => onChange(value ? value + " " + text : text)}
           placeholder="We exist to..."
           rows={6}
           maxLength={limit}
@@ -504,10 +507,12 @@ function StepAudience({
           <Label htmlFor="problemSolved">
             Problem <span className="text-destructive" aria-label="required">*</span>
           </Label>
-          <Textarea
+          <TextareaWithSpeech
+            enableSpeech
             id="problemSolved"
             value={problemSolved}
             onChange={(e) => onProblemChange(e.target.value)}
+            onSpeechTranscript={(text) => onProblemChange(problemSolved ? problemSolved + " " + text : text)}
             placeholder="The problem we solve is..."
             rows={4}
             maxLength={problemLimit}
@@ -530,10 +535,12 @@ function StepAudience({
           <Label htmlFor="whoServed">
             Target audience <span className="text-destructive" aria-label="required">*</span>
           </Label>
-          <Textarea
+          <TextareaWithSpeech
+            enableSpeech
             id="whoServed"
             value={whoServed}
             onChange={(e) => onAudienceChange(e.target.value)}
+            onSpeechTranscript={(text) => onAudienceChange(whoServed ? whoServed + " " + text : text)}
             placeholder="We serve..."
             rows={4}
             maxLength={audienceLimit}
@@ -570,10 +577,12 @@ function StepDifferentiation({
         <Label htmlFor="uniqueValue">
           Your unique value <span className="text-destructive" aria-label="required">*</span>
         </Label>
-        <Textarea
+        <TextareaWithSpeech
+          enableSpeech
           id="uniqueValue"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onSpeechTranscript={(text) => onChange(value ? value + " " + text : text)}
           placeholder="What makes us different is..."
           rows={6}
           maxLength={limit}
@@ -609,10 +618,12 @@ function StepVision({
         <Label htmlFor="fiveYearVision">
           5-year vision <span className="text-destructive" aria-label="required">*</span>
         </Label>
-        <Textarea
+        <TextareaWithSpeech
+          enableSpeech
           id="fiveYearVision"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onSpeechTranscript={(text) => onChange(value ? value + " " + text : text)}
           placeholder="In 5 years, we will..."
           rows={6}
           maxLength={limit}
@@ -661,10 +672,12 @@ function StepReview({
         <Label htmlFor="purpose">
           Purpose (The "why") <span className="text-destructive" aria-label="required">*</span>
         </Label>
-        <Textarea
+        <TextareaWithSpeech
+          enableSpeech
           id="purpose"
           value={purpose}
           onChange={(e) => onPurposeChange(e.target.value)}
+          onSpeechTranscript={(text) => onPurposeChange(purpose ? purpose + " " + text : text)}
           placeholder="Why we exist..."
           rows={3}
           maxLength={purposeLimit}
@@ -678,10 +691,12 @@ function StepReview({
 
       <div className="space-y-2">
         <Label htmlFor="mission">Mission (What we do)</Label>
-        <Textarea
+        <TextareaWithSpeech
+          enableSpeech
           id="mission"
           value={mission}
           onChange={(e) => onMissionChange(e.target.value)}
+          onSpeechTranscript={(text) => onMissionChange(mission ? mission + " " + text : text)}
           placeholder="What we do and for whom..."
           rows={2}
           maxLength={missionLimit}
@@ -693,10 +708,12 @@ function StepReview({
 
       <div className="space-y-2">
         <Label htmlFor="vision">Vision (Where we're going)</Label>
-        <Textarea
+        <TextareaWithSpeech
+          enableSpeech
           id="vision"
           value={vision}
           onChange={(e) => onVisionChange(e.target.value)}
+          onSpeechTranscript={(text) => onVisionChange(vision ? vision + " " + text : text)}
           placeholder="The future state we're working toward..."
           rows={2}
           maxLength={visionLimit}

@@ -37,8 +37,10 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { InputWithSpeech } from '@/components/ui/input-with-speech'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { TextareaWithSpeech } from '@/components/ui/textarea-with-speech'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -780,10 +782,12 @@ function StepDefineGoal({
             *
           </span>
         </Label>
-        <Input
+        <InputWithSpeech
+          enableSpeech
           id="goal-name"
           value={goalName}
           onChange={(e) => onGoalNameChange(e.target.value)}
+          onSpeechTranscript={(text) => onGoalNameChange(goalName ? goalName + " " + text : text)}
           placeholder="e.g., Raise £2M Seed Round"
           maxLength={200}
           aria-required="true"
@@ -836,10 +840,12 @@ function StepDefineGoal({
       {/* Success criteria */}
       <div className="space-y-2">
         <Label htmlFor="success-criteria">Success criteria</Label>
-        <Textarea
+        <TextareaWithSpeech
+          enableSpeech
           id="success-criteria"
           value={successCriteria}
           onChange={(e) => onSuccessCriteriaChange(e.target.value)}
+          onSpeechTranscript={(text) => onSuccessCriteriaChange(successCriteria ? successCriteria + " " + text : text)}
           placeholder="How will you know you've achieved this?"
           rows={3}
           maxLength={500}

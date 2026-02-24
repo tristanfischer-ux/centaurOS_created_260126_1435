@@ -6,7 +6,9 @@ import { cn } from '@/lib/utils'
 import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { InputWithSpeech } from '@/components/ui/input-with-speech'
 import { Textarea } from '@/components/ui/textarea'
+import { TextareaWithSpeech } from '@/components/ui/textarea-with-speech'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -288,10 +290,12 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="company_name">Company Name *</Label>
-                  <Input
+                  <InputWithSpeech
+                    enableSpeech
                     id="company_name"
                     value={formData.company_name || ''}
                     onChange={(e) => updateField('company_name', e.target.value)}
+                    onSpeechTranscript={(text) => updateField('company_name', (formData.company_name || '') ? (formData.company_name || '') + " " + text : text)}
                     placeholder="Acme Corp"
                     disabled={isPending}
                   />
@@ -311,10 +315,12 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="headquarters">Headquarters</Label>
-                  <Input
+                  <InputWithSpeech
+                    enableSpeech
                     id="headquarters"
                     value={formData.headquarters || ''}
                     onChange={(e) => updateField('headquarters', e.target.value)}
+                    onSpeechTranscript={(text) => updateField('headquarters', (formData.headquarters || '') ? (formData.headquarters || '') + " " + text : text)}
                     placeholder="London, UK"
                     disabled={isPending}
                   />
@@ -374,10 +380,12 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
             <>
               <div className="space-y-2">
                 <Label htmlFor="product_description">Product Description *</Label>
-                <Textarea
+                <TextareaWithSpeech
+                  enableSpeech
                   id="product_description"
                   value={formData.product_description || ''}
                   onChange={(e) => updateField('product_description', e.target.value)}
+                  onSpeechTranscript={(text) => updateField('product_description', (formData.product_description || '') ? (formData.product_description || '') + " " + text : text)}
                   placeholder="Describe what your company does and what product/service you offer..."
                   rows={4}
                   disabled={isPending}
@@ -390,10 +398,12 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
 
               <div className="space-y-2">
                 <Label htmlFor="problem_solved">Problem You Solve</Label>
-                <Textarea
+                <TextareaWithSpeech
+                  enableSpeech
                   id="problem_solved"
                   value={formData.problem_solved || ''}
                   onChange={(e) => updateField('problem_solved', e.target.value)}
+                  onSpeechTranscript={(text) => updateField('problem_solved', (formData.problem_solved || '') ? (formData.problem_solved || '') + " " + text : text)}
                   placeholder="What problem does your product solve? Why does it matter?"
                   rows={3}
                   disabled={isPending}
@@ -402,10 +412,12 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
 
               <div className="space-y-2">
                 <Label htmlFor="target_market">Target Market</Label>
-                <Textarea
+                <TextareaWithSpeech
+                  enableSpeech
                   id="target_market"
                   value={formData.target_market || ''}
                   onChange={(e) => updateField('target_market', e.target.value)}
+                  onSpeechTranscript={(text) => updateField('target_market', (formData.target_market || '') ? (formData.target_market || '') + " " + text : text)}
                   placeholder="Who are your customers? What's your TAM/SAM/SOM?"
                   rows={2}
                   disabled={isPending}
@@ -414,10 +426,12 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
 
               <div className="space-y-2">
                 <Label htmlFor="competitive_landscape">Competitive Landscape</Label>
-                <Textarea
+                <TextareaWithSpeech
+                  enableSpeech
                   id="competitive_landscape"
                   value={formData.competitive_landscape || ''}
                   onChange={(e) => updateField('competitive_landscape', e.target.value)}
+                  onSpeechTranscript={(text) => updateField('competitive_landscape', (formData.competitive_landscape || '') ? (formData.competitive_landscape || '') + " " + text : text)}
                   placeholder="Who are your competitors? What's your differentiation?"
                   rows={2}
                   disabled={isPending}
@@ -471,10 +485,12 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
 
               <div className="space-y-2">
                 <Label htmlFor="traction_summary">Traction Summary</Label>
-                <Textarea
+                <TextareaWithSpeech
+                  enableSpeech
                   id="traction_summary"
                   value={formData.traction_summary || ''}
                   onChange={(e) => updateField('traction_summary', e.target.value)}
+                  onSpeechTranscript={(text) => updateField('traction_summary', (formData.traction_summary || '') ? (formData.traction_summary || '') + " " + text : text)}
                   placeholder="Key metrics: ARR, MRR, users, growth rate, notable customers..."
                   rows={3}
                   disabled={isPending}
@@ -489,20 +505,24 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="amount_seeking">Amount Seeking</Label>
-                    <Input
+                    <InputWithSpeech
+                      enableSpeech
                       id="amount_seeking"
                       value={formData.amount_seeking || ''}
                       onChange={(e) => updateField('amount_seeking', e.target.value)}
+                      onSpeechTranscript={(text) => updateField('amount_seeking', (formData.amount_seeking || '') ? (formData.amount_seeking || '') + " " + text : text)}
                       placeholder="e.g., £500K-£1M"
                       disabled={isPending}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="timeline">Timeline</Label>
-                    <Input
+                    <InputWithSpeech
+                      enableSpeech
                       id="timeline"
                       value={formData.timeline || ''}
                       onChange={(e) => updateField('timeline', e.target.value)}
+                      onSpeechTranscript={(text) => updateField('timeline', (formData.timeline || '') ? (formData.timeline || '') + " " + text : text)}
                       placeholder="e.g., Q2 2026"
                       disabled={isPending}
                     />
@@ -511,10 +531,12 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
 
                 <div className="space-y-2 mt-4">
                   <Label htmlFor="use_of_funds">Use of Funds</Label>
-                  <Textarea
+                  <TextareaWithSpeech
+                    enableSpeech
                     id="use_of_funds"
                     value={formData.use_of_funds || ''}
                     onChange={(e) => updateField('use_of_funds', e.target.value)}
+                    onSpeechTranscript={(text) => updateField('use_of_funds', (formData.use_of_funds || '') ? (formData.use_of_funds || '') + " " + text : text)}
                     placeholder="How do you plan to use the funding?"
                     rows={2}
                     disabled={isPending}
@@ -582,10 +604,12 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
 
               <div className="space-y-2">
                 <Label htmlFor="specific_questions">Specific Questions or Areas to Focus On</Label>
-                <Textarea
+                <TextareaWithSpeech
+                  enableSpeech
                   id="specific_questions"
                   value={formData.specific_questions || ''}
                   onChange={(e) => updateField('specific_questions', e.target.value)}
+                  onSpeechTranscript={(text) => updateField('specific_questions', (formData.specific_questions || '') ? (formData.specific_questions || '') + " " + text : text)}
                   placeholder="Any specific areas you want help with? Questions you want to prepare for?"
                   rows={3}
                   disabled={isPending}

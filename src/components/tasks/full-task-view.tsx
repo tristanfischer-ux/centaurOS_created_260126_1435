@@ -21,6 +21,7 @@ import { AttachmentList } from "@/components/tasks/attachment-list"
 import { Markdown } from "@/components/ui/markdown"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { TextareaWithSpeech } from "@/components/ui/textarea-with-speech"
 import { Label } from "@/components/ui/label"
 import {
     Select,
@@ -752,9 +753,11 @@ function FullTaskViewComponent({ open, onOpenChange, task, members, currentUserI
                                     <MessageSquare className="h-4 w-4" /> Description
                                 </h3>
                                 {isEditing ? (
-                                    <Textarea
+                                    <TextareaWithSpeech
+                                        enableSpeech
                                         value={editedDescription}
                                         onChange={(e) => setEditedDescription(e.target.value)}
+                                        onSpeechTranscript={(text) => setEditedDescription(prev => prev ? prev + " " + text : text)}
                                         className="min-h-[150px] bg-muted"
                                         placeholder="Add a description..."
                                     />

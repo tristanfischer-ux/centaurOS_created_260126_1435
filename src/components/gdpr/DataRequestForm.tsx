@@ -7,6 +7,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { TextareaWithSpeech } from "@/components/ui/textarea-with-speech"
 import {
   Card,
   CardContent,
@@ -290,12 +291,14 @@ export function DataRequestForm({
             <label htmlFor="reason" className="text-sm font-medium">
               Reason for Deletion <span className="text-destructive">*</span>
             </label>
-            <textarea
+            <TextareaWithSpeech
               id="reason"
+              enableSpeech
               value={reason}
               onChange={(e) => setReason(e.target.value)}
+              onSpeechTranscript={(text) => setReason((prev) => prev ? prev + " " + text : text)}
               placeholder="Please tell us why you want to delete your account..."
-              className="w-full min-h-[100px] p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+              className="min-h-[100px] resize-none"
               required
             />
             <p className="text-xs text-muted-foreground">

@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { Textarea } from '@/components/ui/textarea'
+import { TextareaWithSpeech } from '@/components/ui/textarea-with-speech'
 import {
   Select,
   SelectContent,
@@ -479,9 +479,11 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
             )}
 
             <form onSubmit={handleSend} className="flex flex-col gap-2">
-              <Textarea
+              <TextareaWithSpeech
+                enableSpeech
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
+                onSpeechTranscript={(text) => setNewComment((prev) => prev ? prev + " " + text : text)}
                 placeholder="Add a note..."
                 className="min-h-[72px] text-xs resize-none w-full"
                 disabled={isSending}

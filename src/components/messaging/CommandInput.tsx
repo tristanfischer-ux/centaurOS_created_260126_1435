@@ -7,15 +7,16 @@ import { Button } from '@/components/ui/button'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { MessageInputHelp } from '@/components/messaging/MessageInputHelp'
 import { cn } from '@/lib/utils'
-import { 
-  Send, 
-  Paperclip, 
+import {
+  Send,
+  Paperclip,
   Loader2,
   Slash,
   AtSign,
   Hash,
-  CheckSquare
+  CheckSquare,
 } from 'lucide-react'
+import { SpeechButton } from '@/components/ui/speech-button'
 import { getMentionAtCursor } from '@/lib/mentions'
 import { 
   getCommandAtCursor, 
@@ -646,10 +647,16 @@ export function CommandInput({
           />
           {renderDropdown()}
         </div>
-        
-        <Button 
-          type="submit" 
-          size="icon" 
+
+        <SpeechButton
+          onTranscript={(text) => setInputValue(inputValue ? inputValue + " " + text : text)}
+          disabled={disabled || isSending}
+          className="flex-shrink-0 mb-0.5"
+        />
+
+        <Button
+          type="submit"
+          size="icon"
           disabled={!inputValue.trim() || isSending || disabled}
           className="flex-shrink-0 mb-0.5"
           aria-label={isSending ? "Sending message" : "Send message"}

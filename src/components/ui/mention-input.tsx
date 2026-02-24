@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Textarea } from '@/components/ui/textarea'
 import { UserAvatar } from '@/components/ui/user-avatar'
+import { SpeechButton } from '@/components/ui/speech-button'
 import { getMentionAtCursor } from '@/lib/mentions'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +21,8 @@ interface MentionInputProps {
   placeholder?: string
   className?: string
   onSubmit?: () => void
+  /** Show a speech-to-text mic button */
+  enableSpeech?: boolean
 }
 
 export function MentionInput({
@@ -28,7 +31,8 @@ export function MentionInput({
   members,
   placeholder,
   className,
-  onSubmit
+  onSubmit,
+  enableSpeech = false,
 }: MentionInputProps) {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestions, setSuggestions] = useState<Profile[]>([])
@@ -232,6 +236,15 @@ export function MentionInput({
     )
   }
 
+  const [isListening, setIsListening] = useState(false)
+
+  const handleSpeechTranscript = useCallback(
+    (text: string) => {
+      onChange(value ? value + " " + text : text)
+    },
+    [onChange, value]
+  )
+
   return (
     <div className="relative flex-1 w-full">
       <Textarea
@@ -239,9 +252,21 @@ export function MentionInput({
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        className={cn("w-full", className)}
+        placeholder={isListening ? "Listening... speak now" : placeholder}
+        className={cn(
+          "w-full",
+          enableSpeech && "pr-10",
+          isListening && "border-destructive/50",
+          className
+        )}
       />
+      {enableSpeech && (
+        <SpeechButton
+          onTranscript={handleSpeechTranscript}
+          onListeningChange={setIsListening}
+          className="absolute right-1 top-1"
+        />
+      )}
       {renderDropdown()}
     </div>
   )

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { TextareaWithSpeech } from '@/components/ui/textarea-with-speech'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import {
   UserCheck,
@@ -174,10 +175,12 @@ export function ReviewGateBanner({ gates, currentUserId, onUpdate }: ReviewGateB
         {/* Review action area */}
         {isExpanded && canReview && (
           <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
-            <Textarea
+            <TextareaWithSpeech
+              enableSpeech
               placeholder="Review notes (optional)..."
               value={reviewNotes}
               onChange={(e) => setReviewNotes(e.target.value)}
+              onSpeechTranscript={(text) => setReviewNotes(prev => prev ? prev + " " + text : text)}
               className="text-sm min-h-[60px]"
             />
             <div className="flex items-center gap-2">

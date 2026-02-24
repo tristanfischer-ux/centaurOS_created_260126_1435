@@ -13,7 +13,9 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { InputWithSpeech } from "@/components/ui/input-with-speech"
 import { Textarea } from "@/components/ui/textarea"
+import { TextareaWithSpeech } from "@/components/ui/textarea-with-speech"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import {
@@ -174,11 +176,16 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                         <Label htmlFor="title" className="text-sm font-medium">
                             Question Title <span className="text-destructive">*</span>
                         </Label>
-                        <Input
+                        <InputWithSpeech
+                            enableSpeech
                             id="title"
                             value={title}
                             onChange={(e) => {
                                 setTitle(e.target.value)
+                                if (errors.title) setErrors(prev => ({ ...prev, title: "" }))
+                            }}
+                            onSpeechTranscript={(text) => {
+                                setTitle(prev => prev ? prev + " " + text : text)
                                 if (errors.title) setErrors(prev => ({ ...prev, title: "" }))
                             }}
                             placeholder="What would you like to know?"
@@ -197,11 +204,16 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                         <Label htmlFor="body" className="text-sm font-medium">
                             Details <span className="text-destructive">*</span>
                         </Label>
-                        <Textarea
+                        <TextareaWithSpeech
+                            enableSpeech
                             id="body"
                             value={body}
                             onChange={(e) => {
                                 setBody(e.target.value)
+                                if (errors.body) setErrors(prev => ({ ...prev, body: "" }))
+                            }}
+                            onSpeechTranscript={(text) => {
+                                setBody(prev => prev ? prev + " " + text : text)
                                 if (errors.body) setErrors(prev => ({ ...prev, body: "" }))
                             }}
                             placeholder="Provide context and specifics to get better answers..."

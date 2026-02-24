@@ -29,8 +29,10 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { InputWithSpeech } from '@/components/ui/input-with-speech'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { TextareaWithSpeech } from '@/components/ui/textarea-with-speech'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DatePickerWithShortcuts } from '@/components/ui/date-picker-with-shortcuts'
 import {
@@ -262,10 +264,12 @@ export function AddToRiverDialog({
               {mode === 'milestone' ? 'Milestone' : 'Objective'} title{' '}
               <span className="text-destructive" aria-label="required">*</span>
             </Label>
-            <Input
+            <InputWithSpeech
+              enableSpeech
               id="item-title"
               value={title}
               onChange={(e) => { setTitle(e.target.value); if (error) setError(null) }}
+              onSpeechTranscript={(text) => { setTitle(prev => prev ? prev + " " + text : text); if (error) setError(null) }}
               placeholder={
                 mode === 'milestone'
                   ? 'e.g. Complete market research'
@@ -326,10 +330,12 @@ export function AddToRiverDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="obj-description">Description (optional)</Label>
-                <Textarea
+                <TextareaWithSpeech
+                  enableSpeech
                   id="obj-description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  onSpeechTranscript={(text) => setDescription(prev => prev ? prev + " " + text : text)}
                   placeholder="What does achieving this objective look like?"
                   maxLength={DESCRIPTION_MAX_LENGTH}
                   rows={3}

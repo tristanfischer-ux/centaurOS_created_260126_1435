@@ -18,7 +18,7 @@ import Image from "next/image"
 import { Sparkles, ArrowRight, FileBox, Shapes, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
+import { TextareaWithSpeech } from "@/components/ui/textarea-with-speech"
 import { Skeleton } from "@/components/ui/skeleton"
 import { suggestMashupCombinations } from "@/actions/cad-lab"
 import type { MashupSuggestion, MashupSourceInput } from "@/lib/cad-lab-types"
@@ -222,10 +222,12 @@ export function MashupConceptSearch({
       {/* Search input */}
       <div className="space-y-3">
         <div className="flex gap-3">
-          <Textarea
+          <TextareaWithSpeech
+            enableSpeech
             placeholder="Describe what you want to create — e.g. a humanoid robot with quadcopter propellers"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onSpeechTranscript={(text) => setQuery((prev) => prev ? prev + " " + text : text)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault()

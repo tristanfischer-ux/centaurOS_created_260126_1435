@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { InputWithSpeech } from '@/components/ui/input-with-speech'
 import { Switch } from '@/components/ui/switch'
 import {
   Select,
@@ -32,6 +33,7 @@ import {
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Textarea } from '@/components/ui/textarea'
+import { TextareaWithSpeech } from '@/components/ui/textarea-with-speech'
 import {
   Building2,
   Users,
@@ -418,11 +420,13 @@ function StepBasics({
 
       <div className="space-y-2">
         <Label htmlFor="location">Location</Label>
-        <Input
+        <InputWithSpeech
+          enableSpeech
           id="location"
           placeholder="e.g. London, UK"
           value={location}
           onChange={(e) => onLocationChange(e.target.value)}
+          onSpeechTranscript={(text) => onLocationChange(location ? location + " " + text : text)}
         />
       </div>
 
@@ -511,12 +515,22 @@ function StepBusiness({
           <Swords className="inline h-4 w-4 mr-1.5 -mt-0.5" />
           Key competitors
         </Label>
-        <Textarea
+        <TextareaWithSpeech
+          enableSpeech
           id="competitors"
           placeholder={"e.g. Acme Corp, https://widgetco.com, FastWidget\n\nOne per line — company names or website URLs"}
           value={(competitors ?? []).join('\n')}
           onChange={(e) => {
             const lines = e.target.value
+              .split('\n')
+              .map(l => l.trim())
+              .filter(l => l.length > 0)
+            onCompetitorsChange(lines.length > 0 ? lines : null)
+          }}
+          onSpeechTranscript={(text) => {
+            const current = (competitors ?? []).join('\n')
+            const updated = current ? current + '\n' + text : text
+            const lines = updated
               .split('\n')
               .map(l => l.trim())
               .filter(l => l.length > 0)

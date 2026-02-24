@@ -29,8 +29,10 @@ import {
 
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { TextareaWithSpeech } from '@/components/ui/textarea-with-speech'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { InputWithSpeech } from '@/components/ui/input-with-speech'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -489,10 +491,12 @@ function StepInput({
         <Label htmlFor="transcript-input">
           Raw text <span className="text-destructive" aria-label="required">*</span>
         </Label>
-        <Textarea
+        <TextareaWithSpeech
+          enableSpeech
           id="transcript-input"
           value={rawText}
           onChange={(e) => onRawTextChange(e.target.value)}
+          onSpeechTranscript={(text) => onRawTextChange(rawText ? rawText + " " + text : text)}
           placeholder="Paste your meeting transcript, notes, or strategic discussion here..."
           className="min-h-[300px] font-mono text-sm"
           maxLength={maxLength}
@@ -538,9 +542,11 @@ function StepReview({
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <Flag className="h-4 w-4 text-international-orange shrink-0" />
-                <Input
+                <InputWithSpeech
+                  enableSpeech
                   value={so.title}
                   onChange={(e) => onUpdateStrategicObjective(soIndex, (s) => ({ ...s, title: e.target.value }))}
+                  onSpeechTranscript={(text) => onUpdateStrategicObjective(soIndex, (s) => ({ ...s, title: s.title ? s.title + " " + text : text }))}
                   className="font-semibold text-base border-none bg-transparent p-0 h-auto focus-visible:ring-0"
                   aria-label="Strategic objective title"
                 />
@@ -568,9 +574,11 @@ function StepReview({
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <Target className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <Input
+                    <InputWithSpeech
+                      enableSpeech
                       value={oo.title}
                       onChange={(e) => onUpdateOperationalObjective(soIndex, ooIndex, (o) => ({ ...o, title: e.target.value }))}
+                      onSpeechTranscript={(text) => onUpdateOperationalObjective(soIndex, ooIndex, (o) => ({ ...o, title: o.title ? o.title + " " + text : text }))}
                       className="text-sm font-medium border-none bg-transparent p-0 h-auto focus-visible:ring-0"
                       aria-label="Operational objective title"
                     />
@@ -675,9 +683,11 @@ function TaskRow({
     )}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <Input
+          <InputWithSpeech
+            enableSpeech
             value={task.title}
             onChange={(e) => onUpdate((t) => ({ ...t, title: e.target.value }))}
+            onSpeechTranscript={(text) => onUpdate((t) => ({ ...t, title: t.title ? t.title + " " + text : text }))}
             className="text-sm border-none bg-transparent p-0 h-auto focus-visible:ring-0"
             disabled={isSkipped}
             aria-label="Task title"

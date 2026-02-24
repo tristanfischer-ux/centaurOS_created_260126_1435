@@ -28,6 +28,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { InputWithSpeech } from '@/components/ui/input-with-speech'
+import { TextareaWithSpeech } from '@/components/ui/textarea-with-speech'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
@@ -557,9 +559,11 @@ export function ArtifactDetailDialog({
           <div className="flex items-start gap-3 pr-8">
             <div className="flex-1 min-w-0">
               {isEditing ? (
-                <Input
+                <InputWithSpeech
+                  enableSpeech
                   value={editTitle}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditTitle(e.target.value)}
+                  onSpeechTranscript={(text) => setEditTitle((prev) => prev ? prev + " " + text : text)}
                   className="text-lg font-semibold"
                   placeholder="Output title"
                   autoFocus
@@ -735,10 +739,12 @@ export function ArtifactDetailDialog({
                   Edit
                 </p>
               </div>
-              <textarea
+              <TextareaWithSpeech
+                enableSpeech
                 value={editContent}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditContent(e.target.value)}
-                className="flex-1 w-full p-4 text-sm font-mono bg-background text-foreground resize-none focus:outline-none"
+                onSpeechTranscript={(text) => setEditContent((prev) => prev ? prev + " " + text : text)}
+                className="flex-1 w-full p-4 text-sm font-mono bg-background text-foreground resize-none focus:outline-none border-0"
                 placeholder="Write your content in markdown..."
                 aria-label="Content editor"
               />
@@ -837,10 +843,12 @@ export function ArtifactDetailDialog({
                 Subject
                 <span className="text-destructive ml-1" aria-label="required">*</span>
               </Label>
-              <Input
+              <InputWithSpeech
                 id="email-subject"
+                enableSpeech
                 value={emailSubject}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmailSubject(e.target.value)}
+                onSpeechTranscript={(text) => setEmailSubject((prev) => prev ? prev + " " + text : text)}
                 placeholder="Email subject"
                 aria-required
               />

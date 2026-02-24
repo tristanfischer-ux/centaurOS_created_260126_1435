@@ -13,9 +13,10 @@ import { Plus, Trash2, Send, Link } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { InputWithSpeech } from '@/components/ui/input-with-speech'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
+import { TextareaWithSpeech } from '@/components/ui/textarea-with-speech'
 import {
   Select,
   SelectContent,
@@ -129,11 +130,13 @@ export function QuickInvoiceForm({ className }: QuickInvoiceFormProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="recipient-name">Name</Label>
-              <Input
+              <InputWithSpeech
                 id="recipient-name"
+                enableSpeech
                 placeholder="Acme Ltd"
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
+                onSpeechTranscript={(text) => setRecipientName((prev) => prev ? prev + " " + text : text)}
               />
             </div>
             <div className="space-y-2">
@@ -168,10 +171,12 @@ export function QuickInvoiceForm({ className }: QuickInvoiceFormProps) {
           {lineItems.map((item, index) => (
             <div key={index} className="flex items-start gap-3">
               <div className="flex-1 space-y-2">
-                <Input
+                <InputWithSpeech
+                  enableSpeech
                   placeholder="Description"
                   value={item.description}
                   onChange={(e) => updateLineItem(index, 'description', e.target.value)}
+                  onSpeechTranscript={(text) => updateLineItem(index, 'description', item.description ? item.description + " " + text : text)}
                 />
               </div>
               <div className="w-20 space-y-2">
@@ -236,10 +241,12 @@ export function QuickInvoiceForm({ className }: QuickInvoiceFormProps) {
           <CardTitle className="text-base font-semibold">Notes</CardTitle>
         </CardHeader>
         <CardContent>
-          <Textarea
+          <TextareaWithSpeech
+            enableSpeech
             placeholder="Payment terms, bank details, or additional notes..."
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
+            onSpeechTranscript={(text) => setNotes((prev) => prev ? prev + " " + text : text)}
             rows={3}
           />
         </CardContent>

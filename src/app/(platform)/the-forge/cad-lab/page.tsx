@@ -33,6 +33,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { InputWithSpeech } from "@/components/ui/input-with-speech"
 import { Card, CardContent } from "@/components/ui/card"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
@@ -194,9 +195,11 @@ export default function CadLabResearchPage(): React.ReactNode {
           <div className="flex items-center gap-3">
             <div className="h-8 w-1 rounded-full bg-international-orange flex-shrink-0" />
             {isEditingSubject ? (
-              <Input
+              <InputWithSpeech
+                enableSpeech
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
+                onSpeechTranscript={(text) => setSubject(subject ? subject + " " + text : text)}
                 onBlur={() => setIsEditingSubject(false)}
                 onKeyDown={(e) => { if (e.key === "Enter") setIsEditingSubject(false) }}
                 className="text-xl font-bold h-auto py-1 px-2"

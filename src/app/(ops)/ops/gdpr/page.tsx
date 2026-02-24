@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
+import { TextareaWithSpeech } from "@/components/ui/textarea-with-speech"
 import {
   Card,
   CardContent,
@@ -399,11 +400,13 @@ export default function AdminGDPRPage() {
                 {showDenyDialog && (
                   <div className="space-y-3 p-3 border rounded-lg bg-destructive/5">
                     <p className="font-medium text-sm">Reason for Denial</p>
-                    <textarea
+                    <TextareaWithSpeech
+                      enableSpeech
                       value={denyReason}
                       onChange={(e) => setDenyReason(e.target.value)}
+                      onSpeechTranscript={(text) => setDenyReason((prev) => prev ? prev + " " + text : text)}
                       placeholder="Provide a detailed reason..."
-                      className="w-full min-h-[80px] p-2 border rounded text-sm bg-background"
+                      className="min-h-[80px] text-sm"
                     />
                     <div className="flex gap-2">
                       <Button

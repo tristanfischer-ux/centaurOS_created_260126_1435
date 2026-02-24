@@ -12,8 +12,10 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { InputWithSpeech } from '@/components/ui/input-with-speech'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { TextareaWithSpeech } from '@/components/ui/textarea-with-speech'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -133,10 +135,12 @@ export function CreateBlueprintDialog({
             {/* Common fields */}
             <div className="space-y-2">
               <Label htmlFor="name">Blueprint Name *</Label>
-              <Input
+              <InputWithSpeech
+                enableSpeech
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onSpeechTranscript={(text) => setName(prev => prev ? prev + " " + text : text)}
                 placeholder="e.g., Smart Thermostat v2"
               />
             </div>
@@ -169,10 +173,12 @@ export function CreateBlueprintDialog({
                 <p className="text-sm text-muted-foreground">
                   Describe your product in detail. AI will identify the knowledge domains you need.
                 </p>
-                <Textarea
+                <TextareaWithSpeech
+                  enableSpeech
                   id="ai-description"
                   value={aiDescription}
                   onChange={(e) => setAiDescription(e.target.value)}
+                  onSpeechTranscript={(text) => setAiDescription(prev => prev ? prev + " " + text : text)}
                   placeholder="e.g., A smart thermostat that senses room temperature and humidity, connects via WiFi, has a color touchscreen display, runs on C-wire power with battery backup, and integrates with major smart home platforms. We'll sell it retail in the US and EU."
                   rows={5}
                 />
@@ -259,10 +265,12 @@ export function CreateBlueprintDialog({
             {tab === 'template' && (
               <div className="space-y-2">
                 <Label htmlFor="description">Description (optional)</Label>
-                <Textarea
+                <TextareaWithSpeech
+                  enableSpeech
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  onSpeechTranscript={(text) => setDescription(prev => prev ? prev + " " + text : text)}
                   placeholder="Brief description of your specific project..."
                   rows={2}
                 />

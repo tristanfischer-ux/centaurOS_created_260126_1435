@@ -25,7 +25,7 @@ import {
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { TextareaWithSpeech } from "@/components/ui/textarea-with-speech"
 import {
   Select,
   SelectContent,
@@ -179,10 +179,12 @@ export function DesignIntakeForm({
               <Label htmlFor="use-case" className="flex items-center gap-1.5">
                 <Ruler className="h-3.5 w-3.5" /> Use case & critical dimensions
               </Label>
-              <Textarea
+              <TextareaWithSpeech
                 id="use-case"
+                enableSpeech
                 value={designBrief.useCase}
                 onChange={(e) => setDesignBrief((prev) => ({ ...prev, useCase: e.target.value }))}
+                onSpeechTranscript={(text) => setDesignBrief((prev) => ({ ...prev, useCase: prev.useCase ? prev.useCase + " " + text : text }))}
                 placeholder="e.g. Outdoor heavy-lift UAV payload mount, 300×220×120mm envelope, must survive 20g shock"
                 className="min-h-[84px]"
                 disabled={isAnyLoading}
@@ -192,10 +194,12 @@ export function DesignIntakeForm({
               <Label htmlFor="compliance" className="flex items-center gap-1.5">
                 <ShieldCheck className="h-3.5 w-3.5" /> Compliance and constraints
               </Label>
-              <Textarea
+              <TextareaWithSpeech
                 id="compliance"
+                enableSpeech
                 value={designBrief.complianceNotes}
                 onChange={(e) => setDesignBrief((prev) => ({ ...prev, complianceNotes: e.target.value }))}
+                onSpeechTranscript={(text) => setDesignBrief((prev) => ({ ...prev, complianceNotes: prev.complianceNotes ? prev.complianceNotes + " " + text : text }))}
                 placeholder="e.g. IP54 ingress protection, ASTM F963 edges, RoHS, food-safe surfaces"
                 className="min-h-[84px]"
                 disabled={isAnyLoading}
@@ -284,10 +288,12 @@ export function DesignIntakeForm({
           {/* Assumptions */}
           <div className="space-y-2">
             <Label htmlFor="assumptions">Known assumptions or non-negotiables</Label>
-            <Textarea
+            <TextareaWithSpeech
               id="assumptions"
+              enableSpeech
               value={assumptionNotes}
               onChange={(e) => setAssumptionNotes(e.target.value)}
+              onSpeechTranscript={(text) => setAssumptionNotes(assumptionNotes ? assumptionNotes + " " + text : text)}
               placeholder="e.g. Must fit existing M3 bolt pattern at 60mm PCD; supplier must support PPAP level 3"
               className="min-h-[72px]"
               disabled={isAnyLoading}
