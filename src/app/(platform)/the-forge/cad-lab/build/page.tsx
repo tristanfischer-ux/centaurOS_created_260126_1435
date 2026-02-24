@@ -126,6 +126,23 @@ export default function CadLabBuildPage(): React.ReactNode {
       parts.push(`${modules.length} sub-assemblies decomposed.`)
       parts.push(`${generatedModuleCount} of ${modules.length} modules have generated CAD.`)
       if (isBatchRunning) parts.push("Batch generation is currently running.")
+      // Design brief summary
+      const briefParts: string[] = []
+      if (designBrief.useCase) briefParts.push(`Use case: ${designBrief.useCase}`)
+      if (designBrief.targetProcess) briefParts.push(`Process: ${designBrief.targetProcess}`)
+      if (designBrief.targetMaterial) briefParts.push(`Material: ${designBrief.targetMaterial}`)
+      if (briefParts.length > 0) parts.push(`Design brief: ${briefParts.join(", ")}.`)
+      // Risk summary
+      const totalFailureModes = modules.reduce((s, m) => s + m.failureModes.length, 0)
+      const totalUnknowns = modules.reduce((s, m) => s + m.unknowns.length, 0)
+      const totalDfmIssues = modules.reduce((s, m) => {
+        const r = m.result as CadLabResult | undefined
+        return s + (r?.dfm?.issues?.length ?? 0)
+      }, 0)
+      if (totalFailureModes + totalUnknowns + totalDfmIssues > 0) {
+        parts.push(`Risks: ${totalFailureModes} failure modes, ${totalUnknowns} unknowns, ${totalDfmIssues} DFM issues.`)
+      }
+      if (integratedAssemblyStlUrl) parts.push("Integration assembly generated.")
       return {
         pageTitle: `The Forge — Build: ${subject}`,
         summary: parts.join(" "),
@@ -140,7 +157,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                 : "pending",
         })),
       }
-    }, [hasResearch, subject, modules, generatedModuleCount, isBatchRunning]),
+    }, [hasResearch, subject, modules, generatedModuleCount, isBatchRunning, designBrief, integratedAssemblyStlUrl]),
   )
 
   const handleCopyCode = useCallback(async (code: string) => {

@@ -60,7 +60,27 @@ export default function CadLabReviewPage(): React.ReactNode {
   useRegisterScreenContext(
     useMemo(() => {
       const parts: string[] = [`Viewing the Review stage for "${subject}".`]
-      parts.push(`Supplier-ready documentation for ${modules.length} modules.`)
+      parts.push(`Supplier-ready documentation for ${modules.length} modules (${generatedModuleCount} generated).`)
+      // Diagnostics completion
+      const diagTotal = modules.length * 6 // 6 diagnostic categories per module
+      const diagCompleted = diagnosticAnswers
+        ? Object.values(diagnosticAnswers).reduce((s, ma) => s + Object.keys(ma).length, 0)
+        : 0
+      if (diagTotal > 0) parts.push(`Diagnostics: ${diagCompleted}/${diagTotal} completed.`)
+      // DFM issues summary
+      const dfmIssueCount = modules.reduce((s, m) => {
+        const r = m.result as CadLabResult | undefined
+        return s + (r?.dfm?.issues?.length ?? 0)
+      }, 0)
+      if (dfmIssueCount > 0) parts.push(`${dfmIssueCount} DFM issues across all modules.`)
+      // RFQ status
+      parts.push(linkedRfqId ? "RFQ linked to project." : "No RFQ linked yet.")
+      // Design brief parameters
+      const briefParts: string[] = []
+      if (designBrief.useCase) briefParts.push(`Use case: ${designBrief.useCase}`)
+      if (designBrief.targetProcess) briefParts.push(`Process: ${designBrief.targetProcess}`)
+      if (designBrief.targetMaterial) briefParts.push(`Material: ${designBrief.targetMaterial}`)
+      if (briefParts.length > 0) parts.push(`Design brief: ${briefParts.join(", ")}.`)
       return {
         pageTitle: `The Forge — Review: ${subject}`,
         summary: parts.join(" "),
@@ -70,7 +90,7 @@ export default function CadLabReviewPage(): React.ReactNode {
           status: m.status === "generated" ? "CAD generated" : "pending",
         })),
       }
-    }, [subject, modules, generatedModuleCount]),
+    }, [subject, modules, generatedModuleCount, diagnosticAnswers, linkedRfqId, designBrief]),
   )
 
   // Show empty state instead of redirect
