@@ -106,17 +106,27 @@ export default defineConfig({
         storageState: path.join(authDir, 'founder.json'),
       },
     },
+    // Outreach E2E suite (authenticated founder)
+    {
+      name: 'outreach',
+      testMatch: /outreach\.spec\.ts$/,
+      dependencies: ['auth-setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: path.join(authDir, 'founder.json'),
+      },
+    },
     // General tests (unauthenticated)
     {
       name: 'chromium',
       testMatch:
-        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite)\.spec\.ts$/,
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach)\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'Mobile Chrome',
       testMatch:
-        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite)\.spec\.ts$/,
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach)\.spec\.ts$/,
       use: { ...devices['Pixel 5'] },
     },
     // Mobile Delight Audit — iPhone 14 Pro viewport, Founder auth
