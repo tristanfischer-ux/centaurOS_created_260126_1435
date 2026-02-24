@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Layers,
   FileText,
+  Loader2,
 } from "lucide-react"
 
 import { FORGE_ROUTES } from "@/lib/forge-routes"
@@ -52,7 +53,7 @@ export default function CadLabReviewPage(): React.ReactNode {
     aiPrefilled, designBrief, assumptionNotes,
     activeProjectId, linkedRfqId,
     systemIllustrationUrl, researchResult,
-    handleDownload,
+    handleDownload, isBatchRunning,
   } = useCadLab()
 
   const [showBuildContext, setShowBuildContext] = useState(false)
@@ -98,12 +99,15 @@ export default function CadLabReviewPage(): React.ReactNode {
     return (
       <div className="py-12">
         <EmptyState
-          title="No modules generated yet"
-          description="Generate at least one module in the Build stage to create a supplier-ready review package with expert discipline recommendations."
+          title={isBatchRunning ? "Modules are generating..." : "No modules generated yet"}
+          description={isBatchRunning
+            ? "CAD generation is running in the Build stage. This page will populate with a supplier-ready review package as modules complete. You can safely switch back and forth."
+            : "Generate at least one module in the Build stage to create a supplier-ready review package with expert discipline recommendations."
+          }
           action={
             <Button onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5">
-              <Box className="h-4 w-4" />
-              Go to Build
+              {isBatchRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Box className="h-4 w-4" />}
+              {isBatchRunning ? "Back to Build" : "Go to Build"}
             </Button>
           }
         />

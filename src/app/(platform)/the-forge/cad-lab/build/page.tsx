@@ -631,15 +631,15 @@ export default function CadLabBuildPage(): React.ReactNode {
                 return (
                   <div
                     key={mod.id}
-                    className={`border rounded-lg p-3 transition-all duration-300 ${
-                      isActive ? "border-international-orange/40 bg-gradient-to-r from-international-orange-light/10 to-background shadow-sm" :
-                      isDone ? "border-status-success/30 bg-status-success-light/10 cursor-pointer hover:shadow-sm" :
+                    className={`border rounded-lg p-3 transition-all duration-300 cursor-pointer hover:shadow-sm ${
+                      isActive ? "border-international-orange/40 bg-gradient-to-r from-international-orange-light/10 to-background" :
+                      isDone ? "border-status-success/30 bg-status-success-light/10" :
                       isError ? "border-destructive/30 bg-status-error-light/10" :
                       "border-muted bg-muted/10"
                     }`}
-                    onClick={isDone ? () => setExpandedModuleId(expandedModuleId === mod.id ? null : mod.id) : undefined}
-                    role={isDone ? "button" : undefined}
-                    tabIndex={isDone ? 0 : undefined}
+                    onClick={() => setExpandedModuleId(expandedModuleId === mod.id ? null : mod.id)}
+                    role="button"
+                    tabIndex={0}
                   >
                     <div className="flex items-center justify-between gap-4">
                       {/* Module info */}
@@ -736,20 +736,24 @@ export default function CadLabBuildPage(): React.ReactNode {
                         </div>
                       </div>
 
-                      {/* Status label + expand hint for completed */}
-                      <div className="flex-shrink-0 w-32 text-right">
+                      {/* Status label + expand/collapse hint */}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
                         <span className={`text-xs font-medium ${
                           isDone ? "text-status-success" :
                           isActive ? "text-international-orange" :
                           isError ? "text-destructive" :
                           "text-muted-foreground"
                         }`}>
-                          {isDone ? "Complete — click to view" :
+                          {isDone ? "Complete" :
                            status === "interface" ? "Planning dims..." :
                            status === "generating" ? "Building CAD..." :
                            isError ? "Failed" :
                            "In queue"}
                         </span>
+                        {expandedModuleId === mod.id
+                          ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                          : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        }
                       </div>
                     </div>
 
@@ -769,10 +773,146 @@ export default function CadLabBuildPage(): React.ReactNode {
                           variant="outline"
                           className="h-7 text-xs gap-1"
                           disabled={activeModuleId !== null}
-                          onClick={() => handleGenerateSingleModule(mod.id)}
+                          onClick={(e) => { e.stopPropagation(); handleGenerateSingleModule(mod.id) }}
                         >
                           <RotateCcw className="h-3 w-3" /> Retry
                         </Button>
+                      </div>
+                    )}
+
+                    {/* Expanded module detail — readable while CAD generates */}
+                    {expandedModuleId === mod.id && (
+                      <div className="border-t mt-3 pt-3 space-y-4" onClick={(e) => e.stopPropagation()}>
+                        {/* Blueprint illustration from Concept stage */}
+                        {mod.imageUrl && mod.imageStatus === "complete" && (
+                          <div className="aspect-[3/2] w-full max-w-md rounded-lg overflow-hidden bg-muted border">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={mod.imageUrl}
+                              alt={`Concept blueprint: ${mod.name}`}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                            <p className="text-[10px] text-muted-foreground text-center py-1 bg-muted/50">Concept illustration</p>
+                          </div>
+                        )}
+
+                        {/* Description */}
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Description</p>
+                          <p className="text-sm text-foreground">{mod.description}</p>
+                        </div>
+
+                        {/* Why This Module Matters */}
+                        {mod.whyItMatters && (
+                          <div className="border-l-2 border-international-orange pl-3">
+                            <p className="text-xs font-semibold text-foreground mb-0.5">Why This Module Matters</p>
+                            <p className="text-sm text-muted-foreground">{mod.whyItMatters}</p>
+                          </div>
+                        )}
+
+                        {/* What the AI Assumed */}
+                        {((mod.result?.assumptions && mod.result.assumptions.length > 0) || (mod.result?.validationWarnings && mod.result.validationWarnings.length > 0)) && (
+                          <div className="border rounded-lg p-3 space-y-2 bg-status-info-light/10">
+                            <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                              <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
+                              What the AI Assumed — Validate Before Sending to Factory
+                            </p>
+                            {mod.result?.assumptions && mod.result.assumptions.length > 0 && (
+                              <ul className="space-y-1.5">
+                                {mod.result.assumptions.map((assumption, aIdx) => (
+                                  <li key={aIdx} className="text-xs text-foreground flex items-start gap-1.5">
+                                    <Info className="h-3 w-3 text-status-info flex-shrink-0 mt-0.5" />
+                                    <span>The AI assumed: <span className="font-medium">{assumption}</span> — is this correct for your use case?</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {mod.result?.validationWarnings && mod.result.validationWarnings.length > 0 && (
+                              <ul className="space-y-1.5">
+                                {mod.result.validationWarnings.map((warning, wIdx) => (
+                                  <li key={wIdx} className="text-xs text-status-warning-dark flex items-start gap-1.5">
+                                    <AlertTriangle className="h-3 w-3 text-status-warning flex-shrink-0 mt-0.5" />{warning}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Manufacturing Questions */}
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Questions for Your Factory</p>
+                          <ManufacturingInsightCard moduleAnswers={diagnosticAnswers?.[mod.id]} />
+                        </div>
+
+                        {/* IO Flow */}
+                        <div className="flex items-center gap-4 text-xs">
+                          <div>
+                            <p className="font-semibold text-muted-foreground mb-1">Inputs</p>
+                            {mod.inputs.map((inp, iIdx) => (
+                              <span key={iIdx} className="inline-block bg-muted px-2 py-0.5 rounded mr-1 mb-1 font-mono">{inp}</span>
+                            ))}
+                          </div>
+                          <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold text-muted-foreground mb-1">Outputs</p>
+                            {mod.outputs.map((out, oIdx) => (
+                              <span key={oIdx} className="inline-block bg-muted px-2 py-0.5 rounded mr-1 mb-1 font-mono">{out}</span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Key Parts */}
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Key Components</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {mod.keyParts.map((part, pIdx) => (
+                              <span key={pIdx} className="text-xs bg-muted px-2 py-0.5 rounded font-mono">{part}</span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Risks & Unknowns */}
+                        {(mod.failureModes.length > 0 || mod.unknowns.length > 0) && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {mod.failureModes.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Failure Modes</p>
+                                <ul className="space-y-1">
+                                  {mod.failureModes.map((fm, fIdx) => (
+                                    <li key={fIdx} className="text-xs text-foreground flex items-start gap-1.5">
+                                      <AlertTriangle className="h-3 w-3 text-status-warning flex-shrink-0 mt-0.5" />{fm}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {mod.unknowns.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Unknowns</p>
+                                <ul className="space-y-1">
+                                  {mod.unknowns.map((u, uIdx) => (
+                                    <li key={uIdx} className="text-xs text-foreground flex items-start gap-1.5">
+                                      <Info className="h-3 w-3 text-status-info flex-shrink-0 mt-0.5" />{u}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Dimensional Specification */}
+                        {mod.interfaceDefinition && (
+                          <div className="border rounded-lg p-3 space-y-2 bg-muted/10">
+                            <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                              <Ruler className="h-3.5 w-3.5 text-international-orange" />
+                              Dimensional Specification
+                            </p>
+                            <pre className="text-xs font-mono whitespace-pre-wrap text-foreground max-h-[300px] overflow-y-auto">{mod.interfaceDefinition}</pre>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

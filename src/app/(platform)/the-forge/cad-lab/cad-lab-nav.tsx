@@ -98,7 +98,7 @@ function getStageAccess(
   return {
     research: { enabled: true, completed: hasResearch },
     build: { enabled: hasResearch && moduleCount > 0, completed: generatedCount > 0 && generatedCount === moduleCount },
-    review: { enabled: generatedCount > 0, completed: false },
+    review: { enabled: moduleCount > 0, completed: generatedCount > 0 && generatedCount === moduleCount },
   }
 }
 

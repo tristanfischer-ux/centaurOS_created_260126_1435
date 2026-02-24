@@ -894,6 +894,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       })
     }
 
+    const RETRYABLE_STATUSES = new Set([500, 502, 503, 529])
+
     const generateOne = async (mod: CadLabModule): Promise<void> => {
       await waitForSlot()
       activeModuleCountRef.current++
@@ -902,42 +904,58 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setBatchProgress((prev) => ({ ...prev, [mod.id]: "generating" }))
 
       try {
-        const res = await fetch("/api/cad-lab/generate-module", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            projectId: activeProjectId,
-            moduleId: mod.id,
-          }),
-        })
+        const MAX_ATTEMPTS = 2
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+          try {
+            const res = await fetch("/api/cad-lab/generate-module", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                projectId: activeProjectId,
+                moduleId: mod.id,
+              }),
+            })
 
-        if (!res.ok) {
-          const errBody = await res.json().catch(() => ({ error: "Unknown error" })) as { error?: string }
-          throw new Error(errBody.error || `HTTP ${res.status}`)
-        }
+            if (!res.ok) {
+              const errBody = await res.json().catch(() => ({ error: "Unknown error" })) as { error?: string }
+              const httpStatus = res.status
+              // Auto-retry once on transient server errors
+              if (attempt === 0 && RETRYABLE_STATUSES.has(httpStatus)) {
+                addProgressLine(`${mod.name} failed (attempt 1), retrying in 3s...`)
+                await new Promise((r) => setTimeout(r, 3000))
+                continue
+              }
+              throw new Error(errBody.error || `HTTP ${httpStatus}`)
+            }
 
-        const data = await res.json() as { done: boolean; module: CadLabModule; elapsedMs: number }
+            const data = await res.json() as { done: boolean; module: CadLabModule; elapsedMs: number }
 
-        // Update module in local state immediately
-        setModules((prev) =>
-          prev.map((m) => (m.id === mod.id ? data.module : m)),
-        )
-        setBatchProgress((prev) => ({ ...prev, [mod.id]: "done" }))
-        completedCount++
-        addProgressLine(
-          `${mod.name} complete (${(data.elapsedMs / 1000).toFixed(0)}s) — ${completedCount}/${modules.length} done`,
-        )
+            // Update module in local state immediately
+            setModules((prev) =>
+              prev.map((m) => (m.id === mod.id ? data.module : m)),
+            )
+            setBatchProgress((prev) => ({ ...prev, [mod.id]: "done" }))
+            completedCount++
+            addProgressLine(
+              `${mod.name} complete (${(data.elapsedMs / 1000).toFixed(0)}s) — ${completedCount}/${modules.length} done`,
+            )
 
-        // Auto-expand and scroll to the completed module
-        setExpandedModuleId(mod.id)
-        requestAnimationFrame(() => {
-          const el = document.getElementById(`module-${mod.id}`)
-          el?.scrollIntoView({ behavior: "smooth", block: "start" })
-        })
+            // Auto-expand and scroll to the completed module
+            setExpandedModuleId(mod.id)
+            requestAnimationFrame(() => {
+              const el = document.getElementById(`module-${mod.id}`)
+              el?.scrollIntoView({ behavior: "smooth", block: "start" })
+            })
 
-        // Request notification permission after the first success (less disruptive)
-        if (completedCount === 1 && typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
-          Notification.requestPermission().catch(() => { /* Non-critical */ })
+            // Request notification permission after the first success (less disruptive)
+            if (completedCount === 1 && typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+              Notification.requestPermission().catch(() => { /* Non-critical */ })
+            }
+            return // Success — exit the retry loop
+          } catch (err) {
+            // On last attempt, surface the error
+            if (attempt === MAX_ATTEMPTS - 1) throw err
+          }
         }
       } catch (err) {
         console.error("[CAD-LAB] Module generation failed:", mod.name, err instanceof Error ? err.message : err)
