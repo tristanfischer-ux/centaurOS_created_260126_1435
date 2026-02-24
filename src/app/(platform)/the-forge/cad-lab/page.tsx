@@ -40,6 +40,7 @@ import { AskSpecialistButton } from "@/components/specialists/ask-specialist-but
 import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
 import { ModuleImageGrid } from "./components/module-image-grid"
+import { ProcessFlowDiagram } from "./components/process-flow-diagram"
 
 // ─── Extract executive summary from research report markdown ─────────
 
@@ -274,6 +275,20 @@ export default function CadLabResearchPage(): React.ReactNode {
             </Card>
           )}
 
+          {/* ── System illustration failed — soft placeholder ── */}
+          {systemIllustrationStatus === "idle" && !systemIllustrationUrl && modules.length > 0 && (
+            <Card className="overflow-hidden border-dashed">
+              <div className="aspect-[16/9] w-full bg-muted/30 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-2">
+                  <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
+                  <span className="text-xs text-muted-foreground">
+                    Concept illustration unavailable
+                  </span>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* ── Executive summary (extracted from research report) ── */}
           {executiveSummary && modules.length === 0 && (
             <Card>
@@ -341,6 +356,9 @@ export default function CadLabResearchPage(): React.ReactNode {
                 expandedModuleId={expandedModuleId}
                 onToggleExpand={(id) => setExpandedModuleId(expandedModuleId === id ? null : id)}
               />
+
+              {/* Process flow — how modules connect via inputs and outputs */}
+              <ProcessFlowDiagram modules={modules} />
 
               {/* Continue to Build CTA — only after all modules are revealed */}
               {allModulesRevealed && (
