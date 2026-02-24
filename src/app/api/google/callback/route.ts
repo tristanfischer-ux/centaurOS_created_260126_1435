@@ -63,9 +63,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
 
     // SECURITY: Validate signed state parameter to prevent CSRF/tampering.
-    const oauthStateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET
+    // Uses a dedicated secret — MUST NOT fall back to GOOGLE_CLIENT_SECRET.
+    const oauthStateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET
     if (!oauthStateSecret) {
-        console.error('[GoogleCallback] Missing OAuth state signing secret')
+        console.error('[SECURITY] GOOGLE_OAUTH_STATE_SECRET not configured')
         return NextResponse.redirect(
             new URL('/google-apps?error=not_configured', req.nextUrl.origin)
         )

@@ -80,9 +80,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
 
     // SECURITY: Sign OAuth state to prevent tampering between connect and callback.
-    const oauthStateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET
+    // Uses a dedicated secret — MUST NOT fall back to GOOGLE_CLIENT_SECRET (which
+    // serves a different purpose and may be rotated independently).
+    const oauthStateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET
     if (!oauthStateSecret) {
-        console.error('[GoogleConnect] Missing OAuth state signing secret')
+        console.error('[SECURITY] GOOGLE_OAUTH_STATE_SECRET not configured')
         return redirectWithError('not_configured')
     }
 

@@ -5,11 +5,14 @@
  * Creates tasks from forwarded emails, similar to voice-to-task.
  *
  * @security
- * - Validates webhook signature to prevent unauthorized task creation
+ * - Validates webhook Bearer token to prevent unauthorized task creation
+ * - Resend inbound webhooks do NOT support cryptographic signatures (DKIM/SPF
+ *   verification happens at Resend's infrastructure level, not in the webhook payload).
+ *   Mitigation: Bearer token auth + sender-email-must-match-account check + rate limiting.
  * - Sanitizes email content before storing
- * - Rate limited per sender
+ * - Rate limited per IP and per sender
  *
- * @audit Logs email_to_task event
+ * @audit Logs email_to_task event with sender, user, and task details
  *
  * @related
  * - src/app/api/voice-to-task/route.ts - Similar pattern for voice input
@@ -122,12 +125,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const profile = profiles[0]
 
-    // SECURITY: Verify the sender email matches the user's email
-    // This prevents others from creating tasks in someone's account
+    // SECURITY: Verify the sender email matches the user's email.
+    // This is the primary defense against forged emails creating tasks in someone's
+    // account, since Resend's inbound webhooks don't include DKIM/SPF verification
+    // results in the payload.
     if (senderEmail !== profile.email?.toLowerCase()) {
-        console.warn('[EmailInbound] Sender mismatch:', {
+        console.warn('[SECURITY] Email sender mismatch — possible spoofing attempt:', {
             sender: senderEmail,
-            expected: profile.email,
+            targetUser: profile.id,
+            toAddress: payload.to,
         })
         return NextResponse.json({ error: 'Sender not authorized' }, { status: 403 })
     }
