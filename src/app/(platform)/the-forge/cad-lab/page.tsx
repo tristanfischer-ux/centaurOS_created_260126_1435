@@ -38,6 +38,7 @@ import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
 import { ModuleImageGrid } from "./components/module-image-grid"
 import { ProcessFlowDiagram } from "./components/process-flow-diagram"
+import { CadLabProgress } from "@/components/cad/cad-lab-progress"
 
 // ─── Extract executive summary from research report markdown ─────────
 
@@ -66,6 +67,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     isGeneratingImages,
     revealedModuleIds,
     systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
+    progressLines,
   } = useCadLab()
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
@@ -273,14 +275,14 @@ export default function CadLabResearchPage(): React.ReactNode {
             </Card>
           )}
 
-          {/* ── Decomposing in progress ── */}
+          {/* ── Decomposing in progress (inline below Product Overview) ── */}
           {modules.length === 0 && isDecomposing && (
-            <Card className="border-international-orange/20">
-              <CardContent className="pt-6 flex items-center gap-3">
-                <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
-                <p className="text-sm text-muted-foreground">Mapping sub-assemblies...</p>
-              </CardContent>
-            </Card>
+            <CadLabProgress
+              lines={progressLines}
+              isActive={true}
+              operationType="breakdown"
+              subject={subject}
+            />
           )}
 
           {/* ── Modules: progressive reveal grid (name + image + purpose only) ── */}

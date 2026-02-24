@@ -332,12 +332,12 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
         />
       )}
 
-      {/* ── Live progress (hidden in post-research idle: research done, no modules, nothing active) ── */}
-      {!(hasResearch && modules.length === 0 && !isAnyActive) && (
+      {/* ── Live progress (hidden in post-research idle and during decomposition on concept page — concept page renders it inline below Product Overview) ── */}
+      {!(hasResearch && modules.length === 0 && !isAnyActive) && !isDecomposing && (
         <CadLabProgress
           lines={progressLines}
           isActive={isAnyActive}
-          operationType={isResearching ? "research" : isDecomposing ? "breakdown" : isBatchRunning ? "batch" : "generate"}
+          operationType={isResearching ? "research" : isBatchRunning ? "batch" : "generate"}
           subject={subject}
         />
       )}
