@@ -683,6 +683,13 @@ export async function generateCadLabInterface(
 
 Your job is to produce a text-only interface definition that will be used to generate CadQuery Python code. Every dimension must be a specific number in millimetres. The numbers must sum correctly — show ALL arithmetic step-by-step.
 
+CRITICAL SCALE PRESERVATION:
+- ALWAYS use the EXACT dimensions from the research report — never scale them down
+- If research mentions "6m container" or "2.4m height", use 6000mm and 2400mm in your calculations
+- Large systems (containers, buildings, vehicles) should be modeled at FULL SIZE, not as small components
+- Example scales: shipping container = 6000×2400×2600mm, not 200×150×100mm
+- When planning a MODULE of a large system, still respect the overall system scale
+
 Output EXACTLY these 4 sections:
 
 === a) SPACE BUDGET ===
@@ -735,6 +742,13 @@ CRITICAL RULES:
 
 Research Report (use these dimensions — do not invent new ones):
 ${researchReport}
+
+SCALE GUIDANCE:
+Extract the real-world scale from the research report and preserve it exactly:
+- If this is a shipping container, building, vehicle, or large system: use FULL SCALE dimensions in millimeters
+- Convert: 6m = 6000mm, 2.4m = 2400mm, etc.
+- Even if modeling a MODULE of a large system, respect the overall system proportions
+- Large structural components should remain large, not be scaled to desktop size
 
 Generate the complete interface definition following the exact 4-section format.`
 
@@ -865,6 +879,13 @@ ${researchReport}
 
 === INTERFACE DEFINITION (implement EVERY component listed here) ===
 ${interfaceDefinition}
+
+SCALE PRESERVATION CRITICAL:
+- Use the EXACT scale from the research report and interface definition
+- Large systems (shipping containers, buildings, vehicles) must be modeled at FULL SIZE
+- If the interface defines 6000mm dimensions, use 6000mm — do NOT scale down to 200mm
+- Example: shipping container = 6058×2438×2591mm (real ISO dimensions), not 200×150×100mm
+- Industrial equipment, structures, and vehicles should result in models with realistic masses and bounding boxes
 
 Generate the complete CadQuery Python code following the methodology. The code must:
 1. Start with "import cadquery as cq" and "import math" (if needed)

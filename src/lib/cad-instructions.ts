@@ -51,6 +51,17 @@ Evaporator: Ø900 × 2400mm
 Crystallizer: Ø1000 × 3000mm with Ø500 draft tube
 \`\`\`
 
+**Example — Large structural systems (critical: preserve full scale):**
+\`\`\`
+20ft shipping container: 6058 × 2438 × 2591mm
+40ft shipping container: 12192 × 2438 × 2591mm
+Standard building door: 2030 × 813 × 44mm
+Warehouse bay: 7320 × 12200 × 8500mm (height to beam)
+Vehicle chassis: 4500 × 1800 × 300mm steel frame
+\`\`\`
+
+**SCALE PRESERVATION CRITICAL:** Always model large systems at their REAL scale. A shipping container CAD model should have dimensions ~6000×2400×2600mm and mass ~2000kg, not 200×150×100mm and 500g.
+
 If you can't find exact specs, use reasonable engineering estimates and document them.
 
 ### Step 2: Write the INTERFACE DEFINITION (text only — no code yet)
@@ -72,6 +83,16 @@ LED bracket:     16mm
 Plumbing zone:   50mm
 ─────────────────────
 Total per level: 500mm  ← must match before you write any code
+\`\`\`
+
+\`\`\`
+Example — Shipping container structure (large scale):
+Floor thickness:       100mm
+Cargo space height:   2390mm
+Ceiling panel:         20mm
+Roof structure:        80mm
+─────────────────────────────
+Total internal height: 2590mm  ← ISO standard height
 \`\`\`
 
 **Rule: if the numbers don't add up in text, they won't add up in 3D.**
