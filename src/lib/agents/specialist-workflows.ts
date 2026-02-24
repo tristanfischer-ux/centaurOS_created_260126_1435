@@ -111,11 +111,11 @@ Structure your response as follows:
 **PROPOSED_ACTIONS:** At the end of your response, you MUST include a PROPOSED_ACTIONS block so the founder can one-click create objectives or tasks from your top recommendations. Use the exact format:
 <!-- PROPOSED_ACTIONS
 [
-  { "type": "objective", "title": "...", "description": "...", "strategicGoalTitle": "Existing strategic goal name" },
-  { "type": "task", "title": "...", "description": "...", "objectiveTitle": "Parent objective name" }
+  { "type": "objective", "title": "...", "description": "...", "strategicGoalTitle": "Existing strategic goal name", "estimatedWeeks": 8 },
+  { "type": "task", "title": "...", "description": "...", "objectiveTitle": "Parent objective name", "estimatedWeeks": 2 }
 ]
 -->
-Include 2–4 actions (objectives and/or tasks) that correspond to your top strategic recommendations. Every objective must have "strategicGoalTitle" matching an existing strategic goal; every task must have "objectiveTitle" matching an existing objective. If no suitable parent exists, include an objective (with strategicGoalTitle) in the same block before any tasks that depend on it.
+Include 2–4 actions (objectives and/or tasks) that correspond to your top strategic recommendations. Every objective must have "strategicGoalTitle" matching an existing strategic goal; every task must have "objectiveTitle" matching an existing objective. If no suitable parent exists, include an objective (with strategicGoalTitle) in the same block before any tasks that depend on it. Include "estimatedWeeks" (1–12) on every item so work is scheduled across the timeline, not bunched together.
 
 Context from our conversation and company:
 {{context}}`,
